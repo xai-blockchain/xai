@@ -1,0 +1,54 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XAI Mobile Monitor</title>
+<style>
+    body{margin:0;font-family:'Segoe UI',sans-serif;background:#050710;color:#f5f5ff;display:flex;align-items:center;justify-content:center;min-height:100vh}
+    .card{background:rgba(255,255,255,0.05);padding:20px;border-radius:20px;box-shadow:0 10px 30px rgba(0,0,0,0.4);width:90%;max-width:400px;border:1px solid rgba(255,255,255,0.1)}
+    h1{font-size:1.5rem;margin-bottom:10px}
+    .count{font-size:2rem;margin:10px 0}
+    .rows{display:flex;justify-content:space-between;margin-top:12px}
+    .rows span{font-size:0.85rem;color:#9bb;color:#9bb}
+    .labels{font-size:0.8rem;color:#b0c4ff;margin-top:20px}
+    button{margin-top:12px;width:100%;padding:10px;border:none;border-radius:12px;background:linear-gradient(120deg,#76c7ff,#9b5de5);color:#fff;font-weight:600}
+</style>
+</head>
+<body>
+<div class="card">
+    <h1>XAI Mobile Monitor</h1>
+    <div>
+        <p class="labels">Total Blocks</p>
+        <div class="count" id="blocks">--</div>
+    </div>
+    <div>
+        <p class="labels">Pending TXs</p>
+        <div class="count" id="pending">--</div>
+    </div>
+    <div class="rows">
+        <span>Difficulty: <strong id="diff">--</strong></span>
+        <span>Supply: <strong id="supply">--</strong></span>
+    </div>
+    <div class="rows">
+        <span>Hash rate: <strong id="hash">--</strong></span>
+        <span>Miner: <strong id="miner">—</strong></span>
+    </div>
+    <button id="refresh">Refresh</button>
+    <p class="labels">Use this page as a companion view for the desktop miner. Refresh to see blocks grow.</p>
+</div>
+<script>
+    const blocksEl=document.getElementById('blocks');
+    const pendingEl=document.getElementById('pending');
+    const diffEl=document.getElementById('diff');
+    const supplyEl=document.getElementById('supply');
+    const hashEl=document.getElementById('hash');
+    const minerEl=document.getElementById('miner');
+    async function refresh(){
+        try{const resp=await fetch('/api/dashboard');if(!resp.ok)return;const data=await resp.json();const stats=data.stats||{};blocksEl.textContent=stats.total_blocks||0;pendingEl.textContent=stats.pending_transactions||0;diffEl.textContent=stats.difficulty||0;supplyEl.textContent=(stats.total_supply||0).toLocaleString();hashEl.textContent=((stats.hash_rate||0).toFixed?stats.hash_rate.toFixed(0):stats.hash_rate)+' H/s';minerEl.textContent=data.recent_blocks?.[0]?.miner||'—';}catch(e){console.error(e)}}
+    document.getElementById('refresh').addEventListener('click',refresh);
+    refresh();
+    setInterval(refresh,15000);
+</script>
+</body>
+</html>

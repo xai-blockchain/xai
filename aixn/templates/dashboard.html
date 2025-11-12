@@ -1,1194 +1,352 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>XAI Testing Dashboard</title>
+    <title>XAI Desktop Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            color-scheme: dark;
+            --bg: #0c1320;
+            --card: rgba(255, 255, 255, 0.06);
+            --border: rgba(255, 255, 255, 0.12);
+            --text: #f8fbff;
+            --muted: rgba(255, 255, 255, 0.7);
         }
-
+        * { box-sizing: border-box; }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #333;
-            padding: 20px;
+            margin: 0;
+            font-family: 'Inter', system-ui, sans-serif;
+            background: radial-gradient(circle at 10% 20%, rgba(118, 199, 255, 0.12), transparent 45%),
+                        radial-gradient(circle at 85% -10%, rgba(155, 93, 229, 0.18), transparent 45%),
+                        var(--bg);
+            color: var(--text);
+            min-height: 100vh;
         }
-
-        .container {
-            max-width: 1400px;
+        .page {
+            max-width: 1200px;
             margin: 0 auto;
+            padding: 24px 20px 40px;
         }
-
-        h1 {
-            color: white;
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 2.5em;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        header {
+            margin-bottom: 28px;
         }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
+        header h1 {
+            font-size: 2.6rem;
+            margin-bottom: 6px;
         }
-
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 25px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        header p {
+            color: var(--muted);
+            margin-bottom: 10px;
         }
-
-        .card h2 {
-            color: #667eea;
-            margin-bottom: 15px;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 10px;
-        }
-
-        .stat {
+        header .codex-links {
             display: flex;
-            justify-content: space-between;
-            padding: 10px 0;
-            border-bottom: 1px solid #eee;
-        }
-
-        .stat:last-child {
-            border-bottom: none;
-        }
-
-        .stat-label {
-            font-weight: 600;
-            color: #666;
-        }
-
-        .stat-value {
-            color: #333;
-            font-weight: bold;
-        }
-
-        button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: transform 0.2s, box-shadow 0.2s;
-            width: 100%;
-            margin-top: 10px;
-        }
-
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }
-
-        button:active {
-            transform: translateY(0);
-        }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        input, textarea, select {
-            width: 100%;
-            padding: 10px;
-            margin: 8px 0;
-            border: 2px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
-        }
-
-        input:focus, textarea:focus, select:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            color: #555;
-        }
-
-        .output {
-            background: #f5f5f5;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            padding: 15px;
-            margin-top: 15px;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            max-height: 200px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
-        .success {
-            background: #d4edda;
-            border-color: #c3e6cb;
-            color: #155724;
-        }
-
-        .error {
-            background: #f8d7da;
-            border-color: #f5c6cb;
-            color: #721c24;
-        }
-
-        .mining-status {
-            text-align: center;
-            padding: 20px;
-            font-size: 1.2em;
-        }
-
-        .mining-active {
-            color: #28a745;
-            font-weight: bold;
-        }
-
-        .mining-inactive {
-            color: #dc3545;
-            font-weight: bold;
-        }
-
-        .hash-display {
-            background: #2d2d2d;
-            color: #0f0;
-            padding: 15px;
-            border-radius: 6px;
-            font-family: 'Courier New', monospace;
-            margin-top: 10px;
-            font-size: 11px;
-            overflow-x: auto;
-        }
-
-        .wallet-display {
-            background: #fff3cd;
-            border: 2px solid #ffc107;
-            padding: 15px;
-            border-radius: 6px;
-            margin-top: 10px;
-        }
-
-        .wallet-display strong {
-            display: block;
-            margin-bottom: 5px;
-            color: #856404;
-        }
-
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
             flex-wrap: wrap;
+            gap: 10px;
         }
-
-        .tab {
-            padding: 10px 20px;
-            background: white;
-            border-radius: 6px;
+        header .codex-links a {
+            padding: 6px 14px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            text-decoration: none;
+            color: var(--text);
+            font-size: 0.85rem;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        header .codex-links a:hover { border-color: #76c7ff; background: rgba(118, 199, 255, 0.1); }
+        .hero {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        .hero-card {
+            flex: 1;
+            min-width: 260px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 22px;
+            box-shadow: 0 30px 50px rgba(0,0,0,0.35);
+        }
+        .hero-card h2 { margin-top: 0; }
+        .hero-card p { color: var(--muted); }
+        .hero-card .cta {
+            margin-top: 14px;
+            padding: 10px 16px;
+            background: linear-gradient(120deg, #76c7ff, #9b5de5);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
             cursor: pointer;
-            transition: all 0.3s;
+            font-weight: 600;
+            box-shadow: 0 14px 30px rgba(0,0,0,0.35);
         }
-
-        .tab:hover {
-            background: #667eea;
-            color: white;
+        .qr-panel {
+            text-align: center;
         }
-
-        .tab.active {
-            background: #667eea;
-            color: white;
+        .qr-panel canvas {
+            width: 180px;
+            height: 180px;
+            margin: 0 auto;
+            display: block;
         }
-
-        .tab-content {
+        .guide-box { margin-top: 10px; color: var(--muted); font-size: 0.9rem; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+        }
+        .stat-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px;
+            position: relative;
+        }
+        .stat-card p { margin-bottom: 8px; color: var(--muted); }
+        .stat-card h3 { font-size: 1.8rem; margin: 0; }
+        .stat-card .note {
+            font-size: 0.75rem;
+            color: var(--muted);
+            margin-top: 6px;
+        }
+        .section-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 24px;
+            margin-top: 24px;
+        }
+        .progress {
+            height: 12px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 999px;
+            overflow: hidden;
+            margin: 16px 0;
+        }
+        .progress span {
+            display: block;
+            height: 100%;
+            background: linear-gradient(120deg, #76c7ff, #9b5de5);
+            width: 0;
+            transition: width 0.8s ease;
+        }
+        .progress-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+        .progress-meta strong { color: #fff; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            color: var(--text);
+        }
+        th, td { padding: 10px; text-align: left; }
+        th { font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
+        tr:not(:last-child) { border-bottom: 1px solid rgba(255,255,255,0.08); }
+        .learn-card details {
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.02);
+        }
+        .learn-card summary { cursor: pointer; font-weight: 600; }
+        .basic-panel {
+            margin-top: 22px;
+            background: rgba(0,0,0,0.4);
+            padding: 18px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            font-family: 'Courier New', monospace;
             display: none;
         }
-
-        .tab-content.active {
-            display: block;
-        }
+        .page.show-basic .basic-panel { display: block; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
 </head>
 <body>
-    <div class="container">
-        <h1>🚀 XAI Blockchain Testing Dashboard</h1>
-
-        <!-- Navigation Tabs -->
-        <div class="tabs">
-            <div class="tab active" onclick="showTab('stats')">📊 Stats</div>
-            <div class="tab" onclick="showTab('mining')">⛏️ Mining</div>
-            <div class="tab" onclick="showTab('wallet')">💼 Wallet</div>
-            <div class="tab" onclick="showTab('transactions')">💸 Transactions</div>
-            <div class="tab" onclick="showTab('gamification')">🎮 Gamification</div>
-            <div class="tab" onclick="showTab('governance')">🏛️ Governance</div>
-            <div class="tab" onclick="showTab('exchange')">💱 Exchange</div>
-            <div class="tab" onclick="showTab('mobile')">?? Mobile</div>
-        </div>
-
-        <!-- Stats Tab -->
-        <div id="stats" class="tab-content active">
-            <div class="grid">
-                <div class="card">
-                    <h2>�>"�,? Blockchain Stats</h2>
-                    <div id="blockchain-stats"></div>
-                    <button onclick="refreshStats()">dY", Refresh</button>
-                </div>
-
-                <div class="card">
-                    <h2>dYO? Node Info</h2>
-                    <div id="node-info"></div>
-                </div>
-
-                <div class="card">
-                    <h2>dY"^ Recent Blocks</h2>
-                    <div id="recent-blocks"></div>
-                    <button onclick="viewExplorer()">dY"? Open Block Explorer</button>
-                </div>
-
-                <div class="card">
-                    <h2>dY" Wallet Claim Pipeline</h2>
-                    <div id="wallet-claims-summary" class="output">Loading wallet claim status...</div>
-                    <button onclick="refreshWalletClaimsSummary()">dY' Refresh Claims</button>
-                </div>
+    <div class="page" id="dashboardPage">
+        <header>
+            <h1>XAI Mining Studio</h1>
+            <p>Graphically track your blocks, mining status, and QR-linked mobile control in one modern dashboard.</p>
+            <div class="codex-links">
+                <a href="{{ url_for('index') }}">Explorer Home</a>
+                <a href="{{ node_url }}/metrics" target="_blank">Metrics</a>
+                <a href="{{ url_for('mobile_view') }}">Mobile View</a>
             </div>
-        </div>
-
-        <!-- Mining Tab -->
-        <div id="mining" class="tab-content">
-            <div class="grid">
-                <div class="card">
-                    <h2>⛏️ Browser Mining</h2>
-                    <div class="mining-status">
-                        Status: <span id="mining-status" class="mining-inactive">Stopped</span>
-                    </div>
-                    <div>
-                        <label>Miner Address:</label>
-                        <input type="text" id="miner-address" placeholder="Your wallet address">
-                    </div>
-                    <button onclick="startMining()">▶️ Start Mining</button>
-                    <button onclick="stopMining()">⏹️ Stop Mining</button>
-                    <button onclick="mineBlock()">⚡ Mine Single Block</button>
-                    <div id="mining-output" class="output"></div>
+        </header>
+        <section class="hero">
+            <article class="hero-card">
+                <h2>Immersive mining interface</h2>
+                <p>Charts, counters, and live blocks keep you informed. Tap "Switch to technical view" when you want CLI power.</p>
+                <button class="cta" id="toggleBasicBtn">Toggle technical view</button>
+            </article>
+            <article class="hero-card qr-panel">
+                <h2>Scan for phone controls</h2>
+                <canvas id="qrCodeCanvas"></canvas>
+                <div class="guide-box">
+                    Scan or open <code>{{ request.host_url }}mobile</code> to monitor mining on your phone and control the node remotely.
                 </div>
-
-                <div class="card">
-                    <h2>🏆 Mining Rewards</h2>
-                    <div id="mining-rewards"></div>
-                    <button onclick="claimWallet()">🎁 Claim Bonus Wallet</button>
-                    <div id="claim-output" class="output"></div>
-                </div>
-
-                <div class="card">
-                    <h2>📊 Mining Stats</h2>
-                    <div id="mining-stats-display"></div>
-                </div>
+            </article>
+        </section>
+        <section class="stats-grid">
+            {% set cards = [
+                ('Total Blocks', stats.get('total_blocks', 0), 'Blocks mined so far'),
+                ('Total Transactions', stats.get('total_transactions', 0), 'Confirmed transactions'),
+                ('Pending Txns', stats.get('pending_transactions', 0), 'Awaiting confirmation'),
+                ('Total Supply', stats.get('total_supply', 0), 'Coins in circulation'),
+                ('Network Difficulty', stats.get('difficulty', 0), 'Work required for next block'),
+                ('Unique Addresses', stats.get('unique_addresses', 0), 'Active wallet count')
+            ] %}
+            {% for label, value, note in cards %}
+            <article class="stat-card">
+                <p>{{ label }}</p>
+                <h3 data-target="{{ value }}">{{ value }}</h3>
+                <div class="note">{{ note }} • updated live</div>
+            </article>
+            {% endfor %}
+        </section>
+        <section class="section-card mine-card">
+            <h2>Mining progress</h2>
+            <div class="progress"><span id="progressBar"></span></div>
+            <div class="progress-meta">
+                <div><span>Hash Rate</span><strong id="hashRate">-- H/s</strong></div>
+                <div><span>Estimated Reward</span><strong id="rewardEstimate">-- XAI</strong></div>
+                <div><span>Next ETA</span><strong id="nextEta">--s</strong></div>
+                <div><span>Difficulty</span><strong id="difficultyVal">{{ stats.get('difficulty', 0) }}</strong></div>
             </div>
-        </div>
-
-        <!-- Wallet Tab -->
-        <div id="wallet" class="tab-content">
-            <div class="grid">
-                <div class="card">
-                    <h2>💼 Create New Wallet</h2>
-                    <button onclick="createWallet()">✨ Generate Wallet</button>
-                    <div id="new-wallet-output" class="wallet-display" style="display:none;"></div>
-                </div>
-
-                <div class="card">
-                    <h2>💰 Check Balance</h2>
-                    <div class="form-group">
-                        <label>Address:</label>
-                        <input type="text" id="balance-address" placeholder="TXAI...">
-                    </div>
-                    <button onclick="checkBalance()">Check Balance</button>
-                    <div id="balance-output" class="output"></div>
-                </div>
-
-                <div class="card">
-                    <h2>🚰 Testnet Faucet</h2>
-                    <div class="form-group">
-                        <label>Address:</label>
-                        <input type="text" id="faucet-address" placeholder="TXAI...">
-                    </div>
-                    <button onclick="claimFaucet()">💧 Claim 100 XAI</button>
-                    <div id="faucet-output" class="output"></div>
-                </div>
-
-                <div class="card">
-                    <h2>dY" Wallet Claim Reminders</h2>
-                    <div class="form-group">
-                        <label>Identifier (miner/node):</label>
-                        <input type="text" id="reminder-identifier" placeholder="miner-node ID">
-                    </div>
-                    <button onclick="checkWalletReminder()">dY' Check Reminder</button>
-                    <div id="reminder-output" class="output"></div>
-                    <div id="reminder-summary" class="output">Reminder daemon runs daily; reminders fallback to monthly after a dismissal.</div>
-                    <p style="font-size: 0.85em; color: #666; margin-top: 10px;">
-                        Reminder daemon executes `python scripts/wallet_reminder_daemon.py` every morning and exposes `/wallet-claims/summary` for dashboards.
-                    </p>
-                </div>
-
-            </div>
-        </div>
-
-        <!-- Transactions Tab -->
-        <div id="transactions" class="tab-content">
-            <div class="grid">
-                <div class="card">
-                    <h2>💸 Send Transaction</h2>
-                    <div class="form-group">
-                        <label>From Address:</label>
-                        <input type="text" id="tx-sender" placeholder="TXAI...">
-                    </div>
-                    <div class="form-group">
-                        <label>To Address:</label>
-                        <input type="text" id="tx-recipient" placeholder="TXAI...">
-                    </div>
-                    <div class="form-group">
-                        <label>Amount (XAI):</label>
-                        <input type="number" id="tx-amount" placeholder="10.0" step="0.01">
-                    </div>
-                    <div class="form-group">
-                        <label>Private Key:</label>
-                        <input type="password" id="tx-private-key" placeholder="Your private key">
-                    </div>
-                    <button onclick="sendTransaction()">📤 Send</button>
-                    <div id="tx-output" class="output"></div>
-                </div>
-
-                <div class="card">
-                    <h2>🔍 Transaction History</h2>
-                    <div class="form-group">
-                        <label>Address:</label>
-                        <input type="text" id="history-address" placeholder="TXAI...">
-                    </div>
-                    <button onclick="getHistory()">📜 View History</button>
-                    <div id="history-output" class="output"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Gamification Tab -->
-        <div id="gamification" class="tab-content">
-            <div class="grid">
-                <div class="card">
-                    <h2>🎁 Airdrops</h2>
-                    <button onclick="getAirdrops()">🎈 View Recent Airdrops</button>
-                    <div id="airdrop-output" class="output"></div>
-                </div>
-
-                <div class="card">
-                    <h2>🏴‍☠️ Treasure Hunts</h2>
-                    <button onclick="getActiveTreasures()">🗺️ View Active Treasures</button>
-                    <div id="treasure-output" class="output"></div>
-                    <hr style="margin: 20px 0;">
-                    <h3 style="font-size: 1em; margin-bottom: 10px;">Create Treasure</h3>
-                    <input type="text" id="treasure-creator" placeholder="Your address">
-                    <input type="number" id="treasure-amount" placeholder="Amount" step="0.01">
-                    <select id="treasure-type">
-                        <option value="riddle">Riddle</option>
-                        <option value="math">Math Problem</option>
-                        <option value="trivia">Trivia</option>
-                    </select>
-                    <textarea id="treasure-puzzle" placeholder="Puzzle question" rows="2"></textarea>
-                    <input type="text" id="treasure-answer" placeholder="Answer">
-                    <button onclick="createTreasure()">🏴‍☠️ Create Treasure</button>
-                </div>
-
-                <div class="card">
-                    <h2>⏰ Time Capsules</h2>
-                    <button onclick="getPendingCapsules()">📦 View Pending</button>
-                    <div id="capsule-output" class="output"></div>
-                </div>
-
-                <div class="card">
-                    <h2>🔥 Mining Streaks</h2>
-                    <button onclick="getStreaks()">🏆 View Leaderboard</button>
-                    <div id="streak-output" class="output"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Governance Tab -->
-        <div id="governance" class="tab-content">
-            <div class="grid">
-                <div class="card">
-                    <h2>dY?>�,? On-Chain Governance</h2>
-                    <p style="color: #666; margin-bottom: 15px;">Create proposals and vote on blockchain changes</p>
-                    <button onclick="alert('Governance features coming in next update!')">dY"< View Proposals</button>
-                    <button onclick="alert('Governance features coming in next update!')">�o?�,? Create Proposal</button>
-                </div>
-                <div class="card">
-                    <h2>Micro AI Assistants</h2>
-                    <p style="color: #666; margin-bottom: 15px;">View assistant profiles, watch aggregate metrics, and pass the desired assistant via the `X-AI-Assistant` header.</p>
-                    <button onclick="loadAssistantProfiles()">Refresh Assistants</button>
-                    <div id="assistant-metrics" class="output"></div>
-                    <div id="assistant-profiles" class="output"></div>
-                </div>
-                <div class="card">
-                    <h2>Mini App Manifest</h2>
-                    <p style="color: #666; margin-bottom: 10px;">Use the `/mini-apps/manifest` endpoint to embed polls, votes, and games with AML-aware cues.</p>
-                    <div class="form-group">
-                        <label>Address (optional for AML targeting)</label>
-                        <input type="text" id="manifest-address" placeholder="XAI1..." />
-                    </div>
-                    <button onclick="loadMiniAppManifest()">Load Manifest</button>
-                    <div id="mini-apps-output" class="output">Mini-app manifest status will appear here.</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Exchange Tab -->
-        <div id="exchange" class="tab-content">
-            <div class="grid">
-                <div class="card">
-                    <h2>💱 Order Book</h2>
-                    <button onclick="getOrderBook()">📊 View Orders</button>
-                    <div id="orderbook-output" class="output"></div>
-                </div>
-
-                <div class="card">
-                    <h2>📈 Exchange Stats</h2>
-                    <button onclick="getExchangeStats()">📊 View Stats</button>
-                    <div id="exchange-stats-output" class="output"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Mobile Tab -->
-        <div id="mobile" class="tab-content">
-            <div class="grid">
-                <div class="card">
-                    <h2>?? Light Client Headers</h2>
-                    <button onclick="loadLightClientHeaders()">Load Latest Headers</button>
-                    <div id="light-client-output" class="output"></div>
-                </div>
-
-                <div class="card">
-                    <h2>?? Create Mobile Draft</h2>
-                    <div class="form-group">
-                        <label>Sender</label>
-                        <input type="text" id="mobile-draft-sender" placeholder="XAI1..." />
-                    </div>
-                    <div class="form-group">
-                        <label>Recipient</label>
-                        <input type="text" id="mobile-draft-recipient" placeholder="XAI1..." />
-                    </div>
-                    <div class="form-group">
-                        <label>Amount</label>
-                        <input type="number" id="mobile-draft-amount" placeholder="10" step="0.0001" />
-                    </div>
-                    <div class="form-group">
-                        <label>Priority</label>
-                        <select id="mobile-draft-priority">
-                            <option value="normal">Normal</option>
-                            <option value="high">High</option>
-                            <option value="low">Low</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Memo (optional)</label>
-                        <input type="text" id="mobile-draft-memo" placeholder="Gift wallet" />
-                    </div>
-                    <div class="form-group">
-                        <label>Metadata (JSON)</label>
-                        <textarea id="mobile-draft-metadata" rows="2" placeholder='{"note":"mobile"}'></textarea>
-                    </div>
-                    <button onclick="createMobileDraft()">Create Draft</button>
-                    <hr style="margin: 15px 0;">
-                    <div class="form-group">
-                        <label>Draft ID (auto-filled)</label>
-                        <input type="text" id="mobile-draft-id" placeholder="auto" />
-                    </div>
-                    <div class="form-group">
-                        <label>Public Key</label>
-                        <input type="text" id="mobile-draft-public" placeholder="hex public key" />
-                    </div>
-                    <div class="form-group">
-                        <label>Signature</label>
-                        <textarea id="mobile-draft-signature" rows="2" placeholder="signed payload hex"></textarea>
-                    </div>
-                    <button onclick="commitMobileDraft()">Commit Signed Draft</button>
-                    <div id="mobile-draft-output" class="output"></div>
-                </div>
-
-                <div class="card">
-                    <h2>??? Mobile Cache Summary</h2>
-                    <div class="form-group">
-                        <label>Address (optional risk lookup)</label>
-                        <input type="text" id="mobile-cache-address" placeholder="XAI1..." />
-                    </div>
-                    <button onclick="loadMobileCacheSummary()">Refresh Summary</button>
-                    <div id="mobile-cache-output" class="output"></div>
-                </div>
-            </div>
-        </div>
+        </section>
+        <section class="section-card blocks-card">
+            <h2>Recent blocks</h2>
+            <table>
+                <thead>
+                    <tr><th>#</th><th>Hash</th><th>Txns</th><th>Miner</th><th>Time</th></tr>
+                </thead>
+                <tbody id="blockTableBody">
+                {% for block in recent_blocks %}
+                    <tr>
+                        <td>#{{ block.get('index', '—') }}</td>
+                        <td>{{ block.get('hash', '')[:10] }}…</td>
+                        <td>{{ block.get('transaction_count', block.get('tx_count', 0)) }}</td>
+                        <td>{{ block.get('miner', '—') }}</td>
+                        <td>{{ format_timestamp(block.get('timestamp', 0)) }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        <section class="section-card learn-card">
+            <h2>Curious insights</h2>
+            <details>
+                <summary>How the mining counter works</summary>
+                <p>Proof-of-work secures the network. The dashboard shows hash rate vs difficulty so you can see how much work is required before the next reward.</p>
+            </details>
+            <details>
+                <summary>Why QR controls exist</summary>
+                <p>Scan to open a mobile-friendly dashboard on your phone. Start/stop mining, watch blocks, and verify wallet activity while away from the desk.</p>
+            </details>
+            <details>
+                <summary>Want deeper knowledge?</summary>
+                <p><a href="/docs/onboarding.md" target="_blank" style="color:#76c7ff">Onboarding guide</a> • <a href="/docs/TECHNICAL.md" target="_blank" style="color:#9b5de5">Technical spec</a></p>
+            </details>
+        </section>
+        <section class="basic-panel" id="basicPanel">
+            <p>Command-line view for power users:</p>
+            <code>curl -X POST {{ node_url }}/transactions -H "Content-Type: application/json" -d '{...}'</code>
+            <code>curl -X POST {{ node_url }}/mine -H "Content-Type: application/json" -d '{"miner_address":"XAI1..."}'</code>
+            <code>curl {{ node_url }}/stats</code>
+        </section>
     </div>
-
     <script>
-        const NODE_URL = 'http://localhost:5000';
-        let miningInterval = null;
+        const cards = document.querySelectorAll('.stat-card h3');
+        const progressBar = document.getElementById('progressBar');
+        const hashRate = document.getElementById('hashRate');
+        const rewardEstimate = document.getElementById('rewardEstimate');
+        const nextEta = document.getElementById('nextEta');
+        const blockTable = document.getElementById('blockTableBody');
+        const page = document.getElementById('dashboardPage');
+        const basicPanel = document.getElementById('basicPanel');
 
-        // Tab Navigation
-        function showTab(tabName) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
-            document.getElementById(tabName).classList.add('active');
-            event.target.classList.add('active');
-        }
-
-        // Stats Functions
-        async function refreshStats() {
-            try {
-                const response = await fetch(`${NODE_URL}/stats`);
-                const data = await response.json();
-
-                document.getElementById('blockchain-stats').innerHTML = `
-                    <div class="stat"><span class="stat-label">Total Blocks:</span><span class="stat-value">${data.blocks?.toLocaleString()}</span></div>
-                    <div class="stat"><span class="stat-label">Total Transactions:</span><span class="stat-value">${data.total_transactions?.toLocaleString()}</span></div>
-                    <div class="stat"><span class="stat-label">Pending TXs:</span><span class="stat-value">${data.pending_transactions}</span></div>
-                    <div class="stat"><span class="stat-label">Total Supply:</span><span class="stat-value">${data.total_supply?.toLocaleString()} XAI</span></div>
-                    <div class="stat"><span class="stat-label">Difficulty:</span><span class="stat-value">${data.difficulty}</span></div>
-                `;
-
-                document.getElementById('node-info').innerHTML = `
-                    <div class="stat"><span class="stat-label">Miner Address:</span><span class="stat-value">${data.miner_address?.substring(0, 20)}...</span></div>
-                    <div class="stat"><span class="stat-label">Peers:</span><span class="stat-value">${data.peers}</span></div>
-                    <div class="stat"><span class="stat-label">Mining:</span><span class="stat-value">${data.is_mining ? '✅ Active' : '❌ Stopped'}</span></div>
-                    <div class="stat"><span class="stat-label">Uptime:</span><span class="stat-value">${(data.node_uptime / 3600).toFixed(2)} hours</span></div>
-                `;
-
-                // Get recent blocks
-                const blocksResponse = await fetch(`${NODE_URL}/blocks?limit=5`);
-                const blocksData = await blocksResponse.json();
-
-                let blocksHTML = '';
-                blocksData.blocks?.forEach(block => {
-                    blocksHTML += `<div class="stat"><span class="stat-label">Block #${block.index}</span><span class="stat-value">${block.transactions?.length} TXs</span></div>`;
-                });
-                document.getElementById('recent-blocks').innerHTML = blocksHTML;
-
-            } catch (error) {
-                console.error('Error refreshing stats:', error);
-            }
-        }
-
-        // Mining Functions
-        async function startMining() {
-            const address = document.getElementById('miner-address').value;
-            if (!address) {
-                alert('Please enter miner address');
-                return;
-            }
-
-            try {
-                const response = await fetch(`${NODE_URL}/auto-mine/start`, { method: 'POST' });
-                const data = await response.json();
-                document.getElementById('mining-status').textContent = 'Mining...';
-                document.getElementById('mining-status').className = 'mining-active';
-                document.getElementById('mining-output').innerHTML = 'Mining started! Blocks will be mined automatically.';
-                document.getElementById('mining-output').className = 'output success';
-            } catch (error) {
-                document.getElementById('mining-output').innerHTML = 'Error: ' + error.message;
-                document.getElementById('mining-output').className = 'output error';
-            }
-        }
-
-        async function stopMining() {
-            try {
-                const response = await fetch(`${NODE_URL}/auto-mine/stop`, { method: 'POST' });
-                const data = await response.json();
-                document.getElementById('mining-status').textContent = 'Stopped';
-                document.getElementById('mining-status').className = 'mining-inactive';
-                document.getElementById('mining-output').innerHTML = 'Mining stopped.';
-                document.getElementById('mining-output').className = 'output';
-            } catch (error) {
-                document.getElementById('mining-output').innerHTML = 'Error: ' + error.message;
-                document.getElementById('mining-output').className = 'output error';
-            }
-        }
-
-        async function mineBlock() {
-            try {
-                document.getElementById('mining-output').innerHTML = 'Mining block... Please wait.';
-                const response = await fetch(`${NODE_URL}/mine`, { method: 'POST' });
-                const data = await response.json();
-
-                if (data.success) {
-                    document.getElementById('mining-output').innerHTML = `
-                        ✅ Block #${data.block.index} mined!
-                        Hash: ${data.block.hash}
-                        Reward: ${data.reward} XAI
-                        Transactions: ${data.block.transactions.length}
-                    `;
-                    document.getElementById('mining-output').className = 'output success';
-                    refreshStats();
-                } else {
-                    document.getElementById('mining-output').innerHTML = '❌ Error: ' + data.error;
-                    document.getElementById('mining-output').className = 'output error';
+        function animateNumber(el, end) {
+            const start = Number(el.textContent.replace(/[^0-9.-]/g, '')) || 0;
+            const duration = 600;
+            const stepTime = 20;
+            const steps = Math.ceil(duration / stepTime);
+            let current = start;
+            const delta = (end - start) / steps;
+            let iteration = 0;
+            const timer = setInterval(() => {
+                iteration += 1;
+                current += delta;
+                el.textContent = Math.round(current).toLocaleString();
+                if (iteration >= steps) {
+                    el.textContent = Math.round(end).toLocaleString();
+                    clearInterval(timer);
                 }
-            } catch (error) {
-                document.getElementById('mining-output').innerHTML = '❌ Error: ' + error.message;
-                document.getElementById('mining-output').className = 'output error';
-            }
+            }, stepTime);
         }
 
-        // Wallet Functions
-        async function createWallet() {
-            // Generate wallet on client side (simplified - in production use proper key generation)
-            const wallet = {
-                address: 'TXAI' + Math.random().toString(36).substring(2, 40),
-                privateKey: Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2),
-                publicKey: Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2)
-            };
-
-            const output = document.getElementById('new-wallet-output');
-            output.innerHTML = `
-                <strong>⚠️ IMPORTANT: Save these details immediately!</strong><br><br>
-                <strong>Address:</strong><br>${wallet.address}<br><br>
-                <strong>Private Key:</strong><br>${wallet.privateKey}<br><br>
-                <strong>Public Key:</strong><br>${wallet.publicKey}<br><br>
-                <strong style="color: #dc3545;">Never share your private key!</strong>
-            `;
-            output.style.display = 'block';
-        }
-
-        async function checkBalance() {
-            const address = document.getElementById('balance-address').value;
-            if (!address) {
-                alert('Please enter an address');
-                return;
-            }
-
+        async function fetchDashboard() {
             try {
-                const response = await fetch(`${NODE_URL}/balance/${address}`);
+                const response = await fetch('/api/dashboard');
+                if (!response.ok) return;
                 const data = await response.json();
-
-                document.getElementById('balance-output').innerHTML = `
-                    Address: ${data.address}
-                    Balance: ${data.balance?.toLocaleString()} XAI
-                `;
-                document.getElementById('balance-output').className = 'output success';
-            } catch (error) {
-                document.getElementById('balance-output').innerHTML = 'Error: ' + error.message;
-                document.getElementById('balance-output').className = 'output error';
-            }
-        }
-
-        async function claimFaucet() {
-            const address = document.getElementById('faucet-address').value;
-            if (!address) {
-                alert('Please enter an address');
-                return;
-            }
-
-            try {
-                const response = await fetch(`${NODE_URL}/faucet/claim`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ address })
+                const stats = data.stats || {};
+                const blocks = data.recent_blocks || [];
+                const mapping = {
+                    'Total Blocks': stats.total_blocks || 0,
+                    'Total Transactions': stats.total_transactions || 0,
+                    'Pending Txns': stats.pending_transactions || 0,
+                    'Total Supply': stats.total_supply || 0,
+                    'Network Difficulty': stats.difficulty || 0,
+                    'Unique Addresses': stats.unique_addresses || 0
+                };
+                cards.forEach(card => {
+                    const label = card.previousElementSibling.textContent.trim();
+                    const target = mapping[label] || 0;
+                    animateNumber(card, target);
                 });
-                const data = await response.json();
-
-                if (data.success) {
-                    document.getElementById('faucet-output').innerHTML = `
-                        ✅ ${data.message}
-                        Amount: ${data.amount} XAI
-                        TXID: ${data.txid}
-                    `;
-                    document.getElementById('faucet-output').className = 'output success';
-                } else {
-                    document.getElementById('faucet-output').innerHTML = '❌ Error: ' + data.error;
-                    document.getElementById('faucet-output').className = 'output error';
-                }
-            } catch (error) {
-                document.getElementById('faucet-output').innerHTML = '❌ Error: ' + error.message;
-                document.getElementById('faucet-output').className = 'output error';
-            }
-        }
-
-        // Transaction Functions
-        async function sendTransaction() {
-            const sender = document.getElementById('tx-sender').value;
-            const recipient = document.getElementById('tx-recipient').value;
-            const amount = parseFloat(document.getElementById('tx-amount').value);
-            const privateKey = document.getElementById('tx-private-key').value;
-
-            if (!sender || !recipient || !amount || !privateKey) {
-                alert('Please fill all fields');
-                return;
-            }
-
-            try {
-                const response = await fetch(`${NODE_URL}/send`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        sender,
-                        recipient,
-                        amount,
-                        private_key: privateKey,
-                        fee: 0.01
-                    })
-                });
-                const data = await response.json();
-
-                if (data.success) {
-                    document.getElementById('tx-output').innerHTML = `
-                        ✅ Transaction sent successfully!
-                        TXID: ${data.txid}
-                        ${data.message}
-                    `;
-                    document.getElementById('tx-output').className = 'output success';
-                } else {
-                    document.getElementById('tx-output').innerHTML = '❌ Error: ' + data.error;
-                    document.getElementById('tx-output').className = 'output error';
-                }
-            } catch (error) {
-                document.getElementById('tx-output').innerHTML = '❌ Error: ' + error.message;
-                document.getElementById('tx-output').className = 'output error';
-            }
-        }
-
-        async function getHistory() {
-            const address = document.getElementById('history-address').value;
-            if (!address) {
-                alert('Please enter an address');
-                return;
-            }
-
-            try {
-                const response = await fetch(`${NODE_URL}/history/${address}`);
-                const data = await response.json();
-
-                let html = `Total Transactions: ${data.transaction_count}\n\n`;
-                data.transactions?.forEach(tx => {
-                    html += `Type: ${tx.type || 'normal'}\n`;
-                    html += `Amount: ${tx.amount} XAI\n`;
-                    html += `${tx.type === 'sent' ? 'To' : 'From'}: ${tx.address}\n`;
-                    html += `Time: ${new Date(tx.timestamp * 1000).toLocaleString()}\n\n`;
-                });
-
-                document.getElementById('history-output').innerHTML = html || 'No transactions found';
-                document.getElementById('history-output').className = 'output';
-            } catch (error) {
-                document.getElementById('history-output').innerHTML = 'Error: ' + error.message;
-                document.getElementById('history-output').className = 'output error';
-            }
-        }
-
-        // Gamification Functions
-        async function getAirdrops() {
-            try {
-                const response = await fetch(`${NODE_URL}/airdrop/winners?limit=10`);
-                const data = await response.json();
-
-                let html = 'Recent Airdrops:\n\n';
-                data.airdrops?.forEach(airdrop => {
-                    html += `Block #${airdrop.block_index}\n`;
-                    html += `Recipients: ${airdrop.recipients.length}\n`;
-                    html += `Total: ${airdrop.total_amount} XAI\n\n`;
-                });
-
-                document.getElementById('airdrop-output').innerHTML = html || 'No airdrops yet';
-            } catch (error) {
-                document.getElementById('airdrop-output').innerHTML = 'Error: ' + error.message;
-            }
-        }
-
-        async function getActiveTreasures() {
-            try {
-                const response = await fetch(`${NODE_URL}/treasure/active`);
-                const data = await response.json();
-
-                let html = `Active Treasure Hunts: ${data.count}\n\n`;
-                data.treasures?.forEach(treasure => {
-                    html += `ID: ${treasure.id}\n`;
-                    html += `Amount: ${treasure.amount} XAI\n`;
-                    html += `Type: ${treasure.puzzle_type}\n`;
-                    html += `Hint: ${treasure.hint || 'No hint'}\n\n`;
-                });
-
-                document.getElementById('treasure-output').innerHTML = html || 'No active treasures';
-            } catch (error) {
-                document.getElementById('treasure-output').innerHTML = 'Error: ' + error.message;
-            }
-        }
-
-        async function getPendingCapsules() {
-            try {
-                const response = await fetch(`${NODE_URL}/timecapsule/pending`);
-                const data = await response.json();
-
-                let html = `Pending Time Capsules: ${data.count}\n\n`;
-                data.capsules?.forEach(capsule => {
-                    html += `Amount: ${capsule.amount} XAI\n`;
-                    html += `Unlock: ${new Date(capsule.unlock_timestamp * 1000).toLocaleString()}\n\n`;
-                });
-
-                document.getElementById('capsule-output').innerHTML = html || 'No pending capsules';
-            } catch (error) {
-                document.getElementById('capsule-output').innerHTML = 'Error: ' + error.message;
-            }
-        }
-
-        async function getStreaks() {
-            try {
-                const response = await fetch(`${NODE_URL}/mining/streaks?limit=10`);
-                const data = await response.json();
-
-                let html = 'Mining Streak Leaderboard:\n\n';
-                data.leaderboard?.forEach((miner, index) => {
-                    html += `#${index + 1} ${miner.address.substring(0, 20)}...\n`;
-                    html += `Streak: ${miner.current_streak} days\n`;
-                    html += `Bonus: ${(miner.streak_bonus * 100).toFixed(0)}%\n\n`;
-                });
-
-                document.getElementById('streak-output').innerHTML = html || 'No data yet';
-            } catch (error) {
-                document.getElementById('streak-output').innerHTML = 'Error: ' + error.message;
-            }
-        }
-
-        // Exchange Functions
-        async function getOrderBook() {
-            try {
-                const response = await fetch(`${NODE_URL}/exchange/orders`);
-                const data = await response.json();
-
-                let html = `Buy Orders: ${data.total_buy_orders}\n`;
-                html += `Sell Orders: ${data.total_sell_orders}\n\n`;
-
-                document.getElementById('orderbook-output').innerHTML = html;
-            } catch (error) {
-                document.getElementById('orderbook-output').innerHTML = 'Error: ' + error.message;
-            }
-        }
-
-        async function getExchangeStats() {
-            try {
-                const response = await fetch(`${NODE_URL}/exchange/stats`);
-                const data = await response.json();
-
-                const stats = data.stats;
-                let html = `Current Price: $${stats.current_price}\n`;
-                html += `24h Volume: ${stats.volume_24h.toLocaleString()} XAI\n`;
-                html += `24h Change: ${stats.change_24h.toFixed(2)}%\n`;
-                html += `Active Orders: ${stats.active_orders}\n`;
-
-                document.getElementById('exchange-stats-output').innerHTML = html;
-            } catch (error) {
-                document.getElementById('exchange-stats-output').innerHTML = 'Error: ' + error.message;
-            }
-        }
-
-        async function loadLightClientHeaders() {
-            const output = document.getElementById('light-client-output');
-            output.innerHTML = 'Loading headers...';
-            try {
-                const response = await fetch(`${NODE_URL}/light-client/headers?count=5`);
-                const data = await response.json();
-                if (!data.success) {
-                    throw new Error(data.error || 'Failed to load headers');
-                }
-                let html = `Height: ${data.latest_height}\n`;
-                data.headers?.forEach(header => {
-                    html += `#${header.index} ${header.hash?.substring(0, 16)}...\n`;
-                });
-                output.innerHTML = html;
-            } catch (error) {
-                output.innerHTML = 'Error: ' + error.message;
-            }
-        }
-
-        let lastMobileDraftId = null;
-
-        async function createMobileDraft() {
-            const sender = document.getElementById('mobile-draft-sender').value;
-            const recipient = document.getElementById('mobile-draft-recipient').value;
-            const amount = parseFloat(document.getElementById('mobile-draft-amount').value);
-            const priority = document.getElementById('mobile-draft-priority').value;
-            const memo = document.getElementById('mobile-draft-memo').value;
-            const metadataRaw = document.getElementById('mobile-draft-metadata').value;
-            const output = document.getElementById('mobile-draft-output');
-
-            if (!sender || !recipient || !amount) {
-                output.innerHTML = 'Provide sender, recipient, and amount.';
-                return;
-            }
-
-            let metadata = {};
-            if (metadataRaw) {
-                try {
-                    metadata = JSON.parse(metadataRaw);
-                } catch (error) {
-                    output.innerHTML = 'Metadata must be valid JSON.';
-                    return;
-                }
-            }
-
-            try {
-                const response = await fetch(`${NODE_URL}/mobile/transactions/draft`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        sender,
-                        recipient,
-                        amount,
-                        priority,
-                        memo,
-                        metadata
-                    })
-                });
-                const data = await response.json();
-                if (!data.success) {
-                    throw new Error(data.error || 'Draft failed');
-                }
-                lastMobileDraftId = data.draft.draft_id;
-                document.getElementById('mobile-draft-id').value = lastMobileDraftId;
-                output.innerHTML = `
-                    Draft ID: ${data.draft.draft_id}
-                    Fee Quote: ${data.draft.fee_quote.recommended_fee} XAI
-                    QR Payload: ${data.draft.qr_payload.substring(0, 60)}...
-                `;
-            } catch (error) {
-                output.innerHTML = 'Error: ' + error.message;
-            }
-        }
-
-        async function commitMobileDraft() {
-            const draftId = document.getElementById('mobile-draft-id').value || lastMobileDraftId;
-            const signature = document.getElementById('mobile-draft-signature').value;
-            const publicKey = document.getElementById('mobile-draft-public').value;
-            const output = document.getElementById('mobile-draft-output');
-
-            if (!draftId) {
-                output.innerHTML = 'No draft selected.';
-                return;
-            }
-            if (!signature || !publicKey) {
-                output.innerHTML = 'Provide signature and public key.';
-                return;
-            }
-
-            try {
-                const response = await fetch(`${NODE_URL}/mobile/transactions/commit`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        draft_id: draftId,
-                        signature,
-                        public_key: publicKey
-                    })
-                });
-                const data = await response.json();
-                if (!data.success) {
-                    throw new Error(data.error || 'Commit failed');
-                }
-                output.innerHTML = `Submitted TX: ${data.txid}`;
-            } catch (error) {
-                output.innerHTML = 'Error: ' + error.message;
-            }
-        }
-
-        async function loadMobileCacheSummary() {
-            const output = document.getElementById('mobile-cache-output');
-            const address = document.getElementById('mobile-cache-address').value;
-            const params = address ? `?address=${encodeURIComponent(address)}` : '';
-            output.innerHTML = 'Loading summary...';
-            try {
-                const response = await fetch(`${NODE_URL}/mobile/cache/summary${params}`);
-                const data = await response.json();
-                if (!data.success) {
-                    throw new Error(data.error || 'Unable to load summary');
-                }
-                output.innerHTML = JSON.stringify(data.summary, null, 2);
-            } catch (error) {
-                output.innerHTML = 'Error: ' + error.message;
-            }
-        }
-
-        function viewExplorer() {
-            window.open('http://localhost:3000', '_blank');
-        }
-
-        async function claimWallet() {
-            alert('Feature coming soon! Use /claim-wallet API endpoint');
-        }
-
-        async function createTreasure() {
-            alert('Feature coming soon! Use /treasure/create API endpoint');
-        }
-
-        async function refreshWalletClaimsSummary() {
-            const summaryEl = document.getElementById('wallet-claims-summary');
-            if (!summaryEl) return;
-            summaryEl.innerHTML = 'Loading wallet claim status...';
-            try {
-                const response = await fetch(`${NODE_URL}/wallet-claims/summary`);
-                const data = await response.json();
-                if (!data.success) {
-                    throw new Error(data.message || 'Unable to load wallet claims');
-                }
-                const pending = data.pending || [];
-                const dueValues = pending
-                    .map(claim => claim.next_notification_due)
-                    .filter(value => typeof value === 'number');
-                const nextDueTimestamp = dueValues.length ? Math.min(...dueValues) : null;
-                const nextDueLabel = nextDueTimestamp !== null
-                    ? new Date(nextDueTimestamp * 1000).toLocaleString()
-                    : 'No reminders scheduled';
-                const preview = pending.slice(0, 3).map(claim => {
-                    const due = claim.next_notification_due
-                        ? new Date(claim.next_notification_due * 1000).toLocaleString()
-                        : 'Not scheduled yet';
-                    return `
-                        <div class='stat'>
-                            <span class='stat-label'>${claim.identifier}</span>
-                            <span class='stat-value'>${claim.context || 'claim'} - ${due}</span>
-                        </div>
-                    `;
+                const difficulty = stats.difficulty || 0;
+                document.getElementById('difficultyVal').textContent = difficulty;
+                progressBar.style.width = `${Math.min(100, 20 + difficulty)}%`;
+                hashRate.textContent = `${(stats.hash_rate || difficulty * 100).toFixed(0)} H/s`;
+                rewardEstimate.textContent = `${(stats.block_reward || 12).toFixed(2)} XAI`;
+                nextEta.textContent = `${Math.max(5, 120 - difficulty)}s`;
+                blockTable.innerHTML = blocks.map(block => {
+                    const date = new Date((block.timestamp || Date.now()/1000) * 1000);
+                    return `<tr><td>#${block.index || '–'}</td><td>${(block.hash || '').slice(0, 10)}…</td><td>${block.transaction_count || block.tx_count || 0}</td><td>${block.miner || '–'}</td><td>${date.toLocaleString()}</td></tr>`;
                 }).join('');
-                summaryEl.innerHTML = `
-                    <div class='stat'><span class='stat-label'>Pending claims:</span><span class='stat-value'>${pending.length}</span></div>
-                    <div class='stat'><span class='stat-label'>Next reminder:</span><span class='stat-value'>${nextDueLabel}</span></div>
-                    ${preview || '<p>No active reminders.</p>'}
-                `;
-            } catch (error) {
-                summaryEl.innerHTML = `<div class='error'>Unable to load wallet claims: ${error.message}</div>`;
+            } catch (err) {
+                console.error('Dashboard fetch failed', err);
             }
         }
 
-        async function checkWalletReminder() {
-            const identifier = document.getElementById('reminder-identifier').value.trim();
-            const output = document.getElementById('reminder-output');
-            const summary = document.getElementById('reminder-summary');
-            if (!identifier) {
-                output.innerHTML = '<div class="error">Provide an identifier to check.</div>';
-                return;
-            }
-            output.innerHTML = 'Checking reminder...';
-            summary.innerHTML = 'Reminder daemon runs daily and drives /wallet-claims/summary.';
-            try {
-                const response = await fetch(`${NODE_URL}/check-unclaimed-wallet/${encodeURIComponent(identifier)}`);
-                const data = await response.json();
-                if (data.unclaimed) {
-                    const note = data.notification || {};
-                    output.innerHTML = `
-                        <div class='stat'><span class='stat-label'>Message:</span><span class='stat-value'>${note.message || 'Reminder sent'}</span></div>
-                        <div class='stat'><span class='stat-label'>Details:</span><span class='stat-value'>${note.details || ''}</span></div>
-                        <div class='stat'><span class='stat-label'>Action:</span><span class='stat-value'>${note.action || 'Follow guidance'}</span></div>
-                    `;
-                } else {
-                    output.innerHTML = `<div class='success'>${data.message || 'No unclaimed wallet at this identifier'}</div>`;
-                }
-            } catch (error) {
-                output.innerHTML = `<div class='error'>Reminder check failed: ${error.message}</div>`;
-            }
+        function buildQRCode() {
+            const canvas = document.getElementById('qrCodeCanvas');
+            if (!window.QRCode || !canvas) return;
+            const url = window.location.origin + "{{ url_for('mobile_view') }}";
+            QRCode.toCanvas(canvas, url, { width: 180 }, err => {
+                if (err) console.error(err);
+            });
         }
 
-        async function loadAssistantProfiles() {
-            const metricsEl = document.getElementById('assistant-metrics');
-            const profilesEl = document.getElementById('assistant-profiles');
-            if (!metricsEl || !profilesEl) return;
-            metricsEl.innerHTML = 'Loading assistants...';
-            profilesEl.innerHTML = '';
-            try {
-                const response = await fetch(`${NODE_URL}/personal-ai/assistants`);
-                const data = await response.json();
-                if (!data.success) {
-                    throw new Error(data.error || 'Unable to load assistants');
-                }
-                const { profiles = [], aggregated_metrics = {} } = data.assistants || {};
-                metricsEl.innerHTML = `
-                    <div class='stat'><span class='stat-label'>Requests:</span><span class='stat-value'>${aggregated_metrics.total_requests ?? 0}</span></div>
-                    <div class='stat'><span class='stat-label'>Tokens:</span><span class='stat-value'>${aggregated_metrics.total_tokens ?? 0}</span></div>
-                    <div class='stat'><span class='stat-label'>Trending skills:</span><span class='stat-value'>${(aggregated_metrics.trending_skills || []).join(', ') || 'N/A'}</span></div>
-                `;
-                const profileHtml = profiles.map(profile => `
-                    <div class='stat'>
-                        <span class='stat-label'>${profile.name} - ${profile.personality}</span>
-                        <span class='stat-value'>${profile.usage_count} runs - ${profile.tokens_consumed} tokens</span>
-                    </div>
-                    <p style='margin-top: 5px; font-size: 0.85em;'>Skills: ${profile.skills.join(', ')}</p>
-                    <p style='margin-top: 5px; font-size: 0.85em;'>${profile.description}</p>
-                `).join('<hr>');
-                profilesEl.innerHTML = profileHtml || '<p>No micro assistants yet.</p>';
-            } catch (error) {
-                metricsEl.innerHTML = `<div class='error'>Failed to load assistants: ${error.message}</div>`;
-                profilesEl.innerHTML = '';
-            }
-        }
+        document.getElementById('toggleBasicBtn').addEventListener('click', () => {
+            page.classList.toggle('show-basic');
+        });
 
-        async function loadMiniAppManifest() {
-            const output = document.getElementById('mini-apps-output');
-            if (!output) return;
-            const address = document.getElementById('manifest-address').value.trim();
-            output.innerHTML = 'Loading manifest...';
-            try {
-                const params = new URLSearchParams();
-                if (address) {
-                    params.set('address', address);
-                }
-                const url = `${NODE_URL}/mini-apps/manifest${params.toString() ? `?${params}` : ''}`;
-                const response = await fetch(url);
-                const data = await response.json();
-                if (!data.success) {
-                    throw new Error(data.error || 'Failed to load manifest');
-                }
-                const apps = data.mini_apps || [];
-                let html = `
-                    <div class='stat'><span class='stat-label'>Risk Level:</span><span class='stat-value'>${data.aml_context?.risk_level ?? 'clean'}</span></div>
-                    <div class='stat'><span class='stat-label'>Score:</span><span class='stat-value'>${data.aml_context?.risk_score ?? 0}</span></div>
-                `;
-                if (!apps.length) {
-                    html += '<p>No mini-app entries available.</p>';
-                } else {
-                    apps.forEach(app => {
-                        html += `
-                            <div class='stat'>
-                                <span class='stat-label'>${app.name}</span>
-                                <span class='stat-value'>${app.recommended_flow}</span>
-                            </div>
-                            <p style='margin-top:4px; font-size:0.85em;'>${app.description}</p>
-                            <p style='margin-top:4px; font-size:0.8em;'>Embed: <a href='${app.embed_url}' target='_blank'>${app.embed_url}</a></p>
-                            <hr>
-                        `;
-                    });
-                }
-                output.innerHTML = html;
-            } catch (error) {
-                output.innerHTML = `<div class='error'>${error.message}</div>`;
-            }
-        }
-
-        // Auto-refresh stats every 10 seconds
-        setInterval(refreshStats, 10000);
-
-        // Load stats on page load
-        refreshStats();
-        refreshWalletClaimsSummary();
-        loadAssistantProfiles();
-        loadMiniAppManifest();
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchDashboard();
+            buildQRCode();
+            setInterval(fetchDashboard, 9000);
+        });
     </script>
 </body>
 </html>

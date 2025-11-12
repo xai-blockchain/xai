@@ -28,21 +28,22 @@ def get_node_stats():
         pass
     return None
 
+
+def get_recent_blocks(limit=10):
+    """Fetch recent blocks from node"""
+    try:
+        response = requests.get(f"{NODE_URL}/blocks?limit={limit}", timeout=2)
+        if response.status_code == 200:
+            return response.json().get('blocks', [])
+    except:
+        pass
+    return []
+
 @app.route('/')
 def index():
     """Home page with stats and recent blocks"""
     stats = get_node_stats()
-
-    recent_blocks = []
-    if stats:
-        try:
-            response = requests.get(f"{NODE_URL}/blocks?limit=10", timeout=2)
-            if response.status_code == 200:
-                blocks_data = response.json()
-                recent_blocks = blocks_data.get('blocks', [])
-        except:
-            pass
-
+    recent_blocks = get_recent_blocks(5)
     return render_template('index.html', stats=stats, recent_blocks=recent_blocks)
 
 @app.route('/blocks')
@@ -141,7 +142,9 @@ def search():
 @app.route('/dashboard')
 def dashboard():
     """Interactive testing dashboard"""
-    return render_template('dashboard.html')
+    stats = get_node_stats() or {}
+    recent_blocks = get_recent_blocks(6)
+    return render_template('dashboard.html', stats=stats, recent_blocks=recent_blocks, node_url=NODE_URL)
 
 @app.route('/api/stats')
 def api_stats():
@@ -150,6 +153,25 @@ def api_stats():
     if stats:
         return jsonify(stats)
     return jsonify({'error': 'Node unavailable'}), 503
+
+
+@app.route('/api/dashboard')
+def api_dashboard():
+    """Combined stats + recent blocks for the dashboard"""
+    stats = get_node_stats() or {}
+    recent_blocks = get_recent_blocks(6)
+    return jsonify({
+        'stats': stats,
+        'recent_blocks': recent_blocks,
+        'timestamp': datetime.utcnow().isoformat() + "Z"
+    })
+
+
+@app.route('/mobile')
+def mobile_view():
+    """Simplified mobile page for scanners and QR navigation"""
+    stats = get_node_stats() or {}
+    return render_template('mobile.html', stats=stats, node_url=NODE_URL)
 
 if __name__ == '__main__':
     print("=" * 60)
