@@ -16,9 +16,9 @@ let explorerProcess;
 let mainWindow;
 let tray;
 
-function spawnPython(script, args = []) {
+function spawnScript(script, args = []) {
   const scriptPath = path.join(AIXN_DIR, script);
-  const proc = spawn(PYTHON_PATH, [scriptPath, ...args], {
+  const proc = spawn('powershell.exe', ['-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...args], {
     cwd: AIXN_DIR,
     env: {
       ...process.env,
@@ -82,8 +82,8 @@ function createTray() {
 }
 
 async function startProcesses() {
-  nodeProcess = spawnPython('run-python.ps1', ['core/node.py', '--miner', process.env.XAI_MINER_ADDRESS || 'XAI1miner000000000000000000000']);
-  explorerProcess = spawnPython('run-python.ps1', ['explorer.py']);
+  nodeProcess = spawnScript('run-python.ps1', ['core/node.py', '--miner', process.env.XAI_MINER_ADDRESS || 'XAI1miner000000000000000000000']);
+  explorerProcess = spawnScript('run-python.ps1', ['explorer.py']);
   await waitForServer('http://127.0.0.1:3000/dashboard');
 }
 
