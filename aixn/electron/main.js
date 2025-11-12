@@ -9,6 +9,8 @@ const DASHBOARD_URL = 'http://127.0.0.1:3000/dashboard';
 const MOBILE_URL = 'http://127.0.0.1:3000/mobile';
 const NODE_URL = 'http://127.0.0.1:5000';
 
+const PYTHON_PATH = process.env.PYTHON_PATH || 'python';
+
 let nodeProcess;
 let explorerProcess;
 let mainWindow;
@@ -16,16 +18,19 @@ let tray;
 
 function spawnPython(script, args = []) {
   const scriptPath = path.join(AIXN_DIR, script);
-  const proc = spawn('python', [scriptPath, ...args], {
+  const proc = spawn(PYTHON_PATH, [scriptPath, ...args], {
     cwd: AIXN_DIR,
-    env: { ...process.env }
+    env: {
+      ...process.env,
+      PYTHONPATH: `${ROOT_DIR};${AIXN_DIR}`
+    }
   });
   proc.stdout.on('data', data => console.log(`[${script}] ${data.toString()}`));
   proc.stderr.on('data', data => console.error(`[${script}] ${data.toString()}`));
   return proc;
 }
 
-async function waitForServer(url, timeout = 20000) {
+async function waitForServer(url, timeout = 40000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     try {

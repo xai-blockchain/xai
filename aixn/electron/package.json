@@ -34,7 +34,8 @@
   "author": "XAI Team",
   "license": "MIT",
   "dependencies": {
-    "electron": "^26.2.0"
+    "electron": "^39.1.2",
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
     "electron-builder": "^24.5.0"
