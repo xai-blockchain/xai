@@ -244,7 +244,7 @@ class XAIProvider:
                 headers=headers,
                 json=payload,
                 timeout=120
-            }
+            )
 
             response.raise_for_status()
             data = response.json()
