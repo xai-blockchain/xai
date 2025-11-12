@@ -1,0 +1,414 @@
+"""
+XAI Blockchain - Security Validation Module
+
+Comprehensive input validation and sanitization.
+Protects against:
+- Injection attacks
+- Integer overflow/underflow
+- Invalid addresses
+- Negative amounts
+- Excessive fees
+- Malformed data
+"""
+
+import re
+from typing import Any, Union
+from datetime import datetime, timezone
+
+
+class ValidationError(Exception):
+    """Validation error - safe to expose to users"""
+    pass
+
+
+class SecurityValidator:
+    """
+    Security validation for all user inputs
+
+    All validation errors are safe to display to users.
+    No internal information leaked.
+    """
+
+    # Constants
+    MAX_SUPPLY = 121000000.0
+    MAX_TRANSACTION_AMOUNT = MAX_SUPPLY
+    MAX_FEE = 1000.0  # Prevent excessive fees
+    MIN_AMOUNT = 0.00000001  # 1 satoshi equivalent
+
+    # Address validation
+    VALID_PREFIXES = ['XAI', 'AIXN', 'TXAI']
+    MIN_ADDRESS_LENGTH = 40
+    MAX_ADDRESS_LENGTH = 100
+
+    # String limits (prevent memory exhaustion)
+    MAX_STRING_LENGTH = 1000
+    MAX_JSON_SIZE = 1024 * 1024  # 1MB
+
+    @staticmethod
+    def validate_amount(amount: Any, field_name: str = "amount") -> float:
+        """
+        Validate transaction amount
+
+        Args:
+            amount: Amount to validate
+            field_name: Name of field (for error messages)
+
+        Returns:
+            float: Validated amount
+
+        Raises:
+            ValidationError: If validation fails
+        """
+        # Type check
+        if not isinstance(amount, (int, float)):
+            raise ValidationError(f"{field_name} must be a number")
+
+        # Convert to float
+        try:
+            amount = float(amount)
+        except (ValueError, OverflowError):
+            raise ValidationError(f"Invalid {field_name} value")
+
+        # Check for special values
+        if not (amount == amount):  # NaN check
+            raise ValidationError(f"{field_name} cannot be NaN")
+
+        if amount == float('inf') or amount == float('-inf'):
+            raise ValidationError(f"{field_name} cannot be infinite")
+
+        # Range validation
+        if amount < 0:
+            raise ValidationError(f"{field_name} cannot be negative")
+
+        if amount < SecurityValidator.MIN_AMOUNT and amount != 0:
+            raise ValidationError(f"{field_name} too small (minimum: {SecurityValidator.MIN_AMOUNT})")
+
+        if amount > SecurityValidator.MAX_TRANSACTION_AMOUNT:
+            raise ValidationError(f"{field_name} exceeds maximum ({SecurityValidator.MAX_TRANSACTION_AMOUNT})")
+
+        # Precision check (max 8 decimal places)
+        if round(amount, 8) != amount:
+            amount = round(amount, 8)
+
+        return amount
+
+    @staticmethod
+    def validate_address(address: Any, field_name: str = "address") -> str:
+        """
+        Validate XAI blockchain address
+
+        Args:
+            address: Address to validate
+            field_name: Name of field
+
+        Returns:
+            str: Validated address
+
+        Raises:
+            ValidationError: If validation fails
+        """
+        # Type check
+        if not isinstance(address, str):
+            raise ValidationError(f"{field_name} must be a string")
+
+        # Length check
+        if len(address) < SecurityValidator.MIN_ADDRESS_LENGTH:
+            raise ValidationError(f"{field_name} is too short")
+
+        if len(address) > SecurityValidator.MAX_ADDRESS_LENGTH:
+            raise ValidationError(f"{field_name} is too long")
+
+        # Prefix check
+        has_valid_prefix = False
+        for prefix in SecurityValidator.VALID_PREFIXES:
+            if address.startswith(prefix):
+                has_valid_prefix = True
+                break
+
+        if not has_valid_prefix:
+            valid_prefixes = ", ".join(SecurityValidator.VALID_PREFIXES)
+            raise ValidationError(f"{field_name} must start with one of: {valid_prefixes}")
+
+        # Character validation (alphanumeric only)
+        if not re.match(r'^[A-Za-z0-9_]+$', address):
+            raise ValidationError(f"{field_name} contains invalid characters")
+
+        return address
+
+    @staticmethod
+    def validate_fee(fee: Any) -> float:
+        """
+        Validate transaction fee
+
+        Args:
+            fee: Fee to validate
+
+        Returns:
+            float: Validated fee
+
+        Raises:
+            ValidationError: If validation fails
+        """
+        # Use amount validation
+        fee = SecurityValidator.validate_amount(fee, "fee")
+
+        # Additional fee-specific validation
+        if fee > SecurityValidator.MAX_FEE:
+            raise ValidationError(f"Fee too high (maximum: {SecurityValidator.MAX_FEE})")
+
+        return fee
+
+    @staticmethod
+    def validate_string(value: Any, field_name: str = "value", max_length: int = None) -> str:
+        """
+        Validate and sanitize string input
+
+        Args:
+            value: String to validate
+            field_name: Name of field
+            max_length: Maximum allowed length
+
+        Returns:
+            str: Sanitized string
+
+        Raises:
+            ValidationError: If validation fails
+        """
+        # Type check
+        if not isinstance(value, str):
+            raise ValidationError(f"{field_name} must be a string")
+
+        # Length check
+        max_len = max_length or SecurityValidator.MAX_STRING_LENGTH
+        if len(value) > max_len:
+            raise ValidationError(f"{field_name} is too long (maximum: {max_len} characters)")
+
+        # No control characters
+        if any(ord(c) < 32 for c in value if c not in '\n\r\t'):
+            raise ValidationError(f"{field_name} contains invalid characters")
+
+        # Strip whitespace
+        value = value.strip()
+
+        return value
+
+    @staticmethod
+    def validate_positive_integer(value: Any, field_name: str = "value") -> int:
+        """
+        Validate positive integer
+
+        Args:
+            value: Value to validate
+            field_name: Name of field
+
+        Returns:
+            int: Validated integer
+
+        Raises:
+            ValidationError: If validation fails
+        """
+        # Type check
+        if not isinstance(value, int):
+            try:
+                value = int(value)
+            except (ValueError, TypeError):
+                raise ValidationError(f"{field_name} must be an integer")
+
+        # Range check
+        if value < 0:
+            raise ValidationError(f"{field_name} must be positive")
+
+        if value > 2**63 - 1:  # Max safe integer
+            raise ValidationError(f"{field_name} is too large")
+
+        return value
+
+    @staticmethod
+    def validate_timestamp(timestamp: Any, field_name: str = "timestamp") -> float:
+        """
+        Validate UTC timestamp
+
+        Args:
+            timestamp: Timestamp to validate
+            field_name: Name of field
+
+        Returns:
+            float: Validated timestamp
+
+        Raises:
+            ValidationError: If validation fails
+        """
+        # Type check
+        if not isinstance(timestamp, (int, float)):
+            raise ValidationError(f"{field_name} must be a number")
+
+        try:
+            timestamp = float(timestamp)
+        except (ValueError, OverflowError):
+            raise ValidationError(f"Invalid {field_name}")
+
+        # Reasonable range (after year 2000, before year 2100)
+        if timestamp < 946684800:  # 2000-01-01
+            raise ValidationError(f"{field_name} is too old")
+
+        if timestamp > 4102444800:  # 2100-01-01
+            raise ValidationError(f"{field_name} is too far in future")
+
+        # Not too far in future (allow 2 hour clock drift)
+        current_time = datetime.now(timezone.utc).timestamp()
+        if timestamp > current_time + 7200:
+            raise ValidationError(f"{field_name} is too far in future")
+
+        return timestamp
+
+    @staticmethod
+    def validate_hex_string(value: Any, field_name: str = "value", exact_length: int = None) -> str:
+        """
+        Validate hexadecimal string
+
+        Args:
+            value: Hex string to validate
+            field_name: Name of field
+            exact_length: Exact length required (optional)
+
+        Returns:
+            str: Validated hex string
+
+        Raises:
+            ValidationError: If validation fails
+        """
+        # Type check
+        if not isinstance(value, str):
+            raise ValidationError(f"{field_name} must be a string")
+
+        # Hex validation
+        if not re.match(r'^[0-9a-fA-F]+$', value):
+            raise ValidationError(f"{field_name} must be hexadecimal")
+
+        # Length check
+        if exact_length and len(value) != exact_length:
+            raise ValidationError(f"{field_name} must be exactly {exact_length} characters")
+
+        return value.lower()
+
+    @staticmethod
+    def validate_network_type(network: Any) -> str:
+        """
+        Validate network type
+
+        Args:
+            network: Network to validate
+
+        Returns:
+            str: Validated network ('testnet' or 'mainnet')
+
+        Raises:
+            ValidationError: If validation fails
+        """
+        if not isinstance(network, str):
+            raise ValidationError("Network must be a string")
+
+        network = network.lower().strip()
+
+        if network not in ['testnet', 'mainnet']:
+            raise ValidationError("Network must be 'testnet' or 'mainnet'")
+
+        return network
+
+    @staticmethod
+    def sanitize_for_logging(data: Any) -> str:
+        """
+        Sanitize data for logging
+
+        Args:
+            data: Data to sanitize
+
+        Returns:
+            str: Sanitized string safe for logging
+        """
+        if isinstance(data, dict):
+            # Remove sensitive keys
+            sensitive_keys = ['ip', 'ip_address', 'user', 'email', 'phone', 'location', 'geo']
+            sanitized = {k: v for k, v in data.items() if k.lower() not in sensitive_keys}
+
+            # Truncate addresses for privacy
+            if 'address' in sanitized and isinstance(sanitized['address'], str):
+                addr = sanitized['address']
+                if len(addr) > 20:
+                    sanitized['address'] = f"{addr[:10]}...{addr[-6:]}"
+
+            return str(sanitized)
+
+        elif isinstance(data, str):
+            # Truncate long strings
+            if len(data) > 100:
+                return f"{data[:50]}...(truncated)"
+            return data
+
+        else:
+            return str(data)
+
+
+# Convenience functions for common validations
+
+def validate_transaction_data(data: dict) -> dict:
+    """
+    Validate complete transaction data
+
+    Args:
+        data: Transaction data dictionary
+
+    Returns:
+        dict: Validated transaction data
+
+    Raises:
+        ValidationError: If validation fails
+    """
+    validator = SecurityValidator()
+
+    # Required fields
+    if 'sender' not in data:
+        raise ValidationError("Missing required field: sender")
+    if 'recipient' not in data:
+        raise ValidationError("Missing required field: recipient")
+    if 'amount' not in data:
+        raise ValidationError("Missing required field: amount")
+
+    # Validate each field
+    validated = {
+        'sender': validator.validate_address(data['sender'], 'sender'),
+        'recipient': validator.validate_address(data['recipient'], 'recipient'),
+        'amount': validator.validate_amount(data['amount'], 'amount'),
+        'fee': validator.validate_fee(data.get('fee', 0.24))
+    }
+
+    # Optional fields
+    if 'private_key' in data:
+        validated['private_key'] = validator.validate_hex_string(
+            data['private_key'], 'private_key', exact_length=64
+        )
+
+    return validated
+
+
+def validate_api_request(data: dict, max_size: int = SecurityValidator.MAX_JSON_SIZE) -> dict:
+    """
+    Validate API request data
+
+    Args:
+        data: Request data
+        max_size: Maximum JSON size in bytes
+
+    Returns:
+        dict: Validated data
+
+    Raises:
+        ValidationError: If validation fails
+    """
+    # Size check
+    import json
+    json_str = json.dumps(data)
+    if len(json_str) > max_size:
+        raise ValidationError(f"Request too large (maximum: {max_size} bytes)")
+
+    return data

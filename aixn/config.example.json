@@ -1,0 +1,24 @@
+{
+  "network": {
+    "host": "0.0.0.0",
+    "port": 8545,
+    "comment": "Configure network settings. Use environment variables for production."
+  },
+  "mining": {
+    "enabled": false,
+    "threads": 1
+  },
+  "api": {
+    "enabled": true,
+    "websocket_enabled": true
+  },
+  "anonymity": {
+    "comment": "For maximum anonymity:",
+    "recommendations": [
+      "Run behind Tor hidden service",
+      "Use firewall rules to restrict access",
+      "Never expose to public internet directly",
+      "Change port from default 8545"
+    ]
+  }
+}

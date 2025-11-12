@@ -1,0 +1,21 @@
+# XAI Blockchain Dependencies
+
+# Cryptography
+ecdsa==0.18.0
+cryptography==41.0.5
+base58==2.1.1
+
+# Web Framework
+fastapi==0.104.1
+uvicorn==0.24.0
+pydantic==2.5.0
+flask==3.0.0
+flask-cors==4.0.0
+
+# Networking
+requests==2.31.0
+prometheus-client==0.20.0
+
+# Utilities
+python-dotenv==1.0.0
+pyyaml==6.0.1

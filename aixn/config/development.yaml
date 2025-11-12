@@ -1,0 +1,78 @@
+# XAI Blockchain - Development Configuration
+# Settings for local development and testing
+# Overrides default.yaml values
+
+# Network Configuration
+network:
+  port: 8545
+  host: "127.0.0.1"  # Only local connections in development
+  rpc_port: 8546
+  max_peers: 10  # Limited peers in development
+  peer_timeout: 15
+  sync_interval: 30
+  p2p_enabled: false  # Disable P2P in development
+
+# Blockchain Configuration
+blockchain:
+  difficulty: 2  # Easier mining for development
+  block_time_target: 30  # Faster blocks for testing (30 seconds)
+  initial_block_reward: 12.0
+  halving_interval: 1000  # Shorter interval for testing
+  max_supply: 121000000.0
+  max_block_size: 1048576
+  min_transaction_fee: 0.0001
+  transaction_fee_percent: 0.24
+
+# Security Configuration
+security:
+  rate_limit_enabled: false  # Disable rate limiting in development
+  rate_limit_requests: 1000
+  rate_limit_window: 60
+  ban_threshold: 100
+  ban_duration: 60  # Short ban duration for testing
+  enable_ip_whitelist: false
+  ip_whitelist: []
+  enable_ip_blacklist: false
+  ip_blacklist: []
+  max_transaction_size: 102400
+  max_mempool_size: 1000
+
+# Storage Configuration
+storage:
+  data_dir: "data_dev"
+  blockchain_file: "blockchain_dev.json"
+  wallet_dir: "wallets_dev"
+  backup_enabled: false  # Disable backups in development
+  backup_frequency: 3600
+  backup_retention: 1
+  max_backup_count: 3
+  enable_compression: false
+
+# Logging Configuration
+logging:
+  level: "DEBUG"  # Verbose logging for development
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  enable_file_logging: true
+  log_file: "logs/node_dev.log"
+  max_log_size: 5242880  # 5MB
+  log_retention: 1  # Keep logs for 1 day
+  enable_console_logging: true
+  enable_anonymous_logging: false  # Full logging in development
+
+# Genesis Block Configuration
+genesis:
+  genesis_file: "genesis_dev.json"
+  genesis_timestamp: 1704067200.0
+  network_id: 0xDEV1
+  address_prefix: "XDEV"
+
+# Feature Flags
+features:
+  faucet_enabled: true  # Enable faucet for testing
+  faucet_amount: 1000.0  # Generous faucet for testing
+  allow_chain_reset: true  # Allow chain reset in development
+  governance_enabled: true
+  ai_features_enabled: true
+  gamification_enabled: true
+  time_capsules_enabled: true
+  token_burning_enabled: true

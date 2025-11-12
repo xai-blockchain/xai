@@ -1,0 +1,12 @@
+{
+  "TEST123": [
+    {
+      "user_address": "TEST123",
+      "currency": "SOL",
+      "deposit_address": "7524bc8bbabf2f7cbccc2682562cfa15f76dccde2442",
+      "created_at": 1762495614.365128,
+      "total_deposited": 0.0,
+      "last_checked": 0
+    }
+  ]
+}

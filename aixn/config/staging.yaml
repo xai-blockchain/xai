@@ -1,0 +1,78 @@
+# XAI Blockchain - Staging Configuration
+# Settings for staging/pre-production testing
+# Overrides default.yaml values
+
+# Network Configuration
+network:
+  port: 9545  # Different port from prod
+  host: "0.0.0.0"
+  rpc_port: 9546
+  max_peers: 25
+  peer_timeout: 30
+  sync_interval: 60
+  p2p_enabled: true
+
+# Blockchain Configuration
+blockchain:
+  difficulty: 3  # Between testnet and mainnet
+  block_time_target: 120
+  initial_block_reward: 12.0
+  halving_interval: 262800
+  max_supply: 121000000.0
+  max_block_size: 1048576
+  min_transaction_fee: 0.0001
+  transaction_fee_percent: 0.24
+
+# Security Configuration
+security:
+  rate_limit_enabled: true
+  rate_limit_requests: 150
+  rate_limit_window: 60
+  ban_threshold: 15
+  ban_duration: 1800  # 30 minutes
+  enable_ip_whitelist: false
+  ip_whitelist: []
+  enable_ip_blacklist: true
+  ip_blacklist: []
+  max_transaction_size: 102400
+  max_mempool_size: 7500
+
+# Storage Configuration
+storage:
+  data_dir: "data_staging"
+  blockchain_file: "blockchain_staging.json"
+  wallet_dir: "wallets_staging"
+  backup_enabled: true
+  backup_frequency: 3600
+  backup_retention: 5  # days
+  max_backup_count: 7
+  enable_compression: true
+
+# Logging Configuration
+logging:
+  level: "DEBUG"  # More verbose for staging
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  enable_file_logging: true
+  log_file: "logs/node_staging.log"
+  max_log_size: 10485760
+  log_retention: 5  # days
+  enable_console_logging: true
+  enable_anonymous_logging: true
+
+# Genesis Block Configuration
+genesis:
+  genesis_file: "genesis_staging.json"
+  genesis_timestamp: 1704067200.0
+  network_id: 0x5742  # Different from mainnet
+  address_prefix: "SXAI"  # Staging prefix
+
+# Feature Flags
+features:
+  faucet_enabled: true  # Enable faucet for testing
+  faucet_amount: 50.0
+  allow_chain_reset: true  # Allow reset in staging
+  governance_enabled: true
+  ai_features_enabled: true
+  gamification_enabled: true
+  time_capsules_enabled: true
+  token_burning_enabled: true

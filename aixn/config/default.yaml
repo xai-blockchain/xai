@@ -1,0 +1,78 @@
+# XAI Blockchain - Default Configuration
+# This file contains the default settings that apply to all environments
+# Environment-specific files (development.yaml, production.yaml) override these values
+
+# Network Configuration
+network:
+  port: 8545
+  host: "0.0.0.0"
+  rpc_port: 8546
+  max_peers: 50
+  peer_timeout: 30  # seconds
+  sync_interval: 60  # seconds
+  p2p_enabled: true
+
+# Blockchain Configuration
+blockchain:
+  difficulty: 4
+  block_time_target: 120  # 2 minutes in seconds
+  initial_block_reward: 12.0
+  halving_interval: 262800  # blocks (approximately 1 year at 2min/block)
+  max_supply: 121000000.0  # Bitcoin tribute: 21M × 5 + 1M
+  max_block_size: 1048576  # 1MB
+  min_transaction_fee: 0.0001
+  transaction_fee_percent: 0.24
+
+# Security Configuration
+security:
+  rate_limit_enabled: true
+  rate_limit_requests: 100  # requests per window
+  rate_limit_window: 60  # seconds
+  ban_threshold: 10  # violations before ban
+  ban_duration: 3600  # 1 hour in seconds
+  enable_ip_whitelist: false
+  ip_whitelist: []
+  enable_ip_blacklist: true
+  ip_blacklist: []
+  max_transaction_size: 102400  # 100KB
+  max_mempool_size: 10000  # maximum pending transactions
+
+# Storage Configuration
+storage:
+  data_dir: "data"
+  blockchain_file: "blockchain.json"
+  wallet_dir: "wallets"
+  backup_enabled: true
+  backup_frequency: 3600  # 1 hour in seconds
+  backup_retention: 7  # days
+  max_backup_count: 10
+  enable_compression: true
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  enable_file_logging: true
+  log_file: "logs/node.log"
+  max_log_size: 10485760  # 10MB
+  log_retention: 7  # days
+  enable_console_logging: true
+  enable_anonymous_logging: true
+
+# Genesis Block Configuration
+genesis:
+  genesis_file: "genesis_new.json"
+  genesis_timestamp: 1704067200.0  # Jan 1, 2024
+  network_id: 0x5841  # 'XA' in hex
+  address_prefix: "AIXN"
+
+# Feature Flags
+features:
+  faucet_enabled: false
+  faucet_amount: 0.0
+  allow_chain_reset: false
+  governance_enabled: true
+  ai_features_enabled: true
+  gamification_enabled: true
+  time_capsules_enabled: true
+  token_burning_enabled: true

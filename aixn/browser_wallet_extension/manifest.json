@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "XAI Browser Wallet & Miner",
+  "description": "Lightweight wallet, mining controls, and wallet-to-wallet trading access.",
+  "version": "0.1.0",
+  "action": {
+    "default_title": "XAI Wallet Miner",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "host_permissions": [
+    "http://localhost:8545/*",
+    "http://127.0.0.1:8545/*",
+    "http://localhost:18545/*",
+    "http://127.0.0.1:18545/*"
+  ],
+  "permissions": [
+    "storage",
+    "alarms"
+ ]
+}

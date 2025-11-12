@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}XAI Block Explorer - Home{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    {% if stats %}
+    <div class="stat-card">
+        <h3>Total Blocks</h3>
+        <p>{{ "{:,}".format(stats.blocks) }}</p>
+    </div>
+    <div class="stat-card">
+        <h3>Total Transactions</h3>
+        <p>{{ "{:,}".format(stats.total_transactions) }}</p>
+    </div>
+    <div class="stat-card">
+        <h3>Pending TXs</h3>
+        <p>{{ stats.pending_transactions }}</p>
+    </div>
+    <div class="stat-card">
+        <h3>Total Supply</h3>
+        <p>{{ "{:,.0f}".format(stats.total_supply) }} XAI</p>
+    </div>
+    <div class="stat-card">
+        <h3>Network Difficulty</h3>
+        <p>{{ stats.difficulty }}</p>
+    </div>
+    <div class="stat-card">
+        <h3>Unique Addresses</h3>
+        <p>{{ "{:,}".format(stats.unique_addresses) }}</p>
+    </div>
+    {% else %}
+    <div class="stat-card">
+        <h3>Error</h3>
+        <p>Cannot connect to node</p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Recent Blocks</h2>
+    {% if recent_blocks %}
+    <table>
+        <thead>
+            <tr>
+                <th>Block</th>
+                <th>Hash</th>
+                <th>Transactions</th>
+                <th>Miner</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for block in recent_blocks %}
+            <tr>
+                <td><a href="/block/{{ block.index }}">#{{ block.index }}</a></td>
+                <td class="hash truncate">{{ block.hash[:16] }}...</td>
+                <td>{{ block.transactions|length }}</td>
+                <td class="hash truncate">
+                    {% if block.transactions %}
+                        <a href="/address/{{ block.transactions[0].recipient }}">
+                            {{ block.transactions[0].recipient[:20] }}...
+                        </a>
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </td>
+                <td>{{ format_timestamp(block.timestamp) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No blocks found or unable to connect to node.</p>
+    {% endif %}
+</div>
+
+{% if stats %}
+<div class="card">
+    <h2>Network Information</h2>
+    <table>
+        <tr>
+            <td><strong>Latest Block Hash</strong></td>
+            <td class="hash">{{ stats.latest_block_hash }}</td>
+        </tr>
+        <tr>
+            <td><strong>Miner Address</strong></td>
+            <td class="hash"><a href="/address/{{ stats.miner_address }}">{{ stats.miner_address }}</a></td>
+        </tr>
+        <tr>
+            <td><strong>Connected Peers</strong></td>
+            <td>{{ stats.peers }}</td>
+        </tr>
+        <tr>
+            <td><strong>Mining Status</strong></td>
+            <td>{% if stats.is_mining %}<span style="color: #4ecdc4;">✓ Active</span>{% else %}<span style="color: #ff6b6b;">✗ Stopped</span>{% endif %}</td>
+        </tr>
+        <tr>
+            <td><strong>Node Uptime</strong></td>
+            <td>{{ "%.2f"|format(stats.node_uptime / 3600) }} hours</td>
+        </tr>
+    </table>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-refresh stats every 10 seconds
+setInterval(function() {
+    fetch('/api/stats')
+        .then(response => response.json())
+        .then(data => {
+            if (data.blocks) {
+                // Optionally update stats without full page reload
+                console.log('Stats updated:', data);
+            }
+        })
+        .catch(error => console.error('Error fetching stats:', error));
+}, 10000);
+</script>
+{% endblock %}

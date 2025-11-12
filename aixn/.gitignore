@@ -1,0 +1,124 @@
+# XAI Blockchain - Anonymous Release Configuration
+
+# ============================================================
+# CRITICAL: Private wallet files (NEVER COMMIT)
+# ============================================================
+*PRIVATE*.json
+*_YOURS.json
+reserved_wallets*.json
+premium_wallets_PRIVATE.json
+standard_wallets_PRIVATE.json
+wallet_claims.json
+
+# Personal notes (NEVER COMMIT)
+NOTES.md
+TODO_PERSONAL.md
+PERSONAL_*.md
+*_PERSONAL.*
+
+# Configuration files (may contain custom network settings)
+config.json
+
+# ============================================================
+# Blockchain data (release separately as ZIP)
+# ============================================================
+blockchain_data/
+checkpoints/
+*.dat
+*.db
+
+# ============================================================
+# Python
+# ============================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ============================================================
+# Logs and temporary files
+# ============================================================
+*.log
+logs/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# ============================================================
+# OS Files (contain metadata)
+# ============================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ============================================================
+# IDEs (contain local paths)
+# ============================================================
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.project
+.pydevproject
+.settings/
+
+# ============================================================
+# Environment variables (may contain secrets)
+# ============================================================
+.env
+.env.local
+.env.*.local
+
+# ============================================================
+# Testing artifacts
+# ============================================================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ============================================================
+# Package managers
+# ============================================================
+node_modules/
+package-lock.json
+yarn.lock
+
+# ============================================================
+# Backup files
+# ============================================================
+*.bak
+*.backup
+*~
+
+# ============================================================
+# Windows
+# ============================================================
+[Tt]humbs.db
+[Ee]hthumbs.db
+[Ee]hthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# ============================================================
+# macOS
+# ============================================================
+.AppleDouble
+.LSOverride
+Icon

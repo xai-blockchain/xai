@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}XAI Block Explorer - Transaction{% endblock %}
+
+{% block content %}
+{% if tx %}
+<div class="card">
+    <h2>Transaction Details</h2>
+    <table>
+        <tr>
+            <td><strong>Transaction ID</strong></td>
+            <td class="hash">{{ tx.txid }}</td>
+        </tr>
+        <tr>
+            <td><strong>From</strong></td>
+            <td class="hash">
+                {% if tx.sender == 'COINBASE' %}
+                    <span style="color: #4ecdc4;">COINBASE (Block Reward)</span>
+                {% else %}
+                    <a href="/address/{{ tx.sender }}">{{ tx.sender }}</a>
+                {% endif %}
+            </td>
+        </tr>
+        <tr>
+            <td><strong>To</strong></td>
+            <td class="hash"><a href="/address/{{ tx.recipient }}">{{ tx.recipient }}</a></td>
+        </tr>
+        <tr>
+            <td><strong>Amount</strong></td>
+            <td style="color: #4ecdc4; font-size: 1.2em;"><strong>{{ format_amount(tx.amount) }} XAI</strong></td>
+        </tr>
+        <tr>
+            <td><strong>Transaction Fee</strong></td>
+            <td>{{ format_amount(tx.fee) }} XAI</td>
+        </tr>
+        <tr>
+            <td><strong>Timestamp</strong></td>
+            <td>{{ format_timestamp(tx.timestamp) }}</td>
+        </tr>
+        <tr>
+            <td><strong>Transaction Type</strong></td>
+            <td>
+                {% if tx.tx_type %}
+                    <span style="color: #ff6b6b;">{{ tx.tx_type }}</span>
+                {% else %}
+                    normal
+                {% endif %}
+            </td>
+        </tr>
+        {% if tx.signature %}
+        <tr>
+            <td><strong>Signature</strong></td>
+            <td class="hash" style="word-break: break-all;">{{ tx.signature }}</td>
+        </tr>
+        {% endif %}
+        {% if tx.public_key %}
+        <tr>
+            <td><strong>Public Key</strong></td>
+            <td class="hash" style="word-break: break-all;">{{ tx.public_key }}</td>
+        </tr>
+        {% endif %}
+    </table>
+</div>
+
+<div style="margin-top: 20px;">
+    <a href="/">← Back to Home</a>
+</div>
+{% else %}
+<div class="card">
+    <h2>Transaction Not Found</h2>
+    <p>The requested transaction does not exist or the node is unavailable.</p>
+    <p style="margin-top: 20px;"><a href="/">← Back to Home</a></p>
+</div>
+{% endif %}
+{% endblock %}

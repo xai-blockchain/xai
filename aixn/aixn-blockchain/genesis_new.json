@@ -1,0 +1,105 @@
+{
+  "index": 0,
+  "timestamp": 1704067200.0,
+  "transactions": [
+    {
+      "sender": "COINBASE",
+      "recipient": "AIXN7f3a9c2e1b8d4f6a5c9e2d1f8b4a7c3e9d2f1b",
+      "amount": 137500.0
+    },
+    {
+      "sender": "COINBASE",
+      "recipient": "AIXN4b8f2d9a6c3e1f7b4d9a2c8f1e6b3d7a9c2e",
+      "amount": 97600.0
+    },
+    {
+      "sender": "COINBASE",
+      "recipient": "AIXN9e2f1b4d7a3c6e8f2b4d9a1c7e3f6b8d2a9c",
+      "amount": 112300.0
+    },
+    {
+      "sender": "COINBASE",
+      "recipient": "AIXN3c6e8f1b4d7a2c9e4f2b8d1a6c3e7f9b2d4a",
+      "amount": 89400.0
+    },
+    {
+      "sender": "COINBASE",
+      "recipient": "AIXN8d2a9c4e6f1b3d7a2c9e8f4b1d6a3c7e2f9b",
+      "amount": 103700.0
+    },
+    {
+      "sender": "COINBASE",
+      "recipient": "AIXN2f9b4d6a1c8e3f7b2d9a4c6e1f8b3d7a2c9e",
+      "amount": 78900.0
+    },
+    {
+      "sender": "COINBASE",
+      "recipient": "AIXN6e3f7b2d9a1c4e8f3b6d2a9c1e7f4b8d3a2c",
+      "amount": 94200.0
+    },
+    {
+      "sender": "COINBASE",
+      "recipient": "AIXN1c4e7f9b3d2a6c8e1f4b7d9a2c3e6f8b1d4a",
+      "amount": 121000.0
+    },
+    {
+      "sender": "COINBASE",
+      "recipient": "AIXN7b2d9a4c1e6f8b3d7a2c9e4f1b6d8a3c2e7f",
+      "amount": 68500.0
+    },
+    {
+      "sender": "COINBASE",
+      "recipient": "AIXN4e8f2b6d1a9c3e7f4b2d8a1c6e9f3b7d2a4c",
+      "amount": 82300.0
+    },
+    {
+      "sender": "COINBASE",
+      "recipient": "AIXN9a3c2e6f1b8d4a7c2e9f3b1d6a8c4e2f7b9d",
+      "amount": 14600.0
+    },
+    {
+      "sender": "COINBASE",
+      "recipient": "AIXNVEST_FOUNDER_5M_DEC12_2026_2030",
+      "amount": 5000000.0,
+      "lock_until": 1765497600.0,
+      "vesting_schedule": "annual_dec12"
+    },
+    {
+      "sender": "COINBASE",
+      "recipient": "AIXNVEST_DEV_10M_JAN4_2028_2031",
+      "amount": 10000000.0,
+      "lock_until": 1799049600.0,
+      "vesting_schedule": "dev_fund"
+    },
+    {
+      "sender": "COINBASE",
+      "recipient": "AIXNVEST_MARKETING_6M_JAN4_2029",
+      "amount": 6000000.0,
+      "lock_until": 1830585600.0,
+      "vesting_schedule": "marketing_fund"
+    },
+    {
+      "sender": "COINBASE",
+      "recipient": "AIXNVEST_LIQUIDITY_400K_MONTHLY",
+      "amount": 400000.0,
+      "lock_until": 1704067200.0,
+      "vesting_schedule": "monthly_liquidity"
+    }
+  ],
+  "total_premine": 22400000.0,
+  "allocation_summary": {
+    "founder_immediate": 1000000.0,
+    "founder_vested": 5000000.0,
+    "dev_fund_vested": 10000000.0,
+    "marketing_vested": 6000000.0,
+    "liquidity_vested": 400000.0,
+    "total": 22400000.0
+  },
+  "mining_emission": {
+    "total_mineable": 98600000.0,
+    "emission_schedule": "16_years",
+    "starting_block_reward": 12.0,
+    "total_supply_cap": 121000000.0,
+    "bitcoin_tribute": "121M cap as homage to Bitcoin's 21M"
+  }
+}

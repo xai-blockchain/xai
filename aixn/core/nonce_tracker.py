@@ -1,0 +1,222 @@
+"""
+XAI Blockchain - Transaction Nonce Tracking
+
+Prevents replay attacks by tracking sequential nonces per address.
+"""
+
+import json
+import os
+from typing import Dict, Optional
+from threading import RLock
+
+
+class NonceTracker:
+    """
+    Track transaction nonces per address
+
+    Each address has a sequential nonce starting from 0.
+    Transactions must have nonce = current_nonce + 1.
+    """
+
+    def __init__(self, data_dir: str = None):
+        """
+        Initialize nonce tracker
+
+        Args:
+            data_dir: Directory to store nonce data
+        """
+        if data_dir is None:
+            data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+
+        self.data_dir = data_dir
+        os.makedirs(data_dir, exist_ok=True)
+
+        self.nonce_file = os.path.join(data_dir, 'nonces.json')
+        self.nonces: Dict[str, int] = {}
+        self.pending_nonces: Dict[str, int] = {}
+        self.lock = RLock()
+
+        # Load existing nonces
+        self._load_nonces()
+
+    def _load_nonces(self):
+        """Load nonces from file"""
+        if os.path.exists(self.nonce_file):
+            try:
+                with open(self.nonce_file, 'r') as f:
+                    self.nonces = json.load(f)
+            except Exception:
+                self.nonces = {}
+
+    def _save_nonces(self):
+        """Save nonces to file"""
+        try:
+            with open(self.nonce_file, 'w') as f:
+                json.dump(self.nonces, f, indent=2)
+        except Exception as e:
+            print(f"Error saving nonces: {e}")
+
+    def _get_confirmed_nonce(self, address: str) -> int:
+        return self.nonces.get(address, -1)
+
+    def _get_effective_nonce(self, address: str) -> int:
+        confirmed = self._get_confirmed_nonce(address)
+        pending = self.pending_nonces.get(address)
+        if pending is not None and pending > confirmed:
+            return pending
+        return confirmed
+
+    def get_nonce(self, address: str) -> int:
+        """
+        Get current nonce for address
+
+        Args:
+            address: Wallet address
+
+        Returns:
+            int: Current nonce (0 if new address)
+        """
+        with self.lock:
+            return self._get_confirmed_nonce(address)
+
+    def get_next_nonce(self, address: str) -> int:
+        """
+        Get next expected nonce for address
+
+        Args:
+            address: Wallet address
+
+        Returns:
+            int: Next nonce to use
+        """
+        with self.lock:
+            return self._get_effective_nonce(address) + 1
+
+    def validate_nonce(self, address: str, nonce: int) -> bool:
+        """
+        Validate that nonce is correct for address
+
+        Args:
+            address: Wallet address
+            nonce: Proposed nonce
+
+        Returns:
+            bool: True if nonce is valid
+        """
+        with self.lock:
+            expected = self._get_effective_nonce(address) + 1
+            return nonce == expected
+
+    def reserve_nonce(self, address: str, nonce: int):
+        """
+        Track a nonce that has been accepted into the mempool so the next
+        transaction from the same address can use nonce+1 even before confirmation.
+        """
+        with self.lock:
+            current = self._get_effective_nonce(address)
+            if nonce <= current:
+                return
+            self.pending_nonces[address] = nonce
+
+    def increment_nonce(self, address: str, nonce: Optional[int] = None):
+        """
+        Increment nonce after successful transaction
+
+        Args:
+            address: Wallet address
+        """
+        with self.lock:
+            confirmed = self._get_confirmed_nonce(address)
+            next_nonce = nonce if nonce is not None else confirmed + 1
+            if next_nonce < confirmed:
+                next_nonce = confirmed
+
+            self.nonces[address] = next_nonce
+            pending = self.pending_nonces.get(address)
+            if pending is not None and pending <= next_nonce:
+                self.pending_nonces.pop(address, None)
+
+            self._save_nonces()
+
+    def reset_nonce(self, address: str):
+        """
+        Reset nonce to 0 (for testing only)
+
+        Args:
+            address: Wallet address
+        """
+        with self.lock:
+            self.nonces[address] = -1
+            self.pending_nonces.pop(address, None)
+            self._save_nonces()
+
+    def get_stats(self) -> dict:
+        """
+        Get nonce tracking statistics
+
+        Returns:
+            dict: Statistics
+        """
+        with self.lock:
+            return {
+                'total_addresses': len(self.nonces),
+                'highest_nonce': max(self.nonces.values()) if self.nonces else 0,
+                'total_transactions': sum(self.nonces.values())
+            }
+
+
+# Global nonce tracker instance
+_global_nonce_tracker = None
+
+
+def get_nonce_tracker() -> NonceTracker:
+    """
+    Get global nonce tracker instance
+
+    Returns:
+        NonceTracker: Global tracker
+    """
+    global _global_nonce_tracker
+    if _global_nonce_tracker is None:
+        _global_nonce_tracker = NonceTracker()
+    return _global_nonce_tracker
+
+
+def validate_transaction_nonce(address: str, nonce: int) -> bool:
+    """
+    Convenience function to validate nonce
+
+    Args:
+        address: Wallet address
+        nonce: Proposed nonce
+
+    Returns:
+        bool: True if valid
+    """
+    tracker = get_nonce_tracker()
+    return tracker.validate_nonce(address, nonce)
+
+
+def increment_transaction_nonce(address: str, nonce: Optional[int] = None):
+    """
+    Convenience function to increment nonce
+
+    Args:
+        address: Wallet address
+    """
+    tracker = get_nonce_tracker()
+    tracker.increment_nonce(address, nonce)
+
+
+def get_next_nonce(address: str) -> int:
+    """
+    Convenience function to get next nonce
+
+    Args:
+        address: Wallet address
+
+    Returns:
+        int: Next nonce
+    """
+    tracker = get_nonce_tracker()
+    return tracker.get_next_nonce(address)

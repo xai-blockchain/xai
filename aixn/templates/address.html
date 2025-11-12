@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}XAI Block Explorer - Address{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Address Details</h2>
+    <table>
+        <tr>
+            <td><strong>Address</strong></td>
+            <td class="hash">{{ address }}</td>
+        </tr>
+        <tr>
+            <td><strong>Balance</strong></td>
+            <td style="color: #4ecdc4; font-size: 1.5em;"><strong>{{ format_amount(balance) }} XAI</strong></td>
+        </tr>
+        <tr>
+            <td><strong>Total Transactions</strong></td>
+            <td>{{ history|length }}</td>
+        </tr>
+    </table>
+</div>
+
+<div class="card">
+    <h2>Transaction History ({{ history|length }})</h2>
+    {% if history %}
+    <table>
+        <thead>
+            <tr>
+                <th>Block</th>
+                <th>Transaction ID</th>
+                <th>Type</th>
+                <th>From/To</th>
+                <th>Amount</th>
+                <th>Fee</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in history %}
+            <tr>
+                <td><a href="/block/{{ item.block }}">#{{ item.block }}</a></td>
+                <td class="hash truncate">
+                    <a href="/transaction/{{ item.txid }}" title="{{ item.txid }}">{{ item.txid[:16] }}...</a>
+                </td>
+                <td>
+                    {% if item.type == 'sent' %}
+                        <span style="color: #ff6b6b;">↗ Sent</span>
+                    {% else %}
+                        <span style="color: #4ecdc4;">↙ Received</span>
+                    {% endif %}
+                </td>
+                <td class="hash truncate">
+                    {% if item.type == 'sent' %}
+                        To: <a href="/address/{{ item.recipient }}" title="{{ item.recipient }}">{{ item.recipient[:16] }}...</a>
+                    {% else %}
+                        {% if item.sender == 'COINBASE' %}
+                            From: <span style="color: #4ecdc4;">COINBASE</span>
+                        {% else %}
+                            From: <a href="/address/{{ item.sender }}" title="{{ item.sender }}">{{ item.sender[:16] }}...</a>
+                        {% endif %}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if item.type == 'sent' %}
+                        <span style="color: #ff6b6b;">-{{ format_amount(item.amount) }} XAI</span>
+                    {% else %}
+                        <span style="color: #4ecdc4;">+{{ format_amount(item.amount) }} XAI</span>
+                    {% endif %}
+                </td>
+                <td>{{ format_amount(item.fee) }} XAI</td>
+                <td>{{ format_timestamp(item.timestamp) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No transactions found for this address.</p>
+    {% endif %}
+</div>
+
+<div style="margin-top: 20px;">
+    <a href="/">← Back to Home</a>
+</div>
+{% endblock %}

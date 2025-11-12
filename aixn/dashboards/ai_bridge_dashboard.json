@@ -1,0 +1,45 @@
+{
+  "title": "AI Bridge Health",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Queued Proposals",
+      "targets": [
+        {
+          "expr": "xai_ai_bridge_queue_events_total",
+          "legendFormat": "queued events"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Completed Tasks",
+      "targets": [
+        {
+          "expr": "xai_ai_completed_tasks_total",
+          "legendFormat": "completed"
+        }
+      ]
+    },
+    {
+      "type": "graph",
+      "title": "Tokens Consumed",
+      "targets": [
+        {
+          "expr": "xai_ai_tokens_consumed_total",
+          "legendFormat": "tokens"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Last Bridge Sync",
+      "targets": [
+        {
+          "expr": "xai_ai_bridge_last_sync_timestamp",
+          "legendFormat": "last sync"
+        }
+      ]
+    }
+  ]
+}
