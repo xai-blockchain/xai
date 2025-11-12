@@ -1,94 +1,39 @@
 """
-XAI Blockchain Node - Full node implementation
+AXN Blockchain Node - Full node implementation
 Runs blockchain, mines blocks, handles transactions, P2P communication
 """
 
 import json
+import os
+import sys
 import time
 import threading
 import requests
-from flask import Flask, jsonify, request, Response
+from flask import Flask, jsonify, request
 from flask_cors import CORS
-from blockchain import Blockchain, Transaction
-from ai_metrics import metrics
-from wallet import Wallet, WalletManager
-from social_recovery import SocialRecoveryManager
-from mining_bonuses import MiningBonusManager
-from exchange_wallet import ExchangeWalletManager
-from crypto_deposit_manager import CryptoDepositManager
-from trading import SwapOrderType
-from wallet_trade_manager import WalletTradeManager
-import sys
-import os
-from datetime import datetime, timezone
-from hardware_wallet import HardwareWalletManager
-from light_client_service import LightClientService
-from mobile_wallet_bridge import MobileWalletBridge
-from mobile_cache import MobileCacheService
-
-AI_BLOCKCHAIN_DIR = os.path.join(os.path.dirname(__file__), '..', 'aixn-blockchain')
-if AI_BLOCKCHAIN_DIR not in sys.path:
-    sys.path.insert(0, AI_BLOCKCHAIN_DIR)
-
-from ai_governance_dao import AIGovernanceDAO
-from blockchain_ai_bridge import BlockchainAIBridge
-from ai_safety_controls import AISafetyControls
-from ai_safety_controls_api import add_safety_control_routes
-
-# Import configuration (testnet/mainnet)
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from config import Config
-
-# Import security modules
-from security_validation import SecurityValidator, ValidationError, validate_transaction_data
-from rate_limiter import get_rate_limiter
-from anonymous_logger import get_logger
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
-
-from fiat_unlock_governance import FiatUnlockGovernance
-from aml_compliance import RegulatorDashboard, RiskLevel
-from api_security import APISecurityManager, RateLimitExceeded
-from account_abstraction import AccountAbstractionManager
-from mini_app_registry import MiniAppRegistry
-
-# Import algorithmic features
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-try:
-    from ai.fee_optimizer import AIFeeOptimizer
-    from ai.fraud_detector import AIFraudDetector
-    ALGO_FEATURES_ENABLED = True
-    print("✅ Algorithmic features loaded: Fee Optimizer + Fraud Detector")
-except ImportError as e:
-    ALGO_FEATURES_ENABLED = False
-    print(f"⚠️  Algorithmic features not available: {e}")
+from .blockchain import Blockchain, Transaction
+from .wallet import Wallet
+from .social_recovery import SocialRecoveryManager
+from .mining_bonuses import MiningBonusManager
+from .exchange_wallet import ExchangeWalletManager
+from .payment_processor import PaymentProcessor
+from .crypto_deposit_manager import CryptoDepositManager
+from .ai.fee_optimizer import AIFeeOptimizer
+from .ai.fraud_detector import AIFraudDetector
+ALGO_FEATURES_ENABLED = True
+print("✅ Algorithmic features loaded: Fee Optimizer + Fraud Detector")
 
 class BlockchainNode:
     """Full blockchain node with mining and networking"""
 
-    def __init__(self, host=None, port=None, miner_address=None):
-        # Network configuration from environment or defaults
-        # Use environment variables for production: XAI_HOST, XAI_PORT
-        self.host = host or os.getenv('XAI_HOST', '0.0.0.0')
-        self.port = port or int(os.getenv('XAI_PORT', str(Config.DEFAULT_PORT)))
-        self.blockchain = Blockchain()
-        self.safety_controls = AISafetyControls(self.blockchain)
+    def __init__(self, host='0.0.0.0', port=8545, miner_address=None):
+        self.host = host
+        self.port = port
+        self.data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+        self.blockchain = Blockchain(data_dir=self.data_dir)
         self.peers = set()  # Connected peer nodes
         self.is_mining = False
         self.mining_thread = None
-
-        # Initialize security
-        self.validator = SecurityValidator()
-        self.rate_limiter = get_rate_limiter()
-        self.logger = get_logger()
-        self.api_security = APISecurityManager()
-        self.light_client_service = LightClientService(self.blockchain)
-
-        # Initialize P2P security
-        from p2p_security import P2PSecurityManager
-        self.p2p_security = P2PSecurityManager()
-
-        # AML/regulator monitoring
-        self.regulator_dashboard = RegulatorDashboard(self.blockchain)
 
         # Initialize algorithmic features
         if ALGO_FEATURES_ENABLED:
@@ -111,19 +56,9 @@ class BlockchainNode:
         self.exchange_wallet_manager = ExchangeWalletManager(data_dir=os.path.join(os.path.dirname(__file__), '..', 'exchange_data'))
         print("Exchange Wallet system initialized")
 
-        trade_data_dir = os.path.join(os.path.dirname(__file__), '..', 'wallet_trade_data')
-        self.wallet_trade_manager = WalletTradeManager(
-            exchange_wallet_manager=self.exchange_wallet_manager,
-            data_dir=trade_data_dir
-        )
-        print("Wallet trade engine initialized")
-
-        # Payment/fiat services safety management
-        self.card_payments_disabled = True
-        governance_dir = os.path.join(Config.DATA_DIR, 'governance')
-        governance_path = os.path.join(os.path.dirname(__file__), '..', governance_dir)
-        self.fiat_unlock_manager = FiatUnlockGovernance(governance_path)
-        self.fiat_rails_unlocked = self.fiat_unlock_manager.is_unlocked()
+        # Initialize payment processor
+        self.payment_processor = PaymentProcessor()
+        print("Payment Processor initialized")
 
         # Initialize crypto deposit manager
         self.crypto_deposit_manager = CryptoDepositManager(
@@ -132,61 +67,6 @@ class BlockchainNode:
         )
         self.crypto_deposit_manager.start_monitoring()
         print("Crypto Deposit Manager initialized and monitoring started")
-
-        # Initialize wallet claim system
-        from wallet_claim_system import WalletClaimSystem
-        self.wallet_claim_system = WalletClaimSystem()
-
-        # Wallet manager for embedded accounts
-        wallet_dir = os.path.join(os.path.dirname(__file__), '..', 'wallets')
-        self.wallet_manager = WalletManager(data_dir=wallet_dir)
-        self.account_abstraction = AccountAbstractionManager(self.wallet_manager)
-
-        # Hardware wallet manager + Ledger integration
-        self.hardware_wallet_manager = HardwareWalletManager()
-        try:
-            from hardware_wallet_ledger import LedgerHardwareWallet
-        except ImportError:
-            LedgerHardwareWallet = None
-
-        if LedgerHardwareWallet:
-            try:
-                ledger_wallet = LedgerHardwareWallet()
-                ledger_wallet.connect()
-                self.hardware_wallet_manager.register_device('ledger', ledger_wallet)
-                print("Ledger hardware wallet registered.")
-            except Exception as exc:
-                print(f"Ledger hardware wallet unavailable: {exc}")
-
-        self.mobile_wallet_bridge = MobileWalletBridge(
-            blockchain=self.blockchain,
-            validator=self.validator,
-            fee_optimizer=getattr(self, 'fee_optimizer', None)
-        )
-        self.mobile_cache_service = MobileCacheService(self)
-        self.mini_app_registry = MiniAppRegistry()
-
-        # Generate unique node ID
-        self.node_id = self._generate_node_id()
-
-        # Track node start time for uptime-based wallet assignment
-        self.node_start_time = time.time()
-        self.uptime_wallet_claimed = False
-
-        # Check for bonus wallet assignment (immediate premium wallets)
-        self._check_bonus_wallet()
-
-        # Start uptime wallet checker thread
-        self._start_uptime_wallet_checker()
-
-        # Start governance AI bridge
-        self.governance_dao = AIGovernanceDAO(self.blockchain)
-        self.ai_bridge = BlockchainAIBridge(
-            blockchain=self.blockchain,
-            governance_dao=self.governance_dao,
-            development_pool=self.blockchain.ai_pool
-        )
-        self._start_ai_bridge_loop()
 
         # Set up miner wallet
         if miner_address:
@@ -201,33 +81,15 @@ class BlockchainNode:
         self.app = Flask(__name__)
         CORS(self.app)
         self.setup_routes()
-        add_safety_control_routes(self.app, self)
 
     def setup_routes(self):
         """Setup API endpoints"""
-
-        @self.app.before_request
-        def enforce_api_security():
-            """Apply rate limits and payload validation globally."""
-            if request.path.startswith('/ws') or request.path.startswith('/metrics'):
-                return
-            try:
-                self.api_security.enforce_request()
-            except RateLimitExceeded as exc:
-                return jsonify({'success': False, 'error': 'RATE_LIMIT_EXCEEDED', 'message': str(exc)}), 429
-            except ValidationError as exc:
-                return jsonify({'success': False, 'error': 'INVALID_REQUEST', 'message': str(exc)}), 400
-
-        # Error handler for validation errors
-        @self.app.errorhandler(ValidationError)
-        def handle_validation_error(error):
-            return jsonify({'error': str(error)}), 400
 
         @self.app.route('/', methods=['GET'])
         def index():
             return jsonify({
                 'status': 'online',
-                'node': 'XAI Full Node',
+                'node': 'AXN Full Node',
                 'version': '2.0.0',
                 'algorithmic_features': ALGO_FEATURES_ENABLED,
                 'endpoints': {
@@ -274,190 +136,9 @@ class BlockchainNode:
                     '/mining/referral/use': 'POST - Use referral code',
                     '/mining/user-bonuses/<address>': 'GET - Get all bonuses for user',
                     '/mining/leaderboard': 'GET - Mining bonus leaderboard',
-                    '/mining/stats': 'GET - Mining bonus system statistics',
-                    '/consensus/stats': 'GET - Advanced consensus statistics',
-                    '/consensus/finality/<block_index>': 'GET - Block finality information',
-                    '/consensus/orphans': 'GET - Orphan block pool statistics',
-                    '/consensus/difficulty': 'GET - Difficulty adjustment information',
-                    '/consensus/propagation': 'GET - Block propagation statistics',
-                    '/consensus/peer-performance': 'GET - Peer performance metrics'
+                    '/mining/stats': 'GET - Mining bonus system statistics'
                 }
             })
-
-        @self.app.route('/regulator/flagged', methods=['GET'])
-        def regulator_flagged_transactions():
-            """Expose high-risk transactions to compliance tooling."""
-            dashboard = getattr(self, 'regulator_dashboard', None)
-            if not dashboard:
-                return jsonify({'success': False, 'error': 'REGULATOR_UNAVAILABLE'}), 503
-            limit = request.args.get('limit', default=100, type=int)
-            min_score = request.args.get('min_score', default=61, type=int)
-            flagged = dashboard.get_flagged_transactions(min_score=min_score, limit=limit)
-            return jsonify({
-                'success': True,
-                'flagged_transactions': flagged,
-                'min_score': min_score
-            })
-
-        @self.app.route('/regulator/high-risk', methods=['GET'])
-        def regulator_high_risk():
-            """Expose addresses with consistently elevated risk."""
-            dashboard = getattr(self, 'regulator_dashboard', None)
-            if not dashboard:
-                return jsonify({'success': False, 'error': 'REGULATOR_UNAVAILABLE'}), 503
-            min_score = request.args.get('min_score', default=70, type=int)
-            high_risk = dashboard.get_high_risk_addresses(min_score=min_score)
-            return jsonify({
-                'success': True,
-                'high_risk_addresses': high_risk,
-                'min_score': min_score
-            })
-
-        @self.app.route('/mini-apps/manifest', methods=['GET'])
-        def mini_apps_manifest():
-            """Return the mini-app manifest that embeds via iframes or React components."""
-            dashboard = getattr(self, 'regulator_dashboard', None)
-            registry = getattr(self, 'mini_app_registry', None) or MiniAppRegistry()
-            address = request.args.get('address', '').strip()
-
-            risk_context = {
-                "address": address,
-                "risk_score": 0,
-                "risk_level": RiskLevel.CLEAN.value,
-                "flag_reasons": [],
-                "last_seen": None
-            }
-
-            if address:
-                try:
-                    self.validator.validate_address(address)
-                except ValidationError as ve:
-                    return jsonify({
-                        'success': False,
-                        'error': 'INVALID_ADDRESS',
-                        'message': str(ve)
-                    }), 400
-                if dashboard:
-                    risk_context = dashboard.get_address_risk_profile(address)
-
-            manifest = registry.build_manifest(risk_context)
-            return jsonify({
-                'success': True,
-                'address': address or None,
-                'aml_context': risk_context,
-                'mini_apps': manifest,
-            })
-
-        @self.app.route('/light-client/headers', methods=['GET'])
-        def light_client_headers():
-            """Return compact block headers for mobile clients."""
-            count = request.args.get('count', default=20, type=int)
-            start_index = request.args.get('start', default=None, type=int)
-            summary = self.light_client_service.get_recent_headers(count=count, start_index=start_index)
-            return jsonify({'success': True, **summary})
-
-        @self.app.route('/light-client/checkpoint', methods=['GET'])
-        def light_client_checkpoint():
-            """Return the latest checkpoint summary for SPV wallets."""
-            checkpoint = self.light_client_service.get_checkpoint()
-            return jsonify({'success': True, **checkpoint})
-
-        @self.app.route('/light-client/tx-proof/<txid>', methods=['GET'])
-        def light_client_tx_proof(txid):
-            """Return a merkle proof for a confirmed transaction."""
-            proof = self.light_client_service.get_transaction_proof(txid)
-            if not proof:
-                return jsonify({'success': False, 'error': 'TX_NOT_FOUND'}), 404
-            return jsonify({'success': True, 'proof': proof})
-
-        @self.app.route('/mobile/transactions/draft', methods=['POST'])
-        def mobile_tx_draft():
-            payload = request.get_json() or {}
-            try:
-                draft = self.mobile_wallet_bridge.create_draft(payload)
-            except ValueError as exc:
-                return jsonify({'success': False, 'error': str(exc)}), 400
-            return jsonify({'success': True, 'draft': draft})
-
-        @self.app.route('/mobile/transactions/draft/<draft_id>', methods=['GET'])
-        def mobile_tx_get_draft(draft_id):
-            draft = self.mobile_wallet_bridge.get_draft(draft_id)
-            if not draft:
-                return jsonify({'success': False, 'error': 'DRAFT_NOT_FOUND'}), 404
-            return jsonify({'success': True, 'draft': draft})
-
-        @self.app.route('/mobile/transactions/commit', methods=['POST'])
-        def mobile_tx_commit():
-            payload = request.get_json() or {}
-            draft_id = payload.get('draft_id')
-            signature = payload.get('signature')
-            public_key = payload.get('public_key')
-            if not all([draft_id, signature, public_key]):
-                return jsonify({'success': False, 'error': 'draft_id, signature, and public_key are required'}), 400
-            try:
-                tx = self.mobile_wallet_bridge.commit_draft(draft_id, signature, public_key)
-            except ValueError as exc:
-                return jsonify({'success': False, 'error': str(exc)}), 400
-            return jsonify({'success': True, 'txid': tx.txid})
-
-        @self.app.route('/mobile/cache/summary', methods=['GET'])
-        def mobile_cache_summary():
-            address = request.args.get('address', '').strip()
-            try:
-                summary = self.mobile_cache_service.build_summary(address or None)
-                return jsonify({'success': True, 'summary': summary})
-            except Exception as exc:  # pragma: no cover
-                if hasattr(self, 'logger'):
-                    self.logger.error(f"Mobile cache summary failed: {exc}")
-                return jsonify({
-                    'success': False,
-                    'error': 'MOBILE_CACHE_ERROR',
-                    'message': str(exc)
-                }), 500
-
-        @self.app.route('/ai/bridge/status', methods=['GET'])
-        def ai_bridge_status():
-            """Get quick summary of the AI bridge queue"""
-
-            total_queued = len(self.ai_bridge.proposal_task_map)
-            total_completed = len(self.blockchain.ai_pool.completed_tasks)
-
-            return jsonify({
-                'queued_proposals': total_queued,
-                'completed_tasks': total_completed,
-                'bridge_recognized': len(self.ai_bridge.queued_proposals)
-            }), 200
-
-        @self.app.route('/ai/bridge/tasks', methods=['GET'])
-        def ai_bridge_tasks():
-            """List currently queued AI tasks and their proposals"""
-
-            completed_ids = {task.task_id for task in self.blockchain.ai_pool.completed_tasks}
-            tasks = []
-
-            for proposal_id, task_id in self.ai_bridge.proposal_task_map.items():
-                proposal = self.governance_dao.proposals.get(proposal_id)
-                state = 'completed' if task_id in completed_ids else 'queued'
-
-                tasks.append({
-                    'proposal_id': proposal_id,
-                    'task_id': task_id,
-                    'status': state,
-                    'category': getattr(proposal.category, 'value', None) if proposal else None,
-                    'votes_for': getattr(proposal, 'votes_for', None) if proposal else None,
-                    'estimated_tokens': getattr(proposal, 'estimated_tokens', None) if proposal else None,
-                    'assigned_model': getattr(proposal, 'assigned_ai_model', None) if proposal else None
-                })
-
-            return jsonify({
-                'total_tasks': len(tasks),
-                'tasks': tasks
-            }), 200
-
-        @self.app.route('/ai/metrics', methods=['GET'])
-        def ai_metrics():
-            """Get snapshot of AI metrics"""
-            return jsonify(metrics.get_snapshot()), 200
 
         @self.app.route('/stats', methods=['GET'])
         def get_stats():
@@ -529,9 +210,6 @@ class BlockchainNode:
         @self.app.route('/balance/<address>', methods=['GET'])
         def get_balance(address):
             """Get address balance"""
-            # Validate address
-            address = self.validator.validate_address(address)
-
             balance = self.blockchain.get_balance(address)
             return jsonify({
                 'address': address,
@@ -553,54 +231,29 @@ class BlockchainNode:
             """Submit new transaction"""
             data = request.json
 
-            # Rate limiting
-            rate_ok, rate_msg = self.rate_limiter.check_rate_limit(
-                request_identifier=data.get('sender', 'unknown'),
-                endpoint='/send'
-            )
-            if not rate_ok:
-                self.logger.rate_limit_exceeded('/send')
-                return jsonify({'error': rate_msg}), 429
-
-            required_fields = ['sender', 'recipient', 'amount', 'private_key']
+            required_fields = ['sender', 'recipient', 'amount', 'public_key', 'signature']
             if not all(field in data for field in required_fields):
                 return jsonify({'error': 'Missing required fields'}), 400
 
             try:
-                # Validate transaction data
-                validated = validate_transaction_data(data)
-
-                # Derive public key from private key
-                import ecdsa
-                sk = ecdsa.SigningKey.from_string(bytes.fromhex(validated['private_key']), curve=ecdsa.SECP256k1)
-                vk = sk.get_verifying_key()
-                public_key = vk.to_string().hex()
-
-                # Get next nonce for sender
-                nonce = self.blockchain.nonce_tracker.get_next_nonce(validated['sender'])
-
-                # Create transaction with public key and nonce
+                # Create transaction without signature
                 tx = Transaction(
-                    sender=validated['sender'],
-                    recipient=validated['recipient'],
-                    amount=validated['amount'],
-                    fee=validated['fee'],
-                    public_key=public_key,
-                    nonce=nonce
+                    sender=data['sender'],
+                    recipient=data['recipient'],
+                    amount=float(data['amount']),
+                    fee=float(data.get('fee', 0.01)),
+                    public_key=data['public_key']
                 )
 
-                # Sign transaction
-                tx.sign_transaction(validated['private_key'])
+                # Set the signature from the request data
+                tx.signature = data['signature']
+
+                # Verify the signature
+                if not tx.verify_signature():
+                    return jsonify({'error': 'Invalid signature'}), 400
 
                 # Add to blockchain
                 if self.blockchain.add_transaction(tx):
-                    # Log transaction
-                    self.logger.transaction_received(
-                        validated['sender'],
-                        validated['recipient'],
-                        validated['amount']
-                    )
-
                     # Broadcast to peers
                     self.broadcast_transaction(tx)
 
@@ -610,95 +263,32 @@ class BlockchainNode:
                         'message': 'Transaction submitted successfully'
                     })
                 else:
-                    self.logger.validation_failed('Transaction blockchain validation failed')
                     return jsonify({
                         'success': False,
                         'error': 'Transaction validation failed'
                     }), 400
 
-            except ValidationError as e:
-                self.logger.validation_failed(str(e))
-                raise
             except Exception as e:
-                self.logger.error(f'Transaction error: {str(e)}')
                 return jsonify({'error': str(e)}), 500
 
         @self.app.route('/mine', methods=['POST'])
         def mine_block():
             """Mine pending transactions"""
-            # Rate limiting
-            rate_ok, rate_msg = self.rate_limiter.check_rate_limit(
-                request_identifier=self.miner_address,
-                endpoint='/mine'
-            )
-            if not rate_ok:
-                self.logger.rate_limit_exceeded('/mine')
-                return jsonify({'error': rate_msg}), 429
-
             if not self.blockchain.pending_transactions:
                 return jsonify({'error': 'No pending transactions to mine'}), 400
 
             try:
                 block = self.blockchain.mine_pending_transactions(self.miner_address)
 
-                # Log block mining
-                self.logger.block_mined(
-                    block.index,
-                    block.hash,
-                    len(block.transactions)
-                )
-
                 # Broadcast new block to peers
                 self.broadcast_block(block)
 
-                response = {
+                return jsonify({
                     'success': True,
                     'block': block.to_dict(),
                     'message': f'Block {block.index} mined successfully',
                     'reward': self.blockchain.block_reward
-                }
-
-                # AUTO-CHECK: Check if miner has unclaimed wallet
-                # This ensures browser miners don't miss out!
-                try:
-                    # Check if wallet already exists
-                    premium_wallet_file = os.path.join(os.path.dirname(__file__), '..', 'xai_og_wallet.json')
-                    standard_wallet_file = os.path.join(os.path.dirname(__file__), '..', 'xai_early_adopter_wallet.json')
-
-                    has_wallet = os.path.exists(premium_wallet_file) or os.path.exists(standard_wallet_file)
-
-                    if not has_wallet:
-                        # Try to claim wallet using miner address as identifier
-                        miner_id = self.miner_address
-
-                        # Try premium first
-                        premium_result = self.wallet_claim_system.claim_premium_wallet(
-                            node_id=miner_id,
-                            proof_of_mining=None
-                        )
-
-                        if premium_result['success']:
-                            self._save_bonus_wallet(premium_result['wallet'], tier=premium_result['tier'])
-                            response['bonus_wallet'] = {
-                                'claimed': True,
-                                'tier': 'premium',
-                                'address': premium_result['wallet']['address'],
-                                'file': 'xai_og_wallet.json',
-                                'message': '🎁 CONGRATULATIONS! Premium wallet auto-assigned!',
-                                'remaining_premium': premium_result.get('remaining_premium', 0)
-                            }
-                        else:
-                            # Premium exhausted, notify about uptime requirement
-                            response['wallet_notification'] = {
-                                'message': '🎁 WALLET AVAILABLE! Run node for 30 minutes to claim early adopter wallet',
-                                'action': 'Call POST /claim-wallet with your miner address after 30 minutes'
-                            }
-
-                except Exception as e:
-                    # Don't fail mining if wallet check fails
-                    print(f"[WARNING] Wallet auto-check failed: {e}")
-
-                return jsonify(response)
+                })
 
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
@@ -1134,36 +724,7 @@ class BlockchainNode:
                 'treasure': treasure
             })
 
-        @self.app.route('/timecapsule/create', methods=['POST'])
-        def create_timecapsule():
-            """Create a time-locked transaction"""
-            data = request.json
 
-            required_fields = ['sender', 'recipient', 'amount', 'unlock_timestamp']
-            if not all(field in data for field in required_fields):
-                return jsonify({'error': 'Missing required fields'}), 400
-
-            try:
-                capsule_id = self.blockchain.timecapsule_manager.create_time_capsule(
-                    sender=data['sender'],
-                    recipient=data['recipient'],
-                    amount=float(data['amount']),
-                    unlock_timestamp=float(data['unlock_timestamp']),
-                    message=data.get('message', ''),
-                    private_key=data.get('private_key')
-                )
-
-                from datetime import datetime
-                unlock_date = datetime.fromtimestamp(data['unlock_timestamp']).strftime('%Y-%m-%d %H:%M:%S')
-
-                return jsonify({
-                    'success': True,
-                    'capsule_id': capsule_id,
-                    'unlock_date': unlock_date,
-                    'message': 'Time capsule created successfully'
-                })
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
 
         @self.app.route('/timecapsule/pending', methods=['GET'])
         def get_pending_timecapsules():
@@ -1238,7 +799,7 @@ class BlockchainNode:
 
         @self.app.route('/mining/claim-bonus', methods=['POST'])
         def claim_bonus():
-            """Claim a social bonus"""
+            """Claim a social bonus (tweet verification, discord join, etc.)"""
             data = request.json
 
             required_fields = ['address', 'bonus_type']
@@ -1316,87 +877,6 @@ class BlockchainNode:
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
-        # ==================== ADVANCED CONSENSUS ENDPOINTS ====================
-
-        @self.app.route('/consensus/stats', methods=['GET'])
-        def get_consensus_stats():
-            """Get advanced consensus statistics"""
-            try:
-                stats = self.blockchain.get_consensus_stats()
-                return jsonify({
-                    'success': True,
-                    'stats': stats
-                })
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
-
-        @self.app.route('/consensus/finality/<int:block_index>', methods=['GET'])
-        def get_block_finality(block_index):
-            """Get finality information for a specific block"""
-            try:
-                if block_index < 0 or block_index >= len(self.blockchain.chain):
-                    return jsonify({'error': 'Block not found'}), 404
-
-                finality_info = self.blockchain.get_block_finality(block_index)
-                return jsonify({
-                    'success': True,
-                    'block_index': block_index,
-                    'finality': finality_info
-                })
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
-
-        @self.app.route('/consensus/orphans', methods=['GET'])
-        def get_orphan_stats():
-            """Get orphan block pool statistics"""
-            try:
-                stats = self.blockchain.consensus_manager.orphan_pool.get_stats()
-                return jsonify({
-                    'success': True,
-                    'orphan_pool': stats
-                })
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
-
-        @self.app.route('/consensus/difficulty', methods=['GET'])
-        def get_difficulty_info():
-            """Get difficulty adjustment information"""
-            try:
-                stats = self.blockchain.consensus_manager.difficulty_adjuster.get_difficulty_stats(self.blockchain)
-                return jsonify({
-                    'success': True,
-                    'difficulty_info': stats
-                })
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
-
-        @self.app.route('/consensus/propagation', methods=['GET'])
-        def get_propagation_stats():
-            """Get block propagation statistics"""
-            try:
-                stats = self.blockchain.consensus_manager.propagation_monitor.get_network_stats()
-                return jsonify({
-                    'success': True,
-                    'propagation_stats': stats
-                })
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
-
-        @self.app.route('/consensus/peer-performance', methods=['GET'])
-        def get_peer_performance():
-            """Get performance metrics for all peers"""
-            try:
-                peer_stats = {}
-                for peer in self.peers:
-                    peer_stats[peer] = self.blockchain.consensus_manager.propagation_monitor.get_peer_performance(peer)
-
-                return jsonify({
-                    'success': True,
-                    'peer_performance': peer_stats
-                })
-            except Exception as e:
-                return jsonify({'error': str(e)}), 500
-
         # ==================== EXCHANGE API ENDPOINTS ====================
 
         @self.app.route('/exchange/orders', methods=['GET'])
@@ -1449,8 +929,8 @@ class BlockchainNode:
                 if price <= 0 or amount <= 0:
                     return jsonify({'error': 'Price and amount must be positive'}), 400
 
-                # Parse trading pair (default XAI/USD)
-                pair = data.get('pair', 'XAI/USD')
+                # Parse trading pair (default AXN/USD)
+                pair = data.get('pair', 'AXN/USD')
                 base_currency, quote_currency = pair.split('/')
 
                 # Calculate total cost
@@ -1459,7 +939,7 @@ class BlockchainNode:
                 # Verify user has sufficient balance
                 user_address = data['address']
                 if data['order_type'] == 'buy':
-                    # Buying base currency (XAI), need quote currency (USD/BTC/ETH)
+                    # Buying base currency (AXN), need quote currency (USD/BTC/ETH)
                     balance_info = self.exchange_wallet_manager.get_balance(user_address, quote_currency)
                     if balance_info['available'] < total_cost:
                         return jsonify({
@@ -1472,7 +952,7 @@ class BlockchainNode:
                         return jsonify({'success': False, 'error': 'Failed to lock funds'}), 500
 
                 else:  # sell
-                    # Selling base currency (XAI), need base currency
+                    # Selling base currency (AXN), need base currency
                     balance_info = self.exchange_wallet_manager.get_balance(user_address, base_currency)
                     if balance_info['available'] < amount:
                         return jsonify({
@@ -1873,125 +1353,76 @@ class BlockchainNode:
 
         @self.app.route('/exchange/buy-with-card', methods=['POST'])
         def buy_with_card():
-            """Buy XAI with credit/debit card (temporarily disabled)"""
-            return jsonify({
-                'success': False,
-                'error': 'CARD_PAYMENTS_DISABLED',
-                'message': self._fiat_lock_message()
-            }), 503
+            """Buy AXN with credit/debit card"""
+            data = request.json
+
+            required_fields = ['address', 'usd_amount', 'email']
+            if not all(field in data for field in required_fields):
+                return jsonify({'error': 'Missing required fields'}), 400
+
+            try:
+                # Calculate purchase
+                calc = self.payment_processor.calculate_purchase(data['usd_amount'])
+                if not calc['success']:
+                    return jsonify(calc), 400
+
+                # Process payment (test mode - auto success)
+                payment_result = self.payment_processor.process_card_payment(
+                    user_address=data['address'],
+                    usd_amount=data['usd_amount'],
+                    card_token=data.get('card_token', 'tok_test'),
+                    email=data['email']
+                )
+
+                if not payment_result['success']:
+                    return jsonify(payment_result), 400
+
+                # Deposit AXN to user's exchange wallet
+                deposit_result = self.exchange_wallet_manager.deposit(
+                    user_address=data['address'],
+                    currency='AXN',
+                    amount=payment_result['axn_amount'],
+                    deposit_type='credit_card',
+                    tx_hash=payment_result['payment_id']
+                )
+
+                return jsonify({
+                    'success': True,
+                    'payment': payment_result,
+                    'deposit': deposit_result,
+                    'message': f"Successfully purchased {payment_result['axn_amount']:.2f} AXN"
+                })
+
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
 
         @self.app.route('/exchange/payment-methods', methods=['GET'])
         def get_payment_methods():
-            """Get supported payment methods (card/bank disabled)"""
-            return jsonify({
-                'success': False,
-                'error': 'PAYMENT_METHODS_DISABLED',
-                'message': self._fiat_lock_message()
-            }), 503
+            """Get supported payment methods"""
+            try:
+                methods = self.payment_processor.get_supported_payment_methods()
+                return jsonify({
+                    'success': True,
+                    'methods': methods
+                })
+
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
 
         @self.app.route('/exchange/calculate-purchase', methods=['POST'])
         def calculate_purchase():
-            """Calculate XAI amount for USD purchase (temporarily disabled)"""
-            return jsonify({
-                'success': False,
-                'error': 'CALCULATE_PURCHASE_DISABLED',
-                'message': self._fiat_lock_message()
-            }), 503
+            """Calculate AXN amount for USD purchase"""
+            data = request.json
 
-        # ==================== WALLET TRADE API ====================
-
-        @self.app.route('/wallet-trades/orders', methods=['GET'])
-        def wallet_trade_orders():
-            limit_param = request.args.get('limit')
-            try:
-                limit = int(limit_param) if limit_param else None
-            except ValueError:
-                return jsonify({'error': 'Invalid limit value'}), 400
-
-            orders = self.wallet_trade_manager.list_open_orders(limit=limit)
-            return jsonify({'success': True, 'orders': orders})
-
-        @self.app.route('/wallet-trades/orders/<address>', methods=['GET'])
-        def wallet_orders_for_address(address):
-            orders = self.wallet_trade_manager.get_wallet_orders(address)
-            return jsonify({'success': True, 'orders': orders})
-
-        @self.app.route('/wallet-trades/matches/<address>', methods=['GET'])
-        def wallet_matches_for_address(address):
-            matches = self.wallet_trade_manager.get_wallet_matches(address)
-            status_filter = request.args.get('status')
-            if status_filter:
-                matches = [m for m in matches if m.get('status') == status_filter.lower()]
-            return jsonify({'success': True, 'matches': matches})
-
-        @self.app.route('/wallet-trades/place-order', methods=['POST'])
-        def place_wallet_trade_order():
-            data = request.json or {}
-            required = ['address', 'token_offered', 'amount_offered', 'token_requested', 'price']
-            missing = [field for field in required if field not in data]
-            if missing:
-                return jsonify({'error': f"Missing required fields: {', '.join(missing)}"}), 400
+            if 'usd_amount' not in data:
+                return jsonify({'error': 'Missing usd_amount'}), 400
 
             try:
-                order_type = data.get('order_type', 'sell')
-                order_type_enum = SwapOrderType(order_type.lower())
-                amount_requested = data.get('amount_requested')
-                expiry = float(data['expiry']) if data.get('expiry') else None
-                order, matches = self.wallet_trade_manager.place_order(
-                    maker_address=data['address'],
-                    token_offered=data['token_offered'],
-                    amount_offered=float(data['amount_offered']),
-                    token_requested=data['token_requested'],
-                    amount_requested=float(amount_requested) if amount_requested else None,
-                    price=float(data['price']),
-                    order_type=order_type_enum,
-                    expiry=expiry,
-                    fee=float(data.get('fee', 0.0)),
-                    maker_public_key=data.get('public_key', ''),
-                    metadata=data.get('metadata'),
-                )
-                response = {
-                    'success': True,
-                    'order': order.to_dict(),
-                    'matches': [m.to_dict() for m in matches]
-                }
-                return jsonify(response)
+                calc = self.payment_processor.calculate_purchase(data['usd_amount'])
+                return jsonify(calc)
 
-            except ValueError as ve:
-                return jsonify({'error': str(ve)}), 400
-            except Exception as exc:
-                return jsonify({'error': str(exc)}), 500
-
-        @self.app.route('/wallet-trades/settle', methods=['POST'])
-        def settle_wallet_trade():
-            data = request.json or {}
-            match_id = data.get('match_id')
-            secret = data.get('secret')
-            if not match_id or not secret:
-                return jsonify({'error': 'match_id and secret are required'}), 400
-
-            try:
-                match = self.wallet_trade_manager.settle_match(match_id, secret)
-                return jsonify({'success': True, 'match': match.to_dict()})
-            except ValueError as ve:
-                return jsonify({'error': str(ve)}), 400
-            except Exception as exc:
-                return jsonify({'error': str(exc)}), 500
-
-        @self.app.route('/wallet-trades/refund', methods=['POST'])
-        def refund_wallet_trade():
-            data = request.json or {}
-            match_id = data.get('match_id')
-            if not match_id:
-                return jsonify({'error': 'match_id is required'}), 400
-
-            try:
-                match = self.wallet_trade_manager.refund_match(match_id)
-                return jsonify({'success': True, 'match': match.to_dict()})
-            except ValueError as ve:
-                return jsonify({'error': str(ve)}), 400
-            except Exception as exc:
-                return jsonify({'error': str(exc)}), 500
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
 
         # ==================== CRYPTO DEPOSIT API ENDPOINTS ====================
 
@@ -2070,81 +1501,6 @@ class BlockchainNode:
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
-        # ================================================================
-        # TESTNET FAUCET (only enabled on testnet)
-        # ================================================================
-        if Config.FAUCET_ENABLED:
-            @self.app.route('/faucet/claim', methods=['POST'])
-            def claim_testnet_faucet():
-                """
-                Claim free testnet XAI (TESTNET ONLY!)
-
-                Request:
-                {
-                  "address": "TXAI..."
-                }
-
-                Response:
-                {
-                  "success": true,
-                  "amount": 100.0,
-                  "txid": "...",
-                  "message": "Testnet faucet claim successful"
-                }
-                """
-                data = request.get_json()
-
-                if not data or 'address' not in data:
-                    return jsonify({'error': 'Missing address'}), 400
-
-                address = data['address']
-
-                # Rate limiting (10 per day for faucet)
-                rate_ok, rate_msg = self.rate_limiter.check_rate_limit(
-                    request_identifier=address,
-                    endpoint='/faucet/claim'
-                )
-                if not rate_ok:
-                    self.logger.rate_limit_exceeded('/faucet/claim')
-                    return jsonify({'error': rate_msg}), 429
-
-                # Validate address
-                try:
-                    address = self.validator.validate_address(address)
-                except ValidationError as e:
-                    return jsonify({'error': str(e)}), 400
-
-                # Verify address has correct testnet prefix
-                if not address.startswith(Config.ADDRESS_PREFIX):
-                    return jsonify({
-                        'error': f'Invalid address. Testnet addresses must start with {Config.ADDRESS_PREFIX}'
-                    }), 400
-
-                # Create faucet transaction
-                faucet_tx = Transaction(
-                    sender="TESTNET_FAUCET",
-                    recipient=address,
-                    amount=Config.FAUCET_AMOUNT,
-                    fee=0.0
-                )
-                faucet_tx.txid = faucet_tx.calculate_hash()
-
-                # Add to pending transactions
-                self.blockchain.pending_transactions.append(faucet_tx)
-
-                # Log faucet claim
-                self.logger.info(f'Faucet claim: {address[:6]}...{address[-4:]} ({Config.FAUCET_AMOUNT} XAI)')
-
-                return jsonify({
-                    'success': True,
-                    'amount': Config.FAUCET_AMOUNT,
-                    'txid': faucet_tx.txid,
-                    'message': f'Testnet faucet claim successful! {Config.FAUCET_AMOUNT} XAI will be added to your address after the next block.',
-                    'note': 'This is testnet XAI - it has no real value!'
-                })
-
-            print(f"✅ Testnet faucet enabled: {Config.FAUCET_AMOUNT} XAI per claim")
-
     def _match_orders(self, new_order, all_orders):
         """Internal method to match buy/sell orders and execute balance transfers"""
         try:
@@ -2173,7 +1529,7 @@ class BlockchainNode:
                 seller_addr = match_order['address'] if new_order['order_type'] == 'buy' else new_order['address']
 
                 # Get currencies from orders (they should match)
-                base_currency = new_order.get('base_currency', 'XAI')
+                base_currency = new_order.get('base_currency', 'AXN')
                 quote_currency = new_order.get('quote_currency', 'USD')
 
                 # Execute balance transfer
@@ -2249,319 +1605,6 @@ class BlockchainNode:
             print(f"Error matching orders: {e}")
             return False
 
-        # Setup Wallet Claiming API (ensures no early adopters miss out!)
-        from core.wallet_claiming_api import setup_wallet_claiming_api
-        self.wallet_claiming_tracker = setup_wallet_claiming_api(self.app, self)
-        print("✓ Wallet Claiming API initialized (browser miners protected!)")
-        self.mobile_cache_service = MobileCacheService(self)
-
-        # Setup Token Burning API (utility token economics with 100% anonymity!)
-        from core.burning_api_endpoints import setup_burning_api
-        self.burning_engine = setup_burning_api(self.app, self)
-        # NO treasury - dev funded by pre-mine (10M XAI) + donated AI API minutes!
-
-    def _fiat_lock_message(self) -> str:
-        """Return the current fiat lock notice."""
-        status = self.fiat_unlock_manager.get_status()
-        if status.get("unlocked"):
-            return (
-                "Card rails unlocked via governance or time-based auto-unlock. "
-                "Use the standard exchange endpoints."
-            )
-
-        return (
-            f"Card rails locked until {Config.FIAT_REENABLE_DATE.strftime('%Y-%m-%d')} UTC "
-            f"(governance vote window opens {Config.FIAT_UNLOCK_GOVERNANCE_START.strftime('%Y-%m-%d')} UTC). "
-            f"Support: {status['votes_for']} / {status['required_votes']} votes "
-            f"({status['support_ratio']*100:.1f}% positive). "
-            "Call POST /governance/fiat-unlock/vote to cast your vote."
-        )
-
-    def _generate_node_id(self) -> str:
-        """
-        Generate unique node ID for wallet assignment
-
-        Returns:
-            Unique node identifier
-        """
-        import socket
-        import hashlib
-        import uuid
-
-        try:
-            # Get system identifiers
-            hostname = socket.gethostname()
-            mac = ':'.join(['{:02x}'.format((uuid.getnode() >> elements) & 0xff)
-                           for elements in range(0,2*6,2)][::-1])
-            timestamp = str(time.time())
-
-            # Create unique hash
-            node_string = f"{hostname}_{mac}_{timestamp}"
-            node_id = hashlib.sha256(node_string.encode()).hexdigest()[:16]
-
-            return node_id
-
-        except Exception as e:
-            # Fallback to random ID
-            return hashlib.sha256(str(time.time()).encode()).hexdigest()[:16]
-
-    def _check_bonus_wallet(self):
-        """
-        Check if node qualifies for bonus wallet assignment
-        Displays opt-in message if wallet available
-        """
-
-        # Check if wallet already claimed for this node (check both possible filenames)
-        premium_wallet_file = os.path.join(os.path.dirname(__file__), '..', 'xai_og_wallet.json')
-        standard_wallet_file = os.path.join(os.path.dirname(__file__), '..', 'xai_early_adopter_wallet.json')
-
-        wallet_file = None
-        if os.path.exists(premium_wallet_file):
-            wallet_file = premium_wallet_file
-        elif os.path.exists(standard_wallet_file):
-            wallet_file = standard_wallet_file
-
-        if wallet_file:
-            # Already have a wallet
-            with open(wallet_file, 'r') as f:
-                wallet_data = json.load(f)
-
-            print("\n" + "=" * 70)
-            print("You have a bonus wallet!")
-            print("=" * 70)
-            print(f"Address: {wallet_data['address']}")
-            print(f"Balance: {wallet_data.get('balance', 'Check blockchain')} XAI")
-            print(f"Wallet file: {os.path.basename(wallet_file)}")
-            print("=" * 70 + "\n")
-            return
-
-        # Check if premium wallets available (immediate assignment)
-        try:
-            # Try to claim premium wallet (node operator)
-            result = self.wallet_claim_system.claim_premium_wallet(
-                node_id=self.node_id,
-                proof_of_mining=""  # No proof needed for node operator tier
-            )
-
-            if result['success']:
-                self._display_wallet_bonus(result)
-                self._save_bonus_wallet(result['wallet'], tier=result['tier'])
-                return
-
-        except Exception:
-            pass
-
-        try:
-            bonus_result = self.wallet_claim_system.claim_bonus_wallet(
-                miner_id=self.node_id,
-                proof_of_mining=""
-            )
-            if bonus_result['success'] and bonus_result.get('tier') != 'empty':
-                self._display_wallet_bonus(bonus_result)
-                self._save_bonus_wallet(bonus_result['wallet'], tier=bonus_result['tier'])
-                return
-        except Exception:
-            pass
-
-        # Premium/bonus wallets exhausted - user will qualify for uptime-based wallet
-        print("\n[INFO] Premium & bonus wallets claimed. Run node for 30 minutes to qualify for early adopter wallet!")
-
-    def _display_wallet_bonus(self, claim_result):
-        """
-        Display bonus wallet information to user
-
-        Args:
-            claim_result: Result from wallet claim system
-        """
-
-        wallet = claim_result['wallet']
-        tier = claim_result['tier']
-
-        # Determine wallet filename based on tier
-        wallet_filename = 'xai_og_wallet.json' if tier == 'premium' else 'xai_early_adopter_wallet.json'
-
-        print("\n" + "=" * 70)
-        print("       CONGRATULATIONS!")
-        print("=" * 70)
-        print()
-        print("You started a XAI coin node!")
-        print()
-        print("Find your bonus wallet here as a thank you:")
-        print()
-        print(f"  Tier: {tier.upper()}")
-        print(f"  Address: {wallet['address']}")
-        print()
-        print("How to access your wallet:")
-        print(f"  1. Your private key is saved in: {wallet_filename}")
-        print("  2. Check balance: /balance/<your_address>")
-        print("  3. Send coins: /send endpoint with your private key")
-        print("  4. BACKUP YOUR PRIVATE KEY IMMEDIATELY!")
-        print()
-
-        if tier == 'premium':
-            print("PREMIUM WALLET BONUSES:")
-            print("  - Monthly reward: 200 XAI (requires 30-day uptime)")
-            print("  - Keep your node running 24/7 to qualify")
-            print()
-
-        if claim_result.get('remaining_premium') is not None:
-            remaining = claim_result['remaining_premium']
-            print(f"  Remaining premium wallets: {remaining}")
-        elif claim_result.get('remaining_standard') is not None:
-            remaining = claim_result['remaining_standard']
-            print(f"  Remaining standard wallets: {remaining}")
-
-        print()
-        print("=" * 70 + "\n")
-
-    def _save_bonus_wallet(self, wallet_data, tier='standard'):
-        """
-        Save bonus wallet to file
-
-        Args:
-            wallet_data: Wallet information from claim
-            tier: Wallet tier (premium/standard/micro)
-        """
-
-        # Premium wallets get special filename
-        if tier == 'premium':
-            wallet_file = os.path.join(os.path.dirname(__file__), '..', 'xai_og_wallet.json')
-        elif tier == 'bonus':
-            wallet_file = os.path.join(os.path.dirname(__file__), '..', 'xai_bonus_wallet.json')
-        else:
-            wallet_file = os.path.join(os.path.dirname(__file__), '..', 'xai_early_adopter_wallet.json')
-
-        save_data = {
-            'address': wallet_data['address'],
-            'private_key': wallet_data['private_key'],
-            'public_key': wallet_data['public_key'],
-            'balance': wallet_data.get('total_balance', wallet_data.get('balance', 0)),
-            'claimed_at': time.time(),
-            'node_id': self.node_id,
-            'tier': tier
-        }
-
-        with open(wallet_file, 'w') as f:
-            json.dump(save_data, f, indent=2)
-
-        print(f"[SAVED] Wallet information saved to: {os.path.basename(wallet_file)}")
-        print("[WARNING] BACKUP THIS FILE IMMEDIATELY! Loss of private key = loss of funds!\n")
-
-    def _start_uptime_wallet_checker(self):
-        """
-        Start background thread to check for uptime-based wallet assignment
-        Checks after 30 minutes of uptime
-        """
-        uptime_thread = threading.Thread(target=self._check_uptime_wallet, daemon=True)
-        uptime_thread.start()
-
-    def _start_ai_bridge_loop(self, interval: int = 30):
-        """Run the AI bridge loop in a background thread."""
-        self._ai_bridge_stop_event = threading.Event()
-        bridge_thread = threading.Thread(
-            target=self._run_ai_bridge_loop,
-            args=(interval,),
-            daemon=True
-        )
-        bridge_thread.start()
-        self._ai_bridge_thread = bridge_thread
-
-    def _check_uptime_wallet(self):
-        """
-        Check if node qualifies for uptime-based wallet after 30 minutes
-        """
-        # Wait 30 minutes
-        required_uptime = 30 * 60  # 30 minutes in seconds
-        time.sleep(required_uptime)
-
-        # Check if already claimed (check both possible filenames)
-        premium_wallet_file = os.path.join(os.path.dirname(__file__), '..', 'xai_og_wallet.json')
-        standard_wallet_file = os.path.join(os.path.dirname(__file__), '..', 'xai_early_adopter_wallet.json')
-
-        if os.path.exists(premium_wallet_file) or os.path.exists(standard_wallet_file):
-            return  # Already have wallet
-
-        if self.uptime_wallet_claimed:
-            return  # Already processed
-
-        # Try to claim standard wallet
-        try:
-            result = self.wallet_claim_system.claim_standard_wallet(self.node_id)
-
-            if result['success']:
-                self.uptime_wallet_claimed = True
-                self._display_early_adopter_wallet(result)
-                self._save_bonus_wallet(result['wallet'], tier=result['tier'])
-                return
-
-        except Exception as e:
-            pass
-
-        # Try micro wallet as fallback
-        try:
-            result = self.wallet_claim_system.claim_micro_wallet(self.node_id)
-
-            if result['success']:
-                self.uptime_wallet_claimed = True
-                self._display_early_adopter_wallet(result)
-                self._save_bonus_wallet(result['wallet'], tier=result['tier'])
-                return
-
-        except Exception as e:
-            pass
-
-        # No wallets available
-        print("\n[INFO] All early adopter wallets have been claimed. Mine to earn XAI!")
-
-    def _run_ai_bridge_loop(self, interval: int):
-        """Background loop that periodically syncs the AI bridge."""
-
-        while not getattr(self, '_ai_bridge_stop_event', threading.Event()).is_set():
-            try:
-                created = self.ai_bridge.sync_full_proposals()
-                if created:
-                    self.logger.info("AI bridge queued %d proposals", len(created))
-            except Exception as exc:
-                self.logger.error("AI bridge sync failed: %s", exc)
-            time.sleep(interval)
-
-    def _display_early_adopter_wallet(self, claim_result):
-        """
-        Display early adopter wallet information (after 30 min uptime)
-
-        Args:
-            claim_result: Result from wallet claim system
-        """
-
-        wallet = claim_result['wallet']
-        tier = claim_result['tier']
-
-        print("\n" + "=" * 70)
-        print("       WELCOME TO XAI COIN!")
-        print("=" * 70)
-        print()
-        print("Here is your early adopter bonus wallet:")
-        print()
-        print(f"  Address: {wallet['address']}")
-        print()
-        print("How to access your wallet:")
-        print("  1. Your private key is saved in: xai_early_adopter_wallet.json")
-        print("  2. Check balance: /balance/<your_address>")
-        print("  3. Send coins: /send endpoint with your private key")
-        print("  4. BACKUP YOUR PRIVATE KEY IMMEDIATELY!")
-        print()
-
-        if claim_result.get('remaining_standard') is not None:
-            remaining = claim_result['remaining_standard']
-            print(f"  Remaining early adopter wallets: {remaining}")
-        elif claim_result.get('remaining_micro') is not None:
-            remaining = claim_result['remaining_micro']
-            print(f"  Remaining early adopter wallets: {remaining}")
-
-        print()
-        print("Thank you for supporting XAI!")
-        print("=" * 70 + "\n")
-
     def start_mining(self):
         """Start automatic mining in background thread"""
         self.is_mining = True
@@ -2590,31 +1633,10 @@ class BlockchainNode:
             time.sleep(1)  # Small delay between mining attempts
 
     def add_peer(self, peer_url: str):
-        """Add peer node with security checks"""
-        # Extract IP from URL (simplified)
-        import re
-        ip_match = re.search(r'(\d+\.\d+\.\d+\.\d+)', peer_url)
-        ip_address = ip_match.group(1) if ip_match else "unknown"
-
-        # Security check
-        can_accept, error = self.p2p_security.can_accept_peer(peer_url, ip_address)
-        if not can_accept:
-            print(f"Peer rejected: {peer_url} - {error}")
-            return False
-
+        """Add peer node"""
         if peer_url not in self.peers:
-            # Check max peers limit
-            from p2p_security import P2PSecurityConfig
-            if len(self.peers) >= P2PSecurityConfig.MAX_PEERS_TOTAL:
-                print(f"Max peers reached ({P2PSecurityConfig.MAX_PEERS_TOTAL})")
-                return False
-
             self.peers.add(peer_url)
-            self.p2p_security.track_peer_connection(peer_url, ip_address)
             print(f"Added peer: {peer_url}")
-            self.logger.peer_connected(len(self.peers))
-
-        return True
 
     def broadcast_transaction(self, transaction: Transaction):
         """Broadcast transaction to all peers"""
@@ -2630,9 +1652,6 @@ class BlockchainNode:
 
     def broadcast_block(self, block):
         """Broadcast new block to all peers"""
-        # Record block first seen (for propagation monitoring)
-        self.blockchain.consensus_manager.propagation_monitor.record_block_first_seen(block.hash)
-
         for peer in self.peers:
             try:
                 requests.post(
@@ -2683,40 +1702,27 @@ class BlockchainNode:
         self.start_time = time.time()
 
         print("=" * 60)
-        print("XAI BLOCKCHAIN NODE")
+        print("AIXN BLOCKCHAIN NODE")
         print("=" * 60)
-        print(f"Network: {Config.NETWORK_TYPE.value.upper()}")
-        print(f"Address Prefix: {Config.ADDRESS_PREFIX}")
-        if Config.FAUCET_ENABLED:
-            print(f"Faucet: ENABLED ({Config.FAUCET_AMOUNT} XAI per claim)")
         print(f"Miner Address: {self.miner_address}")
         print(f"Listening on: http://{self.host}:{self.port}")
         print(f"Blockchain height: {len(self.blockchain.chain)}")
         print(f"Network difficulty: {self.blockchain.difficulty}")
-        print(f"Max Supply: {Config.MAX_SUPPLY:,.0f} XAI")
         print("=" * 60)
-
-        # Log node startup
-        network_type = Config.NETWORK_TYPE.value if hasattr(Config.NETWORK_TYPE, 'value') else 'mainnet'
-        self.logger.node_started(network_type, self.port)
 
         # Start auto-mining by default
         self.start_mining()
 
         # Run Flask app
-        try:
-            self.app.run(host=self.host, port=self.port, debug=debug, threaded=True)
-        finally:
-            # Log node shutdown
-            self.logger.node_stopped()
+        self.app.run(host=self.host, port=self.port, debug=debug, threaded=True)
 
 
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description='XAI Blockchain Node')
-    parser.add_argument('--port', type=int, help='Port to listen on (env: XAI_PORT)')
-    parser.add_argument('--host', help='Host to bind to (env: XAI_HOST)')
+    parser = argparse.ArgumentParser(description='AIXN Blockchain Node')
+    parser.add_argument('--port', type=int, default=8545, help='Port to listen on')
+    parser.add_argument('--host', default='0.0.0.0', help='Host to bind to')
     parser.add_argument('--miner', help='Miner wallet address')
     parser.add_argument('--peers', nargs='+', help='Peer node URLs')
 
