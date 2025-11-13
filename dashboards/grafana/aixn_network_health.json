@@ -1,0 +1,155 @@
+{
+  "dashboard": {
+    "title": "AIXN Blockchain - Network Health",
+    "tags": ["blockchain", "aixn", "network"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 1,
+    "refresh": "5s",
+    "time": {
+      "from": "now-30m",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Peer Connections",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "aixn_peers_connected",
+            "legendFormat": "Connected Peers"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Peers"},
+          {"format": "short"}
+        ],
+        "thresholds": [
+          {"value": 3, "colorMode": "critical", "op": "lt", "fill": true, "line": true}
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Network Latency (p50, p95)",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "aixn:network_latency:p50",
+            "legendFormat": "50th percentile"
+          },
+          {
+            "expr": "aixn:network_latency:p95",
+            "legendFormat": "95th percentile"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Latency"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Network Messages by Type",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(aixn_network_messages_total[1m])",
+            "legendFormat": "{{message_type}}"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Messages/s"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Bandwidth Usage",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "aixn:network_bandwidth_sent:rate1m",
+            "legendFormat": "Sent"
+          },
+          {
+            "expr": "aixn:network_bandwidth_received:rate1m",
+            "legendFormat": "Received"
+          },
+          {
+            "expr": "aixn:network_bandwidth_total:rate1m",
+            "legendFormat": "Total"
+          }
+        ],
+        "yaxes": [
+          {"format": "Bps", "label": "Bandwidth"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Total Bandwidth Sent",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 8, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "aixn_network_bandwidth_sent_bytes_total"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes"
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Total Bandwidth Received",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 8, "x": 8, "y": 16},
+        "targets": [
+          {
+            "expr": "aixn_network_bandwidth_received_bytes_total"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Average Latency (5min)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 8, "x": 16, "y": 16},
+        "targets": [
+          {
+            "expr": "aixn:network_latency:p50"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s"
+          }
+        }
+      }
+    ]
+  }
+}

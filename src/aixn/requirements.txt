@@ -1,0 +1,34 @@
+# AIXN Blockchain Core Dependencies
+
+# Cryptography
+ecdsa==0.18.0
+pycryptodome==3.19.0
+cryptography==46.0.3
+base58
+
+# Web Framework
+Flask==3.0.0
+Flask-CORS==4.0.0
+
+# Networking
+requests==2.31.0
+
+# Data Processing
+python-dateutil==2.8.2
+
+# AI Libraries
+anthropic==0.72.0
+openai==2.7.2
+
+# Monitoring
+prometheus-client==0.23.1
+grafana-api==1.0.3
+python-json-logger==4.0.0
+psutil==5.9.8
+
+# Configuration Loading
+python-dotenv==1.0.1
+
+# Optional: Database (for production)
+sqlalchemy==2.0.44
+psycopg2-binary==2.9.11

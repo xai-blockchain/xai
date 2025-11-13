@@ -1,0 +1,107 @@
+{
+  "chain": [
+    {
+      "index": 0,
+      "timestamp": 1730851200.0,
+      "transactions": [
+        {
+          "txid": "founder_immediate_1730851200",
+          "sender": "COINBASE",
+          "recipient": "AIXN6b7c3bb643c795f43e5c461f275e658b56566613",
+          "amount": 5000000.0,
+          "fee": 0.0,
+          "timestamp": 1730851200.0,
+          "signature": null,
+          "public_key": null,
+          "tx_type": "normal"
+        },
+        {
+          "txid": "founder_vesting_1730851200",
+          "sender": "COINBASE",
+          "recipient": "AIXNc4ca02afec916ec543c63805c245067d708afe27",
+          "amount": 19200000.0,
+          "fee": 0.0,
+          "timestamp": 1730851200.0,
+          "signature": null,
+          "public_key": null,
+          "tx_type": "normal"
+        },
+        {
+          "txid": "dev_fund_1730851200",
+          "sender": "COINBASE",
+          "recipient": "AIXN5096fed228eecc015025dd0d99848ce55b8209bc",
+          "amount": 12100000.0,
+          "fee": 0.0,
+          "timestamp": 1730851200.0,
+          "signature": null,
+          "public_key": null,
+          "tx_type": "normal"
+        },
+        {
+          "txid": "marketing_fund_1730851200",
+          "sender": "COINBASE",
+          "recipient": "AIXN8566b2923f79b74e001af47c95b07870cb0eac6e",
+          "amount": 12100000.0,
+          "fee": 0.0,
+          "timestamp": 1730851200.0,
+          "signature": null,
+          "public_key": null,
+          "tx_type": "normal"
+        },
+        {
+          "txid": "mining_pool_1730851200",
+          "sender": "COINBASE",
+          "recipient": "AIXN42a435dc9ebe3b802e861d97b05ba43545271199",
+          "amount": 72600000.0,
+          "fee": 0.0,
+          "timestamp": 1730851200.0,
+          "signature": null,
+          "public_key": null,
+          "tx_type": "normal"
+        }
+      ],
+      "previous_hash": "0",
+      "merkle_root": "AIXN_GENESIS_121M_FOUNDER_ALLOCATION",
+      "nonce": 140714,
+      "hash": "000099dd0205639e0ad496f05bead32227b36d59aaf994699eebf31de9f30e02",
+      "difficulty": 4
+    }
+  ],
+  "utxo_set": {
+    "AIXN6b7c3bb643c795f43e5c461f275e658b56566613": [
+      {
+        "txid": "founder_immediate_1730851200",
+        "amount": 5000000.0,
+        "spent": false
+      }
+    ],
+    "AIXNc4ca02afec916ec543c63805c245067d708afe27": [
+      {
+        "txid": "founder_vesting_1730851200",
+        "amount": 19200000.0,
+        "spent": false
+      }
+    ],
+    "AIXN5096fed228eecc015025dd0d99848ce55b8209bc": [
+      {
+        "txid": "dev_fund_1730851200",
+        "amount": 12100000.0,
+        "spent": false
+      }
+    ],
+    "AIXN8566b2923f79b74e001af47c95b07870cb0eac6e": [
+      {
+        "txid": "marketing_fund_1730851200",
+        "amount": 12100000.0,
+        "spent": false
+      }
+    ],
+    "AIXN42a435dc9ebe3b802e861d97b05ba43545271199": [
+      {
+        "txid": "mining_pool_1730851200",
+        "amount": 72600000.0,
+        "spent": false
+      }
+    ]
+  }
+}

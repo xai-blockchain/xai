@@ -1,0 +1,58 @@
+# Prometheus Configuration for AIXN Blockchain
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'aixn-production'
+    environment: 'production'
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Rule files
+rule_files:
+  # - "alerts/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # AIXN Node metrics
+  - job_name: 'aixn-node'
+    static_configs:
+      - targets: ['aixn-node:9090']
+        labels:
+          instance: 'aixn-node-1'
+          type: 'full-node'
+
+  # PostgreSQL metrics (if exporter is configured)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:9187']
+        labels:
+          instance: 'postgres-main'
+
+  # Redis metrics (if exporter is configured)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:9121']
+        labels:
+          instance: 'redis-main'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Node Exporter for system metrics (optional)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+).*'
+        replacement: '${1}'

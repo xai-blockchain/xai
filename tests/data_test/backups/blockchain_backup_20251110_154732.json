@@ -1,0 +1,134 @@
+{
+  "blockchain": {
+    "chain": [
+      {
+        "difficulty": 4,
+        "hash": "hash_0",
+        "index": 0,
+        "merkle_root": "merkle_0",
+        "nonce": 0,
+        "previous_hash": "0",
+        "timestamp": 1762805795.993671,
+        "transactions": [
+          {
+            "amount": 12.0,
+            "fee": 0.0,
+            "nonce": 0,
+            "public_key": "pubkey_0",
+            "recipient": "recipient_0",
+            "sender": "COINBASE",
+            "signature": "sig_0",
+            "timestamp": 1762805795.9936726,
+            "tx_type": "normal",
+            "txid": "tx_0_0"
+          }
+        ]
+      },
+      {
+        "difficulty": 4,
+        "hash": "hash_1",
+        "index": 1,
+        "merkle_root": "merkle_1",
+        "nonce": 1000,
+        "previous_hash": "hash_0",
+        "timestamp": 1762805795.9936757,
+        "transactions": [
+          {
+            "amount": 12.0,
+            "fee": 0.24,
+            "nonce": 1,
+            "public_key": "pubkey_1",
+            "recipient": "recipient_1",
+            "sender": "sender_1",
+            "signature": "sig_1",
+            "timestamp": 1762805795.993677,
+            "tx_type": "normal",
+            "txid": "tx_1_0"
+          }
+        ]
+      },
+      {
+        "difficulty": 4,
+        "hash": "hash_2",
+        "index": 2,
+        "merkle_root": "merkle_2",
+        "nonce": 2000,
+        "previous_hash": "hash_1",
+        "timestamp": 1762805795.993679,
+        "transactions": [
+          {
+            "amount": 12.0,
+            "fee": 0.24,
+            "nonce": 2,
+            "public_key": "pubkey_2",
+            "recipient": "recipient_2",
+            "sender": "sender_2",
+            "signature": "sig_2",
+            "timestamp": 1762805795.9936795,
+            "tx_type": "normal",
+            "txid": "tx_2_0"
+          }
+        ]
+      },
+      {
+        "difficulty": 4,
+        "hash": "hash_3",
+        "index": 3,
+        "merkle_root": "merkle_3",
+        "nonce": 3000,
+        "previous_hash": "hash_2",
+        "timestamp": 1762805795.993681,
+        "transactions": [
+          {
+            "amount": 12.0,
+            "fee": 0.24,
+            "nonce": 3,
+            "public_key": "pubkey_3",
+            "recipient": "recipient_3",
+            "sender": "sender_3",
+            "signature": "sig_3",
+            "timestamp": 1762805795.9936817,
+            "tx_type": "normal",
+            "txid": "tx_3_0"
+          }
+        ]
+      },
+      {
+        "difficulty": 4,
+        "hash": "hash_4",
+        "index": 4,
+        "merkle_root": "merkle_4",
+        "nonce": 4000,
+        "previous_hash": "hash_3",
+        "timestamp": 1762805795.9936826,
+        "transactions": [
+          {
+            "amount": 12.0,
+            "fee": 0.24,
+            "nonce": 4,
+            "public_key": "pubkey_4",
+            "recipient": "recipient_4",
+            "sender": "sender_4",
+            "signature": "sig_4",
+            "timestamp": 1762805795.993683,
+            "tx_type": "normal",
+            "txid": "tx_4_0"
+          }
+        ]
+      }
+    ],
+    "difficulty": 4,
+    "pending_transactions": [],
+    "stats": {
+      "blocks": 5,
+      "pending_transactions": 0,
+      "total_transactions": 5
+    }
+  },
+  "metadata": {
+    "block_height": 5,
+    "checksum": "aef76c1bd4b0dad79bba578b3b9b4cdea423cd1b617fb8a7289ad436f50cf752",
+    "timestamp": 1762805795.993772,
+    "version": "1.0"
+  }
+}

@@ -25,7 +25,7 @@ python scripts/prepare_node.py \
 ```
 
 The script writes `node_config.json` into the target `data-dir` and echoes:
-* `python core/node.py --miner <address> --data-dir ./data/my-node --rpc-port 18545`
+* `python src/aixn/core/node.py --miner <address> --data-dir ./data/my-node --rpc-port 18545`
 * `curl` examples for `/mining/start`, `/metrics`, `/wallet-trades`, and `/time-capsule/pending`.
 It also checks the data tree for cheap verification.
 

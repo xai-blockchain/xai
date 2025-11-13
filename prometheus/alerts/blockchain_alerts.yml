@@ -1,0 +1,232 @@
+# AIXN Blockchain Alert Rules
+# These rules define conditions that trigger alerts
+
+groups:
+  - name: blockchain_health
+    interval: 30s
+    rules:
+      # Block production has stopped
+      - alert: BlockProductionStopped
+        expr: rate(aixn_blocks_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: mining
+        annotations:
+          summary: "Block production has stopped"
+          description: "No new blocks have been produced in the last 5 minutes"
+
+      # Low block production rate
+      - alert: LowBlockProductionRate
+        expr: aixn_block_production_rate_per_minute < 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: mining
+        annotations:
+          summary: "Block production rate is low"
+          description: "Block production rate is {{ $value }} blocks/min (expected ~1 block/min)"
+
+      # High block mining time
+      - alert: HighBlockMiningTime
+        expr: aixn_block_mining_time_seconds > 300
+        for: 5m
+        labels:
+          severity: warning
+          component: mining
+        annotations:
+          summary: "Block mining time is high"
+          description: "Block mining time is {{ $value }} seconds (expected <60s)"
+
+  - name: network_health
+    interval: 30s
+    rules:
+      # No peers connected
+      - alert: NoPeersConnected
+        expr: aixn_peers_connected == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: network
+        annotations:
+          summary: "No peers connected"
+          description: "Node is isolated - no peer connections"
+
+      # Low peer count
+      - alert: LowPeerCount
+        expr: aixn_peers_connected < 3
+        for: 5m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "Low peer count"
+          description: "Only {{ $value }} peers connected (recommended: 5+)"
+
+      # High network latency
+      - alert: HighNetworkLatency
+        expr: histogram_quantile(0.95, rate(aixn_network_latency_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "High network latency"
+          description: "95th percentile latency is {{ $value }}s"
+
+  - name: transaction_health
+    interval: 30s
+    rules:
+      # Large mempool
+      - alert: LargeMempool
+        expr: aixn_transaction_pool_size > 10000
+        for: 10m
+        labels:
+          severity: warning
+          component: transactions
+        annotations:
+          summary: "Transaction mempool is large"
+          description: "Mempool contains {{ $value }} transactions"
+
+      # High transaction failure rate
+      - alert: HighTransactionFailureRate
+        expr: rate(aixn_transactions_total{status="failed"}[5m]) / rate(aixn_transactions_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: transactions
+        annotations:
+          summary: "High transaction failure rate"
+          description: "{{ $value | humanizePercentage }} of transactions are failing"
+
+  - name: system_health
+    interval: 30s
+    rules:
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: aixn_system_cpu_usage_percent > 90
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}%"
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: aixn_system_memory_percent > 90
+        for: 5m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value }}%"
+
+      # High disk usage
+      - alert: HighDiskUsage
+        expr: aixn_system_disk_percent > 85
+        for: 10m
+        labels:
+          severity: warning
+          component: system
+        annotations:
+          summary: "High disk usage"
+          description: "Disk usage is {{ $value }}% - consider cleanup or expansion"
+
+      # Critical disk usage
+      - alert: CriticalDiskUsage
+        expr: aixn_system_disk_percent > 95
+        for: 5m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Critical disk usage"
+          description: "Disk usage is {{ $value }}% - immediate action required"
+
+  - name: api_health
+    interval: 30s
+    rules:
+      # High API error rate
+      - alert: HighAPIErrorRate
+        expr: rate(aixn_api_requests_total{status=~"5.."}[5m]) / rate(aixn_api_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "High API error rate"
+          description: "{{ $value | humanizePercentage }} of API requests are failing"
+
+      # Slow API responses
+      - alert: SlowAPIResponses
+        expr: histogram_quantile(0.95, rate(aixn_api_request_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: api
+        annotations:
+          summary: "Slow API responses"
+          description: "95th percentile API response time is {{ $value }}s"
+
+  - name: chain_integrity
+    interval: 30s
+    rules:
+      # Chain not synced
+      - alert: ChainNotSynced
+        expr: aixn_chain_sync_status == 0
+        for: 10m
+        labels:
+          severity: warning
+          component: consensus
+        annotations:
+          summary: "Chain is not synced"
+          description: "Blockchain is still syncing"
+
+      # High orphaned block rate
+      - alert: HighOrphanedBlockRate
+        expr: rate(aixn_orphaned_blocks_total[1h]) > 0.1
+        for: 1h
+        labels:
+          severity: warning
+          component: consensus
+        annotations:
+          summary: "High orphaned block rate"
+          description: "{{ $value }} orphaned blocks per hour"
+
+      # Chain reorganization
+      - alert: ChainReorganization
+        expr: increase(aixn_chain_reorgs_total[5m]) > 0
+        labels:
+          severity: warning
+          component: consensus
+        annotations:
+          summary: "Chain reorganization detected"
+          description: "{{ $value }} chain reorgs in the last 5 minutes"
+
+  - name: ai_service_health
+    interval: 60s
+    rules:
+      # High AI task failure rate
+      - alert: HighAITaskFailureRate
+        expr: rate(aixn_ai_tasks_total{status="failed"}[10m]) / rate(aixn_ai_tasks_total[10m]) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          component: ai
+        annotations:
+          summary: "High AI task failure rate"
+          description: "{{ $value | humanizePercentage }} of AI tasks are failing"
+
+      # Slow AI task execution
+      - alert: SlowAITasks
+        expr: histogram_quantile(0.95, rate(aixn_ai_task_duration_seconds_bucket[10m])) > 30
+        for: 10m
+        labels:
+          severity: warning
+          component: ai
+        annotations:
+          summary: "AI tasks are slow"
+          description: "95th percentile AI task duration is {{ $value }}s"

@@ -1,0 +1,390 @@
+version: '3.8'
+
+# ============================================================================
+# AIXN Blockchain - 3-Node Test Network
+# Multi-node setup for testing P2P communication and consensus
+# ============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # AIXN Blockchain Node 1 (Bootstrap Node)
+  # --------------------------------------------------------------------------
+  aixn-node-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: "3.11"
+    container_name: aixn-node-1
+    hostname: aixn-node-1
+    restart: unless-stopped
+    environment:
+      # Node Configuration
+      AIXN_ENV: development
+      AIXN_NODE_PORT: 8333
+      AIXN_API_PORT: 8080
+      AIXN_WS_PORT: 8081
+      AIXN_METRICS_PORT: 9090
+
+      # Network Configuration
+      AIXN_MAX_PEERS: 125
+      AIXN_MIN_PEERS: 2
+      AIXN_NETWORK_ID: 1
+      AIXN_BOOTSTRAP_NODES: ""  # Bootstrap node doesn't need others initially
+
+      # Mining Configuration
+      AIXN_ENABLE_MINING: "true"
+      AIXN_MINING_THREADS: 2
+      AIXN_MINING_ADDRESS: ""  # Will auto-generate
+
+      # Database Configuration
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: aixn_blockchain
+      POSTGRES_USER: aixn
+      POSTGRES_PASSWORD: aixn_secure_password
+
+      # Redis Configuration
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+
+      # Monitoring
+      PROMETHEUS_ENABLED: "true"
+      LOG_LEVEL: INFO
+
+      # Security
+      AIXN_TLS_ENABLED: "false"
+      AIXN_API_KEY: ""
+    ports:
+      - "5001:8080"  # API
+      - "8334:8333"  # P2P
+      - "8082:8081"  # WebSocket
+      - "9094:9090"  # Metrics
+    volumes:
+      - blockchain-data-node1:/data/blockchain
+      - wallet-data-node1:/data/wallets
+      - deposit-data-node1:/data/crypto_deposits
+      - gamification-data-node1:/data/gamification_data
+      - mining-data-node1:/data/mining_data
+      - node-logs-1:/logs
+      - ./config:/config:ro
+    networks:
+      aixn-network:
+        ipv4_address: 172.25.0.10
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # --------------------------------------------------------------------------
+  # AIXN Blockchain Node 2
+  # --------------------------------------------------------------------------
+  aixn-node-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: "3.11"
+    container_name: aixn-node-2
+    hostname: aixn-node-2
+    restart: unless-stopped
+    environment:
+      # Node Configuration
+      AIXN_ENV: development
+      AIXN_NODE_PORT: 8333
+      AIXN_API_PORT: 8080
+      AIXN_WS_PORT: 8081
+      AIXN_METRICS_PORT: 9090
+
+      # Network Configuration
+      AIXN_MAX_PEERS: 125
+      AIXN_MIN_PEERS: 2
+      AIXN_NETWORK_ID: 1
+      AIXN_BOOTSTRAP_NODES: "aixn-node-1:8333"  # Connect to node 1
+
+      # Mining Configuration
+      AIXN_ENABLE_MINING: "true"
+      AIXN_MINING_THREADS: 2
+      AIXN_MINING_ADDRESS: ""  # Will auto-generate
+
+      # Database Configuration
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: aixn_blockchain
+      POSTGRES_USER: aixn
+      POSTGRES_PASSWORD: aixn_secure_password
+
+      # Redis Configuration
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 1  # Different Redis DB
+
+      # Monitoring
+      PROMETHEUS_ENABLED: "true"
+      LOG_LEVEL: INFO
+
+      # Security
+      AIXN_TLS_ENABLED: "false"
+      AIXN_API_KEY: ""
+    ports:
+      - "5002:8080"  # API
+      - "8335:8333"  # P2P
+      - "8087:8081"  # WebSocket
+      - "9095:9090"  # Metrics
+    volumes:
+      - blockchain-data-node2:/data/blockchain
+      - wallet-data-node2:/data/wallets
+      - deposit-data-node2:/data/crypto_deposits
+      - gamification-data-node2:/data/gamification_data
+      - mining-data-node2:/data/mining_data
+      - node-logs-2:/logs
+      - ./config:/config:ro
+    networks:
+      aixn-network:
+        ipv4_address: 172.25.0.11
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      aixn-node-1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # --------------------------------------------------------------------------
+  # AIXN Blockchain Node 3
+  # --------------------------------------------------------------------------
+  aixn-node-3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: "3.11"
+    container_name: aixn-node-3
+    hostname: aixn-node-3
+    restart: unless-stopped
+    environment:
+      # Node Configuration
+      AIXN_ENV: development
+      AIXN_NODE_PORT: 8333
+      AIXN_API_PORT: 8080
+      AIXN_WS_PORT: 8081
+      AIXN_METRICS_PORT: 9090
+
+      # Network Configuration
+      AIXN_MAX_PEERS: 125
+      AIXN_MIN_PEERS: 2
+      AIXN_NETWORK_ID: 1
+      AIXN_BOOTSTRAP_NODES: "aixn-node-1:8333,aixn-node-2:8333"  # Connect to both
+
+      # Mining Configuration
+      AIXN_ENABLE_MINING: "true"
+      AIXN_MINING_THREADS: 2
+      AIXN_MINING_ADDRESS: ""  # Will auto-generate
+
+      # Database Configuration
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: aixn_blockchain
+      POSTGRES_USER: aixn
+      POSTGRES_PASSWORD: aixn_secure_password
+
+      # Redis Configuration
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 2  # Different Redis DB
+
+      # Monitoring
+      PROMETHEUS_ENABLED: "true"
+      LOG_LEVEL: INFO
+
+      # Security
+      AIXN_TLS_ENABLED: "false"
+      AIXN_API_KEY: ""
+    ports:
+      - "5003:8080"  # API
+      - "8336:8333"  # P2P
+      - "8088:8081"  # WebSocket
+      - "9096:9090"  # Metrics
+    volumes:
+      - blockchain-data-node3:/data/blockchain
+      - wallet-data-node3:/data/wallets
+      - deposit-data-node3:/data/crypto_deposits
+      - gamification-data-node3:/data/gamification_data
+      - mining-data-node3:/data/mining_data
+      - node-logs-3:/logs
+      - ./config:/config:ro
+    networks:
+      aixn-network:
+        ipv4_address: 172.25.0.12
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      aixn-node-1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # --------------------------------------------------------------------------
+  # PostgreSQL Database (Shared)
+  # --------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: aixn-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aixn_blockchain
+      POSTGRES_USER: aixn
+      POSTGRES_PASSWORD: aixn_secure_password
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - aixn-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aixn"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "effective_cache_size=1GB"
+
+  # --------------------------------------------------------------------------
+  # Redis Cache & Message Broker (Shared)
+  # --------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: aixn-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --databases 16
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - aixn-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --------------------------------------------------------------------------
+  # Block Explorer (Connected to Node 1)
+  # --------------------------------------------------------------------------
+  block-explorer:
+    build:
+      context: .
+      dockerfile: docker/explorer/Dockerfile
+    container_name: aixn-explorer
+    restart: unless-stopped
+    environment:
+      AIXN_API_URL: http://aixn-node-1:8080
+      EXPLORER_PORT: 8082
+    ports:
+      - "8089:8082"
+    networks:
+      - aixn-network
+    depends_on:
+      - aixn-node-1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  aixn-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+
+# ============================================================================
+# Volumes - Persistent Data Storage (Separate per node)
+# ============================================================================
+volumes:
+  # Node 1 volumes
+  blockchain-data-node1:
+    driver: local
+  wallet-data-node1:
+    driver: local
+  deposit-data-node1:
+    driver: local
+  gamification-data-node1:
+    driver: local
+  mining-data-node1:
+    driver: local
+  node-logs-1:
+    driver: local
+
+  # Node 2 volumes
+  blockchain-data-node2:
+    driver: local
+  wallet-data-node2:
+    driver: local
+  deposit-data-node2:
+    driver: local
+  gamification-data-node2:
+    driver: local
+  mining-data-node2:
+    driver: local
+  node-logs-2:
+    driver: local
+
+  # Node 3 volumes
+  blockchain-data-node3:
+    driver: local
+  wallet-data-node3:
+    driver: local
+  deposit-data-node3:
+    driver: local
+  gamification-data-node3:
+    driver: local
+  mining-data-node3:
+    driver: local
+  node-logs-3:
+    driver: local
+
+  # Shared volumes
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local

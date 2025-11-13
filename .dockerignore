@@ -1,0 +1,207 @@
+# AIXN Blockchain - Docker Ignore Rules
+# Exclude unnecessary files from Docker build context
+
+# ============================================================================
+# Version Control
+# ============================================================================
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# ============================================================================
+# Python
+# ============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.log
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# ============================================================================
+# Development & Testing
+# ============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Test data
+tests/
+test_*.py
+*_test.py
+pytest.ini
+.pytest_cache/
+
+# ============================================================================
+# Documentation
+# ============================================================================
+docs/
+*.md
+README*
+CHANGELOG*
+LICENSE
+CONTRIBUTING*
+
+# ============================================================================
+# Blockchain Data (use volumes instead)
+# ============================================================================
+data/
+*.db
+*.sqlite
+*.json.backup
+blockchain_data/
+wallets/
+crypto_deposits/
+gamification_data/
+mining_data/
+recovery_data/
+exchange_data/
+
+# ============================================================================
+# Logs
+# ============================================================================
+logs/
+*.log
+*.log.*
+log_*.txt
+
+# ============================================================================
+# Secure Keys (NEVER include in images)
+# ============================================================================
+secure_keys/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+keystore/
+.env
+.env.*
+config/*.secret
+secrets/
+
+# ============================================================================
+# Docker files (already in context)
+# ============================================================================
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# ============================================================================
+# CI/CD
+# ============================================================================
+.github/
+.gitlab-ci.yml
+.travis.yml
+azure-pipelines.yml
+
+# ============================================================================
+# Temporary Files
+# ============================================================================
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+
+# ============================================================================
+# Archives
+# ============================================================================
+archived_*/
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# ============================================================================
+# Node Modules (if any JavaScript tools)
+# ============================================================================
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# ============================================================================
+# IDE & Editor files
+# ============================================================================
+.vscode/
+.idea/
+*.sublime-*
+.project
+.settings/
+.classpath
+
+# ============================================================================
+# Monitoring & Metrics (configure via volumes)
+# ============================================================================
+prometheus/data/
+grafana/data/
+
+# ============================================================================
+# Project-specific exclusions
+# ============================================================================
+# Archived directories
+archived_C_UsersdecriGitClonesCryptoaixn/
+archived_UsersdecriGitClonesCryptoaixn/
+XAI/
+
+# Development scripts
+scripts/tools/
+scripts/grant_codex_permissions.ps1
+
+# Electron build artifacts
+electron/node_modules/
+electron/dist/
+electron/out/
+
+# Browser extension
+browser_wallet_extension/
+
+# Benchmarks
+benchmarks/
+
+# Examples
+examples/
+docs/examples/
+
+# Session files
+*PROGRESS.md
+SESSION_*.md
+frozen.txt
+new-tools.txt
+launch_config.json
+temp_response.html
+
+# PowerShell scripts
+*.ps1
+
+# Batch files
+*.bat
+
+# Shell scripts (except deployment scripts)
+*.sh
+!scripts/deploy/*.sh

@@ -1,0 +1,823 @@
+openapi: 3.0.3
+info:
+  title: AIXN Blockchain API
+  version: 1.0.0
+  description: |
+    RESTful API for interacting with the AIXN blockchain network.
+
+    This API provides endpoints for querying blockchain data, submitting transactions,
+    managing wallets, and monitoring network health.
+
+    ## Authentication
+
+    Most endpoints require API key authentication. Include your API key in the `X-API-Key` header:
+
+    ```
+    X-API-Key: your-api-key-here
+    ```
+
+    ## Rate Limiting
+
+    - Free tier: 100 requests per minute
+    - Standard tier: 1,000 requests per minute
+    - Enterprise tier: Custom limits
+
+    Rate limit headers are included in all responses:
+    - `X-RateLimit-Limit`: Total requests allowed per window
+    - `X-RateLimit-Remaining`: Remaining requests in current window
+    - `X-RateLimit-Reset`: Unix timestamp when the limit resets
+
+  contact:
+    name: AIXN Support
+    email: api@aixn.io
+    url: https://docs.aixn.io
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development server
+  - url: https://testnet-api.aixn.io/api/v1
+    description: Testnet API server
+  - url: https://api.aixn.io/api/v1
+    description: Production API server
+
+tags:
+  - name: blockchain
+    description: Blockchain information and statistics
+  - name: blocks
+    description: Block queries and operations
+  - name: transactions
+    description: Transaction submission and queries
+  - name: addresses
+    description: Address balance and history
+  - name: wallet
+    description: Wallet operations
+  - name: network
+    description: Network health and peer information
+  - name: mining
+    description: Mining operations and statistics
+  - name: ai
+    description: AI services integration
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Check if the API is running and responsive
+      tags:
+        - blockchain
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: integer
+                    example: 1704067200
+                  version:
+                    type: string
+                    example: 1.0.0
+
+  /blockchain/info:
+    get:
+      summary: Get blockchain information
+      description: Returns current blockchain statistics and configuration
+      tags:
+        - blockchain
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Blockchain information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockchainInfo'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /blocks:
+    get:
+      summary: List blocks
+      description: Get a list of recent blocks with pagination
+      tags:
+        - blocks
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+          description: Number of blocks to return
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description: Number of blocks to skip
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+          description: Sort order by block height
+      responses:
+        '200':
+          description: List of blocks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  blocks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Block'
+                  total:
+                    type: integer
+                    example: 12500
+                  limit:
+                    type: integer
+                    example: 10
+                  offset:
+                    type: integer
+                    example: 0
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /blocks/{height}:
+    get:
+      summary: Get block by height
+      description: Retrieve a specific block by its height
+      tags:
+        - blocks
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: height
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+          description: Block height
+      responses:
+        '200':
+          description: Block details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Block'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /blocks/latest:
+    get:
+      summary: Get latest block
+      description: Retrieve the most recent block in the blockchain
+      tags:
+        - blocks
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Latest block
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Block'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /transactions:
+    get:
+      summary: List transactions
+      description: Get a list of recent transactions with pagination
+      tags:
+        - transactions
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: List of transactions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+    post:
+      summary: Submit transaction
+      description: Submit a new transaction to the blockchain
+      tags:
+        - transactions
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionSubmit'
+      responses:
+        '201':
+          description: Transaction accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transaction_id:
+                    type: string
+                    example: 0x1234567890abcdef
+                  status:
+                    type: string
+                    example: pending
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /transactions/{txid}:
+    get:
+      summary: Get transaction by ID
+      description: Retrieve transaction details by transaction ID
+      tags:
+        - transactions
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: txid
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Transaction ID
+      responses:
+        '200':
+          description: Transaction details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /addresses/{address}:
+    get:
+      summary: Get address information
+      description: Get balance and transaction history for an address
+      tags:
+        - addresses
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Blockchain address
+      responses:
+        '200':
+          description: Address information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddressInfo'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /addresses/{address}/balance:
+    get:
+      summary: Get address balance
+      description: Get the current balance of an address
+      tags:
+        - addresses
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Address balance
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  address:
+                    type: string
+                    example: aixn1qpzry9x8gf2tvdw0s3jn54khce6mua7l
+                  balance:
+                    type: string
+                    example: "1250.5"
+                  confirmed:
+                    type: string
+                    example: "1250.5"
+                  unconfirmed:
+                    type: string
+                    example: "0"
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /wallet/create:
+    post:
+      summary: Create new wallet
+      description: Generate a new wallet with private/public key pair
+      tags:
+        - wallet
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '201':
+          description: Wallet created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Wallet'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /network/peers:
+    get:
+      summary: List connected peers
+      description: Get list of currently connected network peers
+      tags:
+        - network
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Connected peers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  peers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Peer'
+                  total:
+                    type: integer
+                    example: 24
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /network/stats:
+    get:
+      summary: Get network statistics
+      description: Retrieve current network health and statistics
+      tags:
+        - network
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Network statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkStats'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /mining/info:
+    get:
+      summary: Get mining information
+      description: Get current mining statistics and difficulty
+      tags:
+        - mining
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Mining information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MiningInfo'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /ai/query:
+    post:
+      summary: Query AI assistant
+      description: Submit a query to the blockchain AI assistant
+      tags:
+        - ai
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                  example: What is the current block height?
+                context:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: AI response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  response:
+                    type: string
+                  confidence:
+                    type: number
+                    format: float
+                    minimum: 0
+                    maximum: 1
+                  timestamp:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+
+  schemas:
+    BlockchainInfo:
+      type: object
+      properties:
+        chain:
+          type: string
+          example: mainnet
+        blocks:
+          type: integer
+          example: 12500
+        headers:
+          type: integer
+          example: 12500
+        difficulty:
+          type: string
+          example: "1234567890"
+        mediantime:
+          type: integer
+          example: 1704067200
+        chainwork:
+          type: string
+          example: "000000000000000000000000000000000000000001234567890abcdef"
+        size_on_disk:
+          type: integer
+          example: 5242880000
+
+    Block:
+      type: object
+      properties:
+        height:
+          type: integer
+          example: 12500
+        hash:
+          type: string
+          example: 0000000000000000000a1b2c3d4e5f6789abcdef
+        previous_hash:
+          type: string
+          example: 0000000000000000000a1b2c3d4e5f6789abcdef
+        timestamp:
+          type: integer
+          example: 1704067200
+        nonce:
+          type: integer
+          example: 2083236893
+        difficulty:
+          type: string
+          example: "1234567890"
+        merkle_root:
+          type: string
+          example: 4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b
+        transaction_count:
+          type: integer
+          example: 245
+        size:
+          type: integer
+          example: 125000
+        miner:
+          type: string
+          example: aixn1qpzry9x8gf2tvdw0s3jn54khce6mua7l
+        reward:
+          type: string
+          example: "50.0"
+
+    Transaction:
+      type: object
+      properties:
+        txid:
+          type: string
+          example: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+        version:
+          type: integer
+          example: 1
+        size:
+          type: integer
+          example: 250
+        locktime:
+          type: integer
+          example: 0
+        block_height:
+          type: integer
+          example: 12500
+        timestamp:
+          type: integer
+          example: 1704067200
+        confirmations:
+          type: integer
+          example: 6
+        inputs:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionInput'
+        outputs:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionOutput'
+        fee:
+          type: string
+          example: "0.001"
+
+    TransactionInput:
+      type: object
+      properties:
+        txid:
+          type: string
+          example: abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890
+        vout:
+          type: integer
+          example: 0
+        address:
+          type: string
+          example: aixn1qpzry9x8gf2tvdw0s3jn54khce6mua7l
+        value:
+          type: string
+          example: "10.5"
+        signature:
+          type: string
+          example: 3045022100abcdef...
+
+    TransactionOutput:
+      type: object
+      properties:
+        n:
+          type: integer
+          example: 0
+        value:
+          type: string
+          example: "10.0"
+        address:
+          type: string
+          example: aixn1qpzry9x8gf2tvdw0s3jn54khce6mua7l
+        script_pub_key:
+          type: string
+          example: 76a914...88ac
+        spent:
+          type: boolean
+          example: false
+
+    TransactionSubmit:
+      type: object
+      required:
+        - from
+        - to
+        - amount
+      properties:
+        from:
+          type: string
+          example: aixn1qpzry9x8gf2tvdw0s3jn54khce6mua7l
+        to:
+          type: string
+          example: aixn1qqqqqp399et2xygdj5xreqhjjvcmzhxw4aywxe
+        amount:
+          type: string
+          example: "10.5"
+        fee:
+          type: string
+          example: "0.001"
+        data:
+          type: string
+          example: ""
+        signature:
+          type: string
+          example: 3045022100abcdef...
+
+    AddressInfo:
+      type: object
+      properties:
+        address:
+          type: string
+          example: aixn1qpzry9x8gf2tvdw0s3jn54khce6mua7l
+        balance:
+          type: string
+          example: "1250.5"
+        total_received:
+          type: string
+          example: "5000.0"
+        total_sent:
+          type: string
+          example: "3749.5"
+        tx_count:
+          type: integer
+          example: 125
+        unconfirmed_balance:
+          type: string
+          example: "0"
+        first_seen:
+          type: integer
+          example: 1704000000
+        last_seen:
+          type: integer
+          example: 1704067200
+
+    Wallet:
+      type: object
+      properties:
+        address:
+          type: string
+          example: aixn1qpzry9x8gf2tvdw0s3jn54khce6mua7l
+        public_key:
+          type: string
+          example: 04abcdef1234567890...
+        private_key:
+          type: string
+          example: 5KYZdUEo39z3FPrtuX2QbbwGnNP5zTd7yyr2SC1j299sBCnWjss
+        mnemonic:
+          type: string
+          example: abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about
+
+    Peer:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 16Uiu2HAm9TZzPUBZZVQTCDdyqzAWqFR9b82Q45sSuXC5jPqTT
+        address:
+          type: string
+          example: /ip4/192.168.1.100/tcp/8333
+        version:
+          type: string
+          example: 1.0.0
+        latency:
+          type: integer
+          example: 45
+          description: Latency in milliseconds
+        connected_since:
+          type: integer
+          example: 1704000000
+
+    NetworkStats:
+      type: object
+      properties:
+        peers_connected:
+          type: integer
+          example: 24
+        network_hashrate:
+          type: string
+          example: "1.5 EH/s"
+        difficulty:
+          type: string
+          example: "1234567890"
+        mempool_size:
+          type: integer
+          example: 1250
+        mempool_bytes:
+          type: integer
+          example: 312500
+
+    MiningInfo:
+      type: object
+      properties:
+        blocks:
+          type: integer
+          example: 12500
+        difficulty:
+          type: string
+          example: "1234567890"
+        network_hashrate:
+          type: string
+          example: "1.5 EH/s"
+        pool_hashrate:
+          type: string
+          example: "50 TH/s"
+        current_block_reward:
+          type: string
+          example: "50.0"
+        next_difficulty_change:
+          type: integer
+          example: 2016
+          description: Blocks until next difficulty adjustment
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        code:
+          type: integer
+        timestamp:
+          type: integer
+
+  responses:
+    UnauthorizedError:
+      description: Authentication required or invalid API key
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Unauthorized
+            message: Invalid or missing API key
+            code: 401
+            timestamp: 1704067200
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Not Found
+            message: The requested resource was not found
+            code: 404
+            timestamp: 1704067200
+
+    BadRequestError:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Bad Request
+            message: Invalid request parameters
+            code: 400
+            timestamp: 1704067200

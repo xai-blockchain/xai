@@ -1,0 +1,318 @@
+version: '3.8'
+
+# ============================================================================
+# AIXN Blockchain - Testnet Configuration
+# Multi-node testnet for development and testing
+# ============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # Bootstrap Node - Primary testnet node
+  # --------------------------------------------------------------------------
+  aixn-testnet-bootstrap:
+    build:
+      context: ../..
+      dockerfile: docker/node/Dockerfile
+    container_name: aixn-testnet-bootstrap
+    hostname: bootstrap-node
+    restart: unless-stopped
+    environment:
+      AIXN_ENV: testnet
+      AIXN_NODE_PORT: 8333
+      AIXN_API_PORT: 8080
+      AIXN_WS_PORT: 8081
+      AIXN_METRICS_PORT: 9090
+      AIXN_NETWORK_ID: 2
+      AIXN_IS_BOOTSTRAP: "true"
+      AIXN_BOOTSTRAP_NODES: ""
+      AIXN_ENABLE_MINING: "true"
+      AIXN_MINING_THREADS: 2
+      AIXN_MAX_PEERS: 50
+      AIXN_MIN_PEERS: 3
+      LOG_LEVEL: DEBUG
+      POSTGRES_HOST: testnet-postgres
+      REDIS_HOST: testnet-redis
+      POSTGRES_DB: aixn_testnet
+      POSTGRES_USER: aixn_testnet
+      POSTGRES_PASSWORD: testnet_password
+    ports:
+      - "8333:8333"
+      - "8080:8080"
+      - "8081:8081"
+      - "9090:9090"
+    volumes:
+      - bootstrap-data:/data
+      - bootstrap-logs:/logs
+      - ./config:/config:ro
+    networks:
+      testnet-network:
+        ipv4_address: 172.30.0.10
+    depends_on:
+      - testnet-postgres
+      - testnet-redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # --------------------------------------------------------------------------
+  # Testnet Node 1 - Additional peer node
+  # --------------------------------------------------------------------------
+  aixn-testnet-node1:
+    build:
+      context: ../..
+      dockerfile: docker/node/Dockerfile
+    container_name: aixn-testnet-node1
+    hostname: testnet-node-1
+    restart: unless-stopped
+    environment:
+      AIXN_ENV: testnet
+      AIXN_NODE_PORT: 8333
+      AIXN_API_PORT: 8080
+      AIXN_METRICS_PORT: 9090
+      AIXN_NETWORK_ID: 2
+      AIXN_IS_BOOTSTRAP: "false"
+      AIXN_BOOTSTRAP_NODES: "172.30.0.10:8333"
+      AIXN_ENABLE_MINING: "true"
+      AIXN_MINING_THREADS: 1
+      AIXN_MAX_PEERS: 25
+      LOG_LEVEL: INFO
+      POSTGRES_HOST: testnet-postgres
+      REDIS_HOST: testnet-redis
+      POSTGRES_DB: aixn_testnet
+      POSTGRES_USER: aixn_testnet
+      POSTGRES_PASSWORD: testnet_password
+    ports:
+      - "8334:8333"
+      - "8084:8080"
+      - "9091:9090"
+    volumes:
+      - node1-data:/data
+      - node1-logs:/logs
+      - ./config:/config:ro
+    networks:
+      testnet-network:
+        ipv4_address: 172.30.0.11
+    depends_on:
+      - aixn-testnet-bootstrap
+      - testnet-postgres
+      - testnet-redis
+
+  # --------------------------------------------------------------------------
+  # Testnet Node 2 - Additional peer node
+  # --------------------------------------------------------------------------
+  aixn-testnet-node2:
+    build:
+      context: ../..
+      dockerfile: docker/node/Dockerfile
+    container_name: aixn-testnet-node2
+    hostname: testnet-node-2
+    restart: unless-stopped
+    environment:
+      AIXN_ENV: testnet
+      AIXN_NODE_PORT: 8333
+      AIXN_API_PORT: 8080
+      AIXN_METRICS_PORT: 9090
+      AIXN_NETWORK_ID: 2
+      AIXN_IS_BOOTSTRAP: "false"
+      AIXN_BOOTSTRAP_NODES: "172.30.0.10:8333,172.30.0.11:8333"
+      AIXN_ENABLE_MINING: "false"
+      AIXN_MAX_PEERS: 25
+      LOG_LEVEL: INFO
+      POSTGRES_HOST: testnet-postgres
+      REDIS_HOST: testnet-redis
+      POSTGRES_DB: aixn_testnet
+      POSTGRES_USER: aixn_testnet
+      POSTGRES_PASSWORD: testnet_password
+    ports:
+      - "8335:8333"
+      - "8085:8080"
+      - "9092:9090"
+    volumes:
+      - node2-data:/data
+      - node2-logs:/logs
+      - ./config:/config:ro
+    networks:
+      testnet-network:
+        ipv4_address: 172.30.0.12
+    depends_on:
+      - aixn-testnet-bootstrap
+      - testnet-postgres
+      - testnet-redis
+
+  # --------------------------------------------------------------------------
+  # PostgreSQL Database (Testnet)
+  # --------------------------------------------------------------------------
+  testnet-postgres:
+    image: postgres:15-alpine
+    container_name: aixn-testnet-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aixn_testnet
+      POSTGRES_USER: aixn_testnet
+      POSTGRES_PASSWORD: testnet_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5433:5432"
+    volumes:
+      - testnet-postgres-data:/var/lib/postgresql/data
+    networks:
+      testnet-network:
+        ipv4_address: 172.30.0.20
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aixn_testnet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --------------------------------------------------------------------------
+  # Redis Cache (Testnet)
+  # --------------------------------------------------------------------------
+  testnet-redis:
+    image: redis:7-alpine
+    container_name: aixn-testnet-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "6380:6379"
+    volumes:
+      - testnet-redis-data:/data
+    networks:
+      testnet-network:
+        ipv4_address: 172.30.0.21
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --------------------------------------------------------------------------
+  # Testnet Faucet (Optional)
+  # --------------------------------------------------------------------------
+  testnet-faucet:
+    build:
+      context: ../..
+      dockerfile: docker/faucet/Dockerfile
+    container_name: aixn-testnet-faucet
+    restart: unless-stopped
+    environment:
+      AIXN_API_URL: http://aixn-testnet-bootstrap:8080
+      FAUCET_PORT: 8086
+      FAUCET_AMOUNT: "100"
+      FAUCET_COOLDOWN: "3600"
+    ports:
+      - "8086:8086"
+    networks:
+      testnet-network:
+        ipv4_address: 172.30.0.30
+    depends_on:
+      - aixn-testnet-bootstrap
+    profiles:
+      - faucet
+
+  # --------------------------------------------------------------------------
+  # Testnet Block Explorer
+  # --------------------------------------------------------------------------
+  testnet-explorer:
+    build:
+      context: ../..
+      dockerfile: docker/explorer/Dockerfile
+    container_name: aixn-testnet-explorer
+    restart: unless-stopped
+    environment:
+      AIXN_API_URL: http://aixn-testnet-bootstrap:8080
+      EXPLORER_PORT: 8087
+      EXPLORER_ENV: testnet
+    ports:
+      - "8087:8087"
+    networks:
+      testnet-network:
+        ipv4_address: 172.30.0.31
+    depends_on:
+      - aixn-testnet-bootstrap
+
+  # --------------------------------------------------------------------------
+  # Prometheus Monitoring (Testnet)
+  # --------------------------------------------------------------------------
+  testnet-prometheus:
+    image: prom/prometheus:latest
+    container_name: aixn-testnet-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus-testnet.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+    ports:
+      - "9093:9090"
+    volumes:
+      - ./monitoring/prometheus-testnet.yml:/etc/prometheus/prometheus-testnet.yml:ro
+      - testnet-prometheus-data:/prometheus
+    networks:
+      testnet-network:
+        ipv4_address: 172.30.0.40
+    depends_on:
+      - aixn-testnet-bootstrap
+      - aixn-testnet-node1
+      - aixn-testnet-node2
+
+  # --------------------------------------------------------------------------
+  # Grafana Visualization (Testnet)
+  # --------------------------------------------------------------------------
+  testnet-grafana:
+    image: grafana/grafana:latest
+    container_name: aixn-testnet-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: testnet123
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "3001:3000"
+    volumes:
+      - testnet-grafana-data:/var/lib/grafana
+      - ./monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
+    networks:
+      testnet-network:
+        ipv4_address: 172.30.0.41
+    depends_on:
+      - testnet-prometheus
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  testnet-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.30.0.0/16
+          gateway: 172.30.0.1
+
+# ============================================================================
+# Volumes
+# ============================================================================
+volumes:
+  # Node data
+  bootstrap-data:
+  node1-data:
+  node2-data:
+
+  # Logs
+  bootstrap-logs:
+  node1-logs:
+  node2-logs:
+
+  # Database
+  testnet-postgres-data:
+  testnet-redis-data:
+
+  # Monitoring
+  testnet-prometheus-data:
+  testnet-grafana-data:

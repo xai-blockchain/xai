@@ -1,0 +1,68 @@
+# AIXN Blockchain - Testnet Configuration
+
+network:
+  name: "AIXN Testnet"
+  network_id: 2
+  port: 8333
+  max_peers: 50
+  min_peers: 3
+  bootstrap_timeout: 60
+
+consensus:
+  algorithm: "proof_of_work"
+  difficulty: 2  # Lower difficulty for testnet
+  block_time: 5  # Faster blocks for testing
+  difficulty_adjustment_interval: 100  # More frequent adjustments
+
+blockchain:
+  max_block_size: 1048576  # 1MB
+  max_transaction_size: 102400  # 100KB
+  coinbase_maturity: 10  # Blocks before coinbase can be spent
+
+mining:
+  enabled: false  # Override via environment variable
+  threads: 2
+  reward: 50.0
+
+api:
+  enabled: true
+  port: 8080
+  host: "0.0.0.0"
+  cors_origins: ["*"]  # Allow all for testnet
+  rate_limit:
+    enabled: true
+    requests_per_minute: 120
+
+websocket:
+  enabled: true
+  port: 8081
+  host: "0.0.0.0"
+
+database:
+  type: "postgresql"
+  pool_size: 10
+  pool_recycle: 3600
+
+cache:
+  type: "redis"
+  ttl: 300
+
+monitoring:
+  prometheus:
+    enabled: true
+    port: 9090
+  logging:
+    level: "DEBUG"
+    format: "json"
+    file: "/logs/node/aixn-testnet.log"
+
+security:
+  tls_enabled: false  # No TLS for testnet
+  api_key_required: false
+  peer_verification: false
+
+features:
+  gamification: true
+  ai_integration: true
+  social_recovery: true
+  time_capsules: true

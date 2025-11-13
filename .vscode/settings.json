@@ -1,0 +1,151 @@
+{
+  // VS Code Memory Optimization Settings for Blockchain Project
+  // Created: 2025-11-12
+
+  // =========================================================================
+  // File Watching Exclusions (Reduces CPU/Memory by ~40%)
+  // =========================================================================
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/.pytest_cache/**": true,
+    "**/__pycache__/**": true,
+    "**/site/**": true,
+    "**/archived_*/**": true,
+    "**/.mypy_cache/**": true,
+    "**/data/**": true,
+    "**/data_testnet/**": true,
+    "**/logs/**": true,
+    "**/secure_keys/**": true,
+    "**/*.log": true,
+    "**/.venv/**": true,
+    "**/venv/**": true,
+    "**/env/**": true,
+    "**/.docker/**": true,
+    "**/docker/data/**": true,
+    "**/prometheus/data/**": true,
+    "**/grafana/data/**": true
+  },
+
+  // =========================================================================
+  // Search Exclusions (Speeds up searches, reduces indexing)
+  // =========================================================================
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.git": true,
+    "**/__pycache__": true,
+    "**/site": true,
+    "**/.pytest_cache": true,
+    "**/.mypy_cache": true,
+    "**/archived_*": true,
+    "**/data": true,
+    "**/data_testnet": true,
+    "**/logs": true,
+    "**/secure_keys": true,
+    "**/*.log": true,
+    "**/venv": true,
+    "**/.venv": true,
+    "**/docker/data": true
+  },
+
+  // =========================================================================
+  // File Explorer Exclusions (Cleaner UI, less memory)
+  // =========================================================================
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.mypy_cache": true,
+    "**/*.pyc": true,
+    "**/.DS_Store": true
+  },
+
+  // =========================================================================
+  // Python Language Server Optimization (MAJOR MEMORY SAVER)
+  // =========================================================================
+  "python.analysis.memory.keepLibraryAst": false,
+  "python.analysis.indexing": false,
+  "python.analysis.packageIndexDepths": [
+    {
+      "name": "",
+      "depth": 1
+    }
+  ],
+  "python.analysis.diagnosticMode": "openFilesOnly",
+  "python.analysis.cacheFolderPath": "${workspaceFolder}/.vscode/python_analysis_cache",
+
+  // =========================================================================
+  // Git Optimization (Reduces background processes)
+  // =========================================================================
+  "git.autorefresh": false,
+  "git.autofetch": false,
+  "git.postCommitCommand": "none",
+  "git.decorations.enabled": true,
+  "git.enableSmartCommit": false,
+  "git.fetchOnPull": false,
+
+  // =========================================================================
+  // TypeScript/JavaScript (Even if not primary language)
+  // =========================================================================
+  "typescript.disableAutomaticTypeAcquisition": true,
+  "typescript.tsserver.maxTsServerMemory": 4096,
+  "javascript.suggest.enabled": false,
+
+  // =========================================================================
+  // Editor Performance Optimization
+  // =========================================================================
+  "editor.minimap.enabled": false,
+  "editor.suggestOnTriggerCharacters": true,
+  "editor.quickSuggestions": {
+    "other": true,
+    "comments": false,
+    "strings": false
+  },
+  "editor.wordBasedSuggestions": "off",
+  "editor.parameterHints.enabled": true,
+  "editor.acceptSuggestionOnEnter": "on",
+
+  // =========================================================================
+  // Terminal Optimization
+  // =========================================================================
+  "terminal.integrated.gpuAcceleration": "off",
+  "terminal.integrated.rendererType": "dom",
+  "terminal.integrated.persistentSessionReviveProcess": "never",
+
+  // =========================================================================
+  // Disable Telemetry (Privacy + slight performance gain)
+  // =========================================================================
+  "telemetry.telemetryLevel": "off",
+
+  // =========================================================================
+  // Recommended: Python Formatting & Linting
+  // =========================================================================
+  "python.formatting.provider": "black",
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": true,
+  "python.linting.lintOnSave": true,
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  },
+
+  // =========================================================================
+  // File Associations
+  // =========================================================================
+  "files.associations": {
+    "*.md": "markdown",
+    "Dockerfile*": "dockerfile",
+    ".env*": "properties",
+    "*.yml": "yaml",
+    "*.yaml": "yaml"
+  },
+
+  // =========================================================================
+  // Auto-save (Optional - comment out if you prefer manual save)
+  // =========================================================================
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000
+}

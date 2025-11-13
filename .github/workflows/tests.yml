@@ -1,0 +1,193 @@
+name: Automated Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  unit-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.10', '3.11', '3.12']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/pip
+          ~/AppData/Local/pip/Cache
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-${{ matrix.python-version }}-
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-cov pytest-xdist pytest-timeout
+        pip install -r src/aixn/requirements.txt
+        pip install -r tests/aixn_tests/requirements_test.txt
+
+    - name: Run unit tests
+      run: |
+        pytest tests/aixn_tests/unit/ -v --cov=src/aixn/core --cov-report=xml --cov-report=term --cov-report=html -n auto
+      timeout-minutes: 10
+
+    - name: Upload coverage to Codecov
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-${{ matrix.os }}-py${{ matrix.python-version }}
+        fail_ci_if_error: false
+
+    - name: Upload coverage HTML report
+      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report-unit
+        path: htmlcov/
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-cov pytest-timeout
+        pip install -r src/aixn/requirements.txt
+        pip install -r tests/aixn_tests/requirements_test.txt
+
+    - name: Run integration tests
+      run: |
+        pytest tests/aixn_tests/integration/ -v --cov=src/aixn --cov-report=xml --cov-report=term
+      timeout-minutes: 20
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        flags: integration
+        name: codecov-integration
+        fail_ci_if_error: false
+
+  performance-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-benchmark
+        pip install -r src/aixn/requirements.txt
+        pip install -r tests/aixn_tests/requirements_test.txt
+
+    - name: Run performance tests
+      run: |
+        pytest tests/aixn_tests/performance/ -v --benchmark-only --benchmark-json=benchmark.json
+      timeout-minutes: 15
+      continue-on-error: true
+
+    - name: Store benchmark results
+      uses: benchmark-action/github-action-benchmark@v1
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      with:
+        tool: 'pytest'
+        output-file-path: benchmark.json
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+      continue-on-error: true
+
+  security-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-cov
+        pip install -r src/aixn/requirements.txt
+        pip install -r tests/aixn_tests/requirements_test.txt
+
+    - name: Run security tests
+      run: |
+        pytest tests/aixn_tests/security/ -v --cov=src/aixn --cov-report=xml --cov-report=term
+      timeout-minutes: 15
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        flags: security
+        name: codecov-security
+        fail_ci_if_error: false
+
+  test-summary:
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, performance-tests, security-tests]
+    if: always()
+
+    steps:
+    - name: Generate test summary
+      run: |
+        echo "## Test Suite Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Test Categories:" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Unit Tests (multiple Python versions & OS)" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Integration Tests" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Performance Tests (with benchmarking)" >> $GITHUB_STEP_SUMMARY
+        echo "- ✅ Security Tests" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Coverage Reports:" >> $GITHUB_STEP_SUMMARY
+        echo "Coverage reports uploaded to Codecov" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Matrix Testing:" >> $GITHUB_STEP_SUMMARY
+        echo "- Python: 3.10, 3.11, 3.12" >> $GITHUB_STEP_SUMMARY
+        echo "- OS: Ubuntu, Windows" >> $GITHUB_STEP_SUMMARY

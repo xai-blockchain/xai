@@ -1,0 +1,73 @@
+# Docker Compose Override Example
+# Copy this file to docker-compose.override.yml and customize for local development
+#
+# This file is automatically loaded by docker-compose and allows you to
+# override settings without modifying the main docker-compose.yml
+
+version: '3.8'
+
+services:
+  # Development overrides for AIXN node
+  aixn-node:
+    # Enable debug mode
+    environment:
+      LOG_LEVEL: DEBUG
+      AIXN_DEBUG: "true"
+      AIXN_HOT_RELOAD: "true"
+
+    # Mount source code for live development
+    volumes:
+      - ./src:/app/src:ro
+      - ./config:/config:ro
+
+    # Expose additional debugging ports
+    ports:
+      - "5678:5678"  # Python debugger
+
+  # Development database with easier access
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: dev_password  # Easier password for development
+
+    # Expose database port
+    ports:
+      - "5432:5432"
+
+  # Development Redis
+  redis:
+    # Disable persistence for faster development
+    command: redis-server --save "" --appendonly no
+
+    # Expose Redis port
+    ports:
+      - "6379:6379"
+
+  # Add development tools (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: aixn-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@localhost
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    networks:
+      - aixn-network
+    depends_on:
+      - postgres
+    profiles:
+      - dev-tools
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: aixn-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8081:8081"
+    networks:
+      - aixn-network
+    depends_on:
+      - redis
+    profiles:
+      - dev-tools

@@ -1,0 +1,316 @@
+version: '3.8'
+
+# ============================================================================
+# AIXN Blockchain - Complete Stack
+# Docker Compose configuration for local development and production
+# ============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # AIXN Blockchain Node
+  # --------------------------------------------------------------------------
+  aixn-node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: "3.11"
+    container_name: aixn-node
+    hostname: aixn-node-1
+    restart: unless-stopped
+    environment:
+      # Node Configuration
+      AIXN_ENV: ${AIXN_ENV:-development}
+      AIXN_NODE_PORT: ${AIXN_NODE_PORT:-8333}
+      AIXN_API_PORT: 8080  # Internal container port (mapped to 5000 on host)
+      AIXN_WS_PORT: ${AIXN_WS_PORT:-8081}
+      AIXN_METRICS_PORT: ${AIXN_METRICS_PORT:-9090}
+
+      # Network Configuration
+      AIXN_MAX_PEERS: ${AIXN_MAX_PEERS:-125}
+      AIXN_MIN_PEERS: ${AIXN_MIN_PEERS:-8}
+      AIXN_NETWORK_ID: ${AIXN_NETWORK_ID:-1}
+
+      # Mining Configuration
+      AIXN_ENABLE_MINING: ${AIXN_ENABLE_MINING:-false}
+      AIXN_MINING_THREADS: ${AIXN_MINING_THREADS:-2}
+      AIXN_MINING_ADDRESS: ${AIXN_MINING_ADDRESS:-}
+
+      # Database Configuration
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-aixn_blockchain}
+      POSTGRES_USER: ${POSTGRES_USER:-aixn}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aixn_secure_password}
+
+      # Redis Configuration
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: ${REDIS_DB:-0}
+
+      # Monitoring
+      PROMETHEUS_ENABLED: ${PROMETHEUS_ENABLED:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+      # Security
+      AIXN_TLS_ENABLED: ${AIXN_TLS_ENABLED:-false}
+      AIXN_API_KEY: ${AIXN_API_KEY:-}
+    ports:
+      - "${AIXN_NODE_PORT:-8333}:8333"
+      - "5000:8080"
+      - "${AIXN_WS_PORT:-8081}:8081"
+      - "${AIXN_METRICS_PORT:-9090}:9090"
+    volumes:
+      # Persistent blockchain data
+      - blockchain-data:/data/blockchain
+      - wallet-data:/data/wallets
+      - deposit-data:/data/crypto_deposits
+      - gamification-data:/data/gamification_data
+      - mining-data:/data/mining_data
+
+      # Logs
+      - node-logs:/logs
+
+      # Configuration
+      - ./config:/config:ro
+
+      # Optional: Mount secure keys (production only)
+      # - ./secure_keys/aixn_secure_keys:/app/secure_keys:ro
+    networks:
+      - aixn-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # --------------------------------------------------------------------------
+  # PostgreSQL Database
+  # --------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: aixn-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aixn_blockchain}
+      POSTGRES_USER: ${POSTGRES_USER:-aixn}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aixn_secure_password}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/deploy/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - aixn-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aixn}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "effective_cache_size=1GB"
+
+  # --------------------------------------------------------------------------
+  # Redis Cache & Message Broker
+  # --------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: aixn-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - aixn-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --------------------------------------------------------------------------
+  # Prometheus Monitoring
+  # --------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: aixn-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "${PROMETHEUS_PORT:-9091}:9090"
+    volumes:
+      - ./docker/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - aixn-network
+    depends_on:
+      - aixn-node
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # --------------------------------------------------------------------------
+  # Grafana Visualization
+  # --------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: aixn-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
+      GF_SERVER_ROOT_URL: http://localhost:3000
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./docker/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./docker/monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - aixn-network
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # --------------------------------------------------------------------------
+  # Block Explorer (Optional)
+  # --------------------------------------------------------------------------
+  block-explorer:
+    build:
+      context: .
+      dockerfile: docker/explorer/Dockerfile
+    container_name: aixn-explorer
+    restart: unless-stopped
+    environment:
+      AIXN_API_URL: http://aixn-node:8080
+      EXPLORER_PORT: 8082
+    ports:
+      - "${EXPLORER_PORT:-8082}:8082"
+    networks:
+      - aixn-network
+    depends_on:
+      - aixn-node
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # --------------------------------------------------------------------------
+  # Nginx Reverse Proxy (Optional - for production)
+  # --------------------------------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    container_name: aixn-nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
+      - nginx-logs:/var/log/nginx
+    networks:
+      - aixn-network
+    depends_on:
+      - aixn-node
+      - block-explorer
+      - grafana
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - production
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  aixn-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+
+# ============================================================================
+# Volumes - Persistent Data Storage
+# ============================================================================
+volumes:
+  # Blockchain data
+  blockchain-data:
+    driver: local
+
+  # Wallet data
+  wallet-data:
+    driver: local
+
+  # Deposit data
+  deposit-data:
+    driver: local
+
+  # Gamification data
+  gamification-data:
+    driver: local
+
+  # Mining data
+  mining-data:
+    driver: local
+
+  # Database data
+  postgres-data:
+    driver: local
+
+  # Redis data
+  redis-data:
+    driver: local
+
+  # Monitoring data
+  prometheus-data:
+    driver: local
+
+  grafana-data:
+    driver: local
+
+  # Logs
+  node-logs:
+    driver: local
+
+  nginx-logs:
+    driver: local

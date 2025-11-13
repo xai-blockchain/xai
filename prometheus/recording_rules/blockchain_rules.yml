@@ -1,0 +1,128 @@
+# AIXN Blockchain Recording Rules
+# Pre-compute frequently used or expensive queries
+
+groups:
+  - name: blockchain_aggregations
+    interval: 30s
+    rules:
+      # Block production rate (blocks per minute)
+      - record: aixn:block_production_rate:1m
+        expr: rate(aixn_blocks_total[1m]) * 60
+
+      # Block production rate (blocks per hour)
+      - record: aixn:block_production_rate:1h
+        expr: rate(aixn_blocks_total[1h]) * 3600
+
+      # Average block size
+      - record: aixn:block_size_bytes:avg
+        expr: avg_over_time(aixn_block_size_bytes_bucket[5m])
+
+      # Average mining time
+      - record: aixn:block_mining_time:avg
+        expr: avg_over_time(aixn_block_mining_time_seconds_bucket[5m])
+
+  - name: transaction_aggregations
+    interval: 30s
+    rules:
+      # Transaction throughput (tx/s)
+      - record: aixn:transaction_throughput:1m
+        expr: rate(aixn_transactions_total[1m])
+
+      # Transaction success rate
+      - record: aixn:transaction_success_rate:5m
+        expr: |
+          rate(aixn_transactions_total{status="confirmed"}[5m])
+          /
+          rate(aixn_transactions_total[5m])
+
+      # Average transaction fee
+      - record: aixn:transaction_fee:avg
+        expr: |
+          sum(rate(aixn_transaction_fee_aixn_sum[5m]))
+          /
+          sum(rate(aixn_transaction_fee_aixn_count[5m]))
+
+  - name: network_aggregations
+    interval: 30s
+    rules:
+      # Network bandwidth (bytes/s)
+      - record: aixn:network_bandwidth_sent:rate1m
+        expr: rate(aixn_network_bandwidth_sent_bytes_total[1m])
+
+      - record: aixn:network_bandwidth_received:rate1m
+        expr: rate(aixn_network_bandwidth_received_bytes_total[1m])
+
+      # Total network bandwidth
+      - record: aixn:network_bandwidth_total:rate1m
+        expr: |
+          rate(aixn_network_bandwidth_sent_bytes_total[1m])
+          +
+          rate(aixn_network_bandwidth_received_bytes_total[1m])
+
+      # Median network latency
+      - record: aixn:network_latency:p50
+        expr: histogram_quantile(0.50, rate(aixn_network_latency_seconds_bucket[5m]))
+
+      # 95th percentile network latency
+      - record: aixn:network_latency:p95
+        expr: histogram_quantile(0.95, rate(aixn_network_latency_seconds_bucket[5m]))
+
+  - name: api_aggregations
+    interval: 30s
+    rules:
+      # API request rate
+      - record: aixn:api_requests:rate1m
+        expr: rate(aixn_api_requests_total[1m])
+
+      # API success rate
+      - record: aixn:api_success_rate:5m
+        expr: |
+          rate(aixn_api_requests_total{status=~"2.."}[5m])
+          /
+          rate(aixn_api_requests_total[5m])
+
+      # API error rate
+      - record: aixn:api_error_rate:5m
+        expr: |
+          rate(aixn_api_requests_total{status=~"5.."}[5m])
+          /
+          rate(aixn_api_requests_total[5m])
+
+      # API latency percentiles
+      - record: aixn:api_latency:p50
+        expr: histogram_quantile(0.50, rate(aixn_api_request_duration_seconds_bucket[5m]))
+
+      - record: aixn:api_latency:p95
+        expr: histogram_quantile(0.95, rate(aixn_api_request_duration_seconds_bucket[5m]))
+
+      - record: aixn:api_latency:p99
+        expr: histogram_quantile(0.99, rate(aixn_api_request_duration_seconds_bucket[5m]))
+
+  - name: mining_aggregations
+    interval: 30s
+    rules:
+      # Mining success rate
+      - record: aixn:mining_success_rate:1h
+        expr: |
+          rate(aixn_mining_success_total[1h])
+          /
+          rate(aixn_mining_attempts_total[1h])
+
+      # Effective hashrate (hashes/s)
+      - record: aixn:mining_effective_hashrate:1h
+        expr: avg_over_time(aixn_mining_hashrate[1h])
+
+  - name: system_aggregations
+    interval: 30s
+    rules:
+      # Average CPU usage
+      - record: aixn:system_cpu:avg5m
+        expr: avg_over_time(aixn_system_cpu_usage_percent[5m])
+
+      # Average memory usage
+      - record: aixn:system_memory:avg5m
+        expr: avg_over_time(aixn_system_memory_percent[5m])
+
+      # Disk growth rate (bytes/hour)
+      - record: aixn:system_disk_growth:1h
+        expr: rate(aixn_system_disk_usage_bytes[1h]) * 3600
