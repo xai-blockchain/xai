@@ -420,13 +420,22 @@ def get_transactions():
 
 ### CORS Configuration
 
-```python
-CORS_CONFIG = {
-    'origins': ['https://app.example.com'],
-    'methods': ['GET', 'POST'],
-    'allow_headers': ['Content-Type', 'Authorization'],
-    'max_age': 3600
-}
+CORS (Cross-Origin Resource Sharing) is configured to restrict which domains can access the API. The allowed origins are defined in `config/cors.yaml`.
+
+By default, the following origins are allowed in development:
+```yaml
+origins:
+  - http://localhost:3000
+  - http://localhost:8080
+```
+
+For production, this should be updated to only allow your application's domain.
+
+Example of a production configuration:
+```yaml
+origins:
+  - https://yourapp.com
+  - https://www.yourapp.com
 ```
 
 ## Incident Response

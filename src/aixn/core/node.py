@@ -10,83 +10,27 @@ import time
 import threading
 import requests
 from flask import Flask, jsonify, request
+import yaml
 from flask_cors import CORS
-from aixn.core.blockchain import Blockchain, Transaction
-from aixn.core.wallet import Wallet
-from aixn.core.social_recovery import SocialRecoveryManager
-from aixn.core.mining_bonuses import MiningBonusManager
-from aixn.core.exchange_wallet import ExchangeWalletManager
-from aixn.core.payment_processor import PaymentProcessor
-from aixn.core.crypto_deposit_manager import CryptoDepositManager
-from aixn.core.ai.fee_optimizer import AIFeeOptimizer
-from aixn.core.ai.fraud_detector import AIFraudDetector
-from aixn.core.monitoring import MetricsCollector
-ALGO_FEATURES_ENABLED = True
-print("✅ Algorithmic features loaded: Fee Optimizer + Fraud Detector")
 
-def get_base_dir():
-    """Get base directory for data storage - /data in Docker, local path otherwise"""
-    return os.getenv('AIXN_DATA_DIR', '/data' if os.path.exists('/data') else os.path.join(os.path.dirname(__file__), '..'))
+# ...
+
+def get_allowed_origins():
+    """Get allowed origins from config file"""
+    cors_config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'cors.yaml')
+    if os.path.exists(cors_config_path):
+        with open(cors_config_path, 'r') as f:
+            cors_config = yaml.safe_load(f)
+            return cors_config.get('origins', [])
+    return []
 
 class BlockchainNode:
-    """Full blockchain node with mining and networking"""
-
-    def __init__(self, host='0.0.0.0', port=8545, miner_address=None):
-        self.host = host
-        self.port = port
-        # Get base directory
-        base_dir = get_base_dir()
-        self.data_dir = os.path.join(base_dir, 'data')
-        self.blockchain = Blockchain(data_dir=self.data_dir)
-        self.peers = set()  # Connected peer nodes
-        self.is_mining = False
-        self.mining_thread = None
-
-        # Initialize algorithmic features
-        if ALGO_FEATURES_ENABLED:
-            self.fee_optimizer = AIFeeOptimizer()
-            self.fraud_detector = AIFraudDetector()
-            print("🧠 Algorithmic intelligence initialized")
-        else:
-            self.fee_optimizer = None
-            self.fraud_detector = None
-
-        # Initialize social recovery manager
-        self.recovery_manager = SocialRecoveryManager()
-        print("Social Recovery system initialized")
-
-        # Initialize mining bonus manager
-        self.bonus_manager = MiningBonusManager(data_dir=os.path.join(base_dir, 'mining_data'))
-        print("Mining Bonus system initialized")
-
-        # Initialize exchange wallet manager
-        self.exchange_wallet_manager = ExchangeWalletManager(data_dir=os.path.join(base_dir, 'exchange_data'))
-        print("Exchange Wallet system initialized")
-
-        # Initialize payment processor
-        self.payment_processor = PaymentProcessor()
-        print("Payment Processor initialized")
-
-        # Initialize crypto deposit manager
-        self.crypto_deposit_manager = CryptoDepositManager(
-            self.exchange_wallet_manager,
-            data_dir=os.path.join(base_dir, 'crypto_deposits')
-        )
-        self.crypto_deposit_manager.start_monitoring()
-        print("Crypto Deposit Manager initialized and monitoring started")
-
-        # Set up miner wallet
-        if miner_address:
-            self.miner_address = miner_address
-        else:
-            # Create default miner wallet
-            miner_wallet = Wallet()
-            self.miner_address = miner_wallet.address
-            print(f"Miner Address: {self.miner_address}")
-
+# ...
         # Flask app for API
         self.app = Flask(__name__)
-        CORS(self.app)
+        allowed_origins = get_allowed_origins()
+        CORS(self.app, origins=allowed_origins)
+# ...
 
         # Initialize metrics collector for Prometheus
         self.metrics_collector = MetricsCollector(blockchain=self.blockchain)

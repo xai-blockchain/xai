@@ -74,6 +74,28 @@ repos:
         args: ['-r', 'src/', '-ll', '--skip=B101,B601']
         exclude: ^(tests/|docs/|archived_)
 
+  # Python dependency scanning with pip-audit
+  - repo: local
+    hooks:
+      - id: pip-audit
+        name: Pip Audit
+        entry: pip-audit -r requirements.txt
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [commit]
+
+  # Python static analysis with Semgrep
+  - repo: local
+    hooks:
+      - id: semgrep
+        name: Semgrep
+        entry: semgrep --config auto src/
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [commit]
+
   # Type checking with MyPy
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.13.0

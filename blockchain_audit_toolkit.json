@@ -1,0 +1,353 @@
+{
+  "project": "Blockchain Security Audit Toolkit",
+  "version": "1.0.0",
+  "generated_at_utc": "2025-11-14T05:01:06.776661Z",
+  "description": "Configuration and reference manifest for LLM-based agents auditing a blockchain project (node software, smart contracts, wallets, miners, GUIs, installers, CI). Agents may selectively use tools, MCP servers, and workflows described here.",
+  "languages_example": [
+    "Solidity/Vyper (smart contracts)",
+    "Rust (node / validator / wallet backend)",
+    "Go (node)",
+    "TypeScript/JavaScript (GUI / wallet frontend / APIs)",
+    "Shell / Docker / Terraform (infra, installers)"
+  ],
+  "sources_note": "The URLs here point to official or primary project pages as of late 2025. Agents should verify links and versions before installing anything.",
+  "tools": {
+    "smart_contract_static_analysis": [
+      {
+        "id": "slither",
+        "name": "Slither",
+        "description": "Static analysis framework for Solidity and Vyper smart contracts. Detects common vulnerabilities, prints contract summaries, and provides APIs for custom analyses.",
+        "homepage": "https://github.com/crytic/slither",
+        "docs": "https://github.com/crytic/slither#readme",
+        "install_hint": "Python3 package. Typical: `pip install slither-analyzer` (check docs for latest)."
+      },
+      {
+        "id": "mythril",
+        "name": "Mythril",
+        "description": "Symbolic-execution-based security analysis tool for EVM bytecode. Detects vulnerabilities in Ethereum and EVM-compatible smart contracts.",
+        "homepage": "https://github.com/ConsenSysDiligence/mythril",
+        "docs": "https://mythril-classic.readthedocs.io/",
+        "install_hint": "Python package / Docker images. See README for `pip install mythril` or Docker usage."
+      },
+      {
+        "id": "manticore_smart_contracts",
+        "name": "Manticore",
+        "description": "Symbolic execution tool for analysis of Ethereum smart contracts and binaries. Useful for deeper path exploration and custom analyses.",
+        "homepage": "https://github.com/trailofbits/manticore",
+        "docs": "https://manticore.readthedocs.io/",
+        "install_hint": "Python package with extra system dependencies. Follow documentation for setup."
+      }
+    ],
+    "smart_contract_fuzzing_and_property_testing": [
+      {
+        "id": "echidna",
+        "name": "Echidna",
+        "description": "Property-based fuzzer for Ethereum smart contracts. Uses ABI and developer-defined invariants to falsify security properties.",
+        "homepage": "https://github.com/crytic/echidna",
+        "docs": "https://github.com/crytic/echidna#readme"
+      },
+      {
+        "id": "foundry_forge",
+        "name": "Foundry / Forge",
+        "description": "Blazing fast Ethereum development toolkit. `forge` supports tests, fuzzing, and invariant testing for Solidity smart contracts.",
+        "homepage": "https://getfoundry.sh/",
+        "docs": "https://book.getfoundry.sh/"
+      }
+    ],
+    "general_code_static_analysis": [
+      {
+        "id": "codeql",
+        "name": "CodeQL",
+        "description": "Semantic code analysis engine by GitHub. Supports writing custom queries to find vulnerability patterns across large codebases.",
+        "homepage": "https://codeql.github.com/",
+        "docs": "https://docs.github.com/code-security/code-scanning/introduction-to-code-scanning/about-code-scanning-with-codeql",
+        "install_hint": "Use CodeQL CLI or GitHub code scanning / actions. See official docs."
+      },
+      {
+        "id": "semgrep",
+        "name": "Semgrep",
+        "description": "Fast, open-source static analysis. Pattern-based rules for many languages (Go, Rust, Python, JS/TS, etc.). Good for enforcing secure coding standards.",
+        "homepage": "https://semgrep.dev/",
+        "docs": "https://github.com/semgrep/semgrep"
+      }
+    ],
+    "dependency_and_supply_chain": [
+      {
+        "id": "cargo_audit",
+        "name": "cargo-audit",
+        "description": "Audits Rust crates for known vulnerabilities using RustSec advisory database.",
+        "homepage": "https://github.com/RustSec/rustsec/tree/main/cargo-audit"
+      },
+      {
+        "id": "gosec",
+        "name": "gosec",
+        "description": "Security scanner for Go code. Checks for common issues like hardcoded credentials, unsafe functions, etc.",
+        "homepage": "https://github.com/securego/gosec"
+      },
+      {
+        "id": "npm_audit",
+        "name": "npm audit / yarn audit / pnpm audit",
+        "description": "Dependency vulnerability scanning built into major JS package managers.",
+        "homepage": "https://docs.npmjs.com/cli/v10/commands/npm-audit"
+      },
+      {
+        "id": "sbom_syft",
+        "name": "Syft (SBOM)",
+        "description": "Generates Software Bill of Materials (SBOM) from container images and filesystems; useful for supply-chain visibility.",
+        "homepage": "https://github.com/anchore/syft"
+      },
+      {
+        "id": "trivy",
+        "name": "Trivy",
+        "description": "Comprehensive container and filesystem scanner for vulnerabilities, misconfigurations, and secrets.",
+        "homepage": "https://github.com/aquasecurity/trivy"
+      }
+    ],
+    "fuzzing_and_dynamic_analysis": [
+      {
+        "id": "libfuzzer",
+        "name": "libFuzzer / LLVM libFuzzer",
+        "description": "Coverage-guided fuzzing engine integrated with Clang/LLVM. Good for C/C++/Rust components.",
+        "homepage": "https://llvm.org/docs/LibFuzzer.html"
+      },
+      {
+        "id": "aflplusplus",
+        "name": "AFL++",
+        "description": "Modern fork of American Fuzzy Lop. Coverage-guided fuzzer for binaries / native code.",
+        "homepage": "https://github.com/AFLplusplus/AFLplusplus"
+      },
+      {
+        "id": "go_fuzz",
+        "name": "go-fuzz / built-in Go fuzzing",
+        "description": "Coverage-guided fuzzing for Go. Newer Go versions include built-in fuzzing via `testing` package.",
+        "homepage": "https://go.dev/doc/fuzz/"
+      }
+    ],
+    "formatters_and_linters": [
+      {
+        "id": "rust_clippy",
+        "name": "clippy",
+        "description": "Rust lints for common mistakes and potential bugs, including some security-relevant patterns.",
+        "homepage": "https://github.com/rust-lang/rust-clippy"
+      },
+      {
+        "id": "eslint_security",
+        "name": "ESLint + security plugins",
+        "description": "Static analysis of JS/TS front-ends and wallet GUIs, with plugins targeting security and best practices.",
+        "homepage": "https://eslint.org/"
+      },
+      {
+        "id": "shellcheck",
+        "name": "ShellCheck",
+        "description": "Static analysis for shell scripts. Useful for installers and deployment scripts.",
+        "homepage": "https://www.shellcheck.net/"
+      }
+    ]
+  },
+  "mcp": {
+    "specification": {
+      "description": "Model Context Protocol (MCP) allows LLM applications to connect to external tools and data sources via MCP servers.",
+      "homepage": "https://modelcontextprotocol.io/",
+      "spec": "https://modelcontextprotocol.io/specification/"
+    },
+    "recommended_servers_to_implement": [
+      {
+        "id": "mcp.slither_server",
+        "name": "Slither MCP Server",
+        "type": "custom_mcp_server",
+        "purpose": "Expose Slither smart contract analysis as MCP tools callable by LLM agents.",
+        "example_tools": [
+          "run_slither_full(project_path)",
+          "run_slither_on_file(file_path)",
+          "list_slither_detectors()",
+          "get_slither_report(format=\"json\")"
+        ],
+        "implementation_notes": "Wrap the Slither CLI or Python API in an MCP server. The server accepts parameters like project path or contract file, runs Slither with selected detectors, and returns JSON results summarized or filtered for the agent."
+      },
+      {
+        "id": "mcp.mythril_server",
+        "name": "Mythril MCP Server",
+        "type": "custom_mcp_server",
+        "purpose": "Run Mythril analyses on given contracts or bytecode, returning vulnerability findings.",
+        "example_tools": [
+          "run_mythril_bytecode(bytecode_or_address)",
+          "run_mythril_source(file_path)",
+          "get_last_mythril_report(format=\"json\")"
+        ]
+      },
+      {
+        "id": "mcp.foundry_server",
+        "name": "Foundry / Forge MCP Server",
+        "type": "custom_mcp_server",
+        "purpose": "Expose `forge test`, `forge fmt`, fuzz tests, and invariant tests as MCP tools.",
+        "example_tools": [
+          "forge_test(project_path, options)",
+          "forge_coverage(project_path)",
+          "forge_fuzz(project_path, test_pattern)"
+        ]
+      },
+      {
+        "id": "mcp.codeql_server",
+        "name": "CodeQL MCP Server",
+        "type": "custom_mcp_server",
+        "purpose": "Manage CodeQL databases and analyses across repos (node, wallet, backend, CLI tools).",
+        "example_tools": [
+          "codeql_create_database(repo_path, language)",
+          "codeql_run_analysis(database_path, query_suite)",
+          "codeql_list_alerts(database_path)"
+        ]
+      },
+      {
+        "id": "mcp.semgrep_server",
+        "name": "Semgrep MCP Server",
+        "type": "custom_mcp_server",
+        "purpose": "Run Semgrep rulesets (including security rules) on selected directories or diffs.",
+        "example_tools": [
+          "semgrep_scan(path, ruleset)",
+          "semgrep_scan_diff(path, base_ref, head_ref)"
+        ]
+      },
+      {
+        "id": "mcp.repo_server",
+        "name": "Repository MCP Server",
+        "type": "custom_mcp_server",
+        "purpose": "Generic access to the blockchain project repositories (git operations, diff retrieval, file reading).",
+        "example_tools": [
+          "list_repos()",
+          "list_files(repo, path_prefix)",
+          "get_file(repo, path)",
+          "get_diff(repo, base_ref, head_ref)"
+        ]
+      },
+      {
+        "id": "mcp.ci_server",
+        "name": "CI / Test Runner MCP Server",
+        "type": "custom_mcp_server",
+        "purpose": "Trigger CI pipelines, run test suites, fuzzers, and code quality tools on demand.",
+        "example_tools": [
+          "run_ci_pipeline(pipeline_id, branch)",
+          "run_test_suite(repo, test_pattern)",
+          "run_fuzzer(job_id)"
+        ]
+      }
+    ]
+  },
+  "agents": [
+    {
+      "id": "agent.smart_contract_auditor",
+      "name": "Smart Contract Security Auditor",
+      "role_prompt": "You are a senior smart contract security auditor. You specialize in Solidity/Vyper smart contracts, DeFi protocols, and low-level EVM behavior. You use static analysis, symbolic execution, fuzzing, and manual reasoning to identify vulnerabilities and suggest safe remediations.",
+      "primary_targets": [
+        "L1/L2 protocol smart contracts",
+        "Token contracts and staking logic",
+        "Bridges, AMMs, lending protocols",
+        "Governance contracts and timelocks"
+      ],
+      "preferred_tools": [
+        "mcp.slither_server.run_slither_full",
+        "mcp.mythril_server.run_mythril_source",
+        "mcp.foundry_server.forge_test",
+        "mcp.foundry_server.forge_fuzz"
+      ],
+      "workflow_outline": [
+        "Fetch relevant contracts via mcp.repo_server.get_file or project docs.",
+        "Run Slither on the whole project to get a quick vulnerability overview.",
+        "Run Mythril or Manticore on high-value contracts for deeper path exploration.",
+        "Design and run invariant tests and fuzz campaigns using Foundry / Echidna.",
+        "Summarize findings by severity and provide code-level remediation suggestions.",
+        "Generate additional tests that would fail without the recommended fixes."
+      ]
+    },
+    {
+      "id": "agent.node_and_wallet_appsec",
+      "name": "Node + Wallet Application Security Analyst",
+      "role_prompt": "You are an application security engineer focusing on node software, wallet backends, and APIs. You look for memory safety bugs (if applicable), unsafe RPC handling, authentication/authorization issues, and unsafe key or seed handling.",
+      "primary_targets": [
+        "Node / validator clients (Rust/Go/C++)",
+        "Wallet daemons / backend services",
+        "RPC endpoints and APIs"
+      ],
+      "preferred_tools": [
+        "mcp.codeql_server.codeql_run_analysis",
+        "mcp.semgrep_server.semgrep_scan",
+        "libfuzzer",
+        "aflplusplus"
+      ],
+      "workflow_outline": [
+        "Discover repositories and modules via mcp.repo_server.list_files.",
+        "Run CodeQL queries focused on injection, auth, and deserialization issues.",
+        "Run Semgrep rulesets tuned for network services, crypto, and secrets.",
+        "Identify RPC and P2P entry points; design fuzz harnesses for them.",
+        "Recommend dependency and supply-chain checks (cargo-audit, gosec, npm audit, etc.)."
+      ]
+    },
+    {
+      "id": "agent.frontend_wallet_ux",
+      "name": "Wallet & GUI Security / UX Reviewer",
+      "role_prompt": "You review wallet and GUI code (web, desktop, mobile) for security and UX patterns that can lead to phishing, mis-signing, or dangerous approvals. You ensure that users see clear risk information and that signing flows are hard to abuse.",
+      "primary_targets": [
+        "Browser extension wallets",
+        "Web GUIs for dApps/bridges",
+        "Desktop or mobile wallet UIs"
+      ],
+      "preferred_tools": [
+        "mcp.repo_server.get_file",
+        "mcp.semgrep_server.semgrep_scan",
+        "eslint_security"
+      ],
+      "workflow_outline": [
+        "Enumerate signing flows and approval screens.",
+        "Check for anti-phishing measures and clear labeling of actions.",
+        "Review key management, seed handling, and exposure of sensitive data.",
+        "Run JS/TS linters and security scans where applicable.",
+        "Propose UX and copy changes that make dangerous actions visually and textually obvious."
+      ]
+    },
+    {
+      "id": "agent.devops_and_installers",
+      "name": "DevOps / Installer Hardening Agent",
+      "role_prompt": "You focus on CI/CD pipelines, Dockerfiles, shell scripts, installers, and infrastructure-as-code. You look for supply chain risks, insecure defaults, and privilege escalation vectors.",
+      "primary_targets": [
+        "Node installers and bootstrap scripts",
+        "Docker images and compose files",
+        "Kubernetes manifests / Terraform configs",
+        "CI workflows and secrets handling"
+      ],
+      "preferred_tools": [
+        "shellcheck",
+        "mcp.repo_server.list_files",
+        "mcp.ci_server.run_ci_pipeline",
+        "trivy",
+        "sbom_syft"
+      ],
+      "workflow_outline": [
+        "Locate all installers, Dockerfiles, and CI configs.",
+        "Run ShellCheck on shell scripts and highlight dangerous patterns.",
+        "Suggest hardened Docker and Kubernetes configurations.",
+        "Generate SBOMs and vulnerability scans for images and dependencies.",
+        "Recommend secure secret management workflows and principle-of-least-privilege settings."
+      ]
+    },
+    {
+      "id": "agent.coordination_lead",
+      "name": "Security Coordination & Reporting Agent",
+      "role_prompt": "You coordinate multiple specialized security agents. You do not run tools directly; instead, you plan, delegate, and synthesize. You maintain a global view of project risk, track findings, deduplicate reports, and produce final human-readable audit documents.",
+      "primary_targets": [
+        "Cross-cutting issues and risk aggregation",
+        "Audit report drafting",
+        "Prioritization of fixes by impact and feasibility"
+      ],
+      "preferred_tools": [
+        "mcp.repo_server.list_repos",
+        "mcp.repo_server.get_diff"
+      ],
+      "workflow_outline": [
+        "Build an inventory of components: nodes, contracts, wallets, infra.",
+        "Assign scope segments to the relevant specialized agents.",
+        "Aggregate and normalize findings from all agents into a single risk register.",
+        "Highlight protocol-level invariants and assumptions that appear violated or under-tested.",
+        "Produce a final report structured by component, severity, and recommended timeline for fixes."
+      ]
+    }
+  ]
+}

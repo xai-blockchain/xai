@@ -7,7 +7,28 @@ Successfully deployed and tested a 3-node XAI blockchain network in Docker with 
 
 ## Latest Completed Tasks (Current Session)
 
-### 1. Security Enhancements ✅
+### 1. Security Audit Fixes ✅
+**Status:** COMPLETE
+
+**Improvements Implemented:**
+- **Updated `flask-cors` and `requests`:** Updated `flask-cors` to `>=6.0.0` and `requests` to `>=2.32.4` in `requirements.txt` to address multiple CVEs.
+- **Hardened CORS Policies:** Configured Flask applications (`src/aixn/core/node.py` and `src/aixn/block_explorer.py`) to read allowed CORS origins from `config/cors.yaml`. Default origins are `http://localhost:3000` and `http://localhost:8080`.
+- **Implemented Dependency Pinning:** Pinned all dependencies in `requirements.txt` and `src/aixn/requirements.txt` to their exact versions using `pip-tools`.
+- **Added Pre-commit Hooks:** Integrated `pip-audit` and `semgrep` into `.pre-commit-config.yaml` to run security checks before commits.
+
+**Files Modified:**
+- `requirements.txt`
+- `src/aixn/requirements.txt`
+- `src/aixn/core/node.py`
+- `src/aixn/block_explorer.py`
+- `config/cors.yaml` (new file)
+- `docker/testnet/config/testnet.yaml`
+- `docs/security/overview.md`
+- `.pre-commit-config.yaml`
+
+---
+
+### 2. Security Enhancements ✅
 **Status:** COMPLETE
 
 **Improvements Implemented:**

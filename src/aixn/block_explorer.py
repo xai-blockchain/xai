@@ -13,14 +13,21 @@ Then visit: http://localhost:8080
 import os
 import sys
 from flask import Flask, render_template, request, jsonify
+import yaml
 from flask_cors import CORS
-import requests
-from datetime import datetime, timezone
 
-
+def get_allowed_origins():
+    """Get allowed origins from config file"""
+    cors_config_path = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'cors.yaml')
+    if os.path.exists(cors_config_path):
+        with open(cors_config_path, 'r') as f:
+            cors_config = yaml.safe_load(f)
+            return cors_config.get('origins', [])
+    return []
 
 app = Flask(__name__)
-CORS(app)
+allowed_origins = get_allowed_origins()
+CORS(app, origins=allowed_origins)
 
 # Configuration
 NODE_URL = os.getenv('XAI_NODE_URL', 'http://localhost:8545')
