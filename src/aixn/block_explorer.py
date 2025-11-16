@@ -48,7 +48,17 @@ class SimpleCache:
         Args:
             ttl: Time-to-live in seconds for cached entries
             max_size: Maximum number of entries to cache
+
+        Raises:
+            ValueError: If ttl or max_size are invalid
         """
+        if ttl <= 0:
+            raise ValueError(f"TTL must be positive, got {ttl}")
+        if max_size <= 0:
+            raise ValueError(f"Max size must be positive, got {max_size}")
+        if max_size > 10000:
+            raise ValueError(f"Max size too large (max 10000), got {max_size}")
+
         self.ttl = ttl
         self.max_size = max_size
         self.cache: Dict[str, tuple[Any, float]] = {}
@@ -62,7 +72,13 @@ class SimpleCache:
 
         Returns:
             Cached value or None if not found or expired
+
+        Raises:
+            ValueError: If key is empty or invalid
         """
+        if not key or not isinstance(key, str):
+            raise ValueError("Cache key must be a non-empty string")
+
         if key in self.cache:
             value, timestamp = self.cache[key]
             if datetime.now().timestamp() - timestamp < self.ttl:
@@ -79,7 +95,15 @@ class SimpleCache:
         Args:
             key: Cache key
             value: Value to cache
+
+        Raises:
+            ValueError: If key is empty or invalid, or value is None
         """
+        if not key or not isinstance(key, str):
+            raise ValueError("Cache key must be a non-empty string")
+        if value is None:
+            raise ValueError("Cannot cache None value")
+
         # Simple eviction: if at max size, remove oldest
         if len(self.cache) >= self.max_size:
             oldest_key = min(self.cache.keys(), key=lambda k: self.cache[k][1])
