@@ -10,8 +10,8 @@ Demonstrates how to use the AI safety control system to:
 
 import sys
 import time
-from src.aixn.core.blockchain import Blockchain
-from src.aixn.core.ai_safety_controls import AISafetyControls, StopReason, AISafetyLevel
+from aixn.core.blockchain import Blockchain
+from aixn.core.ai_safety_controls import AISafetyControls, StopReason, AISafetyLevel
 
 
 def test_personal_ai_cancellation():

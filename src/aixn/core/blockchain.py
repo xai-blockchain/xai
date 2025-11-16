@@ -585,3 +585,95 @@ class Blockchain:
             "difficulty": self.difficulty,
             "stats": self.get_stats(),
         }
+
+    def submit_governance_proposal(self, submitter: str, title: str, description: str, 
+                                   proposal_type: str, proposal_data: dict) -> dict:
+        """
+        Submit a governance proposal on-chain.
+        
+        Args:
+            submitter: Address submitting the proposal
+            title: Proposal title
+            description: Detailed description
+            proposal_type: Type of proposal (ai_improvement, parameter_change, etc.)
+            proposal_data: Additional proposal data
+            
+        Returns:
+            dict with proposal_id, txid, and status
+        """
+        import hashlib
+        import time
+        
+        # Generate proposal ID
+        proposal_id = hashlib.sha256(f"{submitter}{title}{time.time()}".encode()).hexdigest()[:16]
+        
+        # Create a transaction to record the proposal
+        tx_data = {
+            "type": "governance_proposal",
+            "proposal_id": proposal_id,
+            "submitter": submitter,
+            "title": title,
+            "description": description,
+            "proposal_type": proposal_type,
+            "proposal_data": proposal_data,
+            "timestamp": time.time()
+        }
+        
+        # Create transaction
+        tx = Transaction(submitter, "GOVERNANCE", 0.0, fee=0.1)
+        tx.metadata = tx_data
+        tx.txid = tx.calculate_hash()
+        
+        # Add to pending transactions
+        self.pending_transactions.append(tx)
+        
+        return {
+            "proposal_id": proposal_id,
+            "txid": tx.txid,
+            "status": "pending"
+        }
+    
+    def cast_governance_vote(self, voter: str, proposal_id: str, vote: str, 
+                            voting_power: float) -> dict:
+        """
+        Cast a vote on a governance proposal.
+        
+        Args:
+            voter: Address casting the vote
+            proposal_id: ID of the proposal
+            vote: Vote choice (yes/no/abstain)
+            voting_power: Voting power of the voter
+            
+        Returns:
+            dict with vote confirmation
+        """
+        import time
+        
+        # Create vote transaction
+        tx_data = {
+            "type": "governance_vote",
+            "proposal_id": proposal_id,
+            "voter": voter,
+            "vote": vote,
+            "voting_power": voting_power,
+            "timestamp": time.time()
+        }
+        
+        tx = Transaction(voter, "GOVERNANCE", 0.0, fee=0.05)
+        tx.metadata = tx_data
+        tx.txid = tx.calculate_hash()
+        
+        # Add to pending transactions
+        self.pending_transactions.append(tx)
+        
+        # Count existing votes (simplified)
+        vote_count = sum(1 for t in self.pending_transactions 
+                        if hasattr(t, 'metadata') and 
+                        t.metadata.get('type') == 'governance_vote' and
+                        t.metadata.get('proposal_id') == proposal_id)
+        
+        return {
+            "txid": tx.txid,
+            "status": "recorded",
+            "vote_count": vote_count
+        }
