@@ -2,7 +2,7 @@ import os
 import sys
 import time
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'aixn-blockchain')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "aixn-blockchain")))
 
 import pytest
 
@@ -36,23 +36,23 @@ def test_bridge_queues_proposal_and_records_metrics():
     blockchain = DummyBlockchain()
     dao = AIGovernanceDAO(blockchain)
 
-    proposal = type('P', (), {})()
-    proposal.proposal_id = 'prop-test'
+    proposal = type("P", (), {})()
+    proposal.proposal_id = "prop-test"
     proposal.category = ProposalCategory.SECURITY
-    proposal.description = 'Test'
-    proposal.detailed_prompt = 'Test prompt'
+    proposal.description = "Test"
+    proposal.detailed_prompt = "Test prompt"
     proposal.estimated_tokens = 1000
-    proposal.best_ai_model = 'claude-opus-4'
+    proposal.best_ai_model = "claude-opus-4"
     proposal.status = ProposalStatus.FULLY_FUNDED
 
     dao.proposals[proposal.proposal_id] = proposal
 
     bridge = BlockchainAIBridge(blockchain=blockchain, governance_dao=dao)
-    before = metrics.get_snapshot()['queue_events']
+    before = metrics.get_snapshot()["queue_events"]
 
     out = bridge.sync_full_proposals()
 
-    assert out and out[0]['queued']
+    assert out and out[0]["queued"]
     after = metrics.get_snapshot()
-    assert after['queue_events'] > before
-    assert after['completed_tasks'] >= 0
+    assert after["queue_events"] > before
+    assert after["completed_tasks"] >= 0

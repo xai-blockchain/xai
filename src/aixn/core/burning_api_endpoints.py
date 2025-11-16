@@ -17,6 +17,7 @@ from flask import jsonify, request
 from aixn.core.token_burning_engine import TokenBurningEngine, ServiceType
 from aixn.core.anonymous_treasury import AnonymousTreasury
 
+
 def setup_burning_api(app, node):
     """
     Setup token burning API endpoints
@@ -30,9 +31,11 @@ def setup_burning_api(app, node):
 
     # Initialize burning engine (anonymous)
     # NOTE: No treasury needed - dev funded by pre-mine (10M XAI) + donated AI API minutes
-    burning_engine = TokenBurningEngine(blockchain=node.blockchain if hasattr(node, 'blockchain') else None)
+    burning_engine = TokenBurningEngine(
+        blockchain=node.blockchain if hasattr(node, "blockchain") else None
+    )
 
-    @app.route('/burn/consume-service', methods=['POST'])
+    @app.route("/burn/consume-service", methods=["POST"])
     def consume_service():
         """
         Consume XAI for service usage
@@ -60,29 +63,27 @@ def setup_burning_api(app, node):
         """
         data = request.get_json()
 
-        if not data or 'wallet_address' not in data or 'service_type' not in data:
-            return jsonify({'error': 'Missing wallet_address or service_type'}), 400
+        if not data or "wallet_address" not in data or "service_type" not in data:
+            return jsonify({"error": "Missing wallet_address or service_type"}), 400
 
-        wallet_address = data['wallet_address']
-        service_type_str = data['service_type']
-        custom_amount = data.get('custom_amount')
+        wallet_address = data["wallet_address"]
+        service_type_str = data["service_type"]
+        custom_amount = data.get("custom_amount")
 
         # Validate service type
         try:
             service_type = ServiceType[service_type_str.upper()]
         except KeyError:
-            return jsonify({'error': f'Invalid service_type: {service_type_str}'}), 400
+            return jsonify({"error": f"Invalid service_type: {service_type_str}"}), 400
 
         # Consume service (anonymous) - NO treasury, dev funded separately!
         result = burning_engine.consume_service(
-            wallet_address=wallet_address,
-            service_type=service_type,
-            custom_amount=custom_amount
+            wallet_address=wallet_address, service_type=service_type, custom_amount=custom_amount
         )
 
         return jsonify(result)
 
-    @app.route('/burn/stats', methods=['GET'])
+    @app.route("/burn/stats", methods=["GET"])
     def get_burn_stats():
         """
         Get anonymous burn statistics
@@ -105,7 +106,7 @@ def setup_burning_api(app, node):
         stats = burning_engine.get_anonymous_stats()
         return jsonify(stats)
 
-    @app.route('/burn/recent', methods=['GET'])
+    @app.route("/burn/recent", methods=["GET"])
     def get_recent_burns():
         """
         Get recent anonymous burn transactions
@@ -128,14 +129,11 @@ def setup_burning_api(app, node):
 
         NO personal identifiers!
         """
-        limit = int(request.args.get('limit', 100))
+        limit = int(request.args.get("limit", 100))
         burns = burning_engine.get_recent_burns(limit=limit)
-        return jsonify({
-            'burns': burns,
-            'count': len(burns)
-        })
+        return jsonify({"burns": burns, "count": len(burns)})
 
-    @app.route('/burn/service/<service_type>', methods=['GET'])
+    @app.route("/burn/service/<service_type>", methods=["GET"])
     def get_service_burn_stats(service_type):
         """
         Get anonymous burn statistics for specific service
@@ -150,13 +148,13 @@ def setup_burning_api(app, node):
         try:
             service = ServiceType[service_type.upper()]
         except KeyError:
-            return jsonify({'error': f'Invalid service_type: {service_type}'}), 400
+            return jsonify({"error": f"Invalid service_type: {service_type}"}), 400
 
         stats = burning_engine.get_burn_by_service(service)
-        stats['service_type'] = service_type
+        stats["service_type"] = service_type
         return jsonify(stats)
 
-    @app.route('/burn/price/<service_type>', methods=['GET'])
+    @app.route("/burn/price/<service_type>", methods=["GET"])
     def get_service_price(service_type):
         """
         Get current XAI price for service (dynamic, USD-pegged)
@@ -172,19 +170,21 @@ def setup_burning_api(app, node):
         try:
             service = ServiceType[service_type.upper()]
         except KeyError:
-            return jsonify({'error': f'Invalid service_type: {service_type}'}), 400
+            return jsonify({"error": f"Invalid service_type: {service_type}"}), 400
 
         from aixn.core.token_burning_engine import SERVICE_PRICES_USD
 
         price_xai = burning_engine.calculate_service_cost(service)
         price_usd = SERVICE_PRICES_USD[service]
 
-        return jsonify({
-            'service_type': service_type,
-            'price_xai': price_xai,
-            'price_usd': price_usd,
-            'xai_price_usd': burning_engine.xai_price_usd
-        })
+        return jsonify(
+            {
+                "service_type": service_type,
+                "price_xai": price_xai,
+                "price_usd": price_usd,
+                "xai_price_usd": burning_engine.xai_price_usd,
+            }
+        )
 
     print("✓ Token Burning API initialized (100% ANONYMOUS)")
     print("  Distribution: 50% burn (deflationary) + 50% miners (security)")

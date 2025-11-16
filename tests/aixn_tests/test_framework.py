@@ -25,6 +25,7 @@ from core.advanced_consensus import AdvancedConsensusManager
 
 class FrameworkResult:
     """Test result tracking"""
+
     def __init__(self):
         self.total = 0
         self.passed = 0
@@ -45,7 +46,7 @@ class BlockchainUnitTests:
     def test_wallet_creation():
         """Test wallet creation and key generation"""
         wallet = Wallet()
-        assert wallet.address.startswith('XAI'), "Wallet address should start with XAI"
+        assert wallet.address.startswith("XAI"), "Wallet address should start with XAI"
         assert len(wallet.private_key) == 64, "Private key should be 64 chars"
         assert len(wallet.public_key) == 128, "Public key should be 128 chars"
         return True
@@ -73,7 +74,7 @@ class BlockchainUnitTests:
         block = Block(0, [tx], "0", difficulty=2)
         block.hash = block.mine_block()
 
-        assert block.hash.startswith('00'), "Block should meet difficulty requirement"
+        assert block.hash.startswith("00"), "Block should meet difficulty requirement"
         assert block.merkle_root is not None, "Block should have merkle root"
         return True
 
@@ -93,7 +94,7 @@ class BlockchainUnitTests:
         wallet2 = Wallet()
 
         # Give wallet1 some funds
-        blockchain.utxo_set[wallet1.address] = [{'txid': 'test', 'amount': 100.0, 'spent': False}]
+        blockchain.utxo_set[wallet1.address] = [{"txid": "test", "amount": 100.0, "spent": False}]
 
         tx = Transaction(wallet1.address, wallet2.address, 10.0, 0.1, wallet1.public_key, nonce=0)
         tx.sign_transaction(wallet1.private_key)
@@ -108,9 +109,9 @@ class BlockchainUnitTests:
         wallet = Wallet()
 
         blockchain.utxo_set[wallet.address] = [
-            {'txid': 'tx1', 'amount': 50.0, 'spent': False},
-            {'txid': 'tx2', 'amount': 30.0, 'spent': False},
-            {'txid': 'tx3', 'amount': 20.0, 'spent': True}  # Spent
+            {"txid": "tx1", "amount": 50.0, "spent": False},
+            {"txid": "tx2", "amount": 30.0, "spent": False},
+            {"txid": "tx3", "amount": 20.0, "spent": True},  # Spent
         ]
 
         balance = blockchain.get_balance(wallet.address)
@@ -129,7 +130,9 @@ class BlockchainIntegrationTests:
         wallet2 = Wallet()
 
         # Give wallet1 funds via genesis
-        blockchain.utxo_set[wallet1.address] = [{'txid': 'genesis', 'amount': 1000.0, 'spent': False}]
+        blockchain.utxo_set[wallet1.address] = [
+            {"txid": "genesis", "amount": 1000.0, "spent": False}
+        ]
 
         # Create and sign transaction
         tx = Transaction(wallet1.address, wallet2.address, 100.0, 1.0, wallet1.public_key, nonce=0)
@@ -144,7 +147,9 @@ class BlockchainIntegrationTests:
         block = blockchain.mine_pending_transactions(miner_wallet.address)
 
         assert len(blockchain.chain) == 2, "Should have 2 blocks after mining"
-        assert blockchain.get_balance(wallet2.address) == 100.0, "Recipient should have received funds"
+        assert (
+            blockchain.get_balance(wallet2.address) == 100.0
+        ), "Recipient should have received funds"
         return True
 
     @staticmethod
@@ -196,13 +201,14 @@ class BlockchainIntegrationTests:
 
         # Give wallet1 funds split across multiple UTXOs so concurrent pending txs can be funded
         blockchain.utxo_set[wallet1.address] = [
-            {'txid': f'genesis-{i}', 'amount': 1000.0, 'spent': False}
-            for i in range(len(wallets))
+            {"txid": f"genesis-{i}", "amount": 1000.0, "spent": False} for i in range(len(wallets))
         ]
 
         # Create multiple transactions
         for i, wallet in enumerate(wallets):
-            tx = Transaction(wallet1.address, wallet.address, 100.0, 1.0, wallet1.public_key, nonce=i)
+            tx = Transaction(
+                wallet1.address, wallet.address, 100.0, 1.0, wallet1.public_key, nonce=i
+            )
             tx.sign_transaction(wallet1.private_key)
             blockchain.add_transaction(tx)
 
@@ -229,7 +235,9 @@ class SecurityTests:
         wallet3 = Wallet()
 
         # Give wallet1 100 XAI
-        blockchain.utxo_set[wallet1.address] = [{'txid': 'genesis', 'amount': 100.0, 'spent': False}]
+        blockchain.utxo_set[wallet1.address] = [
+            {"txid": "genesis", "amount": 100.0, "spent": False}
+        ]
 
         # Try to spend same funds twice
         tx1 = Transaction(wallet1.address, wallet2.address, 90.0, 1.0, wallet1.public_key, nonce=0)
@@ -252,7 +260,9 @@ class SecurityTests:
         wallet1 = Wallet()
         wallet2 = Wallet()
 
-        blockchain.utxo_set[wallet1.address] = [{'txid': 'genesis', 'amount': 100.0, 'spent': False}]
+        blockchain.utxo_set[wallet1.address] = [
+            {"txid": "genesis", "amount": 100.0, "spent": False}
+        ]
 
         tx = Transaction(wallet1.address, wallet2.address, 50.0, 1.0, wallet1.public_key, nonce=0)
         tx.sign_transaction(wallet1.private_key)
@@ -275,7 +285,7 @@ class SecurityTests:
         # This should be within limits
         # In real implementation, transaction size would be checked
         # For now, just verify the security manager exists
-        assert hasattr(blockchain, 'security_manager'), "Should have security manager"
+        assert hasattr(blockchain, "security_manager"), "Should have security manager"
         assert blockchain.security_manager is not None, "Security manager should be initialized"
         return True
 
@@ -286,10 +296,14 @@ class SecurityTests:
         wallet1 = Wallet()
         wallet2 = Wallet()
 
-        blockchain.utxo_set[wallet1.address] = [{'txid': 'genesis', 'amount': 100.0, 'spent': False}]
+        blockchain.utxo_set[wallet1.address] = [
+            {"txid": "genesis", "amount": 100.0, "spent": False}
+        ]
 
         # Try to create dust transaction (below minimum)
-        tx = Transaction(wallet1.address, wallet2.address, 0.000001, 0.0, wallet1.public_key, nonce=0)
+        tx = Transaction(
+            wallet1.address, wallet2.address, 0.000001, 0.0, wallet1.public_key, nonce=0
+        )
         tx.sign_transaction(wallet1.private_key)
 
         # Should be rejected by security manager
@@ -303,7 +317,9 @@ class SecurityTests:
         blockchain = Blockchain()
 
         # Test that reorg protection exists
-        assert hasattr(blockchain.security_manager, 'reorg_protection'), "Should have reorg protection"
+        assert hasattr(
+            blockchain.security_manager, "reorg_protection"
+        ), "Should have reorg protection"
 
         # Simulate a chain taller than the configured limit to trigger rejection
         max_depth = BlockchainSecurityConfig.MAX_REORG_DEPTH
@@ -349,8 +365,7 @@ class PerformanceTests:
         wallet = Wallet()
 
         blockchain.utxo_set[wallet.address] = [
-            {'txid': f'genesis-{i}', 'amount': 2500.0, 'spent': False}
-            for i in range(50)
+            {"txid": f"genesis-{i}", "amount": 2500.0, "spent": False} for i in range(50)
         ]
 
         # Add many transactions
@@ -358,7 +373,9 @@ class PerformanceTests:
         start = time.time()
 
         for i, recipient in enumerate(recipients):
-            tx = Transaction(wallet.address, recipient.address, 1.0, 0.01, wallet.public_key, nonce=i)
+            tx = Transaction(
+                wallet.address, recipient.address, 1.0, 0.01, wallet.public_key, nonce=i
+            )
             tx.sign_transaction(wallet.private_key)
             blockchain.add_transaction(tx)
 
@@ -395,8 +412,7 @@ class PerformanceTests:
 
         # Create many UTXOs
         blockchain.utxo_set[wallet.address] = [
-            {'txid': f'tx{i}', 'amount': 1.0, 'spent': False}
-            for i in range(1000)
+            {"txid": f"tx{i}", "amount": 1.0, "spent": False} for i in range(1000)
         ]
 
         # Time balance calculation
@@ -451,7 +467,7 @@ class FrameworkRunner:
         test_methods = [
             (name, getattr(test_class, name))
             for name in dir(test_class)
-            if name.startswith('test_') and callable(getattr(test_class, name))
+            if name.startswith("test_") and callable(getattr(test_class, name))
         ]
 
         for test_name, test_func in test_methods:
@@ -487,9 +503,9 @@ class FrameworkRunner:
 
 def run_all_tests():
     """Run all test suites"""
-    print("="*70)
+    print("=" * 70)
     print("XAI BLOCKCHAIN - COMPREHENSIVE TEST SUITE")
-    print("="*70)
+    print("=" * 70)
 
     runner = FrameworkRunner()
 

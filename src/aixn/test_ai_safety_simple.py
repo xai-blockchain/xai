@@ -40,7 +40,7 @@ def test_safety_controls():
         user_address=user_address,
         operation="atomic_swap",
         ai_provider="anthropic",
-        ai_model="claude-opus-4"
+        ai_model="claude-opus-4",
     )
     print(f"[OK] Registered request: {result}")
 
@@ -50,7 +50,7 @@ def test_safety_controls():
 
     cancel_result = safety.cancel_personal_ai_request(request_id, user_address)
     print(f"[OK] Cancelled request: {cancel_result['success']}")
-    assert cancel_result['success'], "Cancellation should succeed"
+    assert cancel_result["success"], "Cancellation should succeed"
 
     is_cancelled = safety.is_request_cancelled(request_id)
     print(f"   Cancelled after: {is_cancelled}")
@@ -63,16 +63,13 @@ def test_safety_controls():
 
     task_id = "gov_task_001"
     result = safety.register_governance_task(
-        task_id=task_id,
-        proposal_id="prop_123",
-        task_type="code_implementation",
-        ai_count=3
+        task_id=task_id, proposal_id="prop_123", task_type="code_implementation", ai_count=3
     )
     print(f"[OK] Registered task: {result}")
 
     pause_result = safety.pause_governance_task(task_id, "system")
     print(f"[OK] Paused task: {pause_result['success']}")
-    assert pause_result['success'], "Pause should succeed"
+    assert pause_result["success"], "Pause should succeed"
 
     is_paused = safety.is_task_paused(task_id)
     print(f"   Paused: {is_paused}")
@@ -80,7 +77,7 @@ def test_safety_controls():
 
     resume_result = safety.resume_governance_task(task_id)
     print(f"[OK] Resumed task: {resume_result['success']}")
-    assert resume_result['success'], "Resume should succeed"
+    assert resume_result["success"], "Resume should succeed"
 
     is_paused = safety.is_task_paused(task_id)
     print(f"   Paused: {is_paused}")
@@ -94,7 +91,7 @@ def test_safety_controls():
     for level in [AISafetyLevel.NORMAL, AISafetyLevel.CAUTION, AISafetyLevel.RESTRICTED]:
         level_result = safety.set_safety_level(level, "test_system")
         print(f"[OK] Set level to {level.value}: {level_result['success']}")
-        assert level_result['new_level'] == level.value, f"Level should be {level.value}"
+        assert level_result["new_level"] == level.value, f"Level should be {level.value}"
 
     # Test 4: Status retrieval
     print("\n" + "-" * 70)
@@ -113,25 +110,19 @@ def test_safety_controls():
     print("TEST 5: Global Emergency Stop")
     print("-" * 70)
 
-    safety.register_personal_ai_request(
-        "req_002", "XAI1user2", "smart_contract", "openai", "gpt-4"
-    )
-    safety.register_governance_task(
-        "task_002", "prop_456", "testing", 2
-    )
+    safety.register_personal_ai_request("req_002", "XAI1user2", "smart_contract", "openai", "gpt-4")
+    safety.register_governance_task("task_002", "prop_456", "testing", 2)
 
     print("   Registered test operations")
 
     stop_result = safety.activate_emergency_stop(
-        reason=StopReason.SECURITY_THREAT,
-        details="Test emergency stop",
-        activator="test_system"
+        reason=StopReason.SECURITY_THREAT, details="Test emergency stop", activator="test_system"
     )
     print(f"[OK] Emergency stop activated: {stop_result['success']}")
-    assert stop_result['success'], "Emergency stop should succeed"
+    assert stop_result["success"], "Emergency stop should succeed"
 
     status = safety.get_status()
-    assert status['emergency_stop_active'], "Emergency stop should be active"
+    assert status["emergency_stop_active"], "Emergency stop should be active"
     print(f"   Emergency stop active: {status['emergency_stop_active']}")
 
     result = safety.register_personal_ai_request(
@@ -142,10 +133,10 @@ def test_safety_controls():
 
     deactivate_result = safety.deactivate_emergency_stop("test_system")
     print(f"[OK] Emergency stop deactivated: {deactivate_result['success']}")
-    assert deactivate_result['success'], "Deactivation should succeed"
+    assert deactivate_result["success"], "Deactivation should succeed"
 
     status = safety.get_status()
-    assert not status['emergency_stop_active'], "Emergency stop should be inactive"
+    assert not status["emergency_stop_active"], "Emergency stop should be inactive"
     print(f"   Emergency stop active: {status['emergency_stop_active']}")
 
     # Final summary
@@ -159,5 +150,3 @@ def test_safety_controls():
     print("- Status retrieval: [OK] Working")
     print("- Global emergency stop: [OK] Working")
     print("\nUsers have instant control over AI operations!")
-
-

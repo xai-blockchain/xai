@@ -17,7 +17,7 @@ from typing import Any, Dict, Optional, Union
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from enum import Enum
-from dotenv import load_dotenv # Import load_dotenv
+from dotenv import load_dotenv  # Import load_dotenv
 
 
 DEFAULT_CONFIG_DIR = Path(__file__).resolve().parent / "config"
@@ -25,6 +25,7 @@ DEFAULT_CONFIG_DIR = Path(__file__).resolve().parent / "config"
 
 class Environment(Enum):
     """Environment types"""
+
     DEVELOPMENT = "development"
     STAGING = "staging"
     PRODUCTION = "production"
@@ -33,6 +34,7 @@ class Environment(Enum):
 
 class NetworkType(Enum):
     """Network types"""
+
     TESTNET = "testnet"
     MAINNET = "mainnet"
 
@@ -40,6 +42,7 @@ class NetworkType(Enum):
 @dataclass
 class NetworkConfig:
     """Network configuration settings"""
+
     port: int = 8545
     host: str = "0.0.0.0"
     rpc_port: int = 8546
@@ -63,6 +66,7 @@ class NetworkConfig:
 @dataclass
 class BlockchainConfig:
     """Blockchain configuration settings"""
+
     difficulty: int = 4
     block_time_target: int = 120  # seconds
     initial_block_reward: float = 12.0
@@ -79,7 +83,9 @@ class BlockchainConfig:
         if self.block_time_target < 1:
             raise ValueError(f"Invalid block_time_target: {self.block_time_target}. Must be >= 1")
         if self.initial_block_reward <= 0:
-            raise ValueError(f"Invalid initial_block_reward: {self.initial_block_reward}. Must be > 0")
+            raise ValueError(
+                f"Invalid initial_block_reward: {self.initial_block_reward}. Must be > 0"
+            )
         if self.halving_interval <= 0:
             raise ValueError(f"Invalid halving_interval: {self.halving_interval}. Must be > 0")
         if self.max_supply <= 0:
@@ -91,6 +97,7 @@ class BlockchainConfig:
 @dataclass
 class SecurityConfig:
     """Security configuration settings"""
+
     rate_limit_enabled: bool = True
     rate_limit_requests: int = 100
     rate_limit_window: int = 60  # seconds
@@ -106,7 +113,9 @@ class SecurityConfig:
     def validate(self):
         """Validate security configuration"""
         if self.rate_limit_requests < 1:
-            raise ValueError(f"Invalid rate_limit_requests: {self.rate_limit_requests}. Must be >= 1")
+            raise ValueError(
+                f"Invalid rate_limit_requests: {self.rate_limit_requests}. Must be >= 1"
+            )
         if self.rate_limit_window < 1:
             raise ValueError(f"Invalid rate_limit_window: {self.rate_limit_window}. Must be >= 1")
         if self.ban_threshold < 1:
@@ -118,6 +127,7 @@ class SecurityConfig:
 @dataclass
 class StorageConfig:
     """Storage configuration settings"""
+
     data_dir: str = "data"
     blockchain_file: str = "blockchain.json"
     wallet_dir: str = "wallets"
@@ -142,6 +152,7 @@ class StorageConfig:
 @dataclass
 class LoggingConfig:
     """Logging configuration settings"""
+
     level: str = "INFO"
     format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     enable_file_logging: bool = True
@@ -163,6 +174,7 @@ class LoggingConfig:
 @dataclass
 class GenesisConfig:
     """Genesis block configuration"""
+
     genesis_file: str = "genesis_new.json"
     genesis_timestamp: float = 1704067200.0
     network_id: int = 0x5841
@@ -191,10 +203,12 @@ class ConfigManager:
     5. Built-in defaults (lowest priority)
     """
 
-    def __init__(self,
-                 environment: Optional[str] = None,
-                 config_dir: Optional[str] = None,
-                 cli_overrides: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        environment: Optional[str] = None,
+        config_dir: Optional[str] = None,
+        cli_overrides: Optional[Dict[str, Any]] = None,
+    ):
         """
         Initialize Configuration Manager
 
@@ -204,7 +218,7 @@ class ConfigManager:
             cli_overrides: Command-line argument overrides
         """
         # Load .env file first to make its variables available for subsequent steps
-        load_dotenv() # <-- Added this line
+        load_dotenv()  # <-- Added this line
 
         self.environment = self._determine_environment(environment)
         self.config_dir = Path(config_dir).resolve() if config_dir else DEFAULT_CONFIG_DIR
@@ -237,8 +251,7 @@ class ConfigManager:
         if environment:
             env_str = environment.lower()
         else:
-            env_str = os.getenv("XAI_ENVIRONMENT",
-                               os.getenv("XAI_NETWORK", "development")).lower()
+            env_str = os.getenv("XAI_ENVIRONMENT", os.getenv("XAI_NETWORK", "development")).lower()
 
         # Map to Environment enum
         env_mapping = {
@@ -293,13 +306,13 @@ class ConfigManager:
         # Try YAML first
         yaml_path = self.config_dir / f"{filename}.yaml"
         if yaml_path.exists():
-            with open(yaml_path, 'r') as f:
+            with open(yaml_path, "r") as f:
                 return yaml.safe_load(f) or {}
 
         # Try JSON
         json_path = self.config_dir / f"{filename}.json"
         if json_path.exists():
-            with open(json_path, 'r') as f:
+            with open(json_path, "r") as f:
                 return json.load(f)
 
         # File not found - return empty dict
@@ -541,7 +554,7 @@ class ConfigManager:
             "genesis": {
                 "network_id": self.genesis.network_id,
                 "address_prefix": self.genesis.address_prefix,
-            }
+            },
         }
 
     def reload(self):
@@ -560,7 +573,7 @@ def get_config_manager(
     environment: Optional[str] = None,
     config_dir: Optional[str] = None,
     cli_overrides: Optional[Dict[str, Any]] = None,
-    force_reload: bool = False
+    force_reload: bool = False,
 ) -> ConfigManager:
     """
     Get or create ConfigManager singleton instance
@@ -578,9 +591,7 @@ def get_config_manager(
 
     if _config_manager is None or force_reload:
         _config_manager = ConfigManager(
-            environment=environment,
-            config_dir=config_dir,
-            cli_overrides=cli_overrides
+            environment=environment, config_dir=config_dir, cli_overrides=cli_overrides
         )
 
     return _config_manager

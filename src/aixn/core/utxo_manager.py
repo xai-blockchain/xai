@@ -37,17 +37,22 @@ class UTXOManager:
             script_pubkey: The script public key (or similar locking script).
         """
         utxo = {
-            'txid': txid,
-            'vout': vout,
-            'amount': amount,
-            'script_pubkey': script_pubkey,
-            'spent': False  # Track if this UTXO has been spent
+            "txid": txid,
+            "vout": vout,
+            "amount": amount,
+            "script_pubkey": script_pubkey,
+            "spent": False,  # Track if this UTXO has been spent
         }
         self.utxo_set[address].append(utxo)
         self.total_utxos += 1
         self.total_value += amount
-        self.logger.debug(f"Added UTXO: {txid}:{vout} for {address} with {amount} XAI",
-                          address=address, txid=txid, vout=vout, amount=amount)
+        self.logger.debug(
+            f"Added UTXO: {txid}:{vout} for {address} with {amount} XAI",
+            address=address,
+            txid=txid,
+            vout=vout,
+            amount=amount,
+        )
 
     def mark_utxo_spent(self, address: str, txid: str, vout: int) -> bool:
         """
@@ -63,14 +68,22 @@ class UTXOManager:
         """
         if address in self.utxo_set:
             for utxo in self.utxo_set[address]:
-                if utxo['txid'] == txid and utxo['vout'] == vout and not utxo['spent']:
-                    utxo['spent'] = True
-                    self.total_value -= utxo['amount']
-                    self.logger.debug(f"Marked UTXO: {txid}:{vout} for {address} as spent",
-                                      address=address, txid=txid, vout=vout)
+                if utxo["txid"] == txid and utxo["vout"] == vout and not utxo["spent"]:
+                    utxo["spent"] = True
+                    self.total_value -= utxo["amount"]
+                    self.logger.debug(
+                        f"Marked UTXO: {txid}:{vout} for {address} as spent",
+                        address=address,
+                        txid=txid,
+                        vout=vout,
+                    )
                     return True
-        self.logger.warn(f"Attempted to mark non-existent or already spent UTXO: {txid}:{vout} for {address}",
-                         address=address, txid=txid, vout=vout)
+        self.logger.warn(
+            f"Attempted to mark non-existent or already spent UTXO: {txid}:{vout} for {address}",
+            address=address,
+            txid=txid,
+            vout=vout,
+        )
         return False
 
     def get_utxos_for_address(self, address: str) -> List[Dict[str, Any]]:
@@ -83,7 +96,7 @@ class UTXOManager:
         Returns:
             A list of unspent UTXO dictionaries.
         """
-        return [utxo for utxo in self.utxo_set[address] if not utxo['spent']]
+        return [utxo for utxo in self.utxo_set[address] if not utxo["spent"]]
 
     def get_balance(self, address: str) -> float:
         """
@@ -95,9 +108,9 @@ class UTXOManager:
         Returns:
             The total balance as a float.
         """
-        return sum(utxo['amount'] for utxo in self.get_utxos_for_address(address))
+        return sum(utxo["amount"] for utxo in self.get_utxos_for_address(address))
 
-    def process_transaction_outputs(self, transaction: 'Transaction'):
+    def process_transaction_outputs(self, transaction: "Transaction"):
         """
         Adds new UTXOs created by a transaction's outputs.
         Each output in the transaction creates a new UTXO.
@@ -106,10 +119,18 @@ class UTXOManager:
             transaction: The transaction whose outputs are to be added as UTXOs.
         """
         for vout, output in enumerate(transaction.outputs):
-            self.add_utxo(output['address'], transaction.txid, vout, output['amount'], f"P2PKH {output['address']}")
-        self.logger.info(f"Processed outputs for transaction {transaction.txid[:10]}...", txid=transaction.txid)
+            self.add_utxo(
+                output["address"],
+                transaction.txid,
+                vout,
+                output["amount"],
+                f"P2PKH {output['address']}",
+            )
+        self.logger.info(
+            f"Processed outputs for transaction {transaction.txid[:10]}...", txid=transaction.txid
+        )
 
-    def process_transaction_inputs(self, transaction: 'Transaction') -> bool:
+    def process_transaction_inputs(self, transaction: "Transaction") -> bool:
         """
         Marks UTXOs consumed by a transaction's inputs as spent.
 
@@ -119,17 +140,23 @@ class UTXOManager:
         Returns:
             True if all inputs were successfully marked as spent, False otherwise.
         """
-        if transaction.sender == "COINBASE": # Coinbase transactions don't spend inputs
+        if transaction.sender == "COINBASE":  # Coinbase transactions don't spend inputs
             return True
 
         for input_utxo_ref in transaction.inputs:
-            txid = input_utxo_ref['txid']
-            vout = input_utxo_ref['vout']
+            txid = input_utxo_ref["txid"]
+            vout = input_utxo_ref["vout"]
             if not self.mark_utxo_spent(transaction.sender, txid, vout):
-                self.logger.error(f"Failed to mark UTXO {txid}:{vout} as spent for sender {transaction.sender}.",
-                                  txid=txid, vout=vout, sender=transaction.sender)
+                self.logger.error(
+                    f"Failed to mark UTXO {txid}:{vout} as spent for sender {transaction.sender}.",
+                    txid=txid,
+                    vout=vout,
+                    sender=transaction.sender,
+                )
                 return False
-        self.logger.info(f"Processed inputs for transaction {transaction.txid[:10]}...", txid=transaction.txid)
+        self.logger.info(
+            f"Processed inputs for transaction {transaction.txid[:10]}...", txid=transaction.txid
+        )
         return True
 
     def get_unspent_output(self, txid: str, vout: int) -> Optional[Dict[str, Any]]:
@@ -145,7 +172,7 @@ class UTXOManager:
         """
         for address_utxos in self.utxo_set.values():
             for utxo in address_utxos:
-                if utxo['txid'] == txid and utxo['vout'] == vout and not utxo['spent']:
+                if utxo["txid"] == txid and utxo["vout"] == vout and not utxo["spent"]:
                     return utxo
         return None
 
@@ -164,12 +191,12 @@ class UTXOManager:
         current_sum = 0.0
         for utxo in self.get_utxos_for_address(address):
             spendable_utxos.append(utxo)
-            current_sum += utxo['amount']
+            current_sum += utxo["amount"]
             if current_sum >= amount:
                 break
-        
+
         if current_sum < amount:
-            return [] # Not enough spendable UTXOs
+            return []  # Not enough spendable UTXOs
 
         return spendable_utxos
 
@@ -183,7 +210,7 @@ class UTXOManager:
         serializable_utxo_set = {}
         for address, utxos in self.utxo_set.items():
             serializable_utxo_set[address] = [
-                {k: v for k, v in utxo.items()} # Copy to avoid modifying original
+                {k: v for k, v in utxo.items()}  # Copy to avoid modifying original
                 for utxo in utxos
             ]
         return serializable_utxo_set
@@ -199,8 +226,10 @@ class UTXOManager:
             for utxo in utxos:
                 # Re-add UTXOs to correctly update total_utxos and total_value
                 # This assumes utxo['spent'] is correctly loaded
-                if not utxo.get('spent', False):
-                    self.add_utxo(address, utxo['txid'], utxo['vout'], utxo['amount'], utxo['script_pubkey'])
+                if not utxo.get("spent", False):
+                    self.add_utxo(
+                        address, utxo["txid"], utxo["vout"], utxo["amount"], utxo["script_pubkey"]
+                    )
                 else:
                     # If spent, just add to the list without affecting totals
                     self.utxo_set[address].append(utxo)
@@ -223,9 +252,9 @@ class UTXOManager:
         Returns statistics about the current UTXO set.
         """
         return {
-            'total_utxos': self.total_utxos,
-            'total_unspent_value': self.total_value,
-            'unique_addresses_with_utxos': len(self.utxo_set)
+            "total_utxos": self.total_utxos,
+            "total_unspent_value": self.total_value,
+            "unique_addresses_with_utxos": len(self.utxo_set),
         }
 
     def reset(self):
@@ -237,8 +266,10 @@ class UTXOManager:
         self.total_value = 0.0
         self.logger.info("UTXO Manager reset.")
 
+
 # Global instance for convenience
 _global_utxo_manager = None
+
 
 def get_utxo_manager(logger: Optional[StructuredLogger] = None) -> UTXOManager:
     """

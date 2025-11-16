@@ -22,12 +22,12 @@ class AnonymousRateLimiter:
 
         # Rate limits: {endpoint: (max_requests, time_window_seconds)}
         self.limits = {
-            '/faucet/claim': (10, 86400),  # 10 per day
-            '/mine': (100, 3600),  # 100 per hour
-            '/send': (100, 3600),  # 100 per hour
-            '/balance': (1000, 3600),  # 1000 per hour
-            '/claim-wallet': (5, 86400),  # 5 per day
-            'default': (200, 3600)  # 200 per hour for unlisted endpoints
+            "/faucet/claim": (10, 86400),  # 10 per day
+            "/mine": (100, 3600),  # 100 per hour
+            "/send": (100, 3600),  # 100 per hour
+            "/balance": (1000, 3600),  # 1000 per hour
+            "/claim-wallet": (5, 86400),  # 5 per day
+            "default": (200, 3600),  # 200 per hour for unlisted endpoints
         }
 
         # Cleanup old entries every 5 minutes
@@ -49,7 +49,7 @@ class AnonymousRateLimiter:
             str: Anonymous hash token
         """
         # Hash the request data with salt
-        data = f"{request_data}:{salt}".encode('utf-8')
+        data = f"{request_data}:{salt}".encode("utf-8")
         token = hashlib.sha256(data).hexdigest()[:16]  # Use first 16 chars
         return token
 
@@ -72,8 +72,7 @@ class AnonymousRateLimiter:
         for token in list(self.request_log.keys()):
             # Filter out old requests
             self.request_log[token] = [
-                (ts, endpoint) for ts, endpoint in self.request_log[token]
-                if ts > cutoff_time
+                (ts, endpoint) for ts, endpoint in self.request_log[token] if ts > cutoff_time
             ]
 
             # Remove empty entries
@@ -82,7 +81,9 @@ class AnonymousRateLimiter:
 
         self.last_cleanup = current_time
 
-    def check_rate_limit(self, request_identifier: str, endpoint: str) -> Tuple[bool, Optional[str]]:
+    def check_rate_limit(
+        self, request_identifier: str, endpoint: str
+    ) -> Tuple[bool, Optional[str]]:
         """
         Check if request is within rate limits
 
@@ -105,7 +106,7 @@ class AnonymousRateLimiter:
         if endpoint in self.limits:
             max_requests, time_window = self.limits[endpoint]
         else:
-            max_requests, time_window = self.limits['default']
+            max_requests, time_window = self.limits["default"]
 
         # Get current time
         current_time = time.time()
@@ -113,8 +114,7 @@ class AnonymousRateLimiter:
 
         # Count requests in time window
         recent_requests = [
-            ts for ts, ep in self.request_log[token]
-            if ts > window_start and ep == endpoint
+            ts for ts, ep in self.request_log[token] if ts > window_start and ep == endpoint
         ]
 
         # Check if limit exceeded
@@ -149,15 +149,14 @@ class AnonymousRateLimiter:
         if endpoint in self.limits:
             max_requests, time_window = self.limits[endpoint]
         else:
-            max_requests, time_window = self.limits['default']
+            max_requests, time_window = self.limits["default"]
 
         # Count recent requests
         current_time = time.time()
         window_start = current_time - time_window
 
         recent_requests = [
-            ts for ts, ep in self.request_log[token]
-            if ts > window_start and ep == endpoint
+            ts for ts, ep in self.request_log[token] if ts > window_start and ep == endpoint
         ]
 
         remaining = max_requests - len(recent_requests)
@@ -188,13 +187,13 @@ class AnonymousRateLimiter:
         total_requests = sum(len(requests) for requests in self.request_log.values())
 
         return {
-            'active_rate_limit_tokens': active_tokens,
-            'total_tracked_requests': total_requests,
-            'configured_limits': {
+            "active_rate_limit_tokens": active_tokens,
+            "total_tracked_requests": total_requests,
+            "configured_limits": {
                 endpoint: f"{max_req} per {window}s"
                 for endpoint, (max_req, window) in self.limits.items()
             },
-            'note': 'All tracking is anonymous via hashed tokens'
+            "note": "All tracking is anonymous via hashed tokens",
         }
 
 

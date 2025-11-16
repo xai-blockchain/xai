@@ -17,18 +17,29 @@ class XAITokenWallet(Wallet):
     It extends the base Wallet class with token-specific functionalities.
     """
 
-    def __init__(self, private_key: Optional[str] = None, token_manager: Optional[XAITokenManager] = None, logger: Optional[StructuredLogger] = None):
+    def __init__(
+        self,
+        private_key: Optional[str] = None,
+        token_manager: Optional[XAITokenManager] = None,
+        logger: Optional[StructuredLogger] = None,
+    ):
         super().__init__(private_key)
         self.token_manager = token_manager or get_xai_token_manager()
         self.logger = logger or get_structured_logger()
-        self.logger.info(f"XAITokenWallet initialized for address: {self.address}", address=self.address)
+        self.logger.info(
+            f"XAITokenWallet initialized for address: {self.address}", address=self.address
+        )
 
     def get_xai_balance(self) -> float:
         """
         Retrieves the current XAI token balance for this wallet's address.
         """
         balance = self.token_manager.get_balance(self.address)
-        self.logger.debug(f"Retrieved XAI balance for {self.address}: {balance}", address=self.address, balance=balance)
+        self.logger.debug(
+            f"Retrieved XAI balance for {self.address}: {balance}",
+            address=self.address,
+            balance=balance,
+        )
         return balance
 
     def send_xai(self, recipient_address: str, amount: float) -> bool:
@@ -43,11 +54,19 @@ class XAITokenWallet(Wallet):
             True if the transfer was successful, False otherwise.
         """
         if not self.token_manager.transfer_tokens(self.address, recipient_address, amount):
-            self.logger.warn(f"Failed to send {amount} XAI from {self.address} to {recipient_address}.",
-                             sender=self.address, recipient=recipient_address, amount=amount)
+            self.logger.warn(
+                f"Failed to send {amount} XAI from {self.address} to {recipient_address}.",
+                sender=self.address,
+                recipient=recipient_address,
+                amount=amount,
+            )
             return False
-        self.logger.info(f"Successfully sent {amount} XAI from {self.address} to {recipient_address}.",
-                         sender=self.address, recipient=recipient_address, amount=amount)
+        self.logger.info(
+            f"Successfully sent {amount} XAI from {self.address} to {recipient_address}.",
+            sender=self.address,
+            recipient=recipient_address,
+            amount=amount,
+        )
         return True
 
     def receive_xai(self, sender_address: str, amount: float) -> bool:
@@ -67,22 +86,32 @@ class XAITokenWallet(Wallet):
         # For this model, we'll directly update the balance via the token manager.
         # Note: The token_manager.transfer_tokens already handles the recipient's balance update.
         # This method might be redundant or used for specific scenarios like initial minting.
-        self.logger.info(f"Received {amount} XAI from {sender_address} into {self.address}.",
-                         sender=sender_address, recipient=self.address, amount=amount)
-        return True # Assuming the transfer_tokens call already handled the logic
+        self.logger.info(
+            f"Received {amount} XAI from {sender_address} into {self.address}.",
+            sender=sender_address,
+            recipient=self.address,
+            amount=amount,
+        )
+        return True  # Assuming the transfer_tokens call already handled the logic
 
     def get_wallet_info(self) -> Dict[str, Any]:
         """
         Returns comprehensive information about the XAI token wallet.
         """
         info = super().to_public_dict()
-        info['xai_balance'] = self.get_xai_balance()
+        info["xai_balance"] = self.get_xai_balance()
         return info
+
 
 # Global instance for convenience
 _global_xai_token_wallet = None
 
-def get_xai_token_wallet(private_key: Optional[str] = None, token_manager: Optional[XAITokenManager] = None, logger: Optional[StructuredLogger] = None) -> XAITokenWallet:
+
+def get_xai_token_wallet(
+    private_key: Optional[str] = None,
+    token_manager: Optional[XAITokenManager] = None,
+    logger: Optional[StructuredLogger] = None,
+) -> XAITokenWallet:
     """
     Get global XAITokenWallet instance.
     """

@@ -129,7 +129,7 @@ class PeerReputation:
 
     def get_peer_ip_prefix(self, ip_address: str) -> str:
         """Get IP /16 prefix for diversity check"""
-        parts = ip_address.split('.')
+        parts = ip_address.split(".")
         if len(parts) >= 2:
             return f"{parts[0]}.{parts[1]}"
         return ip_address
@@ -178,8 +178,7 @@ class MessageRateLimiter:
 
         # Clean old messages (older than 1 second)
         self.message_log[peer_url] = [
-            ts for ts in self.message_log[peer_url]
-            if current_time - ts < 1.0
+            ts for ts in self.message_log[peer_url] if current_time - ts < 1.0
         ]
 
         # Check rate
@@ -210,7 +209,10 @@ class MessageValidator:
         size = len(message_data)
 
         if size > P2PSecurityConfig.MAX_MESSAGE_SIZE:
-            return False, f"Message too large: {size} bytes (max {P2PSecurityConfig.MAX_MESSAGE_SIZE})"
+            return (
+                False,
+                f"Message too large: {size} bytes (max {P2PSecurityConfig.MAX_MESSAGE_SIZE})",
+            )
 
         return True, None
 
@@ -225,11 +227,11 @@ class MessageValidator:
         Returns:
             (valid, error_message)
         """
-        if 'type' not in message:
+        if "type" not in message:
             return False, "Message missing 'type' field"
 
-        valid_types = ['block', 'transaction', 'peer_discovery', 'sync_request', 'ping']
-        if message['type'] not in valid_types:
+        valid_types = ["block", "transaction", "peer_discovery", "sync_request", "ping"]
+        if message["type"] not in valid_types:
             return False, f"Invalid message type: {message['type']}"
 
         return True, None
@@ -262,7 +264,9 @@ class P2PSecurityManager:
         """Track new peer connection"""
         self.peer_reputation.track_peer_ip(peer_url, ip_address)
 
-    def validate_message(self, peer_url: str, message_data: bytes, message: dict) -> Tuple[bool, Optional[str]]:
+    def validate_message(
+        self, peer_url: str, message_data: bytes, message: dict
+    ) -> Tuple[bool, Optional[str]]:
         """
         Validate incoming message from peer
 
@@ -310,11 +314,7 @@ class P2PSecurityManager:
             peer_url: Peer URL
             severity: "minor", "major", or "critical"
         """
-        penalties = {
-            "minor": 5,
-            "major": 20,
-            "critical": 100
-        }
+        penalties = {"minor": 5, "major": 20, "critical": 100}
 
         penalty = penalties.get(severity, 10)
         self.peer_reputation.penalize_bad_behavior(peer_url, penalty)
@@ -339,8 +339,12 @@ class P2PSecurityManager:
     def get_peer_stats(self) -> dict:
         """Get P2P security statistics"""
         return {
-            'total_peers_tracked': len(self.peer_reputation.reputation),
-            'banned_peers': len(self.peer_reputation.ban_list),
-            'connections_per_ip': dict(self.peer_reputation.connections_per_ip),
-            'average_reputation': sum(self.peer_reputation.reputation.values()) / len(self.peer_reputation.reputation) if self.peer_reputation.reputation else 0
+            "total_peers_tracked": len(self.peer_reputation.reputation),
+            "banned_peers": len(self.peer_reputation.ban_list),
+            "connections_per_ip": dict(self.peer_reputation.connections_per_ip),
+            "average_reputation": (
+                sum(self.peer_reputation.reputation.values()) / len(self.peer_reputation.reputation)
+                if self.peer_reputation.reputation
+                else 0
+            ),
         }

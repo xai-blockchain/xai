@@ -23,7 +23,7 @@ class AnonymousLogger:
     - Error details sanitized
     """
 
-    def __init__(self, log_dir: str = None, log_name: str = 'xai_node.log'):
+    def __init__(self, log_dir: str = None, log_name: str = "xai_node.log"):
         """
         Initialize anonymous logger
 
@@ -32,7 +32,7 @@ class AnonymousLogger:
             log_name: Log file name
         """
         if log_dir is None:
-            log_dir = os.path.join(os.path.dirname(__file__), '..', 'logs')
+            log_dir = os.path.join(os.path.dirname(__file__), "..", "logs")
 
         # Create log directory if it doesn't exist
         os.makedirs(log_dir, exist_ok=True)
@@ -40,20 +40,15 @@ class AnonymousLogger:
         log_path = os.path.join(log_dir, log_name)
 
         # Configure logger
-        self.logger = logging.getLogger('XAI_Anonymous')
+        self.logger = logging.getLogger("XAI_Anonymous")
         self.logger.setLevel(logging.INFO)
 
         # Rotating file handler (10MB per file, keep 5 backups)
-        handler = RotatingFileHandler(
-            log_path,
-            maxBytes=10 * 1024 * 1024,  # 10MB
-            backupCount=5
-        )
+        handler = RotatingFileHandler(log_path, maxBytes=10 * 1024 * 1024, backupCount=5)  # 10MB
 
         # Anonymous format - UTC time + level + message only
         formatter = logging.Formatter(
-            '[%(asctime)s UTC] %(levelname)s: %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
+            "[%(asctime)s UTC] %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
         )
         formatter.converter = lambda *args: datetime.now(timezone.utc).timetuple()
 
@@ -88,10 +83,10 @@ class AnonymousLogger:
         """
         # Keywords that should not appear in logs
         sensitive_patterns = [
-            ('private_key', 'REDACTED'),
-            ('password', 'REDACTED'),
-            ('secret', 'REDACTED'),
-            ('api_key', 'REDACTED'),
+            ("private_key", "REDACTED"),
+            ("password", "REDACTED"),
+            ("secret", "REDACTED"),
+            ("api_key", "REDACTED"),
         ]
 
         sanitized = message
@@ -152,10 +147,7 @@ class AnonymousLogger:
         sender_trunc = self._truncate_address(sender)
         recipient_trunc = self._truncate_address(recipient)
 
-        self.logger.info(
-            f"Transaction: {sender_trunc} → {recipient_trunc} "
-            f"({amount:.4f} XAI)"
-        )
+        self.logger.info(f"Transaction: {sender_trunc} → {recipient_trunc} " f"({amount:.4f} XAI)")
 
     def wallet_claimed(self, address: str, tier: str):
         """
@@ -176,10 +168,7 @@ class AnonymousLogger:
             service_type: Type of service
             amount_burned: Amount of XAI burned
         """
-        self.logger.info(
-            f"Service consumed: {service_type} "
-            f"(burned: {amount_burned:.4f} XAI)"
-        )
+        self.logger.info(f"Service consumed: {service_type} " f"(burned: {amount_burned:.4f} XAI)")
 
     def node_started(self, network: str, port: int):
         """

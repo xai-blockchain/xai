@@ -1,10 +1,18 @@
 from typing import Dict, Any, List, Tuple
 import hashlib
 import json
-from src.aixn.blockchain.merkle import MerkleTree # Import MerkleTree
+from src.aixn.blockchain.merkle import MerkleTree  # Import MerkleTree
+
 
 class BlockHeader:
-    def __init__(self, block_number: int, prev_block_hash: str, state_root: str, transactions_root: str, timestamp: int):
+    def __init__(
+        self,
+        block_number: int,
+        prev_block_hash: str,
+        state_root: str,
+        transactions_root: str,
+        timestamp: int,
+    ):
         if not isinstance(block_number, int) or block_number < 0:
             raise ValueError("Block number must be a non-negative integer.")
         if not prev_block_hash or not state_root or not transactions_root:
@@ -30,7 +38,7 @@ class BlockHeader:
             "state_root": self.state_root,
             "transactions_root": self.transactions_root,
             "timestamp": self.timestamp,
-            "block_hash": self.block_hash
+            "block_hash": self.block_hash,
         }
 
     def __repr__(self):
@@ -39,10 +47,11 @@ class BlockHeader:
             f"state_root='{self.state_root[:8]}...')"
         )
 
+
 class LightClient:
     def __init__(self, chain_id: str):
         self.chain_id = chain_id
-        self.trusted_headers: Dict[int, BlockHeader] = {} # {block_number: BlockHeader}
+        self.trusted_headers: Dict[int, BlockHeader] = {}  # {block_number: BlockHeader}
         self.latest_block_number = -1
 
     def sync_header(self, header: BlockHeader):
@@ -52,9 +61,11 @@ class LightClient:
         and linking it to a previous trusted header. Here, we simply store it.
         """
         if header.block_number <= self.latest_block_number:
-            print(f"Warning: Header for block {header.block_number} is older or same as latest. Not syncing.")
+            print(
+                f"Warning: Header for block {header.block_number} is older or same as latest. Not syncing."
+            )
             return
-        
+
         self.trusted_headers[header.block_number] = header
         self.latest_block_number = header.block_number
         print(f"Light client for {self.chain_id} synced header for block {header.block_number}.")
@@ -62,11 +73,14 @@ class LightClient:
     def get_header(self, block_number: int) -> BlockHeader:
         header = self.trusted_headers.get(block_number)
         if not header:
-            raise ValueError(f"Header for block {block_number} not found in light client for {self.chain_id}.")
+            raise ValueError(
+                f"Header for block {block_number} not found in light client for {self.chain_id}."
+            )
         return header
 
-    def verify_transaction_inclusion(self, transaction_data: Any, merkle_proof: List[Tuple[str, str]],
-                                     block_number: int) -> bool:
+    def verify_transaction_inclusion(
+        self, transaction_data: Any, merkle_proof: List[Tuple[str, str]], block_number: int
+    ) -> bool:
         """
         Verifies that a transaction is included in a specific block of the source chain
         by checking its Merkle proof against the transactions_root in the block header.
@@ -79,14 +93,21 @@ class LightClient:
 
         # In this simplified model, we assume the Merkle proof is against the transactions_root.
         # In a more complex system, it could be against a state_root for state changes.
-        is_included = MerkleTree.verify_merkle_proof(transaction_data, header.transactions_root, merkle_proof)
+        is_included = MerkleTree.verify_merkle_proof(
+            transaction_data, header.transactions_root, merkle_proof
+        )
 
         if is_included:
-            print(f"Transaction successfully verified for inclusion in {self.chain_id} at block {block_number}.")
+            print(
+                f"Transaction successfully verified for inclusion in {self.chain_id} at block {block_number}."
+            )
         else:
-            print(f"Transaction FAILED verification for inclusion in {self.chain_id} at block {block_number}.")
-        
+            print(
+                f"Transaction FAILED verification for inclusion in {self.chain_id} at block {block_number}."
+            )
+
         return is_included
+
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
@@ -97,7 +118,7 @@ if __name__ == "__main__":
     tx1 = {"from": "Alice", "to": "Bob", "amount": 10}
     tx2 = {"from": "Bob", "to": "Charlie", "amount": 5}
     tx3 = {"from": "Charlie", "to": "Alice", "amount": 12}
-    
+
     block_transactions = [tx1, tx2, tx3]
     transactions_merkle_tree = MerkleTree(block_transactions)
     transactions_root = transactions_merkle_tree.get_root()
@@ -108,7 +129,7 @@ if __name__ == "__main__":
         prev_block_hash="0xprevhash99",
         state_root="0xstateroot100",
         transactions_root=transactions_root,
-        timestamp=int(datetime.now(timezone.utc).timestamp())
+        timestamp=int(datetime.now(timezone.utc).timestamp()),
     )
     light_client_a.sync_header(header_100)
 
@@ -117,8 +138,8 @@ if __name__ == "__main__":
         block_number=101,
         prev_block_hash=header_100.block_hash,
         state_root="0xstateroot101",
-        transactions_root="0xtxroot101", # Different transactions root for this block
-        timestamp=int(datetime.now(timezone.utc).timestamp()) + 60
+        transactions_root="0xtxroot101",  # Different transactions root for this block
+        timestamp=int(datetime.now(timezone.utc).timestamp()) + 60,
     )
     light_client_a.sync_header(header_101)
 
@@ -130,8 +151,10 @@ if __name__ == "__main__":
     print(f"Is tx1 included in block 100? {is_tx1_included}")
 
     print("\n--- Verifying a tampered transaction ---")
-    tampered_tx1 = {"from": "Alice", "to": "Bob", "amount": 11} # Tampered amount
-    is_tampered_tx1_included = light_client_a.verify_transaction_inclusion(tampered_tx1, proof_for_tx1, 100)
+    tampered_tx1 = {"from": "Alice", "to": "Bob", "amount": 11}  # Tampered amount
+    is_tampered_tx1_included = light_client_a.verify_transaction_inclusion(
+        tampered_tx1, proof_for_tx1, 100
+    )
     print(f"Is tampered tx1 included in block 100? {is_tampered_tx1_included}")
 
     print("\n--- Verifying transaction inclusion in a different block (should fail) ---")

@@ -22,7 +22,7 @@ from config_manager import (
     SecurityConfig,
     StorageConfig,
     LoggingConfig,
-    GenesisConfig
+    GenesisConfig,
 )
 
 
@@ -30,8 +30,12 @@ def test_default_configuration():
     """Test loading default configuration"""
     config = get_config_manager(force_reload=True)
 
-    assert config.environment in [Environment.DEVELOPMENT, Environment.TESTNET,
-                                  Environment.PRODUCTION, Environment.STAGING]
+    assert config.environment in [
+        Environment.DEVELOPMENT,
+        Environment.TESTNET,
+        Environment.PRODUCTION,
+        Environment.STAGING,
+    ]
     assert config.network is not None
     assert config.blockchain is not None
     assert config.security is not None
@@ -55,15 +59,10 @@ def test_environment_specific_config():
 
 def test_cli_overrides():
     """Test command-line argument overrides"""
-    cli_overrides = {
-        "network.port": 9999,
-        "blockchain.difficulty": 8
-    }
+    cli_overrides = {"network.port": 9999, "blockchain.difficulty": 8}
 
     config = get_config_manager(
-        environment="production",
-        cli_overrides=cli_overrides,
-        force_reload=True
+        environment="production", cli_overrides=cli_overrides, force_reload=True
     )
 
     assert config.network.port == 9999
@@ -187,11 +186,7 @@ def test_network_config_validation():
 def test_blockchain_config_validation():
     """Test BlockchainConfig validation"""
     # Valid config
-    config = BlockchainConfig(
-        difficulty=4,
-        initial_block_reward=12.0,
-        max_supply=121000000.0
-    )
+    config = BlockchainConfig(difficulty=4, initial_block_reward=12.0, max_supply=121000000.0)
     config.validate()
 
     # Invalid difficulty
@@ -214,11 +209,7 @@ def test_blockchain_config_validation():
 def test_security_config_validation():
     """Test SecurityConfig validation"""
     # Valid config
-    config = SecurityConfig(
-        rate_limit_enabled=True,
-        rate_limit_requests=100,
-        ban_threshold=10
-    )
+    config = SecurityConfig(rate_limit_enabled=True, rate_limit_requests=100, ban_threshold=10)
     config.validate()
 
     # Invalid rate limit
@@ -233,10 +224,7 @@ def test_security_config_validation():
 def test_storage_config_validation():
     """Test StorageConfig validation"""
     # Valid config
-    config = StorageConfig(
-        data_dir="data",
-        blockchain_file="blockchain.json"
-    )
+    config = StorageConfig(data_dir="data", blockchain_file="blockchain.json")
     config.validate()
 
     # Invalid backup frequency
@@ -266,10 +254,7 @@ def test_logging_config_validation():
 def test_genesis_config_validation():
     """Test GenesisConfig validation"""
     # Valid config
-    config = GenesisConfig(
-        genesis_file="genesis.json",
-        address_prefix="AIXN"
-    )
+    config = GenesisConfig(genesis_file="genesis.json", address_prefix="AIXN")
     config.validate()
 
     # Invalid timestamp
@@ -288,18 +273,13 @@ def test_config_precedence():
         config_dir = Path(tmpdir)
 
         # Create default config
-        default_config = {
-            "network": {"port": 8545},
-            "blockchain": {"difficulty": 4}
-        }
-        with open(config_dir / "default.yaml", 'w') as f:
+        default_config = {"network": {"port": 8545}, "blockchain": {"difficulty": 4}}
+        with open(config_dir / "default.yaml", "w") as f:
             yaml.dump(default_config, f)
 
         # Create production config (overrides default)
-        prod_config = {
-            "network": {"port": 9545}  # Override port
-        }
-        with open(config_dir / "production.yaml", 'w') as f:
+        prod_config = {"network": {"port": 9545}}  # Override port
+        with open(config_dir / "production.yaml", "w") as f:
             yaml.dump(prod_config, f)
 
         # Set environment variable (overrides file)
@@ -310,9 +290,7 @@ def test_config_precedence():
 
         # Load config
         config = ConfigManager(
-            environment="production",
-            config_dir=str(config_dir),
-            cli_overrides=cli_overrides
+            environment="production", config_dir=str(config_dir), cli_overrides=cli_overrides
         )
 
         # Verify precedence:
@@ -382,7 +360,7 @@ if __name__ == "__main__":
         test_genesis_config_validation,
         test_config_precedence,
         test_reload,
-        test_environment_determination
+        test_environment_determination,
     ]
 
     passed = 0
@@ -397,6 +375,7 @@ if __name__ == "__main__":
             print(f"[FAIL] {test_func.__name__}: {e}")
             failed += 1
             import traceback
+
             traceback.print_exc()
 
     print(f"\nResults: {passed} passed, {failed} failed")

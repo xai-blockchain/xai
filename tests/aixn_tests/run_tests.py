@@ -73,11 +73,7 @@ class TestRunner:
         print("Running Tests with COVERAGE")
         print("=" * 70 + "\n")
 
-        return self._run_pytest([
-            "--cov=../core",
-            "--cov-report=html",
-            "--cov-report=term"
-        ])
+        return self._run_pytest(["--cov=../core", "--cov-report=html", "--cov-report=term"])
 
     def run_specific_test(self, test_path):
         """Run a specific test file or function"""
@@ -95,11 +91,7 @@ class TestRunner:
         cmd.append("--rootdir=" + self.test_dir)
 
         try:
-            result = subprocess.run(
-                cmd,
-                cwd=self.test_dir,
-                capture_output=False
-            )
+            result = subprocess.run(cmd, cwd=self.test_dir, capture_output=False)
             return result.returncode
         except Exception as e:
             print(f"Error running tests: {e}")
@@ -114,10 +106,7 @@ class TestRunner:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         report_file = os.path.join(self.test_dir, f"test_report_{timestamp}.html")
 
-        return self._run_pytest([
-            "--html=" + report_file,
-            "--self-contained-html"
-        ])
+        return self._run_pytest(["--html=" + report_file, "--self-contained-html"])
 
     def list_tests(self):
         """List all available tests"""
@@ -153,74 +142,32 @@ Examples:
   %(prog)s --list             List all available tests
   %(prog)s --keyword balance  Run tests matching 'balance'
   %(prog)s --test unit/test_wallet.py  Run specific test file
-        """
+        """,
     )
 
-    parser.add_argument(
-        "--all",
-        action="store_true",
-        help="Run all tests"
-    )
+    parser.add_argument("--all", action="store_true", help="Run all tests")
+
+    parser.add_argument("--unit", action="store_true", help="Run unit tests only")
+
+    parser.add_argument("--integration", action="store_true", help="Run integration tests only")
+
+    parser.add_argument("--security", action="store_true", help="Run security tests only")
+
+    parser.add_argument("--performance", action="store_true", help="Run performance tests only")
 
     parser.add_argument(
-        "--unit",
-        action="store_true",
-        help="Run unit tests only"
+        "--fast", action="store_true", help="Run fast tests only (exclude slow tests)"
     )
 
-    parser.add_argument(
-        "--integration",
-        action="store_true",
-        help="Run integration tests only"
-    )
+    parser.add_argument("--coverage", action="store_true", help="Run tests with coverage report")
 
-    parser.add_argument(
-        "--security",
-        action="store_true",
-        help="Run security tests only"
-    )
+    parser.add_argument("--report", action="store_true", help="Generate HTML test report")
 
-    parser.add_argument(
-        "--performance",
-        action="store_true",
-        help="Run performance tests only"
-    )
+    parser.add_argument("--list", action="store_true", help="List all available tests")
 
-    parser.add_argument(
-        "--fast",
-        action="store_true",
-        help="Run fast tests only (exclude slow tests)"
-    )
+    parser.add_argument("--keyword", "-k", type=str, help="Run tests matching keyword")
 
-    parser.add_argument(
-        "--coverage",
-        action="store_true",
-        help="Run tests with coverage report"
-    )
-
-    parser.add_argument(
-        "--report",
-        action="store_true",
-        help="Generate HTML test report"
-    )
-
-    parser.add_argument(
-        "--list",
-        action="store_true",
-        help="List all available tests"
-    )
-
-    parser.add_argument(
-        "--keyword", "-k",
-        type=str,
-        help="Run tests matching keyword"
-    )
-
-    parser.add_argument(
-        "--test", "-t",
-        type=str,
-        help="Run specific test file or function"
-    )
+    parser.add_argument("--test", "-t", type=str, help="Run specific test file or function")
 
     args = parser.parse_args()
 

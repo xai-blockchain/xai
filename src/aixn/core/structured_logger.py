@@ -23,7 +23,7 @@ import time
 
 
 # Context variable for correlation ID (thread-safe)
-correlation_id: ContextVar[Optional[str]] = ContextVar('correlation_id', default=None)
+correlation_id: ContextVar[Optional[str]] = ContextVar("correlation_id", default=None)
 
 
 class JSONFormatter(logging.Formatter):
@@ -42,36 +42,33 @@ class JSONFormatter(logging.Formatter):
 
         # Base log entry
         log_entry = {
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
-            'level': record.levelname,
-            'logger': record.name,
-            'message': record.getMessage(),
-            'module': record.module,
-            'function': record.funcName,
-            'line': record.lineno
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
         }
 
         # Add correlation ID if present
         corr_id = correlation_id.get()
         if corr_id:
-            log_entry['correlation_id'] = corr_id
+            log_entry["correlation_id"] = corr_id
 
         # Add thread information
-        log_entry['thread'] = {
-            'id': threading.get_ident(),
-            'name': threading.current_thread().name
-        }
+        log_entry["thread"] = {"id": threading.get_ident(), "name": threading.current_thread().name}
 
         # Add exception info if present
         if record.exc_info:
-            log_entry['exception'] = {
-                'type': record.exc_info[0].__name__,
-                'message': str(record.exc_info[1]),
-                'traceback': self.formatException(record.exc_info)
+            log_entry["exception"] = {
+                "type": record.exc_info[0].__name__,
+                "message": str(record.exc_info[1]),
+                "traceback": self.formatException(record.exc_info),
             }
 
         # Add custom fields from extra parameter
-        if hasattr(record, 'extra_fields'):
+        if hasattr(record, "extra_fields"):
             log_entry.update(record.extra_fields)
 
         return json.dumps(log_entry, default=str)
@@ -91,12 +88,14 @@ class StructuredLogger:
     - Privacy-preserving (truncated addresses, sanitized data)
     """
 
-    def __init__(self,
-                 name: str = 'XAI_Blockchain',
-                 log_dir: str = None,
-                 log_level: str = 'INFO',
-                 max_bytes: int = 100 * 1024 * 1024,  # 100MB
-                 backup_count: int = 30):  # Keep 30 days
+    def __init__(
+        self,
+        name: str = "XAI_Blockchain",
+        log_dir: str = None,
+        log_level: str = "INFO",
+        max_bytes: int = 100 * 1024 * 1024,  # 100MB
+        backup_count: int = 30,
+    ):  # Keep 30 days
         """
         Initialize structured logger
 
@@ -111,7 +110,7 @@ class StructuredLogger:
 
         # Create log directory
         if log_dir is None:
-            log_dir = os.path.join(os.path.dirname(__file__), '..', 'logs')
+            log_dir = os.path.join(os.path.dirname(__file__), "..", "logs")
         os.makedirs(log_dir, exist_ok=True)
 
         # Configure logger
@@ -121,31 +120,31 @@ class StructuredLogger:
         # Prevent duplicate handlers
         if not self.logger.handlers:
             # JSON log file (daily rotation)
-            json_log_path = os.path.join(log_dir, f'{name.lower()}.json.log')
+            json_log_path = os.path.join(log_dir, f"{name.lower()}.json.log")
             json_handler = TimedRotatingFileHandler(
                 json_log_path,
-                when='midnight',
+                when="midnight",
                 interval=1,
                 backupCount=backup_count,
-                encoding='utf-8',
-                utc=True
+                encoding="utf-8",
+                utc=True,
             )
             json_handler.setFormatter(JSONFormatter())
             self.logger.addHandler(json_handler)
 
             # Human-readable log file (for easier debugging)
-            text_log_path = os.path.join(log_dir, f'{name.lower()}.log')
+            text_log_path = os.path.join(log_dir, f"{name.lower()}.log")
             text_handler = TimedRotatingFileHandler(
                 text_log_path,
-                when='midnight',
+                when="midnight",
                 interval=1,
                 backupCount=backup_count,
-                encoding='utf-8',
-                utc=True
+                encoding="utf-8",
+                utc=True,
             )
             text_formatter = logging.Formatter(
-                '[%(asctime)s UTC] %(levelname)-8s [%(correlation_id)s] %(message)s',
-                datefmt='%Y-%m-%d %H:%M:%S'
+                "[%(asctime)s UTC] %(levelname)-8s [%(correlation_id)s] %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
             )
             text_formatter.converter = lambda *args: datetime.now(timezone.utc).timetuple()
             text_handler.setFormatter(text_formatter)
@@ -153,13 +152,7 @@ class StructuredLogger:
             self.logger.addHandler(text_handler)
 
         self.performance_metrics = {}
-        self.log_counts = {
-            'DEBUG': 0,
-            'INFO': 0,
-            'WARN': 0,
-            'ERROR': 0,
-            'CRITICAL': 0
-        }
+        self.log_counts = {"DEBUG": 0, "INFO": 0, "WARN": 0, "ERROR": 0, "CRITICAL": 0}
 
     def _truncate_address(self, address: str) -> str:
         """Truncate wallet address for privacy"""
@@ -169,12 +162,12 @@ class StructuredLogger:
 
     def _sanitize_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Remove sensitive information from data"""
-        sensitive_keys = ['private_key', 'password', 'secret', 'api_key', 'signature']
+        sensitive_keys = ["private_key", "password", "secret", "api_key", "signature"]
         sanitized = {}
 
         for key, value in data.items():
             if any(sensitive in key.lower() for sensitive in sensitive_keys):
-                sanitized[key] = 'REDACTED'
+                sanitized[key] = "REDACTED"
             elif isinstance(value, dict):
                 sanitized[key] = self._sanitize_data(value)
             else:
@@ -191,106 +184,100 @@ class StructuredLogger:
             kwargs = self._sanitize_data(kwargs)
 
         # Create log record with extra fields
-        extra = {'extra_fields': kwargs} if kwargs else {}
+        extra = {"extra_fields": kwargs} if kwargs else {}
 
         log_func = getattr(self.logger, level.lower())
         log_func(message, extra=extra)
 
     def debug(self, message: str, **kwargs):
         """Log debug message"""
-        self._log('DEBUG', message, **kwargs)
+        self._log("DEBUG", message, **kwargs)
 
     def info(self, message: str, **kwargs):
         """Log info message"""
-        self._log('INFO', message, **kwargs)
+        self._log("INFO", message, **kwargs)
 
     def warn(self, message: str, **kwargs):
         """Log warning message"""
-        self._log('WARN', message, **kwargs)
+        self._log("WARN", message, **kwargs)
 
     def error(self, message: str, **kwargs):
         """Log error message"""
-        self._log('ERROR', message, **kwargs)
+        self._log("ERROR", message, **kwargs)
 
     def critical(self, message: str, **kwargs):
         """Log critical message"""
-        self._log('CRITICAL', message, **kwargs)
+        self._log("CRITICAL", message, **kwargs)
 
     # Blockchain-specific logging methods
 
-    def block_mined(self, block_index: int, block_hash: str,
-                    miner: str, tx_count: int, reward: float,
-                    mining_time: float = None):
+    def block_mined(
+        self,
+        block_index: int,
+        block_hash: str,
+        miner: str,
+        tx_count: int,
+        reward: float,
+        mining_time: float = None,
+    ):
         """Log block mining event"""
         self.info(
             f"Block #{block_index} mined",
             block_index=block_index,
-            block_hash=block_hash[:16] + '...',
+            block_hash=block_hash[:16] + "...",
             miner=self._truncate_address(miner),
             transaction_count=tx_count,
             block_reward=reward,
-            mining_time_seconds=mining_time
+            mining_time_seconds=mining_time,
         )
 
-    def transaction_submitted(self, txid: str, sender: str,
-                             recipient: str, amount: float, fee: float):
+    def transaction_submitted(
+        self, txid: str, sender: str, recipient: str, amount: float, fee: float
+    ):
         """Log transaction submission"""
         self.info(
             f"Transaction submitted: {txid[:16]}...",
-            txid=txid[:16] + '...',
+            txid=txid[:16] + "...",
             sender=self._truncate_address(sender),
             recipient=self._truncate_address(recipient),
             amount=amount,
-            fee=fee
+            fee=fee,
         )
 
     def transaction_confirmed(self, txid: str, block_index: int):
         """Log transaction confirmation"""
         self.info(
             f"Transaction confirmed in block #{block_index}",
-            txid=txid[:16] + '...',
-            block_index=block_index
+            txid=txid[:16] + "...",
+            block_index=block_index,
         )
 
     def network_event(self, event_type: str, peer_count: int = None, **kwargs):
         """Log network event"""
-        self.info(
-            f"Network: {event_type}",
-            event_type=event_type,
-            peer_count=peer_count,
-            **kwargs
-        )
+        self.info(f"Network: {event_type}", event_type=event_type, peer_count=peer_count, **kwargs)
 
     def consensus_event(self, event_type: str, **kwargs):
         """Log consensus event"""
-        self.info(
-            f"Consensus: {event_type}",
-            event_type=event_type,
-            **kwargs
-        )
+        self.info(f"Consensus: {event_type}", event_type=event_type, **kwargs)
 
-    def security_event(self, event_type: str, severity: str = 'WARN', **kwargs):
+    def security_event(self, event_type: str, severity: str = "WARN", **kwargs):
         """Log security event"""
-        log_func = self.warn if severity == 'WARN' else self.error
-        log_func(
-            f"SECURITY: {event_type}",
-            event_type=event_type,
-            security_event=True,
-            **kwargs
-        )
+        log_func = self.warn if severity == "WARN" else self.error
+        log_func(f"SECURITY: {event_type}", event_type=event_type, security_event=True, **kwargs)
 
-    def performance_event(self, metric_name: str, value: float, unit: str = ''):
+    def performance_event(self, metric_name: str, value: float, unit: str = ""):
         """Log performance metric"""
         self.debug(
             f"Performance: {metric_name}",
             metric_name=metric_name,
             value=value,
             unit=unit,
-            performance_metric=True
+            performance_metric=True,
         )
 
-    def api_request(self, endpoint: str, method: str,
-                   status_code: int = None, duration_ms: float = None):
+    def api_request(
+        self, endpoint: str, method: str, status_code: int = None, duration_ms: float = None
+    ):
         """Log API request"""
         self.info(
             f"API: {method} {endpoint}",
@@ -298,16 +285,13 @@ class StructuredLogger:
             method=method,
             status_code=status_code,
             duration_ms=duration_ms,
-            api_request=True
+            api_request=True,
         )
 
     def governance_event(self, event_type: str, proposal_id: str = None, **kwargs):
         """Log governance event"""
         self.info(
-            f"Governance: {event_type}",
-            event_type=event_type,
-            proposal_id=proposal_id,
-            **kwargs
+            f"Governance: {event_type}", event_type=event_type, proposal_id=proposal_id, **kwargs
         )
 
     def wallet_event(self, event_type: str, address: str, **kwargs):
@@ -316,15 +300,15 @@ class StructuredLogger:
             f"Wallet: {event_type}",
             event_type=event_type,
             address=self._truncate_address(address),
-            **kwargs
+            **kwargs,
         )
 
     def get_stats(self) -> Dict[str, Any]:
         """Get logger statistics"""
         return {
-            'log_counts': self.log_counts.copy(),
-            'total_logs': sum(self.log_counts.values()),
-            'performance_metrics': self.performance_metrics.copy()
+            "log_counts": self.log_counts.copy(),
+            "total_logs": sum(self.log_counts.values()),
+            "performance_metrics": self.performance_metrics.copy(),
         }
 
 
@@ -333,7 +317,7 @@ class CorrelationIDFilter(logging.Filter):
 
     def filter(self, record):
         corr_id = correlation_id.get()
-        record.correlation_id = corr_id if corr_id else 'NO-ID'
+        record.correlation_id = corr_id if corr_id else "NO-ID"
         return True
 
 
@@ -404,18 +388,14 @@ class PerformanceTimer:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Stop timer and log duration"""
         duration = (time.time() - self.start_time) * 1000  # Convert to ms
-        self.logger.performance_event(
-            self.operation_name,
-            duration,
-            'ms'
-        )
+        self.logger.performance_event(self.operation_name, duration, "ms")
 
 
 # Global logger instance
 _global_structured_logger = None
 
 
-def get_structured_logger(name: str = 'XAI_Blockchain') -> StructuredLogger:
+def get_structured_logger(name: str = "XAI_Blockchain") -> StructuredLogger:
     """
     Get global structured logger instance
 
@@ -456,7 +436,7 @@ def clear_correlation_id():
 # Example usage
 if __name__ == "__main__":
     # Create logger
-    logger = StructuredLogger('XAI_Test', log_level='DEBUG')
+    logger = StructuredLogger("XAI_Test", log_level="DEBUG")
 
     print("Testing Structured Logger...")
     print("=" * 70)
@@ -474,33 +454,30 @@ if __name__ == "__main__":
         logger.info("Request completed")
 
     # Performance timing
-    with PerformanceTimer(logger, 'test_operation'):
+    with PerformanceTimer(logger, "test_operation"):
         time.sleep(0.1)  # Simulate work
 
     # Blockchain events
     logger.block_mined(
         block_index=100,
-        block_hash='0x123456789abcdef',
-        miner='XAI1234567890abcdef',
+        block_hash="0x123456789abcdef",
+        miner="XAI1234567890abcdef",
         tx_count=10,
         reward=50.0,
-        mining_time=5.2
+        mining_time=5.2,
     )
 
     logger.transaction_submitted(
-        txid='0xabcdef123456',
-        sender='XAI1111111111',
-        recipient='XAI2222222222',
+        txid="0xabcdef123456",
+        sender="XAI1111111111",
+        recipient="XAI2222222222",
         amount=100.0,
-        fee=0.01
+        fee=0.01,
     )
 
     # Security event
     logger.security_event(
-        'rate_limit_exceeded',
-        severity='WARN',
-        endpoint='/send',
-        ip_hash='abc123'
+        "rate_limit_exceeded", severity="WARN", endpoint="/send", ip_hash="abc123"
     )
 
     # Get stats

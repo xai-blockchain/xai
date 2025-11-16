@@ -27,9 +27,11 @@ class TestConfiguration:
 
     def test_network_type(self):
         """Test that network type is set"""
-        assert hasattr(Config, 'NETWORK_TYPE'), "Should have NETWORK_TYPE"
-        assert Config.NETWORK_TYPE in [NetworkType.TESTNET, NetworkType.MAINNET], \
-            "Network type should be TESTNET or MAINNET"
+        assert hasattr(Config, "NETWORK_TYPE"), "Should have NETWORK_TYPE"
+        assert Config.NETWORK_TYPE in [
+            NetworkType.TESTNET,
+            NetworkType.MAINNET,
+        ], "Network type should be TESTNET or MAINNET"
 
 
 class TestTestnetConfig:
@@ -42,8 +44,9 @@ class TestTestnetConfig:
     def test_testnet_difficulty(self):
         """Test testnet has lower difficulty"""
         assert TestnetConfig.INITIAL_DIFFICULTY == 2, "Testnet difficulty should be 2"
-        assert TestnetConfig.INITIAL_DIFFICULTY < MainnetConfig.INITIAL_DIFFICULTY, \
-            "Testnet difficulty should be less than mainnet"
+        assert (
+            TestnetConfig.INITIAL_DIFFICULTY < MainnetConfig.INITIAL_DIFFICULTY
+        ), "Testnet difficulty should be less than mainnet"
 
     def test_testnet_ports(self):
         """Test testnet uses different ports"""
@@ -52,7 +55,7 @@ class TestTestnetConfig:
 
     def test_testnet_address_prefix(self):
         """Test testnet address prefix"""
-        assert TestnetConfig.ADDRESS_PREFIX == 'TXAI', "Testnet prefix should be TXAI"
+        assert TestnetConfig.ADDRESS_PREFIX == "TXAI", "Testnet prefix should be TXAI"
 
     def test_testnet_faucet_enabled(self):
         """Test testnet has faucet enabled"""
@@ -65,11 +68,11 @@ class TestTestnetConfig:
 
     def test_testnet_genesis_file(self):
         """Test testnet uses separate genesis file"""
-        assert TestnetConfig.GENESIS_FILE == 'genesis_testnet.json'
+        assert TestnetConfig.GENESIS_FILE == "genesis_testnet.json"
 
     def test_testnet_blockchain_file(self):
         """Test testnet uses separate blockchain file"""
-        assert TestnetConfig.BLOCKCHAIN_FILE == 'blockchain_testnet.json'
+        assert TestnetConfig.BLOCKCHAIN_FILE == "blockchain_testnet.json"
 
 
 class TestMainnetConfig:
@@ -90,7 +93,7 @@ class TestMainnetConfig:
 
     def test_mainnet_address_prefix(self):
         """Test mainnet address prefix"""
-        assert MainnetConfig.ADDRESS_PREFIX == 'AIXN', "Mainnet prefix should be AIXN"
+        assert MainnetConfig.ADDRESS_PREFIX == "AIXN", "Mainnet prefix should be AIXN"
 
     def test_mainnet_faucet_disabled(self):
         """Test mainnet has faucet disabled"""
@@ -103,11 +106,11 @@ class TestMainnetConfig:
 
     def test_mainnet_genesis_file(self):
         """Test mainnet uses production genesis file"""
-        assert MainnetConfig.GENESIS_FILE == 'genesis_new.json'
+        assert MainnetConfig.GENESIS_FILE == "genesis_new.json"
 
     def test_mainnet_blockchain_file(self):
         """Test mainnet uses production blockchain file"""
-        assert MainnetConfig.BLOCKCHAIN_FILE == 'blockchain.json'
+        assert MainnetConfig.BLOCKCHAIN_FILE == "blockchain.json"
 
 
 class TestSharedConfig:
@@ -117,8 +120,9 @@ class TestSharedConfig:
         """Test max supply is same for both networks"""
         assert TestnetConfig.MAX_SUPPLY == 121000000.0, "Testnet max supply should be 121M"
         assert MainnetConfig.MAX_SUPPLY == 121000000.0, "Mainnet max supply should be 121M"
-        assert TestnetConfig.MAX_SUPPLY == MainnetConfig.MAX_SUPPLY, \
-            "Both networks should have same max supply"
+        assert (
+            TestnetConfig.MAX_SUPPLY == MainnetConfig.MAX_SUPPLY
+        ), "Both networks should have same max supply"
 
     def test_block_reward(self):
         """Test initial block reward is same"""
@@ -143,33 +147,39 @@ class TestNetworkIsolation:
 
     def test_different_network_ids(self):
         """Test networks have different IDs"""
-        assert TestnetConfig.NETWORK_ID != MainnetConfig.NETWORK_ID, \
-            "Networks should have different IDs"
+        assert (
+            TestnetConfig.NETWORK_ID != MainnetConfig.NETWORK_ID
+        ), "Networks should have different IDs"
 
     def test_different_ports(self):
         """Test networks use different ports"""
-        assert TestnetConfig.DEFAULT_PORT != MainnetConfig.DEFAULT_PORT, \
-            "Networks should use different ports"
+        assert (
+            TestnetConfig.DEFAULT_PORT != MainnetConfig.DEFAULT_PORT
+        ), "Networks should use different ports"
 
     def test_different_address_prefixes(self):
         """Test networks use different address prefixes"""
-        assert TestnetConfig.ADDRESS_PREFIX != MainnetConfig.ADDRESS_PREFIX, \
-            "Networks should use different address prefixes"
+        assert (
+            TestnetConfig.ADDRESS_PREFIX != MainnetConfig.ADDRESS_PREFIX
+        ), "Networks should use different address prefixes"
 
     def test_different_genesis_files(self):
         """Test networks use different genesis files"""
-        assert TestnetConfig.GENESIS_FILE != MainnetConfig.GENESIS_FILE, \
-            "Networks should use different genesis files"
+        assert (
+            TestnetConfig.GENESIS_FILE != MainnetConfig.GENESIS_FILE
+        ), "Networks should use different genesis files"
 
     def test_different_blockchain_files(self):
         """Test networks use different blockchain files"""
-        assert TestnetConfig.BLOCKCHAIN_FILE != MainnetConfig.BLOCKCHAIN_FILE, \
-            "Networks should use different blockchain files"
+        assert (
+            TestnetConfig.BLOCKCHAIN_FILE != MainnetConfig.BLOCKCHAIN_FILE
+        ), "Networks should use different blockchain files"
 
     def test_different_data_directories(self):
         """Test networks use different data directories"""
-        assert TestnetConfig.DATA_DIR != MainnetConfig.DATA_DIR, \
-            "Networks should use different data directories"
+        assert (
+            TestnetConfig.DATA_DIR != MainnetConfig.DATA_DIR
+        ), "Networks should use different data directories"
 
 
 class TestSecurityConstraints:
@@ -187,9 +197,10 @@ class TestSecurityConstraints:
 
     def test_production_difficulty(self):
         """Test mainnet has higher difficulty for security"""
-        assert MainnetConfig.INITIAL_DIFFICULTY > TestnetConfig.INITIAL_DIFFICULTY, \
-            "Mainnet should have higher difficulty than testnet"
+        assert (
+            MainnetConfig.INITIAL_DIFFICULTY > TestnetConfig.INITIAL_DIFFICULTY
+        ), "Mainnet should have higher difficulty than testnet"
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

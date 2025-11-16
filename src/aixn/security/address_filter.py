@@ -1,10 +1,11 @@
 from typing import Set, List
 
+
 class AddressFilter:
     def __init__(self, enable_whitelist: bool = False):
         self.whitelist: Set[str] = set()
         self.blacklist: Set[str] = set()
-        self.enable_whitelist = enable_whitelist # If True, only whitelisted addresses are allowed
+        self.enable_whitelist = enable_whitelist  # If True, only whitelisted addresses are allowed
 
     def add_to_whitelist(self, address: str):
         if not address:
@@ -51,12 +52,12 @@ class AddressFilter:
         If whitelist is disabled, all addresses are allowed unless blacklisted.
         """
         if not address:
-            return False # Empty address is never allowed
+            return False  # Empty address is never allowed
 
         if address in self.blacklist:
             print(f"Address {address} is BLACKLISTED. Access DENIED.")
             return False
-        
+
         if self.enable_whitelist:
             if address in self.whitelist:
                 print(f"Address {address} is WHITELISTED. Access GRANTED.")
@@ -68,6 +69,7 @@ class AddressFilter:
             # Whitelist is not enabled, so all non-blacklisted addresses are allowed
             print(f"Address {address} is not blacklisted. Access GRANTED (whitelist disabled).")
             return True
+
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
@@ -86,12 +88,16 @@ if __name__ == "__main__":
     filter_whitelist_enabled = AddressFilter(enable_whitelist=True)
     filter_whitelist_enabled.add_to_whitelist("0xAdmin1")
     filter_whitelist_enabled.add_to_whitelist("0xRelayerA")
-    filter_whitelist_enabled.add_to_blacklist("0xCompromisedAdmin") # Blacklist takes precedence
+    filter_whitelist_enabled.add_to_blacklist("0xCompromisedAdmin")  # Blacklist takes precedence
 
     print(f"Check 0xAdmin1: {filter_whitelist_enabled.check_address('0xAdmin1')}")
     print(f"Check 0xRelayerA: {filter_whitelist_enabled.check_address('0xRelayerA')}")
-    print(f"Check 0xUnauthorizedUser: {filter_whitelist_enabled.check_address('0xUnauthorizedUser')}")
-    print(f"Check 0xCompromisedAdmin: {filter_whitelist_enabled.check_address('0xCompromisedAdmin')}")
+    print(
+        f"Check 0xUnauthorizedUser: {filter_whitelist_enabled.check_address('0xUnauthorizedUser')}"
+    )
+    print(
+        f"Check 0xCompromisedAdmin: {filter_whitelist_enabled.check_address('0xCompromisedAdmin')}"
+    )
 
     # Scenario 3: Dynamic changes
     print("\n--- Scenario 3: Dynamic Changes ---")
@@ -104,4 +110,6 @@ if __name__ == "__main__":
     filter_dynamic.enable_whitelist = True
     filter_dynamic.add_to_whitelist("0xNewAdmin")
     print(f"Check 0xNewAdmin (whitelist enabled): {filter_dynamic.check_address('0xNewAdmin')}")
-    print(f"Check 0xRegularUser (whitelist enabled): {filter_dynamic.check_address('0xRegularUser')}")
+    print(
+        f"Check 0xRegularUser (whitelist enabled): {filter_dynamic.check_address('0xRegularUser')}"
+    )

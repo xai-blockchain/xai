@@ -9,7 +9,7 @@ from peer_discovery import (
     BootstrapNodes,
     PeerDiscoveryProtocol,
     PeerDiversityManager,
-    PeerDiscoveryManager
+    PeerDiscoveryManager,
 )
 
 
@@ -149,8 +149,8 @@ class TestPeerDiversityManager(unittest.TestCase):
         peers = [
             PeerInfo("http://192.168.1.100:5000"),  # 192.168 subnet
             PeerInfo("http://192.168.1.101:5000"),  # 192.168 subnet
-            PeerInfo("http://10.0.0.1:5000"),       # 10.0 subnet
-            PeerInfo("http://172.16.0.1:5000"),     # 172.16 subnet
+            PeerInfo("http://10.0.0.1:5000"),  # 10.0 subnet
+            PeerInfo("http://172.16.0.1:5000"),  # 172.16 subnet
         ]
 
         # Give different quality scores
@@ -166,8 +166,7 @@ class TestPeerDiversityManager(unittest.TestCase):
         # Should prefer diversity over quality
         # (one from 192.168, one from 10.0, one from 172.16)
         ip_prefixes = set(
-            PeerDiversityManager.get_ip_prefix(peer.ip_address, 16)
-            for peer in selected
+            PeerDiversityManager.get_ip_prefix(peer.ip_address, 16) for peer in selected
         )
         self.assertGreaterEqual(len(ip_prefixes), 2)
 
@@ -181,7 +180,7 @@ class TestPeerDiscoveryManager(unittest.TestCase):
             network_type="testnet",
             my_url="http://127.0.0.1:9999",
             max_peers=20,
-            discovery_interval=60
+            discovery_interval=60,
         )
 
     def test_manager_initialization(self):
@@ -248,11 +247,11 @@ class TestPeerDiscoveryManager(unittest.TestCase):
 
         stats = self.manager.get_stats()
 
-        self.assertEqual(stats['network_type'], 'testnet')
-        self.assertEqual(stats['known_peers'], 5)
-        self.assertEqual(stats['max_peers'], 20)
-        self.assertIn('diversity_score', stats)
-        self.assertIn('avg_peer_quality', stats)
+        self.assertEqual(stats["network_type"], "testnet")
+        self.assertEqual(stats["known_peers"], 5)
+        self.assertEqual(stats["max_peers"], 20)
+        self.assertIn("diversity_score", stats)
+        self.assertIn("avg_peer_quality", stats)
 
     def test_get_peer_details(self):
         """Test getting peer details"""
@@ -267,8 +266,8 @@ class TestPeerDiscoveryManager(unittest.TestCase):
 
         self.assertEqual(len(details), 3)
         self.assertTrue(all(isinstance(d, dict) for d in details))
-        self.assertTrue(all('url' in d for d in details))
-        self.assertTrue(all('quality_score' in d for d in details))
+        self.assertTrue(all("url" in d for d in details))
+        self.assertTrue(all("quality_score" in d for d in details))
 
 
 class TestIntegration(unittest.TestCase):
@@ -277,9 +276,7 @@ class TestIntegration(unittest.TestCase):
     def test_full_peer_lifecycle(self):
         """Test complete peer lifecycle"""
         manager = PeerDiscoveryManager(
-            network_type="testnet",
-            my_url="http://127.0.0.1:9999",
-            max_peers=10
+            network_type="testnet", my_url="http://127.0.0.1:9999", max_peers=10
         )
 
         # Add a peer
@@ -303,7 +300,7 @@ class TestIntegration(unittest.TestCase):
 
         # Get stats
         stats = manager.get_stats()
-        self.assertEqual(stats['known_peers'], 1)
+        self.assertEqual(stats["known_peers"], 1)
 
 
 def run_tests():

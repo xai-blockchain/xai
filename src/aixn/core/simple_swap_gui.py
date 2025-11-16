@@ -18,25 +18,33 @@ from enum import Enum
 
 class SwapOrderType(Enum):
     """Type of swap order"""
-    BUY = "buy"   # Buy XAI (sell other coin)
+
+    BUY = "buy"  # Buy XAI (sell other coin)
     SELL = "sell"  # Sell XAI (buy other coin)
 
 
 class SwapOrderStatus(Enum):
     """Status of swap order"""
-    PENDING = "pending"       # Waiting for match
-    MATCHED = "matched"       # Found counterparty
+
+    PENDING = "pending"  # Waiting for match
+    MATCHED = "matched"  # Found counterparty
     HTLC_CREATED = "htlc_created"  # Both HTLCs created
-    COMPLETED = "completed"   # Swap finished
-    CANCELLED = "cancelled"   # User cancelled
-    EXPIRED = "expired"       # Timed out
+    COMPLETED = "completed"  # Swap finished
+    CANCELLED = "cancelled"  # User cancelled
+    EXPIRED = "expired"  # Timed out
 
 
 class SwapOrder:
     """Individual swap order in orderbook"""
 
-    def __init__(self, order_type: SwapOrderType, xai_amount: float,
-                 other_coin: str, other_amount: float, user_address: str):
+    def __init__(
+        self,
+        order_type: SwapOrderType,
+        xai_amount: float,
+        other_coin: str,
+        other_amount: float,
+        user_address: str,
+    ):
         self.order_id = self._generate_order_id()
         self.order_type = order_type
         self.xai_amount = xai_amount
@@ -64,16 +72,16 @@ class SwapOrder:
     def to_dict(self) -> Dict:
         """Convert to dictionary"""
         return {
-            'order_id': self.order_id,
-            'order_type': self.order_type.value,
-            'xai_amount': self.xai_amount,
-            'other_coin': self.other_coin,
-            'other_amount': self.other_amount,
-            'price_per_xai': self.price_per_xai,
-            'user_address': self.user_address,
-            'timestamp': self.timestamp,
-            'status': self.status.value,
-            'matched_with': self.matched_with
+            "order_id": self.order_id,
+            "order_type": self.order_type.value,
+            "xai_amount": self.xai_amount,
+            "other_coin": self.other_coin,
+            "other_amount": self.other_amount,
+            "price_per_xai": self.price_per_xai,
+            "user_address": self.user_address,
+            "timestamp": self.timestamp,
+            "status": self.status.value,
+            "matched_with": self.matched_with,
         }
 
 
@@ -86,28 +94,31 @@ class MarketPriceTracker:
     def __init__(self):
         self.swap_history = []  # List of completed swaps
         self.genesis_ratios = {
-            'BTC': 45000.0,   # Fallback ratios from genesis
-            'ETH': 2500.0,
-            'LTC': 75.0,
-            'DOGE': 0.08,
-            'USDT': 1.0,
-            'USDC': 1.0,
-            'DAI': 1.0
+            "BTC": 45000.0,  # Fallback ratios from genesis
+            "ETH": 2500.0,
+            "LTC": 75.0,
+            "DOGE": 0.08,
+            "USDT": 1.0,
+            "USDC": 1.0,
+            "DAI": 1.0,
         }
 
-    def record_swap(self, xai_amount: float, other_coin: str,
-                   other_amount: float, timestamp: float):
+    def record_swap(
+        self, xai_amount: float, other_coin: str, other_amount: float, timestamp: float
+    ):
         """Record completed swap for price tracking"""
 
         price_per_xai = other_amount / xai_amount
 
-        self.swap_history.append({
-            'timestamp': timestamp,
-            'xai_amount': xai_amount,
-            'other_coin': other_coin,
-            'other_amount': other_amount,
-            'price_per_xai': price_per_xai
-        })
+        self.swap_history.append(
+            {
+                "timestamp": timestamp,
+                "xai_amount": xai_amount,
+                "other_coin": other_coin,
+                "other_amount": other_amount,
+                "price_per_xai": price_per_xai,
+            }
+        )
 
         # Keep only last 1000 swaps
         if len(self.swap_history) > 1000:
@@ -121,14 +132,13 @@ class MarketPriceTracker:
         """
 
         # Stablecoins always = $1
-        if coin in ['USDT', 'USDC', 'DAI']:
+        if coin in ["USDT", "USDC", "DAI"]:
             return 1.0
 
         # Filter recent swaps for this coin
         cutoff_time = time.time() - (lookback_hours * 3600)
         recent_swaps = [
-            s for s in self.swap_history
-            if s['other_coin'] == coin and s['timestamp'] > cutoff_time
+            s for s in self.swap_history if s["other_coin"] == coin and s["timestamp"] > cutoff_time
         ]
 
         if not recent_swaps:
@@ -136,13 +146,13 @@ class MarketPriceTracker:
             return self.genesis_ratios.get(coin)
 
         # Calculate median price from recent swaps
-        prices = [s['price_per_xai'] for s in recent_swaps]
+        prices = [s["price_per_xai"] for s in recent_swaps]
         prices.sort()
 
         if len(prices) % 2 == 0:
-            median = (prices[len(prices)//2 - 1] + prices[len(prices)//2]) / 2
+            median = (prices[len(prices) // 2 - 1] + prices[len(prices) // 2]) / 2
         else:
-            median = prices[len(prices)//2]
+            median = prices[len(prices) // 2]
 
         return median
 
@@ -155,9 +165,9 @@ class MarketPriceTracker:
 
         # Get all stablecoin swaps
         stablecoin_swaps = [
-            s for s in self.swap_history
-            if s['other_coin'] in ['USDT', 'USDC', 'DAI']
-            and s['timestamp'] > cutoff_time
+            s
+            for s in self.swap_history
+            if s["other_coin"] in ["USDT", "USDC", "DAI"] and s["timestamp"] > cutoff_time
         ]
 
         if not stablecoin_swaps:
@@ -166,13 +176,13 @@ class MarketPriceTracker:
 
         # Calculate median XAI price from stablecoin swaps
         # Price per XAI = stablecoin amount / XAI amount
-        prices = [s['other_amount'] / s['xai_amount'] for s in stablecoin_swaps]
+        prices = [s["other_amount"] / s["xai_amount"] for s in stablecoin_swaps]
         prices.sort()
 
         if len(prices) % 2 == 0:
-            median = (prices[len(prices)//2 - 1] + prices[len(prices)//2]) / 2
+            median = (prices[len(prices) // 2 - 1] + prices[len(prices) // 2]) / 2
         else:
-            median = prices[len(prices)//2]
+            median = prices[len(prices) // 2]
 
         return median
 
@@ -190,9 +200,14 @@ class OnChainOrderbook:
         self.orders = {}  # order_id -> SwapOrder
         self.active_orders = []  # List of pending orders
 
-    def create_order(self, order_type: SwapOrderType, xai_amount: float,
-                    other_coin: str, other_amount: float,
-                    user_address: str) -> Dict:
+    def create_order(
+        self,
+        order_type: SwapOrderType,
+        xai_amount: float,
+        other_coin: str,
+        other_amount: float,
+        user_address: str,
+    ) -> Dict:
         """
         Create new swap order
 
@@ -200,7 +215,7 @@ class OnChainOrderbook:
         """
 
         # Calculate implied XAI price in USD
-        if other_coin in ['USDT', 'USDC', 'DAI']:
+        if other_coin in ["USDT", "USDC", "DAI"]:
             # Stablecoins: direct price calculation
             xai_price_usd = other_amount / xai_amount
 
@@ -209,9 +224,9 @@ class OnChainOrderbook:
 
             if xai_price_usd < current_floor:
                 return {
-                    'success': False,
-                    'error': 'PRICE_BELOW_FLOOR',
-                    'message': f'Price too low (floor enforced on stablecoins)'
+                    "success": False,
+                    "error": "PRICE_BELOW_FLOOR",
+                    "message": f"Price too low (floor enforced on stablecoins)",
                 }
 
         # Crypto pairs (BTC, ETH, etc): free market, no validation
@@ -222,7 +237,7 @@ class OnChainOrderbook:
             xai_amount=xai_amount,
             other_coin=other_coin,
             other_amount=other_amount,
-            user_address=user_address
+            user_address=user_address,
         )
 
         self.orders[order.order_id] = order
@@ -233,18 +248,18 @@ class OnChainOrderbook:
 
         if match:
             return {
-                'success': True,
-                'order_id': order.order_id,
-                'status': 'MATCHED',
-                'matched_with': match.order_id,
-                'message': 'Order matched! Swap ready to execute.'
+                "success": True,
+                "order_id": order.order_id,
+                "status": "MATCHED",
+                "matched_with": match.order_id,
+                "message": "Order matched! Swap ready to execute.",
             }
         else:
             return {
-                'success': True,
-                'order_id': order.order_id,
-                'status': 'PENDING',
-                'message': 'Order created. Waiting for match...'
+                "success": True,
+                "order_id": order.order_id,
+                "status": "PENDING",
+                "message": "Order created. Waiting for match...",
             }
 
     def _find_matching_order(self, new_order: SwapOrder) -> Optional[SwapOrder]:
@@ -254,12 +269,14 @@ class OnChainOrderbook:
         BUY order matches with SELL order (and vice versa)
         """
 
-        opposite_type = (SwapOrderType.SELL if new_order.order_type == SwapOrderType.BUY
-                        else SwapOrderType.BUY)
+        opposite_type = (
+            SwapOrderType.SELL if new_order.order_type == SwapOrderType.BUY else SwapOrderType.BUY
+        )
 
         # Find matching orders
         candidates = [
-            order for order in self.active_orders
+            order
+            for order in self.active_orders
             if order.status == SwapOrderStatus.PENDING
             and order.order_type == opposite_type
             and order.other_coin == new_order.other_coin
@@ -296,26 +313,30 @@ class OnChainOrderbook:
         sell_orders = [o for o in orders if o.order_type == SwapOrderType.SELL]
 
         return {
-            'buy_orders': [o.to_dict() for o in sorted(buy_orders, key=lambda x: x.price_per_xai, reverse=True)],
-            'sell_orders': [o.to_dict() for o in sorted(sell_orders, key=lambda x: x.price_per_xai)],
-            'total_pending': len(orders)
+            "buy_orders": [
+                o.to_dict() for o in sorted(buy_orders, key=lambda x: x.price_per_xai, reverse=True)
+            ],
+            "sell_orders": [
+                o.to_dict() for o in sorted(sell_orders, key=lambda x: x.price_per_xai)
+            ],
+            "total_pending": len(orders),
         }
 
     def cancel_order(self, order_id: str) -> Dict:
         """Cancel pending order"""
 
         if order_id not in self.orders:
-            return {'success': False, 'error': 'Order not found'}
+            return {"success": False, "error": "Order not found"}
 
         order = self.orders[order_id]
 
         if order.status != SwapOrderStatus.PENDING:
-            return {'success': False, 'error': 'Cannot cancel non-pending order'}
+            return {"success": False, "error": "Cannot cancel non-pending order"}
 
         order.status = SwapOrderStatus.CANCELLED
         self.active_orders.remove(order)
 
-        return {'success': True, 'message': 'Order cancelled'}
+        return {"success": True, "message": "Order cancelled"}
 
 
 class SimpleSwapGUI:
@@ -325,7 +346,7 @@ class SimpleSwapGUI:
     """
 
     def __init__(self, blockchain, wallet_address):
-                from aixn.core.mystery_price_floor import MysteryPriceFloor
+        from aixn.core.mystery_price_floor import MysteryPriceFloor
 
         self.blockchain = blockchain
         self.wallet_address = wallet_address
@@ -333,8 +354,9 @@ class SimpleSwapGUI:
         self.orderbook = OnChainOrderbook(blockchain, self.price_floor)
         self.active_swaps = {}  # track user's active swaps
 
-    def swap_xai_for_coin(self, xai_amount: float, target_coin: str,
-                         max_price: float = None) -> Dict:
+    def swap_xai_for_coin(
+        self, xai_amount: float, target_coin: str, max_price: float = None
+    ) -> Dict:
         """
         One-click swap: Sell XAI, get other coin
 
@@ -350,7 +372,7 @@ class SimpleSwapGUI:
         # Get current market price
         market_price = self.orderbook.price_tracker.get_xai_price_usd()
 
-        if target_coin in ['USDT', 'USDC', 'DAI']:
+        if target_coin in ["USDT", "USDC", "DAI"]:
             # Stablecoin swap - use market price
             other_amount = xai_amount * market_price
         else:
@@ -360,9 +382,9 @@ class SimpleSwapGUI:
                 other_amount = (xai_amount * market_price) / coin_price_usd
             else:
                 return {
-                    'success': False,
-                    'error': 'PRICE_UNAVAILABLE',
-                    'message': f'No recent {target_coin} swaps. Cannot determine price.'
+                    "success": False,
+                    "error": "PRICE_UNAVAILABLE",
+                    "message": f"No recent {target_coin} swaps. Cannot determine price.",
                 }
 
         # Create sell order
@@ -371,19 +393,20 @@ class SimpleSwapGUI:
             xai_amount=xai_amount,
             other_coin=target_coin,
             other_amount=other_amount,
-            user_address=self.wallet_address
+            user_address=self.wallet_address,
         )
 
-        if result['success'] and result['status'] == 'MATCHED':
+        if result["success"] and result["status"] == "MATCHED":
             # Order matched! Create HTLC automatically
-            swap_id = self._create_htlc_swap(result['order_id'], result['matched_with'])
-            result['swap_id'] = swap_id
-            result['message'] = f'Swapping {xai_amount} XAI for {other_amount:.8f} {target_coin}...'
+            swap_id = self._create_htlc_swap(result["order_id"], result["matched_with"])
+            result["swap_id"] = swap_id
+            result["message"] = f"Swapping {xai_amount} XAI for {other_amount:.8f} {target_coin}..."
 
         return result
 
-    def swap_coin_for_xai(self, other_coin: str, other_amount: float,
-                         min_xai: float = None) -> Dict:
+    def swap_coin_for_xai(
+        self, other_coin: str, other_amount: float, min_xai: float = None
+    ) -> Dict:
         """
         One-click swap: Sell other coin, get XAI
 
@@ -399,7 +422,7 @@ class SimpleSwapGUI:
         # Get current market price
         market_price = self.orderbook.price_tracker.get_xai_price_usd()
 
-        if other_coin in ['USDT', 'USDC', 'DAI']:
+        if other_coin in ["USDT", "USDC", "DAI"]:
             # Stablecoin swap
             xai_amount = other_amount / market_price
 
@@ -407,9 +430,9 @@ class SimpleSwapGUI:
             current_floor = self.price_floor.get_current_floor()
             if market_price < current_floor:
                 return {
-                    'success': False,
-                    'error': 'PRICE_BELOW_FLOOR',
-                    'message': 'Current market price below floor'
+                    "success": False,
+                    "error": "PRICE_BELOW_FLOOR",
+                    "message": "Current market price below floor",
                 }
         else:
             # Crypto swap
@@ -418,9 +441,9 @@ class SimpleSwapGUI:
                 xai_amount = (other_amount * coin_price_usd) / market_price
             else:
                 return {
-                    'success': False,
-                    'error': 'PRICE_UNAVAILABLE',
-                    'message': f'No recent {other_coin} swaps'
+                    "success": False,
+                    "error": "PRICE_UNAVAILABLE",
+                    "message": f"No recent {other_coin} swaps",
                 }
 
         # Create buy order
@@ -429,14 +452,14 @@ class SimpleSwapGUI:
             xai_amount=xai_amount,
             other_coin=other_coin,
             other_amount=other_amount,
-            user_address=self.wallet_address
+            user_address=self.wallet_address,
         )
 
-        if result['success'] and result['status'] == 'MATCHED':
+        if result["success"] and result["status"] == "MATCHED":
             # Order matched! Create HTLC automatically
-            swap_id = self._create_htlc_swap(result['order_id'], result['matched_with'])
-            result['swap_id'] = swap_id
-            result['message'] = f'Swapping {other_amount:.8f} {other_coin} for {xai_amount} XAI...'
+            swap_id = self._create_htlc_swap(result["order_id"], result["matched_with"])
+            result["swap_id"] = swap_id
+            result["message"] = f"Swapping {other_amount:.8f} {other_coin} for {xai_amount} XAI..."
 
         return result
 
@@ -458,15 +481,15 @@ class SimpleSwapGUI:
 
         # Store swap data
         self.active_swaps[swap_id] = {
-            'order_id': order_id,
-            'matched_order_id': matched_order_id,
-            'secret': secret.hex(),
-            'secret_hash': secret_hash,
-            'status': 'HTLC_CREATED',
-            'xai_amount': order.xai_amount,
-            'other_coin': order.other_coin,
-            'other_amount': order.other_amount,
-            'created_at': time.time()
+            "order_id": order_id,
+            "matched_order_id": matched_order_id,
+            "secret": secret.hex(),
+            "secret_hash": secret_hash,
+            "status": "HTLC_CREATED",
+            "xai_amount": order.xai_amount,
+            "other_coin": order.other_coin,
+            "other_amount": order.other_amount,
+            "created_at": time.time(),
         }
 
         # Update order statuses
@@ -482,34 +505,33 @@ class SimpleSwapGUI:
         """
 
         if swap_id not in self.active_swaps:
-            return {'error': 'Swap not found'}
+            return {"error": "Swap not found"}
 
         swap = self.active_swaps[swap_id]
 
         # Calculate progress
         progress_steps = {
-            'HTLC_CREATED': 25,
-            'SECRET_REVEALED': 50,
-            'FUNDS_LOCKED': 75,
-            'COMPLETED': 100
+            "HTLC_CREATED": 25,
+            "SECRET_REVEALED": 50,
+            "FUNDS_LOCKED": 75,
+            "COMPLETED": 100,
         }
 
-        progress = progress_steps.get(swap['status'], 0)
+        progress = progress_steps.get(swap["status"], 0)
 
         return {
-            'swap_id': swap_id,
-            'status': swap['status'],
-            'progress_percent': progress,
-            'xai_amount': swap['xai_amount'],
-            'other_coin': swap['other_coin'],
-            'other_amount': swap['other_amount'],
-            'estimated_completion': swap['created_at'] + 3600  # 1 hour estimate
+            "swap_id": swap_id,
+            "status": swap["status"],
+            "progress_percent": progress,
+            "xai_amount": swap["xai_amount"],
+            "other_coin": swap["other_coin"],
+            "other_amount": swap["other_amount"],
+            "estimated_completion": swap["created_at"] + 3600,  # 1 hour estimate
         }
 
     def get_supported_coins(self) -> List[str]:
         """Get list of supported coins for swaps"""
-        return ['BTC', 'ETH', 'LTC', 'DOGE', 'XMR', 'BCH',
-                'USDT', 'ZEC', 'DASH', 'USDC', 'DAI']
+        return ["BTC", "ETH", "LTC", "DOGE", "XMR", "BCH", "USDT", "ZEC", "DASH", "USDC", "DAI"]
 
     def get_current_prices(self) -> Dict:
         """
@@ -521,24 +543,24 @@ class SimpleSwapGUI:
         xai_price_usd = self.orderbook.price_tracker.get_xai_price_usd()
 
         for coin in self.get_supported_coins():
-            if coin in ['USDT', 'USDC', 'DAI']:
+            if coin in ["USDT", "USDC", "DAI"]:
                 # Stablecoins
                 prices[coin] = {
-                    'price_usd': 1.0,
-                    'xai_per_unit': 1.0 / xai_price_usd if xai_price_usd > 0 else 0
+                    "price_usd": 1.0,
+                    "xai_per_unit": 1.0 / xai_price_usd if xai_price_usd > 0 else 0,
                 }
             else:
                 # Crypto
                 coin_price = self.orderbook.price_tracker.get_market_price(coin)
                 if coin_price:
                     prices[coin] = {
-                        'price_usd': coin_price,
-                        'xai_per_unit': coin_price / xai_price_usd if xai_price_usd > 0 else 0
+                        "price_usd": coin_price,
+                        "xai_per_unit": coin_price / xai_price_usd if xai_price_usd > 0 else 0,
                     }
 
-        prices['XAI'] = {
-            'price_usd': xai_price_usd,
-            'floor_usd': self.price_floor.get_current_floor()
+        prices["XAI"] = {
+            "price_usd": xai_price_usd,
+            "floor_usd": self.price_floor.get_current_floor(),
         }
 
         return prices
@@ -557,10 +579,7 @@ if __name__ == "__main__":
     blockchain = MockBlockchain()
 
     # Create GUI instance
-    gui = SimpleSwapGUI(
-        blockchain=blockchain,
-        wallet_address="xai_1a2b3c4d5e6f"
-    )
+    gui = SimpleSwapGUI(blockchain=blockchain, wallet_address="xai_1a2b3c4d5e6f")
 
     print("\nSupported Coins:")
     print("-" * 70)
@@ -570,16 +589,13 @@ if __name__ == "__main__":
     print("\n\nExample: Swapping 1000 XAI for USDT")
     print("-" * 70)
 
-    result = gui.swap_xai_for_coin(
-        xai_amount=1000,
-        target_coin='USDT'
-    )
+    result = gui.swap_xai_for_coin(xai_amount=1000, target_coin="USDT")
 
     print(f"Status: {result.get('status')}")
     print(f"Message: {result.get('message')}")
 
-    if 'swap_id' in result:
+    if "swap_id" in result:
         print(f"\nSwap Progress:")
-        progress = gui.get_swap_progress(result['swap_id'])
+        progress = gui.get_swap_progress(result["swap_id"])
         print(f"  Progress: {progress['progress_percent']}%")
         print(f"  Status: {progress['status']}")

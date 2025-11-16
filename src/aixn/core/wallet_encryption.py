@@ -45,10 +45,10 @@ class WalletEncryption:
             length=WalletEncryption.KEY_SIZE,
             salt=salt,
             iterations=WalletEncryption.PBKDF2_ITERATIONS,
-            backend=default_backend()
+            backend=default_backend(),
         )
 
-        key = kdf.derive(password.encode('utf-8'))
+        key = kdf.derive(password.encode("utf-8"))
         return base64.urlsafe_b64encode(key)
 
     @staticmethod
@@ -66,7 +66,7 @@ class WalletEncryption:
         if not password or len(password) < 8:
             raise ValueError("Password must be at least 8 characters")
 
-        if 'private_key' not in wallet_data:
+        if "private_key" not in wallet_data:
             raise ValueError("Wallet data must contain 'private_key'")
 
         # Generate random salt
@@ -77,21 +77,21 @@ class WalletEncryption:
 
         # Encrypt private key
         fernet = Fernet(encryption_key)
-        encrypted_pk = fernet.encrypt(wallet_data['private_key'].encode('utf-8'))
+        encrypted_pk = fernet.encrypt(wallet_data["private_key"].encode("utf-8"))
 
         # Return encrypted wallet (ANONYMOUS - no password stored!)
         encrypted_wallet = {
-            'address': wallet_data['address'],
-            'public_key': wallet_data['public_key'],
-            'encrypted_private_key': base64.b64encode(encrypted_pk).decode('utf-8'),
-            'salt': base64.b64encode(salt).decode('utf-8'),
-            'encryption_version': '1.0',
-            'encrypted': True,
-            'note': 'Password required to access private key'
+            "address": wallet_data["address"],
+            "public_key": wallet_data["public_key"],
+            "encrypted_private_key": base64.b64encode(encrypted_pk).decode("utf-8"),
+            "salt": base64.b64encode(salt).decode("utf-8"),
+            "encryption_version": "1.0",
+            "encrypted": True,
+            "note": "Password required to access private key",
         }
 
         # Include optional fields
-        for key in ['initial_balance', 'time_capsule_eligible', 'tier']:
+        for key in ["initial_balance", "time_capsule_eligible", "tier"]:
             if key in wallet_data:
                 encrypted_wallet[key] = wallet_data[key]
 
@@ -112,18 +112,18 @@ class WalletEncryption:
         Raises:
             ValueError: If password is incorrect or wallet is not encrypted
         """
-        if not encrypted_wallet.get('encrypted'):
+        if not encrypted_wallet.get("encrypted"):
             raise ValueError("Wallet is not encrypted")
 
-        if 'encrypted_private_key' not in encrypted_wallet:
+        if "encrypted_private_key" not in encrypted_wallet:
             raise ValueError("Missing encrypted private key")
 
-        if 'salt' not in encrypted_wallet:
+        if "salt" not in encrypted_wallet:
             raise ValueError("Missing encryption salt")
 
         # Decode salt and encrypted private key
-        salt = base64.b64decode(encrypted_wallet['salt'])
-        encrypted_pk = base64.b64decode(encrypted_wallet['encrypted_private_key'])
+        salt = base64.b64decode(encrypted_wallet["salt"])
+        encrypted_pk = base64.b64decode(encrypted_wallet["encrypted_private_key"])
 
         # Derive decryption key from password
         decryption_key = WalletEncryption._derive_key(password, salt)
@@ -131,20 +131,20 @@ class WalletEncryption:
         # Decrypt private key
         try:
             fernet = Fernet(decryption_key)
-            decrypted_pk = fernet.decrypt(encrypted_pk).decode('utf-8')
+            decrypted_pk = fernet.decrypt(encrypted_pk).decode("utf-8")
         except InvalidToken:
             raise ValueError("Incorrect password")
 
         # Return decrypted wallet
         decrypted_wallet = {
-            'address': encrypted_wallet['address'],
-            'public_key': encrypted_wallet['public_key'],
-            'private_key': decrypted_pk,
-            'encrypted': False
+            "address": encrypted_wallet["address"],
+            "public_key": encrypted_wallet["public_key"],
+            "private_key": decrypted_pk,
+            "encrypted": False,
         }
 
         # Include optional fields
-        for key in ['initial_balance', 'time_capsule_eligible', 'tier']:
+        for key in ["initial_balance", "time_capsule_eligible", "tier"]:
             if key in encrypted_wallet:
                 decrypted_wallet[key] = encrypted_wallet[key]
 
@@ -180,7 +180,7 @@ class WalletEncryption:
         Returns:
             bool: True if encrypted
         """
-        return wallet_data.get('encrypted', False)
+        return wallet_data.get("encrypted", False)
 
 
 def save_encrypted_wallet(wallet_data: dict, password: str, filename: str):
@@ -194,7 +194,7 @@ def save_encrypted_wallet(wallet_data: dict, password: str, filename: str):
     """
     encrypted = WalletEncryption.encrypt_wallet(wallet_data, password)
 
-    with open(filename, 'w') as f:
+    with open(filename, "w") as f:
         json.dump(encrypted, f, indent=2)
 
 
@@ -209,7 +209,7 @@ def load_encrypted_wallet(filename: str, password: str) -> dict:
     Returns:
         dict: Decrypted wallet data
     """
-    with open(filename, 'r') as f:
+    with open(filename, "r") as f:
         encrypted = json.load(f)
 
     return WalletEncryption.decrypt_wallet(encrypted, password)

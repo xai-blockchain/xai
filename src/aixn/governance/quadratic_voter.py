@@ -1,6 +1,7 @@
 import math
 from typing import Dict, Any
 
+
 class QuadraticVoter:
     def __init__(self):
         # Stores voter balances: {voter_address: balance}
@@ -25,7 +26,7 @@ class QuadraticVoter:
         """
         if not isinstance(num_votes, int) or num_votes < 0:
             raise ValueError("Number of votes must be a non-negative integer.")
-        return float(num_votes ** 2)
+        return float(num_votes**2)
 
     def calculate_effective_votes(self, tokens_spent: float) -> float:
         """
@@ -43,18 +44,23 @@ class QuadraticVoter:
         """
         if not voter_address in self.balances:
             raise ValueError(f"Voter {voter_address} has no balance set.")
-        
+
         cost = self.calculate_vote_cost(num_votes)
         current_balance = self.balances[voter_address]
 
         if current_balance < cost:
-            raise ValueError(f"Voter {voter_address} has insufficient balance ({current_balance:.2f}) to cast {num_votes} votes (cost: {cost:.2f}).")
-        
+            raise ValueError(
+                f"Voter {voter_address} has insufficient balance ({current_balance:.2f}) to cast {num_votes} votes (cost: {cost:.2f})."
+            )
+
         self.balances[voter_address] -= cost
         effective_votes = self.calculate_effective_votes(cost)
-        
-        print(f"Voter {voter_address} cast {num_votes} votes (cost: {cost:.2f} tokens). Effective votes: {effective_votes:.2f}. Remaining balance: {self.balances[voter_address]:.2f}")
+
+        print(
+            f"Voter {voter_address} cast {num_votes} votes (cost: {cost:.2f} tokens). Effective votes: {effective_votes:.2f}. Remaining balance: {self.balances[voter_address]:.2f}"
+        )
         return effective_votes
+
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
@@ -63,17 +69,21 @@ if __name__ == "__main__":
     whale_address = "0xWhale"
     normal_user_address = "0xNormalUser"
 
-    voter_manager.set_balance(whale_address, 10000.0) # Whale has 10,000 tokens
-    voter_manager.set_balance(normal_user_address, 100.0) # Normal user has 100 tokens
+    voter_manager.set_balance(whale_address, 10000.0)  # Whale has 10,000 tokens
+    voter_manager.set_balance(normal_user_address, 100.0)  # Normal user has 100 tokens
 
     print("\n--- Whale Voting ---")
     try:
         # Whale casts 10 votes
-        whale_effective_votes_1 = voter_manager.cast_votes(whale_address, 10) # Cost: 10^2 = 100 tokens
+        whale_effective_votes_1 = voter_manager.cast_votes(
+            whale_address, 10
+        )  # Cost: 10^2 = 100 tokens
         print(f"Whale effective votes (10 votes): {whale_effective_votes_1:.2f}")
 
         # Whale casts another 50 votes
-        whale_effective_votes_2 = voter_manager.cast_votes(whale_address, 50) # Cost: 50^2 = 2500 tokens
+        whale_effective_votes_2 = voter_manager.cast_votes(
+            whale_address, 50
+        )  # Cost: 50^2 = 2500 tokens
         print(f"Whale effective votes (50 votes): {whale_effective_votes_2:.2f}")
 
         # Whale tries to cast 100 votes (cost 10000)
@@ -90,11 +100,15 @@ if __name__ == "__main__":
     print("\n--- Normal User Voting ---")
     try:
         # Normal user casts 5 votes
-        user_effective_votes_1 = voter_manager.cast_votes(normal_user_address, 5) # Cost: 5^2 = 25 tokens
+        user_effective_votes_1 = voter_manager.cast_votes(
+            normal_user_address, 5
+        )  # Cost: 5^2 = 25 tokens
         print(f"Normal user effective votes (5 votes): {user_effective_votes_1:.2f}")
 
         # Normal user casts another 8 votes
-        user_effective_votes_2 = voter_manager.cast_votes(normal_user_address, 8) # Cost: 8^2 = 64 tokens
+        user_effective_votes_2 = voter_manager.cast_votes(
+            normal_user_address, 8
+        )  # Cost: 8^2 = 64 tokens
         print(f"Normal user effective votes (8 votes): {user_effective_votes_2:.2f}")
 
         # Normal user tries to cast 10 votes (cost 100)

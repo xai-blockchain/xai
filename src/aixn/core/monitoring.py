@@ -21,6 +21,7 @@ from enum import Enum
 
 class MetricType(Enum):
     """Metric types"""
+
     COUNTER = "counter"
     GAUGE = "gauge"
     HISTOGRAM = "histogram"
@@ -29,6 +30,7 @@ class MetricType(Enum):
 
 class AlertLevel(Enum):
     """Alert severity levels"""
+
     INFO = "info"
     WARNING = "warning"
     CRITICAL = "critical"
@@ -37,8 +39,9 @@ class AlertLevel(Enum):
 class Metric:
     """Base metric class"""
 
-    def __init__(self, name: str, description: str, metric_type: MetricType,
-                 labels: Dict[str, str] = None):
+    def __init__(
+        self, name: str, description: str, metric_type: MetricType, labels: Dict[str, str] = None
+    ):
         """
         Initialize metric
 
@@ -57,15 +60,15 @@ class Metric:
 
     def to_prometheus(self) -> str:
         """Convert metric to Prometheus format"""
-        label_str = ','.join([f'{k}="{v}"' for k, v in self.labels.items()])
-        label_part = f'{{{label_str}}}' if label_str else ''
+        label_str = ",".join([f'{k}="{v}"' for k, v in self.labels.items()])
+        label_part = f"{{{label_str}}}" if label_str else ""
 
         lines = [
-            f'# HELP {self.name} {self.description}',
-            f'# TYPE {self.name} {self.metric_type.value}',
-            f'{self.name}{label_part} {self.value}'
+            f"# HELP {self.name} {self.description}",
+            f"# TYPE {self.name} {self.metric_type.value}",
+            f"{self.name}{label_part} {self.value}",
         ]
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
 
 class Counter(Metric):
@@ -110,8 +113,13 @@ class Gauge(Metric):
 class Histogram(Metric):
     """Histogram metric - tracks distribution of values"""
 
-    def __init__(self, name: str, description: str,
-                 buckets: List[float] = None, labels: Dict[str, str] = None):
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        buckets: List[float] = None,
+        labels: Dict[str, str] = None,
+    ):
         super().__init__(name, description, MetricType.HISTOGRAM, labels)
         self.buckets = buckets or [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
         self.bucket_counts = defaultdict(int)
@@ -131,41 +139,44 @@ class Histogram(Metric):
 
     def to_prometheus(self) -> str:
         """Convert histogram to Prometheus format"""
-        label_str = ','.join([f'{k}="{v}"' for k, v in self.labels.items()])
-        base_labels = f'{{{label_str}}}' if label_str else ''
+        label_str = ",".join([f'{k}="{v}"' for k, v in self.labels.items()])
+        base_labels = f"{{{label_str}}}" if label_str else ""
 
-        lines = [
-            f'# HELP {self.name} {self.description}',
-            f'# TYPE {self.name} histogram'
-        ]
+        lines = [f"# HELP {self.name} {self.description}", f"# TYPE {self.name} histogram"]
 
         # Bucket counts
         for bucket in sorted(self.buckets):
             count = self.bucket_counts.get(bucket, 0)
             bucket_labels = f'le="{bucket}"'
             if label_str:
-                bucket_labels = f'{label_str},{bucket_labels}'
-            lines.append(f'{self.name}_bucket{{{bucket_labels}}} {count}')
+                bucket_labels = f"{label_str},{bucket_labels}"
+            lines.append(f"{self.name}_bucket{{{bucket_labels}}} {count}")
 
         # +Inf bucket
         inf_labels = f'le="+Inf"'
         if label_str:
-            inf_labels = f'{label_str},{inf_labels}'
-        lines.append(f'{self.name}_bucket{{{inf_labels}}} {self.count}')
+            inf_labels = f"{label_str},{inf_labels}"
+        lines.append(f"{self.name}_bucket{{{inf_labels}}} {self.count}")
 
         # Sum and count
-        lines.append(f'{self.name}_sum{base_labels} {self.sum}')
-        lines.append(f'{self.name}_count{base_labels} {self.count}')
+        lines.append(f"{self.name}_sum{base_labels} {self.sum}")
+        lines.append(f"{self.name}_count{base_labels} {self.count}")
 
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
 
 class Alert:
     """Alert representation"""
 
-    def __init__(self, name: str, message: str, level: AlertLevel,
-                 metric_name: str = None, threshold: float = None,
-                 current_value: float = None):
+    def __init__(
+        self,
+        name: str,
+        message: str,
+        level: AlertLevel,
+        metric_name: str = None,
+        threshold: float = None,
+        current_value: float = None,
+    ):
         """
         Initialize alert
 
@@ -189,14 +200,14 @@ class Alert:
     def to_dict(self) -> Dict[str, Any]:
         """Convert alert to dictionary"""
         return {
-            'name': self.name,
-            'message': self.message,
-            'level': self.level.value,
-            'metric_name': self.metric_name,
-            'threshold': self.threshold,
-            'current_value': self.current_value,
-            'timestamp': self.timestamp.isoformat(),
-            'active': self.active
+            "name": self.name,
+            "message": self.message,
+            "level": self.level.value,
+            "metric_name": self.metric_name,
+            "threshold": self.threshold,
+            "current_value": self.current_value,
+            "timestamp": self.timestamp.isoformat(),
+            "active": self.active,
         }
 
 
@@ -246,145 +257,85 @@ class MetricsCollector:
         """Initialize all metrics"""
 
         # Blockchain metrics
+        self.register_counter("xai_blocks_mined_total", "Total number of blocks mined")
         self.register_counter(
-            'xai_blocks_mined_total',
-            'Total number of blocks mined'
+            "xai_transactions_processed_total", "Total number of transactions processed"
         )
-        self.register_counter(
-            'xai_transactions_processed_total',
-            'Total number of transactions processed'
-        )
-        self.register_gauge(
-            'xai_chain_height',
-            'Current blockchain height'
-        )
-        self.register_gauge(
-            'xai_difficulty',
-            'Current mining difficulty'
-        )
-        self.register_gauge(
-            'xai_pending_transactions',
-            'Number of pending transactions in mempool'
-        )
-        self.register_gauge(
-            'xai_total_supply',
-            'Total XAI in circulation'
-        )
+        self.register_gauge("xai_chain_height", "Current blockchain height")
+        self.register_gauge("xai_difficulty", "Current mining difficulty")
+        self.register_gauge("xai_pending_transactions", "Number of pending transactions in mempool")
+        self.register_gauge("xai_total_supply", "Total XAI in circulation")
 
         # Network metrics
-        self.register_gauge(
-            'xai_peers_connected',
-            'Number of connected peers'
-        )
-        self.register_counter(
-            'xai_p2p_messages_received_total',
-            'Total P2P messages received'
-        )
-        self.register_counter(
-            'xai_p2p_messages_sent_total',
-            'Total P2P messages sent'
-        )
-        self.register_counter(
-            'xai_blocks_received_total',
-            'Total blocks received from network'
-        )
-        self.register_counter(
-            'xai_blocks_propagated_total',
-            'Total blocks propagated to network'
-        )
+        self.register_gauge("xai_peers_connected", "Number of connected peers")
+        self.register_counter("xai_p2p_messages_received_total", "Total P2P messages received")
+        self.register_counter("xai_p2p_messages_sent_total", "Total P2P messages sent")
+        self.register_counter("xai_blocks_received_total", "Total blocks received from network")
+        self.register_counter("xai_blocks_propagated_total", "Total blocks propagated to network")
 
         # Performance metrics
         self.register_histogram(
-            'xai_block_mining_duration_seconds',
-            'Time taken to mine a block',
-            buckets=[1, 5, 10, 30, 60, 120, 300, 600]
+            "xai_block_mining_duration_seconds",
+            "Time taken to mine a block",
+            buckets=[1, 5, 10, 30, 60, 120, 300, 600],
         )
         self.register_histogram(
-            'xai_block_propagation_duration_seconds',
-            'Time taken for block to propagate',
-            buckets=[0.1, 0.5, 1, 2, 5, 10]
+            "xai_block_propagation_duration_seconds",
+            "Time taken for block to propagate",
+            buckets=[0.1, 0.5, 1, 2, 5, 10],
         )
         self.register_histogram(
-            'xai_transaction_validation_duration_seconds',
-            'Time taken to validate a transaction',
-            buckets=[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0]
+            "xai_transaction_validation_duration_seconds",
+            "Time taken to validate a transaction",
+            buckets=[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0],
         )
-        self.register_gauge(
-            'xai_mempool_size_bytes',
-            'Size of transaction mempool in bytes'
-        )
+        self.register_gauge("xai_mempool_size_bytes", "Size of transaction mempool in bytes")
 
         # System metrics
-        self.register_gauge(
-            'xai_node_cpu_usage_percent',
-            'Node CPU usage percentage'
-        )
-        self.register_gauge(
-            'xai_node_memory_usage_bytes',
-            'Node memory usage in bytes'
-        )
-        self.register_gauge(
-            'xai_node_memory_usage_percent',
-            'Node memory usage percentage'
-        )
-        self.register_gauge(
-            'xai_node_disk_usage_bytes',
-            'Node disk usage in bytes'
-        )
-        self.register_gauge(
-            'xai_node_uptime_seconds',
-            'Node uptime in seconds'
-        )
+        self.register_gauge("xai_node_cpu_usage_percent", "Node CPU usage percentage")
+        self.register_gauge("xai_node_memory_usage_bytes", "Node memory usage in bytes")
+        self.register_gauge("xai_node_memory_usage_percent", "Node memory usage percentage")
+        self.register_gauge("xai_node_disk_usage_bytes", "Node disk usage in bytes")
+        self.register_gauge("xai_node_uptime_seconds", "Node uptime in seconds")
 
         # API metrics
-        self.register_counter(
-            'xai_api_requests_total',
-            'Total API requests received'
-        )
-        self.register_counter(
-            'xai_api_errors_total',
-            'Total API errors'
-        )
+        self.register_counter("xai_api_requests_total", "Total API requests received")
+        self.register_counter("xai_api_errors_total", "Total API errors")
         self.register_histogram(
-            'xai_api_request_duration_seconds',
-            'API request duration',
-            buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 5.0]
+            "xai_api_request_duration_seconds",
+            "API request duration",
+            buckets=[0.01, 0.05, 0.1, 0.5, 1.0, 5.0],
         )
 
         # Consensus metrics
-        self.register_counter(
-            'xai_consensus_forks_total',
-            'Total number of chain forks detected'
-        )
-        self.register_counter(
-            'xai_consensus_reorgs_total',
-            'Total number of chain reorganizations'
-        )
-        self.register_gauge(
-            'xai_consensus_finalized_height',
-            'Height of last finalized block'
-        )
+        self.register_counter("xai_consensus_forks_total", "Total number of chain forks detected")
+        self.register_counter("xai_consensus_reorgs_total", "Total number of chain reorganizations")
+        self.register_gauge("xai_consensus_finalized_height", "Height of last finalized block")
 
         # Start time for uptime calculation
         self.start_time = time.time()
 
-    def register_counter(self, name: str, description: str,
-                        labels: Dict[str, str] = None) -> Counter:
+    def register_counter(
+        self, name: str, description: str, labels: Dict[str, str] = None
+    ) -> Counter:
         """Register a counter metric"""
         counter = Counter(name, description, labels)
         self.metrics[name] = counter
         return counter
 
-    def register_gauge(self, name: str, description: str,
-                      labels: Dict[str, str] = None) -> Gauge:
+    def register_gauge(self, name: str, description: str, labels: Dict[str, str] = None) -> Gauge:
         """Register a gauge metric"""
         gauge = Gauge(name, description, labels)
         self.metrics[name] = gauge
         return gauge
 
-    def register_histogram(self, name: str, description: str,
-                          buckets: List[float] = None,
-                          labels: Dict[str, str] = None) -> Histogram:
+    def register_histogram(
+        self,
+        name: str,
+        description: str,
+        buckets: List[float] = None,
+        labels: Dict[str, str] = None,
+    ) -> Histogram:
         """Register a histogram metric"""
         histogram = Histogram(name, description, buckets, labels)
         self.metrics[name] = histogram
@@ -411,20 +362,20 @@ class MetricsCollector:
         try:
             # CPU usage
             cpu_percent = psutil.cpu_percent(interval=1)
-            self.get_metric('xai_node_cpu_usage_percent').set(cpu_percent)
+            self.get_metric("xai_node_cpu_usage_percent").set(cpu_percent)
 
             # Memory usage
             memory = psutil.virtual_memory()
-            self.get_metric('xai_node_memory_usage_bytes').set(memory.used)
-            self.get_metric('xai_node_memory_usage_percent').set(memory.percent)
+            self.get_metric("xai_node_memory_usage_bytes").set(memory.used)
+            self.get_metric("xai_node_memory_usage_percent").set(memory.percent)
 
             # Disk usage
-            disk = psutil.disk_usage('/')
-            self.get_metric('xai_node_disk_usage_bytes').set(disk.used)
+            disk = psutil.disk_usage("/")
+            self.get_metric("xai_node_disk_usage_bytes").set(disk.used)
 
             # Uptime
             uptime = time.time() - self.start_time
-            self.get_metric('xai_node_uptime_seconds').set(uptime)
+            self.get_metric("xai_node_uptime_seconds").set(uptime)
 
         except Exception as e:
             print(f"Error updating system metrics: {e}")
@@ -434,65 +385,70 @@ class MetricsCollector:
         try:
             # Chain height
             chain_height = len(self.blockchain.chain)
-            self.get_metric('xai_chain_height').set(chain_height)
+            self.get_metric("xai_chain_height").set(chain_height)
 
             # Difficulty
-            self.get_metric('xai_difficulty').set(self.blockchain.difficulty)
+            self.get_metric("xai_difficulty").set(self.blockchain.difficulty)
 
             # Pending transactions
             pending = len(self.blockchain.pending_transactions)
-            self.get_metric('xai_pending_transactions').set(pending)
+            self.get_metric("xai_pending_transactions").set(pending)
 
             # Total supply
-            total_supply = self.blockchain.get_total_circulating_supply() if hasattr(self.blockchain, 'get_total_circulating_supply') else 0
-            self.get_metric('xai_total_supply').set(total_supply)
+            total_supply = (
+                self.blockchain.get_total_circulating_supply()
+                if hasattr(self.blockchain, "get_total_circulating_supply")
+                else 0
+            )
+            self.get_metric("xai_total_supply").set(total_supply)
 
         except Exception as e:
             print(f"Error updating blockchain metrics: {e}")
 
     def record_block_mined(self, block_index: int, mining_time: float = None):
         """Record block mining event"""
-        self.get_metric('xai_blocks_mined_total').inc()
-        self.get_metric('xai_chain_height').set(block_index)
+        self.get_metric("xai_blocks_mined_total").inc()
+        self.get_metric("xai_chain_height").set(block_index)
 
         if mining_time:
-            self.get_metric('xai_block_mining_duration_seconds').observe(mining_time)
+            self.get_metric("xai_block_mining_duration_seconds").observe(mining_time)
             self.block_times.append(mining_time)
 
     def record_transaction_processed(self, processing_time: float = None):
         """Record transaction processing"""
-        self.get_metric('xai_transactions_processed_total').inc()
+        self.get_metric("xai_transactions_processed_total").inc()
 
         if processing_time:
-            self.get_metric('xai_transaction_validation_duration_seconds').observe(processing_time)
+            self.get_metric("xai_transaction_validation_duration_seconds").observe(processing_time)
             self.tx_processing_times.append(processing_time)
 
     def record_peer_connected(self, peer_count: int):
         """Record peer connection"""
-        self.get_metric('xai_peers_connected').set(peer_count)
+        self.get_metric("xai_peers_connected").set(peer_count)
 
     def record_p2p_message(self, direction: str):
         """Record P2P message sent or received"""
-        if direction == 'sent':
-            self.get_metric('xai_p2p_messages_sent_total').inc()
+        if direction == "sent":
+            self.get_metric("xai_p2p_messages_sent_total").inc()
         else:
-            self.get_metric('xai_p2p_messages_received_total').inc()
+            self.get_metric("xai_p2p_messages_received_total").inc()
 
     def record_block_propagation(self, propagation_time: float):
         """Record block propagation time"""
-        self.get_metric('xai_block_propagation_duration_seconds').observe(propagation_time)
-        self.get_metric('xai_blocks_propagated_total').inc()
+        self.get_metric("xai_block_propagation_duration_seconds").observe(propagation_time)
+        self.get_metric("xai_blocks_propagated_total").inc()
 
     def record_api_request(self, endpoint: str, duration: float, error: bool = False):
         """Record API request"""
-        self.get_metric('xai_api_requests_total').inc()
-        self.get_metric('xai_api_request_duration_seconds').observe(duration)
+        self.get_metric("xai_api_requests_total").inc()
+        self.get_metric("xai_api_request_duration_seconds").observe(duration)
 
         if error:
-            self.get_metric('xai_api_errors_total').inc()
+            self.get_metric("xai_api_errors_total").inc()
 
-    def add_alert_rule(self, name: str, condition: Callable[[], bool],
-                      message: str, level: AlertLevel):
+    def add_alert_rule(
+        self, name: str, condition: Callable[[], bool], message: str, level: AlertLevel
+    ):
         """
         Add alert rule
 
@@ -502,23 +458,16 @@ class MetricsCollector:
             message: Alert message
             level: Alert severity level
         """
-        self.alert_rules.append({
-            'name': name,
-            'condition': condition,
-            'message': message,
-            'level': level
-        })
+        self.alert_rules.append(
+            {"name": name, "condition": condition, "message": message, "level": level}
+        )
 
     def _check_alert_rules(self):
         """Check all alert rules and fire alerts if needed"""
         for rule in self.alert_rules:
             try:
-                if rule['condition']():
-                    self._fire_alert(
-                        rule['name'],
-                        rule['message'],
-                        rule['level']
-                    )
+                if rule["condition"]():
+                    self._fire_alert(rule["name"], rule["message"], rule["level"])
             except Exception as e:
                 print(f"Error checking alert rule {rule['name']}: {e}")
 
@@ -529,7 +478,7 @@ class MetricsCollector:
 
         # Keep only recent alerts
         if len(self.alerts) > self.max_alerts:
-            self.alerts = self.alerts[-self.max_alerts:]
+            self.alerts = self.alerts[-self.max_alerts :]
 
         # Log alert
         print(f"[ALERT {level.value.upper()}] {name}: {message}")
@@ -554,9 +503,9 @@ class MetricsCollector:
         output = []
         for metric in self.metrics.values():
             output.append(metric.to_prometheus())
-            output.append('')  # Empty line between metrics
+            output.append("")  # Empty line between metrics
 
-        return '\n'.join(output)
+        return "\n".join(output)
 
     def get_health_status(self) -> Dict[str, Any]:
         """
@@ -566,78 +515,79 @@ class MetricsCollector:
             Health status dictionary
         """
         status = {
-            'status': 'healthy',
-            'timestamp': datetime.utcnow().isoformat(),
-            'uptime_seconds': time.time() - self.start_time,
-            'checks': {}
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "uptime_seconds": time.time() - self.start_time,
+            "checks": {},
         }
 
         # Check system resources
-        cpu_percent = self.get_metric('xai_node_cpu_usage_percent').value
-        memory_percent = self.get_metric('xai_node_memory_usage_percent').value
+        cpu_percent = self.get_metric("xai_node_cpu_usage_percent").value
+        memory_percent = self.get_metric("xai_node_memory_usage_percent").value
 
-        status['checks']['cpu'] = {
-            'status': 'healthy' if cpu_percent < 90 else 'degraded',
-            'usage_percent': cpu_percent
+        status["checks"]["cpu"] = {
+            "status": "healthy" if cpu_percent < 90 else "degraded",
+            "usage_percent": cpu_percent,
         }
 
-        status['checks']['memory'] = {
-            'status': 'healthy' if memory_percent < 90 else 'degraded',
-            'usage_percent': memory_percent
+        status["checks"]["memory"] = {
+            "status": "healthy" if memory_percent < 90 else "degraded",
+            "usage_percent": memory_percent,
         }
 
         # Check blockchain
         if self.blockchain:
-            pending = self.get_metric('xai_pending_transactions').value
-            status['checks']['mempool'] = {
-                'status': 'healthy' if pending < 10000 else 'degraded',
-                'pending_transactions': pending
+            pending = self.get_metric("xai_pending_transactions").value
+            status["checks"]["mempool"] = {
+                "status": "healthy" if pending < 10000 else "degraded",
+                "pending_transactions": pending,
             }
 
-            chain_height = self.get_metric('xai_chain_height').value
-            status['checks']['blockchain'] = {
-                'status': 'healthy',
-                'chain_height': chain_height
-            }
+            chain_height = self.get_metric("xai_chain_height").value
+            status["checks"]["blockchain"] = {"status": "healthy", "chain_height": chain_height}
 
         # Overall status
-        if any(check['status'] == 'degraded' for check in status['checks'].values()):
-            status['status'] = 'degraded'
+        if any(check["status"] == "degraded" for check in status["checks"].values()):
+            status["status"] = "degraded"
 
         # Add active alerts
         active_alerts = self.get_active_alerts()
         if active_alerts:
-            status['alerts'] = active_alerts
-            if any(alert['level'] == 'critical' for alert in active_alerts):
-                status['status'] = 'unhealthy'
+            status["alerts"] = active_alerts
+            if any(alert["level"] == "critical" for alert in active_alerts):
+                status["status"] = "unhealthy"
 
         return status
 
     def get_stats(self) -> Dict[str, Any]:
         """Get monitoring statistics"""
         stats = {
-            'metrics_count': len(self.metrics),
-            'alerts_count': len([a for a in self.alerts if a.active]),
-            'uptime_seconds': time.time() - self.start_time
+            "metrics_count": len(self.metrics),
+            "alerts_count": len([a for a in self.alerts if a.active]),
+            "uptime_seconds": time.time() - self.start_time,
         }
 
         # Add metric values
-        stats['metrics'] = {}
+        stats["metrics"] = {}
         for name, metric in self.metrics.items():
             if isinstance(metric, (Counter, Gauge)):
-                stats['metrics'][name] = metric.value
+                stats["metrics"][name] = metric.value
             elif isinstance(metric, Histogram):
-                stats['metrics'][name] = {
-                    'count': metric.count,
-                    'sum': metric.sum,
-                    'avg': metric.sum / metric.count if metric.count > 0 else 0
+                stats["metrics"][name] = {
+                    "count": metric.count,
+                    "sum": metric.sum,
+                    "avg": metric.sum / metric.count if metric.count > 0 else 0,
                 }
 
         # Performance stats
         if self.block_times:
-            stats['performance'] = {
-                'avg_block_time': sum(self.block_times) / len(self.block_times),
-                'avg_tx_processing_time': sum(self.tx_processing_times) / len(self.tx_processing_times) if self.tx_processing_times else 0
+            stats["performance"] = {
+                "avg_block_time": sum(self.block_times) / len(self.block_times),
+                "avg_tx_processing_time": (
+                    sum(self.tx_processing_times) / len(self.tx_processing_times)
+                    if self.tx_processing_times
+                    else 0
+                ),
             }
 
         return stats
@@ -668,20 +618,18 @@ if __name__ == "__main__":
 
     # Add alert rule
     def high_cpu_check():
-        cpu = collector.get_metric('xai_node_cpu_usage_percent').value
+        cpu = collector.get_metric("xai_node_cpu_usage_percent").value
         return cpu > 80
 
     collector.add_alert_rule(
-        'high_cpu',
-        high_cpu_check,
-        'CPU usage is above 80%',
-        AlertLevel.WARNING
+        "high_cpu", high_cpu_check, "CPU usage is above 80%", AlertLevel.WARNING
     )
 
     # Get health status
     print("\nHealth Status:")
     health = collector.get_health_status()
     import json
+
     print(json.dumps(health, indent=2))
 
     # Export Prometheus metrics

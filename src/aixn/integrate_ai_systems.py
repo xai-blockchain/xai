@@ -26,6 +26,7 @@ print("\n📦 Step 1: Importing core blockchain components...")
 try:
     from src.aixn.core.node import BlockchainNode
     from src.aixn.core.blockchain import Blockchain
+
     print("✅ Core blockchain loaded")
 except ImportError as e:
     print(f"❌ Error loading blockchain: {e}")
@@ -38,6 +39,7 @@ try:
     from src.aixn.core.ai_node_operator_questioning import AINodeOperatorQuestioning
     from src.aixn.core.multi_ai_collaboration import MultiAICollaboration
     from src.aixn.core.ai_task_matcher import AITaskMatcher
+
     print("✅ Governance AI components loaded")
 except ImportError as e:
     print(f"❌ Error loading governance AI: {e}")
@@ -46,6 +48,7 @@ except ImportError as e:
 print("\n📦 Step 3: Importing Personal AI components...")
 try:
     from src.aixn.ai.ai_assistant.personal_ai_assistant import PersonalAIAssistant
+
     print("✅ Personal AI components loaded")
 except ImportError as e:
     print(f"❌ Error loading Personal AI: {e}")
@@ -54,6 +57,7 @@ except ImportError as e:
 print("\n📦 Step 4: Importing API extensions...")
 try:
     from src.aixn.core.api_extensions import extend_node_api
+
     print("✅ API extensions loaded")
 except ImportError as e:
     print(f"⚠️  Warning: API extensions not available: {e}")
@@ -62,6 +66,7 @@ except ImportError as e:
 print("\n📦 Step 5: Importing AI Trading Bot...")
 try:
     from src.aixn.core.ai_trading_bot import AITradingBot, TradingStrategy, STRATEGY_TEMPLATES
+
     print("✅ AI Trading Bot loaded")
 except ImportError as e:
     print(f"⚠️  Warning: AI Trading Bot not available yet: {e}")
@@ -74,8 +79,8 @@ class IntegratedXAINode:
     """
 
     DEFAULT_TRADING_MODELS = {
-        'anthropic': 'claude-opus-4',
-        'openai': 'gpt-4-turbo',
+        "anthropic": "claude-opus-4",
+        "openai": "gpt-4-turbo",
     }
 
     def __init__(self, host=None, port=None, miner_address=None):
@@ -88,8 +93,8 @@ class IntegratedXAINode:
             miner_address: Mining reward address
         """
         # Use environment variables for network configuration
-        host = host or os.getenv('XAI_HOST', '0.0.0.0')
-        port = port or int(os.getenv('XAI_PORT', '8545'))
+        host = host or os.getenv("XAI_HOST", "0.0.0.0")
+        port = port or int(os.getenv("XAI_PORT", "8545"))
         print("\n" + "=" * 80)
         print("INITIALIZING INTEGRATED XAI NODE")
         print("=" * 80)
@@ -110,8 +115,7 @@ class IntegratedXAINode:
         # 3. Initialize node operator questioning
         print("\n🔧 3. Initializing node operator questioning...")
         self.questioning = AINodeOperatorQuestioning(
-            blockchain=self.blockchain,
-            governance_dao=None  # Will integrate with DAO
+            blockchain=self.blockchain, governance_dao=None  # Will integrate with DAO
         )
         print("   ✅ AI can ask 25+ operators for guidance")
         print("   ✅ Weighted consensus voting")
@@ -126,8 +130,7 @@ class IntegratedXAINode:
         # 5. Initialize multi-AI collaboration
         print("\n🔧 5. Initializing multi-AI collaboration...")
         self.collaboration = MultiAICollaboration(
-            ai_executor=None,  # Will be set up
-            ai_matcher=self.ai_matcher
+            ai_executor=None, ai_matcher=self.ai_matcher  # Will be set up
         )
         print("   ✅ 2-3 AIs can work together")
         print("   ✅ 5 collaboration strategies")
@@ -137,6 +140,7 @@ class IntegratedXAINode:
         print("\n🔧 6. Initializing AI Safety Controls...")
         try:
             from src.aixn.core.ai_safety_controls import AISafetyControls
+
             self.safety_controls = AISafetyControls(self.blockchain)
             print("   ✅ Emergency stop system initialized")
         except Exception as e:
@@ -177,6 +181,7 @@ class IntegratedXAINode:
         print("\n🔧 10. Initializing Time Capsule system...")
         try:
             from src.aixn.core.time_capsule_api import add_time_capsule_routes
+
             self.time_capsule_manager = self.blockchain.time_capsule_manager
             add_time_capsule_routes(self.node.app, self.node)
             print("   ✅ Time Capsule system initialized")
@@ -189,6 +194,7 @@ class IntegratedXAINode:
         print("\n🔧 11. Adding AI Safety Control API...")
         try:
             from src.aixn.core.ai_safety_controls_api import add_safety_control_routes
+
             add_safety_control_routes(self.node.app, self)
             print("   ✅ Emergency stop API endpoints added")
             print("   ✅ Personal AI request cancellation")
@@ -278,11 +284,7 @@ class IntegratedXAINode:
         """
         print(f"\n📝 Governance Proposal: {proposal_data['title']}")
         # In production, integrate with governance DAO
-        return {
-            'success': True,
-            'proposal_id': f"prop_{int(time.time())}",
-            'status': 'submitted'
-        }
+        return {"success": True, "proposal_id": f"prop_{int(time.time())}", "status": "submitted"}
 
     def vote_on_proposal(self, voter_address, proposal_id, vote):
         """
@@ -300,7 +302,7 @@ class IntegratedXAINode:
             proposal_id=proposal_id,
             voter_address=voter_address,
             vote_choice=vote,
-            ai_donation_history={}  # Would fetch from donation system
+            ai_donation_history={},  # Would fetch from donation system
         )
 
     # Personal AI methods
@@ -324,7 +326,7 @@ class IntegratedXAINode:
             ai_provider=ai_provider,
             ai_model=ai_model,
             user_api_key=user_api_key,
-            swap_details=swap_details
+            swap_details=swap_details,
         )
 
     def ai_create_contract(self, user_address, ai_provider, ai_model, user_api_key, description):
@@ -346,7 +348,7 @@ class IntegratedXAINode:
             ai_provider=ai_provider,
             ai_model=ai_model,
             user_api_key=user_api_key,
-            contract_description=description
+            contract_description=description,
         )
 
     def _normalize_trading_strategy(self, strategy_input):
@@ -354,29 +356,29 @@ class IntegratedXAINode:
             return strategy_input, strategy_input.value
 
         if isinstance(strategy_input, dict):
-            name = strategy_input.get('name', 'balanced')
+            name = strategy_input.get("name", "balanced")
         elif isinstance(strategy_input, str):
             name = strategy_input
         else:
-            name = 'balanced'
+            name = "balanced"
 
         name = name.lower()
         try:
             return TradingStrategy(name), name
         except ValueError:
-            return TradingStrategy.BALANCED, 'balanced'
+            return TradingStrategy.BALANCED, "balanced"
 
     def _prepare_trading_config(self, strategy_name, strategy_input):
-        base = STRATEGY_TEMPLATES.get(strategy_name, STRATEGY_TEMPLATES.get('balanced', {})).copy()
+        base = STRATEGY_TEMPLATES.get(strategy_name, STRATEGY_TEMPLATES.get("balanced", {})).copy()
         if isinstance(strategy_input, dict):
-            overrides = {k: v for k, v in strategy_input.items() if k not in ('name', 'strategy')}
+            overrides = {k: v for k, v in strategy_input.items() if k not in ("name", "strategy")}
             base.update(overrides)
         return base
 
     def _default_trading_model(self, provider: str) -> str:
         if not provider:
-            return self.DEFAULT_TRADING_MODELS['anthropic']
-        return self.DEFAULT_TRADING_MODELS.get(provider.lower(), 'gpt-4-turbo')
+            return self.DEFAULT_TRADING_MODELS["anthropic"]
+        return self.DEFAULT_TRADING_MODELS.get(provider.lower(), "gpt-4-turbo")
 
     # AI Trading methods
 
@@ -394,7 +396,7 @@ class IntegratedXAINode:
         Returns:
             Trading bot status
         """
-        provider = ai_provider or 'anthropic'
+        provider = ai_provider or "anthropic"
         trading_strategy, strategy_name = self._normalize_trading_strategy(strategy)
         strategy_config = self._prepare_trading_config(strategy_name, strategy)
         ai_model = ai_model or self._default_trading_model(provider)
@@ -411,7 +413,7 @@ class IntegratedXAINode:
             strategy=trading_strategy,
             config=strategy_config,
             blockchain=self.blockchain,
-            personal_ai=self.personal_ai
+            personal_ai=self.personal_ai,
         )
 
         self.trading_bots[user_address] = bot
@@ -420,12 +422,12 @@ class IntegratedXAINode:
 
         start_result = bot.start()
         return {
-            'success': start_result.get('success', False),
-            'message': start_result.get('message', 'Trading bot start requested'),
-            'strategy': trading_strategy.value,
-            'ai_provider': provider,
-            'ai_model': ai_model,
-            'bot_status': start_result,
+            "success": start_result.get("success", False),
+            "message": start_result.get("message", "Trading bot start requested"),
+            "strategy": trading_strategy.value,
+            "ai_provider": provider,
+            "ai_model": ai_model,
+            "bot_status": start_result,
         }
 
 
@@ -461,7 +463,7 @@ def quick_start(port=8545, miner_address=None):
 
 
 # Main execution
-if __name__ == '__main__':
+if __name__ == "__main__":
     import time
 
     print("\n" + "=" * 80)
@@ -469,7 +471,7 @@ if __name__ == '__main__':
     print("=" * 80)
 
     # Check if running as script or being imported
-    if len(sys.argv) > 1 and sys.argv[1] == 'run':
+    if len(sys.argv) > 1 and sys.argv[1] == "run":
         # Run the node
         node = quick_start(port=8545)
         node.run()
@@ -493,12 +495,12 @@ if __name__ == '__main__':
 
         # Test imports
         components = {
-            'Base Blockchain': True,
-            'Enhanced Voting': True,
-            'Node Operator Questioning': True,
-            'Multi-AI Collaboration': True,
-            'Personal AI Assistant': True,
-            'AI Task Matcher': True,
+            "Base Blockchain": True,
+            "Enhanced Voting": True,
+            "Node Operator Questioning": True,
+            "Multi-AI Collaboration": True,
+            "Personal AI Assistant": True,
+            "AI Task Matcher": True,
         }
 
         for component, status in components.items():

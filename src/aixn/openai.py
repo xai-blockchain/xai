@@ -2,8 +2,10 @@
 Minimal openai stub for offline builds.
 """
 
+
 class OpenAIError(Exception):
     pass
+
 
 class OpenAI:
     def __init__(self, api_key: str):

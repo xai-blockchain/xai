@@ -68,7 +68,7 @@ class ReorganizationProtection:
         """Load checkpoints from disk"""
         if os.path.exists(self.checkpoint_file):
             try:
-                with open(self.checkpoint_file, 'r') as f:
+                with open(self.checkpoint_file, "r") as f:
                     data = json.load(f)
                     self.checkpoints = {int(k): v for k, v in data.items()}
             except Exception:
@@ -77,7 +77,7 @@ class ReorganizationProtection:
     def _save_checkpoints(self):
         """Save checkpoints to disk"""
         os.makedirs(os.path.dirname(self.checkpoint_file), exist_ok=True)
-        with open(self.checkpoint_file, 'w') as f:
+        with open(self.checkpoint_file, "w") as f:
             json.dump(self.checkpoints, f, indent=2)
 
     def add_checkpoint(self, block_index: int, block_hash: str):
@@ -91,7 +91,9 @@ class ReorganizationProtection:
         self.checkpoints[block_index] = block_hash
         self._save_checkpoints()
 
-    def validate_reorganization(self, current_height: int, fork_point: int) -> Tuple[bool, Optional[str]]:
+    def validate_reorganization(
+        self, current_height: int, fork_point: int
+    ) -> Tuple[bool, Optional[str]]:
         """
         Validate if reorganization is allowed
 
@@ -134,8 +136,9 @@ class SupplyValidator:
         self.last_checked_height = 0
         self.last_known_supply = 0.0
 
-    def validate_coinbase_amount(self, block_height: int, coinbase_amount: float,
-                                 expected_reward: float, total_fees: float) -> bool:
+    def validate_coinbase_amount(
+        self, block_height: int, coinbase_amount: float, expected_reward: float, total_fees: float
+    ) -> bool:
         """
         Validate coinbase transaction doesn't create excess coins
 
@@ -167,14 +170,14 @@ class SupplyValidator:
             (valid, total_supply)
         """
         # Calculate total supply from UTXO set (or numeric input for tests)
-        input_is_blockchain = hasattr(blockchain, 'utxo_set')
+        input_is_blockchain = hasattr(blockchain, "utxo_set")
         total_supply_decimal = Decimal(0)
 
         if input_is_blockchain:
             for address, utxos in blockchain.utxo_set.items():
                 for utxo in utxos:
-                    if not utxo['spent']:
-                        total_supply_decimal += Decimal(str(utxo['amount']))
+                    if not utxo["spent"]:
+                        total_supply_decimal += Decimal(str(utxo["amount"]))
         else:
             total_supply_decimal = Decimal(str(blockchain))
 
@@ -210,7 +213,7 @@ class OverflowProtection:
 
     def __init__(self):
         self.max_money = Decimal(str(BlockchainSecurityConfig.MAX_MONEY))
-        self.safe_limit = self.max_money / Decimal('100')
+        self.safe_limit = self.max_money / Decimal("100")
 
     def safe_add(self, a: float, b: float) -> Tuple[Optional[float], bool]:
         """Safely add two amounts"""
@@ -247,7 +250,7 @@ class OverflowProtection:
 
         # Check precision (max 8 decimal places)
         amount_str = f"{amount:.8f}"
-        if len(amount_str.split('.')[-1]) > 8:
+        if len(amount_str.split(".")[-1]) > 8:
             return False, "Amount has too many decimal places"
 
         return True, "Amount is valid"
@@ -321,7 +324,10 @@ class BlockSizeValidator:
         tx_size = len(tx_json.encode())
 
         if tx_size > BlockchainSecurityConfig.MAX_TRANSACTION_SIZE:
-            return False, f"Transaction too large: {tx_size} bytes (max {BlockchainSecurityConfig.MAX_TRANSACTION_SIZE})"
+            return (
+                False,
+                f"Transaction too large: {tx_size} bytes (max {BlockchainSecurityConfig.MAX_TRANSACTION_SIZE})",
+            )
 
         return True, None
 
@@ -339,14 +345,20 @@ class BlockSizeValidator:
         # Check transaction count
         tx_count = len(block.transactions)
         if tx_count > BlockchainSecurityConfig.MAX_TRANSACTIONS_PER_BLOCK:
-            return False, f"Too many transactions in block: {tx_count} (max {BlockchainSecurityConfig.MAX_TRANSACTIONS_PER_BLOCK})"
+            return (
+                False,
+                f"Too many transactions in block: {tx_count} (max {BlockchainSecurityConfig.MAX_TRANSACTIONS_PER_BLOCK})",
+            )
 
         # Check total block size
         block_json = json.dumps(block.to_dict())
         block_size = len(block_json.encode())
 
         if block_size > BlockchainSecurityConfig.MAX_BLOCK_SIZE:
-            return False, f"Block too large: {block_size} bytes (max {BlockchainSecurityConfig.MAX_BLOCK_SIZE})"
+            return (
+                False,
+                f"Block too large: {block_size} bytes (max {BlockchainSecurityConfig.MAX_BLOCK_SIZE})",
+            )
 
         return True, None
 
@@ -394,7 +406,10 @@ class DustProtection:
             (valid, error_message)
         """
         if amount < BlockchainSecurityConfig.MIN_TRANSACTION_AMOUNT:
-            return False, f"Amount too small: {amount} (min {BlockchainSecurityConfig.MIN_TRANSACTION_AMOUNT})"
+            return (
+                False,
+                f"Amount too small: {amount} (min {BlockchainSecurityConfig.MIN_TRANSACTION_AMOUNT})",
+            )
 
         return True, None
 
@@ -427,7 +442,7 @@ class MedianTimePast:
             return time.time()
 
         # Get last N blocks
-        recent_blocks = blockchain.chain[-self.span:]
+        recent_blocks = blockchain.chain[-self.span :]
 
         # Get timestamps
         timestamps = [block.timestamp for block in recent_blocks]
@@ -460,7 +475,10 @@ class MedianTimePast:
 
         # Must not be too far in future
         if block.timestamp > current_time + BlockchainSecurityConfig.MAX_FUTURE_BLOCK_TIME:
-            return False, f"Block timestamp too far in future: {block.timestamp} > {current_time + BlockchainSecurityConfig.MAX_FUTURE_BLOCK_TIME}"
+            return (
+                False,
+                f"Block timestamp too far in future: {block.timestamp} > {current_time + BlockchainSecurityConfig.MAX_FUTURE_BLOCK_TIME}",
+            )
 
         return True, None
 
@@ -475,8 +493,8 @@ class TimeValidator:
     def calculate_median_time_past(self, chain) -> float:
         timestamps = [
             block.timestamp
-            for block in chain[-self.median_time_span:]
-            if hasattr(block, 'timestamp')
+            for block in chain[-self.median_time_span :]
+            if hasattr(block, "timestamp")
         ]
 
         if not timestamps:
@@ -522,7 +540,9 @@ class EmergencyGovernanceTimelock:
         expiry_block = current_block_height + self.emergency_timelock
         self.pending_emergency_actions[proposal_id] = expiry_block
 
-    def can_execute_emergency_action(self, proposal_id: str, current_block_height: int) -> Tuple[bool, Optional[str]]:
+    def can_execute_emergency_action(
+        self, proposal_id: str, current_block_height: int
+    ) -> Tuple[bool, Optional[str]]:
         """
         Check if emergency action can be executed
 
@@ -597,7 +617,9 @@ class BlockchainSecurityManager:
             return False, msg
 
         # Mempool capacity
-        valid, error = self.mempool_manager.can_add_transaction(tx, self.blockchain.pending_transactions)
+        valid, error = self.mempool_manager.can_add_transaction(
+            tx, self.blockchain.pending_transactions
+        )
         if not valid:
             return False, error
 
@@ -628,15 +650,14 @@ class BlockchainSecurityManager:
             coinbase_tx = block.transactions[0]
             if coinbase_tx.sender == "COINBASE":
                 base_reward = self.blockchain.get_block_reward(block.index)
-                bonus_percent = self.blockchain.streak_tracker.get_streak_bonus(coinbase_tx.recipient)
+                bonus_percent = self.blockchain.streak_tracker.get_streak_bonus(
+                    coinbase_tx.recipient
+                )
                 expected_reward = base_reward * (1 + bonus_percent)
                 total_fees = sum(tx.fee for tx in block.transactions[1:])
 
                 valid = self.supply_validator.validate_coinbase_amount(
-                    block.index,
-                    coinbase_tx.amount,
-                    expected_reward,
-                    total_fees
+                    block.index, coinbase_tx.amount, expected_reward, total_fees
                 )
                 if not valid:
                     return False, "Invalid coinbase amount (inflation bug)"
@@ -647,7 +668,9 @@ class BlockchainSecurityManager:
         """Add checkpoint"""
         self.reorg_protection.add_checkpoint(block_index, block_hash)
 
-    def validate_chain_reorganization(self, current_height: int, fork_point: int) -> Tuple[bool, Optional[str]]:
+    def validate_chain_reorganization(
+        self, current_height: int, fork_point: int
+    ) -> Tuple[bool, Optional[str]]:
         """Validate reorganization attempt"""
         return self.reorg_protection.validate_reorganization(current_height, fork_point)
 

@@ -10,7 +10,7 @@ import os
 import time
 
 # Add core directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'core'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
 from blockchain import Blockchain, Transaction
 from wallet import Wallet
@@ -317,7 +317,7 @@ class TestMiningValidation:
         block = bc.mine_pending_transactions(miner.address)
 
         # Block should meet difficulty
-        assert block.hash.startswith('0' * bc.difficulty)
+        assert block.hash.startswith("0" * bc.difficulty)
 
         # Chain should be valid
         assert bc.validate_chain()
@@ -334,7 +334,7 @@ class TestMiningValidation:
 
         # Verify linking
         for i in range(1, len(blocks)):
-            assert blocks[i].previous_hash == blocks[i-1].hash
+            assert blocks[i].previous_hash == blocks[i - 1].hash
 
     def test_utxo_consistency(self):
         """Test UTXO set remains consistent"""
@@ -400,5 +400,5 @@ class TestMiningPerformance:
         assert time2 >= time1 * 0.5
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

@@ -26,12 +26,12 @@ class NonceTracker:
             data_dir: Directory to store nonce data
         """
         if data_dir is None:
-            data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
+            data_dir = os.path.join(os.path.dirname(__file__), "..", "data")
 
         self.data_dir = data_dir
         os.makedirs(data_dir, exist_ok=True)
 
-        self.nonce_file = os.path.join(data_dir, 'nonces.json')
+        self.nonce_file = os.path.join(data_dir, "nonces.json")
         self.nonces: Dict[str, int] = {}
         self.pending_nonces: Dict[str, int] = {}
         self.lock = RLock()
@@ -43,7 +43,7 @@ class NonceTracker:
         """Load nonces from file"""
         if os.path.exists(self.nonce_file):
             try:
-                with open(self.nonce_file, 'r') as f:
+                with open(self.nonce_file, "r") as f:
                     self.nonces = json.load(f)
             except Exception:
                 self.nonces = {}
@@ -51,7 +51,7 @@ class NonceTracker:
     def _save_nonces(self):
         """Save nonces to file"""
         try:
-            with open(self.nonce_file, 'w') as f:
+            with open(self.nonce_file, "w") as f:
                 json.dump(self.nonces, f, indent=2)
         except Exception as e:
             print(f"Error saving nonces: {e}")
@@ -159,9 +159,9 @@ class NonceTracker:
         """
         with self.lock:
             return {
-                'total_addresses': len(self.nonces),
-                'highest_nonce': max(self.nonces.values()) if self.nonces else 0,
-                'total_transactions': sum(self.nonces.values())
+                "total_addresses": len(self.nonces),
+                "highest_nonce": max(self.nonces.values()) if self.nonces else 0,
+                "total_transactions": sum(self.nonces.values()),
             }
 
 

@@ -5,7 +5,11 @@ Integration examples and helper functions for incorporating
 error recovery into the blockchain node.
 """
 
-from aixn.core.error_recovery import (ErrorRecoveryManager, create_recovery_manager, wrap_blockchain_operation)
+from aixn.core.error_recovery import (
+    ErrorRecoveryManager,
+    create_recovery_manager,
+    wrap_blockchain_operation,
+)
 from flask import jsonify, request
 import functools
 import time
@@ -49,13 +53,7 @@ def _wrap_blockchain_methods(blockchain, recovery_manager):
 
     @functools.wraps(original_mine)
     def wrapped_mine(*args, **kwargs):
-        return wrap_blockchain_operation(
-            recovery_manager,
-            'mining',
-            original_mine,
-            *args,
-            **kwargs
-        )
+        return wrap_blockchain_operation(recovery_manager, "mining", original_mine, *args, **kwargs)
 
     blockchain.mine_pending_transactions = wrapped_mine
 
@@ -67,8 +65,7 @@ def _wrap_blockchain_methods(blockchain, recovery_manager):
         try:
             # Validate transaction first
             success, result, error = recovery_manager.wrap_operation(
-                'validation',
-                lambda: blockchain.validate_transaction(transaction)
+                "validation", lambda: blockchain.validate_transaction(transaction)
             )
 
             if not success or not result:
@@ -90,10 +87,7 @@ def _wrap_blockchain_methods(blockchain, recovery_manager):
 
     @functools.wraps(original_validate)
     def wrapped_validate():
-        success, result, error = recovery_manager.wrap_operation(
-            'validation',
-            original_validate
-        )
+        success, result, error = recovery_manager.wrap_operation("validation", original_validate)
 
         if not success or not result:
             # Chain validation failed - check for corruption
@@ -114,226 +108,173 @@ def setup_recovery_api_endpoints(app, recovery_manager):
         recovery_manager: ErrorRecoveryManager instance
     """
 
-    @app.route('/recovery/status', methods=['GET'])
+    @app.route("/recovery/status", methods=["GET"])
     def get_recovery_status():
         """Get error recovery system status"""
         status = recovery_manager.get_recovery_status()
-        return jsonify({
-            'success': True,
-            'recovery_status': status
-        })
+        return jsonify({"success": True, "recovery_status": status})
 
-    @app.route('/recovery/health', methods=['GET'])
+    @app.route("/recovery/health", methods=["GET"])
     def get_health():
         """Get blockchain health metrics"""
         health = recovery_manager.health_monitor.get_health_status()
-        return jsonify({
-            'success': True,
-            'health': health
-        })
+        return jsonify({"success": True, "health": health})
 
-    @app.route('/recovery/circuit-breakers', methods=['GET'])
+    @app.route("/recovery/circuit-breakers", methods=["GET"])
     def get_circuit_breakers():
         """Get circuit breaker states"""
         breakers = {
             name: {
-                'state': breaker.state.value,
-                'failure_count': breaker.failure_count,
-                'success_count': breaker.success_count
+                "state": breaker.state.value,
+                "failure_count": breaker.failure_count,
+                "success_count": breaker.success_count,
             }
             for name, breaker in recovery_manager.circuit_breakers.items()
         }
 
-        return jsonify({
-            'success': True,
-            'circuit_breakers': breakers
-        })
+        return jsonify({"success": True, "circuit_breakers": breakers})
 
-    @app.route('/recovery/circuit-breakers/<name>/reset', methods=['POST'])
+    @app.route("/recovery/circuit-breakers/<name>/reset", methods=["POST"])
     def reset_circuit_breaker(name):
         """Reset specific circuit breaker"""
         if name not in recovery_manager.circuit_breakers:
-            return jsonify({
-                'success': False,
-                'error': f'Circuit breaker not found: {name}'
-            }), 404
+            return jsonify({"success": False, "error": f"Circuit breaker not found: {name}"}), 404
 
         recovery_manager.circuit_breakers[name].reset()
 
-        return jsonify({
-            'success': True,
-            'message': f'Circuit breaker {name} reset'
-        })
+        return jsonify({"success": True, "message": f"Circuit breaker {name} reset"})
 
-    @app.route('/recovery/backups', methods=['GET'])
+    @app.route("/recovery/backups", methods=["GET"])
     def list_backups():
         """List available backups"""
         backups = recovery_manager.backup_manager.list_backups()
-        return jsonify({
-            'success': True,
-            'count': len(backups),
-            'backups': backups
-        })
+        return jsonify({"success": True, "count": len(backups), "backups": backups})
 
-    @app.route('/recovery/backup/create', methods=['POST'])
+    @app.route("/recovery/backup/create", methods=["POST"])
     def create_backup():
         """Create manual backup"""
         data = request.get_json() or {}
-        name = data.get('name')
+        name = data.get("name")
 
         backup_path = recovery_manager.create_checkpoint(name)
 
-        return jsonify({
-            'success': True,
-            'backup_path': backup_path,
-            'message': 'Backup created successfully'
-        })
+        return jsonify(
+            {"success": True, "backup_path": backup_path, "message": "Backup created successfully"}
+        )
 
-    @app.route('/recovery/backup/restore', methods=['POST'])
+    @app.route("/recovery/backup/restore", methods=["POST"])
     def restore_backup():
         """Restore from backup"""
         data = request.get_json()
 
-        if not data or 'backup_name' not in data:
-            return jsonify({
-                'success': False,
-                'error': 'Missing backup_name'
-            }), 400
+        if not data or "backup_name" not in data:
+            return jsonify({"success": False, "error": "Missing backup_name"}), 400
 
         # Find backup
         backups = recovery_manager.backup_manager.list_backups()
-        backup = next((b for b in backups if b['name'] == data['backup_name']), None)
+        backup = next((b for b in backups if b["name"] == data["backup_name"]), None)
 
         if not backup:
-            return jsonify({
-                'success': False,
-                'error': 'Backup not found'
-            }), 404
+            return jsonify({"success": False, "error": "Backup not found"}), 404
 
         # Restore backup
-        success, backup_data, error = recovery_manager.backup_manager.restore_backup(backup['path'])
+        success, backup_data, error = recovery_manager.backup_manager.restore_backup(backup["path"])
 
         if not success:
-            return jsonify({
-                'success': False,
-                'error': f'Restore failed: {error}'
-            }), 500
+            return jsonify({"success": False, "error": f"Restore failed: {error}"}), 500
 
         # Validate and apply
         if recovery_manager._validate_backup(backup_data):
             recovery_manager._apply_backup(backup_data)
 
-            return jsonify({
-                'success': True,
-                'message': f'Restored from backup: {data["backup_name"]}',
-                'chain_height': len(recovery_manager.blockchain.chain)
-            })
+            return jsonify(
+                {
+                    "success": True,
+                    "message": f'Restored from backup: {data["backup_name"]}',
+                    "chain_height": len(recovery_manager.blockchain.chain),
+                }
+            )
         else:
-            return jsonify({
-                'success': False,
-                'error': 'Backup validation failed'
-            }), 500
+            return jsonify({"success": False, "error": "Backup validation failed"}), 500
 
-    @app.route('/recovery/corruption/check', methods=['POST'])
+    @app.route("/recovery/corruption/check", methods=["POST"])
     def check_corruption():
         """Check for blockchain corruption"""
         is_corrupted, issues = recovery_manager.corruption_detector.detect_corruption(
             recovery_manager.blockchain
         )
 
-        return jsonify({
-            'success': True,
-            'is_corrupted': is_corrupted,
-            'issue_count': len(issues),
-            'issues': issues
-        })
+        return jsonify(
+            {
+                "success": True,
+                "is_corrupted": is_corrupted,
+                "issue_count": len(issues),
+                "issues": issues,
+            }
+        )
 
-    @app.route('/recovery/corruption/fix', methods=['POST'])
+    @app.route("/recovery/corruption/fix", methods=["POST"])
     def fix_corruption():
         """Attempt to fix blockchain corruption"""
         data = request.get_json() or {}
-        force_rollback = data.get('force_rollback', False)
+        force_rollback = data.get("force_rollback", False)
 
         success, error = recovery_manager.handle_corruption(force_rollback)
 
         if success:
-            return jsonify({
-                'success': True,
-                'message': 'Corruption fixed successfully'
-            })
+            return jsonify({"success": True, "message": "Corruption fixed successfully"})
         else:
-            return jsonify({
-                'success': False,
-                'error': error
-            }), 500
+            return jsonify({"success": False, "error": error}), 500
 
-    @app.route('/recovery/errors', methods=['GET'])
+    @app.route("/recovery/errors", methods=["GET"])
     def get_error_log():
         """Get recent errors"""
-        limit = request.args.get('limit', default=50, type=int)
+        limit = request.args.get("limit", default=50, type=int)
 
         errors = list(recovery_manager.error_log)[-limit:]
 
-        return jsonify({
-            'success': True,
-            'count': len(errors),
-            'errors': errors
-        })
+        return jsonify({"success": True, "count": len(errors), "errors": errors})
 
-    @app.route('/recovery/actions', methods=['GET'])
+    @app.route("/recovery/actions", methods=["GET"])
     def get_recovery_log():
         """Get recent recovery actions"""
-        limit = request.args.get('limit', default=50, type=int)
+        limit = request.args.get("limit", default=50, type=int)
 
         actions = list(recovery_manager.recovery_log)[-limit:]
 
-        return jsonify({
-            'success': True,
-            'count': len(actions),
-            'actions': actions
-        })
+        return jsonify({"success": True, "count": len(actions), "actions": actions})
 
-    @app.route('/recovery/shutdown', methods=['POST'])
+    @app.route("/recovery/shutdown", methods=["POST"])
     def graceful_shutdown():
         """Perform graceful shutdown"""
         data = request.get_json() or {}
-        reason = data.get('reason', 'manual')
+        reason = data.get("reason", "manual")
 
         # Initiate shutdown in background thread
         import threading
+
         shutdown_thread = threading.Thread(
-            target=recovery_manager.graceful_shutdown,
-            args=(reason,),
-            daemon=True
+            target=recovery_manager.graceful_shutdown, args=(reason,), daemon=True
         )
         shutdown_thread.start()
 
-        return jsonify({
-            'success': True,
-            'message': 'Graceful shutdown initiated'
-        })
+        return jsonify({"success": True, "message": "Graceful shutdown initiated"})
 
-    @app.route('/recovery/network/reconnect', methods=['POST'])
+    @app.route("/recovery/network/reconnect", methods=["POST"])
     def handle_network_partition():
         """Handle network partition"""
         success, error = recovery_manager.handle_network_partition()
 
         if success:
-            return jsonify({
-                'success': True,
-                'message': 'Network partition handled'
-            })
+            return jsonify({"success": True, "message": "Network partition handled"})
         else:
-            return jsonify({
-                'success': False,
-                'error': error
-            }), 500
+            return jsonify({"success": False, "error": error}), 500
 
     print("Recovery API endpoints registered")
 
 
 # Decorator for automatic error handling
-def with_recovery(recovery_manager, operation='validation'):
+def with_recovery(recovery_manager, operation="validation"):
     """
     Decorator for automatic error handling
 
@@ -344,14 +285,12 @@ def with_recovery(recovery_manager, operation='validation'):
     Returns:
         Decorator function
     """
+
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             success, result, error = recovery_manager.wrap_operation(
-                operation,
-                func,
-                *args,
-                **kwargs
+                operation, func, *args, **kwargs
             )
 
             if not success:
@@ -400,7 +339,8 @@ class RecoveryEnabledBlockchain:
         Returns:
             Mined block
         """
-        @with_recovery(self.recovery_manager, 'mining')
+
+        @with_recovery(self.recovery_manager, "mining")
         def _mine():
             return self.blockchain.mine_pending_transactions(miner_address)
 
@@ -424,7 +364,7 @@ class RecoveryEnabledBlockchain:
         """
         try:
             # Validate with circuit breaker
-            @with_recovery(self.recovery_manager, 'validation')
+            @with_recovery(self.recovery_manager, "validation")
             def _validate():
                 return self.blockchain.validate_transaction(transaction)
 
@@ -461,7 +401,7 @@ class RecoveryEnabledBlockchain:
                 raise Exception(f"Chain validation failed: {error}")
 
         # Then validate chain
-        @with_recovery(self.recovery_manager, 'validation')
+        @with_recovery(self.recovery_manager, "validation")
         def _validate():
             return self.blockchain.validate_chain()
 
@@ -496,6 +436,7 @@ class RecoveryScheduler:
     def start(self):
         """Start scheduled tasks"""
         import threading
+
         self.scheduler_thread = threading.Thread(target=self._run_scheduler, daemon=True)
         self.scheduler_thread.start()
         print("Recovery scheduler started")
@@ -525,8 +466,10 @@ class RecoveryScheduler:
                 # Corruption check every 6 hours
                 if current_time - last_corruption_check >= 21600:  # 6 hours
                     print("Running scheduled corruption check...")
-                    is_corrupted, issues = self.recovery_manager.corruption_detector.detect_corruption(
-                        self.recovery_manager.blockchain
+                    is_corrupted, issues = (
+                        self.recovery_manager.corruption_detector.detect_corruption(
+                            self.recovery_manager.blockchain
+                        )
                     )
 
                     if is_corrupted:

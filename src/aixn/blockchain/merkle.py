@@ -1,6 +1,7 @@
 import hashlib
 import json
 
+
 class MerkleTree:
     def __init__(self, data_leaves):
         if not data_leaves:
@@ -21,7 +22,7 @@ class MerkleTree:
             return hash2
         if hash2 is None:
             return hash1
-        
+
         # Sort hashes to ensure deterministic tree construction
         if hash1 > hash2:
             hash1, hash2 = hash2, hash1
@@ -34,7 +35,9 @@ class MerkleTree:
             next_level = []
             for i in range(0, len(current_level), 2):
                 hash1 = current_level[i]
-                hash2 = current_level[i+1] if i+1 < len(current_level) else hash1 # Duplicate last hash if odd number
+                hash2 = (
+                    current_level[i + 1] if i + 1 < len(current_level) else hash1
+                )  # Duplicate last hash if odd number
                 next_level.append(self._hash_pair(hash1, hash2))
             tree.append(next_level)
             current_level = next_level
@@ -51,20 +54,20 @@ class MerkleTree:
         proof = []
         leaf_index = self.data_leaves.index(leaf_hash)
 
-        for level in self.tree[:-1]: # Iterate through levels from leaves up to root-1
-            if len(level) == 1: # If only one hash in the level, it's the root
+        for level in self.tree[:-1]:  # Iterate through levels from leaves up to root-1
+            if len(level) == 1:  # If only one hash in the level, it's the root
                 break
-            
-            is_left_node = (leaf_index % 2 == 0)
+
+            is_left_node = leaf_index % 2 == 0
             sibling_index = leaf_index + 1 if is_left_node else leaf_index - 1
 
             if sibling_index < len(level):
                 sibling_hash = level[sibling_index]
                 proof.append((sibling_hash, "left" if not is_left_node else "right"))
-            elif not is_left_node and sibling_index >= len(level): # Handle duplicated last hash
-                proof.append((level[leaf_index], "left")) # Sibling is itself
+            elif not is_left_node and sibling_index >= len(level):  # Handle duplicated last hash
+                proof.append((level[leaf_index], "left"))  # Sibling is itself
 
-            leaf_index //= 2 # Move up to the next level
+            leaf_index //= 2  # Move up to the next level
 
         return proof
 
@@ -75,10 +78,11 @@ class MerkleTree:
         for sibling_hash, position in proof:
             if position == "left":
                 current_hash = MerkleTree._hash_pair(sibling_hash, current_hash)
-            else: # position == "right"
+            else:  # position == "right"
                 current_hash = MerkleTree._hash_pair(current_hash, sibling_hash)
-        
+
         return current_hash == merkle_root
+
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
@@ -87,7 +91,7 @@ if __name__ == "__main__":
         {"from": "B", "to": "C", "amount": 5},
         {"from": "C", "to": "D", "amount": 12},
         {"from": "D", "to": "A", "amount": 3},
-        {"from": "E", "to": "F", "amount": 7} # Odd number of transactions
+        {"from": "E", "to": "F", "amount": 7},  # Odd number of transactions
     ]
 
     merkle_tree = MerkleTree(transactions)
@@ -109,6 +113,6 @@ if __name__ == "__main__":
         print(f"Error generating proof for invalid tx: {e}")
 
     # Test with a tampered transaction
-    tampered_tx = {"from": "B", "to": "C", "amount": 6} # Changed amount
+    tampered_tx = {"from": "B", "to": "C", "amount": 6}  # Changed amount
     is_tampered_valid = MerkleTree.verify_merkle_proof(tampered_tx, merkle_tree.get_root(), proof)
     print(f"Is tampered proof valid? {is_tampered_valid}")

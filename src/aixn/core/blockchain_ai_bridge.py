@@ -8,7 +8,6 @@ import time
 from typing import Dict, List, Optional, Set
 
 
-
 from aixn.core.ai_development_pool import AIDevelopmentPool
 from aixn.core.ai_metrics import metrics
 
@@ -20,53 +19,50 @@ class BlockchainAIBridge:
     """Glue between funded governance proposals and the AI development pool."""
 
     TASK_TYPE_MAP = {
-        'atomic_swap': 'code_generation',
-        'security': 'security_audit',
-        'trading_features': 'code_generation',
-        'mobile_app': 'code_generation',
-        'browser_extension': 'code_generation',
-        'community_support': 'documentation',
-        'analytics': 'documentation',
-        'marketing': 'documentation',
-        'developer_tools': 'code_generation',
-        'education': 'documentation',
-        'research': 'code_generation',
-        'localization': 'code_generation',
-        'compliance': 'security_audit',
-        'infrastructure': 'code_generation',
-        'performance': 'optimization',
-        'user_experience': 'code_generation',
-        'integration': 'code_generation',
-        'gamification': 'documentation',
-        'other': 'code_generation'
+        "atomic_swap": "code_generation",
+        "security": "security_audit",
+        "trading_features": "code_generation",
+        "mobile_app": "code_generation",
+        "browser_extension": "code_generation",
+        "community_support": "documentation",
+        "analytics": "documentation",
+        "marketing": "documentation",
+        "developer_tools": "code_generation",
+        "education": "documentation",
+        "research": "code_generation",
+        "localization": "code_generation",
+        "compliance": "security_audit",
+        "infrastructure": "code_generation",
+        "performance": "optimization",
+        "user_experience": "code_generation",
+        "integration": "code_generation",
+        "gamification": "documentation",
+        "other": "code_generation",
     }
 
     PRIORITY_MAP = {
-        'security': 9,
-        'compliance': 9,
-        'infrastructure': 8,
-        'performance': 8,
-        'atomic_swap': 7,
-        'trading_features': 7,
-        'integration': 7,
-        'research': 6,
-        'developer_tools': 6,
-        'mobile_app': 5,
-        'browser_extension': 5,
-        'community_support': 4,
-        'marketing': 4,
-        'analytics': 4,
-        'education': 3,
-        'localization': 3,
-        'gamification': 2,
-        'other': 1
+        "security": 9,
+        "compliance": 9,
+        "infrastructure": 8,
+        "performance": 8,
+        "atomic_swap": 7,
+        "trading_features": 7,
+        "integration": 7,
+        "research": 6,
+        "developer_tools": 6,
+        "mobile_app": 5,
+        "browser_extension": 5,
+        "community_support": 4,
+        "marketing": 4,
+        "analytics": 4,
+        "education": 3,
+        "localization": 3,
+        "gamification": 2,
+        "other": 1,
     }
 
     def __init__(
-        self,
-        blockchain,
-        governance_dao,
-        development_pool: Optional[AIDevelopmentPool] = None
+        self, blockchain, governance_dao, development_pool: Optional[AIDevelopmentPool] = None
     ):
         """Initialize bridge with blockchain, DAO, and AI pool."""
         self.blockchain = blockchain
@@ -91,19 +87,19 @@ class BlockchainAIBridge:
         return created_tasks
 
     def _should_queue_proposal(self, proposal) -> bool:
-        status = getattr(proposal, 'status', None)
+        status = getattr(proposal, "status", None)
         if status is None:
             return False
 
-        status_name = getattr(status, 'name', '').lower()
-        if status_name != 'fully_funded':
+        status_name = getattr(status, "name", "").lower()
+        if status_name != "fully_funded":
             return False
 
         return proposal.proposal_id not in self.proposal_task_map
 
     def _queue_proposal(self, proposal) -> Dict[str, Optional[str]]:
-        category = getattr(proposal.category, 'value', 'other')
-        task_type = self.TASK_TYPE_MAP.get(category, 'code_generation')
+        category = getattr(proposal.category, "value", "other")
+        task_type = self.TASK_TYPE_MAP.get(category, "code_generation")
         priority = self.PRIORITY_MAP.get(category, 5)
         description = proposal.detailed_prompt or proposal.description
 
@@ -111,10 +107,10 @@ class BlockchainAIBridge:
             task_type=task_type,
             description=description,
             estimated_tokens=proposal.estimated_tokens,
-            priority=priority
+            priority=priority,
         )
 
-        task_id = result.get('task_id')
+        task_id = result.get("task_id")
 
         if task_id:
             self.proposal_task_map[proposal.proposal_id] = task_id
@@ -126,26 +122,18 @@ class BlockchainAIBridge:
                 "Queued AI proposal %s as task %s (model %s)",
                 proposal.proposal_id,
                 task_id,
-                proposal.best_ai_model
+                proposal.best_ai_model,
             )
             metrics.record_queue_event()
         else:
             logger.warning(
-                "Failed to queue AI proposal %s (status %s)",
-                proposal.proposal_id,
-                proposal.status
+                "Failed to queue AI proposal %s (status %s)", proposal.proposal_id, proposal.status
             )
 
-        return {
-            'proposal_id': proposal.proposal_id,
-            'queued': bool(task_id),
-            'task_id': task_id
-        }
+        return {"proposal_id": proposal.proposal_id, "queued": bool(task_id), "task_id": task_id}
 
     def _update_completed_proposals(self):
-        completed_ids = {
-            task.task_id for task in self.development_pool.completed_tasks
-        }
+        completed_ids = {task.task_id for task in self.development_pool.completed_tasks}
 
         for proposal_id, task_id in list(self.proposal_task_map.items()):
             if task_id not in completed_ids:
@@ -158,12 +146,11 @@ class BlockchainAIBridge:
             proposal.status = proposal.status.__class__.CODE_REVIEW
             proposal.execution_completed_at = time.time()
             task = next(
-                (t for t in self.development_pool.completed_tasks if t.task_id == task_id),
-                None
+                (t for t in self.development_pool.completed_tasks if t.task_id == task_id), None
             )
 
             if task and task.result and isinstance(task.result, dict):
-                output = task.result.get('output') or ''
+                output = task.result.get("output") or ""
                 if output:
                     proposal.result_hash = hashlib.sha256(output.encode()).hexdigest()
 

@@ -23,12 +23,12 @@ class BlockchainStorageConfig:
     """Configuration for blockchain storage"""
 
     # Data directory
-    DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
+    DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 
     # Storage files
-    BLOCKCHAIN_FILE = os.path.join(DATA_DIR, 'blockchain.json')
-    BACKUP_DIR = os.path.join(DATA_DIR, 'backups')
-    CHECKPOINT_DIR = os.path.join(DATA_DIR, 'checkpoints')
+    BLOCKCHAIN_FILE = os.path.join(DATA_DIR, "blockchain.json")
+    BACKUP_DIR = os.path.join(DATA_DIR, "backups")
+    CHECKPOINT_DIR = os.path.join(DATA_DIR, "checkpoints")
 
     # Checkpoint interval (blocks)
     CHECKPOINT_INTERVAL = 1000
@@ -62,9 +62,9 @@ class BlockchainStorage:
         # Setup directories
         if data_dir:
             self.data_dir = data_dir
-            self.blockchain_file = os.path.join(data_dir, 'blockchain.json')
-            self.backup_dir = os.path.join(data_dir, 'backups')
-            self.checkpoint_dir = os.path.join(data_dir, 'checkpoints')
+            self.blockchain_file = os.path.join(data_dir, "blockchain.json")
+            self.backup_dir = os.path.join(data_dir, "backups")
+            self.checkpoint_dir = os.path.join(data_dir, "checkpoints")
         else:
             self.data_dir = BlockchainStorageConfig.DATA_DIR
             self.blockchain_file = BlockchainStorageConfig.BLOCKCHAIN_FILE
@@ -80,7 +80,7 @@ class BlockchainStorage:
         self.lock = Lock()
 
         # Metadata file
-        self.metadata_file = os.path.join(self.data_dir, 'blockchain_metadata.json')
+        self.metadata_file = os.path.join(self.data_dir, "blockchain_metadata.json")
 
     def _calculate_checksum(self, data: str) -> str:
         """
@@ -92,7 +92,7 @@ class BlockchainStorage:
         Returns:
             str: Hex checksum
         """
-        return hashlib.sha256(data.encode('utf-8')).hexdigest()
+        return hashlib.sha256(data.encode("utf-8")).hexdigest()
 
     def _verify_checksum(self, data: str, expected_checksum: str) -> bool:
         """
@@ -132,17 +132,14 @@ class BlockchainStorage:
 
                 # Create metadata
                 metadata = {
-                    'timestamp': time.time(),
-                    'block_height': len(blockchain_data.get('chain', [])),
-                    'checksum': checksum,
-                    'version': '1.0'
+                    "timestamp": time.time(),
+                    "block_height": len(blockchain_data.get("chain", [])),
+                    "checksum": checksum,
+                    "version": "1.0",
                 }
 
                 # Package data with metadata
-                package = {
-                    'metadata': metadata,
-                    'blockchain': blockchain_data
-                }
+                package = {"metadata": metadata, "blockchain": blockchain_data}
 
                 package_json = json.dumps(package, indent=2, sort_keys=True)
 
@@ -151,10 +148,10 @@ class BlockchainStorage:
                     self._create_backup()
 
                 # Atomic write: write to temp file, then rename
-                temp_file = self.blockchain_file + '.tmp'
+                temp_file = self.blockchain_file + ".tmp"
 
                 # Write to temp file
-                with open(temp_file, 'w') as f:
+                with open(temp_file, "w") as f:
                     f.write(package_json)
                     f.flush()
                     os.fsync(f.fileno())  # Force write to disk
@@ -166,15 +163,18 @@ class BlockchainStorage:
                     os.rename(temp_file, self.blockchain_file)
 
                 # Save metadata separately for quick access
-                with open(self.metadata_file, 'w') as f:
+                with open(self.metadata_file, "w") as f:
                     json.dump(metadata, f, indent=2)
 
                 # Create checkpoint if needed
-                block_height = metadata['block_height']
+                block_height = metadata["block_height"]
                 if block_height % BlockchainStorageConfig.CHECKPOINT_INTERVAL == 0:
                     self._create_checkpoint(blockchain_data, block_height)
 
-                return True, f"Blockchain saved successfully (height: {block_height}, checksum: {checksum[:8]}...)"
+                return (
+                    True,
+                    f"Blockchain saved successfully (height: {block_height}, checksum: {checksum[:8]}...)",
+                )
 
             except Exception as e:
                 return False, f"Failed to save blockchain: {str(e)}"
@@ -195,16 +195,16 @@ class BlockchainStorage:
 
             try:
                 # Read file
-                with open(self.blockchain_file, 'r') as f:
+                with open(self.blockchain_file, "r") as f:
                     package = json.load(f)
 
                 # Extract metadata and blockchain
-                metadata = package.get('metadata', {})
-                blockchain_data = package.get('blockchain', {})
+                metadata = package.get("metadata", {})
+                blockchain_data = package.get("blockchain", {})
 
                 # Verify checksum
                 blockchain_json = json.dumps(blockchain_data, indent=2, sort_keys=True)
-                expected_checksum = metadata.get('checksum')
+                expected_checksum = metadata.get("checksum")
 
                 if expected_checksum:
                     if not self._verify_checksum(blockchain_json, expected_checksum):
@@ -212,9 +212,13 @@ class BlockchainStorage:
                         print("WARNING: Checksum verification failed. Attempting recovery...")
                         return self._attempt_recovery()
 
-                block_height = len(blockchain_data.get('chain', []))
+                block_height = len(blockchain_data.get("chain", []))
 
-                return True, blockchain_data, f"Blockchain loaded successfully (height: {block_height})"
+                return (
+                    True,
+                    blockchain_data,
+                    f"Blockchain loaded successfully (height: {block_height})",
+                )
 
             except json.JSONDecodeError as e:
                 # Corrupted JSON - attempt recovery
@@ -232,11 +236,8 @@ class BlockchainStorage:
             bool: Success
         """
         try:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            backup_file = os.path.join(
-                self.backup_dir,
-                f'blockchain_backup_{timestamp}.json'
-            )
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_file = os.path.join(self.backup_dir, f"blockchain_backup_{timestamp}.json")
 
             # Copy current blockchain to backup
             shutil.copy2(self.blockchain_file, backup_file)
@@ -257,14 +258,14 @@ class BlockchainStorage:
             backups = [
                 os.path.join(self.backup_dir, f)
                 for f in os.listdir(self.backup_dir)
-                if f.startswith('blockchain_backup_') and f.endswith('.json')
+                if f.startswith("blockchain_backup_") and f.endswith(".json")
             ]
 
             # Sort by modification time
             backups.sort(key=lambda x: os.path.getmtime(x), reverse=True)
 
             # Remove old backups
-            for backup in backups[BlockchainStorageConfig.MAX_BACKUPS:]:
+            for backup in backups[BlockchainStorageConfig.MAX_BACKUPS :]:
                 os.remove(backup)
 
         except Exception as e:
@@ -279,10 +280,7 @@ class BlockchainStorage:
             block_height: Current block height
         """
         try:
-            checkpoint_file = os.path.join(
-                self.checkpoint_dir,
-                f'checkpoint_{block_height}.json'
-            )
+            checkpoint_file = os.path.join(self.checkpoint_dir, f"checkpoint_{block_height}.json")
 
             # Calculate checksum
             json_data = json.dumps(blockchain_data, indent=2, sort_keys=True)
@@ -290,14 +288,14 @@ class BlockchainStorage:
 
             # Create checkpoint package
             checkpoint = {
-                'block_height': block_height,
-                'timestamp': time.time(),
-                'checksum': checksum,
-                'blockchain': blockchain_data
+                "block_height": block_height,
+                "timestamp": time.time(),
+                "checksum": checksum,
+                "blockchain": blockchain_data,
             }
 
             # Write checkpoint
-            with open(checkpoint_file, 'w') as f:
+            with open(checkpoint_file, "w") as f:
                 json.dump(checkpoint, f, indent=2)
 
             print(f"Checkpoint created at block {block_height}")
@@ -344,37 +342,43 @@ class BlockchainStorage:
             backups = [
                 os.path.join(self.backup_dir, f)
                 for f in os.listdir(self.backup_dir)
-                if f.startswith('blockchain_backup_') and f.endswith('.json')
+                if f.startswith("blockchain_backup_") and f.endswith(".json")
             ]
             backups.sort(key=lambda x: os.path.getmtime(x), reverse=True)
 
             # Try each backup
             for backup_file in backups:
                 try:
-                    with open(backup_file, 'r') as f:
+                    with open(backup_file, "r") as f:
                         package = json.load(f)
 
                     # Check format
-                    if 'metadata' in package and 'blockchain' in package:
+                    if "metadata" in package and "blockchain" in package:
                         # New format
-                        blockchain_data = package.get('blockchain', {})
-                        metadata = package.get('metadata', {})
+                        blockchain_data = package.get("blockchain", {})
+                        metadata = package.get("metadata", {})
 
                         # Verify checksum if available
                         blockchain_json = json.dumps(blockchain_data, indent=2, sort_keys=True)
-                        expected_checksum = metadata.get('checksum')
+                        expected_checksum = metadata.get("checksum")
 
-                        if expected_checksum and self._verify_checksum(blockchain_json, expected_checksum):
+                        if expected_checksum and self._verify_checksum(
+                            blockchain_json, expected_checksum
+                        ):
                             print(f"Recovered from backup: {os.path.basename(backup_file)}")
                             return blockchain_data
                         elif not expected_checksum:
                             # No checksum, accept anyway
-                            print(f"Recovered from backup (no checksum): {os.path.basename(backup_file)}")
+                            print(
+                                f"Recovered from backup (no checksum): {os.path.basename(backup_file)}"
+                            )
                             return blockchain_data
                     else:
                         # Old format - direct blockchain data
                         blockchain_data = package
-                        print(f"Recovered from backup (old format): {os.path.basename(backup_file)}")
+                        print(
+                            f"Recovered from backup (old format): {os.path.basename(backup_file)}"
+                        )
                         return blockchain_data
 
                 except Exception as e:
@@ -399,14 +403,16 @@ class BlockchainStorage:
             checkpoints = [
                 os.path.join(self.checkpoint_dir, f)
                 for f in os.listdir(self.checkpoint_dir)
-                if f.startswith('checkpoint_') and f.endswith('.json')
+                if f.startswith("checkpoint_") and f.endswith(".json")
             ]
 
             # Extract block heights and sort
             checkpoint_data = []
             for cp_file in checkpoints:
                 try:
-                    height = int(os.path.basename(cp_file).replace('checkpoint_', '').replace('.json', ''))
+                    height = int(
+                        os.path.basename(cp_file).replace("checkpoint_", "").replace(".json", "")
+                    )
                     checkpoint_data.append((height, cp_file))
                 except ValueError:
                     continue
@@ -416,16 +422,18 @@ class BlockchainStorage:
             # Try each checkpoint
             for height, checkpoint_file in checkpoint_data:
                 try:
-                    with open(checkpoint_file, 'r') as f:
+                    with open(checkpoint_file, "r") as f:
                         checkpoint = json.load(f)
 
-                    blockchain_data = checkpoint.get('blockchain', {})
-                    expected_checksum = checkpoint.get('checksum')
+                    blockchain_data = checkpoint.get("blockchain", {})
+                    expected_checksum = checkpoint.get("checksum")
 
                     # Verify checksum
                     blockchain_json = json.dumps(blockchain_data, indent=2, sort_keys=True)
 
-                    if expected_checksum and self._verify_checksum(blockchain_json, expected_checksum):
+                    if expected_checksum and self._verify_checksum(
+                        blockchain_json, expected_checksum
+                    ):
                         print(f"Recovered from checkpoint at block {height}")
                         return blockchain_data
 
@@ -456,21 +464,25 @@ class BlockchainStorage:
                 return False, None, f"Backup file not found: {backup_filename}"
 
             try:
-                with open(backup_path, 'r') as f:
+                with open(backup_path, "r") as f:
                     package = json.load(f)
 
                 # Check if this is the new format (with metadata) or old format
-                if 'metadata' in package and 'blockchain' in package:
+                if "metadata" in package and "blockchain" in package:
                     # New format
-                    blockchain_data = package.get('blockchain', {})
-                    metadata = package.get('metadata', {})
+                    blockchain_data = package.get("blockchain", {})
+                    metadata = package.get("metadata", {})
 
                     # Verify checksum if available
                     blockchain_json = json.dumps(blockchain_data, indent=2, sort_keys=True)
-                    expected_checksum = metadata.get('checksum')
+                    expected_checksum = metadata.get("checksum")
 
-                    if expected_checksum and not self._verify_checksum(blockchain_json, expected_checksum):
-                        print(f"Warning: Checksum mismatch for {backup_filename}, but continuing with restore")
+                    if expected_checksum and not self._verify_checksum(
+                        blockchain_json, expected_checksum
+                    ):
+                        print(
+                            f"Warning: Checksum mismatch for {backup_filename}, but continuing with restore"
+                        )
                         # Don't fail on checksum mismatch for backups - they may be from recovery
                 else:
                     # Old format - direct blockchain data
@@ -490,8 +502,9 @@ class BlockchainStorage:
         """
         try:
             backups = [
-                f for f in os.listdir(self.backup_dir)
-                if f.startswith('blockchain_backup_') and f.endswith('.json')
+                f
+                for f in os.listdir(self.backup_dir)
+                if f.startswith("blockchain_backup_") and f.endswith(".json")
             ]
 
             backup_info = []
@@ -501,21 +514,25 @@ class BlockchainStorage:
 
                 # Try to get block height from metadata
                 try:
-                    with open(backup_path, 'r') as f:
+                    with open(backup_path, "r") as f:
                         package = json.load(f)
-                    block_height = package.get('metadata', {}).get('block_height', 'unknown')
+                    block_height = package.get("metadata", {}).get("block_height", "unknown")
                 except:
-                    block_height = 'unknown'
+                    block_height = "unknown"
 
-                backup_info.append({
-                    'filename': backup,
-                    'timestamp': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
-                    'size_mb': stat.st_size / (1024 * 1024),
-                    'block_height': block_height
-                })
+                backup_info.append(
+                    {
+                        "filename": backup,
+                        "timestamp": datetime.fromtimestamp(stat.st_mtime).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
+                        "size_mb": stat.st_size / (1024 * 1024),
+                        "block_height": block_height,
+                    }
+                )
 
             # Sort by timestamp (newest first)
-            backup_info.sort(key=lambda x: x['timestamp'], reverse=True)
+            backup_info.sort(key=lambda x: x["timestamp"], reverse=True)
 
             return backup_info
 
@@ -532,8 +549,9 @@ class BlockchainStorage:
         """
         try:
             checkpoints = [
-                f for f in os.listdir(self.checkpoint_dir)
-                if f.startswith('checkpoint_') and f.endswith('.json')
+                f
+                for f in os.listdir(self.checkpoint_dir)
+                if f.startswith("checkpoint_") and f.endswith(".json")
             ]
 
             checkpoint_info = []
@@ -543,19 +561,26 @@ class BlockchainStorage:
 
                 # Extract block height
                 try:
-                    height = int(checkpoint.replace('checkpoint_', '').replace('.json', ''))
+                    height = int(checkpoint.replace("checkpoint_", "").replace(".json", ""))
                 except ValueError:
-                    height = 'unknown'
+                    height = "unknown"
 
-                checkpoint_info.append({
-                    'filename': checkpoint,
-                    'block_height': height,
-                    'timestamp': datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
-                    'size_mb': stat.st_size / (1024 * 1024)
-                })
+                checkpoint_info.append(
+                    {
+                        "filename": checkpoint,
+                        "block_height": height,
+                        "timestamp": datetime.fromtimestamp(stat.st_mtime).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
+                        "size_mb": stat.st_size / (1024 * 1024),
+                    }
+                )
 
             # Sort by block height (highest first)
-            checkpoint_info.sort(key=lambda x: x['block_height'] if isinstance(x['block_height'], int) else 0, reverse=True)
+            checkpoint_info.sort(
+                key=lambda x: x["block_height"] if isinstance(x["block_height"], int) else 0,
+                reverse=True,
+            )
 
             return checkpoint_info
 
@@ -572,7 +597,7 @@ class BlockchainStorage:
         """
         try:
             if os.path.exists(self.metadata_file):
-                with open(self.metadata_file, 'r') as f:
+                with open(self.metadata_file, "r") as f:
                     return json.load(f)
             return None
         except Exception as e:
@@ -591,15 +616,15 @@ class BlockchainStorage:
                 return False, "Blockchain file not found"
 
             # Load and verify
-            with open(self.blockchain_file, 'r') as f:
+            with open(self.blockchain_file, "r") as f:
                 package = json.load(f)
 
-            metadata = package.get('metadata', {})
-            blockchain_data = package.get('blockchain', {})
+            metadata = package.get("metadata", {})
+            blockchain_data = package.get("blockchain", {})
 
             # Verify checksum
             blockchain_json = json.dumps(blockchain_data, indent=2, sort_keys=True)
-            expected_checksum = metadata.get('checksum')
+            expected_checksum = metadata.get("checksum")
 
             if not expected_checksum:
                 return False, "No checksum found in metadata"
@@ -607,9 +632,12 @@ class BlockchainStorage:
             if not self._verify_checksum(blockchain_json, expected_checksum):
                 return False, "Checksum verification failed"
 
-            block_height = len(blockchain_data.get('chain', []))
+            block_height = len(blockchain_data.get("chain", []))
 
-            return True, f"Integrity verified (height: {block_height}, checksum: {expected_checksum[:8]}...)"
+            return (
+                True,
+                f"Integrity verified (height: {block_height}, checksum: {expected_checksum[:8]}...)",
+            )
 
         except Exception as e:
             return False, f"Integrity check failed: {str(e)}"

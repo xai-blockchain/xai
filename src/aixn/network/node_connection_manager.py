@@ -1,5 +1,6 @@
 from typing import Dict, Any
 
+
 class NodeConnectionManager:
     def __init__(self, max_inbound_connections: int = 100, max_outbound_connections: int = 50):
         if not isinstance(max_inbound_connections, int) or max_inbound_connections <= 0:
@@ -9,14 +10,16 @@ class NodeConnectionManager:
 
         self.max_inbound_connections = max_inbound_connections
         self.max_outbound_connections = max_outbound_connections
-        
+
         self.current_inbound_connections = 0
         self.current_outbound_connections = 0
-        
+
         # Stores active connections: {connection_id: {"type": "inbound"|"outbound", "peer_info": Any}}
         self.active_connections: Dict[str, Dict[str, Any]] = {}
         self._connection_id_counter = 0
-        print(f"NodeConnectionManager initialized. Max inbound: {self.max_inbound_connections}, Max outbound: {self.max_outbound_connections}.")
+        print(
+            f"NodeConnectionManager initialized. Max inbound: {self.max_inbound_connections}, Max outbound: {self.max_outbound_connections}."
+        )
 
     def _generate_connection_id(self) -> str:
         self._connection_id_counter += 1
@@ -28,12 +31,16 @@ class NodeConnectionManager:
         Returns connection_id if successful.
         """
         if self.current_inbound_connections >= self.max_inbound_connections:
-            raise ValueError(f"Inbound connection rejected: Max inbound connections ({self.max_inbound_connections}) reached.")
-        
+            raise ValueError(
+                f"Inbound connection rejected: Max inbound connections ({self.max_inbound_connections}) reached."
+            )
+
         conn_id = self._generate_connection_id()
         self.active_connections[conn_id] = {"type": "inbound", "peer_info": peer_info}
         self.current_inbound_connections += 1
-        print(f"Inbound connection {conn_id} established. Current inbound: {self.current_inbound_connections}/{self.max_inbound_connections}")
+        print(
+            f"Inbound connection {conn_id} established. Current inbound: {self.current_inbound_connections}/{self.max_inbound_connections}"
+        )
         return conn_id
 
     def establish_outbound_connection(self, peer_info: Any) -> str:
@@ -42,12 +49,16 @@ class NodeConnectionManager:
         Returns connection_id if successful.
         """
         if self.current_outbound_connections >= self.max_outbound_connections:
-            raise ValueError(f"Outbound connection rejected: Max outbound connections ({self.max_outbound_connections}) reached.")
-        
+            raise ValueError(
+                f"Outbound connection rejected: Max outbound connections ({self.max_outbound_connections}) reached."
+            )
+
         conn_id = self._generate_connection_id()
         self.active_connections[conn_id] = {"type": "outbound", "peer_info": peer_info}
         self.current_outbound_connections += 1
-        print(f"Outbound connection {conn_id} established. Current outbound: {self.current_outbound_connections}/{self.max_outbound_connections}")
+        print(
+            f"Outbound connection {conn_id} established. Current outbound: {self.current_outbound_connections}/{self.max_outbound_connections}"
+        )
         return conn_id
 
     def disconnect_connection(self, connection_id: str):
@@ -58,10 +69,14 @@ class NodeConnectionManager:
         if connection:
             if connection["type"] == "inbound":
                 self.current_inbound_connections -= 1
-                print(f"Inbound connection {connection_id} disconnected. Current inbound: {self.current_inbound_connections}/{self.max_inbound_connections}")
+                print(
+                    f"Inbound connection {connection_id} disconnected. Current inbound: {self.current_inbound_connections}/{self.max_inbound_connections}"
+                )
             elif connection["type"] == "outbound":
                 self.current_outbound_connections -= 1
-                print(f"Outbound connection {connection_id} disconnected. Current outbound: {self.current_outbound_connections}/{self.max_outbound_connections}")
+                print(
+                    f"Outbound connection {connection_id} disconnected. Current outbound: {self.current_outbound_connections}/{self.max_outbound_connections}"
+                )
         else:
             print(f"Connection {connection_id} not found.")
 
@@ -70,8 +85,9 @@ class NodeConnectionManager:
         return {
             "inbound": self.current_inbound_connections,
             "outbound": self.current_outbound_connections,
-            "total": len(self.active_connections)
+            "total": len(self.active_connections),
         }
+
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
@@ -82,7 +98,7 @@ if __name__ == "__main__":
     in_conn_2 = manager.handle_inbound_connection("peer_B_info")
     in_conn_3 = manager.handle_inbound_connection("peer_C_info")
     try:
-        manager.handle_inbound_connection("peer_D_info") # Should fail
+        manager.handle_inbound_connection("peer_D_info")  # Should fail
     except ValueError as e:
         print(f"Error (expected): {e}")
     print(f"Current connections: {manager.get_connection_counts()}")
@@ -91,7 +107,7 @@ if __name__ == "__main__":
     out_conn_1 = manager.establish_outbound_connection("peer_X_info")
     out_conn_2 = manager.establish_outbound_connection("peer_Y_info")
     try:
-        manager.establish_outbound_connection("peer_Z_info") # Should fail
+        manager.establish_outbound_connection("peer_Z_info")  # Should fail
     except ValueError as e:
         print(f"Error (expected): {e}")
     print(f"Current connections: {manager.get_connection_counts()}")
@@ -102,5 +118,5 @@ if __name__ == "__main__":
     print(f"Current connections: {manager.get_connection_counts()}")
 
     print("\n--- Re-establishing after Disconnect ---")
-    in_conn_4 = manager.handle_inbound_connection("peer_D_info") # Should now be allowed
+    in_conn_4 = manager.handle_inbound_connection("peer_D_info")  # Should now be allowed
     print(f"Current connections: {manager.get_connection_counts()}")

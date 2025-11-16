@@ -2,6 +2,7 @@ from typing import Dict, List, Any
 import time
 from src.aixn.security.circuit_breaker import CircuitBreaker, CircuitBreakerState
 
+
 class OrderBook:
     def __init__(self):
         # Orders stored as {order_id: {"price": float, "amount": float, "type": "buy"|"sell", "timestamp": int, "status": "open"|"canceled"|"filled"}}
@@ -22,7 +23,7 @@ class OrderBook:
             "amount": amount,
             "type": order_type,
             "timestamp": int(time.time()),
-            "status": "open"
+            "status": "open",
         }
         if order_type == "buy":
             self.buy_orders[order_id] = order
@@ -45,29 +46,41 @@ class OrderBook:
 
     def get_order_book_depth(self) -> Dict[str, List[Dict[str, Any]]]:
         """Returns current open buy and sell orders, sorted by price."""
-        sorted_buy_orders = sorted([o for o in self.buy_orders.values() if o["status"] == "open"], key=lambda x: x["price"], reverse=True)
-        sorted_sell_orders = sorted([o for o in self.sell_orders.values() if o["status"] == "open"], key=lambda x: x["price"])
+        sorted_buy_orders = sorted(
+            [o for o in self.buy_orders.values() if o["status"] == "open"],
+            key=lambda x: x["price"],
+            reverse=True,
+        )
+        sorted_sell_orders = sorted(
+            [o for o in self.sell_orders.values() if o["status"] == "open"],
+            key=lambda x: x["price"],
+        )
         return {"buy": sorted_buy_orders, "sell": sorted_sell_orders}
 
     def get_current_market_price(self) -> float:
         """Estimates current market price from the best bid/ask."""
         depth = self.get_order_book_depth()
         best_bid = depth["buy"][0]["price"] if depth["buy"] else 0
-        best_ask = depth["sell"][0]["price"] if depth["sell"] else float('inf')
-        if best_bid > 0 and best_ask != float('inf'):
+        best_ask = depth["sell"][0]["price"] if depth["sell"] else float("inf")
+        if best_bid > 0 and best_ask != float("inf"):
             return (best_bid + best_ask) / 2
         elif best_bid > 0:
             return best_bid
-        elif best_ask != float('inf'):
+        elif best_ask != float("inf"):
             return best_ask
         return 0.0
 
+
 class OrderBookManipulationDetector:
-    def __init__(self, order_book: OrderBook, circuit_breaker: CircuitBreaker,
-                 spoofing_threshold_percentage: float = 50.0, # % of order book depth
-                 spoofing_cancel_time_seconds: int = 5,
-                 layering_min_orders: int = 3,
-                 layering_price_increment_percentage: float = 0.1):
+    def __init__(
+        self,
+        order_book: OrderBook,
+        circuit_breaker: CircuitBreaker,
+        spoofing_threshold_percentage: float = 50.0,  # % of order book depth
+        spoofing_cancel_time_seconds: int = 5,
+        layering_min_orders: int = 3,
+        layering_price_increment_percentage: float = 0.1,
+    ):
         if not isinstance(order_book, OrderBook):
             raise ValueError("order_book must be an instance of OrderBook.")
         if not isinstance(circuit_breaker, CircuitBreaker):
@@ -87,18 +100,41 @@ class OrderBookManipulationDetector:
         """
         print("\n--- Detecting Spoofing ---")
         current_time = int(time.time())
-        
-        total_buy_depth = sum(o["amount"] * o["price"] for o in self.order_book.buy_orders.values() if o["status"] == "open")
-        total_sell_depth = sum(o["amount"] * o["price"] for o in self.order_book.sell_orders.values() if o["status"] == "open")
 
-        for order_id, order in list(self.order_book.buy_orders.items()) + list(self.order_book.sell_orders.items()):
-            if order["status"] == "canceled" and (current_time - order["timestamp"]) <= self.spoofing_cancel_time_seconds:
+        total_buy_depth = sum(
+            o["amount"] * o["price"]
+            for o in self.order_book.buy_orders.values()
+            if o["status"] == "open"
+        )
+        total_sell_depth = sum(
+            o["amount"] * o["price"]
+            for o in self.order_book.sell_orders.values()
+            if o["status"] == "open"
+        )
+
+        for order_id, order in list(self.order_book.buy_orders.items()) + list(
+            self.order_book.sell_orders.items()
+        ):
+            if (
+                order["status"] == "canceled"
+                and (current_time - order["timestamp"]) <= self.spoofing_cancel_time_seconds
+            ):
                 # Check if the canceled order was significantly large relative to the book
-                if order["type"] == "buy" and total_buy_depth > 0 and (order["amount"] * order["price"] / total_buy_depth) * 100 > self.spoofing_threshold_percentage:
+                if (
+                    order["type"] == "buy"
+                    and total_buy_depth > 0
+                    and (order["amount"] * order["price"] / total_buy_depth) * 100
+                    > self.spoofing_threshold_percentage
+                ):
                     print(f"!!! SPOOFING DETECTED: Large buy order {order_id} canceled quickly.")
                     self.circuit_breaker.record_failure()
                     return True
-                elif order["type"] == "sell" and total_sell_depth > 0 and (order["amount"] * order["price"] / total_sell_depth) * 100 > self.spoofing_threshold_percentage:
+                elif (
+                    order["type"] == "sell"
+                    and total_sell_depth > 0
+                    and (order["amount"] * order["price"] / total_sell_depth) * 100
+                    > self.spoofing_threshold_percentage
+                ):
                     print(f"!!! SPOOFING DETECTED: Large sell order {order_id} canceled quickly.")
                     self.circuit_breaker.record_failure()
                     return True
@@ -117,33 +153,40 @@ class OrderBookManipulationDetector:
         def check_layering_side(orders: List[Dict[str, Any]], is_buy_side: bool) -> bool:
             if len(orders) < self.layering_min_orders:
                 return False
-            
+
             # Sort orders by price (desc for buy, asc for sell)
             sorted_orders = sorted(orders, key=lambda x: x["price"], reverse=is_buy_side)
 
             # Check for consistent small price increments
             for i in range(len(sorted_orders) - self.layering_min_orders + 1):
                 potential_layer = sorted_orders[i : i + self.layering_min_orders]
-                
+
                 is_layered = True
                 for j in range(len(potential_layer) - 1):
-                    price_diff = abs(potential_layer[j]["price"] - potential_layer[j+1]["price"])
-                    avg_price = (potential_layer[j]["price"] + potential_layer[j+1]["price"]) / 2
-                    if avg_price > 0 and (price_diff / avg_price) * 100 > self.layering_price_increment_percentage:
+                    price_diff = abs(potential_layer[j]["price"] - potential_layer[j + 1]["price"])
+                    avg_price = (potential_layer[j]["price"] + potential_layer[j + 1]["price"]) / 2
+                    if (
+                        avg_price > 0
+                        and (price_diff / avg_price) * 100
+                        > self.layering_price_increment_percentage
+                    ):
                         is_layered = False
                         break
                 if is_layered:
-                    print(f"!!! LAYERING DETECTED: {self.layering_min_orders} or more orders with small price increments on {'buy' if is_buy_side else 'sell'} side.")
+                    print(
+                        f"!!! LAYERING DETECTED: {self.layering_min_orders} or more orders with small price increments on {'buy' if is_buy_side else 'sell'} side."
+                    )
                     self.circuit_breaker.record_failure()
                     return True
             return False
 
         if check_layering_side(depth["buy"], True) or check_layering_side(depth["sell"], False):
             return True
-        
+
         print("No layering detected.")
         self.circuit_breaker.record_success()
         return False
+
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
@@ -160,7 +203,7 @@ if __name__ == "__main__":
     print(f"Circuit Breaker State: {cb.state}\n")
 
     print("--- Scenario 2: Spoofing Attempt ---")
-    spoof_order_id = order_book.place_order("buy", 90.0, 1000) # Large order far from market
+    spoof_order_id = order_book.place_order("buy", 90.0, 1000)  # Large order far from market
     time.sleep(1)
     order_book.cancel_order(spoof_order_id)
     print(f"Manipulation detected: {detector.detect_spoofing() or detector.detect_layering()}")
@@ -169,12 +212,21 @@ if __name__ == "__main__":
     print("--- Scenario 3: Layering Attempt ---")
     # Reset order book for clear layering test
     order_book_layering = OrderBook()
-    cb_layering = CircuitBreaker(name="LayeringCB", failure_threshold=1, recovery_timeout_seconds=60)
-    detector_layering = OrderBookManipulationDetector(order_book_layering, cb_layering, layering_min_orders=3, layering_price_increment_percentage=0.1)
+    cb_layering = CircuitBreaker(
+        name="LayeringCB", failure_threshold=1, recovery_timeout_seconds=60
+    )
+    detector_layering = OrderBookManipulationDetector(
+        order_book_layering,
+        cb_layering,
+        layering_min_orders=3,
+        layering_price_increment_percentage=0.1,
+    )
 
     order_book_layering.place_order("sell", 100.1, 1)
     order_book_layering.place_order("sell", 100.2, 1)
     order_book_layering.place_order("sell", 100.3, 1)
     order_book_layering.place_order("sell", 100.4, 1)
-    print(f"Manipulation detected: {detector_layering.detect_spoofing() or detector_layering.detect_layering()}")
+    print(
+        f"Manipulation detected: {detector_layering.detect_spoofing() or detector_layering.detect_layering()}"
+    )
     print(f"Circuit Breaker State: {cb_layering.state}\n")

@@ -34,7 +34,7 @@ class PerplexityProvider:
         api_key: str,
         task: str,
         max_tokens: int,
-        model: str = "llama-3.1-sonar-large-128k-online"
+        model: str = "llama-3.1-sonar-large-128k-online",
     ) -> Dict:
         """
         Call Perplexity API with STRICT token limit
@@ -46,62 +46,49 @@ class PerplexityProvider:
         """
 
         try:
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
+            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
             payload = {
                 "model": model,
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are a helpful AI assistant with real-time web access. Provide accurate, up-to-date information with sources."
+                        "content": "You are a helpful AI assistant with real-time web access. Provide accurate, up-to-date information with sources.",
                     },
-                    {
-                        "role": "user",
-                        "content": task
-                    }
+                    {"role": "user", "content": task},
                 ],
                 "max_tokens": max_tokens,  # HARD LIMIT
                 "temperature": 0.7,
                 "return_citations": True,  # Get sources
-                "return_images": False
+                "return_images": False,
             }
 
             response = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=120
+                f"{self.base_url}/chat/completions", headers=headers, json=payload, timeout=120
             )
 
             response.raise_for_status()
             data = response.json()
 
             # Extract response
-            message = data['choices'][0]['message']['content']
-            citations = data.get('citations', [])
+            message = data["choices"][0]["message"]["content"]
+            citations = data.get("citations", [])
 
             # Token counting
-            tokens_used = data['usage']['total_tokens']
+            tokens_used = data["usage"]["total_tokens"]
 
             return {
-                'success': True,
-                'output': message,
-                'tokens_used': tokens_used,
-                'input_tokens': data['usage']['prompt_tokens'],
-                'output_tokens': data['usage']['completion_tokens'],
-                'sources': citations,  # ⭐ Unique feature
-                'model': model
+                "success": True,
+                "output": message,
+                "tokens_used": tokens_used,
+                "input_tokens": data["usage"]["prompt_tokens"],
+                "output_tokens": data["usage"]["completion_tokens"],
+                "sources": citations,  # ⭐ Unique feature
+                "model": model,
             }
 
         except requests.exceptions.RequestException as e:
-            return {
-                'success': False,
-                'error': f'Perplexity API error: {str(e)}',
-                'tokens_used': 0
-            }
+            return {"success": False, "error": f"Perplexity API error: {str(e)}", "tokens_used": 0}
 
 
 class GroqProvider:
@@ -116,11 +103,7 @@ class GroqProvider:
         self.base_url = "https://api.groq.com/openai/v1"
 
     def call_with_limit(
-        self,
-        api_key: str,
-        task: str,
-        max_tokens: int,
-        model: str = "llama-3.1-70b-versatile"
+        self, api_key: str, task: str, max_tokens: int, model: str = "llama-3.1-70b-versatile"
     ) -> Dict:
         """
         Call Groq API with STRICT token limit
@@ -133,61 +116,51 @@ class GroqProvider:
         """
 
         try:
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
+            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
             payload = {
                 "model": model,
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are a helpful AI coding assistant. Provide clear, concise, high-quality code and explanations."
+                        "content": "You are a helpful AI coding assistant. Provide clear, concise, high-quality code and explanations.",
                     },
-                    {
-                        "role": "user",
-                        "content": task
-                    }
+                    {"role": "user", "content": task},
                 ],
                 "max_tokens": max_tokens,  # HARD LIMIT
                 "temperature": 0.7,
                 "top_p": 1,
-                "stream": False
+                "stream": False,
             }
 
             response = requests.post(
                 f"{self.base_url}/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=60  # Groq is fast, shouldn't take long
+                timeout=60,  # Groq is fast, shouldn't take long
             )
 
             response.raise_for_status()
             data = response.json()
 
             # Extract response
-            message = data['choices'][0]['message']['content']
+            message = data["choices"][0]["message"]["content"]
 
             # Token counting
-            tokens_used = data['usage']['total_tokens']
+            tokens_used = data["usage"]["total_tokens"]
 
             return {
-                'success': True,
-                'output': message,
-                'tokens_used': tokens_used,
-                'input_tokens': data['usage']['prompt_tokens'],
-                'output_tokens': data['usage']['completion_tokens'],
-                'model': model,
-                'inference_speed': 'ultra_fast'  # ⭐ 10-20x faster
+                "success": True,
+                "output": message,
+                "tokens_used": tokens_used,
+                "input_tokens": data["usage"]["prompt_tokens"],
+                "output_tokens": data["usage"]["completion_tokens"],
+                "model": model,
+                "inference_speed": "ultra_fast",  # ⭐ 10-20x faster
             }
 
         except requests.exceptions.RequestException as e:
-            return {
-                'success': False,
-                'error': f'Groq API error: {str(e)}',
-                'tokens_used': 0
-            }
+            return {"success": False, "error": f"Groq API error: {str(e)}", "tokens_used": 0}
 
 
 class XAIProvider:
@@ -202,11 +175,7 @@ class XAIProvider:
         self.base_url = "https://api.x.ai/v1"
 
     def call_with_limit(
-        self,
-        api_key: str,
-        task: str,
-        max_tokens: int,
-        model: str = "grok-beta"
+        self, api_key: str, task: str, max_tokens: int, model: str = "grok-beta"
     ) -> Dict:
         """
         Call xAI/Grok API with STRICT token limit
@@ -217,60 +186,47 @@ class XAIProvider:
         """
 
         try:
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
+            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
             payload = {
                 "model": model,
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are Grok, a helpful AI with real-time knowledge and access to X/Twitter. Provide current, accurate information with a witty edge."
+                        "content": "You are Grok, a helpful AI with real-time knowledge and access to X/Twitter. Provide current, accurate information with a witty edge.",
                     },
-                    {
-                        "role": "user",
-                        "content": task
-                    }
+                    {"role": "user", "content": task},
                 ],
                 "max_tokens": max_tokens,  # HARD LIMIT
                 "temperature": 0.7,
-                "stream": False
+                "stream": False,
             }
 
             response = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=120
+                f"{self.base_url}/chat/completions", headers=headers, json=payload, timeout=120
             )
 
             response.raise_for_status()
             data = response.json()
 
             # Extract response
-            message = data['choices'][0]['message']['content']
+            message = data["choices"][0]["message"]["content"]
 
             # Token counting
-            tokens_used = data['usage']['total_tokens']
+            tokens_used = data["usage"]["total_tokens"]
 
             return {
-                'success': True,
-                'output': message,
-                'tokens_used': tokens_used,
-                'input_tokens': data['usage']['prompt_tokens'],
-                'output_tokens': data['usage']['completion_tokens'],
-                'model': model,
-                'real_time_data': True  # ⭐ Has current information
+                "success": True,
+                "output": message,
+                "tokens_used": tokens_used,
+                "input_tokens": data["usage"]["prompt_tokens"],
+                "output_tokens": data["usage"]["completion_tokens"],
+                "model": model,
+                "real_time_data": True,  # ⭐ Has current information
             }
 
         except requests.exceptions.RequestException as e:
-            return {
-                'success': False,
-                'error': f'xAI API error: {str(e)}',
-                'tokens_used': 0
-            }
+            return {"success": False, "error": f"xAI API error: {str(e)}", "tokens_used": 0}
 
 
 class TogetherAIProvider:
@@ -289,7 +245,7 @@ class TogetherAIProvider:
         api_key: str,
         task: str,
         max_tokens: int,
-        model: str = "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"
+        model: str = "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
     ) -> Dict:
         """
         Call Together AI API with STRICT token limit
@@ -302,61 +258,48 @@ class TogetherAIProvider:
         """
 
         try:
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
+            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
             payload = {
                 "model": model,
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are a helpful AI assistant. Provide clear, accurate responses."
+                        "content": "You are a helpful AI assistant. Provide clear, accurate responses.",
                     },
-                    {
-                        "role": "user",
-                        "content": task
-                    }
+                    {"role": "user", "content": task},
                 ],
                 "max_tokens": max_tokens,  # HARD LIMIT
                 "temperature": 0.7,
                 "top_p": 1,
-                "stream": False
+                "stream": False,
             }
 
             response = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=120
+                f"{self.base_url}/chat/completions", headers=headers, json=payload, timeout=120
             )
 
             response.raise_for_status()
             data = response.json()
 
             # Extract response
-            message = data['choices'][0]['message']['content']
+            message = data["choices"][0]["message"]["content"]
 
             # Token counting
-            tokens_used = data['usage']['total_tokens']
+            tokens_used = data["usage"]["total_tokens"]
 
             return {
-                'success': True,
-                'output': message,
-                'tokens_used': tokens_used,
-                'input_tokens': data['usage']['prompt_tokens'],
-                'output_tokens': data['usage']['completion_tokens'],
-                'model': model,
-                'cost_optimized': True  # ⭐ Very cheap
+                "success": True,
+                "output": message,
+                "tokens_used": tokens_used,
+                "input_tokens": data["usage"]["prompt_tokens"],
+                "output_tokens": data["usage"]["completion_tokens"],
+                "model": model,
+                "cost_optimized": True,  # ⭐ Very cheap
             }
 
         except requests.exceptions.RequestException as e:
-            return {
-                'success': False,
-                'error': f'Together AI error: {str(e)}',
-                'tokens_used': 0
-            }
+            return {"success": False, "error": f"Together AI error: {str(e)}", "tokens_used": 0}
 
 
 class FireworksAIProvider:
@@ -375,7 +318,7 @@ class FireworksAIProvider:
         api_key: str,
         task: str,
         max_tokens: int,
-        model: str = "accounts/fireworks/models/llama-v3p1-70b-instruct"
+        model: str = "accounts/fireworks/models/llama-v3p1-70b-instruct",
     ) -> Dict:
         """
         Call Fireworks AI API with STRICT token limit
@@ -387,60 +330,47 @@ class FireworksAIProvider:
         """
 
         try:
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
+            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
             payload = {
                 "model": model,
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are a helpful AI assistant. Provide high-quality, production-ready code and responses."
+                        "content": "You are a helpful AI assistant. Provide high-quality, production-ready code and responses.",
                     },
-                    {
-                        "role": "user",
-                        "content": task
-                    }
+                    {"role": "user", "content": task},
                 ],
                 "max_tokens": max_tokens,  # HARD LIMIT
                 "temperature": 0.7,
-                "top_p": 1
+                "top_p": 1,
             }
 
             response = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=120
+                f"{self.base_url}/chat/completions", headers=headers, json=payload, timeout=120
             )
 
             response.raise_for_status()
             data = response.json()
 
             # Extract response
-            message = data['choices'][0]['message']['content']
+            message = data["choices"][0]["message"]["content"]
 
             # Token counting
-            tokens_used = data['usage']['total_tokens']
+            tokens_used = data["usage"]["total_tokens"]
 
             return {
-                'success': True,
-                'output': message,
-                'tokens_used': tokens_used,
-                'input_tokens': data['usage']['prompt_tokens'],
-                'output_tokens': data['usage']['completion_tokens'],
-                'model': model,
-                'production_grade': True  # ⭐ Optimized for production
+                "success": True,
+                "output": message,
+                "tokens_used": tokens_used,
+                "input_tokens": data["usage"]["prompt_tokens"],
+                "output_tokens": data["usage"]["completion_tokens"],
+                "model": model,
+                "production_grade": True,  # ⭐ Optimized for production
             }
 
         except requests.exceptions.RequestException as e:
-            return {
-                'success': False,
-                'error': f'Fireworks AI error: {str(e)}',
-                'tokens_used': 0
-            }
+            return {"success": False, "error": f"Fireworks AI error: {str(e)}", "tokens_used": 0}
 
 
 class DeepSeekProvider:
@@ -455,11 +385,7 @@ class DeepSeekProvider:
         self.base_url = "https://api.deepseek.com/v1"
 
     def call_with_limit(
-        self,
-        api_key: str,
-        task: str,
-        max_tokens: int,
-        model: str = "deepseek-coder"
+        self, api_key: str, task: str, max_tokens: int, model: str = "deepseek-coder"
     ) -> Dict:
         """
         Call DeepSeek API with STRICT token limit
@@ -470,60 +396,47 @@ class DeepSeekProvider:
         """
 
         try:
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            }
+            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
             payload = {
                 "model": model,
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are an expert programming assistant. Write clean, efficient, well-documented code."
+                        "content": "You are an expert programming assistant. Write clean, efficient, well-documented code.",
                     },
-                    {
-                        "role": "user",
-                        "content": task
-                    }
+                    {"role": "user", "content": task},
                 ],
                 "max_tokens": max_tokens,  # HARD LIMIT
                 "temperature": 0.7,
-                "stream": False
+                "stream": False,
             }
 
             response = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=payload,
-                timeout=120
+                f"{self.base_url}/chat/completions", headers=headers, json=payload, timeout=120
             )
 
             response.raise_for_status()
             data = response.json()
 
             # Extract response
-            message = data['choices'][0]['message']['content']
+            message = data["choices"][0]["message"]["content"]
 
             # Token counting
-            tokens_used = data['usage']['total_tokens']
+            tokens_used = data["usage"]["total_tokens"]
 
             return {
-                'success': True,
-                'output': message,
-                'tokens_used': tokens_used,
-                'input_tokens': data['usage']['prompt_tokens'],
-                'output_tokens': data['usage']['completion_tokens'],
-                'model': model,
-                'code_specialist': True  # ⭐ Best for code
+                "success": True,
+                "output": message,
+                "tokens_used": tokens_used,
+                "input_tokens": data["usage"]["prompt_tokens"],
+                "output_tokens": data["usage"]["completion_tokens"],
+                "model": model,
+                "code_specialist": True,  # ⭐ Best for code
             }
 
         except requests.exceptions.RequestException as e:
-            return {
-                'success': False,
-                'error': f'DeepSeek API error: {str(e)}',
-                'tokens_used': 0
-            }
+            return {"success": False, "error": f"DeepSeek API error: {str(e)}", "tokens_used": 0}
 
 
 # Integration with existing auto_switching_ai_executor.py
@@ -570,7 +483,9 @@ def extend_executor_with_new_providers(executor_class):
     # Update provider routing
     original_execute = executor_class._execute_with_strict_limits
 
-    def _execute_with_strict_limits_extended(self, keys, task_description, estimated_tokens, max_tokens, provider):
+    def _execute_with_strict_limits_extended(
+        self, keys, task_description, estimated_tokens, max_tokens, provider
+    ):
         # Add new provider handling
         if provider.value == "perplexity":
             result = self._call_perplexity_with_limit(api_key, task_description, max_tokens)
@@ -586,7 +501,9 @@ def extend_executor_with_new_providers(executor_class):
             result = self._call_deepseek_with_limit(api_key, task_description, max_tokens)
         else:
             # Fall back to original implementation for Anthropic/OpenAI/Google
-            return original_execute(self, keys, task_description, estimated_tokens, max_tokens, provider)
+            return original_execute(
+                self, keys, task_description, estimated_tokens, max_tokens, provider
+            )
 
         return result
 
@@ -594,7 +511,7 @@ def extend_executor_with_new_providers(executor_class):
 
 
 # Example usage
-if __name__ == '__main__':
+if __name__ == "__main__":
     print("=" * 80)
     print("NEW AI PROVIDERS - TESTING")
     print("=" * 80)
@@ -606,7 +523,7 @@ if __name__ == '__main__':
         ("xAI/Grok", XAIProvider()),
         ("Together AI", TogetherAIProvider()),
         ("Fireworks AI", FireworksAIProvider()),
-        ("DeepSeek", DeepSeekProvider())
+        ("DeepSeek", DeepSeekProvider()),
     ]
 
     test_task = "Write a Python function to calculate Fibonacci numbers"
@@ -625,7 +542,8 @@ if __name__ == '__main__':
     print("\n\n" + "=" * 80)
     print("PROVIDER CAPABILITIES SUMMARY")
     print("=" * 80)
-    print("""
+    print(
+        """
 1. Perplexity
    ⭐ Unique: Real-time web access
    📚 Best for: Research, finding current info
@@ -661,4 +579,5 @@ All providers support:
 ✅ Real-time token counting
 ✅ Error handling & retries
 ✅ Integration with auto-switching system
-    """)
+    """
+    )

@@ -6,6 +6,7 @@ import os
 
 IP_WHITELIST_CONFIG_FILE = "ip_whitelist.json"
 
+
 class IPWhitelist:
     def __init__(self, config_file=IP_WHITELIST_CONFIG_FILE):
         self.config_file = os.path.join("config", config_file)
@@ -16,7 +17,10 @@ class IPWhitelist:
         if os.path.exists(self.config_file):
             with open(self.config_file, "r") as f:
                 config = json.load(f)
-                self.whitelisted_ips = [ipaddress.ip_network(ip, strict=False) for ip in config.get("whitelisted_ips", [])]
+                self.whitelisted_ips = [
+                    ipaddress.ip_network(ip, strict=False)
+                    for ip in config.get("whitelisted_ips", [])
+                ]
         else:
             # Default to an empty whitelist if config file doesn't exist
             self.whitelisted_ips = []
@@ -47,7 +51,7 @@ class IPWhitelist:
                     return True
             return False
         except ValueError:
-            return False # Invalid IP address format
+            return False  # Invalid IP address format
 
     def whitelist_required(self):
         def decorator(f):
@@ -57,8 +61,11 @@ class IPWhitelist:
                 if not self.is_whitelisted(client_ip):
                     abort(403, description="Forbidden: IP address not whitelisted.")
                 return f(*args, **kwargs)
+
             return decorated_function
+
         return decorator
+
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

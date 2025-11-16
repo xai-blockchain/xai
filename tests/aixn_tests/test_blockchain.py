@@ -17,7 +17,7 @@ import os
 import time
 
 # Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'core'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "core"))
 
 from blockchain import Blockchain, Transaction, Block
 from wallet import Wallet
@@ -54,7 +54,7 @@ class TestBlockchainCore:
 
         assert block.index == 1, "First mined block should be index 1"
         assert block.previous_hash == bc.chain[0].hash, "Previous hash should match genesis"
-        assert block.hash.startswith('0' * bc.difficulty), "Hash should meet difficulty"
+        assert block.hash.startswith("0" * bc.difficulty), "Hash should meet difficulty"
 
     def test_transaction_creation(self):
         """Test transaction creation and signing"""
@@ -63,10 +63,18 @@ class TestBlockchainCore:
 
         # For a simple transfer, we'll assume a single input and output for now
         # In a real scenario, UTXOManager would help select inputs
-        mock_input = {'txid': 'mock_txid', 'vout': 0}
-        mock_output = {'address': wallet2.address, 'amount': 10.0}
+        mock_input = {"txid": "mock_txid", "vout": 0}
+        mock_output = {"address": wallet2.address, "amount": 10.0}
 
-        tx = Transaction(wallet1.address, wallet2.address, 10.0, 0.24, public_key=wallet1.public_key, inputs=[mock_input], outputs=[mock_output])
+        tx = Transaction(
+            wallet1.address,
+            wallet2.address,
+            10.0,
+            0.24,
+            public_key=wallet1.public_key,
+            inputs=[mock_input],
+            outputs=[mock_output],
+        )
         tx.sign_transaction(wallet1.private_key)
 
         assert tx.txid is not None, "Transaction should have ID"
@@ -80,13 +88,26 @@ class TestBlockchainCore:
         wallet2 = Wallet()
 
         # Create transaction with mock inputs/outputs for validation
-        mock_input = {'txid': 'mock_txid', 'vout': 0}
-        mock_output = {'address': wallet2.address, 'amount': 10.0}
-        tx = Transaction(wallet1.address, wallet2.address, 10.0, 0.24, public_key=wallet1.public_key, inputs=[mock_input], outputs=[mock_output])
+        mock_input = {"txid": "mock_txid", "vout": 0}
+        mock_output = {"address": wallet2.address, "amount": 10.0}
+        tx = Transaction(
+            wallet1.address,
+            wallet2.address,
+            10.0,
+            0.24,
+            public_key=wallet1.public_key,
+            inputs=[mock_input],
+            outputs=[mock_output],
+        )
         tx.sign_transaction(wallet1.private_key)
 
         # Coinbase transactions should be valid
-        coinbase_tx = Transaction("COINBASE", wallet1.address, 12.0, outputs=[{'address': wallet1.address, 'amount': 12.0}])
+        coinbase_tx = Transaction(
+            "COINBASE",
+            wallet1.address,
+            12.0,
+            outputs=[{"address": wallet1.address, "amount": 12.0}],
+        )
         coinbase_tx.txid = coinbase_tx.calculate_hash()
 
         # Note: bc.validate_transaction is now handled by TransactionValidator
@@ -165,18 +186,20 @@ class TestWalletOperations:
         # Find spendable UTXOs for wallet1
         amount_to_send = 5.0
         fee = 0.24
-        spendable_utxos = bc.utxo_manager.find_spendable_utxos(wallet1.address, amount_to_send + fee)
+        spendable_utxos = bc.utxo_manager.find_spendable_utxos(
+            wallet1.address, amount_to_send + fee
+        )
         assert len(spendable_utxos) > 0
 
         # Create a transaction from wallet1 to wallet2
-        input_sum = sum(utxo['amount'] for utxo in spendable_utxos)
+        input_sum = sum(utxo["amount"] for utxo in spendable_utxos)
         change_amount = input_sum - (amount_to_send + fee)
-        
-        outputs = [{'address': wallet2.address, 'amount': amount_to_send}]
-        if change_amount > 0:
-            outputs.append({'address': wallet1.address, 'amount': change_amount})
 
-        inputs = [{'txid': utxo['txid'], 'vout': utxo['vout']} for utxo in spendable_utxos]
+        outputs = [{"address": wallet2.address, "amount": amount_to_send}]
+        if change_amount > 0:
+            outputs.append({"address": wallet1.address, "amount": change_amount})
+
+        inputs = [{"txid": utxo["txid"], "vout": utxo["vout"]} for utxo in spendable_utxos]
 
         tx = Transaction(
             wallet1.address,
@@ -185,10 +208,10 @@ class TestWalletOperations:
             fee,
             public_key=wallet1.public_key,
             inputs=inputs,
-            outputs=outputs
+            outputs=outputs,
         )
         tx.sign_transaction(wallet1.private_key)
-        
+
         # Add transaction to pending pool
         assert bc.add_transaction(tx) is True
 

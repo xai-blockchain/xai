@@ -9,21 +9,17 @@ are safe to call from the settlement path.
 from prometheus_client import Counter, Gauge
 
 fee_collection_counter = Counter(
-    'xai_trade_fee_collected_total',
-    'Total XAI collected from wallet trade fees',
-    ['currency']
+    "xai_trade_fee_collected_total", "Total XAI collected from wallet trade fees", ["currency"]
 )
 
 fee_transfer_events = Counter(
-    'xai_trade_fee_transfer_events_total',
-    'Total number of fee transfer events emitted by the treasury',
-    ['direction']
+    "xai_trade_fee_transfer_events_total",
+    "Total number of fee transfer events emitted by the treasury",
+    ["direction"],
 )
 
 treasury_balance_gauge = Gauge(
-    'xai_fee_treasury_balance',
-    'Current balance of the fee treasury',
-    ['address', 'currency']
+    "xai_fee_treasury_balance", "Current balance of the fee treasury", ["address", "currency"]
 )
 
 
@@ -33,10 +29,10 @@ def record_fee_collection(currency: str, amount: float):
         return
 
     fee_collection_counter.labels(currency=currency).inc(amount)
-    fee_transfer_events.labels(direction='collected').inc()
+    fee_transfer_events.labels(direction="collected").inc()
 
 
-def update_fee_treasury_balance(blockchain, fee_address: str, currency: str = 'XAI'):
+def update_fee_treasury_balance(blockchain, fee_address: str, currency: str = "XAI"):
     """Refresh the treasury balance gauge from on-chain UTXOs."""
     if not blockchain or not fee_address:
         return

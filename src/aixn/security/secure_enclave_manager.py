@@ -8,12 +8,17 @@ from typing import Optional, Dict, Any, Tuple
 # Its purpose is to illustrate the concept of offloading sensitive operations to a secure environment.
 # DO NOT use this for any production or security-sensitive applications.
 
+
 class SecureEnclaveManager:
     def __init__(self, simulate_enclave_available: bool = True):
         self._simulate_enclave_available = simulate_enclave_available
-        self._enclave_keys: Dict[str, Tuple[bytes, bytes]] = {} # {key_handle: (conceptual_private_key, conceptual_public_key)}
+        self._enclave_keys: Dict[str, Tuple[bytes, bytes]] = (
+            {}
+        )  # {key_handle: (conceptual_private_key, conceptual_public_key)}
         self._key_handle_counter = 0
-        print(f"Secure Enclave Manager initialized. Enclave available: {self._simulate_enclave_available}")
+        print(
+            f"Secure Enclave Manager initialized. Enclave available: {self._simulate_enclave_available}"
+        )
 
     def _is_enclave_available(self) -> bool:
         """Simulates checking if the secure enclave is available."""
@@ -27,17 +32,17 @@ class SecureEnclaveManager:
         if not self._is_enclave_available():
             print("Error: Secure enclave not available.")
             return None
-        
+
         self._key_handle_counter += 1
         key_handle = f"enclave_key_{self._key_handle_counter}"
-        
+
         # Conceptually generate a private key and a corresponding public key inside the enclave
-        conceptual_private_key = os.urandom(32) # 32 bytes for a conceptual private key
+        conceptual_private_key = os.urandom(32)  # 32 bytes for a conceptual private key
         # For conceptual public key, we'll just hash the private key. This is NOT how real public keys are derived.
-        conceptual_public_key = hashlib.sha256(conceptual_private_key).digest() 
-        
+        conceptual_public_key = hashlib.sha256(conceptual_private_key).digest()
+
         self._enclave_keys[key_handle] = (conceptual_private_key, conceptual_public_key)
-        
+
         print(f"Key pair conceptually generated inside enclave. Handle: {key_handle}")
         return key_handle
 
@@ -48,13 +53,13 @@ class SecureEnclaveManager:
         if not self._is_enclave_available():
             print("Error: Secure enclave not available.")
             return None
-        
+
         key_pair = self._enclave_keys.get(key_handle)
         if key_pair is None:
             print(f"Error: Key handle {key_handle} not found in enclave.")
             return None
-        
-        return key_pair[1] # Return the conceptual public key
+
+        return key_pair[1]  # Return the conceptual public key
 
     def sign_data_in_enclave(self, key_handle: str, data_to_sign: bytes) -> Optional[bytes]:
         """
@@ -64,19 +69,19 @@ class SecureEnclaveManager:
         if not self._is_enclave_available():
             print("Error: Secure enclave not available.")
             return None
-        
+
         key_pair = self._enclave_keys.get(key_handle)
         if key_pair is None:
             print(f"Error: Key handle {key_handle} not found in enclave.")
             return None
-        
+
         conceptual_private_key = key_pair[0]
-        
+
         # Simulate signing: hash data_to_sign with the conceptual private key
         # In a real enclave, this would be a proper cryptographic signature (e.g., ECDSA).
         signature_input = conceptual_private_key + data_to_sign
         conceptual_signature = hashlib.sha256(signature_input).digest()
-        
+
         print(f"Data conceptually signed in enclave using handle {key_handle}.")
         return conceptual_signature
 
@@ -87,29 +92,29 @@ class SecureEnclaveManager:
         # In our simplified signing, the signature is a hash of (private_key + data).
         # To verify this, we need to know the conceptual private key to re-create the hash.
         # This is NOT how real public key cryptography works.
-        
+
         # For this conceptual model, we'll assume the `public_key` provided here
         # is the conceptual public key that was returned by `get_public_key_from_enclave`.
         # And the signature is a hash of (conceptual_private_key + data_to_sign).
         # We cannot verify this with just the `public_key` without knowing the `private_key`.
-        
+
         # This highlights the limitation of simulating real crypto without actual crypto.
-        
+
         # Let's adjust the conceptual verification to match the conceptual signing.
         # If the signature is `hash(private_key + data)`, then to verify with `public_key`,
         # we would need a way to derive `private_key` from `public_key`, which is the core
         # of public-key crypto.
-        
+
         # For this simulation, we'll make a very simplified assumption:
         # The `public_key` is actually a hash of the `private_key`.
         # And the `signature` is `hash(private_key + data_to_sign)`.
         # We cannot verify this with just the `public_key` without knowing the `private_key`.
-        
+
         # To make this example work conceptually, we need to change the `sign_data_in_enclave`
         # to produce a signature that can be verified with the conceptual public key.
         # Let's make the conceptual signature simply a hash of (public_key + data_to_sign).
         # This is still not a real signature, but it allows for a conceptual verification.
-        
+
         expected_signature_input = public_key + data_to_sign
         expected_signature = hashlib.sha256(expected_signature_input).digest()
 
@@ -120,6 +125,7 @@ class SecureEnclaveManager:
             print("Conceptual signature verification failed.")
             return False
 
+
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
     enclave_manager = SecureEnclaveManager(simulate_enclave_available=True)
@@ -128,7 +134,7 @@ if __name__ == "__main__":
     key_handle = enclave_manager.generate_key_in_enclave()
     if key_handle:
         print(f"Obtained key handle: {key_handle}")
-        
+
         conceptual_public_key = enclave_manager.get_public_key_from_enclave(key_handle)
         if conceptual_public_key:
             print(f"Conceptual Public Key: {conceptual_public_key.hex()}")
@@ -140,12 +146,16 @@ if __name__ == "__main__":
                 print(f"Conceptual Signature 1: {signature_1.hex()}")
 
                 print(f"\n--- Verifying Signature 1 ---")
-                is_valid_1 = enclave_manager.verify_signature(conceptual_public_key, data_to_sign_1, signature_1)
+                is_valid_1 = enclave_manager.verify_signature(
+                    conceptual_public_key, data_to_sign_1, signature_1
+                )
                 print(f"Signature 1 Valid: {is_valid_1}")
 
                 # Test with invalid data
                 data_to_sign_1_modified = b"This is a modified message to be signed."
-                is_valid_1_modified = enclave_manager.verify_signature(conceptual_public_key, data_to_sign_1_modified, signature_1)
+                is_valid_1_modified = enclave_manager.verify_signature(
+                    conceptual_public_key, data_to_sign_1_modified, signature_1
+                )
                 print(f"Signature 1 Valid with modified data: {is_valid_1_modified}")
             else:
                 print("Signature generation failed.")
@@ -157,8 +167,10 @@ if __name__ == "__main__":
     unavailable_key_handle = unavailable_enclave_manager.generate_key_in_enclave()
     if unavailable_key_handle is None:
         print("As expected, key generation failed when enclave is unavailable.")
-    
+
     data_to_sign_2 = b"Another message."
-    unavailable_signature = unavailable_enclave_manager.sign_data_in_enclave("some_handle", data_to_sign_2)
+    unavailable_signature = unavailable_enclave_manager.sign_data_in_enclave(
+        "some_handle", data_to_sign_2
+    )
     if unavailable_signature is None:
         print("As expected, signing failed when enclave is unavailable.")

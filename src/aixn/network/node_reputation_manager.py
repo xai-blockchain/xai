@@ -1,30 +1,41 @@
 import time
 from typing import Dict, Any, List
 
+
 class NodeReputationManager:
-    def __init__(self, initial_reputation: float = 50.0, min_reputation: float = 0.0, max_reputation: float = 100.0, decay_rate: float = 0.01):
+    def __init__(
+        self,
+        initial_reputation: float = 50.0,
+        min_reputation: float = 0.0,
+        max_reputation: float = 100.0,
+        decay_rate: float = 0.01,
+    ):
         if not (0 <= initial_reputation <= 100):
             raise ValueError("Initial reputation must be between 0 and 100.")
         if not (0 <= min_reputation < max_reputation <= 100):
-            raise ValueError("Min reputation must be less than max reputation and both between 0 and 100.")
+            raise ValueError(
+                "Min reputation must be less than max reputation and both between 0 and 100."
+            )
         if not (0 <= decay_rate <= 1):
             raise ValueError("Decay rate must be between 0 and 1.")
 
         self.initial_reputation = initial_reputation
         self.min_reputation = min_reputation
         self.max_reputation = max_reputation
-        self.decay_rate = decay_rate # Percentage decay per time unit (e.g., per hour)
+        self.decay_rate = decay_rate  # Percentage decay per time unit (e.g., per hour)
 
         # Stores reputation: {peer_id: {"score": float, "last_updated": float}}
         self.peer_reputations: Dict[str, Dict[str, float]] = {}
-        print(f"NodeReputationManager initialized. Initial: {initial_reputation}, Min: {min_reputation}, Max: {max_reputation}, Decay: {decay_rate}.")
+        print(
+            f"NodeReputationManager initialized. Initial: {initial_reputation}, Min: {min_reputation}, Max: {max_reputation}, Decay: {decay_rate}."
+        )
 
     def _get_reputation_entry(self, peer_id: str) -> Dict[str, float]:
         """Initializes or retrieves reputation data for a peer."""
         if peer_id not in self.peer_reputations:
             self.peer_reputations[peer_id] = {
                 "score": self.initial_reputation,
-                "last_updated": time.time()
+                "last_updated": time.time(),
             }
         return self.peer_reputations[peer_id]
 
@@ -33,7 +44,7 @@ class NodeReputationManager:
         entry = self._get_reputation_entry(peer_id)
         current_time = time.time()
         time_elapsed = current_time - entry["last_updated"]
-        
+
         # For simplicity, decay linearly per second for now. In a real system,
         # this might be per hour, per day, or based on block intervals.
         decay_amount = self.decay_rate * time_elapsed * (entry["score"] - self.min_reputation)
@@ -49,7 +60,7 @@ class NodeReputationManager:
         """Increases a peer's reputation score."""
         if not isinstance(amount, (int, float)) or amount < 0:
             raise ValueError("Reputation increase amount must be a non-negative number.")
-        
+
         entry = self._get_reputation_entry(peer_id)
         self._apply_decay(peer_id)
         entry["score"] = min(self.max_reputation, entry["score"] + amount)
@@ -65,7 +76,9 @@ class NodeReputationManager:
         entry["score"] = max(self.min_reputation, entry["score"] - amount)
         print(f"Reputation for {peer_id} decreased to {entry['score']:.2f}.")
 
-    def get_reputable_peers(self, all_peer_ids: List[str], min_score_threshold: float = 25.0) -> List[str]:
+    def get_reputable_peers(
+        self, all_peer_ids: List[str], min_score_threshold: float = 25.0
+    ) -> List[str]:
         """
         Returns a list of peer IDs whose reputation is above the given threshold.
         """
@@ -74,6 +87,7 @@ class NodeReputationManager:
             if self.get_reputation(peer_id) >= min_score_threshold:
                 reputable_peers.append(peer_id)
         return reputable_peers
+
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

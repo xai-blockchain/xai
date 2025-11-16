@@ -1,8 +1,14 @@
 import time
 from typing import Dict, Any
 
+
 class DowntimePenaltyManager:
-    def __init__(self, initial_validators: Dict[str, float], grace_period_seconds: int = 300, penalty_rate_per_second: float = 0.00001):
+    def __init__(
+        self,
+        initial_validators: Dict[str, float],
+        grace_period_seconds: int = 300,
+        penalty_rate_per_second: float = 0.00001,
+    ):
         """
         Initializes the DowntimePenaltyManager.
         :param initial_validators: A dictionary where keys are validator_ids (str) and values are staked_amounts (float).
@@ -13,7 +19,9 @@ class DowntimePenaltyManager:
             raise ValueError("Initial validators must be a dictionary.")
         if not isinstance(grace_period_seconds, int) or grace_period_seconds < 0:
             raise ValueError("Grace period must be a non-negative integer.")
-        if not isinstance(penalty_rate_per_second, (int, float)) or not (0 <= penalty_rate_per_second <= 1):
+        if not isinstance(penalty_rate_per_second, (int, float)) or not (
+            0 <= penalty_rate_per_second <= 1
+        ):
             raise ValueError("Penalty rate must be a number between 0 and 1.")
 
         self.grace_period_seconds = grace_period_seconds
@@ -29,9 +37,11 @@ class DowntimePenaltyManager:
                 "staked_amount": staked_amount,
                 "last_active_time": time.time(),
                 "total_penalties": 0.0,
-                "is_jailed": False # Conceptual jailing status
+                "is_jailed": False,  # Conceptual jailing status
             }
-        print(f"DowntimePenaltyManager initialized with {len(self.validators)} validators. Grace period: {grace_period_seconds}s.")
+        print(
+            f"DowntimePenaltyManager initialized with {len(self.validators)} validators. Grace period: {grace_period_seconds}s."
+        )
 
     def record_activity(self, validator_id: str):
         """Records activity for a validator, resetting their last_active_time."""
@@ -52,15 +62,19 @@ class DowntimePenaltyManager:
         print(f"\n--- Checking for downtime at {current_time:.2f} ---")
         for validator_id, info in self.validators.items():
             if info["is_jailed"]:
-                print(f"Validator {validator_id} is jailed. No further penalties applied until unjailed.")
+                print(
+                    f"Validator {validator_id} is jailed. No further penalties applied until unjailed."
+                )
                 continue
 
             time_since_last_activity = current_time - info["last_active_time"]
 
             if time_since_last_activity > self.grace_period_seconds:
                 downtime_duration = time_since_last_activity - self.grace_period_seconds
-                penalty_amount = info["staked_amount"] * self.penalty_rate_per_second * downtime_duration
-                
+                penalty_amount = (
+                    info["staked_amount"] * self.penalty_rate_per_second * downtime_duration
+                )
+
                 # Ensure penalty doesn't exceed staked amount
                 penalty_amount = min(penalty_amount, info["staked_amount"])
 
@@ -68,36 +82,47 @@ class DowntimePenaltyManager:
                     info["staked_amount"] -= penalty_amount
                     info["total_penalties"] += penalty_amount
                     # Update last_active_time to current_time to prevent re-penalizing for same period
-                    info["last_active_time"] = current_time 
-                    print(f"Validator {validator_id} penalized {penalty_amount:.4f} for {downtime_duration:.2f}s downtime. "
-                          f"New staked amount: {info['staked_amount']:.2f}. Total penalties: {info['total_penalties']:.2f}.")
-                    
+                    info["last_active_time"] = current_time
+                    print(
+                        f"Validator {validator_id} penalized {penalty_amount:.4f} for {downtime_duration:.2f}s downtime. "
+                        f"New staked amount: {info['staked_amount']:.2f}. Total penalties: {info['total_penalties']:.2f}."
+                    )
+
                     # Conceptual jailing for severe downtime (e.g., if staked amount drops too low)
-                    if info["staked_amount"] < self.validators[validator_id]["staked_amount"] * 0.5: # Example threshold
+                    if (
+                        info["staked_amount"] < self.validators[validator_id]["staked_amount"] * 0.5
+                    ):  # Example threshold
                         info["is_jailed"] = True
-                        print(f"Validator {validator_id} has been JAILED due to significant penalties!")
+                        print(
+                            f"Validator {validator_id} has been JAILED due to significant penalties!"
+                        )
                 else:
-                    print(f"Validator {validator_id} is within grace period or no significant penalty to apply.")
+                    print(
+                        f"Validator {validator_id} is within grace period or no significant penalty to apply."
+                    )
             else:
-                print(f"Validator {validator_id} is active (last active {time_since_last_activity:.2f}s ago).")
+                print(
+                    f"Validator {validator_id} is active (last active {time_since_last_activity:.2f}s ago)."
+                )
 
     def get_validator_status(self, validator_id: str) -> Dict[str, Any] | None:
         """Returns the current status of a validator."""
         return self.validators.get(validator_id)
 
+
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
-    initial_stakes = {
-        "validator_X": 1000.0,
-        "validator_Y": 1500.0,
-        "validator_Z": 500.0
-    }
-    manager = DowntimePenaltyManager(initial_stakes, grace_period_seconds=5, penalty_rate_per_second=0.001) # 0.1% per second after grace
+    initial_stakes = {"validator_X": 1000.0, "validator_Y": 1500.0, "validator_Z": 500.0}
+    manager = DowntimePenaltyManager(
+        initial_stakes, grace_period_seconds=5, penalty_rate_per_second=0.001
+    )  # 0.1% per second after grace
 
     print("\n--- Initial Status ---")
     for v_id in initial_stakes.keys():
         status = manager.get_validator_status(v_id)
-        print(f"{v_id}: Staked={status['staked_amount']:.2f}, Last Active={status['last_active_time']:.2f}, Jailed={status['is_jailed']}")
+        print(
+            f"{v_id}: Staked={status['staked_amount']:.2f}, Last Active={status['last_active_time']:.2f}, Jailed={status['is_jailed']}"
+        )
 
     # Simulate some activity
     manager.record_activity("validator_X")
@@ -112,7 +137,9 @@ if __name__ == "__main__":
     print("\n--- Status After First Check ---")
     for v_id in initial_stakes.keys():
         status = manager.get_validator_status(v_id)
-        print(f"{v_id}: Staked={status['staked_amount']:.2f}, Last Active={status['last_active_time']:.2f}, Jailed={status['is_jailed']}")
+        print(
+            f"{v_id}: Staked={status['staked_amount']:.2f}, Last Active={status['last_active_time']:.2f}, Jailed={status['is_jailed']}"
+        )
 
     # Simulate more time passing, X and Y might now be penalized
     print("\n--- Simulating another 10 seconds pass (X and Y might be penalized) ---")
@@ -122,10 +149,12 @@ if __name__ == "__main__":
     print("\n--- Status After Second Check ---")
     for v_id in initial_stakes.keys():
         status = manager.get_validator_status(v_id)
-        print(f"{v_id}: Staked={status['staked_amount']:.2f}, Last Active={status['last_active_time']:.2f}, Jailed={status['is_jailed']}")
+        print(
+            f"{v_id}: Staked={status['staked_amount']:.2f}, Last Active={status['last_active_time']:.2f}, Jailed={status['is_jailed']}"
+        )
 
     # Simulate Z being active again
     print("\n--- Validator Z becomes active ---")
     manager.record_activity("validator_Z")
     time.sleep(2)
-    manager.check_for_downtime() # Z should not be penalized now
+    manager.check_for_downtime()  # Z should not be penalized now

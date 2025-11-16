@@ -22,7 +22,7 @@ def add_safety_control_routes(app, node):
 
     # ===== PERSONAL AI CONTROLS =====
 
-    @app.route('/ai/cancel-request/<request_id>', methods=['POST'])
+    @app.route("/ai/cancel-request/<request_id>", methods=["POST"])
     def cancel_personal_ai_request(request_id):
         """
         Cancel a Personal AI request immediately
@@ -34,22 +34,22 @@ def add_safety_control_routes(app, node):
         """
         try:
             data = request.get_json()
-            user_address = data.get('user_address')
+            user_address = data.get("user_address")
 
             if not user_address:
-                return jsonify({'error': 'user_address required'}), 400
+                return jsonify({"error": "user_address required"}), 400
 
             result = safety.cancel_personal_ai_request(request_id, user_address)
 
-            if result['success']:
+            if result["success"]:
                 return jsonify(result), 200
             else:
                 return jsonify(result), 400
 
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            return jsonify({"error": str(e)}), 500
 
-    @app.route('/ai/request-status/<request_id>', methods=['GET'])
+    @app.route("/ai/request-status/<request_id>", methods=["GET"])
     def check_request_status(request_id):
         """
         Check if a Personal AI request is cancelled
@@ -59,17 +59,14 @@ def add_safety_control_routes(app, node):
         try:
             is_cancelled = safety.is_request_cancelled(request_id)
 
-            return jsonify({
-                'request_id': request_id,
-                'is_cancelled': is_cancelled
-            }), 200
+            return jsonify({"request_id": request_id, "is_cancelled": is_cancelled}), 200
 
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            return jsonify({"error": str(e)}), 500
 
     # ===== TRADING BOT CONTROLS =====
 
-    @app.route('/ai/emergency-stop/trading-bot', methods=['POST'])
+    @app.route("/ai/emergency-stop/trading-bot", methods=["POST"])
     def emergency_stop_trading_bot():
         """
         Emergency stop for trading bot (instant)
@@ -81,22 +78,22 @@ def add_safety_control_routes(app, node):
         """
         try:
             data = request.get_json()
-            user_address = data.get('user_address')
+            user_address = data.get("user_address")
 
             if not user_address:
-                return jsonify({'error': 'user_address required'}), 400
+                return jsonify({"error": "user_address required"}), 400
 
             result = safety.emergency_stop_trading_bot(user_address)
 
-            if result['success']:
+            if result["success"]:
                 return jsonify(result), 200
             else:
                 return jsonify(result), 400
 
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            return jsonify({"error": str(e)}), 500
 
-    @app.route('/ai/stop-all-trading-bots', methods=['POST'])
+    @app.route("/ai/stop-all-trading-bots", methods=["POST"])
     def stop_all_trading_bots():
         """
         Stop ALL trading bots (emergency use only)
@@ -111,7 +108,7 @@ def add_safety_control_routes(app, node):
         """
         try:
             data = request.get_json()
-            reason_str = data.get('reason', 'emergency')
+            reason_str = data.get("reason", "emergency")
 
             # Convert string to StopReason enum
             try:
@@ -124,11 +121,11 @@ def add_safety_control_routes(app, node):
             return jsonify(result), 200
 
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            return jsonify({"error": str(e)}), 500
 
     # ===== GOVERNANCE AI CONTROLS =====
 
-    @app.route('/ai/pause-governance-task/<task_id>', methods=['POST'])
+    @app.route("/ai/pause-governance-task/<task_id>", methods=["POST"])
     def pause_governance_task(task_id):
         """
         Pause a Governance AI task
@@ -142,19 +139,19 @@ def add_safety_control_routes(app, node):
         """
         try:
             data = request.get_json()
-            pauser = data.get('pauser', 'system')
+            pauser = data.get("pauser", "system")
 
             result = safety.pause_governance_task(task_id, pauser)
 
-            if result['success']:
+            if result["success"]:
                 return jsonify(result), 200
             else:
                 return jsonify(result), 400
 
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            return jsonify({"error": str(e)}), 500
 
-    @app.route('/ai/resume-governance-task/<task_id>', methods=['POST'])
+    @app.route("/ai/resume-governance-task/<task_id>", methods=["POST"])
     def resume_governance_task(task_id):
         """
         Resume a paused Governance AI task
@@ -164,15 +161,15 @@ def add_safety_control_routes(app, node):
         try:
             result = safety.resume_governance_task(task_id)
 
-            if result['success']:
+            if result["success"]:
                 return jsonify(result), 200
             else:
                 return jsonify(result), 400
 
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            return jsonify({"error": str(e)}), 500
 
-    @app.route('/ai/governance-task-status/<task_id>', methods=['GET'])
+    @app.route("/ai/governance-task-status/<task_id>", methods=["GET"])
     def check_governance_task_status(task_id):
         """
         Check if Governance AI task is paused
@@ -182,17 +179,14 @@ def add_safety_control_routes(app, node):
         try:
             is_paused = safety.is_task_paused(task_id)
 
-            return jsonify({
-                'task_id': task_id,
-                'is_paused': is_paused
-            }), 200
+            return jsonify({"task_id": task_id, "is_paused": is_paused}), 200
 
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            return jsonify({"error": str(e)}), 500
 
     # ===== GLOBAL EMERGENCY STOP =====
 
-    @app.route('/ai/emergency-stop/global', methods=['POST'])
+    @app.route("/ai/emergency-stop/global", methods=["POST"])
     def activate_global_emergency_stop():
         """
         🚨 GLOBAL EMERGENCY STOP - Halt ALL AI operations
@@ -220,9 +214,9 @@ def add_safety_control_routes(app, node):
         try:
             data = request.get_json()
 
-            reason_str = data.get('reason', 'emergency')
-            details = data.get('details', 'Emergency stop activated via API')
-            activator = data.get('activator', 'system')
+            reason_str = data.get("reason", "emergency")
+            details = data.get("details", "Emergency stop activated via API")
+            activator = data.get("activator", "system")
 
             # Convert string to StopReason enum
             try:
@@ -235,9 +229,9 @@ def add_safety_control_routes(app, node):
             return jsonify(result), 200
 
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            return jsonify({"error": str(e)}), 500
 
-    @app.route('/ai/emergency-stop/deactivate', methods=['POST'])
+    @app.route("/ai/emergency-stop/deactivate", methods=["POST"])
     def deactivate_global_emergency_stop():
         """
         Deactivate global emergency stop
@@ -251,19 +245,19 @@ def add_safety_control_routes(app, node):
         """
         try:
             data = request.get_json()
-            deactivator = data.get('deactivator', 'system')
+            deactivator = data.get("deactivator", "system")
 
             result = safety.deactivate_emergency_stop(deactivator)
 
-            if result['success']:
+            if result["success"]:
                 return jsonify(result), 200
             else:
                 return jsonify(result), 400
 
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            return jsonify({"error": str(e)}), 500
 
-    @app.route('/ai/safety-level', methods=['POST'])
+    @app.route("/ai/safety-level", methods=["POST"])
     def set_safety_level():
         """
         Set global AI safety level
@@ -286,25 +280,25 @@ def add_safety_control_routes(app, node):
         try:
             data = request.get_json()
 
-            level_str = data.get('level', 'normal')
-            setter = data.get('setter', 'system')
+            level_str = data.get("level", "normal")
+            setter = data.get("setter", "system")
 
             # Convert string to AISafetyLevel enum
             try:
                 level = AISafetyLevel[level_str.upper()]
             except KeyError:
-                return jsonify({'error': 'Invalid safety level'}), 400
+                return jsonify({"error": "Invalid safety level"}), 400
 
             result = safety.set_safety_level(level, setter)
 
             return jsonify(result), 200
 
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            return jsonify({"error": str(e)}), 500
 
     # ===== STATUS & MONITORING =====
 
-    @app.route('/ai/safety-status', methods=['GET'])
+    @app.route("/ai/safety-status", methods=["GET"])
     def get_safety_status():
         """
         Get current AI safety status
@@ -322,9 +316,9 @@ def add_safety_control_routes(app, node):
             return jsonify(status), 200
 
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            return jsonify({"error": str(e)}), 500
 
-    @app.route('/ai/active-operations', methods=['GET'])
+    @app.route("/ai/active-operations", methods=["GET"])
     def get_active_operations():
         """
         Get list of all active AI operations
@@ -341,47 +335,47 @@ def add_safety_control_routes(app, node):
             return jsonify(operations), 200
 
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            return jsonify({"error": str(e)}), 500
 
-
-    @app.route('/ai/safety-callers', methods=['GET'])
+    @app.route("/ai/safety-callers", methods=["GET"])
     def list_safety_callers():
         """List all authorized safety-level callers"""
 
         try:
             callers = list(safety.authorized_callers)
-            return jsonify({'authorized_callers': callers}), 200
+            return jsonify({"authorized_callers": callers}), 200
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            return jsonify({"error": str(e)}), 500
 
-    @app.route('/ai/safety-callers', methods=['POST'])
+    @app.route("/ai/safety-callers", methods=["POST"])
     def add_safety_caller():
         """Authorize a new safety-level caller"""
 
         try:
             data = request.get_json()
-            identifier = data.get('identifier') if data else None
+            identifier = data.get("identifier") if data else None
 
             result = safety.authorize_safety_caller(identifier)
 
-            if result.get('success'):
+            if result.get("success"):
                 return jsonify(result), 200
             return jsonify(result), 400
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            return jsonify({"error": str(e)}), 500
 
-    @app.route('/ai/safety-callers/<identifier>', methods=['DELETE'])
+    @app.route("/ai/safety-callers/<identifier>", methods=["DELETE"])
     def remove_safety_caller(identifier):
         """Revoke a safety-level caller"""
 
         try:
             result = safety.revoke_safety_caller(identifier)
 
-            if result.get('success'):
+            if result.get("success"):
                 return jsonify(result), 200
             return jsonify(result), 400
         except Exception as e:
-            return jsonify({'error': str(e)}), 500
+            return jsonify({"error": str(e)}), 500
+
     print("✅ AI Safety Control API endpoints added:")
     print("   • POST   /ai/cancel-request/<request_id>")
     print("   • GET    /ai/request-status/<request_id>")

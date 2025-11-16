@@ -10,4 +10,5 @@ class Sock:
     def route(self, path):
         def decorator(handler):
             return handler
+
         return decorator

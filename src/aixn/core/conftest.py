@@ -12,7 +12,6 @@ from pathlib import Path
 import pytest
 
 
-
 from aixn.core.blockchain_persistence import BlockchainStorage
 
 
@@ -41,37 +40,37 @@ def _create_mock_blockchain(num_blocks: int = 5) -> dict:
 
     for i in range(num_blocks):
         block = {
-            'index': i,
-            'timestamp': time.time(),
-            'transactions': [
+            "index": i,
+            "timestamp": time.time(),
+            "transactions": [
                 {
-                    'txid': f'tx_{i}_0',
-                    'sender': 'COINBASE' if i == 0 else f'sender_{i}',
-                    'recipient': f'recipient_{i}',
-                    'amount': 12.0,
-                    'fee': 0.0 if i == 0 else 0.24,
-                    'timestamp': time.time(),
-                    'signature': f'sig_{i}',
-                    'public_key': f'pubkey_{i}',
-                    'tx_type': 'normal',
-                    'nonce': i
+                    "txid": f"tx_{i}_0",
+                    "sender": "COINBASE" if i == 0 else f"sender_{i}",
+                    "recipient": f"recipient_{i}",
+                    "amount": 12.0,
+                    "fee": 0.0 if i == 0 else 0.24,
+                    "timestamp": time.time(),
+                    "signature": f"sig_{i}",
+                    "public_key": f"pubkey_{i}",
+                    "tx_type": "normal",
+                    "nonce": i,
                 }
             ],
-            'previous_hash': '0' if i == 0 else f'hash_{i-1}',
-            'merkle_root': f'merkle_{i}',
-            'nonce': i * 1000,
-            'hash': f'hash_{i}',
-            'difficulty': 4
+            "previous_hash": "0" if i == 0 else f"hash_{i-1}",
+            "merkle_root": f"merkle_{i}",
+            "nonce": i * 1000,
+            "hash": f"hash_{i}",
+            "difficulty": 4,
         }
         chain.append(block)
 
     return {
-        'chain': chain,
-        'pending_transactions': [],
-        'difficulty': 4,
-        'stats': {
-            'blocks': num_blocks,
-            'total_transactions': num_blocks,
-            'pending_transactions': 0
-        }
+        "chain": chain,
+        "pending_transactions": [],
+        "difficulty": 4,
+        "stats": {
+            "blocks": num_blocks,
+            "total_transactions": num_blocks,
+            "pending_transactions": 0,
+        },
     }

@@ -9,17 +9,24 @@ from aixn.core.error_recovery import (
     create_recovery_manager,
     CircuitBreaker,
     RetryStrategy,
-    CorruptionDetector
+    CorruptionDetector,
 )
 from aixn.core.error_recovery_integration import (
     integrate_recovery_with_blockchain,
     add_recovery_to_node,
     RecoveryEnabledBlockchain,
-    RecoveryScheduler
+    RecoveryScheduler,
 )
 
 
-from aixn.core.blockchain import Blockchain
+# Example 1: Basic Integration
+def example_basic_integration():
+    """
+    Basic error recovery integration
+    """
+    from aixn.core.blockchain import Blockchain
+
+    blockchain = Blockchain()
     recovery_manager = create_recovery_manager(blockchain)
 
     print("Recovery manager created")
@@ -40,11 +47,7 @@ def example_circuit_breaker():
     Circuit breaker example
     """
     # Create circuit breaker
-    breaker = CircuitBreaker(
-        failure_threshold=3,
-        timeout=60,
-        success_threshold=2
-    )
+    breaker = CircuitBreaker(failure_threshold=3, timeout=60, success_threshold=2)
 
     # Define a flaky operation
     call_count = [0]
@@ -72,12 +75,7 @@ def example_retry_strategy():
     """
     Retry strategy example
     """
-    retry = RetryStrategy(
-        max_retries=5,
-        base_delay=1.0,
-        max_delay=30.0,
-        exponential_base=2.0
-    )
+    retry = RetryStrategy(max_retries=5, base_delay=1.0, max_delay=30.0, exponential_base=2.0)
 
     # Simulate flaky network call
     call_count = [0]
@@ -97,6 +95,11 @@ def example_retry_strategy():
         print(f"Failed: {error}")
 
 
+# Example 4: Corruption Detection and Recovery
+def example_corruption_recovery():
+    """
+    Corruption detection and recovery example
+    """
     from aixn.core.blockchain import Blockchain
 
     # Create blockchain with some blocks
@@ -129,6 +132,11 @@ def example_retry_strategy():
             print(f"Recovery failed: {error}")
 
 
+# Example 5: Graceful Shutdown
+def example_graceful_shutdown():
+    """
+    Graceful shutdown example
+    """
     from aixn.core.blockchain import Blockchain
 
     # Create blockchain
@@ -261,10 +269,7 @@ def example_api_usage():
     print(f"Circuit Breakers: {response.json()}")
 
     # Create manual backup
-    response = requests.post(
-        f"{base_url}/recovery/backup/create",
-        json={"name": "manual_backup"}
-    )
+    response = requests.post(f"{base_url}/recovery/backup/create", json={"name": "manual_backup"})
     print(f"Backup Created: {response.json()}")
 
     # List backups
@@ -314,7 +319,7 @@ def test_recovery_scenarios():
 
     # Scenario 4: Circuit breaker protection
     print("\nScenario 4: Circuit Breaker")
-    breaker = recovery_manager.circuit_breakers['mining']
+    breaker = recovery_manager.circuit_breakers["mining"]
     print(f"  Initial state: {breaker.state.value}")
 
     # Simulate failures
@@ -338,7 +343,7 @@ def test_recovery_scenarios():
     print("\nScenario 6: Error Logging")
     from error_recovery import ErrorSeverity
 
-    recovery_manager._log_error('test', 'Test error', ErrorSeverity.MEDIUM)
+    recovery_manager._log_error("test", "Test error", ErrorSeverity.MEDIUM)
     recent_errors = list(recovery_manager.error_log)[-5:]
     print(f"  Recent errors: {len(recent_errors)}")
 

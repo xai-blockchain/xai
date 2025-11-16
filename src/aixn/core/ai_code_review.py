@@ -17,6 +17,7 @@ from enum import Enum
 
 class ReviewStatus(Enum):
     """Code review status"""
+
     PENDING_REVIEW = "pending_review"
     COMMUNITY_REVIEWING = "community_reviewing"
     APPROVED_FOR_TESTING = "approved_for_testing"
@@ -29,6 +30,7 @@ class ReviewStatus(Enum):
 
 class SafetyCheck(Enum):
     """Safety validation checks"""
+
     SYNTAX_VALID = "syntax_valid"
     NO_BREAKING_CHANGES = "no_breaking_changes"
     BACKWARDS_COMPATIBLE = "backwards_compatible"
@@ -43,9 +45,14 @@ class AICodeSubmission:
     Similar to GitHub pull requests
     """
 
-    def __init__(self, proposal_id: str, code_changes: Dict,
-                 description: str, files_modified: List[str],
-                 original_approvers: List[str] = None):
+    def __init__(
+        self,
+        proposal_id: str,
+        code_changes: Dict,
+        description: str,
+        files_modified: List[str],
+        original_approvers: List[str] = None,
+    ):
         self.submission_id = hashlib.sha256(f"{proposal_id}{time.time()}".encode()).hexdigest()[:16]
         self.proposal_id = proposal_id
         self.code_changes = code_changes  # file -> {old_code, new_code}
@@ -69,31 +76,33 @@ class AICodeSubmission:
         self.rollback_code = {}  # Store original code for reversal
         self.can_rollback = True
 
-    def add_community_review(self, reviewer_address: str,
-                            approved: bool, comments: str,
-                            voting_power: float) -> Dict:
+    def add_community_review(
+        self, reviewer_address: str, approved: bool, comments: str, voting_power: float
+    ) -> Dict:
         """
         Community member reviews code
         Similar to code review on GitHub
         """
 
         self.community_reviews[reviewer_address] = {
-            'approved': approved,
-            'comments': comments,
-            'voting_power': voting_power,
-            'timestamp': time.time()
+            "approved": approved,
+            "comments": comments,
+            "voting_power": voting_power,
+            "timestamp": time.time(),
         }
 
         # Calculate approval percentage
-        total_power = sum(r['voting_power'] for r in self.community_reviews.values())
-        approval_power = sum(r['voting_power'] for r in self.community_reviews.values() if r['approved'])
+        total_power = sum(r["voting_power"] for r in self.community_reviews.values())
+        approval_power = sum(
+            r["voting_power"] for r in self.community_reviews.values() if r["approved"]
+        )
 
         approval_percent = (approval_power / total_power * 100) if total_power > 0 else 0
 
         return {
-            'review_count': len(self.community_reviews),
-            'approval_percent': approval_percent,
-            'status': self.review_status.value
+            "review_count": len(self.community_reviews),
+            "approval_percent": approval_percent,
+            "status": self.review_status.value,
         }
 
     def run_safety_checks(self) -> Dict:
@@ -129,9 +138,9 @@ class AICodeSubmission:
             self.review_status = ReviewStatus.REJECTED
 
         return {
-            'all_passed': all_passed,
-            'checks': {check.name: passed for check, passed in checks.items()},
-            'failed_checks': [check.name for check, passed in checks.items() if not passed]
+            "all_passed": all_passed,
+            "checks": {check.name: passed for check, passed in checks.items()},
+            "failed_checks": [check.name for check, passed in checks.items() if not passed],
         }
 
     def _check_syntax(self) -> bool:
@@ -152,19 +161,22 @@ class AICodeSubmission:
 
     def _check_supply_unchanged(self) -> bool:
         """Verify AI didn't change token supply"""
-        restricted_terms = ['total_supply', 'mint', 'burn', 'genesis_allocation']
+        restricted_terms = ["total_supply", "mint", "burn", "genesis_allocation"]
 
         for file_changes in self.code_changes.values():
-            new_code = file_changes.get('new_code', '')
+            new_code = file_changes.get("new_code", "")
             for term in restricted_terms:
-                if term in new_code.lower() and term not in file_changes.get('old_code', '').lower():
+                if (
+                    term in new_code.lower()
+                    and term not in file_changes.get("old_code", "").lower()
+                ):
                     return False  # New mention of supply-related terms
 
         return True
 
     def _check_consensus_unchanged(self) -> bool:
         """Verify AI didn't alter consensus mechanism"""
-        restricted_files = ['consensus.py', 'blockchain.py', 'mining_algorithm.py']
+        restricted_files = ["consensus.py", "blockchain.py", "mining_algorithm.py"]
 
         for file_path in self.files_modified:
             if any(restricted in file_path for restricted in restricted_files):
@@ -182,21 +194,21 @@ class AICodeSubmission:
 
         # In real implementation: pytest, unittest
         test_results = {
-            'total_tests': 0,
-            'passed': 0,
-            'failed': 0,
-            'errors': [],
-            'coverage_percent': 0
+            "total_tests": 0,
+            "passed": 0,
+            "failed": 0,
+            "errors": [],
+            "coverage_percent": 0,
         }
 
         # Simulate tests
-        test_results['total_tests'] = 100
-        test_results['passed'] = 100
-        test_results['coverage_percent'] = 95
+        test_results["total_tests"] = 100
+        test_results["passed"] = 100
+        test_results["coverage_percent"] = 95
 
         self.test_results = test_results
 
-        if test_results['failed'] == 0:
+        if test_results["failed"] == 0:
             self.review_status = ReviewStatus.TESTS_PASSED
             self.safety_checks[SafetyCheck.TEST_SUITE_PASSES] = True
         else:
@@ -208,7 +220,7 @@ class AICodeSubmission:
     def prepare_rollback(self):
         """Store original code for potential reversal"""
         for file_path, changes in self.code_changes.items():
-            self.rollback_code[file_path] = changes.get('old_code', '')
+            self.rollback_code[file_path] = changes.get("old_code", "")
 
     def can_proceed_to_vote(self, min_reviewers: int = 250) -> Tuple[bool, str]:
         """Check if code ready for implementation vote"""
@@ -222,11 +234,16 @@ class AICodeSubmission:
 
         # Require minimum community reviewers
         if len(self.community_reviews) < min_reviewers:
-            return False, f"Need {min_reviewers}+ community reviews, have {len(self.community_reviews)}"
+            return (
+                False,
+                f"Need {min_reviewers}+ community reviews, have {len(self.community_reviews)}",
+            )
 
         # Require majority approval from reviewers
-        total_power = sum(r['voting_power'] for r in self.community_reviews.values())
-        approval_power = sum(r['voting_power'] for r in self.community_reviews.values() if r['approved'])
+        total_power = sum(r["voting_power"] for r in self.community_reviews.values())
+        approval_power = sum(
+            r["voting_power"] for r in self.community_reviews.values() if r["approved"]
+        )
         approval_percent = (approval_power / total_power * 100) if total_power > 0 else 0
 
         if approval_percent < 66:
@@ -243,17 +260,14 @@ class AICodeSubmission:
 
         if voter_address not in self.original_approvers:
             return {
-                'success': False,
-                'error': 'NOT_ORIGINAL_APPROVER',
-                'message': 'Only voters who approved starting this work can approve implementation'
+                "success": False,
+                "error": "NOT_ORIGINAL_APPROVER",
+                "message": "Only voters who approved starting this work can approve implementation",
             }
 
         self.implementation_votes[voter_address] = approved
 
-        return {
-            'success': True,
-            'vote_recorded': approved
-        }
+        return {"success": True, "vote_recorded": approved}
 
     def check_implementation_approval(self, required_percent: float = 50) -> Tuple[bool, str, Dict]:
         """
@@ -280,17 +294,21 @@ class AICodeSubmission:
         required_yes_votes = int(self.original_approver_count * (required_percent / 100))
 
         details = {
-            'original_approvers': self.original_approver_count,
-            'required_yes_votes': required_yes_votes,
-            'yes_votes': yes_votes,
-            'no_votes': no_votes,
-            'total_voted': total_voted,
-            'yes_percent_of_original': yes_percent,
-            'required_percent': required_percent
+            "original_approvers": self.original_approver_count,
+            "required_yes_votes": required_yes_votes,
+            "yes_votes": yes_votes,
+            "no_votes": no_votes,
+            "total_voted": total_voted,
+            "yes_percent_of_original": yes_percent,
+            "required_percent": required_percent,
         }
 
         if yes_votes >= required_yes_votes:
-            return True, f"{yes_votes}/{self.original_approver_count} original approvers approved ({yes_percent:.1f}%)", details
+            return (
+                True,
+                f"{yes_votes}/{self.original_approver_count} original approvers approved ({yes_percent:.1f}%)",
+                details,
+            )
         else:
             return False, f"Need {required_yes_votes} yes votes, have {yes_votes}", details
 
@@ -302,7 +320,9 @@ class RollbackProposal:
     """
 
     def __init__(self, original_submission_id: str, reason: str):
-        self.rollback_id = hashlib.sha256(f"rollback_{original_submission_id}{time.time()}".encode()).hexdigest()[:16]
+        self.rollback_id = hashlib.sha256(
+            f"rollback_{original_submission_id}{time.time()}".encode()
+        ).hexdigest()[:16]
         self.original_submission_id = original_submission_id
         self.reason = reason
         self.created_at = time.time()
@@ -324,14 +344,14 @@ if __name__ == "__main__":
     code_submission = AICodeSubmission(
         proposal_id="prop_001",
         code_changes={
-            'wallet.py': {
-                'old_code': 'def transfer(amount): pass',
-                'new_code': 'def transfer(amount):\n    validate_amount(amount)\n    return execute_transfer(amount)'
+            "wallet.py": {
+                "old_code": "def transfer(amount): pass",
+                "new_code": "def transfer(amount):\n    validate_amount(amount)\n    return execute_transfer(amount)",
             }
         },
         description="Add input validation to transfer function",
-        files_modified=['wallet.py'],
-        original_approvers=original_voters
+        files_modified=["wallet.py"],
+        original_approvers=original_voters,
     )
 
     print(f"\nOriginal proposal approved by: {code_submission.original_approver_count} voters")
@@ -347,7 +367,7 @@ if __name__ == "__main__":
     print("-" * 70)
     safety_result = code_submission.run_safety_checks()
     print(f"All checks passed: {safety_result['all_passed']}")
-    for check_name, passed in safety_result['checks'].items():
+    for check_name, passed in safety_result["checks"].items():
         status = "PASS" if passed else "FAIL"
         print(f"  {check_name}: {status}")
 
@@ -356,11 +376,11 @@ if __name__ == "__main__":
     print("-" * 70)
 
     reviews = [
-        ('alice', True, "Looks good, adds needed validation", 42.5),
-        ('bob', True, "Approved - no breaking changes", 35.0),
-        ('carol', False, "Need more test coverage", 20.0),
-        ('dave', True, "Good improvement", 28.0),
-        ('eve', True, "Security enhancement approved", 31.5)
+        ("alice", True, "Looks good, adds needed validation", 42.5),
+        ("bob", True, "Approved - no breaking changes", 35.0),
+        ("carol", False, "Need more test coverage", 20.0),
+        ("dave", True, "Good improvement", 28.0),
+        ("eve", True, "Security enhancement approved", 31.5),
     ]
 
     for reviewer, approved, comment, power in reviews:
@@ -432,7 +452,7 @@ if __name__ == "__main__":
 
     rollback = RollbackProposal(
         original_submission_id=code_submission.submission_id,
-        reason="Found edge case bug in production"
+        reason="Found edge case bug in production",
     )
     print(f"Rollback timelock: {rollback.timelock_days} days (faster than normal)")
 

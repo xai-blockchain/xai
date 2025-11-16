@@ -12,6 +12,7 @@ import time
 from typing import Dict, List, Optional
 import secrets
 from aixn.core.wallet_encryption import WalletEncryption
+from aixn.core.wallet import Wallet
 
 
 class LuckyBlockSystem:
@@ -27,6 +28,7 @@ class LuckyBlockSystem:
         # Use fixed seed so pre-mine matches live chain
         if secret_seed is None:
             from aixn.core.config import Config
+
             secret_seed = Config.LUCKY_BLOCK_SEED
         self.secret_seed = secret_seed
 
@@ -73,10 +75,12 @@ class LuckyBlockSystem:
         lucky_blocks = self.get_lucky_blocks_in_range(1, up_to_block)
 
         return {
-            'total_blocks': up_to_block,
-            'lucky_blocks': len(lucky_blocks),
-            'lucky_percentage': (len(lucky_blocks) / up_to_block * 100) if up_to_block > 0 else 0,
-            'next_lucky_blocks': self.get_lucky_blocks_in_range(up_to_block + 1, up_to_block + 1000)[:5]
+            "total_blocks": up_to_block,
+            "lucky_blocks": len(lucky_blocks),
+            "lucky_percentage": (len(lucky_blocks) / up_to_block * 100) if up_to_block > 0 else 0,
+            "next_lucky_blocks": self.get_lucky_blocks_in_range(
+                up_to_block + 1, up_to_block + 1000
+            )[:5],
         }
 
 
@@ -91,15 +95,14 @@ class HiddenTreasureWallets:
         self.treasure_wallets = []
         self.total_treasure = 100000  # 100 wallets × 1000 XAI
 
-    def generate_treasure_wallets(self, count: int = 100, password: str = 'treasure-secret') -> List[Dict]:
+    def generate_treasure_wallets(
+        self, count: int = 100, password: str = "treasure-secret"
+    ) -> List[Dict]:
         """
         Generate hidden treasure wallets
 
         Returns list of wallets with private keys
         """
-from aixn.core.wallet import Wallet
-from aixn.core.wallet_encryption import WalletEncryption
-
         print(f"\nGenerating {count} hidden treasure wallets...")
 
         wallets = []
@@ -108,14 +111,14 @@ from aixn.core.wallet_encryption import WalletEncryption
             wallet = Wallet()
 
             wallet_data = {
-                'index': i + 1,
-                'address': wallet.address,
-                'public_key': wallet.public_key,
-                'private_key': wallet.private_key,
-                'balance': 1000.0,
-                'discovered': False,
-                'discovery_clue': self._generate_clue(i, wallet.address),
-                'hidden_in_block': random.randint(100, 10000)  # Clue hidden in random block
+                "index": i + 1,
+                "address": wallet.address,
+                "public_key": wallet.public_key,
+                "private_key": wallet.private_key,
+                "balance": 1000.0,
+                "discovered": False,
+                "discovery_clue": self._generate_clue(i, wallet.address),
+                "hidden_in_block": random.randint(100, 10000),  # Clue hidden in random block
             }
 
             wallets.append(wallet_data)
@@ -142,7 +145,7 @@ from aixn.core.wallet_encryption import WalletEncryption
             f"Count the lucky blocks, multiply by {index + 1}, seek there",
             f"The price floor knows: {address[4:12]} is the key",
             f"In block {random.randint(100, 10000)}, fortune favors the clever",
-            f"When the node count reaches {(index + 1) * 10}, the door opens"
+            f"When the node count reaches {(index + 1) * 10}, the door opens",
         ]
 
         return random.choice(clues)
@@ -157,11 +160,11 @@ from aixn.core.wallet_encryption import WalletEncryption
         clue_map = {}
 
         for wallet in self.treasure_wallets:
-            block_num = wallet['hidden_in_block']
+            block_num = wallet["hidden_in_block"]
             clue_map[block_num] = {
-                'type': 'TREASURE_CLUE',
-                'clue': wallet['discovery_clue'],
-                'wallet_index': wallet['index']
+                "type": "TREASURE_CLUE",
+                "clue": wallet["discovery_clue"],
+                "wallet_index": wallet["index"],
             }
 
         return clue_map
@@ -177,8 +180,9 @@ class AirdropClueSystem:
         self.genesis_timestamp = genesis_timestamp
         self.scheduled_airdrops = []
 
-    def schedule_airdrop(self, timestamp: int, amount: float,
-                        recipient_count: int, criteria: str) -> Dict:
+    def schedule_airdrop(
+        self, timestamp: int, amount: float, recipient_count: int, criteria: str
+    ) -> Dict:
         """
         Schedule future airdrop with cryptic clues
 
@@ -198,20 +202,21 @@ class AirdropClueSystem:
         clues = self._generate_airdrop_clues(timestamp, amount, recipient_count)
 
         airdrop = {
-            'id': airdrop_id,
-            'timestamp': timestamp,
-            'amount': amount,
-            'recipient_count': recipient_count,
-            'criteria': criteria,
-            'clues': clues,
-            'status': 'scheduled'
+            "id": airdrop_id,
+            "timestamp": timestamp,
+            "amount": amount,
+            "recipient_count": recipient_count,
+            "criteria": criteria,
+            "clues": clues,
+            "status": "scheduled",
         }
 
         self.scheduled_airdrops.append(airdrop)
         return airdrop
 
-    def _generate_airdrop_clues(self, timestamp: int, amount: float,
-                                recipient_count: int) -> List[Dict]:
+    def _generate_airdrop_clues(
+        self, timestamp: int, amount: float, recipient_count: int
+    ) -> List[Dict]:
         """
         Generate cryptic clues about upcoming airdrop
 
@@ -226,40 +231,48 @@ class AirdropClueSystem:
 
         # Clue 1: Very cryptic (appears 30 days before)
         clue1_time = timestamp - (30 * 86400)
-        clues.append({
-            'timestamp': clue1_time,
-            'block_number': int((clue1_time - self.genesis_timestamp) / 120),
-            'message': f"When the moon completes {int(days_until)} cycles, fortune smiles upon {recipient_count} souls",
-            'type': 'PROPHECY'
-        })
+        clues.append(
+            {
+                "timestamp": clue1_time,
+                "block_number": int((clue1_time - self.genesis_timestamp) / 120),
+                "message": f"When the moon completes {int(days_until)} cycles, fortune smiles upon {recipient_count} souls",
+                "type": "PROPHECY",
+            }
+        )
 
         # Clue 2: Less cryptic (appears 14 days before)
         clue2_time = timestamp - (14 * 86400)
-        clues.append({
-            'timestamp': clue2_time,
-            'block_number': int((clue2_time - self.genesis_timestamp) / 120),
-            'message': f"The heavens shall rain {amount:,.0f} coins upon the worthy",
-            'type': 'OMEN'
-        })
+        clues.append(
+            {
+                "timestamp": clue2_time,
+                "block_number": int((clue2_time - self.genesis_timestamp) / 120),
+                "message": f"The heavens shall rain {amount:,.0f} coins upon the worthy",
+                "type": "OMEN",
+            }
+        )
 
         # Clue 3: Specific date hint (appears 7 days before)
         clue3_time = timestamp - (7 * 86400)
-        airdrop_date = datetime.fromtimestamp(timestamp).strftime('%B %d')
-        clues.append({
-            'timestamp': clue3_time,
-            'block_number': int((clue3_time - self.genesis_timestamp) / 120),
-            'message': f"Mark your calendars: {airdrop_date} brings revelation",
-            'type': 'WARNING'
-        })
+        airdrop_date = datetime.fromtimestamp(timestamp).strftime("%B %d")
+        clues.append(
+            {
+                "timestamp": clue3_time,
+                "block_number": int((clue3_time - self.genesis_timestamp) / 120),
+                "message": f"Mark your calendars: {airdrop_date} brings revelation",
+                "type": "WARNING",
+            }
+        )
 
         # Clue 4: Very specific (appears 24 hours before)
         clue4_time = timestamp - 86400
-        clues.append({
-            'timestamp': clue4_time,
-            'block_number': int((clue4_time - self.genesis_timestamp) / 120),
-            'message': f"In {24} hours, {recipient_count} addresses shall be chosen. Are you prepared?",
-            'type': 'ANNOUNCEMENT'
-        })
+        clues.append(
+            {
+                "timestamp": clue4_time,
+                "block_number": int((clue4_time - self.genesis_timestamp) / 120),
+                "message": f"In {24} hours, {recipient_count} addresses shall be chosen. Are you prepared?",
+                "type": "ANNOUNCEMENT",
+            }
+        )
 
         return clues
 
@@ -269,13 +282,15 @@ class AirdropClueSystem:
         clues_in_block = []
 
         for airdrop in self.scheduled_airdrops:
-            for clue in airdrop['clues']:
-                if clue['block_number'] == block_number:
-                    clues_in_block.append({
-                        'airdrop_id': airdrop['id'],
-                        'message': clue['message'],
-                        'type': clue['type']
-                    })
+            for clue in airdrop["clues"]:
+                if clue["block_number"] == block_number:
+                    clues_in_block.append(
+                        {
+                            "airdrop_id": airdrop["id"],
+                            "message": clue["message"],
+                            "type": clue["type"],
+                        }
+                    )
 
         return clues_in_block
 
@@ -286,17 +301,17 @@ class AirdropClueSystem:
 
         upcoming = [
             {
-                'id': a['id'],
-                'days_until': (a['timestamp'] - current_time) / 86400,
-                'amount': a['amount'],
-                'recipient_count': a['recipient_count'],
-                'status': a['status']
+                "id": a["id"],
+                "days_until": (a["timestamp"] - current_time) / 86400,
+                "amount": a["amount"],
+                "recipient_count": a["recipient_count"],
+                "status": a["status"],
             }
             for a in self.scheduled_airdrops
-            if a['timestamp'] > current_time and a['status'] == 'scheduled'
+            if a["timestamp"] > current_time and a["status"] == "scheduled"
         ]
 
-        return sorted(upcoming, key=lambda x: x['days_until'])
+        return sorted(upcoming, key=lambda x: x["days_until"])
 
 
 class EasterEggManager:
@@ -332,7 +347,7 @@ class EasterEggManager:
             timestamp=self.genesis_timestamp + (90 * 86400),
             amount=50000,
             recipient_count=100,
-            criteria="Random selection from active nodes"
+            criteria="Random selection from active nodes",
         )
 
         # Airdrop 2: 6 months after genesis
@@ -340,7 +355,7 @@ class EasterEggManager:
             timestamp=self.genesis_timestamp + (180 * 86400),
             amount=100000,
             recipient_count=500,
-            criteria="Top 500 node operators by uptime"
+            criteria="Top 500 node operators by uptime",
         )
 
         # Airdrop 3: 1 year after genesis
@@ -348,7 +363,7 @@ class EasterEggManager:
             timestamp=self.genesis_timestamp + (365 * 86400),
             amount=200000,
             recipient_count=1000,
-            criteria="Diamond hands (held for 365 days)"
+            criteria="Diamond hands (held for 365 days)",
         )
 
         print("Done: 3 mystery airdrops scheduled")
@@ -375,11 +390,11 @@ class EasterEggManager:
         print(f"  Cryptic clues will appear before each drop")
 
         return {
-            'lucky_blocks': lucky_stats,
-            'treasure_wallets': len(treasures),
-            'treasure_total': 100000,
-            'scheduled_airdrops': len(self.airdrops.scheduled_airdrops),
-            'airdrop_total': 350000
+            "lucky_blocks": lucky_stats,
+            "treasure_wallets": len(treasures),
+            "treasure_total": 100000,
+            "scheduled_airdrops": len(self.airdrops.scheduled_airdrops),
+            "airdrop_total": 350000,
         }
 
     def get_block_easter_eggs(self, block_number: int) -> Dict:
@@ -391,10 +406,10 @@ class EasterEggManager:
         """
 
         return {
-            'block_number': block_number,
-            'is_lucky': self.lucky_blocks.is_lucky_block(block_number),
-            'treasure_clues': self.treasure_wallets.treasure_wallets,
-            'airdrop_clues': self.airdrops.get_clues_for_block(block_number)
+            "block_number": block_number,
+            "is_lucky": self.lucky_blocks.is_lucky_block(block_number),
+            "treasure_clues": self.treasure_wallets.treasure_wallets,
+            "airdrop_clues": self.airdrops.get_clues_for_block(block_number),
         }
 
 

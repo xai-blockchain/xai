@@ -12,7 +12,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 # Add core directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'core'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
 from blockchain import Blockchain, Transaction
 from wallet import Wallet
@@ -166,7 +166,8 @@ class TestTransactionThroughput:
         start_time = time.time()
 
         verified_count = sum(
-            1 for i, sig in enumerate(signatures)
+            1
+            for i, sig in enumerate(signatures)
             if wallet.verify_signature(f"{message}_{i}", sig, wallet.public_key)
         )
 
@@ -445,5 +446,5 @@ class TestLongRunning:
         print(f"\nChain length after stress test: {len(bc.chain)}")
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v', '-s'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s"])

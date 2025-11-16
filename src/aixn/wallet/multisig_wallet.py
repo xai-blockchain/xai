@@ -3,6 +3,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key
 from typing import List, Dict
 
+
 class MultiSigWallet:
     def __init__(self, public_keys: List[str], threshold: int):
         if threshold > len(public_keys):

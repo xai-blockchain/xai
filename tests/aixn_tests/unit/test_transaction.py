@@ -10,7 +10,7 @@ import os
 import time
 
 # Add core directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'core'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
 from blockchain import Transaction, Blockchain
 from wallet import Wallet
@@ -197,7 +197,7 @@ class TestTransactionHash:
 
         assert hash1 is not None
         assert len(hash1) == 64  # SHA256 hex length
-        assert all(c in '0123456789abcdef' for c in hash1)
+        assert all(c in "0123456789abcdef" for c in hash1)
 
     def test_hash_consistency(self):
         """Test hash is consistent for same transaction"""
@@ -347,5 +347,5 @@ class TestTransactionFees:
         assert not bc.validate_transaction(tx)
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

@@ -10,7 +10,7 @@ import os
 import time
 
 # Add core directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'core'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
 from advanced_consensus import (
     BlockStatus,
@@ -18,7 +18,7 @@ from advanced_consensus import (
     OrphanBlockManager,
     TransactionOrderingRules,
     FinalityMechanism,
-    DifficultyAdjustment
+    DifficultyAdjustment,
 )
 from blockchain import Blockchain, Block
 from wallet import Wallet
@@ -64,8 +64,8 @@ class TestBlockPropagationMonitor:
 
         performance = monitor.get_peer_performance("peer1.aixn.com")
 
-        assert performance['block_count'] == 1
-        assert performance['avg_latency'] > 0
+        assert performance["block_count"] == 1
+        assert performance["avg_latency"] > 0
 
     def test_multiple_peer_tracking(self):
         """Test tracking multiple peers"""
@@ -90,7 +90,7 @@ class TestBlockPropagationMonitor:
 
         # Propagation time should be approximately 0.1 seconds
         performance = monitor.get_peer_performance("peer1.aixn.com")
-        assert 0.05 < performance['avg_latency'] < 0.15
+        assert 0.05 < performance["avg_latency"] < 0.15
 
 
 class TestOrphanBlockManager:
@@ -388,5 +388,5 @@ class TestBlockStatus:
         assert isinstance(BlockStatus.ORPHAN.value, str)
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

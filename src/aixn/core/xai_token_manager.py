@@ -15,10 +15,17 @@ class XAITokenManager:
     Manages the XAI token, its supply, and individual balances.
     """
 
-    def __init__(self, initial_supply: float = 0, supply_cap: float = 121_000_000, logger: Optional[StructuredLogger] = None):
+    def __init__(
+        self,
+        initial_supply: float = 0,
+        supply_cap: float = 121_000_000,
+        logger: Optional[StructuredLogger] = None,
+    ):
         self.xai_token = XAIToken(initial_supply, supply_cap)
         self.logger = logger or get_structured_logger()
-        self.logger.info("XAITokenManager initialized.", initial_supply=initial_supply, supply_cap=supply_cap)
+        self.logger.info(
+            "XAITokenManager initialized.", initial_supply=initial_supply, supply_cap=supply_cap
+        )
 
     def mint_tokens(self, address: str, amount: float) -> bool:
         """
@@ -32,14 +39,25 @@ class XAITokenManager:
             True if minting was successful, False otherwise.
         """
         if amount <= 0:
-            self.logger.warn("Attempted to mint non-positive amount.", address=address, amount=amount)
+            self.logger.warn(
+                "Attempted to mint non-positive amount.", address=address, amount=amount
+            )
             return False
 
         if self.xai_token.mint(address, amount):
-            self.logger.info(f"Minted {amount} XAI to {address}.", address=address, amount=amount, new_total_supply=self.xai_token.total_supply)
+            self.logger.info(
+                f"Minted {amount} XAI to {address}.",
+                address=address,
+                amount=amount,
+                new_total_supply=self.xai_token.total_supply,
+            )
             return True
         else:
-            self.logger.error(f"Failed to mint {amount} XAI to {address}. Supply cap reached or other error.", address=address, amount=amount)
+            self.logger.error(
+                f"Failed to mint {amount} XAI to {address}. Supply cap reached or other error.",
+                address=address,
+                amount=amount,
+            )
             return False
 
     def transfer_tokens(self, sender: str, recipient: str, amount: float) -> bool:
@@ -55,16 +73,32 @@ class XAITokenManager:
             True if transfer was successful, False otherwise.
         """
         if amount <= 0:
-            self.logger.warn("Attempted to transfer non-positive amount.", sender=sender, recipient=recipient, amount=amount)
+            self.logger.warn(
+                "Attempted to transfer non-positive amount.",
+                sender=sender,
+                recipient=recipient,
+                amount=amount,
+            )
             return False
 
         if self.xai_token.balances.get(sender, 0) < amount:
-            self.logger.warn(f"Insufficient balance for transfer from {sender}.", sender=sender, recipient=recipient, amount=amount, sender_balance=self.xai_token.balances.get(sender, 0))
+            self.logger.warn(
+                f"Insufficient balance for transfer from {sender}.",
+                sender=sender,
+                recipient=recipient,
+                amount=amount,
+                sender_balance=self.xai_token.balances.get(sender, 0),
+            )
             return False
 
         self.xai_token.balances[sender] -= amount
         self.xai_token.balances[recipient] = self.xai_token.balances.get(recipient, 0) + amount
-        self.logger.info(f"Transferred {amount} XAI from {sender} to {recipient}.", sender=sender, recipient=recipient, amount=amount)
+        self.logger.info(
+            f"Transferred {amount} XAI from {sender} to {recipient}.",
+            sender=sender,
+            recipient=recipient,
+            amount=amount,
+        )
         return True
 
     def get_balance(self, address: str) -> float:
@@ -97,15 +131,23 @@ class XAITokenManager:
         """
         return self.xai_token.get_token_metrics()
 
-    def create_vesting_schedule(self, address: str, amount: float, cliff_duration: int, total_duration: int) -> bool:
+    def create_vesting_schedule(
+        self, address: str, amount: float, cliff_duration: int, total_duration: int
+    ) -> bool:
         """
         Creates a vesting schedule for a given address.
         """
         if self.xai_token.create_vesting_schedule(address, amount, cliff_duration, total_duration):
-            self.logger.info(f"Vesting schedule created for {address} for {amount} XAI.", address=address, amount=amount)
+            self.logger.info(
+                f"Vesting schedule created for {address} for {amount} XAI.",
+                address=address,
+                amount=amount,
+            )
             return True
         else:
-            self.logger.error(f"Failed to create vesting schedule for {address}.", address=address, amount=amount)
+            self.logger.error(
+                f"Failed to create vesting schedule for {address}.", address=address, amount=amount
+            )
             return False
 
     def get_vesting_status(self, address: str) -> Optional[Dict[str, Any]]:
@@ -114,10 +156,16 @@ class XAITokenManager:
         """
         return self.xai_token.vesting_schedules.get(address)
 
+
 # Global instance for convenience
 _global_xai_token_manager = None
 
-def get_xai_token_manager(initial_supply: float = 0, supply_cap: float = 121_000_000, logger: Optional[StructuredLogger] = None) -> XAITokenManager:
+
+def get_xai_token_manager(
+    initial_supply: float = 0,
+    supply_cap: float = 121_000_000,
+    logger: Optional[StructuredLogger] = None,
+) -> XAITokenManager:
     """
     Get global XAITokenManager instance.
     """

@@ -11,6 +11,7 @@ Demonstrates full governance flow on the blockchain:
 
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(__file__))
 
 from blockchain import Blockchain
@@ -34,37 +35,25 @@ result = blockchain.submit_governance_proposal(
     title="Add zero-knowledge proof support",
     description="Implement zkSNARKs for enhanced privacy",
     proposal_type="ai_improvement",
-    proposal_data={
-        'estimated_minutes': 200,
-        'files_to_modify': ['wallet.py', 'transaction.py']
-    }
+    proposal_data={"estimated_minutes": 200, "files_to_modify": ["wallet.py", "transaction.py"]},
 )
 
 print(f"Proposal submitted: {result['proposal_id']}")
 print(f"Transaction ID: {result['txid'][:32]}...")
 print(f"Status: {result['status']}")
 
-proposal_id = result['proposal_id']
+proposal_id = result["proposal_id"]
 
 # 2. CAST VOTES (ON-CHAIN)
 print("\n" + "=" * 70)
 print("2. CAST VOTES (ON-CHAIN TRANSACTIONS)")
 print("-" * 70)
 
-voters = [
-    ('bob', 45.3),
-    ('carol', 35.0),
-    ('dave', 28.5),
-    ('eve', 31.2),
-    ('frank', 22.8)
-]
+voters = [("bob", 45.3), ("carol", 35.0), ("dave", 28.5), ("eve", 31.2), ("frank", 22.8)]
 
 for voter, power in voters:
     result = blockchain.cast_governance_vote(
-        voter=f"{voter}_address",
-        proposal_id=proposal_id,
-        vote="yes",
-        voting_power=power
+        voter=f"{voter}_address", proposal_id=proposal_id, vote="yes", voting_power=power
     )
     print(f"{voter}: vote recorded, txid = {result['txid'][:16]}...")
 
@@ -76,11 +65,11 @@ print("3. CODE REVIEWS (ON-CHAIN TRANSACTIONS)")
 print("-" * 70)
 
 reviewers = [
-    ('reviewer_1', True, 'Excellent implementation', 35.0),
-    ('reviewer_2', True, 'Security looks good', 28.0),
-    ('reviewer_3', True, 'Well tested', 42.0),
-    ('reviewer_4', False, 'Needs more documentation', 18.0),
-    ('reviewer_5', True, 'Approved', 25.0)
+    ("reviewer_1", True, "Excellent implementation", 35.0),
+    ("reviewer_2", True, "Security looks good", 28.0),
+    ("reviewer_3", True, "Well tested", 42.0),
+    ("reviewer_4", False, "Needs more documentation", 18.0),
+    ("reviewer_5", True, "Approved", 25.0),
 ]
 
 for reviewer, approved, comment, power in reviewers:
@@ -89,7 +78,7 @@ for reviewer, approved, comment, power in reviewers:
         proposal_id=proposal_id,
         approved=approved,
         comments=comment,
-        voting_power=power
+        voting_power=power,
     )
     status = "APPROVED" if approved else "REJECTED"
     print(f"{reviewer}: {status}, txid = {result['txid'][:16]}...")
@@ -104,9 +93,7 @@ print("-" * 70)
 # Original voters approve implementation
 for voter, _ in voters:
     result = blockchain.vote_implementation(
-        voter=f"{voter}_address",
-        proposal_id=proposal_id,
-        approved=True
+        voter=f"{voter}_address", proposal_id=proposal_id, approved=True
     )
     print(f"{voter}: implementation approved, txid = {result['txid'][:16]}...")
 
@@ -118,11 +105,7 @@ print("5. EXECUTE PROPOSAL (ON-CHAIN TRANSACTION)")
 print("-" * 70)
 
 result = blockchain.execute_proposal(
-    proposal_id=proposal_id,
-    execution_data={
-        'executed_at': 1699999999,
-        'code_deployed': True
-    }
+    proposal_id=proposal_id, execution_data={"executed_at": 1699999999, "code_deployed": True}
 )
 
 print(f"Proposal executed!")

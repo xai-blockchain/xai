@@ -8,12 +8,14 @@ import os
 from datetime import datetime, timezone
 from enum import Enum
 
+
 class NetworkType(Enum):
     TESTNET = "testnet"
     MAINNET = "mainnet"
 
+
 # Get network type from environment variable
-NETWORK = os.getenv('XAI_NETWORK', 'testnet')  # Default to testnet for safety
+NETWORK = os.getenv("XAI_NETWORK", "testnet")  # Default to testnet for safety
 
 WALLET_TRADE_PEER_SECRET = os.getenv("XAI_WALLET_TRADE_PEER_SECRET", "xai-peer-secret")
 TIME_CAPSULE_MASTER_KEY = os.getenv("XAI_TIME_CAPSULE_MASTER_KEY", "xai-timecapsule-secret")
@@ -29,16 +31,16 @@ EMBEDDED_WALLET_DIR = os.getenv("XAI_EMBEDDED_DIR", os.path.join(os.getcwd(), "e
 
 SAFE_GENESIS_HASHES = {
     NetworkType.TESTNET: os.getenv(
-        "XAI_TESTNET_GENESIS_HASH", "59b30b2d8525512cbd5715b24546d73b540ddb575d3778fdbdff02ba245a9141"
+        "XAI_TESTNET_GENESIS_HASH",
+        "59b30b2d8525512cbd5715b24546d73b540ddb575d3778fdbdff02ba245a9141",
     ),
-    NetworkType.MAINNET: os.getenv("XAI_MAINNET_GENESIS_HASH", "")
+    NetworkType.MAINNET: os.getenv("XAI_MAINNET_GENESIS_HASH", ""),
 }
 
 # Governance unlock controls
 FIAT_UNLOCK_GOVERNANCE_START = datetime(2026, 3, 12, 0, 0, 0, tzinfo=timezone.utc)
 FIAT_UNLOCK_REQUIRED_VOTES = 5
 FIAT_UNLOCK_SUPPORT_PERCENT = 0.66
-
 
 
 class TestnetConfig:
@@ -49,7 +51,7 @@ class TestnetConfig:
     NETWORK_ID = 0xABCD  # Different from mainnet
 
     # Genesis
-    GENESIS_FILE = 'genesis_testnet.json'
+    GENESIS_FILE = "genesis_testnet.json"
     GENESIS_TIMESTAMP = 1704067200.0  # Can reset for testing
 
     # Supply (smaller for testing)
@@ -66,17 +68,17 @@ class TestnetConfig:
     DEFAULT_RPC_PORT = 18546
 
     # Files (separate from mainnet)
-    BLOCKCHAIN_FILE = 'blockchain_testnet.json'
-    WALLET_DIR = 'wallets_testnet'
-    DATA_DIR = 'data_testnet'
+    BLOCKCHAIN_FILE = "blockchain_testnet.json"
+    WALLET_DIR = "wallets_testnet"
+    DATA_DIR = "data_testnet"
 
     # Faucet (testnet only)
     FAUCET_ENABLED = True
     FAUCET_AMOUNT = 100.0  # Free test XAI
 
     # Addresses (testnet prefix)
-    ADDRESS_PREFIX = 'TXAI'  # Testnet XAI
-    TRADE_FEE_ADDRESS = 'TXAITRADEFEE'
+    ADDRESS_PREFIX = "TXAI"  # Testnet XAI
+    TRADE_FEE_ADDRESS = "TXAITRADEFEE"
     FIAT_REENABLE_DATE = datetime(2026, 11, 1, 0, 0, 0, tzinfo=timezone.utc)
     LEDGER_DERIVATION_PATH = LEDGER_DERIVATION_PATH
     FIAT_UNLOCK_GOVERNANCE_START = FIAT_UNLOCK_GOVERNANCE_START
@@ -84,7 +86,7 @@ class TestnetConfig:
     FIAT_UNLOCK_SUPPORT_PERCENT = FIAT_UNLOCK_SUPPORT_PERCENT
     TRADE_FEE_PERCENT = 0.002
     TRADE_ORDER_EXPIRY = 3600
-    LUCKY_BLOCK_SEED = os.getenv('XAI_LUCKY_BLOCK_SEED', 'testnet-default-seed')
+    LUCKY_BLOCK_SEED = os.getenv("XAI_LUCKY_BLOCK_SEED", "testnet-default-seed")
     API_RATE_LIMIT = API_RATE_LIMIT
     API_RATE_WINDOW_SECONDS = API_RATE_WINDOW_SECONDS
     API_MAX_JSON_BYTES = API_MAX_JSON_BYTES
@@ -94,6 +96,7 @@ class TestnetConfig:
     # Fast reset (testnet only)
     ALLOW_CHAIN_RESET = True
 
+
 class MainnetConfig:
     """Mainnet Configuration (production blockchain)"""
 
@@ -102,7 +105,7 @@ class MainnetConfig:
     NETWORK_ID = 0x5841  # 'XA' in hex
 
     # Genesis
-    GENESIS_FILE = 'genesis_new.json'  # The real genesis with 22.4M premine
+    GENESIS_FILE = "genesis_new.json"  # The real genesis with 22.4M premine
     GENESIS_TIMESTAMP = 1704067200.0
 
     # Supply (121M cap - Bitcoin tribute)
@@ -119,17 +122,17 @@ class MainnetConfig:
     DEFAULT_RPC_PORT = 8546
 
     # Files
-    BLOCKCHAIN_FILE = 'blockchain.json'
-    WALLET_DIR = 'wallets'
-    DATA_DIR = 'data'
+    BLOCKCHAIN_FILE = "blockchain.json"
+    WALLET_DIR = "wallets"
+    DATA_DIR = "data"
 
     # Faucet (disabled on mainnet)
     FAUCET_ENABLED = False
     FAUCET_AMOUNT = 0.0
 
     # Addresses (mainnet prefix)
-    ADDRESS_PREFIX = 'AIXN'
-    TRADE_FEE_ADDRESS = 'AIXNTRADEFEE'
+    ADDRESS_PREFIX = "AIXN"
+    TRADE_FEE_ADDRESS = "AIXNTRADEFEE"
     FIAT_REENABLE_DATE = datetime(2026, 11, 1, 0, 0, 0, tzinfo=timezone.utc)
     LEDGER_DERIVATION_PATH = LEDGER_DERIVATION_PATH
     FIAT_UNLOCK_GOVERNANCE_START = FIAT_UNLOCK_GOVERNANCE_START
@@ -137,7 +140,7 @@ class MainnetConfig:
     FIAT_UNLOCK_SUPPORT_PERCENT = FIAT_UNLOCK_SUPPORT_PERCENT
     TRADE_FEE_PERCENT = 0.001
     TRADE_ORDER_EXPIRY = 3600
-    LUCKY_BLOCK_SEED = os.getenv('XAI_LUCKY_BLOCK_SEED', 'mainnet-default-seed')
+    LUCKY_BLOCK_SEED = os.getenv("XAI_LUCKY_BLOCK_SEED", "mainnet-default-seed")
     API_RATE_LIMIT = API_RATE_LIMIT
     API_RATE_WINDOW_SECONDS = API_RATE_WINDOW_SECONDS
     API_MAX_JSON_BYTES = API_MAX_JSON_BYTES
@@ -147,8 +150,9 @@ class MainnetConfig:
     # No reset on mainnet
     ALLOW_CHAIN_RESET = False
 
+
 # Select config based on network
-if NETWORK.lower() == 'mainnet':
+if NETWORK.lower() == "mainnet":
     Config = MainnetConfig
 else:
     Config = TestnetConfig
@@ -158,8 +162,7 @@ Config.SAFE_GENESIS_HASHES = SAFE_GENESIS_HASHES
 # Wallet trade peers
 
 WALLET_TRADE_PEERS = [
-    peer.strip() for peer in os.getenv('XAI_WALLET_TRADE_PEERS', '').split(',')
-    if peer.strip()
+    peer.strip() for peer in os.getenv("XAI_WALLET_TRADE_PEERS", "").split(",") if peer.strip()
 ]
 
 # Allow Config classes to expose the global peer list
@@ -167,18 +170,18 @@ Config.WALLET_TRADE_PEERS = WALLET_TRADE_PEERS
 
 # Export config
 __all__ = [
-    'Config',
-    'NetworkType',
-    'TestnetConfig',
-    'MainnetConfig',
-    'WALLET_TRADE_PEERS',
-    'WALLET_TRADE_PEER_SECRET',
-    'TIME_CAPSULE_MASTER_KEY',
-    'PERSONAL_AI_WEBHOOK_URL',
-    'PERSONAL_AI_WEBHOOK_TIMEOUT',
-    'WALLET_PASSWORD',
-    'API_RATE_LIMIT',
-    'API_RATE_WINDOW_SECONDS',
-    'API_MAX_JSON_BYTES',
-    'SAFE_GENESIS_HASHES',
+    "Config",
+    "NetworkType",
+    "TestnetConfig",
+    "MainnetConfig",
+    "WALLET_TRADE_PEERS",
+    "WALLET_TRADE_PEER_SECRET",
+    "TIME_CAPSULE_MASTER_KEY",
+    "PERSONAL_AI_WEBHOOK_URL",
+    "PERSONAL_AI_WEBHOOK_TIMEOUT",
+    "WALLET_PASSWORD",
+    "API_RATE_LIMIT",
+    "API_RATE_WINDOW_SECONDS",
+    "API_MAX_JSON_BYTES",
+    "SAFE_GENESIS_HASHES",
 ]

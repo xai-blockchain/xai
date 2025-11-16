@@ -12,6 +12,7 @@ from enum import Enum
 
 class ProposalType(Enum):
     """Types of governance proposals"""
+
     AI_IMPROVEMENT = "ai_improvement"  # AI work on blockchain code
     PARAMETER_CHANGE = "parameter_change"  # Change governance rules
     EMERGENCY = "emergency"  # Security fixes (shorter timelock)
@@ -69,7 +70,9 @@ class GovernanceParameters:
 
         # Check frequency limit (once per month by default)
         if self.last_ai_improvement_time:
-            next_allowed = self.last_ai_improvement_time + (self.ai_improvement_frequency_days * 86400)
+            next_allowed = self.last_ai_improvement_time + (
+                self.ai_improvement_frequency_days * 86400
+            )
             if current_time < next_allowed:
                 days_until = (next_allowed - current_time) / 86400
                 return False, f"Next AI improvement allowed in {days_until:.1f} days"
@@ -100,45 +103,40 @@ class GovernanceParameters:
 
         # Define allowed parameters with min/max ranges
         allowed_params = {
-            'ai_improvement_frequency_days': (1, 365),  # 1 day to 1 year
-            'timelock_ai_improvement': (1, 30),
-            'timelock_parameter_change': (7, 90),
-            'timelock_emergency': (1, 7),
-            'approval_percent': (51, 90),
-            'max_individual_power_percent': (5, 50),
-            'min_approval_voters': (5, 100),
-            'min_voting_power_to_propose': (1, 100),
-            'proposal_deposit_xai': (0, 10000),
-            'voting_period_days': (7, 30),
-            'initial_min_voters': (50, 1000),
-            'reduction_rate': (0.05, 0.50),
-            'absolute_minimum': (10, 200)
+            "ai_improvement_frequency_days": (1, 365),  # 1 day to 1 year
+            "timelock_ai_improvement": (1, 30),
+            "timelock_parameter_change": (7, 90),
+            "timelock_emergency": (1, 7),
+            "approval_percent": (51, 90),
+            "max_individual_power_percent": (5, 50),
+            "min_approval_voters": (5, 100),
+            "min_voting_power_to_propose": (1, 100),
+            "proposal_deposit_xai": (0, 10000),
+            "voting_period_days": (7, 30),
+            "initial_min_voters": (50, 1000),
+            "reduction_rate": (0.05, 0.50),
+            "absolute_minimum": (10, 200),
         }
 
         if param_name not in allowed_params:
             return {
-                'success': False,
-                'error': 'PARAMETER_NOT_CHANGEABLE',
-                'allowed_params': list(allowed_params.keys())
+                "success": False,
+                "error": "PARAMETER_NOT_CHANGEABLE",
+                "allowed_params": list(allowed_params.keys()),
             }
 
         min_val, max_val = allowed_params[param_name]
         if not (min_val <= new_value <= max_val):
-            return {
-                'success': False,
-                'error': 'VALUE_OUT_OF_RANGE',
-                'min': min_val,
-                'max': max_val
-            }
+            return {"success": False, "error": "VALUE_OUT_OF_RANGE", "min": min_val, "max": max_val}
 
         old_value = getattr(self, param_name)
         setattr(self, param_name, new_value)
 
         return {
-            'success': True,
-            'parameter': param_name,
-            'old_value': old_value,
-            'new_value': new_value
+            "success": True,
+            "parameter": param_name,
+            "old_value": old_value,
+            "new_value": new_value,
         }
 
     def get_all_parameters(self) -> Dict:
@@ -146,27 +144,24 @@ class GovernanceParameters:
 
         return {
             # AI restrictions
-            'ai_restriction_period_days': self.ai_restriction_period_days,
-            'ai_improvement_frequency_days': self.ai_improvement_frequency_days,
-
+            "ai_restriction_period_days": self.ai_restriction_period_days,
+            "ai_improvement_frequency_days": self.ai_improvement_frequency_days,
             # Proposal requirements
-            'min_voting_power_to_propose': self.min_voting_power_to_propose,
-            'proposal_deposit_xai': self.proposal_deposit_xai,
-
+            "min_voting_power_to_propose": self.min_voting_power_to_propose,
+            "proposal_deposit_xai": self.proposal_deposit_xai,
             # Timelocks
-            'timelock_ai_improvement': self.timelock_ai_improvement,
-            'timelock_parameter_change': self.timelock_parameter_change,
-            'timelock_emergency': self.timelock_emergency,
-
+            "timelock_ai_improvement": self.timelock_ai_improvement,
+            "timelock_parameter_change": self.timelock_parameter_change,
+            "timelock_emergency": self.timelock_emergency,
             # Voting
-            'voting_period_days': self.voting_period_days,
-            'approval_percent': self.approval_percent,
-            'max_individual_power_percent': self.max_individual_power_percent,
-            'min_approval_voters': self.min_approval_voters,
-            'initial_min_voters': self.initial_min_voters,
-            'reduction_rate': self.reduction_rate,
-            'absolute_minimum': self.absolute_minimum,
-            'revote_delay_days': self.revote_delay_days
+            "voting_period_days": self.voting_period_days,
+            "approval_percent": self.approval_percent,
+            "max_individual_power_percent": self.max_individual_power_percent,
+            "min_approval_voters": self.min_approval_voters,
+            "initial_min_voters": self.initial_min_voters,
+            "reduction_rate": self.reduction_rate,
+            "absolute_minimum": self.absolute_minimum,
+            "revote_delay_days": self.revote_delay_days,
         }
 
 
@@ -176,8 +171,14 @@ class TimelockProposal:
     Standard pattern in DeFi governance
     """
 
-    def __init__(self, proposal_id: str, proposal_type: ProposalType,
-                 approval_time: float, timelock_days: int, execution_data: Dict):
+    def __init__(
+        self,
+        proposal_id: str,
+        proposal_type: ProposalType,
+        approval_time: float,
+        timelock_days: int,
+        execution_data: Dict,
+    ):
         self.proposal_id = proposal_id
         self.proposal_type = proposal_type
         self.approval_time = approval_time
@@ -229,9 +230,9 @@ if __name__ == "__main__":
     print("-" * 70)
 
     print("\nChanging ai_improvement_frequency_days from 30 to 14")
-    result = params.update_parameter('ai_improvement_frequency_days', 14)
+    result = params.update_parameter("ai_improvement_frequency_days", 14)
     print(f"Success: {result['success']}")
-    if result['success']:
+    if result["success"]:
         print(f"Old value: {result['old_value']} days")
         print(f"New value: {result['new_value']} days")
 
@@ -245,7 +246,7 @@ if __name__ == "__main__":
         proposal_type=ProposalType.AI_IMPROVEMENT,
         approval_time=time.time(),
         timelock_days=params.timelock_ai_improvement,
-        execution_data={'task': 'Add privacy features'}
+        execution_data={"task": "Add privacy features"},
     )
 
     print(f"\nProposal: {timelock_proposal.proposal_id}")

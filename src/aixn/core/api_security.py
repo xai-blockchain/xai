@@ -14,6 +14,7 @@ from aixn.core.config import Config
 
 class RateLimitExceeded(ValidationError):
     """Raise when a client exceeds the configured rate limits."""
+
     pass
 
 
@@ -46,8 +47,8 @@ class APISecurityManager:
 
     def enforce_request(self):
         """Run validations before each request."""
-        client_ip = request.headers.get('X-Forwarded-For') or request.remote_addr or '127.0.0.1'
-        client_ip = client_ip.split(',')[0].strip()
+        client_ip = request.headers.get("X-Forwarded-For") or request.remote_addr or "127.0.0.1"
+        client_ip = client_ip.split(",")[0].strip()
 
         if not self.rate_limiter.allow(client_ip):
             raise RateLimitExceeded("Rate limit exceeded; slow down and try again")

@@ -24,7 +24,7 @@ class MiningAlgorithm:
 
     # Mining parameters
     BLOCK_TIME_TARGET = 60  # 60 seconds per block
-    BLOCK_REWARD = Decimal('50.0')  # 50 XAI per block
+    BLOCK_REWARD = Decimal("50.0")  # 50 XAI per block
     HALVING_INTERVAL = 725760  # Halve reward every 725,760 blocks (16.8 months)
     DIFFICULTY_ADJUSTMENT_INTERVAL = 720  # Adjust every 720 blocks (~12 hours)
 
@@ -39,28 +39,33 @@ class MiningAlgorithm:
     def calculate_block_reward(self, block_height: int) -> Decimal:
         """Calculate block reward based on height (with halving)"""
         halvings = block_height // self.HALVING_INTERVAL
-        reward = self.BLOCK_REWARD / (2 ** halvings)
-        return max(reward, Decimal('0.00000001'))  # Minimum 1 satoshi
+        reward = self.BLOCK_REWARD / (2**halvings)
+        return max(reward, Decimal("0.00000001"))  # Minimum 1 satoshi
 
-    def create_block_header(self, block_height: int, previous_hash: str,
-                           transactions: List[Dict], miner_address: str,
-                           nonce: int) -> Dict:
+    def create_block_header(
+        self,
+        block_height: int,
+        previous_hash: str,
+        transactions: List[Dict],
+        miner_address: str,
+        nonce: int,
+    ) -> Dict:
         """Create a block header for mining"""
         return {
-            'version': 1,
-            'height': block_height,
-            'previous_hash': previous_hash,
-            'timestamp': int(time.time()),
-            'transactions_root': self._merkle_root(transactions),
-            'miner': miner_address,
-            'nonce': nonce,
-            'difficulty': self.current_difficulty
+            "version": 1,
+            "height": block_height,
+            "previous_hash": previous_hash,
+            "timestamp": int(time.time()),
+            "transactions_root": self._merkle_root(transactions),
+            "miner": miner_address,
+            "nonce": nonce,
+            "difficulty": self.current_difficulty,
         }
 
     def _merkle_root(self, transactions: List[Dict]) -> str:
         """Calculate Merkle root of transactions"""
         if not transactions:
-            return '0' * 64
+            return "0" * 64
 
         # Simple implementation - hash all transactions together
         tx_data = json.dumps(transactions, sort_keys=True)
@@ -75,7 +80,7 @@ class MiningAlgorithm:
         start_time = time.time()
 
         for nonce in range(max_iterations):
-            block_header['nonce'] = nonce
+            block_header["nonce"] = nonce
             block_hash = self._calculate_block_hash(block_header)
 
             if self._is_valid_hash(block_hash, self.current_difficulty):
@@ -83,12 +88,12 @@ class MiningAlgorithm:
                 hashrate = nonce / elapsed if elapsed > 0 else 0
 
                 return {
-                    'block_header': block_header,
-                    'block_hash': block_hash,
-                    'nonce': nonce,
-                    'iterations': nonce + 1,
-                    'time': elapsed,
-                    'hashrate': hashrate
+                    "block_header": block_header,
+                    "block_hash": block_hash,
+                    "nonce": nonce,
+                    "iterations": nonce + 1,
+                    "time": elapsed,
+                    "hashrate": hashrate,
                 }
 
         return None
@@ -114,11 +119,13 @@ class MiningAlgorithm:
 
         for i in range(self.HASH_ITERATIONS):
             # Mix hash with memory
-            position = int.from_bytes(current_hash[:4], 'big') % len(memory_buffer)
-            memory_buffer[position:position+32] = current_hash
+            position = int.from_bytes(current_hash[:4], "big") % len(memory_buffer)
+            memory_buffer[position : position + 32] = current_hash
 
             # Multiple hash rounds with different algorithms
-            current_hash = hashlib.sha256(current_hash + memory_buffer[position:position+32]).digest()
+            current_hash = hashlib.sha256(
+                current_hash + memory_buffer[position : position + 32]
+            ).digest()
             current_hash = hashlib.sha3_256(current_hash).digest()
             current_hash = hashlib.blake2b(current_hash, digest_size=32).digest()
 
@@ -133,7 +140,7 @@ class MiningAlgorithm:
         Target = 2^256 / difficulty
         """
         hash_int = int(block_hash, 16)
-        target = (2 ** 256) // difficulty
+        target = (2**256) // difficulty
         return hash_int < target
 
     def adjust_difficulty(self, blocks: List[Dict]) -> int:
@@ -146,10 +153,10 @@ class MiningAlgorithm:
             return self.current_difficulty
 
         # Get last N blocks
-        recent_blocks = blocks[-self.DIFFICULTY_ADJUSTMENT_INTERVAL:]
+        recent_blocks = blocks[-self.DIFFICULTY_ADJUSTMENT_INTERVAL :]
 
         # Calculate actual time taken
-        time_taken = recent_blocks[-1]['timestamp'] - recent_blocks[0]['timestamp']
+        time_taken = recent_blocks[-1]["timestamp"] - recent_blocks[0]["timestamp"]
         expected_time = self.BLOCK_TIME_TARGET * self.DIFFICULTY_ADJUSTMENT_INTERVAL
 
         # Adjust difficulty
@@ -175,7 +182,7 @@ class MiningAlgorithm:
             return False
 
         # Check hash meets difficulty
-        if not self._is_valid_hash(block_hash, block_header['difficulty']):
+        if not self._is_valid_hash(block_hash, block_header["difficulty"]):
             return False
 
         return True
@@ -188,7 +195,7 @@ class MiningAlgorithm:
     def estimate_time_to_mine(self, hashrate: float, difficulty: int) -> float:
         """Estimate expected time to mine a block at given hashrate"""
         if hashrate == 0:
-            return float('inf')
+            return float("inf")
         return difficulty / hashrate
 
 
@@ -208,8 +215,7 @@ class BrowserMiningAdapter:
         self.algorithm.MEMORY_SIZE = self.BROWSER_MEMORY_SIZE
         self.algorithm.HASH_ITERATIONS = self.BROWSER_HASH_ITERATIONS
 
-    def get_mining_job(self, block_height: int, previous_hash: str,
-                       miner_address: str) -> Dict:
+    def get_mining_job(self, block_height: int, previous_hash: str, miner_address: str) -> Dict:
         """
         Get a mining job for browser client
 
@@ -220,21 +226,20 @@ class BrowserMiningAdapter:
             previous_hash=previous_hash,
             transactions=[],  # Pool will handle transactions
             miner_address=miner_address,
-            nonce=0
+            nonce=0,
         )
 
         return {
-            'job_id': hashlib.sha256(f"{time.time()}{miner_address}".encode()).hexdigest()[:16],
-            'block_height': block_height,
-            'previous_hash': previous_hash,
-            'timestamp': int(time.time()),
-            'difficulty': self.algorithm.current_difficulty,
-            'miner_address': miner_address,
-            'target': hex((2 ** 256) // self.algorithm.current_difficulty)
+            "job_id": hashlib.sha256(f"{time.time()}{miner_address}".encode()).hexdigest()[:16],
+            "block_height": block_height,
+            "previous_hash": previous_hash,
+            "timestamp": int(time.time()),
+            "difficulty": self.algorithm.current_difficulty,
+            "miner_address": miner_address,
+            "target": hex((2**256) // self.algorithm.current_difficulty),
         }
 
-    def submit_share(self, job_id: str, nonce: int, block_hash: str,
-                     miner_address: str) -> Dict:
+    def submit_share(self, job_id: str, nonce: int, block_hash: str, miner_address: str) -> Dict:
         """
         Submit a mining share from browser
 
@@ -244,12 +249,12 @@ class BrowserMiningAdapter:
         # and credit miner's account in the pool
 
         return {
-            'valid': True,
-            'job_id': job_id,
-            'nonce': nonce,
-            'hash': block_hash,
-            'reward_estimate': str(self.algorithm.BLOCK_REWARD / 1000),  # Share of block reward
-            'timestamp': int(time.time())
+            "valid": True,
+            "job_id": job_id,
+            "nonce": nonce,
+            "hash": block_hash,
+            "reward_estimate": str(self.algorithm.BLOCK_REWARD / 1000),  # Share of block reward
+            "timestamp": int(time.time()),
         }
 
 
@@ -264,11 +269,7 @@ if __name__ == "__main__":
 
     # Create a test block
     block_header = miner.create_block_header(
-        block_height=1,
-        previous_hash='0' * 64,
-        transactions=[],
-        miner_address='AXNtest123',
-        nonce=0
+        block_height=1, previous_hash="0" * 64, transactions=[], miner_address="AXNtest123", nonce=0
     )
 
     print(f"Mining block #1...")
@@ -291,7 +292,7 @@ if __name__ == "__main__":
         print()
 
         # Verify block
-        is_valid = miner.verify_block(block_header, result['block_hash'])
+        is_valid = miner.verify_block(block_header, result["block_hash"])
         print(f"Block valid: {is_valid}")
     else:
         print()

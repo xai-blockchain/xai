@@ -33,45 +33,48 @@ import difflib
 
 class CollaborationStrategy(Enum):
     """How multiple AIs should collaborate"""
-    PARALLEL = "parallel"           # All work simultaneously, compare results
-    SEQUENTIAL = "sequential"       # One AI, then next reviews/improves
-    DEBATE = "debate"              # AIs discuss and vote on approaches
-    MERGE = "merge"                # Each AI does part, merge results
-    PEER_REVIEW = "peer_review"    # One implements, others review
+
+    PARALLEL = "parallel"  # All work simultaneously, compare results
+    SEQUENTIAL = "sequential"  # One AI, then next reviews/improves
+    DEBATE = "debate"  # AIs discuss and vote on approaches
+    MERGE = "merge"  # Each AI does part, merge results
+    PEER_REVIEW = "peer_review"  # One implements, others review
 
 
 MODEL_PROVIDER_MAP = {
-    'claude-opus-4': AIProvider.ANTHROPIC,
-    'claude-sonnet-4': AIProvider.ANTHROPIC,
-    'claude-haiku-4': AIProvider.ANTHROPIC,
-    'gpt-4-turbo': AIProvider.OPENAI,
-    'gpt-4': AIProvider.OPENAI,
-    'gpt-3.5-turbo': AIProvider.OPENAI,
-    'o1-preview': AIProvider.OPENAI,
-    'o1-mini': AIProvider.OPENAI,
-    'gemini-ultra': AIProvider.GOOGLE,
-    'gemini-pro': AIProvider.GOOGLE,
-    'gemini-flash': AIProvider.GOOGLE,
-    'llama-3-70b': AIProvider.ANTHROPIC,
-    'mistral-large': AIProvider.ANTHROPIC,
-    'command-r-plus': AIProvider.ANTHROPIC,
-    'deepseek-coder': AIProvider.ANTHROPIC
+    "claude-opus-4": AIProvider.ANTHROPIC,
+    "claude-sonnet-4": AIProvider.ANTHROPIC,
+    "claude-haiku-4": AIProvider.ANTHROPIC,
+    "gpt-4-turbo": AIProvider.OPENAI,
+    "gpt-4": AIProvider.OPENAI,
+    "gpt-3.5-turbo": AIProvider.OPENAI,
+    "o1-preview": AIProvider.OPENAI,
+    "o1-mini": AIProvider.OPENAI,
+    "gemini-ultra": AIProvider.GOOGLE,
+    "gemini-pro": AIProvider.GOOGLE,
+    "gemini-flash": AIProvider.GOOGLE,
+    "llama-3-70b": AIProvider.ANTHROPIC,
+    "mistral-large": AIProvider.ANTHROPIC,
+    "command-r-plus": AIProvider.ANTHROPIC,
+    "deepseek-coder": AIProvider.ANTHROPIC,
 }
 
 
 class AIRole(Enum):
     """Role of AI in collaboration"""
-    IMPLEMENTER = "implementer"    # Writes the code
-    REVIEWER = "reviewer"          # Reviews code for errors
-    OPTIMIZER = "optimizer"        # Optimizes existing code
-    SECURITY_AUDITOR = "auditor"   # Security-focused review
-    ARCHITECT = "architect"        # High-level design
-    TESTER = "tester"             # Writes tests
+
+    IMPLEMENTER = "implementer"  # Writes the code
+    REVIEWER = "reviewer"  # Reviews code for errors
+    OPTIMIZER = "optimizer"  # Optimizes existing code
+    SECURITY_AUDITOR = "auditor"  # Security-focused review
+    ARCHITECT = "architect"  # High-level design
+    TESTER = "tester"  # Writes tests
 
 
 @dataclass
 class AIContribution:
     """A single AI's contribution to the task"""
+
     ai_provider: str
     ai_model: str
     role: AIRole
@@ -97,6 +100,7 @@ class AIContribution:
 @dataclass
 class AIPeerReview:
     """One AI's review of another AI's work"""
+
     reviewer_ai: str
     reviewer_model: str
     reviewed_contribution_id: str
@@ -121,6 +125,7 @@ class AIPeerReview:
 @dataclass
 class CollaborativeTask:
     """Task being worked on by multiple AIs"""
+
     task_id: str
     proposal_id: str
     description: str
@@ -175,44 +180,40 @@ class MultiAICollaboration:
 
         return {
             CollaborationStrategy.PARALLEL: {
-                'description': 'All AIs implement simultaneously, best solution wins',
-                'ideal_for': ['complex_algorithms', 'multiple_valid_approaches'],
-                'ai_selection': 'diverse',  # Choose different types of AIs
-                'merge_results': False,
-                'review_required': True
+                "description": "All AIs implement simultaneously, best solution wins",
+                "ideal_for": ["complex_algorithms", "multiple_valid_approaches"],
+                "ai_selection": "diverse",  # Choose different types of AIs
+                "merge_results": False,
+                "review_required": True,
             },
-
             CollaborationStrategy.SEQUENTIAL: {
-                'description': 'First AI implements, others improve iteratively',
-                'ideal_for': ['incremental_improvements', 'optimization'],
-                'ai_selection': 'progressive',  # Fast AI first, then better AIs
-                'merge_results': False,
-                'review_required': True
+                "description": "First AI implements, others improve iteratively",
+                "ideal_for": ["incremental_improvements", "optimization"],
+                "ai_selection": "progressive",  # Fast AI first, then better AIs
+                "merge_results": False,
+                "review_required": True,
             },
-
             CollaborationStrategy.DEBATE: {
-                'description': 'AIs discuss approaches before implementing',
-                'ideal_for': ['architectural_decisions', 'security_critical'],
-                'ai_selection': 'expert',  # Choose best AIs for reasoning
-                'merge_results': False,
-                'review_required': True
+                "description": "AIs discuss approaches before implementing",
+                "ideal_for": ["architectural_decisions", "security_critical"],
+                "ai_selection": "expert",  # Choose best AIs for reasoning
+                "merge_results": False,
+                "review_required": True,
             },
-
             CollaborationStrategy.MERGE: {
-                'description': 'Each AI handles different parts, merge together',
-                'ideal_for': ['large_features', 'multi_component'],
-                'ai_selection': 'specialized',  # Choose specialists for each part
-                'merge_results': True,
-                'review_required': True
+                "description": "Each AI handles different parts, merge together",
+                "ideal_for": ["large_features", "multi_component"],
+                "ai_selection": "specialized",  # Choose specialists for each part
+                "merge_results": True,
+                "review_required": True,
             },
-
             CollaborationStrategy.PEER_REVIEW: {
-                'description': 'One AI implements, 2 others review for errors',
-                'ideal_for': ['security_critical', 'financial_code'],
-                'ai_selection': 'implementer_plus_reviewers',
-                'merge_results': False,
-                'review_required': True
-            }
+                "description": "One AI implements, 2 others review for errors",
+                "ideal_for": ["security_critical", "financial_code"],
+                "ai_selection": "implementer_plus_reviewers",
+                "merge_results": False,
+                "review_required": True,
+            },
         }
 
     def start_collaborative_task(
@@ -222,7 +223,7 @@ class MultiAICollaboration:
         description: str,
         requirements: str,
         strategy: CollaborationStrategy = CollaborationStrategy.PARALLEL,
-        num_ais: int = 3
+        num_ais: int = 3,
     ) -> Dict:
         """
         Start multi-AI collaborative task
@@ -240,14 +241,11 @@ class MultiAICollaboration:
         """
 
         if num_ais not in [2, 3]:
-            return {'success': False, 'error': 'num_ais must be 2 or 3'}
+            return {"success": False, "error": "num_ais must be 2 or 3"}
 
         # Select AIs based on strategy
         selected_ais = self._select_ais_for_collaboration(
-            description=description,
-            requirements=requirements,
-            strategy=strategy,
-            num_ais=num_ais
+            description=description, requirements=requirements, strategy=strategy, num_ais=num_ais
         )
 
         # Create collaborative task
@@ -258,7 +256,7 @@ class MultiAICollaboration:
             requirements=requirements,
             strategy=strategy,
             num_ais=num_ais,
-            selected_ais=selected_ais
+            selected_ais=selected_ais,
         )
 
         self.tasks[task_id] = task
@@ -275,10 +273,10 @@ class MultiAICollaboration:
         print(f"{'='*80}\n")
 
         return {
-            'success': True,
-            'task_id': task_id,
-            'strategy': strategy.value,
-            'selected_ais': [(p, m, r.value) for p, m, r in selected_ais]
+            "success": True,
+            "task_id": task_id,
+            "strategy": strategy.value,
+            "selected_ais": [(p, m, r.value) for p, m, r in selected_ais],
         }
 
     def execute_collaborative_task(self, task_id: str) -> Dict:
@@ -293,7 +291,7 @@ class MultiAICollaboration:
         """
 
         if task_id not in self.tasks:
-            return {'success': False, 'error': 'Task not found'}
+            return {"success": False, "error": "Task not found"}
 
         task = self.tasks[task_id]
         strategy_config = self.strategies[task.strategy]
@@ -313,7 +311,7 @@ class MultiAICollaboration:
         elif task.strategy == CollaborationStrategy.PEER_REVIEW:
             return self._execute_peer_review(task)
 
-        return {'success': False, 'error': 'Unknown strategy'}
+        return {"success": False, "error": "Unknown strategy"}
 
     def _execute_parallel(self, task: CollaborativeTask) -> Dict:
         """
@@ -369,11 +367,7 @@ Provide:
 
                 print(f"AI {i+1} ({reviewer_ai[1]}) reviewing AI {j+1}'s work...")
 
-                review = self._simulate_peer_review(
-                    reviewer_ai[0],
-                    reviewer_ai[1],
-                    contribution
-                )
+                review = self._simulate_peer_review(reviewer_ai[0], reviewer_ai[1], contribution)
                 task.reviews.append(review)
 
                 print(f"   Score: {review.overall_score:.1f}/100")
@@ -381,8 +375,8 @@ Provide:
 
         # Select winning contribution
         winner = self._select_best_contribution(task)
-        task.winning_contribution_id = winner['contribution_id']
-        task.consensus_confidence = winner['confidence']
+        task.winning_contribution_id = winner["contribution_id"]
+        task.consensus_confidence = winner["confidence"]
         task.completed_at = time.time()
 
         print(f"\n{'='*80}")
@@ -394,14 +388,14 @@ Provide:
         print(f"{'='*80}\n")
 
         return {
-            'success': True,
-            'strategy': 'parallel',
-            'winning_solution': winner['code'],
-            'winning_ai': winner['ai_model'],
-            'confidence': winner['confidence'],
-            'all_contributions': len(task.contributions),
-            'total_reviews': len(task.reviews),
-            'total_tokens_used': task.total_tokens_used
+            "success": True,
+            "strategy": "parallel",
+            "winning_solution": winner["code"],
+            "winning_ai": winner["ai_model"],
+            "confidence": winner["confidence"],
+            "all_contributions": len(task.contributions),
+            "total_reviews": len(task.reviews),
+            "total_tokens_used": task.total_tokens_used,
         }
 
     def _execute_peer_review(self, task: CollaborativeTask) -> Dict:
@@ -438,10 +432,7 @@ for security, quality, and correctness. Write clean, well-documented code.
 """
 
         contribution = self._simulate_ai_contribution(
-            implementer[0],
-            implementer[1],
-            implementer[2],
-            prompt
+            implementer[0], implementer[1], implementer[2], prompt
         )
         task.contributions.append(contribution)
         task.total_tokens_used += contribution.tokens_used
@@ -458,10 +449,7 @@ for security, quality, and correctness. Write clean, well-documented code.
             print(f"Reviewer: {reviewer_model} ({reviewer_role.value})")
 
             review = self._simulate_peer_review(
-                reviewer_provider,
-                reviewer_model,
-                contribution,
-                focus=reviewer_role.value
+                reviewer_provider, reviewer_model, contribution, focus=reviewer_role.value
             )
             task.reviews.append(review)
 
@@ -488,22 +476,22 @@ for security, quality, and correctness. Write clean, well-documented code.
         print(f"{'='*80}\n")
 
         return {
-            'success': True,
-            'strategy': 'peer_review',
-            'implementation': contribution.code,
-            'implementer': implementer[1],
-            'avg_review_score': avg_score,
-            'all_approved': all_approved,
-            'reviews': len(task.reviews),
-            'total_tokens_used': task.total_tokens_used,
-            'security_issues_found': sum(len(r.security_issues) for r in task.reviews),
-            'bugs_found': sum(len(r.bugs_found) for r in task.reviews)
+            "success": True,
+            "strategy": "peer_review",
+            "implementation": contribution.code,
+            "implementer": implementer[1],
+            "avg_review_score": avg_score,
+            "all_approved": all_approved,
+            "reviews": len(task.reviews),
+            "total_tokens_used": task.total_tokens_used,
+            "security_issues_found": sum(len(r.security_issues) for r in task.reviews),
+            "bugs_found": sum(len(r.bugs_found) for r in task.reviews),
         }
 
     def _execute_sequential(self, task: CollaborativeTask) -> Dict:
         """Execute SEQUENTIAL strategy: Each AI improves previous AI's work"""
         contributions = []
-        previous_output = ''
+        previous_output = ""
 
         for provider, model, role in task.selected_ais:
             prompt = f"{task.description}\nRequirements: {task.requirements}\nRole: {role.value}\nPrevious output:\n{previous_output}"
@@ -516,11 +504,11 @@ for security, quality, and correctness. Write clean, well-documented code.
         task.winning_contribution_id = contributions[-1].ai_model if contributions else None
 
         return {
-            'success': True,
-            'strategy': 'sequential',
-            'final_solution': previous_output,
-            'contributions': len(contributions),
-            'total_tokens_used': task.total_tokens_used
+            "success": True,
+            "strategy": "sequential",
+            "final_solution": previous_output,
+            "contributions": len(contributions),
+            "total_tokens_used": task.total_tokens_used,
         }
 
     def _execute_debate(self, task: CollaborativeTask) -> Dict:
@@ -535,14 +523,14 @@ for security, quality, and correctness. Write clean, well-documented code.
             task.total_tokens_used += contribution.tokens_used
 
         winner = max(debates, key=lambda c: c.confidence) if debates else None
-        best_summary = winner.explanation if winner else 'No debate data'
+        best_summary = winner.explanation if winner else "No debate data"
 
         return {
-            'success': True,
-            'strategy': 'debate',
-            'winner': winner.ai_model if winner else None,
-            'summary': best_summary,
-            'debate_rounds': len(debates)
+            "success": True,
+            "strategy": "debate",
+            "winner": winner.ai_model if winner else None,
+            "summary": best_summary,
+            "debate_rounds": len(debates),
         }
 
     def _execute_merge(self, task: CollaborativeTask) -> Dict:
@@ -560,18 +548,14 @@ for security, quality, and correctness. Write clean, well-documented code.
         task.merged_solution = merged_solution
 
         return {
-            'success': True,
-            'strategy': 'merge',
-            'merged_solution': merged_solution,
-            'parts': len(parts)
+            "success": True,
+            "strategy": "merge",
+            "merged_solution": merged_solution,
+            "parts": len(parts),
         }
 
     def _select_ais_for_collaboration(
-        self,
-        description: str,
-        requirements: str,
-        strategy: CollaborationStrategy,
-        num_ais: int
+        self, description: str, requirements: str, strategy: CollaborationStrategy, num_ais: int
     ) -> List[Tuple[str, str, AIRole]]:
         """
         Intelligently select which AIs should collaborate
@@ -583,46 +567,42 @@ for security, quality, and correctness. Write clean, well-documented code.
         if strategy == CollaborationStrategy.PARALLEL:
             # Choose diverse AIs with different strengths
             return [
-                ('anthropic', 'claude-opus-4', AIRole.IMPLEMENTER),
-                ('openai', 'o1-preview', AIRole.IMPLEMENTER),
-                ('deepseek', 'deepseek-coder', AIRole.IMPLEMENTER)
+                ("anthropic", "claude-opus-4", AIRole.IMPLEMENTER),
+                ("openai", "o1-preview", AIRole.IMPLEMENTER),
+                ("deepseek", "deepseek-coder", AIRole.IMPLEMENTER),
             ][:num_ais]
 
         elif strategy == CollaborationStrategy.PEER_REVIEW:
             # One implementer, rest are reviewers
             if num_ais == 2:
                 return [
-                    ('anthropic', 'claude-opus-4', AIRole.IMPLEMENTER),
-                    ('openai', 'o1-preview', AIRole.SECURITY_AUDITOR)
+                    ("anthropic", "claude-opus-4", AIRole.IMPLEMENTER),
+                    ("openai", "o1-preview", AIRole.SECURITY_AUDITOR),
                 ]
             else:  # 3 AIs
                 return [
-                    ('anthropic', 'claude-opus-4', AIRole.IMPLEMENTER),
-                    ('openai', 'o1-preview', AIRole.SECURITY_AUDITOR),
-                    ('deepseek', 'deepseek-coder', AIRole.REVIEWER)
+                    ("anthropic", "claude-opus-4", AIRole.IMPLEMENTER),
+                    ("openai", "o1-preview", AIRole.SECURITY_AUDITOR),
+                    ("deepseek", "deepseek-coder", AIRole.REVIEWER),
                 ]
 
         elif strategy == CollaborationStrategy.SEQUENTIAL:
             # Fast AI first, then better AIs improve
             return [
-                ('groq', 'groq-llama-3-70b', AIRole.IMPLEMENTER),
-                ('anthropic', 'claude-sonnet-4', AIRole.OPTIMIZER),
-                ('anthropic', 'claude-opus-4', AIRole.REVIEWER)
+                ("groq", "groq-llama-3-70b", AIRole.IMPLEMENTER),
+                ("anthropic", "claude-sonnet-4", AIRole.OPTIMIZER),
+                ("anthropic", "claude-opus-4", AIRole.REVIEWER),
             ][:num_ais]
 
         # Default diverse selection
         return [
-            ('anthropic', 'claude-opus-4', AIRole.IMPLEMENTER),
-            ('openai', 'gpt-4-turbo', AIRole.REVIEWER),
-            ('deepseek', 'deepseek-coder', AIRole.OPTIMIZER)
+            ("anthropic", "claude-opus-4", AIRole.IMPLEMENTER),
+            ("openai", "gpt-4-turbo", AIRole.REVIEWER),
+            ("deepseek", "deepseek-coder", AIRole.OPTIMIZER),
         ][:num_ais]
 
     def _simulate_ai_contribution(
-        self,
-        provider: str,
-        model: str,
-        role: AIRole,
-        prompt: str
+        self, provider: str, model: str, role: AIRole, prompt: str
     ) -> AIContribution:
         """
         Simulate AI contribution (in production, call actual AI API)
@@ -633,7 +613,9 @@ for security, quality, and correctness. Write clean, well-documented code.
 
         code = f"# Implementation by {model}\n# Approach: {role.value}\n\n{prompt}"
 
-        explanation = f"I implemented this using a {role.value} approach focused on clarity and security."
+        explanation = (
+            f"I implemented this using a {role.value} approach focused on clarity and security."
+        )
 
         return AIContribution(
             ai_provider=provider,
@@ -643,15 +625,11 @@ for security, quality, and correctness. Write clean, well-documented code.
             explanation=explanation,
             confidence=0.85 + (hash(model) % 15) / 100,
             tokens_used=50000 + (hash(model) % 20000),
-            execution_time=120.0
+            execution_time=120.0,
         )
+
     def _execute_real_contribution(
-        self,
-        provider: str,
-        model: str,
-        role: AIRole,
-        prompt: str,
-        estimated_tokens: int = 60000
+        self, provider: str, model: str, role: AIRole, prompt: str, estimated_tokens: int = 60000
     ) -> AIContribution:
         """Execute a real AI contribution using the strict pool"""
 
@@ -660,23 +638,23 @@ for security, quality, and correctness. Write clean, well-documented code.
             task_description=prompt,
             estimated_tokens=estimated_tokens,
             provider=provider_enum,
-            max_tokens_override=estimated_tokens + 2048
+            max_tokens_override=estimated_tokens + 2048,
         )
 
-        if not execution.get('success'):
+        if not execution.get("success"):
             return AIContribution(
                 ai_provider=provider,
                 ai_model=model,
                 role=role,
                 code=prompt,
-                explanation=execution.get('error', 'API call failed to produce output.'),
+                explanation=execution.get("error", "API call failed to produce output."),
                 confidence=0.4,
                 tokens_used=0,
-                execution_time=0.0
+                execution_time=0.0,
             )
 
-        output = execution.get('output', '').strip() or prompt
-        tokens_used = execution.get('tokens_used', 0)
+        output = execution.get("output", "").strip() or prompt
+        tokens_used = execution.get("tokens_used", 0)
         confidence = min(1.0, 0.5 + tokens_used / (estimated_tokens * 2))
 
         return AIContribution(
@@ -684,19 +662,18 @@ for security, quality, and correctness. Write clean, well-documented code.
             ai_model=model,
             role=role,
             code=output,
-            explanation=execution.get('output', output)[:300],
+            explanation=execution.get("output", output)[:300],
             confidence=confidence,
             tokens_used=tokens_used,
-            execution_time=execution.get('execution_time', 0.0)
+            execution_time=execution.get("execution_time", 0.0),
         )
-
 
     def _simulate_peer_review(
         self,
         reviewer_provider: str,
         reviewer_model: str,
         contribution: AIContribution,
-        focus: str = "general"
+        focus: str = "general",
     ) -> AIPeerReview:
         """
         Simulate peer review (in production, AI reviews code)
@@ -717,7 +694,7 @@ for security, quality, and correctness. Write clean, well-documented code.
             code_quality_issues=[],
             bugs_found=[],
             summary=f"Reviewed by {reviewer_model}. Overall solid implementation.",
-            recommendation="approve" if score >= 90 else "approve_with_changes"
+            recommendation="approve" if score >= 90 else "approve_with_changes",
         )
 
     def _execute_real_review(
@@ -726,20 +703,18 @@ for security, quality, and correctness. Write clean, well-documented code.
         reviewer_model: str,
         contribution: AIContribution,
         focus: str = "general",
-        estimated_tokens: int = 9000
+        estimated_tokens: int = 9000,
     ) -> AIPeerReview:
         provider_enum = MODEL_PROVIDER_MAP.get(reviewer_model, AIProvider.ANTHROPIC)
         prompt = f"You are reviewing code for issues and improvements. Focus: {focus}.\n\n{contribution.code}"
         result = self.pool_manager.execute_ai_task_with_limits(
-            task_description=prompt,
-            estimated_tokens=estimated_tokens,
-            provider=provider_enum
+            task_description=prompt, estimated_tokens=estimated_tokens, provider=provider_enum
         )
 
-        tokens_used = result.get('tokens_used', 0)
+        tokens_used = result.get("tokens_used", 0)
         overall_score = min(100, 60 + tokens_used / 1000)
-        approved = result.get('success', False)
-        summary = (result.get('output') or 'Review completed.').strip()
+        approved = result.get("success", False)
+        summary = (result.get("output") or "Review completed.").strip()
 
         return AIPeerReview(
             reviewer_ai=provider_enum.value,
@@ -751,7 +726,7 @@ for security, quality, and correctness. Write clean, well-documented code.
             code_quality_issues=[],
             bugs_found=[],
             summary=summary,
-            recommendation="approve" if approved else "approve_with_changes"
+            recommendation="approve" if approved else "approve_with_changes",
         )
 
     def _select_best_contribution(self, task: CollaborativeTask) -> Dict:
@@ -764,31 +739,36 @@ for security, quality, and correctness. Write clean, well-documented code.
         for i, contribution in enumerate(task.contributions):
             # Get reviews for this contribution
             contribution_reviews = [
-                r for r in task.reviews
+                r
+                for r in task.reviews
                 if r.reviewed_contribution_id == f"contrib_{i}" or i == 0  # Simulated
             ]
 
             # Average review score
-            avg_review_score = sum(r.overall_score for r in contribution_reviews) / max(len(contribution_reviews), 1)
+            avg_review_score = sum(r.overall_score for r in contribution_reviews) / max(
+                len(contribution_reviews), 1
+            )
 
             # Combined score: 70% peer reviews + 30% self-confidence
             combined_score = (avg_review_score * 0.7) + (contribution.confidence * 100 * 0.3)
 
-            scores.append({
-                'contribution_id': f"contrib_{i}",
-                'ai_model': contribution.ai_model,
-                'code': contribution.code,
-                'combined_score': combined_score,
-                'confidence': combined_score / 100
-            })
+            scores.append(
+                {
+                    "contribution_id": f"contrib_{i}",
+                    "ai_model": contribution.ai_model,
+                    "code": contribution.code,
+                    "combined_score": combined_score,
+                    "confidence": combined_score / 100,
+                }
+            )
 
         # Return highest scoring contribution
-        winner = max(scores, key=lambda x: x['combined_score'])
+        winner = max(scores, key=lambda x: x["combined_score"])
         return winner
 
 
 # Example usage and demonstration
-if __name__ == '__main__':
+if __name__ == "__main__":
     print("=" * 80)
     print("MULTI-AI COLLABORATION SYSTEM - DEMONSTRATION")
     print("=" * 80)
@@ -817,10 +797,10 @@ if __name__ == '__main__':
         description="Implement Cardano atomic swap with HTLC contracts",
         requirements="Must support time-locked contracts, hash verification, and refund mechanism",
         strategy=CollaborationStrategy.PARALLEL,
-        num_ais=3
+        num_ais=3,
     )
 
-    if result['success']:
+    if result["success"]:
         # Execute collaborative task
         execution_result = collaboration.execute_collaborative_task("task_cardano_swap")
 
@@ -842,10 +822,10 @@ if __name__ == '__main__':
         description="Implement rate limiting to prevent spam attacks",
         requirements="Max 10 transactions per address per hour, must be efficient",
         strategy=CollaborationStrategy.PEER_REVIEW,
-        num_ais=3
+        num_ais=3,
     )
 
-    if result2['success']:
+    if result2["success"]:
         execution_result2 = collaboration.execute_collaborative_task("task_security_feature")
 
         print(f"\n📊 RESULTS:")
@@ -859,7 +839,8 @@ if __name__ == '__main__':
     print("\n\n" + "=" * 80)
     print("MULTI-AI COLLABORATION BENEFITS")
     print("=" * 80)
-    print("""
+    print(
+        """
 1. ✅ Better Code Quality - Multiple perspectives catch more issues
 2. ✅ Error Detection - Peer review finds bugs one AI might miss
 3. ✅ Innovation - Different AIs try different approaches
@@ -881,4 +862,5 @@ Cost Impact:
 - But produces significantly better code
 - Worth it for critical/security features
 - Can use cheaper AIs for some roles (Groq for reviews)
-    """)
+    """
+    )

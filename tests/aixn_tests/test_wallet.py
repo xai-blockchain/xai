@@ -17,7 +17,7 @@ import base64
 from cryptography.fernet import Fernet
 
 # Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'core'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "core"))
 
 from wallet import Wallet, WalletManager
 from blockchain import Transaction
@@ -47,8 +47,9 @@ class TestWalletCreation:
         wallet = Wallet()
 
         # Address should start with XAI or TXAI prefix
-        assert wallet.address.startswith('XAI') or wallet.address.startswith('TXAI'), \
-            "Address should start with XAI or TXAI prefix"
+        assert wallet.address.startswith("XAI") or wallet.address.startswith(
+            "TXAI"
+        ), "Address should start with XAI or TXAI prefix"
 
     def test_private_key_length(self):
         """Test private key is correct length"""
@@ -177,14 +178,14 @@ class TestWalletPersistence:
         wallet = Wallet()
 
         wallet_data = {
-            'address': wallet.address,
-            'private_key': wallet.private_key,
-            'public_key': wallet.public_key
+            "address": wallet.address,
+            "private_key": wallet.private_key,
+            "public_key": wallet.public_key,
         }
 
-        assert 'address' in wallet_data, "Wallet data should have address"
-        assert 'private_key' in wallet_data, "Wallet data should have private key"
-        assert 'public_key' in wallet_data, "Wallet data should have public key"
+        assert "address" in wallet_data, "Wallet data should have address"
+        assert "private_key" in wallet_data, "Wallet data should have private key"
+        assert "public_key" in wallet_data, "Wallet data should have public key"
 
     def test_save_and_load_unencrypted_wallet(self, tmp_path):
         """Test saving and loading an unencrypted wallet"""
@@ -262,7 +263,7 @@ class TestWalletManager:
         """Test creating and loading an unencrypted wallet via WalletManager"""
         manager = wallet_manager_cleanup
         wallet_name = "manager_unencrypted"
-        
+
         created_wallet = manager.create_wallet(wallet_name)
         assert created_wallet is not None
         assert wallet_name in manager.wallets
@@ -310,7 +311,7 @@ class TestWalletManager:
         manager = wallet_manager_cleanup
         manager.create_wallet("wallet_a")
         manager.create_wallet("wallet_b", "pass")
-        
+
         wallets = manager.list_wallets()
         assert "wallet_a" in wallets
         assert "wallet_b" in wallets
@@ -337,5 +338,5 @@ class TestWalletManager:
         assert retrieved_wallet is None
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

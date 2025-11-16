@@ -47,11 +47,11 @@ class LedgerHardwareWallet(HardwareWallet):
 
     def _serialize_derivation_path(self) -> bytes:
         """Serialize BIP32 path into ledger-friendly format."""
-        elements = self.derivation_path.split('/')
-        if elements[0].lower() == 'm':
+        elements = self.derivation_path.split("/")
+        if elements[0].lower() == "m":
             elements = elements[1:]
 
-        result = struct.pack('B', len(elements))
+        result = struct.pack("B", len(elements))
         for component in elements:
             hardened = component.endswith("'")
             if hardened:

@@ -11,7 +11,7 @@ import time
 import threading
 
 # Add core directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'core'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
 from blockchain import Blockchain, Transaction
 from wallet import Wallet
@@ -25,7 +25,7 @@ class TestPeerConnection:
         bc = Blockchain()
 
         # Blockchain should have mechanism to track peers
-        assert hasattr(bc, '__dict__')
+        assert hasattr(bc, "__dict__")
 
     def test_add_peer(self):
         """Test adding peers to network"""
@@ -83,10 +83,10 @@ class TestBlockPropagation:
         block = bc.mine_pending_transactions(miner.address)
 
         # Block should have serializable attributes
-        assert hasattr(block, 'index')
-        assert hasattr(block, 'timestamp')
-        assert hasattr(block, 'transactions')
-        assert hasattr(block, 'hash')
+        assert hasattr(block, "index")
+        assert hasattr(block, "timestamp")
+        assert hasattr(block, "transactions")
+        assert hasattr(block, "hash")
 
     def test_block_validation_on_receive(self):
         """Test received blocks are validated"""
@@ -334,7 +334,7 @@ class TestPeerDiscovery:
         bootstrap_peers = [
             "http://seed1.aixn.com:5000",
             "http://seed2.aixn.com:5000",
-            "http://seed3.aixn.com:5000"
+            "http://seed3.aixn.com:5000",
         ]
 
         peers = set(bootstrap_peers)
@@ -407,5 +407,5 @@ class TestNetworkMessaging:
         assert latest_block.hash is not None
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

@@ -1,14 +1,17 @@
 from typing import Dict, Any
 
+
 class BridgeFeeManager:
-    DEFAULT_TRANSFER_FEE_PERCENTAGE = 0.001 # 0.1% fee
+    DEFAULT_TRANSFER_FEE_PERCENTAGE = 0.001  # 0.1% fee
 
     def __init__(self, transfer_fee_percentage: float = DEFAULT_TRANSFER_FEE_PERCENTAGE):
-        if not isinstance(transfer_fee_percentage, (int, float)) or not (0 <= transfer_fee_percentage < 1):
+        if not isinstance(transfer_fee_percentage, (int, float)) or not (
+            0 <= transfer_fee_percentage < 1
+        ):
             raise ValueError("Transfer fee percentage must be between 0 and 1 (exclusive of 1).")
-        
+
         self.transfer_fee_percentage = transfer_fee_percentage
-        self.insurance_fund_balance = 0.0 # Accumulated fees
+        self.insurance_fund_balance = 0.0  # Accumulated fees
 
     def calculate_fee(self, amount: float) -> float:
         if not isinstance(amount, (int, float)) or amount <= 0:
@@ -22,19 +25,24 @@ class BridgeFeeManager:
         """
         fee = self.calculate_fee(amount)
         self.insurance_fund_balance += fee
-        print(f"Collected {fee:.4f} in fees from transfer of {amount}. Insurance fund balance: {self.insurance_fund_balance:.4f}")
+        print(
+            f"Collected {fee:.4f} in fees from transfer of {amount}. Insurance fund balance: {self.insurance_fund_balance:.4f}"
+        )
         return fee
 
     def get_insurance_fund_balance(self) -> float:
         return self.insurance_fund_balance
 
     def __repr__(self):
-        return ("BridgeFeeManager(fee_percentage="+str(self.transfer_fee_percentage*100)+"%", "
-                "fund_balance="+str(self.insurance_fund_balance)+")")
+        return (
+            f"BridgeFeeManager(fee_percentage={self.transfer_fee_percentage*100}%, "
+            f"fund_balance={self.insurance_fund_balance})"
+        )
+
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
-    fee_manager = BridgeFeeManager(transfer_fee_percentage=0.005) # 0.5% fee
+    fee_manager = BridgeFeeManager(transfer_fee_percentage=0.005)  # 0.5% fee
 
     print("--- Initial State ---")
     print(fee_manager)

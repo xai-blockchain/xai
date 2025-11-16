@@ -1,6 +1,7 @@
 import random
 from typing import List, Dict, Any
 
+
 class Validator:
     def __init__(self, address: str, stake: int, reputation: float = 0.5):
         if not isinstance(address, str) or not address:
@@ -9,16 +10,17 @@ class Validator:
             raise ValueError("Validator stake must be a positive integer.")
         if not isinstance(reputation, (int, float)) or not (0 <= reputation <= 1):
             raise ValueError("Validator reputation must be between 0 and 1.")
-            
+
         self.address = address
         self.stake = stake
-        self.reputation = reputation # A value between 0 and 1, higher is better
+        self.reputation = reputation  # A value between 0 and 1, higher is better
 
     def to_dict(self) -> Dict[str, Any]:
         return {"address": self.address, "stake": self.stake, "reputation": self.reputation}
 
     def __repr__(self):
         return f"Validator(address='{self.address[:8]}...', stake={self.stake}, reputation={self.reputation:.2f})"
+
 
 class ValidatorSetManager:
     def __init__(self, initial_validators: List[Validator] = None, set_size: int = 5):
@@ -40,7 +42,9 @@ class ValidatorSetManager:
     def remove_validator(self, address: str):
         if address in self.all_validators:
             del self.all_validators[address]
-            self.current_validator_set = [v for v in self.current_validator_set if v.address != address]
+            self.current_validator_set = [
+                v for v in self.current_validator_set if v.address != address
+            ]
             print(f"Validator {address} removed.")
         else:
             print(f"Warning: Validator {address} not found.")
@@ -52,15 +56,17 @@ class ValidatorSetManager:
         """
         eligible_validators = list(self.all_validators.values())
         if len(eligible_validators) < self.set_size:
-            raise ValueError(f"Not enough eligible validators ({len(eligible_validators)}) to form a set of size {self.set_size}.")
+            raise ValueError(
+                f"Not enough eligible validators ({len(eligible_validators)}) to form a set of size {self.set_size}."
+            )
 
         # Calculate weights: stake * reputation (can be more complex)
         weights = [v.stake * v.reputation for v in eligible_validators]
-        
+
         # Use random.choices for weighted random selection
         # k is the number of validators to select
         selected_set = random.choices(eligible_validators, weights=weights, k=self.set_size)
-        
+
         # Ensure uniqueness if random.choices can return duplicates (it can if k > len(population))
         # For simplicity, if duplicates are selected, we'll just have a smaller set or re-select.
         # A more robust solution would handle this carefully, e.g., by sampling without replacement.
@@ -70,14 +76,16 @@ class ValidatorSetManager:
             if validator.address not in seen_addresses:
                 unique_selected_set.append(validator)
                 seen_addresses.add(validator.address)
-        
+
         # If after making unique, we don't have enough, we might need to re-sample or adjust logic
         if len(unique_selected_set) < self.set_size:
             # This is a simplified handling. In a real system, you'd ensure enough unique
             # validators are selected, possibly by re-running selection or adjusting weights.
-            print(f"Warning: Selected {len(unique_selected_set)} unique validators, expected {self.set_size}. Adjusting set size.")
+            print(
+                f"Warning: Selected {len(unique_selected_set)} unique validators, expected {self.set_size}. Adjusting set size."
+            )
             return unique_selected_set
-            
+
         return unique_selected_set
 
     def rotate_validator_set(self) -> List[Validator]:
@@ -95,6 +103,7 @@ class ValidatorSetManager:
 
     def get_current_validator_set(self) -> List[Validator]:
         return self.current_validator_set
+
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

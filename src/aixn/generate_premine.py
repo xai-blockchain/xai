@@ -39,8 +39,17 @@ LIQUIDITY_VEST_START = GENESIS_TIMESTAMP  # Immediate monthly vesting
 
 # Founder allocations (immediate amounts)
 FOUNDER_IMMEDIATE_AMOUNTS = [
-    137500, 97600, 112300, 89400, 103700,
-    78900, 94200, 121000, 68500, 82300, 14600
+    137500,
+    97600,
+    112300,
+    89400,
+    103700,
+    78900,
+    94200,
+    121000,
+    68500,
+    82300,
+    14600,
 ]
 
 # Pre-calculated ratios (same for vested)
@@ -73,23 +82,32 @@ class PreMineGenerator:
             vested_amount = FOUNDER_RATIOS[i] * 5000000  # 5M vested, same ratio
 
             wallet_data = {
-                'address': wallet.address,
-                'private_key': wallet.private_key,
-                'public_key': wallet.public_key,
-                'category': 'founder',
-                'wallet_number': i + 1,
-                'immediate_amount': immediate_amount,
-                'vested_amount': vested_amount,
-                'total_amount': immediate_amount + vested_amount,
-                'vest_schedule': {
-                    'lock_until': FOUNDER_VEST_START,
-                    'releases': [
-                        {'date': FOUNDER_VEST_START, 'amount': vested_amount * 0.25},
-                        {'date': FOUNDER_VEST_START + 31536000, 'amount': vested_amount * 0.25},  # +1 year
-                        {'date': FOUNDER_VEST_START + 63072000, 'amount': vested_amount * 0.25},  # +2 years
-                        {'date': FOUNDER_VEST_START + 94608000, 'amount': vested_amount * 0.25}   # +3 years
-                    ]
-                }
+                "address": wallet.address,
+                "private_key": wallet.private_key,
+                "public_key": wallet.public_key,
+                "category": "founder",
+                "wallet_number": i + 1,
+                "immediate_amount": immediate_amount,
+                "vested_amount": vested_amount,
+                "total_amount": immediate_amount + vested_amount,
+                "vest_schedule": {
+                    "lock_until": FOUNDER_VEST_START,
+                    "releases": [
+                        {"date": FOUNDER_VEST_START, "amount": vested_amount * 0.25},
+                        {
+                            "date": FOUNDER_VEST_START + 31536000,
+                            "amount": vested_amount * 0.25,
+                        },  # +1 year
+                        {
+                            "date": FOUNDER_VEST_START + 63072000,
+                            "amount": vested_amount * 0.25,
+                        },  # +2 years
+                        {
+                            "date": FOUNDER_VEST_START + 94608000,
+                            "amount": vested_amount * 0.25,
+                        },  # +3 years
+                    ],
+                },
             }
 
             founder_wallets.append(wallet_data)
@@ -104,7 +122,9 @@ class PreMineGenerator:
             tx_vested.txid = tx_vested.calculate_hash()
             self.genesis_transactions.append(tx_vested)
 
-            print(f"  Founder {i+1}: {immediate_amount:,.0f} immediate + {vested_amount:,.0f} vested = {wallet_data['total_amount']:,.0f} XAI")
+            print(
+                f"  Founder {i+1}: {immediate_amount:,.0f} immediate + {vested_amount:,.0f} vested = {wallet_data['total_amount']:,.0f} XAI"
+            )
 
         self.all_wallets.extend(founder_wallets)
         return founder_wallets
@@ -118,20 +138,20 @@ class PreMineGenerator:
         # Dev fund
         dev_wallet = Wallet()
         dev_data = {
-            'address': dev_wallet.address,
-            'private_key': dev_wallet.private_key,
-            'public_key': dev_wallet.public_key,
-            'category': 'dev_fund',
-            'amount': 10000000,
-            'vest_schedule': {
-                'lock_until': DEV_VEST_START,
-                'releases': [
-                    {'date': DEV_VEST_START, 'amount': 2500000},
-                    {'date': DEV_VEST_START + 31536000, 'amount': 2500000},
-                    {'date': DEV_VEST_START + 63072000, 'amount': 2500000},
-                    {'date': DEV_VEST_START + 94608000, 'amount': 2500000}
-                ]
-            }
+            "address": dev_wallet.address,
+            "private_key": dev_wallet.private_key,
+            "public_key": dev_wallet.public_key,
+            "category": "dev_fund",
+            "amount": 10000000,
+            "vest_schedule": {
+                "lock_until": DEV_VEST_START,
+                "releases": [
+                    {"date": DEV_VEST_START, "amount": 2500000},
+                    {"date": DEV_VEST_START + 31536000, "amount": 2500000},
+                    {"date": DEV_VEST_START + 63072000, "amount": 2500000},
+                    {"date": DEV_VEST_START + 94608000, "amount": 2500000},
+                ],
+            },
         }
         vested_wallets.append(dev_data)
 
@@ -143,17 +163,15 @@ class PreMineGenerator:
         # Marketing fund
         marketing_wallet = Wallet()
         marketing_data = {
-            'address': marketing_wallet.address,
-            'private_key': marketing_wallet.private_key,
-            'public_key': marketing_wallet.public_key,
-            'category': 'marketing',
-            'amount': 6000000,
-            'vest_schedule': {
-                'lock_until': MARKETING_VEST,
-                'releases': [
-                    {'date': MARKETING_VEST, 'amount': 6000000}  # Single release
-                ]
-            }
+            "address": marketing_wallet.address,
+            "private_key": marketing_wallet.private_key,
+            "public_key": marketing_wallet.public_key,
+            "category": "marketing",
+            "amount": 6000000,
+            "vest_schedule": {
+                "lock_until": MARKETING_VEST,
+                "releases": [{"date": MARKETING_VEST, "amount": 6000000}],  # Single release
+            },
         }
         vested_wallets.append(marketing_data)
 
@@ -165,17 +183,17 @@ class PreMineGenerator:
         # Liquidity fund
         liquidity_wallet = Wallet()
         liquidity_data = {
-            'address': liquidity_wallet.address,
-            'private_key': liquidity_wallet.private_key,
-            'public_key': liquidity_wallet.public_key,
-            'category': 'liquidity',
-            'amount': 400000,
-            'vest_schedule': {
-                'lock_until': LIQUIDITY_VEST_START,
-                'type': 'monthly',
-                'monthly_amount': 8333.33,
-                'duration_months': 48
-            }
+            "address": liquidity_wallet.address,
+            "private_key": liquidity_wallet.private_key,
+            "public_key": liquidity_wallet.public_key,
+            "category": "liquidity",
+            "amount": 400000,
+            "vest_schedule": {
+                "lock_until": LIQUIDITY_VEST_START,
+                "type": "monthly",
+                "monthly_amount": 8333.33,
+                "duration_months": 48,
+            },
         }
         vested_wallets.append(liquidity_data)
 
@@ -198,14 +216,14 @@ class PreMineGenerator:
             amount = random.randint(1352, 1602)
 
             wallet_data = {
-                'address': wallet.address,
-                'private_key': wallet.private_key,
-                'public_key': wallet.public_key,
-                'category': 'premium',
-                'wallet_number': i + 1,
-                'amount': amount,
-                'claimed': False,
-                'tier': 'premium'
+                "address": wallet.address,
+                "private_key": wallet.private_key,
+                "public_key": wallet.public_key,
+                "category": "premium",
+                "wallet_number": i + 1,
+                "amount": amount,
+                "claimed": False,
+                "tier": "premium",
             }
 
             premium_wallets.append(wallet_data)
@@ -234,14 +252,14 @@ class PreMineGenerator:
             amount = random.randint(400, 463)
 
             wallet_data = {
-                'address': wallet.address,
-                'private_key': wallet.private_key,
-                'public_key': wallet.public_key,
-                'category': 'bonus',
-                'wallet_number': i + 1,
-                'amount': amount,
-                'claimed': False,
-                'tier': 'bonus'
+                "address": wallet.address,
+                "private_key": wallet.private_key,
+                "public_key": wallet.public_key,
+                "category": "bonus",
+                "wallet_number": i + 1,
+                "amount": amount,
+                "claimed": False,
+                "tier": "bonus",
             }
 
             bonus_wallets.append(wallet_data)
@@ -276,16 +294,16 @@ class PreMineGenerator:
             is_time_capsule = i in time_capsule_indices
 
             wallet_data = {
-                'address': wallet.address,
-                'private_key': wallet.private_key,
-                'public_key': wallet.public_key,
-                'category': 'standard',
-                'wallet_number': i + 1,
-                'amount': amount_per_wallet,
-                'claimed': False,
-                'tier': 'standard',
-                'time_capsule_eligible': is_time_capsule,
-                'time_capsule_bonus': 450 if is_time_capsule else 0
+                "address": wallet.address,
+                "private_key": wallet.private_key,
+                "public_key": wallet.public_key,
+                "category": "standard",
+                "wallet_number": i + 1,
+                "amount": amount_per_wallet,
+                "claimed": False,
+                "tier": "standard",
+                "time_capsule_eligible": is_time_capsule,
+                "time_capsule_bonus": 450 if is_time_capsule else 0,
             }
 
             standard_wallets.append(wallet_data)
@@ -316,14 +334,14 @@ class PreMineGenerator:
             wallet = Wallet()
 
             wallet_data = {
-                'address': wallet.address,
-                'private_key': wallet.private_key,
-                'public_key': wallet.public_key,
-                'category': 'micro',
-                'wallet_number': i + 1,
-                'amount': amount_per_wallet,
-                'claimed': False,
-                'tier': 'micro'
+                "address": wallet.address,
+                "private_key": wallet.private_key,
+                "public_key": wallet.public_key,
+                "category": "micro",
+                "wallet_number": i + 1,
+                "amount": amount_per_wallet,
+                "claimed": False,
+                "tier": "micro",
             }
 
             micro_wallets.append(wallet_data)
@@ -349,15 +367,15 @@ class PreMineGenerator:
         wallet = Wallet()
 
         reserve_data = {
-            'address': wallet.address,
-            'private_key': wallet.private_key,
-            'public_key': wallet.public_key,
-            'category': 'time_capsule_reserve',
-            'amount': 414000,
-            'purpose': 'Fund time capsule bonuses (920 × 450 XAI)'
+            "address": wallet.address,
+            "private_key": wallet.private_key,
+            "public_key": wallet.public_key,
+            "category": "time_capsule_reserve",
+            "amount": 414000,
+            "purpose": "Fund time capsule bonuses (920 × 450 XAI)",
         }
 
-        self.reserve_total = reserve_data['amount']
+        self.reserve_total = reserve_data["amount"]
         self.all_wallets.append(reserve_data)
 
         # Create COINBASE transaction
@@ -375,10 +393,7 @@ class PreMineGenerator:
 
         # Create genesis block
         genesis_block = Block(
-            index=0,
-            transactions=self.genesis_transactions,
-            previous_hash="0",
-            difficulty=4
+            index=0, transactions=self.genesis_transactions, previous_hash="0", difficulty=4
         )
 
         # Set genesis timestamp
@@ -406,40 +421,43 @@ class PreMineGenerator:
         # Encrypt all wallets
         encrypted_wallets = []
         for wallet_data in self.all_wallets:
-            if 'private_key' in wallet_data:
+            if "private_key" in wallet_data:
                 # Encrypt wallet
                 encrypted = WalletEncryption.encrypt_wallet(wallet_data, password)
                 encrypted_wallets.append(encrypted)
 
         # Save to file
-        output_file = 'premine_wallets_ENCRYPTED.json'
+        output_file = "premine_wallets_ENCRYPTED.json"
         if os.path.exists(output_file):
             raise RuntimeError(f"Encrypted wallet file already exists: {output_file}")
-        with open(output_file, 'w') as f:
-            json.dump({
-                'total_wallets': len(encrypted_wallets),
-                'encryption': 'AES-256 with PBKDF2',
-                'note': 'Password required to decrypt',
-                'wallets': encrypted_wallets
-            }, f, indent=2)
+        with open(output_file, "w") as f:
+            json.dump(
+                {
+                    "total_wallets": len(encrypted_wallets),
+                    "encryption": "AES-256 with PBKDF2",
+                    "note": "Password required to decrypt",
+                    "wallets": encrypted_wallets,
+                },
+                f,
+                indent=2,
+            )
 
         print(f"  Saved {len(encrypted_wallets)} encrypted wallets to {output_file}")
 
         # Also save unencrypted summary (no private keys)
         summary = []
         for wallet_data in self.all_wallets:
-            summary_data = {k: v for k, v in wallet_data.items() if k != 'private_key'}
-            address = summary_data.get('address', '')
+            summary_data = {k: v for k, v in wallet_data.items() if k != "private_key"}
+            address = summary_data.get("address", "")
             if not address.startswith(Config.ADDRESS_PREFIX):
-                raise ValueError(f"Generated wallet {address} does not match prefix {Config.ADDRESS_PREFIX}")
+                raise ValueError(
+                    f"Generated wallet {address} does not match prefix {Config.ADDRESS_PREFIX}"
+                )
             summary.append(summary_data)
 
-        summary_file = 'premine_wallets_SUMMARY.json'
-        with open(summary_file, 'w') as f:
-            json.dump({
-                'total_wallets': len(summary),
-                'wallets': summary
-            }, f, indent=2)
+        summary_file = "premine_wallets_SUMMARY.json"
+        with open(summary_file, "w") as f:
+            json.dump({"total_wallets": len(summary), "wallets": summary}, f, indent=2)
 
         print(f"  Saved wallet summary (no private keys) to {summary_file}")
 
@@ -450,52 +468,54 @@ class PreMineGenerator:
         print("\nSaving genesis block...")
 
         genesis_data = {
-            'index': genesis_block.index,
-            'timestamp': genesis_block.timestamp,
-            'transactions': [tx.to_dict() for tx in genesis_block.transactions],
-            'previous_hash': genesis_block.previous_hash,
-            'merkle_root': genesis_block.merkle_root,
-            'nonce': genesis_block.nonce,
-            'hash': genesis_block.hash,
-            'difficulty': genesis_block.difficulty,
-            'total_premine': sum(tx.amount for tx in genesis_block.transactions),
-            'total_transactions': len(genesis_block.transactions)
+            "index": genesis_block.index,
+            "timestamp": genesis_block.timestamp,
+            "transactions": [tx.to_dict() for tx in genesis_block.transactions],
+            "previous_hash": genesis_block.previous_hash,
+            "merkle_root": genesis_block.merkle_root,
+            "nonce": genesis_block.nonce,
+            "hash": genesis_block.hash,
+            "difficulty": genesis_block.difficulty,
+            "total_premine": sum(tx.amount for tx in genesis_block.transactions),
+            "total_transactions": len(genesis_block.transactions),
         }
 
-        output_file = 'genesis.json'
-        with open(output_file, 'w') as f:
+        output_file = "genesis.json"
+        with open(output_file, "w") as f:
             json.dump(genesis_data, f, indent=2)
 
         print(f"  Saved genesis block to {output_file}")
         print(f"  Total pre-mine: {genesis_data['total_premine']:,.0f} XAI")
 
     def _manifest_path(self):
-        return os.path.join(os.getcwd(), 'premine_manifest.json')
+        return os.path.join(os.getcwd(), "premine_manifest.json")
 
     def _write_manifest(self, summary):
         manifest_path = self._manifest_path()
         signer = AuditSigner(os.getcwd())
         manifest_payload = {
-            'network': 'testnet',
-            'address_prefix': Config.ADDRESS_PREFIX,
-            'generated_at': datetime.now(timezone.utc).isoformat(),
-            'total_wallets': len(summary),
-            'wallets': summary
+            "network": "testnet",
+            "address_prefix": Config.ADDRESS_PREFIX,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "total_wallets": len(summary),
+            "wallets": summary,
         }
         signature = signer.sign(json.dumps(manifest_payload, sort_keys=True))
-        manifest_payload['signature'] = signature
-        manifest_payload['public_key'] = signer.public_key()
+        manifest_payload["signature"] = signature
+        manifest_payload["public_key"] = signer.public_key()
 
         if os.path.exists(manifest_path):
-            with open(manifest_path, 'r') as f:
+            with open(manifest_path, "r") as f:
                 existing = json.load(f)
-            if existing.get('signature') == signature:
+            if existing.get("signature") == signature:
                 print(f"  Manifest already exists and matches current run ({manifest_path})")
                 return
             else:
-                raise RuntimeError(f"Manifest already exists with a different signature: {manifest_path}")
+                raise RuntimeError(
+                    f"Manifest already exists with a different signature: {manifest_path}"
+                )
 
-        with open(manifest_path, 'w') as f:
+        with open(manifest_path, "w") as f:
             json.dump(manifest_payload, f, indent=2)
 
         print(f"  Saved signed manifest to {manifest_path}")
@@ -507,7 +527,9 @@ class PreMineGenerator:
         total_xai = sum(tx.amount for tx in self.genesis_transactions)
 
         # Calculate expected
-        founder_total = sum(FOUNDER_IMMEDIATE_AMOUNTS) + 5000000  # immediate + 5M vested per founder
+        founder_total = (
+            sum(FOUNDER_IMMEDIATE_AMOUNTS) + 5000000
+        )  # immediate + 5M vested per founder
         dev_total = 10000000
         marketing_total = 6000000
         liquidity_total = 400000
@@ -517,9 +539,17 @@ class PreMineGenerator:
         micro_total = self.micro_total
         reserve_total = self.reserve_total or 414000
 
-        expected_total = (founder_total + dev_total + marketing_total +
-                         liquidity_total + premium_total + bonus_total +
-                         standard_total + micro_total + reserve_total)
+        expected_total = (
+            founder_total
+            + dev_total
+            + marketing_total
+            + liquidity_total
+            + premium_total
+            + bonus_total
+            + standard_total
+            + micro_total
+            + reserve_total
+        )
 
         print(f"  Founder: {founder_total:,} XAI")
         print(f"  Dev: {dev_total:,} XAI")
@@ -583,7 +613,7 @@ class PreMineGenerator:
         print("=" * 60)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import getpass
 
     print("\n⚠️  This script generates the XAI blockchain genesis block.")
@@ -591,7 +621,7 @@ if __name__ == '__main__':
     print()
 
     confirm = input("Generate pre-mine? (type 'YES' to confirm): ")
-    if confirm != 'YES':
+    if confirm != "YES":
         print("Cancelled.")
         sys.exit(0)
 

@@ -12,6 +12,7 @@ import json
 import os
 from src.aixn.core.wallet import Wallet
 
+
 def create_time_capsule_reserve():
     """Create the Time Capsule Reserve wallet"""
 
@@ -30,23 +31,23 @@ def create_time_capsule_reserve():
     reserve_wallet = Wallet()
 
     reserve_data = {
-        'address': reserve_wallet.address,
-        'private_key': reserve_wallet.private_key,
-        'public_key': reserve_wallet.public_key,
-        'initial_balance': total_reserve,
-        'current_balance': total_reserve,
-        'purpose': 'Time Capsule Protocol Reserve',
-        'max_disbursements': num_time_capsule_wallets,
-        'disbursement_amount': bonus_per_wallet,
-        'disbursements_made': 0,
-        'created_utc': '2025-01-01 00:00:00 UTC',
-        'description': 'Holds 450 XAI bonuses for time capsule protocol participants'
+        "address": reserve_wallet.address,
+        "private_key": reserve_wallet.private_key,
+        "public_key": reserve_wallet.public_key,
+        "initial_balance": total_reserve,
+        "current_balance": total_reserve,
+        "purpose": "Time Capsule Protocol Reserve",
+        "max_disbursements": num_time_capsule_wallets,
+        "disbursement_amount": bonus_per_wallet,
+        "disbursements_made": 0,
+        "created_utc": "2025-01-01 00:00:00 UTC",
+        "description": "Holds 450 XAI bonuses for time capsule protocol participants",
     }
 
     # Save to file
-    reserve_file = 'TIME_CAPSULE_RESERVE.json'
+    reserve_file = "TIME_CAPSULE_RESERVE.json"
 
-    with open(reserve_file, 'w') as f:
+    with open(reserve_file, "w") as f:
         json.dump(reserve_data, f, indent=2)
 
     print(f"✓ Time Capsule Reserve wallet created")
@@ -61,20 +62,21 @@ def create_time_capsule_reserve():
 
     # Also create public reference (no private key)
     public_reference = {
-        'address': reserve_wallet.address,
-        'balance': total_reserve,
-        'purpose': 'Time Capsule Protocol Reserve',
-        'max_disbursements': num_time_capsule_wallets,
-        'note': 'This wallet funds the 450 XAI bonuses for time capsule participants'
+        "address": reserve_wallet.address,
+        "balance": total_reserve,
+        "purpose": "Time Capsule Protocol Reserve",
+        "max_disbursements": num_time_capsule_wallets,
+        "note": "This wallet funds the 450 XAI bonuses for time capsule participants",
     }
 
-    public_file = 'time_capsule_reserve_public.json'
-    with open(public_file, 'w') as f:
+    public_file = "time_capsule_reserve_public.json"
+    with open(public_file, "w") as f:
         json.dump(public_reference, f, indent=2)
 
     print(f"✓ Public reference saved to: {public_file}")
 
     return reserve_data
+
 
 if __name__ == "__main__":
     print("=" * 70)

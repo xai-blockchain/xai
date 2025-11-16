@@ -16,7 +16,11 @@ class XAITokenMetrics:
     Tracks and provides various metrics for the XAI token.
     """
 
-    def __init__(self, token_manager: Optional[XAITokenManager] = None, logger: Optional[StructuredLogger] = None):
+    def __init__(
+        self,
+        token_manager: Optional[XAITokenManager] = None,
+        logger: Optional[StructuredLogger] = None,
+    ):
         self.token_manager = token_manager or get_xai_token_manager()
         self.logger = logger or get_structured_logger()
         self.historical_data: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
@@ -30,8 +34,8 @@ class XAITokenMetrics:
         """
         current_time = int(time.time())
         metrics = self.token_manager.get_token_metrics()
-        metrics['timestamp'] = current_time
-        self.historical_data['supply_metrics'].append(metrics)
+        metrics["timestamp"] = current_time
+        self.historical_data["supply_metrics"].append(metrics)
         self.logger.debug("Token metrics snapshot taken.", metrics=metrics)
         self.last_snapshot_time = current_time
 
@@ -41,7 +45,9 @@ class XAITokenMetrics:
         """
         return self.token_manager.get_token_metrics()
 
-    def get_historical_metrics(self, metric_type: str = 'supply_metrics', limit: int = 100) -> List[Dict[str, Any]]:
+    def get_historical_metrics(
+        self, metric_type: str = "supply_metrics", limit: int = 100
+    ) -> List[Dict[str, Any]]:
         """
         Returns historical token metrics.
 
@@ -66,7 +72,7 @@ class XAITokenMetrics:
         """
         balances = self.get_distribution_data()
         sorted_holders = sorted(balances.items(), key=lambda item: item[1], reverse=True)
-        top_holders = [{'address': addr, 'balance': bal} for addr, bal in sorted_holders[:count]]
+        top_holders = [{"address": addr, "balance": bal} for addr, bal in sorted_holders[:count]]
         return top_holders
 
     def update(self):
@@ -76,10 +82,14 @@ class XAITokenMetrics:
         if time.time() - self.last_snapshot_time >= self.snapshot_interval:
             self.take_snapshot()
 
+
 # Global instance for convenience
 _global_xai_token_metrics = None
 
-def get_xai_token_metrics(token_manager: Optional[XAITokenManager] = None, logger: Optional[StructuredLogger] = None) -> XAITokenMetrics:
+
+def get_xai_token_metrics(
+    token_manager: Optional[XAITokenManager] = None, logger: Optional[StructuredLogger] = None
+) -> XAITokenMetrics:
     """
     Get global XAITokenMetrics instance.
     """

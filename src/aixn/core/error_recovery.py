@@ -30,6 +30,7 @@ from decimal import Decimal
 
 class RecoveryState(Enum):
     """System recovery states"""
+
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     RECOVERING = "recovering"
@@ -39,6 +40,7 @@ class RecoveryState(Enum):
 
 class ErrorSeverity(Enum):
     """Error severity levels"""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -47,6 +49,7 @@ class ErrorSeverity(Enum):
 
 class CircuitState(Enum):
     """Circuit breaker states"""
+
     CLOSED = "closed"  # Normal operation
     OPEN = "open"  # Failing, reject requests
     HALF_OPEN = "half_open"  # Testing recovery
@@ -60,8 +63,7 @@ class CircuitBreaker:
     a service is experiencing issues.
     """
 
-    def __init__(self, failure_threshold: int = 5, timeout: int = 60,
-                 success_threshold: int = 2):
+    def __init__(self, failure_threshold: int = 5, timeout: int = 60, success_threshold: int = 2):
         """
         Initialize circuit breaker
 
@@ -140,8 +142,13 @@ class RetryStrategy:
     Retry logic with exponential backoff
     """
 
-    def __init__(self, max_retries: int = 3, base_delay: float = 1.0,
-                 max_delay: float = 60.0, exponential_base: float = 2.0):
+    def __init__(
+        self,
+        max_retries: int = 3,
+        base_delay: float = 1.0,
+        max_delay: float = 60.0,
+        exponential_base: float = 2.0,
+    ):
         """
         Initialize retry strategy
 
@@ -178,10 +185,7 @@ class RetryStrategy:
 
                 if attempt < self.max_retries:
                     # Calculate delay with exponential backoff
-                    delay = min(
-                        self.base_delay * (self.exponential_base ** attempt),
-                        self.max_delay
-                    )
+                    delay = min(self.base_delay * (self.exponential_base**attempt), self.max_delay)
                     time.sleep(delay)
 
         return False, None, f"Failed after {self.max_retries + 1} attempts: {last_error}"
@@ -220,20 +224,24 @@ class BlockchainBackup:
 
         # Create backup data
         backup_data = {
-            'timestamp': time.time(),
-            'chain_height': len(blockchain.chain),
-            'chain': [block.to_dict() for block in blockchain.chain],
-            'pending_transactions': [tx.to_dict() for tx in blockchain.pending_transactions],
-            'utxo_set': blockchain.utxo_set,
-            'difficulty': blockchain.difficulty,
-            'metadata': {
-                'latest_hash': blockchain.get_latest_block().hash,
-                'total_supply': blockchain.get_total_circulating_supply() if hasattr(blockchain, 'get_total_circulating_supply') else 0
-            }
+            "timestamp": time.time(),
+            "chain_height": len(blockchain.chain),
+            "chain": [block.to_dict() for block in blockchain.chain],
+            "pending_transactions": [tx.to_dict() for tx in blockchain.pending_transactions],
+            "utxo_set": blockchain.utxo_set,
+            "difficulty": blockchain.difficulty,
+            "metadata": {
+                "latest_hash": blockchain.get_latest_block().hash,
+                "total_supply": (
+                    blockchain.get_total_circulating_supply()
+                    if hasattr(blockchain, "get_total_circulating_supply")
+                    else 0
+                ),
+            },
         }
 
         # Write backup
-        with open(backup_path, 'w') as f:
+        with open(backup_path, "w") as f:
             json.dump(backup_data, f, indent=2)
 
         return backup_path
@@ -249,7 +257,7 @@ class BlockchainBackup:
             (success, backup_data, error)
         """
         try:
-            with open(backup_path, 'r') as f:
+            with open(backup_path, "r") as f:
                 backup_data = json.load(f)
 
             return True, backup_data, None
@@ -266,24 +274,26 @@ class BlockchainBackup:
         backups = []
 
         for filename in os.listdir(self.backup_dir):
-            if filename.endswith('.json'):
+            if filename.endswith(".json"):
                 filepath = os.path.join(self.backup_dir, filename)
                 try:
-                    with open(filepath, 'r') as f:
+                    with open(filepath, "r") as f:
                         data = json.load(f)
 
-                    backups.append({
-                        'name': filename,
-                        'path': filepath,
-                        'timestamp': data.get('timestamp'),
-                        'chain_height': data.get('chain_height'),
-                        'size': os.path.getsize(filepath)
-                    })
+                    backups.append(
+                        {
+                            "name": filename,
+                            "path": filepath,
+                            "timestamp": data.get("timestamp"),
+                            "chain_height": data.get("chain_height"),
+                            "size": os.path.getsize(filepath),
+                        }
+                    )
                 except:
                     pass
 
         # Sort by timestamp, newest first
-        backups.sort(key=lambda x: x.get('timestamp', 0), reverse=True)
+        backups.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
         return backups
 
     def cleanup_old_backups(self, keep_count: int = 10):
@@ -298,7 +308,7 @@ class BlockchainBackup:
         # Remove old backups
         for backup in backups[keep_count:]:
             try:
-                os.remove(backup['path'])
+                os.remove(backup["path"])
             except:
                 pass
 
@@ -311,11 +321,11 @@ class CorruptionDetector:
     def __init__(self):
         """Initialize corruption detector"""
         self.corruption_checks = {
-            'hash_integrity': self._check_hash_integrity,
-            'chain_continuity': self._check_chain_continuity,
-            'utxo_consistency': self._check_utxo_consistency,
-            'supply_validation': self._check_supply_validation,
-            'transaction_validity': self._check_transaction_validity
+            "hash_integrity": self._check_hash_integrity,
+            "chain_continuity": self._check_chain_continuity,
+            "utxo_consistency": self._check_utxo_consistency,
+            "supply_validation": self._check_supply_validation,
+            "transaction_validity": self._check_transaction_validity,
         }
 
     def detect_corruption(self, blockchain) -> Tuple[bool, List[str]]:
@@ -348,7 +358,9 @@ class CorruptionDetector:
             # Verify hash matches content
             calculated_hash = block.calculate_hash()
             if block.hash != calculated_hash:
-                errors.append(f"Block {i} hash mismatch: {block.hash[:16]}... != {calculated_hash[:16]}...")
+                errors.append(
+                    f"Block {i} hash mismatch: {block.hash[:16]}... != {calculated_hash[:16]}..."
+                )
 
         return len(errors) == 0, errors
 
@@ -382,11 +394,9 @@ class CorruptionDetector:
                     if tx.recipient not in rebuilt_utxo:
                         rebuilt_utxo[tx.recipient] = []
 
-                    rebuilt_utxo[tx.recipient].append({
-                        'txid': tx.txid,
-                        'amount': tx.amount,
-                        'spent': False
-                    })
+                    rebuilt_utxo[tx.recipient].append(
+                        {"txid": tx.txid, "amount": tx.amount, "spent": False}
+                    )
 
                     # Mark inputs as spent (simplified)
                     if tx.sender != "COINBASE" and tx.sender in rebuilt_utxo:
@@ -394,21 +404,23 @@ class CorruptionDetector:
                         remaining = spent_amount
 
                         for utxo in rebuilt_utxo[tx.sender]:
-                            if not utxo['spent'] and remaining > 0:
-                                if utxo['amount'] <= remaining:
-                                    utxo['spent'] = True
-                                    remaining -= utxo['amount']
+                            if not utxo["spent"] and remaining > 0:
+                                if utxo["amount"] <= remaining:
+                                    utxo["spent"] = True
+                                    remaining -= utxo["amount"]
                                 else:
-                                    utxo['amount'] -= remaining
+                                    utxo["amount"] -= remaining
                                     remaining = 0
 
             # Compare balances
             for address in rebuilt_utxo:
-                rebuilt_balance = sum(u['amount'] for u in rebuilt_utxo[address] if not u['spent'])
+                rebuilt_balance = sum(u["amount"] for u in rebuilt_utxo[address] if not u["spent"])
                 current_balance = blockchain.get_balance(address)
 
                 if abs(rebuilt_balance - current_balance) > 0.00000001:
-                    errors.append(f"UTXO mismatch for {address[:10]}...: rebuilt={rebuilt_balance}, current={current_balance}")
+                    errors.append(
+                        f"UTXO mismatch for {address[:10]}...: rebuilt={rebuilt_balance}, current={current_balance}"
+                    )
 
         except Exception as e:
             errors.append(f"UTXO check failed: {str(e)}")
@@ -423,10 +435,10 @@ class CorruptionDetector:
             total_supply = Decimal(0)
             for address, utxos in blockchain.utxo_set.items():
                 for utxo in utxos:
-                    if not utxo['spent']:
-                        total_supply += Decimal(str(utxo['amount']))
+                    if not utxo["spent"]:
+                        total_supply += Decimal(str(utxo["amount"]))
 
-            max_supply = getattr(blockchain, 'max_supply', 121000000)
+            max_supply = getattr(blockchain, "max_supply", 121000000)
 
             if float(total_supply) > max_supply:
                 errors.append(f"Supply cap exceeded: {float(total_supply)} > {max_supply}")
@@ -465,13 +477,13 @@ class HealthMonitor:
     def __init__(self):
         """Initialize health monitor"""
         self.metrics = {
-            'last_block_time': time.time(),
-            'blocks_mined': 0,
-            'transactions_processed': 0,
-            'errors_encountered': 0,
-            'network_peers': 0,
-            'mempool_size': 0,
-            'sync_status': 'synced'
+            "last_block_time": time.time(),
+            "blocks_mined": 0,
+            "transactions_processed": 0,
+            "errors_encountered": 0,
+            "network_peers": 0,
+            "mempool_size": 0,
+            "sync_status": "synced",
         }
 
         self.health_history = deque(maxlen=100)
@@ -484,21 +496,19 @@ class HealthMonitor:
             blockchain: Blockchain instance
             node: Optional node instance
         """
-        self.metrics['last_block_time'] = blockchain.get_latest_block().timestamp
-        self.metrics['blocks_mined'] = len(blockchain.chain)
-        self.metrics['mempool_size'] = len(blockchain.pending_transactions)
+        self.metrics["last_block_time"] = blockchain.get_latest_block().timestamp
+        self.metrics["blocks_mined"] = len(blockchain.chain)
+        self.metrics["mempool_size"] = len(blockchain.pending_transactions)
 
         if node:
-            self.metrics['network_peers'] = len(node.peers) if hasattr(node, 'peers') else 0
+            self.metrics["network_peers"] = len(node.peers) if hasattr(node, "peers") else 0
 
         # Calculate health score
         health_score = self._calculate_health_score(blockchain)
 
-        self.health_history.append({
-            'timestamp': time.time(),
-            'score': health_score,
-            'metrics': dict(self.metrics)
-        })
+        self.health_history.append(
+            {"timestamp": time.time(), "score": health_score, "metrics": dict(self.metrics)}
+        )
 
     def _calculate_health_score(self, blockchain) -> float:
         """
@@ -513,21 +523,21 @@ class HealthMonitor:
         score = 100.0
 
         # Penalize if last block is old
-        time_since_last_block = time.time() - self.metrics['last_block_time']
+        time_since_last_block = time.time() - self.metrics["last_block_time"]
         if time_since_last_block > 600:  # 10 minutes
             score -= min(30, time_since_last_block / 60)
 
         # Penalize if mempool is very full
-        if self.metrics['mempool_size'] > 10000:
-            score -= min(20, (self.metrics['mempool_size'] - 10000) / 500)
+        if self.metrics["mempool_size"] > 10000:
+            score -= min(20, (self.metrics["mempool_size"] - 10000) / 500)
 
         # Penalize if no peers
-        if self.metrics['network_peers'] == 0:
+        if self.metrics["network_peers"] == 0:
             score -= 25
 
         # Penalize for errors
-        if self.metrics['errors_encountered'] > 10:
-            score -= min(25, self.metrics['errors_encountered'])
+        if self.metrics["errors_encountered"] > 10:
+            score -= min(25, self.metrics["errors_encountered"])
 
         return max(0, score)
 
@@ -539,29 +549,25 @@ class HealthMonitor:
             Health status info
         """
         if not self.health_history:
-            return {
-                'status': 'unknown',
-                'score': 0,
-                'metrics': self.metrics
-            }
+            return {"status": "unknown", "score": 0, "metrics": self.metrics}
 
         current = self.health_history[-1]
-        score = current['score']
+        score = current["score"]
 
         if score >= 80:
-            status = 'healthy'
+            status = "healthy"
         elif score >= 60:
-            status = 'degraded'
+            status = "degraded"
         elif score >= 40:
-            status = 'warning'
+            status = "warning"
         else:
-            status = 'critical'
+            status = "critical"
 
         return {
-            'status': status,
-            'score': score,
-            'metrics': current['metrics'],
-            'timestamp': current['timestamp']
+            "status": status,
+            "score": score,
+            "metrics": current["metrics"],
+            "timestamp": current["timestamp"],
         }
 
 
@@ -592,10 +598,10 @@ class ErrorRecoveryManager:
 
         # Initialize components
         self.circuit_breakers = {
-            'mining': CircuitBreaker(failure_threshold=5, timeout=60),
-            'validation': CircuitBreaker(failure_threshold=3, timeout=30),
-            'network': CircuitBreaker(failure_threshold=10, timeout=120),
-            'storage': CircuitBreaker(failure_threshold=2, timeout=30)
+            "mining": CircuitBreaker(failure_threshold=5, timeout=60),
+            "validation": CircuitBreaker(failure_threshold=3, timeout=30),
+            "network": CircuitBreaker(failure_threshold=10, timeout=120),
+            "storage": CircuitBreaker(failure_threshold=2, timeout=30),
         }
 
         self.retry_strategy = RetryStrategy(max_retries=3, base_delay=1.0)
@@ -611,7 +617,7 @@ class ErrorRecoveryManager:
         self.preserved_transactions = []
 
         # Setup logging
-        self.logger = logging.getLogger('error_recovery')
+        self.logger = logging.getLogger("error_recovery")
         self.logger.setLevel(logging.INFO)
 
         # Start health monitoring thread
@@ -619,8 +625,9 @@ class ErrorRecoveryManager:
         self.monitor_thread = threading.Thread(target=self._monitor_health, daemon=True)
         self.monitor_thread.start()
 
-    def wrap_operation(self, operation: str, func: Callable,
-                      *args, **kwargs) -> Tuple[bool, Any, Optional[str]]:
+    def wrap_operation(
+        self, operation: str, func: Callable, *args, **kwargs
+    ) -> Tuple[bool, Any, Optional[str]]:
         """
         Wrap critical operation with error handling
 
@@ -694,7 +701,7 @@ class ErrorRecoveryManager:
             for backup in backups:
                 self.logger.info(f"Attempting restore from {backup['name']}...")
 
-                success, backup_data, error = self.backup_manager.restore_backup(backup['path'])
+                success, backup_data, error = self.backup_manager.restore_backup(backup["path"])
 
                 if not success:
                     continue
@@ -710,8 +717,9 @@ class ErrorRecoveryManager:
                     self.state = RecoveryState.HEALTHY
                     self.recovery_in_progress = False
 
-                    self._log_recovery("corruption_recovery", "success",
-                                      f"Restored from backup: {backup['name']}")
+                    self._log_recovery(
+                        "corruption_recovery", "success", f"Restored from backup: {backup['name']}"
+                    )
 
                     return True, None
 
@@ -739,7 +747,11 @@ class ErrorRecoveryManager:
 
                 # Try to sync with network
                 success = self.retry_strategy.execute(
-                    lambda: self.node.sync_with_network() if hasattr(self.node, 'sync_with_network') else True
+                    lambda: (
+                        self.node.sync_with_network()
+                        if hasattr(self.node, "sync_with_network")
+                        else True
+                    )
                 )[0]
 
                 if success:
@@ -824,7 +836,7 @@ class ErrorRecoveryManager:
 
         try:
             # 1. Stop mining
-            if self.node and hasattr(self.node, 'stop_mining'):
+            if self.node and hasattr(self.node, "stop_mining"):
                 self.logger.info("Stopping mining...")
                 self.node.stop_mining()
 
@@ -834,8 +846,7 @@ class ErrorRecoveryManager:
             # 3. Create final backup
             self.logger.info("Creating final backup...")
             backup_path = self.backup_manager.create_backup(
-                self.blockchain,
-                name=f"shutdown_{int(time.time())}"
+                self.blockchain, name=f"shutdown_{int(time.time())}"
             )
             self.logger.info(f"Backup created: {backup_path}")
 
@@ -872,17 +883,16 @@ class ErrorRecoveryManager:
         health_status = self.health_monitor.get_health_status()
 
         return {
-            'state': self.state.value,
-            'recovery_in_progress': self.recovery_in_progress,
-            'health': health_status,
-            'circuit_breakers': {
-                name: breaker.state.value
-                for name, breaker in self.circuit_breakers.items()
+            "state": self.state.value,
+            "recovery_in_progress": self.recovery_in_progress,
+            "health": health_status,
+            "circuit_breakers": {
+                name: breaker.state.value for name, breaker in self.circuit_breakers.items()
             },
-            'recent_errors': list(self.error_log)[-10:],
-            'recent_recoveries': list(self.recovery_log)[-10:],
-            'backups_available': len(self.backup_manager.list_backups()),
-            'preserved_transactions': len(self.preserved_transactions)
+            "recent_errors": list(self.error_log)[-10:],
+            "recent_recoveries": list(self.recovery_log)[-10:],
+            "backups_available": len(self.backup_manager.list_backups()),
+            "preserved_transactions": len(self.preserved_transactions),
         }
 
     def _preserve_pending_transactions(self):
@@ -892,8 +902,8 @@ class ErrorRecoveryManager:
                 tx.to_dict() for tx in self.blockchain.pending_transactions
             ]
 
-            os.makedirs('data/recovery', exist_ok=True)
-            with open('data/recovery/pending_transactions.json', 'w') as f:
+            os.makedirs("data/recovery", exist_ok=True)
+            with open("data/recovery/pending_transactions.json", "w") as f:
                 json.dump(self.preserved_transactions, f, indent=2)
 
             self.logger.info(f"Preserved {len(self.preserved_transactions)} pending transactions")
@@ -904,23 +914,21 @@ class ErrorRecoveryManager:
     def _restore_pending_transactions(self):
         """Restore preserved pending transactions"""
         try:
-            if os.path.exists('data/recovery/pending_transactions.json'):
-                with open('data/recovery/pending_transactions.json', 'r') as f:
+            if os.path.exists("data/recovery/pending_transactions.json"):
+                with open("data/recovery/pending_transactions.json", "r") as f:
                     preserved = json.load(f)
 
                 # Recreate transaction objects
                 from aixn.core.blockchain import Transaction
+
                 for tx_data in preserved:
                     tx = Transaction(
-                        tx_data['sender'],
-                        tx_data['recipient'],
-                        tx_data['amount'],
-                        tx_data['fee']
+                        tx_data["sender"], tx_data["recipient"], tx_data["amount"], tx_data["fee"]
                     )
-                    tx.txid = tx_data['txid']
-                    tx.signature = tx_data['signature']
-                    tx.public_key = tx_data.get('public_key')
-                    tx.timestamp = tx_data['timestamp']
+                    tx.txid = tx_data["txid"]
+                    tx.signature = tx_data["signature"]
+                    tx.public_key = tx_data.get("public_key")
+                    tx.timestamp = tx_data["timestamp"]
 
                     # Re-validate and add
                     if self.blockchain.validate_transaction(tx):
@@ -943,11 +951,11 @@ class ErrorRecoveryManager:
         """
         try:
             # Check required fields
-            if 'chain' not in backup_data or 'utxo_set' not in backup_data:
+            if "chain" not in backup_data or "utxo_set" not in backup_data:
                 return False
 
             # Check chain is not empty
-            if len(backup_data['chain']) == 0:
+            if len(backup_data["chain"]) == 0:
                 return False
 
             return True
@@ -966,35 +974,32 @@ class ErrorRecoveryManager:
 
         # Rebuild chain
         new_chain = []
-        for block_data in backup_data['chain']:
+        for block_data in backup_data["chain"]:
             # Recreate transactions
             transactions = []
-            for tx_data in block_data['transactions']:
+            for tx_data in block_data["transactions"]:
                 tx = Transaction(
-                    tx_data['sender'],
-                    tx_data['recipient'],
-                    tx_data['amount'],
-                    tx_data['fee']
+                    tx_data["sender"], tx_data["recipient"], tx_data["amount"], tx_data["fee"]
                 )
-                tx.txid = tx_data['txid']
-                tx.signature = tx_data.get('signature')
-                tx.public_key = tx_data.get('public_key')
-                tx.timestamp = tx_data['timestamp']
-                tx.tx_type = tx_data.get('tx_type', 'normal')
-                tx.nonce = tx_data.get('nonce')
+                tx.txid = tx_data["txid"]
+                tx.signature = tx_data.get("signature")
+                tx.public_key = tx_data.get("public_key")
+                tx.timestamp = tx_data["timestamp"]
+                tx.tx_type = tx_data.get("tx_type", "normal")
+                tx.nonce = tx_data.get("nonce")
                 transactions.append(tx)
 
             # Recreate block
             block = Block(
-                block_data['index'],
+                block_data["index"],
                 transactions,
-                block_data['previous_hash'],
-                block_data['difficulty']
+                block_data["previous_hash"],
+                block_data["difficulty"],
             )
-            block.timestamp = block_data['timestamp']
-            block.nonce = block_data['nonce']
-            block.merkle_root = block_data['merkle_root']
-            block.hash = block_data['hash']
+            block.timestamp = block_data["timestamp"]
+            block.nonce = block_data["nonce"]
+            block.merkle_root = block_data["merkle_root"]
+            block.hash = block_data["hash"]
 
             new_chain.append(block)
 
@@ -1002,7 +1007,7 @@ class ErrorRecoveryManager:
         self.blockchain.chain = new_chain
 
         # Restore UTXO set
-        self.blockchain.utxo_set = backup_data['utxo_set']
+        self.blockchain.utxo_set = backup_data["utxo_set"]
 
         # Clear pending transactions (will be restored separately)
         self.blockchain.pending_transactions = []
@@ -1016,15 +1021,14 @@ class ErrorRecoveryManager:
                 # Check for critical issues
                 health = self.health_monitor.get_health_status()
 
-                if health['score'] < 40 and self.state == RecoveryState.HEALTHY:
+                if health["score"] < 40 and self.state == RecoveryState.HEALTHY:
                     self.logger.warning(f"Health degraded: score={health['score']}")
                     self.state = RecoveryState.DEGRADED
 
                 # Auto-backup on schedule
                 if int(time.time()) % 3600 == 0:  # Every hour
                     self.backup_manager.create_backup(
-                        self.blockchain,
-                        name=f"auto_{int(time.time())}"
+                        self.blockchain, name=f"auto_{int(time.time())}"
                     )
                     self.backup_manager.cleanup_old_backups(keep_count=24)
 
@@ -1043,14 +1047,14 @@ class ErrorRecoveryManager:
             severity: Error severity
         """
         error_entry = {
-            'timestamp': time.time(),
-            'operation': operation,
-            'error': error,
-            'severity': severity.value
+            "timestamp": time.time(),
+            "operation": operation,
+            "error": error,
+            "severity": severity.value,
         }
 
         self.error_log.append(error_entry)
-        self.health_monitor.metrics['errors_encountered'] += 1
+        self.health_monitor.metrics["errors_encountered"] += 1
 
         if severity == ErrorSeverity.CRITICAL:
             self.logger.error(f"[CRITICAL] {operation}: {error}")
@@ -1069,10 +1073,10 @@ class ErrorRecoveryManager:
             details: Recovery details
         """
         recovery_entry = {
-            'timestamp': time.time(),
-            'type': recovery_type,
-            'status': status,
-            'details': details
+            "timestamp": time.time(),
+            "type": recovery_type,
+            "status": status,
+            "details": details,
         }
 
         self.recovery_log.append(recovery_entry)
@@ -1080,6 +1084,7 @@ class ErrorRecoveryManager:
 
 
 # Convenience functions for integration
+
 
 def create_recovery_manager(blockchain, node=None, config=None) -> ErrorRecoveryManager:
     """
@@ -1096,9 +1101,9 @@ def create_recovery_manager(blockchain, node=None, config=None) -> ErrorRecovery
     return ErrorRecoveryManager(blockchain, node, config)
 
 
-def wrap_blockchain_operation(recovery_manager: ErrorRecoveryManager,
-                              operation: str, func: Callable,
-                              *args, **kwargs):
+def wrap_blockchain_operation(
+    recovery_manager: ErrorRecoveryManager, operation: str, func: Callable, *args, **kwargs
+):
     """
     Convenience wrapper for blockchain operations
 

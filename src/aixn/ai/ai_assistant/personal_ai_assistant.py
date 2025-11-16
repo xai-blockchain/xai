@@ -28,7 +28,9 @@ try:
         XAIProvider,
     )
 except ModuleNotFoundError:
-    PerplexityProvider = GroqProvider = XAIProvider = TogetherAIProvider = FireworksAIProvider = DeepSeekProvider = None
+    PerplexityProvider = GroqProvider = XAIProvider = TogetherAIProvider = FireworksAIProvider = (
+        DeepSeekProvider
+    ) = None
 
 
 @dataclass
@@ -47,7 +49,9 @@ class MicroAssistantProfile:
         self.usage_count += 1
         self.interactions += 1
         self.tokens_consumed += tokens
-        self.satisfaction = ((self.satisfaction * (self.interactions - 1)) + (1 if satisfied else 0)) / self.interactions
+        self.satisfaction = (
+            (self.satisfaction * (self.interactions - 1)) + (1 if satisfied else 0)
+        ) / self.interactions
         self.last_active = time.time()
 
 
@@ -108,14 +112,18 @@ class MicroAssistantNetwork:
         for skill in profile.skills:
             self.skill_popularity[skill] += 1
 
-    def record_interaction(self, profile: MicroAssistantProfile, tokens: int, satisfied: bool = True):
+    def record_interaction(
+        self, profile: MicroAssistantProfile, tokens: int, satisfied: bool = True
+    ):
         profile.record_interaction(tokens, satisfied)
         self.record_skill_usage(profile)
         self.aggregate_tokens += tokens
         self.aggregate_requests += 1
 
     def get_aggregate_metrics(self) -> Dict[str, Any]:
-        most_popular = sorted(self.skill_popularity.items(), key=lambda item: item[1], reverse=True)[:3]
+        most_popular = sorted(
+            self.skill_popularity.items(), key=lambda item: item[1], reverse=True
+        )[:3]
         return {
             "total_requests": self.aggregate_requests,
             "total_tokens": self.aggregate_tokens,
@@ -217,9 +225,7 @@ class PersonalAIAssistant:
         for window, limit in self.RATE_LIMITS.items():
             if len(stats[window]) >= limit:
                 oldest = stats[window][0] if stats[window] else now
-                retry_after = math.ceil(
-                    max(1.0, self.RATE_WINDOW_SECONDS[window] - (now - oldest))
-                )
+                retry_after = math.ceil(max(1.0, self.RATE_WINDOW_SECONDS[window] - (now - oldest)))
                 return False, {
                     "success": False,
                     "error": "RATE_LIMIT_EXCEEDED",
@@ -252,11 +258,14 @@ class PersonalAIAssistant:
         user_address = user_address.upper()
         allowed, rate_info = self._check_rate_limit(user_address)
         if not allowed:
-            self._notify_webhook("personal_ai_rate_limit", {
-                "user_address": user_address,
-                "operation": operation,
-                "rate_info": rate_info,
-            })
+            self._notify_webhook(
+                "personal_ai_rate_limit",
+                {
+                    "user_address": user_address,
+                    "operation": operation,
+                    "rate_info": rate_info,
+                },
+            )
             return None, rate_info
 
         now = time.time()
@@ -347,7 +356,9 @@ class PersonalAIAssistant:
         }
         return summary
 
-    def _attach_ai_cost(self, payload: Dict[str, object], ai_cost: Dict[str, object]) -> Dict[str, object]:
+    def _attach_ai_cost(
+        self, payload: Dict[str, object], ai_cost: Dict[str, object]
+    ) -> Dict[str, object]:
         payload["ai_cost"] = ai_cost
         payload["ai_cost_summary"] = self._summarize_ai_cost(ai_cost)
         return payload
@@ -462,9 +473,7 @@ class PersonalAIAssistant:
                     "error": f"Provider {provider} is not supported yet.",
                 }
         except ModuleNotFoundError as exc:  # pragma: no cover - best-effort provider call
-            stub_text = (
-                f"AI provider stub response ({provider} not installed: {exc.name})."
-            )
+            stub_text = f"AI provider stub response ({provider} not installed: {exc.name})."
             return {"success": True, "text": stub_text}
         except Exception as exc:  # pragma: no cover - best-effort provider call
             return {"success": False, "error": str(exc)}
@@ -519,7 +528,11 @@ class PersonalAIAssistant:
         if contract_type == "voting":
             return """class VotingContract:\n    def __init__(self, proposals):\n        self.proposals = {proposal: 0 for proposal in proposals}\n        self.votes = {}\n\n    def vote(self, voter, proposal):\n        if self.votes.get(voter):\n            raise ValueError('Already voted')\n        if proposal not in self.proposals:\n            raise ValueError('Unknown proposal')\n        self.proposals[proposal] += 1\n        self.votes[voter] = proposal"""
         summary = description or "User requested a general contract"
-        return """# {contract_type} contract\n# {summary}\n\nclass CustomContract:\n    def __init__(self):\n        self.metadata = {}\n\n    def execute(self):\n        'Placeholder for custom logic'\n        return 'Review and adapt before deployment'""".replace("{contract_type}", contract_type.title()).replace("{summary}", summary)
+        return """# {contract_type} contract\n# {summary}\n\nclass CustomContract:\n    def __init__(self):\n        self.metadata = {}\n\n    def execute(self):\n        'Placeholder for custom logic'\n        return 'Review and adapt before deployment'""".replace(
+            "{contract_type}", contract_type.title()
+        ).replace(
+            "{summary}", summary
+        )
 
     def execute_atomic_swap_with_ai(
         self,
@@ -570,9 +583,7 @@ class PersonalAIAssistant:
             rate,
         )
         ai_cost = self._estimate_ai_cost(prompt)
-        ai_response = self._call_ai_provider(
-            ai_provider, ai_model, user_api_key, prompt
-        )
+        ai_response = self._call_ai_provider(ai_provider, ai_model, user_api_key, prompt)
 
         swap_tx = {
             "type": "atomic_swap",
@@ -583,8 +594,7 @@ class PersonalAIAssistant:
             "to_amount": round(amount * rate, 8),
             "to_address": recipient,
             "hash_lock": secrets.token_hex(16),
-            "timeout": int(time.time())
-            + int(swap_details.get("timeout_hours", 24)) * 3600,
+            "timeout": int(time.time()) + int(swap_details.get("timeout_hours", 24)) * 3600,
             "fee": round(amount * getattr(Config, "TRADE_FEE_PERCENT", 0.002), 8),
             "exchange_rate": round(rate, 6),
             "ai_assisted": True,
@@ -648,9 +658,7 @@ class PersonalAIAssistant:
         ai_response = self._call_ai_provider(ai_provider, ai_model, user_api_key, prompt)
         generated_code = ai_response.get("text")
         if not generated_code:
-            generated_code = self._generate_contract_template(
-                contract_type, contract_description
-            )
+            generated_code = self._generate_contract_template(contract_type, contract_description)
 
         self._finalize_request(request_id)
         result = {
@@ -697,35 +705,39 @@ class PersonalAIAssistant:
     ) -> Dict[str, object]:
         profile = self._prepare_assistant(assistant_name)
         request_id, error = self._begin_request(
-            user_address, ai_provider, ai_model, "smart_contract_deploy", assistant_name=profile.name
+            user_address,
+            ai_provider,
+            ai_model,
+            "smart_contract_deploy",
+            assistant_name=profile.name,
         )
         if error:
             return error
 
-        contract_type = constructor_params.get('contract_type') if constructor_params else 'general'
+        contract_type = constructor_params.get("contract_type") if constructor_params else "general"
         gas_estimate = self.DEFAULT_GAS_ESTIMATES.get(contract_type, 0.05)
         contract_address = f"XAI_CONTRACT_{uuid.uuid4().hex[:8]}"
         tx_id = f"tx_{int(time.time())}_{contract_type[:3]}"
 
         interface = {
-            'functions': ['confirm()', 'cancel()', 'status()'],
-            'events': ['ActionTaken(address, timestamp)'],
+            "functions": ["confirm()", "cancel()", "status()"],
+            "events": ["ActionTaken(address, timestamp)"],
         }
 
         self._finalize_request(request_id)
         result = {
-            'success': True,
-            'contract_address': contract_address,
-            'transaction_id': tx_id,
-            'gas_used': gas_estimate,
-            'deployment_block': len(self.blockchain.chain) + 1,
-            'status': 'deployed' if signature else 'awaiting_signature',
-            'contract_interface': interface,
-            'warnings': [
-                'User must sign and broadcast to finalize.',
-                'Ensure constructor params are correct before signing.',
+            "success": True,
+            "contract_address": contract_address,
+            "transaction_id": tx_id,
+            "gas_used": gas_estimate,
+            "deployment_block": len(self.blockchain.chain) + 1,
+            "status": "deployed" if signature else "awaiting_signature",
+            "contract_interface": interface,
+            "warnings": [
+                "User must sign and broadcast to finalize.",
+                "Ensure constructor params are correct before signing.",
             ],
-            'testnet': testnet,
+            "testnet": testnet,
         }
         result = self._attach_ai_cost(result, ai_cost)
         return self._finalize_assistant_usage(result, profile)
@@ -746,8 +758,8 @@ class PersonalAIAssistant:
         if error:
             return error
 
-        original_fee = float(transaction.get('fee', 0.01))
-        min_fee = getattr(Config, 'min_transaction_fee', 0.0001)
+        original_fee = float(transaction.get("fee", 0.01))
+        min_fee = getattr(Config, "min_transaction_fee", 0.0001)
         optimized_fee = max(original_fee * 0.6, min_fee)
         savings = original_fee - optimized_fee
         stats = self.blockchain.get_stats()
@@ -755,30 +767,30 @@ class PersonalAIAssistant:
 
         self._finalize_request(request_id)
         result = {
-            'success': True,
-            'original_transaction': transaction,
-            'optimized_transaction': {
-                'amount': transaction.get('amount'),
-                'fee': round(optimized_fee, 8),
-                'total': round(transaction.get('amount', 0) + optimized_fee, 8),
+            "success": True,
+            "original_transaction": transaction,
+            "optimized_transaction": {
+                "amount": transaction.get("amount"),
+                "fee": round(optimized_fee, 8),
+                "total": round(transaction.get("amount", 0) + optimized_fee, 8),
             },
-            'savings': {
-                'original_fee': original_fee,
-                'optimized_fee': round(optimized_fee, 8),
-                'saved': round(savings, 8),
-                'percent_saved': round((savings / original_fee) * 100 if original_fee else 0, 2),
+            "savings": {
+                "original_fee": original_fee,
+                "optimized_fee": round(optimized_fee, 8),
+                "saved": round(savings, 8),
+                "percent_saved": round((savings / original_fee) * 100 if original_fee else 0, 2),
             },
-            'recommendations': [
-                'Network congestion is low.',
-                'Use the optimized fee for faster confirmation.',
+            "recommendations": [
+                "Network congestion is low.",
+                "Use the optimized fee for faster confirmation.",
             ],
-            'optimal_time': 'now',
-            'network_analysis': {
-                'pending_transactions': stats.get('pending_transactions', 0),
-                'avg_fee_last_hour': stats.get('avg_fee', min_fee),
-                'congestion': 'low',
+            "optimal_time": "now",
+            "network_analysis": {
+                "pending_transactions": stats.get("pending_transactions", 0),
+                "avg_fee_last_hour": stats.get("avg_fee", min_fee),
+                "congestion": "low",
             },
-            'security_score': 95,
+            "security_score": 95,
         }
         result = self._attach_ai_cost(result, ai_cost)
         return self._finalize_assistant_usage(result, profile)
@@ -810,20 +822,20 @@ class PersonalAIAssistant:
 
         self._finalize_request(request_id)
         result = {
-            'success': True,
-            'query': query,
-            'answer': answer,
-            'data_sources': {
-                'user_balance': balance,
-                'recent_blocks': stats.get('blocks', 0),
-                'pending_transactions': stats.get('pending_transactions', 0),
+            "success": True,
+            "query": query,
+            "answer": answer,
+            "data_sources": {
+                "user_balance": balance,
+                "recent_blocks": stats.get("blocks", 0),
+                "pending_transactions": stats.get("pending_transactions", 0),
             },
-            'recommendations': [
-                'Stake 60% for stable yield, use 40% for opportunistic swaps.',
-                'Monitor mempool before large transfers.',
+            "recommendations": [
+                "Stake 60% for stable yield, use 40% for opportunistic swaps.",
+                "Monitor mempool before large transfers.",
             ],
-            'ai_provider': self._normalize_provider(ai_provider),
-            'ai_model': ai_model,
+            "ai_provider": self._normalize_provider(ai_provider),
+            "ai_model": ai_model,
         }
         result = self._attach_ai_cost(result, ai_cost)
         return self._finalize_assistant_usage(result, profile)
@@ -847,36 +859,36 @@ class PersonalAIAssistant:
         balance = self.blockchain.get_balance(user_address)
         ai_cost = self._estimate_ai_cost(analysis_type)
         portfolio = {
-            'XAI': balance,
-            'staked_XAI': balance * 0.2,
-            'locked_in_contracts': 0,
+            "XAI": balance,
+            "staked_XAI": balance * 0.2,
+            "locked_in_contracts": 0,
         }
 
         self._finalize_request(request_id)
         result = {
-            'success': True,
-            'portfolio_analysis': {
-                'current_holdings': portfolio,
-                'recommendations': [
-                    'Diversify: stake 40% for stable income.',
-                    'Keep 30% liquid for atomic swaps.',
-                    'Store 30% in cold storage for safety.',
+            "success": True,
+            "portfolio_analysis": {
+                "current_holdings": portfolio,
+                "recommendations": [
+                    "Diversify: stake 40% for stable income.",
+                    "Keep 30% liquid for atomic swaps.",
+                    "Store 30% in cold storage for safety.",
                 ],
-                'risk_assessment': 'Medium',
-                'optimization_suggestions': [
-                    'Enable social recovery.',
-                    'Set up automated staking.',
+                "risk_assessment": "Medium",
+                "optimization_suggestions": [
+                    "Enable social recovery.",
+                    "Set up automated staking.",
                 ],
             },
-            'transaction_patterns': {
-                'avg_tx_per_day': 2.5,
-                'avg_tx_amount': 45,
-                'most_common_recipient': 'XAI_Exchange_...',
-                'fee_efficiency': 'Good',
+            "transaction_patterns": {
+                "avg_tx_per_day": 2.5,
+                "avg_tx_amount": 45,
+                "most_common_recipient": "XAI_Exchange_...",
+                "fee_efficiency": "Good",
             },
-            'analysis_type': analysis_type,
-            'ai_provider': self._normalize_provider(ai_provider),
-            'ai_model': ai_model,
+            "analysis_type": analysis_type,
+            "ai_provider": self._normalize_provider(ai_provider),
+            "ai_model": ai_model,
         }
         result = self._attach_ai_cost(result, ai_cost)
         return self._finalize_assistant_usage(result, profile)
@@ -1036,4 +1048,3 @@ class PersonalAIAssistant:
             "profiles": self.micro_network.list_profiles(),
             "aggregated_metrics": self.micro_network.get_aggregate_metrics(),
         }
-

@@ -10,13 +10,9 @@ import os
 import time
 
 # Add core directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'core'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
-from ai_governance import (
-    AIGovernance,
-    VoterType,
-    VotingPowerDisplay
-)
+from ai_governance import AIGovernance, VoterType, VotingPowerDisplay
 from blockchain import Blockchain, Transaction
 from wallet import Wallet
 
@@ -29,14 +25,14 @@ class TestGovernanceInitialization:
         governance = AIGovernance()
 
         assert governance is not None
-        assert hasattr(governance, 'proposals')
+        assert hasattr(governance, "proposals")
 
     def test_governance_parameters(self):
         """Test governance parameters are set"""
         governance = AIGovernance()
 
         # Should have voting parameters
-        assert hasattr(governance, '__dict__')
+        assert hasattr(governance, "__dict__")
 
     def test_voter_types(self):
         """Test voter type enumeration"""
@@ -58,7 +54,7 @@ class TestProposalCreation:
             proposer_address=proposer.address,
             title="Test Proposal",
             description="Test description",
-            proposal_type="ai_improvement"
+            proposal_type="ai_improvement",
         )
 
         assert proposal_id is not None
@@ -73,15 +69,15 @@ class TestProposalCreation:
             proposer_address=proposer.address,
             title="Test Proposal",
             description="Test description",
-            proposal_type="ai_improvement"
+            proposal_type="ai_improvement",
         )
 
         proposal = governance.proposals[proposal_id]
 
-        assert proposal['title'] == "Test Proposal"
-        assert proposal['description'] == "Test description"
-        assert proposal['proposer'] == proposer.address
-        assert proposal['status'] == 'active'
+        assert proposal["title"] == "Test Proposal"
+        assert proposal["description"] == "Test description"
+        assert proposal["proposer"] == proposer.address
+        assert proposal["status"] == "active"
 
     def test_multiple_proposals(self):
         """Test creating multiple proposals"""
@@ -92,14 +88,14 @@ class TestProposalCreation:
             proposer_address=proposer.address,
             title="Proposal 1",
             description="Description 1",
-            proposal_type="ai_improvement"
+            proposal_type="ai_improvement",
         )
 
         proposal2 = governance.create_proposal(
             proposer_address=proposer.address,
             title="Proposal 2",
             description="Description 2",
-            proposal_type="parameter_change"
+            proposal_type="parameter_change",
         )
 
         assert proposal1 != proposal2
@@ -119,15 +115,12 @@ class TestVotingMechanism:
             proposer_address=proposer.address,
             title="Test Proposal",
             description="Test description",
-            proposal_type="ai_improvement"
+            proposal_type="ai_improvement",
         )
 
         # Cast vote
         success = governance.cast_vote(
-            proposal_id=proposal_id,
-            voter_address=voter.address,
-            vote='yes',
-            voting_power=10.0
+            proposal_id=proposal_id, voter_address=voter.address, vote="yes", voting_power=10.0
         )
 
         assert success
@@ -142,7 +135,7 @@ class TestVotingMechanism:
             proposer_address=proposer.address,
             title="Test Proposal",
             description="Test description",
-            proposal_type="ai_improvement"
+            proposal_type="ai_improvement",
         )
 
         voter1 = Wallet()
@@ -150,12 +143,12 @@ class TestVotingMechanism:
         voter3 = Wallet()
 
         # Different vote options
-        governance.cast_vote(proposal_id, voter1.address, 'yes', 10.0)
-        governance.cast_vote(proposal_id, voter2.address, 'no', 5.0)
-        governance.cast_vote(proposal_id, voter3.address, 'abstain', 3.0)
+        governance.cast_vote(proposal_id, voter1.address, "yes", 10.0)
+        governance.cast_vote(proposal_id, voter2.address, "no", 5.0)
+        governance.cast_vote(proposal_id, voter3.address, "abstain", 3.0)
 
         proposal = governance.proposals[proposal_id]
-        assert 'votes' in proposal
+        assert "votes" in proposal
 
     def test_quadratic_voting(self):
         """Test quadratic voting power calculation"""
@@ -179,14 +172,14 @@ class TestVotingMechanism:
             proposer_address=proposer.address,
             title="Test Proposal",
             description="Test description",
-            proposal_type="ai_improvement"
+            proposal_type="ai_improvement",
         )
 
         # First vote
-        governance.cast_vote(proposal_id, voter.address, 'yes', 10.0)
+        governance.cast_vote(proposal_id, voter.address, "yes", 10.0)
 
         # Try to vote again
-        result = governance.cast_vote(proposal_id, voter.address, 'no', 10.0)
+        result = governance.cast_vote(proposal_id, voter.address, "no", 10.0)
 
         # Should prevent double voting
         assert result == False
@@ -202,7 +195,7 @@ class TestVotingPower:
         impact = display.show_contribution_impact(100.0)
 
         assert impact is not None
-        assert 'voting_power' in impact
+        assert "voting_power" in impact
 
     def test_time_decay(self):
         """Test voting power time decay"""
@@ -248,23 +241,23 @@ class TestProposalExecution:
             proposer_address=proposer.address,
             title="Test Proposal",
             description="Test description",
-            proposal_type="ai_improvement"
+            proposal_type="ai_improvement",
         )
 
         # Cast majority yes votes
         for i in range(10):
             voter = Wallet()
-            governance.cast_vote(proposal_id, voter.address, 'yes', 10.0)
+            governance.cast_vote(proposal_id, voter.address, "yes", 10.0)
 
         # Cast minority no votes
         for i in range(3):
             voter = Wallet()
-            governance.cast_vote(proposal_id, voter.address, 'no', 10.0)
+            governance.cast_vote(proposal_id, voter.address, "no", 10.0)
 
         # Check if passed
         result = governance.tally_votes(proposal_id)
 
-        assert result['passed'] == True
+        assert result["passed"] == True
 
     def test_proposal_fails_without_majority(self):
         """Test proposal fails without majority"""
@@ -275,21 +268,21 @@ class TestProposalExecution:
             proposer_address=proposer.address,
             title="Test Proposal",
             description="Test description",
-            proposal_type="ai_improvement"
+            proposal_type="ai_improvement",
         )
 
         # Cast equal votes
         for i in range(5):
             voter = Wallet()
-            governance.cast_vote(proposal_id, voter.address, 'yes', 10.0)
+            governance.cast_vote(proposal_id, voter.address, "yes", 10.0)
 
         for i in range(5):
             voter = Wallet()
-            governance.cast_vote(proposal_id, voter.address, 'no', 10.0)
+            governance.cast_vote(proposal_id, voter.address, "no", 10.0)
 
         result = governance.tally_votes(proposal_id)
 
-        assert result['passed'] == False
+        assert result["passed"] == False
 
     def test_proposal_timelock(self):
         """Test proposal timelock before execution"""
@@ -300,12 +293,12 @@ class TestProposalExecution:
             proposer_address=proposer.address,
             title="Test Proposal",
             description="Test description",
-            proposal_type="ai_improvement"
+            proposal_type="ai_improvement",
         )
 
         # Proposal should have timelock period
         proposal = governance.proposals[proposal_id]
-        assert 'timelock' in proposal or 'execution_time' in proposal
+        assert "timelock" in proposal or "execution_time" in proposal
 
     def test_execute_proposal(self):
         """Test executing approved proposal"""
@@ -316,13 +309,13 @@ class TestProposalExecution:
             proposer_address=proposer.address,
             title="Test Proposal",
             description="Test description",
-            proposal_type="ai_improvement"
+            proposal_type="ai_improvement",
         )
 
         # Pass the proposal
         for i in range(10):
             voter = Wallet()
-            governance.cast_vote(proposal_id, voter.address, 'yes', 10.0)
+            governance.cast_vote(proposal_id, voter.address, "yes", 10.0)
 
         governance.tally_votes(proposal_id)
 
@@ -345,7 +338,7 @@ class TestGovernanceIntegration:
             proposer_address=proposer.address,
             title="Test Proposal",
             description="Test description",
-            proposal_type="ai_improvement"
+            proposal_type="ai_improvement",
         )
 
         # Proposal should be trackable
@@ -365,12 +358,12 @@ class TestGovernanceIntegration:
             proposer_address=proposer.address,
             title="Test Proposal",
             description="Test description",
-            proposal_type="ai_improvement"
+            proposal_type="ai_improvement",
         )
 
         # Vote with blockchain-verified stake
         voting_power = bc.get_balance(voter.address)
-        governance.cast_vote(proposal_id, voter.address, 'yes', voting_power)
+        governance.cast_vote(proposal_id, voter.address, "yes", voting_power)
 
         assert proposal_id in governance.proposals
 
@@ -383,13 +376,7 @@ class TestGovernanceIntegration:
         bc.mine_pending_transactions(wallet.address)
 
         # Create governance transaction
-        tx = Transaction(
-            wallet.address,
-            "GOVERNANCE_CONTRACT",
-            0.0,
-            0.1,
-            tx_type="governance"
-        )
+        tx = Transaction(wallet.address, "GOVERNANCE_CONTRACT", 0.0, 0.1, tx_type="governance")
 
         assert tx.tx_type == "governance"
 
@@ -412,7 +399,7 @@ class TestGovernanceParameters:
 
         # Update parameter through governance
         new_quorum = 0.6
-        result = governance.update_parameter('quorum', new_quorum)
+        result = governance.update_parameter("quorum", new_quorum)
 
         assert result == True
 
@@ -425,12 +412,12 @@ class TestGovernanceParameters:
             proposer_address=proposer.address,
             title="Change Quorum",
             description="Increase quorum to 60%",
-            proposal_type="parameter_change"
+            proposal_type="parameter_change",
         )
 
         proposal = governance.proposals[proposal_id]
-        assert proposal['proposal_type'] == "parameter_change"
+        assert proposal["proposal_type"] == "parameter_change"
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

@@ -1,12 +1,17 @@
 import time
 
+
 class SupplyCapExceededError(Exception):
     """Exception raised when minting would exceed the token's supply cap."""
+
     pass
+
 
 class InsufficientBalanceError(Exception):
     """Exception raised when an operation requires more tokens than available in a balance."""
+
     pass
+
 
 class XAIToken:
     def __init__(self, initial_supply: float = 0, supply_cap: float = 121_000_000):
@@ -30,13 +35,17 @@ class XAIToken:
             SupplyCapExceededError: If minting the amount would exceed the supply cap.
         """
         if self.total_supply + amount > self.supply_cap:
-            raise SupplyCapExceededError(f"Minting {amount} XAI would exceed the supply cap of {self.supply_cap}.")
-        
+            raise SupplyCapExceededError(
+                f"Minting {amount} XAI would exceed the supply cap of {self.supply_cap}."
+            )
+
         self.total_supply += amount
         self.balances[address] = self.balances.get(address, 0) + amount
         return True
 
-    def create_vesting_schedule(self, address: str, amount: float, cliff_duration: float, total_duration: float) -> bool:
+    def create_vesting_schedule(
+        self, address: str, amount: float, cliff_duration: float, total_duration: float
+    ) -> bool:
         """
         Creates a vesting schedule for a given address.
 
@@ -53,7 +62,9 @@ class XAIToken:
             InsufficientBalanceError: If the address has insufficient balance to cover the vesting amount.
         """
         if self.balances.get(address, 0) < amount:
-            raise InsufficientBalanceError(f"Insufficient balance ({self.balances.get(address, 0)}) for address {address} to create vesting schedule of {amount} XAI.")
+            raise InsufficientBalanceError(
+                f"Insufficient balance ({self.balances.get(address, 0)}) for address {address} to create vesting schedule of {amount} XAI."
+            )
 
         self.vesting_schedules[address] = {
             "amount": amount,
@@ -77,5 +88,8 @@ class XAIToken:
         """
         Calculates the circulating supply by excluding vested tokens.
         """
-        vested_amount = sum(schedule['amount'] - schedule['released'] for schedule in self.vesting_schedules.values())
+        vested_amount = sum(
+            schedule["amount"] - schedule["released"]
+            for schedule in self.vesting_schedules.values()
+        )
         return self.total_supply - vested_amount

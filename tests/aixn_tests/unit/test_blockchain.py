@@ -11,7 +11,7 @@ import time
 from decimal import Decimal
 
 # Add core directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'core'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
 from blockchain import Blockchain, Transaction, Block
 from wallet import Wallet
@@ -83,7 +83,7 @@ class TestBlockMining:
         block = bc.mine_pending_transactions(wallet.address)
 
         # Hash should start with required zeros
-        required_prefix = '0' * bc.difficulty
+        required_prefix = "0" * bc.difficulty
         assert block.hash.startswith(required_prefix)
 
     def test_block_hash_uniqueness(self):
@@ -301,5 +301,5 @@ class TestBlockTimestamps:
         assert genesis.timestamp < time.time() + 100
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

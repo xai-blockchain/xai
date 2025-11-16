@@ -10,8 +10,10 @@ from typing import Dict, Optional, Tuple
 from enum import Enum
 import secrets
 
+
 class CoinType(Enum):
     """Supported coins for atomic swaps"""
+
     BTC = "Bitcoin"
     ETH = "Ethereum"
     LTC = "Litecoin"
@@ -24,11 +26,14 @@ class CoinType(Enum):
     USDC = "USDCoin"
     DAI = "Dai"
 
+
 class SwapProtocol(Enum):
     """Different protocols for different coin types"""
+
     HTLC_UTXO = "htlc_utxo"
     HTLC_ETHEREUM = "htlc_ethereum"
     HTLC_MONERO = "htlc_monero"
+
 
 # Map coins to their protocols
 COIN_PROTOCOLS = {
@@ -42,8 +47,9 @@ COIN_PROTOCOLS = {
     CoinType.USDT: SwapProtocol.HTLC_ETHEREUM,
     CoinType.USDC: SwapProtocol.HTLC_ETHEREUM,
     CoinType.DAI: SwapProtocol.HTLC_ETHEREUM,
-    CoinType.XMR: SwapProtocol.HTLC_MONERO
+    CoinType.XMR: SwapProtocol.HTLC_MONERO,
 }
+
 
 class AtomicSwapHTLC:
     """
@@ -54,11 +60,13 @@ class AtomicSwapHTLC:
         self.coin_type = coin_type
         self.protocol = COIN_PROTOCOLS[coin_type]
 
-    def create_swap_contract(self,
-                            axn_amount: float,
-                            other_coin_amount: float,
-                            counterparty_address: str,
-                            timelock_hours: int = 24) -> Dict:
+    def create_swap_contract(
+        self,
+        axn_amount: float,
+        other_coin_amount: float,
+        counterparty_address: str,
+        timelock_hours: int = 24,
+    ) -> Dict:
         """
         Create a new atomic swap contract
 
@@ -93,21 +101,24 @@ class AtomicSwapHTLC:
                 secret_hash, timelock, counterparty_address, other_coin_amount
             )
 
-        contract.update({
-            'success': True,
-            'secret': secret.hex(),  # Sender keeps this secret
-            'secret_hash': secret_hash,
-            'axn_amount': axn_amount,
-            'other_coin': self.coin_type.name,
-            'other_coin_amount': other_coin_amount,
-            'timelock': timelock,
-            'timelock_hours': timelock_hours
-        })
+        contract.update(
+            {
+                "success": True,
+                "secret": secret.hex(),  # Sender keeps this secret
+                "secret_hash": secret_hash,
+                "axn_amount": axn_amount,
+                "other_coin": self.coin_type.name,
+                "other_coin_amount": other_coin_amount,
+                "timelock": timelock,
+                "timelock_hours": timelock_hours,
+            }
+        )
 
         return contract
 
-    def _create_utxo_htlc(self, secret_hash: str, timelock: int,
-                         recipient: str, amount: float) -> Dict:
+    def _create_utxo_htlc(
+        self, secret_hash: str, timelock: int, recipient: str, amount: float
+    ) -> Dict:
         """
         Create HTLC for UTXO-based coins
         (BTC, LTC, DOGE, BCH, ZEC, DASH)
@@ -123,8 +134,8 @@ class AtomicSwapHTLC:
         """
 
         return {
-            'contract_type': 'HTLC_UTXO',
-            'script_template': f'''
+            "contract_type": "HTLC_UTXO",
+            "script_template": f"""
                 OP_IF
                     OP_SHA256 {secret_hash} OP_EQUALVERIFY
                     {recipient} OP_CHECKSIG
@@ -132,14 +143,15 @@ class AtomicSwapHTLC:
                     {timelock} OP_CHECKLOCKTIMEVERIFY OP_DROP
                     <sender_address> OP_CHECKSIG
                 OP_ENDIF
-            ''',
-            'claim_method': 'Reveal secret to claim',
-            'refund_method': f'Wait until {timelock} then claim refund',
-            'supported_coins': ['BTC', 'LTC', 'DOGE', 'BCH', 'ZEC', 'DASH']
+            """,
+            "claim_method": "Reveal secret to claim",
+            "refund_method": f"Wait until {timelock} then claim refund",
+            "supported_coins": ["BTC", "LTC", "DOGE", "BCH", "ZEC", "DASH"],
         }
 
-    def _create_ethereum_htlc(self, secret_hash: str, timelock: int,
-                             recipient: str, amount: float) -> Dict:
+    def _create_ethereum_htlc(
+        self, secret_hash: str, timelock: int, recipient: str, amount: float
+    ) -> Dict:
         """
         Create HTLC for Ethereum-based tokens
         (ETH, USDT, USDC, DAI)
@@ -147,7 +159,7 @@ class AtomicSwapHTLC:
         Solidity smart contract required
         """
 
-        solidity_contract = f'''
+        solidity_contract = f"""
         // SPDX-License-Identifier: MIT
         pragma solidity ^0.8.0;
 
@@ -168,19 +180,20 @@ class AtomicSwapHTLC:
                 payable(msg.sender).transfer(amount);
             }}
         }}
-        '''
+        """
 
         return {
-            'contract_type': 'HTLC_ETHEREUM',
-            'smart_contract': solidity_contract,
-            'claim_method': 'Call claim(secret) function',
-            'refund_method': f'Call refund() after {timelock}',
-            'supported_tokens': ['ETH', 'USDT', 'USDC', 'DAI'],
-            'gas_estimate': '~150,000 gas for claim, ~50,000 for refund'
+            "contract_type": "HTLC_ETHEREUM",
+            "smart_contract": solidity_contract,
+            "claim_method": "Call claim(secret) function",
+            "refund_method": f"Call refund() after {timelock}",
+            "supported_tokens": ["ETH", "USDT", "USDC", "DAI"],
+            "gas_estimate": "~150,000 gas for claim, ~50,000 for refund",
         }
 
-    def _create_monero_htlc(self, secret_hash: str, timelock: int,
-                           recipient: str, amount: float) -> Dict:
+    def _create_monero_htlc(
+        self, secret_hash: str, timelock: int, recipient: str, amount: float
+    ) -> Dict:
         """
         Create HTLC for Monero (XMR)
 
@@ -193,17 +206,18 @@ class AtomicSwapHTLC:
         """
 
         return {
-            'contract_type': 'HTLC_MONERO',
-            'protocol': 'Adaptor Signatures + View Keys',
-            'claim_method': 'Submit adaptor signature with secret',
-            'refund_method': f'Reclaim after timelock {timelock}',
-            'supported_coins': ['XMR'],
-            'complexity': 'HIGH - Requires Monero daemon integration',
-            'note': 'Privacy-preserving atomic swaps using ring signatures'
+            "contract_type": "HTLC_MONERO",
+            "protocol": "Adaptor Signatures + View Keys",
+            "claim_method": "Submit adaptor signature with secret",
+            "refund_method": f"Reclaim after timelock {timelock}",
+            "supported_coins": ["XMR"],
+            "complexity": "HIGH - Requires Monero daemon integration",
+            "note": "Privacy-preserving atomic swaps using ring signatures",
         }
 
-    def verify_swap_claim(self, secret: str, secret_hash: str,
-                         contract_data: Dict) -> Tuple[bool, str]:
+    def verify_swap_claim(
+        self, secret: str, secret_hash: str, contract_data: Dict
+    ) -> Tuple[bool, str]:
         """
         Verify that counterparty can claim their side of swap
 
@@ -223,7 +237,7 @@ class AtomicSwapHTLC:
             return False, "Secret does not match hash"
 
         # Check if timelock expired
-        if time.time() > contract_data['timelock']:
+        if time.time() > contract_data["timelock"]:
             return False, "Timelock expired - refund period active"
 
         return True, "Valid claim - swap can proceed"
@@ -232,17 +246,17 @@ class AtomicSwapHTLC:
         """Get all supported coins"""
 
         return {
-            'BTC': {'name': 'Bitcoin', 'protocol': 'HTLC_UTXO'},
-            'ETH': {'name': 'Ethereum', 'protocol': 'HTLC_ETHEREUM'},
-            'LTC': {'name': 'Litecoin', 'protocol': 'HTLC_UTXO'},
-            'DOGE': {'name': 'Dogecoin', 'protocol': 'HTLC_UTXO'},
-            'XMR': {'name': 'Monero', 'protocol': 'HTLC_MONERO'},
-            'BCH': {'name': 'Bitcoin Cash', 'protocol': 'HTLC_UTXO'},
-            'USDT': {'name': 'Tether', 'protocol': 'HTLC_ETHEREUM'},
-            'ZEC': {'name': 'Zcash', 'protocol': 'HTLC_UTXO'},
-            'DASH': {'name': 'Dash', 'protocol': 'HTLC_UTXO'},
-            'USDC': {'name': 'USD Coin', 'protocol': 'HTLC_ETHEREUM'},
-            'DAI': {'name': 'Dai', 'protocol': 'HTLC_ETHEREUM'}
+            "BTC": {"name": "Bitcoin", "protocol": "HTLC_UTXO"},
+            "ETH": {"name": "Ethereum", "protocol": "HTLC_ETHEREUM"},
+            "LTC": {"name": "Litecoin", "protocol": "HTLC_UTXO"},
+            "DOGE": {"name": "Dogecoin", "protocol": "HTLC_UTXO"},
+            "XMR": {"name": "Monero", "protocol": "HTLC_MONERO"},
+            "BCH": {"name": "Bitcoin Cash", "protocol": "HTLC_UTXO"},
+            "USDT": {"name": "Tether", "protocol": "HTLC_ETHEREUM"},
+            "ZEC": {"name": "Zcash", "protocol": "HTLC_UTXO"},
+            "DASH": {"name": "Dash", "protocol": "HTLC_UTXO"},
+            "USDC": {"name": "USD Coin", "protocol": "HTLC_ETHEREUM"},
+            "DAI": {"name": "Dai", "protocol": "HTLC_ETHEREUM"},
         }
 
 
@@ -260,11 +274,11 @@ class MeshDEXPairManager:
         for coin in CoinType:
             pair_name = f"XAI/{coin.name}"
             pairs[pair_name] = {
-                'coin_type': coin,
-                'protocol': COIN_PROTOCOLS[coin],
-                'atomic_swap': AtomicSwapHTLC(coin),
-                'active': True,
-                'launch_phase': self._get_launch_phase(coin)
+                "coin_type": coin,
+                "protocol": COIN_PROTOCOLS[coin],
+                "atomic_swap": AtomicSwapHTLC(coin),
+                "active": True,
+                "launch_phase": self._get_launch_phase(coin),
             }
 
         return pairs
@@ -273,8 +287,14 @@ class MeshDEXPairManager:
         """Determine launch phase for each coin"""
 
         # Phase 1: UTXO coins (easiest to implement)
-        phase1 = [CoinType.BTC, CoinType.LTC, CoinType.DOGE,
-                  CoinType.BCH, CoinType.ZEC, CoinType.DASH]
+        phase1 = [
+            CoinType.BTC,
+            CoinType.LTC,
+            CoinType.DOGE,
+            CoinType.BCH,
+            CoinType.ZEC,
+            CoinType.DASH,
+        ]
 
         # Phase 2: Ethereum tokens (requires bridge)
         phase2 = [CoinType.ETH, CoinType.USDT, CoinType.USDC, CoinType.DAI]
@@ -289,8 +309,9 @@ class MeshDEXPairManager:
         elif coin in phase3:
             return "PHASE_3_MONTH_6"
 
-    def create_swap(self, pair: str, axn_amount: float,
-                   other_amount: float, counterparty: str) -> Dict:
+    def create_swap(
+        self, pair: str, axn_amount: float, other_amount: float, counterparty: str
+    ) -> Dict:
         """
         Create atomic swap for any of the 11 pairs
 
@@ -306,25 +327,23 @@ class MeshDEXPairManager:
 
         if pair not in self.supported_pairs:
             return {
-                'success': False,
-                'error': 'UNSUPPORTED_PAIR',
-                'message': f'Pair {pair} not supported. Supported: {list(self.supported_pairs.keys())}'
+                "success": False,
+                "error": "UNSUPPORTED_PAIR",
+                "message": f"Pair {pair} not supported. Supported: {list(self.supported_pairs.keys())}",
             }
 
         pair_data = self.supported_pairs[pair]
 
-        if not pair_data['active']:
+        if not pair_data["active"]:
             return {
-                'success': False,
-                'error': 'PAIR_INACTIVE',
-                'message': f'Pair {pair} is not yet active. Launch phase: {pair_data["launch_phase"]}'
+                "success": False,
+                "error": "PAIR_INACTIVE",
+                "message": f'Pair {pair} is not yet active. Launch phase: {pair_data["launch_phase"]}',
             }
 
         # Create atomic swap
-        swap = pair_data['atomic_swap'].create_swap_contract(
-            axn_amount=axn_amount,
-            other_coin_amount=other_amount,
-            counterparty_address=counterparty
+        swap = pair_data["atomic_swap"].create_swap_contract(
+            axn_amount=axn_amount, other_coin_amount=other_amount, counterparty_address=counterparty
         )
 
         return swap
@@ -334,12 +353,12 @@ class MeshDEXPairManager:
 
         result = {}
         for pair_name, pair_data in self.supported_pairs.items():
-            coin = pair_data['coin_type']
+            coin = pair_data["coin_type"]
             result[pair_name] = {
-                'coin': coin.value,
-                'protocol': pair_data['protocol'].value,
-                'active': pair_data['active'],
-                'launch_phase': pair_data['launch_phase']
+                "coin": coin.value,
+                "protocol": pair_data["protocol"].value,
+                "active": pair_data["active"],
+                "launch_phase": pair_data["launch_phase"],
             }
 
         return result
@@ -359,7 +378,7 @@ if __name__ == "__main__":
     print("-" * 70)
 
     for pair, info in dex.get_all_pairs().items():
-        status = "ACTIVE" if info['active'] else "INACTIVE"
+        status = "ACTIVE" if info["active"] else "INACTIVE"
         print(f"{pair:15} | {info['coin']:20} | {info['protocol']:20} | {status}")
 
     # Show supported coins
@@ -380,10 +399,10 @@ if __name__ == "__main__":
         pair="XAI/BTC",
         axn_amount=1000,
         other_amount=0.005,
-        counterparty="bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
+        counterparty="bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
     )
 
-    if swap_result['success']:
+    if swap_result["success"]:
         print("Swap created successfully")
         print(f"Secret Hash: {swap_result['secret_hash'][:32]}...")
         print(f"Timelock: {swap_result['timelock_hours']} hours")
@@ -398,10 +417,10 @@ if __name__ == "__main__":
         pair="XAI/BTC",
         axn_amount=1000,
         other_amount=0.0038,
-        counterparty="bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
+        counterparty="bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
     )
 
-    if test_swap['success']:
+    if test_swap["success"]:
         print("Swap created successfully (no price restrictions)")
         print(f"Secret Hash: {test_swap['secret_hash'][:32]}...")
     else:

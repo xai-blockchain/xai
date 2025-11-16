@@ -6,20 +6,24 @@ while the actual implementation of WalletTradeManager is located or recreated.
 
 from typing import Dict, Any
 
+
 class AuditSigner:
     """
     Placeholder AuditSigner class.
     """
+
     def public_key(self) -> str:
         """
         Placeholder for public_key method.
         """
         return "PLACEHOLDER_PUBLIC_KEY"
 
+
 class WalletTradeManager:
     """
     Placeholder WalletTradeManager class.
     """
+
     def __init__(self):
         self.audit_signer = AuditSigner()
 
@@ -28,13 +32,21 @@ class WalletTradeManager:
         Placeholder for begin_walletconnect_handshake method.
         """
         print(f"Placeholder: begin_walletconnect_handshake called for {wallet_address}")
-        return {"success": True, "handshake_id": "PLACEHOLDER_HANDSHAKE_ID", "uri": "PLACEHOLDER_URI"}
+        return {
+            "success": True,
+            "handshake_id": "PLACEHOLDER_HANDSHAKE_ID",
+            "uri": "PLACEHOLDER_URI",
+        }
 
-    def complete_walletconnect_handshake(self, handshake_id: str, wallet_address: str, client_public: str) -> Dict[str, Any]:
+    def complete_walletconnect_handshake(
+        self, handshake_id: str, wallet_address: str, client_public: str
+    ) -> Dict[str, Any]:
         """
         Placeholder for complete_walletconnect_handshake method.
         """
-        print(f"Placeholder: complete_walletconnect_handshake called for {handshake_id}, {wallet_address}, {client_public}")
+        print(
+            f"Placeholder: complete_walletconnect_handshake called for {handshake_id}, {wallet_address}, {client_public}"
+        )
         return {"success": True, "session_token": "PLACEHOLDER_SESSION_TOKEN"}
 
     def get_order(self, order_id: str) -> Dict[str, Any]:

@@ -37,14 +37,16 @@ import openai
 
 class TradingStrategy(Enum):
     """Pre-built trading strategies"""
-    CONSERVATIVE = "conservative"      # Low risk, steady gains
-    BALANCED = "balanced"             # Medium risk/reward
-    AGGRESSIVE = "aggressive"         # High risk, high reward
-    CUSTOM = "custom"                # User-defined
+
+    CONSERVATIVE = "conservative"  # Low risk, steady gains
+    BALANCED = "balanced"  # Medium risk/reward
+    AGGRESSIVE = "aggressive"  # High risk, high reward
+    CUSTOM = "custom"  # User-defined
 
 
 class TradeAction(Enum):
     """Trading actions"""
+
     BUY = "buy"
     SELL = "sell"
     HOLD = "hold"
@@ -53,8 +55,9 @@ class TradeAction(Enum):
 @dataclass
 class TradingPair:
     """Trading pair configuration"""
+
     from_coin: str  # e.g., "XAI"
-    to_coin: str    # e.g., "ADA"
+    to_coin: str  # e.g., "ADA"
     current_rate: float = 0.0
     last_updated: float = 0.0
 
@@ -62,6 +65,7 @@ class TradingPair:
 @dataclass
 class TradeExecution:
     """Record of executed trade"""
+
     trade_id: str
     timestamp: float
     action: TradeAction
@@ -76,6 +80,7 @@ class TradeExecution:
 @dataclass
 class TradingPerformance:
     """Bot performance metrics"""
+
     total_trades: int = 0
     successful_trades: int = 0
     failed_trades: int = 0
@@ -101,7 +106,7 @@ class AITradingBot:
         strategy: TradingStrategy,
         config: Dict,
         blockchain,
-        personal_ai
+        personal_ai,
     ):
         """
         Initialize AI trading bot
@@ -134,17 +139,17 @@ class AITradingBot:
         self.trade_history: List[TradeExecution] = []
 
         # Risk management
-        self.max_trade_amount = config.get('max_trade_amount', 100)
-        self.stop_loss_percent = config.get('stop_loss_percent', 10)
-        self.take_profit_percent = config.get('take_profit_percent', 20)
-        self.max_daily_trades = config.get('max_daily_trades', 10)
+        self.max_trade_amount = config.get("max_trade_amount", 100)
+        self.stop_loss_percent = config.get("stop_loss_percent", 10)
+        self.take_profit_percent = config.get("take_profit_percent", 20)
+        self.max_daily_trades = config.get("max_daily_trades", 10)
 
         # Trading pairs
-        self.trading_pairs = self._initialize_trading_pairs(config.get('pairs', ['XAI/ADA']))
+        self.trading_pairs = self._initialize_trading_pairs(config.get("pairs", ["XAI/ADA"]))
 
         # Last analysis
         self.last_analysis_time = 0
-        self.analysis_interval = config.get('analysis_interval', 300)  # 5 minutes
+        self.analysis_interval = config.get("analysis_interval", 300)  # 5 minutes
 
         print(f"\n🤖 AI Trading Bot Initialized")
         print(f"   User: {user_address}")
@@ -158,25 +163,19 @@ class AITradingBot:
         """Initialize trading pairs from config"""
         trading_pairs = []
         for pair_str in pairs:
-            from_coin, to_coin = pair_str.split('/')
-            trading_pairs.append(TradingPair(
-                from_coin=from_coin,
-                to_coin=to_coin
-            ))
+            from_coin, to_coin = pair_str.split("/")
+            trading_pairs.append(TradingPair(from_coin=from_coin, to_coin=to_coin))
         return trading_pairs
 
     def start(self):
         """Start the trading bot"""
         if self.is_active:
-            return {'success': False, 'error': 'Bot already active'}
+            return {"success": False, "error": "Bot already active"}
 
         self.is_active = True
 
         # Start trading thread
-        self.trading_thread = threading.Thread(
-            target=self._trading_loop,
-            daemon=True
-        )
+        self.trading_thread = threading.Thread(target=self._trading_loop, daemon=True)
         self.trading_thread.start()
 
         print(f"\n✅ Trading bot started for {self.user_address}")
@@ -184,16 +183,16 @@ class AITradingBot:
         print(f"   Using {self.strategy.value} strategy")
 
         return {
-            'success': True,
-            'message': 'Trading bot started',
-            'strategy': self.strategy.value,
-            'pairs': [f"{p.from_coin}/{p.to_coin}" for p in self.trading_pairs]
+            "success": True,
+            "message": "Trading bot started",
+            "strategy": self.strategy.value,
+            "pairs": [f"{p.from_coin}/{p.to_coin}" for p in self.trading_pairs],
         }
 
     def stop(self):
         """Stop the trading bot"""
         if not self.is_active:
-            return {'success': False, 'error': 'Bot not active'}
+            return {"success": False, "error": "Bot not active"}
 
         self.is_active = False
 
@@ -208,9 +207,9 @@ class AITradingBot:
         print(f"   ROI: {self.performance.roi:.2f}%")
 
         return {
-            'success': True,
-            'message': 'Trading bot stopped',
-            'performance': self._get_performance_summary()
+            "success": True,
+            "message": "Trading bot stopped",
+            "performance": self._get_performance_summary(),
         }
 
     def _trading_loop(self):
@@ -236,7 +235,7 @@ class AITradingBot:
                     # Get AI analysis
                     analysis = self._analyze_market(pair)
 
-                    if analysis['action'] != TradeAction.HOLD:
+                    if analysis["action"] != TradeAction.HOLD:
                         # Check risk limits
                         if self._check_risk_limits():
                             # Execute trade
@@ -283,7 +282,8 @@ class AITradingBot:
 
         # Get recent trade history for this pair
         recent_trades = [
-            t for t in self.trade_history[-10:]
+            t
+            for t in self.trade_history[-10:]
             if t.pair.from_coin == pair.from_coin and t.pair.to_coin == pair.to_coin
         ]
 
@@ -293,38 +293,44 @@ class AITradingBot:
         # Call user's AI
         ai_response = self._call_user_ai(prompt)
 
-        if not ai_response['success']:
+        if not ai_response["success"]:
             return {
-                'action': TradeAction.HOLD,
-                'reasoning': 'AI analysis failed',
-                'confidence': 0.0
+                "action": TradeAction.HOLD,
+                "reasoning": "AI analysis failed",
+                "confidence": 0.0,
             }
 
         # Parse AI response
         try:
-            analysis = json.loads(ai_response['response'])
+            analysis = json.loads(ai_response["response"])
 
             # Convert action string to enum
-            action_str = analysis.get('action', 'HOLD').upper()
-            action = TradeAction[action_str] if action_str in ['BUY', 'SELL', 'HOLD'] else TradeAction.HOLD
+            action_str = analysis.get("action", "HOLD").upper()
+            action = (
+                TradeAction[action_str]
+                if action_str in ["BUY", "SELL", "HOLD"]
+                else TradeAction.HOLD
+            )
 
             return {
-                'action': action,
-                'reasoning': analysis.get('reasoning', ''),
-                'confidence': analysis.get('confidence', 0.0),
-                'amount': analysis.get('recommended_amount', self.max_trade_amount),
-                'expected_profit': analysis.get('expected_profit', 0.0)
+                "action": action,
+                "reasoning": analysis.get("reasoning", ""),
+                "confidence": analysis.get("confidence", 0.0),
+                "amount": analysis.get("recommended_amount", self.max_trade_amount),
+                "expected_profit": analysis.get("expected_profit", 0.0),
             }
 
         except (json.JSONDecodeError, KeyError) as e:
             print(f"⚠️  Could not parse AI response: {e}")
             return {
-                'action': TradeAction.HOLD,
-                'reasoning': 'Could not parse AI recommendation',
-                'confidence': 0.0
+                "action": TradeAction.HOLD,
+                "reasoning": "Could not parse AI recommendation",
+                "confidence": 0.0,
             }
 
-    def _create_analysis_prompt(self, pair: TradingPair, balance: float, recent_trades: List) -> str:
+    def _create_analysis_prompt(
+        self, pair: TradingPair, balance: float, recent_trades: List
+    ) -> str:
         """Create AI prompt based on strategy"""
 
         base_prompt = f"""
@@ -377,9 +383,12 @@ Strategy: AGGRESSIVE
 """
 
         else:  # CUSTOM
-            strategy_prompt = self.config.get('custom_prompt', '')
+            strategy_prompt = self.config.get("custom_prompt", "")
 
-        full_prompt = base_prompt + strategy_prompt + """
+        full_prompt = (
+            base_prompt
+            + strategy_prompt
+            + """
 
 Task: Analyze the current market and recommend an action.
 
@@ -392,6 +401,7 @@ Return JSON:
   "expected_profit": <estimated profit percentage>
 }
 """
+        )
 
         return full_prompt
 
@@ -404,8 +414,8 @@ Return JSON:
             analysis: AI analysis with action recommendation
         """
 
-        action = analysis['action']
-        amount = min(analysis['amount'], self.max_trade_amount)
+        action = analysis["action"]
+        amount = min(analysis["amount"], self.max_trade_amount)
 
         print(f"\n🔄 Executing {action.value.upper()} trade:")
         print(f"   Pair: {pair.from_coin}/{pair.to_coin}")
@@ -423,11 +433,11 @@ Return JSON:
                     ai_model=self.ai_model,
                     user_api_key=self.user_api_key,
                     swap_details={
-                        'from_coin': pair.to_coin,
-                        'to_coin': pair.from_coin,
-                        'amount': amount / pair.current_rate,  # Amount in to_coin
-                        'recipient_address': self.user_address
-                    }
+                        "from_coin": pair.to_coin,
+                        "to_coin": pair.from_coin,
+                        "amount": amount / pair.current_rate,  # Amount in to_coin
+                        "recipient_address": self.user_address,
+                    },
                 )
 
             elif action == TradeAction.SELL:
@@ -438,18 +448,18 @@ Return JSON:
                     ai_model=self.ai_model,
                     user_api_key=self.user_api_key,
                     swap_details={
-                        'from_coin': pair.from_coin,
-                        'to_coin': pair.to_coin,
-                        'amount': amount,
-                        'recipient_address': self.user_address
-                    }
+                        "from_coin": pair.from_coin,
+                        "to_coin": pair.to_coin,
+                        "amount": amount,
+                        "recipient_address": self.user_address,
+                    },
                 )
 
             else:  # HOLD
                 return
 
             # Record trade
-            if swap_result['success']:
+            if swap_result["success"]:
                 trade = TradeExecution(
                     trade_id=f"trade_{int(time.time())}",
                     timestamp=time.time(),
@@ -457,8 +467,8 @@ Return JSON:
                     pair=pair,
                     amount=amount,
                     rate=pair.current_rate,
-                    fee=swap_result['swap_transaction'].get('fee', 0),
-                    ai_reasoning=analysis['reasoning']
+                    fee=swap_result["swap_transaction"].get("fee", 0),
+                    ai_reasoning=analysis["reasoning"],
                 )
 
                 self.trade_history.append(trade)
@@ -506,13 +516,10 @@ Return JSON:
                 response = client.messages.create(
                     model=self.ai_model,
                     max_tokens=1000,
-                    messages=[{"role": "user", "content": prompt}]
+                    messages=[{"role": "user", "content": prompt}],
                 )
 
-                return {
-                    'success': True,
-                    'response': response.content[0].text
-                }
+                return {"success": True, "response": response.content[0].text}
 
             elif self.ai_provider == "openai":
                 client = openai.OpenAI(api_key=self.user_api_key)
@@ -520,92 +527,81 @@ Return JSON:
                 response = client.chat.completions.create(
                     model=self.ai_model,
                     messages=[{"role": "user", "content": prompt}],
-                    max_tokens=1000
+                    max_tokens=1000,
                 )
 
-                return {
-                    'success': True,
-                    'response': response.choices[0].message.content
-                }
+                return {"success": True, "response": response.choices[0].message.content}
 
             else:
-                return {
-                    'success': False,
-                    'error': f'Provider {self.ai_provider} not supported'
-                }
+                return {"success": False, "error": f"Provider {self.ai_provider} not supported"}
 
         except Exception as e:
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            return {"success": False, "error": str(e)}
 
     def _get_performance_summary(self) -> Dict:
         """Get performance summary"""
 
         return {
-            'total_trades': self.performance.total_trades,
-            'successful_trades': self.performance.successful_trades,
-            'failed_trades': self.performance.failed_trades,
-            'net_profit': self.performance.net_profit,
-            'win_rate': self.performance.win_rate,
-            'roi': self.performance.roi
+            "total_trades": self.performance.total_trades,
+            "successful_trades": self.performance.successful_trades,
+            "failed_trades": self.performance.failed_trades,
+            "net_profit": self.performance.net_profit,
+            "win_rate": self.performance.win_rate,
+            "roi": self.performance.roi,
         }
 
     def get_status(self) -> Dict:
         """Get current bot status"""
 
         return {
-            'is_active': self.is_active,
-            'strategy': self.strategy.value,
-            'pairs': [f"{p.from_coin}/{p.to_coin}" for p in self.trading_pairs],
-            'performance': self._get_performance_summary(),
-            'recent_trades': [
+            "is_active": self.is_active,
+            "strategy": self.strategy.value,
+            "pairs": [f"{p.from_coin}/{p.to_coin}" for p in self.trading_pairs],
+            "performance": self._get_performance_summary(),
+            "recent_trades": [
                 {
-                    'timestamp': t.timestamp,
-                    'action': t.action.value,
-                    'amount': t.amount,
-                    'rate': t.rate,
-                    'profit_loss': t.profit_loss
+                    "timestamp": t.timestamp,
+                    "action": t.action.value,
+                    "amount": t.amount,
+                    "rate": t.rate,
+                    "profit_loss": t.profit_loss,
                 }
                 for t in self.trade_history[-5:]
-            ]
+            ],
         }
 
 
 # Strategy templates
 STRATEGY_TEMPLATES = {
-    'conservative': {
-        'max_trade_amount': 50,
-        'stop_loss_percent': 5,
-        'take_profit_percent': 10,
-        'max_daily_trades': 3,
-        'analysis_interval': 600,  # 10 minutes
-        'pairs': ['XAI/ADA']
+    "conservative": {
+        "max_trade_amount": 50,
+        "stop_loss_percent": 5,
+        "take_profit_percent": 10,
+        "max_daily_trades": 3,
+        "analysis_interval": 600,  # 10 minutes
+        "pairs": ["XAI/ADA"],
     },
-
-    'balanced': {
-        'max_trade_amount': 100,
-        'stop_loss_percent': 10,
-        'take_profit_percent': 20,
-        'max_daily_trades': 10,
-        'analysis_interval': 300,  # 5 minutes
-        'pairs': ['XAI/ADA', 'XAI/BTC']
+    "balanced": {
+        "max_trade_amount": 100,
+        "stop_loss_percent": 10,
+        "take_profit_percent": 20,
+        "max_daily_trades": 10,
+        "analysis_interval": 300,  # 5 minutes
+        "pairs": ["XAI/ADA", "XAI/BTC"],
     },
-
-    'aggressive': {
-        'max_trade_amount': 200,
-        'stop_loss_percent': 15,
-        'take_profit_percent': 30,
-        'max_daily_trades': 20,
-        'analysis_interval': 180,  # 3 minutes
-        'pairs': ['XAI/ADA', 'XAI/BTC', 'XAI/ETH']
-    }
+    "aggressive": {
+        "max_trade_amount": 200,
+        "stop_loss_percent": 15,
+        "take_profit_percent": 30,
+        "max_daily_trades": 20,
+        "analysis_interval": 180,  # 3 minutes
+        "pairs": ["XAI/ADA", "XAI/BTC", "XAI/ETH"],
+    },
 }
 
 
 # Example usage
-if __name__ == '__main__':
+if __name__ == "__main__":
     print("=" * 80)
     print("XAI AI TRADING BOT - DEMONSTRATION")
     print("=" * 80)
@@ -617,10 +613,7 @@ if __name__ == '__main__':
 
     class MockPersonalAI:
         def execute_atomic_swap_with_ai(self, **kwargs):
-            return {
-                'success': True,
-                'swap_transaction': {'fee': 0.15}
-            }
+            return {"success": True, "swap_transaction": {"fee": 0.15}}
 
     blockchain = MockBlockchain()
     personal_ai = MockPersonalAI()
@@ -631,14 +624,14 @@ if __name__ == '__main__':
     print("   User: XAI_Trader_1")
 
     bot = AITradingBot(
-        user_address='XAI_Trader_1',
-        ai_provider='anthropic',
-        ai_model='claude-sonnet-4',
-        user_api_key='sk-ant-demo-key',
+        user_address="XAI_Trader_1",
+        ai_provider="anthropic",
+        ai_model="claude-sonnet-4",
+        user_api_key="sk-ant-demo-key",
         strategy=TradingStrategy.BALANCED,
-        config=STRATEGY_TEMPLATES['balanced'],
+        config=STRATEGY_TEMPLATES["balanced"],
         blockchain=blockchain,
-        personal_ai=personal_ai
+        personal_ai=personal_ai,
     )
 
     print("\n✅ Trading bot created!")

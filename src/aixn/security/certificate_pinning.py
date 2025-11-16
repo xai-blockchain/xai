@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 # Its purpose is to illustrate the concept of associating hosts with expected cryptographic identities.
 # DO NOT use this for any production or security-sensitive applications.
 
+
 class CertificatePinner:
     def __init__(self):
         # Stores pinned public key hashes (SPKI hashes) for hosts: {hostname: [spki_hash1, spki_hash2, ...]})
@@ -19,7 +20,7 @@ class CertificatePinner:
         """
         if not hostname or not spki_hash:
             raise ValueError("Hostname and SPKI hash cannot be empty.")
-        
+
         self.pinned_public_key_hashes.setdefault(hostname, []).append(spki_hash)
         print(f"Pinned SPKI hash '{spki_hash}' for host '{hostname}'.")
 
@@ -32,16 +33,21 @@ class CertificatePinner:
             raise ValueError("Hostname and presented SPKI hash cannot be empty.")
 
         if hostname not in self.pinned_public_key_hashes:
-            print(f"Warning: No pins found for host '{hostname}'. Connection allowed (no pinning enforced).")
-            return True # No pins, so no pinning violation
+            print(
+                f"Warning: No pins found for host '{hostname}'. Connection allowed (no pinning enforced)."
+            )
+            return True  # No pins, so no pinning violation
 
         expected_hashes = self.pinned_public_key_hashes[hostname]
         if presented_spki_hash in expected_hashes:
             print(f"Connection to '{hostname}' verified. Presented hash matches a pinned hash.")
             return True
         else:
-            print(f"!!! SECURITY ALERT !!! Connection to '{hostname}' failed. Presented SPKI hash '{presented_spki_hash}' does not match any pinned hash.")
+            print(
+                f"!!! SECURITY ALERT !!! Connection to '{hostname}' failed. Presented SPKI hash '{presented_spki_hash}' does not match any pinned hash."
+            )
             return False
+
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
@@ -50,13 +56,15 @@ if __name__ == "__main__":
     # Simulate a real SPKI hash (e.g., from a server's public key)
     # In a real scenario, you'd get this from the actual certificate.
     # For demonstration, we'll use a dummy hash.
-    google_spki_hash = "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" # Dummy hash
-    aixn_api_spki_hash = "sha256/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=" # Dummy hash
+    google_spki_hash = "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="  # Dummy hash
+    aixn_api_spki_hash = "sha256/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB="  # Dummy hash
 
     # Pin certificates for specific hosts
     pinner.pin_certificate("api.example.com", google_spki_hash)
     pinner.pin_certificate("aixn.network", aixn_api_spki_hash)
-    pinner.pin_certificate("aixn.network", "sha256/CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=") # Add another valid pin
+    pinner.pin_certificate(
+        "aixn.network", "sha256/CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC="
+    )  # Add another valid pin
 
     print("\n--- Simulating Connections ---")
 
@@ -67,7 +75,9 @@ if __name__ == "__main__":
 
     # Invalid connection to api.example.com (wrong hash)
     print("\nAttempting connection to api.example.com with incorrect pin:")
-    is_invalid_google = pinner.verify_connection("api.example.com", "sha256/DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD=")
+    is_invalid_google = pinner.verify_connection(
+        "api.example.com", "sha256/DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD="
+    )
     print(f"Connection to api.example.com valid: {is_invalid_google}")
 
     # Valid connection to aixn.network (matches one of multiple pins)
@@ -77,5 +87,7 @@ if __name__ == "__main__":
 
     # Connection to an unpinned host
     print("\nAttempting connection to unpinned.host.com:")
-    is_unpinned = pinner.verify_connection("unpinned.host.com", "sha256/EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE=")
+    is_unpinned = pinner.verify_connection(
+        "unpinned.host.com", "sha256/EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE="
+    )
     print(f"Connection to unpinned.host.com valid: {is_unpinned}")

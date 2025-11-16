@@ -8,4 +8,4 @@ from .fee_optimizer import AIFeeOptimizer
 from .fraud_detector import AIFraudDetector
 from .api_rotator import AIAPIRotator
 
-__all__ = ['AIFeeOptimizer', 'AIFraudDetector', 'AIAPIRotator']
+__all__ = ["AIFeeOptimizer", "AIFraudDetector", "AIAPIRotator"]

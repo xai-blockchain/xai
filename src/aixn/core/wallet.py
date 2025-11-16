@@ -113,17 +113,17 @@ class Wallet:
     def save_to_file(self, filename: str, password: Optional[str] = None):
         """Save wallet to encrypted file"""
         wallet_data = {
-            'private_key': self.private_key,
-            'public_key': self.public_key,
-            'address': self.address
+            "private_key": self.private_key,
+            "public_key": self.public_key,
+            "address": self.address,
         }
 
         if password:
             encrypted_data = self._encrypt(json.dumps(wallet_data), password)
-            with open(filename, 'w') as f:
-                json.dump({'encrypted': True, 'data': encrypted_data}, f)
+            with open(filename, "w") as f:
+                json.dump({"encrypted": True, "data": encrypted_data}, f)
         else:
-            with open(filename, 'w') as f:
+            with open(filename, "w") as f:
                 json.dump(wallet_data, f, indent=2)
 
     def _encrypt(self, data: str, password: str) -> str:
@@ -141,20 +141,20 @@ class Wallet:
         return decrypted_data.decode()
 
     @staticmethod
-    def load_from_file(filename: str, password: Optional[str] = None) -> 'Wallet':
+    def load_from_file(filename: str, password: Optional[str] = None) -> "Wallet":
         """Load wallet from file"""
-        with open(filename, 'r') as f:
+        with open(filename, "r") as f:
             data = json.load(f)
 
-        if data.get('encrypted'):
+        if data.get("encrypted"):
             if not password:
                 raise ValueError("Password required for encrypted wallet")
-            wallet_json = Wallet._decrypt_static(data['data'], password)
+            wallet_json = Wallet._decrypt_static(data["data"], password)
             wallet_data = json.loads(wallet_json)
         else:
             wallet_data = data
 
-        return Wallet(private_key=wallet_data['private_key'])
+        return Wallet(private_key=wallet_data["private_key"])
 
     @staticmethod
     def _decrypt_static(encrypted_data: str, password: str) -> str:
@@ -170,10 +170,7 @@ class Wallet:
 
     def to_public_dict(self) -> dict:
         """Export public wallet data only"""
-        return {
-            'address': self.address,
-            'public_key': self.public_key
-        }
+        return {"address": self.address, "public_key": self.public_key}
 
     def to_full_dict_unsafe(self) -> dict:
         """
@@ -181,9 +178,9 @@ class Wallet:
         WARNING: This method exposes the private key and should be used with extreme caution.
         """
         return {
-            'address': self.address,
-            'public_key': self.public_key,
-            'private_key': self.private_key
+            "address": self.address,
+            "public_key": self.public_key,
+            "private_key": self.private_key,
         }
 
 
@@ -192,7 +189,7 @@ class WalletManager:
 
     def __init__(self, data_dir: str = None):
         if data_dir is None:
-            self.data_dir = Path.home() / '.aixn' / 'wallets'
+            self.data_dir = Path.home() / ".aixn" / "wallets"
         else:
             self.data_dir = Path(data_dir)
 
@@ -224,7 +221,7 @@ class WalletManager:
 
     def list_wallets(self) -> list:
         """List all wallet files"""
-        return [f.stem for f in self.data_dir.glob('*.wallet')]
+        return [f.stem for f in self.data_dir.glob("*.wallet")]
 
     def get_wallet(self, name: str) -> Optional[Wallet]:
         """Get loaded wallet"""

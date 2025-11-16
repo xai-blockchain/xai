@@ -60,7 +60,11 @@ class WalletFactory:
             self.logger.error(f"Failed to load wallet '{name}': {e}", error=str(e))
             raise
         except Exception as e:
-            self.logger.error(f"An unexpected error occurred while loading wallet '{name}': {e}", error=str(e), exc_info=True)
+            self.logger.error(
+                f"An unexpected error occurred while loading wallet '{name}': {e}",
+                error=str(e),
+                exc_info=True,
+            )
             raise
 
     def get_wallet_by_name(self, name: str) -> Optional[Wallet]:
@@ -83,7 +87,9 @@ class WalletFactory:
             A dictionary mapping wallet names to their file paths.
         """
         wallet_names = self.wallet_manager.list_wallets()
-        available_wallets = {name: str(self.wallet_manager.data_dir / f"{name}.wallet") for name in wallet_names}
+        available_wallets = {
+            name: str(self.wallet_manager.data_dir / f"{name}.wallet") for name in wallet_names
+        }
         self.logger.debug(f"Found {len(available_wallets)} available wallet files.")
         return available_wallets
 
@@ -92,15 +98,19 @@ class WalletFactory:
         Returns statistics about the managed wallets.
         """
         return {
-            'loaded_wallets_count': len(self.wallet_manager.wallets),
-            'wallet_files_count': len(self.list_available_wallets()),
-            'wallet_data_directory': str(self.wallet_manager.data_dir)
+            "loaded_wallets_count": len(self.wallet_manager.wallets),
+            "wallet_files_count": len(self.list_available_wallets()),
+            "wallet_data_directory": str(self.wallet_manager.data_dir),
         }
+
 
 # Global instance for convenience
 _global_wallet_factory = None
 
-def get_wallet_factory(data_dir: Optional[str] = None, logger: Optional[StructuredLogger] = None) -> WalletFactory:
+
+def get_wallet_factory(
+    data_dir: Optional[str] = None, logger: Optional[StructuredLogger] = None
+) -> WalletFactory:
     """
     Get global WalletFactory instance.
     """

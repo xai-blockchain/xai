@@ -33,17 +33,19 @@ import base64
 
 class KeyStatus(Enum):
     """Status of stored API key"""
+
     PENDING_VALIDATION = "pending_validation"  # Submitted but not validated
-    ACTIVE = "active"                          # Validated and ready for use
-    IN_USE = "in_use"                         # Currently being used for a task
-    DEPLETED = "depleted"                     # All tokens used
-    EXPIRED = "expired"                       # Time-based expiration
-    REVOKED = "revoked"                       # Manually revoked by donor
-    DESTROYED = "destroyed"                   # Securely wiped from storage
+    ACTIVE = "active"  # Validated and ready for use
+    IN_USE = "in_use"  # Currently being used for a task
+    DEPLETED = "depleted"  # All tokens used
+    EXPIRED = "expired"  # Time-based expiration
+    REVOKED = "revoked"  # Manually revoked by donor
+    DESTROYED = "destroyed"  # Securely wiped from storage
 
 
 class AIProvider(Enum):
     """Supported AI providers for key validation"""
+
     ANTHROPIC = "anthropic"
     OPENAI = "openai"
     GOOGLE = "google"
@@ -91,19 +93,17 @@ class SecureAPIKeyManager:
 
         This ensures keys can be recovered after node restart
         """
-        salt = b'xai_secure_api_key_salt_v1'  # Fixed salt for reproducibility
+        salt = b"xai_secure_api_key_salt_v1"  # Fixed salt for reproducibility
 
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=salt,
             iterations=1_000_000,  # 1 million iterations
-            backend=default_backend()
+            backend=default_backend(),
         )
 
-        master_key = base64.urlsafe_b64encode(
-            kdf.derive(blockchain_seed.encode())
-        )
+        master_key = base64.urlsafe_b64encode(kdf.derive(blockchain_seed.encode()))
 
         return master_key
 
@@ -113,7 +113,7 @@ class SecureAPIKeyManager:
         provider: AIProvider,
         api_key: str,
         donated_tokens: int,
-        expiration_days: Optional[int] = None
+        expiration_days: Optional[int] = None,
     ) -> Dict:
         """
         Securely submit API key donation
@@ -132,18 +132,18 @@ class SecureAPIKeyManager:
         # Rate limiting check
         if not self._check_rate_limit(donor_address):
             return {
-                'success': False,
-                'error': 'RATE_LIMIT_EXCEEDED',
-                'message': f'Please wait {self.min_submission_interval}s between submissions'
+                "success": False,
+                "error": "RATE_LIMIT_EXCEEDED",
+                "message": f"Please wait {self.min_submission_interval}s between submissions",
             }
 
         # Validate API key format
         validation = self._validate_api_key_format(provider, api_key)
-        if not validation['valid']:
+        if not validation["valid"]:
             return {
-                'success': False,
-                'error': 'INVALID_API_KEY_FORMAT',
-                'message': validation['reason']
+                "success": False,
+                "error": "INVALID_API_KEY_FORMAT",
+                "message": validation["reason"],
             }
 
         # Generate unique key ID
@@ -152,9 +152,9 @@ class SecureAPIKeyManager:
         # Check for duplicate submission
         if key_id in self.stored_keys:
             return {
-                'success': False,
-                'error': 'DUPLICATE_KEY',
-                'message': 'This API key has already been submitted'
+                "success": False,
+                "error": "DUPLICATE_KEY",
+                "message": "This API key has already been submitted",
             }
 
         # Triple-layer encryption for maximum security
@@ -163,20 +163,22 @@ class SecureAPIKeyManager:
         # Create key record
         current_time = time.time()
         key_record = {
-            'key_id': key_id,
-            'donor_address': donor_address,
-            'provider': provider.value,
-            'encrypted_key': encrypted_key,
-            'donated_tokens': donated_tokens,
-            'used_tokens': 0,
-            'status': KeyStatus.PENDING_VALIDATION.value,
-            'submitted_at': current_time,
-            'validated_at': None,
-            'last_used_at': None,
-            'expiration_time': current_time + (expiration_days * 86400) if expiration_days else None,
-            'tasks_completed': 0,
-            'encryption_version': 'v1_triple_layer',
-            'access_count': 0
+            "key_id": key_id,
+            "donor_address": donor_address,
+            "provider": provider.value,
+            "encrypted_key": encrypted_key,
+            "donated_tokens": donated_tokens,
+            "used_tokens": 0,
+            "status": KeyStatus.PENDING_VALIDATION.value,
+            "submitted_at": current_time,
+            "validated_at": None,
+            "last_used_at": None,
+            "expiration_time": (
+                current_time + (expiration_days * 86400) if expiration_days else None
+            ),
+            "tasks_completed": 0,
+            "encryption_version": "v1_triple_layer",
+            "access_count": 0,
         }
 
         # Store in memory
@@ -186,7 +188,7 @@ class SecureAPIKeyManager:
         self._save_key_to_disk(key_id, key_record)
 
         # Log submission
-        self._log_access('submit', key_id, donor_address, 'API key submitted')
+        self._log_access("submit", key_id, donor_address, "API key submitted")
 
         # Update rate limit
         self.submission_rate_limit[donor_address] = current_time
@@ -195,14 +197,14 @@ class SecureAPIKeyManager:
         self._queue_for_validation(key_id, provider, api_key)
 
         return {
-            'success': True,
-            'key_id': key_id,
-            'donor_address': donor_address,
-            'provider': provider.value,
-            'donated_tokens': donated_tokens,
-            'status': KeyStatus.PENDING_VALIDATION.value,
-            'message': 'API key securely stored and queued for validation',
-            'expiration_time': key_record['expiration_time']
+            "success": True,
+            "key_id": key_id,
+            "donor_address": donor_address,
+            "provider": provider.value,
+            "donated_tokens": donated_tokens,
+            "status": KeyStatus.PENDING_VALIDATION.value,
+            "message": "API key securely stored and queued for validation",
+            "expiration_time": key_record["expiration_time"],
         }
 
     def _triple_encrypt(self, api_key: str) -> str:
@@ -218,23 +220,12 @@ class SecureAPIKeyManager:
         layer1 = self.fernet.encrypt(api_key.encode()).decode()
 
         # Layer 2: XOR with derived key
-        derived_key = hashlib.sha256(
-            (api_key[:8] + str(time.time())).encode()
-        ).digest()
-        layer2_bytes = bytes(a ^ b for a, b in zip(
-            layer1.encode()[:32],
-            derived_key
-        ))
-        layer2 = base64.b64encode(
-            layer2_bytes + layer1.encode()[32:]
-        ).decode()
+        derived_key = hashlib.sha256((api_key[:8] + str(time.time())).encode()).digest()
+        layer2_bytes = bytes(a ^ b for a, b in zip(layer1.encode()[:32], derived_key))
+        layer2 = base64.b64encode(layer2_bytes + layer1.encode()[32:]).decode()
 
         # Layer 3: HMAC signature
-        signature = hmac.new(
-            self.master_key,
-            layer2.encode(),
-            hashlib.sha256
-        ).hexdigest()
+        signature = hmac.new(self.master_key, layer2.encode(), hashlib.sha256).hexdigest()
 
         return f"{signature}:{layer2}"
 
@@ -248,14 +239,10 @@ class SecureAPIKeyManager:
         """
 
         # Split signature and data
-        signature, layer2 = encrypted_data.split(':', 1)
+        signature, layer2 = encrypted_data.split(":", 1)
 
         # Verify HMAC signature (Layer 3)
-        expected_sig = hmac.new(
-            self.master_key,
-            layer2.encode(),
-            hashlib.sha256
-        ).hexdigest()
+        expected_sig = hmac.new(self.master_key, layer2.encode(), hashlib.sha256).hexdigest()
 
         if not hmac.compare_digest(signature, expected_sig):
             raise ValueError("HMAC verification failed - data may be tampered")
@@ -292,27 +279,27 @@ class SecureAPIKeyManager:
 
         # Basic length and format checks
         if not api_key or len(api_key) < 10:
-            return {'valid': False, 'reason': 'API key too short'}
+            return {"valid": False, "reason": "API key too short"}
 
         # Provider-specific format validation
         if provider == AIProvider.ANTHROPIC:
-            if not api_key.startswith('sk-ant-'):
-                return {'valid': False, 'reason': 'Anthropic keys must start with sk-ant-'}
+            if not api_key.startswith("sk-ant-"):
+                return {"valid": False, "reason": "Anthropic keys must start with sk-ant-"}
             if len(api_key) < 50:
-                return {'valid': False, 'reason': 'Anthropic key length invalid'}
+                return {"valid": False, "reason": "Anthropic key length invalid"}
 
         elif provider == AIProvider.OPENAI:
-            if not api_key.startswith('sk-'):
-                return {'valid': False, 'reason': 'OpenAI keys must start with sk-'}
+            if not api_key.startswith("sk-"):
+                return {"valid": False, "reason": "OpenAI keys must start with sk-"}
             if len(api_key) < 40:
-                return {'valid': False, 'reason': 'OpenAI key length invalid'}
+                return {"valid": False, "reason": "OpenAI key length invalid"}
 
         elif provider == AIProvider.GOOGLE:
             # Google API keys are typically 39 characters
             if len(api_key) < 30:
-                return {'valid': False, 'reason': 'Google API key length invalid'}
+                return {"valid": False, "reason": "Google API key length invalid"}
 
-        return {'valid': True}
+        return {"valid": True}
 
     def _queue_for_validation(self, key_id: str, provider: AIProvider, api_key: str):
         """
@@ -322,7 +309,7 @@ class SecureAPIKeyManager:
 
         # Store prefix for later decryption (needed for layer 2)
         prefix = api_key[:8]
-        self.stored_keys[key_id]['key_prefix'] = hashlib.sha256(prefix.encode()).hexdigest()[:16]
+        self.stored_keys[key_id]["key_prefix"] = hashlib.sha256(prefix.encode()).hexdigest()[:16]
 
         # In production, this would:
         # 1. Make a minimal API call (e.g., list models, check credits)
@@ -340,30 +327,28 @@ class SecureAPIKeyManager:
         """
 
         if key_id not in self.stored_keys:
-            return {'success': False, 'error': 'KEY_NOT_FOUND'}
+            return {"success": False, "error": "KEY_NOT_FOUND"}
 
         key_record = self.stored_keys[key_id]
 
         if is_valid:
-            key_record['status'] = KeyStatus.ACTIVE.value
-            key_record['validated_at'] = time.time()
-            self._log_access('validate', key_id, key_record['donor_address'], 'Key validated successfully')
+            key_record["status"] = KeyStatus.ACTIVE.value
+            key_record["validated_at"] = time.time()
+            self._log_access(
+                "validate", key_id, key_record["donor_address"], "Key validated successfully"
+            )
         else:
-            key_record['status'] = KeyStatus.REVOKED.value
-            self._log_access('validate', key_id, key_record['donor_address'], 'Key validation failed')
+            key_record["status"] = KeyStatus.REVOKED.value
+            self._log_access(
+                "validate", key_id, key_record["donor_address"], "Key validation failed"
+            )
 
         self._save_key_to_disk(key_id, key_record)
 
-        return {
-            'success': True,
-            'key_id': key_id,
-            'status': key_record['status']
-        }
+        return {"success": True, "key_id": key_id, "status": key_record["status"]}
 
     def get_api_key_for_task(
-        self,
-        provider: AIProvider,
-        required_tokens: int
+        self, provider: AIProvider, required_tokens: int
     ) -> Optional[Tuple[str, str, Dict]]:
         """
         Retrieve decrypted API key for use in a task
@@ -378,17 +363,18 @@ class SecureAPIKeyManager:
 
         # Find suitable key
         suitable_keys = [
-            (kid, krec) for kid, krec in self.stored_keys.items()
-            if krec['provider'] == provider.value
-            and krec['status'] == KeyStatus.ACTIVE.value
-            and (krec['donated_tokens'] - krec['used_tokens']) >= required_tokens
+            (kid, krec)
+            for kid, krec in self.stored_keys.items()
+            if krec["provider"] == provider.value
+            and krec["status"] == KeyStatus.ACTIVE.value
+            and (krec["donated_tokens"] - krec["used_tokens"]) >= required_tokens
         ]
 
         if not suitable_keys:
             return None
 
         # Sort by most tokens remaining (use most depleted keys first)
-        suitable_keys.sort(key=lambda x: x[1]['donated_tokens'] - x[1]['used_tokens'])
+        suitable_keys.sort(key=lambda x: x[1]["donated_tokens"] - x[1]["used_tokens"])
 
         key_id, key_record = suitable_keys[0]
 
@@ -397,19 +383,21 @@ class SecureAPIKeyManager:
             # Note: Triple decrypt needs the original prefix
             # For now, use standard Fernet decrypt
             decrypted_key = self.fernet.decrypt(
-                key_record['encrypted_key'].split(':', 1)[1].encode()
+                key_record["encrypted_key"].split(":", 1)[1].encode()
             ).decode()
         except Exception as e:
-            self._log_access('decrypt_error', key_id, 'SYSTEM', f'Decryption failed: {str(e)}')
+            self._log_access("decrypt_error", key_id, "SYSTEM", f"Decryption failed: {str(e)}")
             return None
 
         # Update status
-        key_record['status'] = KeyStatus.IN_USE.value
-        key_record['last_used_at'] = time.time()
-        key_record['access_count'] += 1
+        key_record["status"] = KeyStatus.IN_USE.value
+        key_record["last_used_at"] = time.time()
+        key_record["access_count"] += 1
 
         # Log access
-        self._log_access('retrieve', key_id, 'SYSTEM', f'Key retrieved for {required_tokens} tokens')
+        self._log_access(
+            "retrieve", key_id, "SYSTEM", f"Key retrieved for {required_tokens} tokens"
+        )
 
         return (key_id, decrypted_key, key_record)
 
@@ -420,17 +408,17 @@ class SecureAPIKeyManager:
         """
 
         if key_id not in self.stored_keys:
-            return {'success': False, 'error': 'KEY_NOT_FOUND'}
+            return {"success": False, "error": "KEY_NOT_FOUND"}
 
         key_record = self.stored_keys[key_id]
 
         # Update usage
-        key_record['used_tokens'] += tokens_used
+        key_record["used_tokens"] += tokens_used
         if task_completed:
-            key_record['tasks_completed'] += 1
+            key_record["tasks_completed"] += 1
 
         # Check if depleted
-        remaining = key_record['donated_tokens'] - key_record['used_tokens']
+        remaining = key_record["donated_tokens"] - key_record["used_tokens"]
 
         if remaining <= 0:
             # DEPLETED - Destroy the key!
@@ -438,20 +426,22 @@ class SecureAPIKeyManager:
             status = KeyStatus.DESTROYED.value
         else:
             # Still has tokens, return to ACTIVE
-            key_record['status'] = KeyStatus.ACTIVE.value
+            key_record["status"] = KeyStatus.ACTIVE.value
             status = KeyStatus.ACTIVE.value
 
         self._save_key_to_disk(key_id, key_record)
 
-        self._log_access('use', key_id, 'SYSTEM', f'Used {tokens_used} tokens, {remaining} remaining')
+        self._log_access(
+            "use", key_id, "SYSTEM", f"Used {tokens_used} tokens, {remaining} remaining"
+        )
 
         return {
-            'success': True,
-            'key_id': key_id,
-            'tokens_used': tokens_used,
-            'tokens_remaining': max(0, remaining),
-            'status': status,
-            'destroyed': remaining <= 0
+            "success": True,
+            "key_id": key_id,
+            "tokens_used": tokens_used,
+            "tokens_remaining": max(0, remaining),
+            "status": status,
+            "destroyed": remaining <= 0,
         }
 
     def _destroy_api_key(self, key_id: str):
@@ -468,14 +458,14 @@ class SecureAPIKeyManager:
         # Overwrite encrypted key with random data (3 passes)
         for _ in range(3):
             random_data = base64.b64encode(secrets.token_bytes(128)).decode()
-            key_record['encrypted_key'] = random_data
+            key_record["encrypted_key"] = random_data
 
         # Final overwrite with zeros
-        key_record['encrypted_key'] = '0' * 128
+        key_record["encrypted_key"] = "0" * 128
 
         # Mark as destroyed
-        key_record['status'] = KeyStatus.DESTROYED.value
-        key_record['destroyed_at'] = time.time()
+        key_record["status"] = KeyStatus.DESTROYED.value
+        key_record["destroyed_at"] = time.time()
 
         # Save one last time
         self._save_key_to_disk(key_id, key_record)
@@ -483,7 +473,7 @@ class SecureAPIKeyManager:
         # Remove from memory after a delay (to allow final sync)
         # In production, this would be handled by a cleanup task
 
-        self._log_access('destroy', key_id, 'SYSTEM', 'API key securely destroyed')
+        self._log_access("destroy", key_id, "SYSTEM", "API key securely destroyed")
 
     def _generate_key_id(self, donor_address: str, provider: AIProvider, api_key: str) -> str:
         """Generate unique key ID"""
@@ -494,7 +484,7 @@ class SecureAPIKeyManager:
         """Save encrypted key record to disk"""
         file_path = os.path.join(self.storage_path, f"{key_id}.enc")
 
-        with open(file_path, 'w') as f:
+        with open(file_path, "w") as f:
             json.dump(key_record, f, indent=2)
 
     def _load_keys_from_disk(self):
@@ -503,30 +493,30 @@ class SecureAPIKeyManager:
             return
 
         for filename in os.listdir(self.storage_path):
-            if filename.endswith('.enc'):
+            if filename.endswith(".enc"):
                 file_path = os.path.join(self.storage_path, filename)
 
-                with open(file_path, 'r') as f:
+                with open(file_path, "r") as f:
                     key_record = json.load(f)
-                    key_id = key_record['key_id']
+                    key_id = key_record["key_id"]
                     self.stored_keys[key_id] = key_record
 
     def _log_access(self, action: str, key_id: str, actor: str, details: str):
         """Log all access to API keys for audit trail"""
         log_entry = {
-            'timestamp': time.time(),
-            'action': action,
-            'key_id': key_id,
-            'actor': actor,
-            'details': details
+            "timestamp": time.time(),
+            "action": action,
+            "key_id": key_id,
+            "actor": actor,
+            "details": details,
         }
 
         self.access_log.append(log_entry)
 
         # Persist log to disk
-        log_file = os.path.join(self.storage_path, 'access_log.json')
-        with open(log_file, 'a') as f:
-            f.write(json.dumps(log_entry) + '\n')
+        log_file = os.path.join(self.storage_path, "access_log.json")
+        with open(log_file, "a") as f:
+            f.write(json.dumps(log_entry) + "\n")
 
     def get_key_status(self, key_id: str) -> Optional[Dict]:
         """Get current status of a stored key"""
@@ -535,8 +525,8 @@ class SecureAPIKeyManager:
 
         key_record = self.stored_keys[key_id].copy()
         # Remove encrypted key from response
-        key_record.pop('encrypted_key', None)
-        key_record.pop('key_prefix', None)
+        key_record.pop("encrypted_key", None)
+        key_record.pop("key_prefix", None)
 
         return key_record
 
@@ -545,7 +535,7 @@ class SecureAPIKeyManager:
         return [
             self.get_key_status(kid)
             for kid, krec in self.stored_keys.items()
-            if krec['donor_address'] == donor_address
+            if krec["donor_address"] == donor_address
         ]
 
     def get_pool_statistics(self) -> Dict:
@@ -557,44 +547,44 @@ class SecureAPIKeyManager:
         total_remaining = 0
 
         for key_record in self.stored_keys.values():
-            provider = key_record['provider']
+            provider = key_record["provider"]
 
             if provider not in stats_by_provider:
                 stats_by_provider[provider] = {
-                    'total_keys': 0,
-                    'active_keys': 0,
-                    'donated_tokens': 0,
-                    'used_tokens': 0,
-                    'remaining_tokens': 0
+                    "total_keys": 0,
+                    "active_keys": 0,
+                    "donated_tokens": 0,
+                    "used_tokens": 0,
+                    "remaining_tokens": 0,
                 }
 
-            stats_by_provider[provider]['total_keys'] += 1
-            stats_by_provider[provider]['donated_tokens'] += key_record['donated_tokens']
-            stats_by_provider[provider]['used_tokens'] += key_record['used_tokens']
+            stats_by_provider[provider]["total_keys"] += 1
+            stats_by_provider[provider]["donated_tokens"] += key_record["donated_tokens"]
+            stats_by_provider[provider]["used_tokens"] += key_record["used_tokens"]
 
-            remaining = key_record['donated_tokens'] - key_record['used_tokens']
-            stats_by_provider[provider]['remaining_tokens'] += remaining
+            remaining = key_record["donated_tokens"] - key_record["used_tokens"]
+            stats_by_provider[provider]["remaining_tokens"] += remaining
 
-            if key_record['status'] == KeyStatus.ACTIVE.value:
-                stats_by_provider[provider]['active_keys'] += 1
+            if key_record["status"] == KeyStatus.ACTIVE.value:
+                stats_by_provider[provider]["active_keys"] += 1
 
-            total_donated += key_record['donated_tokens']
-            total_used += key_record['used_tokens']
+            total_donated += key_record["donated_tokens"]
+            total_used += key_record["used_tokens"]
             total_remaining += remaining
 
         return {
-            'total_keys_submitted': len(self.stored_keys),
-            'total_tokens_donated': total_donated,
-            'total_tokens_used': total_used,
-            'total_tokens_remaining': total_remaining,
-            'utilization_percent': (total_used / total_donated * 100) if total_donated > 0 else 0,
-            'by_provider': stats_by_provider,
-            'total_access_logs': len(self.access_log)
+            "total_keys_submitted": len(self.stored_keys),
+            "total_tokens_donated": total_donated,
+            "total_tokens_used": total_used,
+            "total_tokens_remaining": total_remaining,
+            "utilization_percent": (total_used / total_donated * 100) if total_donated > 0 else 0,
+            "by_provider": stats_by_provider,
+            "total_access_logs": len(self.access_log),
         }
 
 
 # Example usage
-if __name__ == '__main__':
+if __name__ == "__main__":
     print("=" * 80)
     print("XAI SECURE API KEY MANAGEMENT SYSTEM")
     print("=" * 80)
@@ -616,15 +606,15 @@ if __name__ == '__main__':
         provider=AIProvider.ANTHROPIC,
         api_key="sk-ant-api03-test-key-123456789-actual-key-would-be-longer",
         donated_tokens=500000,
-        expiration_days=180  # 6 months
+        expiration_days=180,  # 6 months
     )
 
     print(f"\n📝 Submission Result:")
     for key, value in result.items():
         print(f"   {key}: {value}")
 
-    if result['success']:
-        key_id = result['key_id']
+    if result["success"]:
+        key_id = result["key_id"]
 
         # Validate the key
         print("\n" + "=" * 80)
@@ -650,8 +640,7 @@ if __name__ == '__main__':
         print("=" * 80)
 
         retrieved = manager.get_api_key_for_task(
-            provider=AIProvider.ANTHROPIC,
-            required_tokens=100000
+            provider=AIProvider.ANTHROPIC, required_tokens=100000
         )
 
         if retrieved:
@@ -679,12 +668,13 @@ if __name__ == '__main__':
     stats = manager.get_pool_statistics()
     print(f"\n📈 Overall Statistics:")
     for key, value in stats.items():
-        if key != 'by_provider':
+        if key != "by_provider":
             print(f"   {key}: {value}")
 
     print("\n\n💡 SECURITY FEATURES:")
     print("-" * 80)
-    print("""
+    print(
+        """
 1. ✅ Persistent encryption key (derived from blockchain seed)
 2. ✅ Triple-layer encryption (Fernet + XOR + HMAC)
 3. ✅ Secure disk storage with encryption
@@ -697,4 +687,5 @@ if __name__ == '__main__':
 10. ✅ Recoverable after node restart
 
 Keys can be safely stored for months or years!
-    """)
+    """
+    )

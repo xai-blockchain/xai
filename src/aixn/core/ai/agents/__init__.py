@@ -2,4 +2,4 @@
 
 from .momentum_trader import MomentumTrader, MarketData
 
-__all__ = ['MomentumTrader', 'MarketData']
+__all__ = ["MomentumTrader", "MarketData"]

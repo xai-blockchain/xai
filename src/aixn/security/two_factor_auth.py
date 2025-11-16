@@ -1,12 +1,14 @@
 from abc import ABC, abstractmethod
-import pyotp # Will need to add to requirements.txt
+import pyotp  # Will need to add to requirements.txt
 import base64
 import os
+
 
 class TwoFactorAuthInterface(ABC):
     """
     Abstract Base Class for Two-Factor Authentication (2FA) providers.
     """
+
     @abstractmethod
     def generate_secret(self) -> str:
         """
@@ -28,14 +30,16 @@ class TwoFactorAuthInterface(ABC):
         """
         pass
 
+
 class TOTPAuthenticator(TwoFactorAuthInterface):
     """
     A Time-based One-Time Password (TOTP) authenticator implementation.
     Uses pyotp library.
     """
+
     def generate_secret(self) -> str:
         # Generate a base32 secret for TOTP
-        return base64.b32encode(os.urandom(10)).decode('utf-8')
+        return base64.b32encode(os.urandom(10)).decode("utf-8")
 
     def verify_code(self, secret: str, code: str) -> bool:
         totp = pyotp.TOTP(secret)
@@ -44,6 +48,7 @@ class TOTPAuthenticator(TwoFactorAuthInterface):
     def get_provisioning_uri(self, secret: str, account_name: str, issuer_name: str) -> str:
         totp = pyotp.TOTP(secret)
         return totp.provisioning_uri(name=account_name, issuer_name=issuer_name)
+
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
@@ -54,7 +59,9 @@ if __name__ == "__main__":
     print(f"User's 2FA Secret: {user_secret}")
 
     # 2. Get provisioning URI (e.g., to scan with Google Authenticator)
-    provisioning_uri = authenticator.get_provisioning_uri(user_secret, "admin@aixn.io", "AIXN Blockchain")
+    provisioning_uri = authenticator.get_provisioning_uri(
+        user_secret, "admin@aixn.io", "AIXN Blockchain"
+    )
     print(f"Provisioning URI: {provisioning_uri}")
     print("Scan this URI with your authenticator app (e.g., Google Authenticator).")
 

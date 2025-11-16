@@ -1,6 +1,10 @@
 from typing import Dict, Any
 from datetime import datetime, timedelta, timezone
-from src.aixn.blockchain.slashing import SlashingManager, ValidatorStake # Re-using ValidatorStake for RelayerStake
+from src.aixn.blockchain.slashing import (
+    SlashingManager,
+    ValidatorStake,
+)  # Re-using ValidatorStake for RelayerStake
+
 
 class Relayer:
     def __init__(self, address: str, bonded_amount: int, status: str = "active"):
@@ -14,14 +18,14 @@ class Relayer:
         self.address = address
         self.bonded_amount = bonded_amount
         self.status = status
-        self.unbonding_start_timestamp: int = 0 # Timestamp when unbonding started
+        self.unbonding_start_timestamp: int = 0  # Timestamp when unbonding started
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "address": self.address,
             "bonded_amount": self.bonded_amount,
             "status": self.status,
-            "unbonding_start_timestamp": self.unbonding_start_timestamp
+            "unbonding_start_timestamp": self.unbonding_start_timestamp,
         }
 
     def __repr__(self):
@@ -30,13 +34,17 @@ class Relayer:
             f"status='{self.status}')"
         )
 
+
 class RelayerStakingManager:
     DEFAULT_MIN_BOND = 10000
-    DEFAULT_UNBONDING_PERIOD_SECONDS = 7 * 24 * 3600 # 7 days
+    DEFAULT_UNBONDING_PERIOD_SECONDS = 7 * 24 * 3600  # 7 days
 
-    def __init__(self, slashing_manager: SlashingManager,
-                 min_bond: int = DEFAULT_MIN_BOND,
-                 unbonding_period_seconds: int = DEFAULT_UNBONDING_PERIOD_SECONDS):
+    def __init__(
+        self,
+        slashing_manager: SlashingManager,
+        min_bond: int = DEFAULT_MIN_BOND,
+        unbonding_period_seconds: int = DEFAULT_UNBONDING_PERIOD_SECONDS,
+    ):
         if not isinstance(min_bond, int) or min_bond <= 0:
             raise ValueError("Minimum bond must be a positive integer.")
         if not isinstance(unbonding_period_seconds, int) or unbonding_period_seconds <= 0:
@@ -49,15 +57,21 @@ class RelayerStakingManager:
 
     def bond_stake(self, relayer_address: str, amount: int) -> Relayer:
         if amount < self.min_bond:
-            raise ValueError(f"Bonded amount {amount} is less than minimum required bond {self.min_bond}.")
-        
+            raise ValueError(
+                f"Bonded amount {amount} is less than minimum required bond {self.min_bond}."
+            )
+
         if relayer_address in self.relay_pool:
             relayer = self.relay_pool[relayer_address]
             if relayer.status == "unbonding":
-                raise ValueError(f"Relayer {relayer_address} is currently unbonding. Cannot bond more stake.")
+                raise ValueError(
+                    f"Relayer {relayer_address} is currently unbonding. Cannot bond more stake."
+                )
             relayer.bonded_amount += amount
             relayer.status = "active"
-            print(f"Relayer {relayer_address} added {amount} to bond. Total bonded: {relayer.bonded_amount}.")
+            print(
+                f"Relayer {relayer_address} added {amount} to bond. Total bonded: {relayer.bonded_amount}."
+            )
         else:
             relayer = Relayer(relayer_address, amount, "active")
             self.relay_pool[relayer_address] = relayer
@@ -78,8 +92,10 @@ class RelayerStakingManager:
 
         relayer.status = "unbonding"
         relayer.unbonding_start_timestamp = int(datetime.now(timezone.utc).timestamp())
-        print(f"Relayer {relayer_address} started unbonding. Funds will be released after "
-              f"{self.unbonding_period_seconds} seconds.")
+        print(
+            f"Relayer {relayer_address} started unbonding. Funds will be released after "
+            f"{self.unbonding_period_seconds} seconds."
+        )
 
     def finalize_unbonding(self, relayer_address: str, current_timestamp: int):
         relayer = self.relay_pool.get(relayer_address)
@@ -90,22 +106,28 @@ class RelayerStakingManager:
 
         if current_timestamp >= relayer.unbonding_start_timestamp + self.unbonding_period_seconds:
             # In a real system, funds would be transferred back to the relayer here.
-            print(f"Relayer {relayer_address} unbonding finalized. {relayer.bonded_amount} released.")
+            print(
+                f"Relayer {relayer_address} unbonding finalized. {relayer.bonded_amount} released."
+            )
             relayer.status = "inactive"
             # Remove from slashing manager as well
             self.slashing_manager.remove_validator_stake(relayer_address)
         else:
-            remaining_time = (relayer.unbonding_start_timestamp + self.unbonding_period_seconds) - current_timestamp
-            print(f"Relayer {relayer_address} unbonding not yet complete. Remaining: {remaining_time} seconds.")
+            remaining_time = (
+                relayer.unbonding_start_timestamp + self.unbonding_period_seconds
+            ) - current_timestamp
+            print(
+                f"Relayer {relayer_address} unbonding not yet complete. Remaining: {remaining_time} seconds."
+            )
 
     def slash_relayer(self, relayer_address: str, offense_type: str):
         relayer = self.relay_pool.get(relayer_address)
         if not relayer:
             raise ValueError(f"Relayer {relayer_address} not found in pool.")
-        
+
         print(f"Slashing relayer {relayer_address} for {offense_type}...")
         self.slashing_manager.report_malicious_behavior(relayer_address, offense_type)
-        
+
         # Update relayer's bonded amount based on slashing manager's deduction
         slashed_stake = self.slashing_manager.get_validator_stake(relayer_address)
         if slashed_stake:
@@ -114,22 +136,29 @@ class RelayerStakingManager:
                 relayer.status = "slashed"
                 print(f"Relayer {relayer_address} fully slashed and set to 'slashed' status.")
             else:
-                print(f"Relayer {relayer_address} bonded amount reduced to {relayer.bonded_amount}.")
+                print(
+                    f"Relayer {relayer_address} bonded amount reduced to {relayer.bonded_amount}."
+                )
         else:
-            print(f"Warning: Relayer {relayer_address} not found in slashing manager after slash attempt.")
+            print(
+                f"Warning: Relayer {relayer_address} not found in slashing manager after slash attempt."
+            )
 
     def get_relayer_status(self, relayer_address: str) -> str:
         relayer = self.relay_pool.get(relayer_address)
         return relayer.status if relayer else "not_found"
+
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
     # Setup SlashingManager
     slashing_manager = SlashingManager()
     # Add a new offense type for relayer slashing
-    SlashingManager.OFFENSE_PENALTIES["relayer_misbehavior"] = 0.30 # 30% slash
+    SlashingManager.OFFENSE_PENALTIES["relayer_misbehavior"] = 0.30  # 30% slash
 
-    staking_manager = RelayerStakingManager(slashing_manager, min_bond=1000, unbonding_period_seconds=5) # 5s unbonding for testing
+    staking_manager = RelayerStakingManager(
+        slashing_manager, min_bond=1000, unbonding_period_seconds=5
+    )  # 5s unbonding for testing
 
     relayer1_addr = "0xRelayer1"
     relayer2_addr = "0xRelayer2"
@@ -139,7 +168,7 @@ if __name__ == "__main__":
     staking_manager.bond_stake(relayer1_addr, 5000)
     staking_manager.bond_stake(relayer2_addr, 1000)
     try:
-        staking_manager.bond_stake(relayer3_addr, 500) # Should fail due to min_bond
+        staking_manager.bond_stake(relayer3_addr, 500)  # Should fail due to min_bond
     except ValueError as e:
         print(f"Error bonding relayer3 (expected): {e}")
     staking_manager.bond_stake(relayer3_addr, 2000)
@@ -161,7 +190,8 @@ if __name__ == "__main__":
 
     print("\n--- Waiting for unbonding period ---")
     import time
-    time.sleep(6) # Wait for 5 seconds + a bit
+
+    time.sleep(6)  # Wait for 5 seconds + a bit
 
     print("\n--- Finalizing unbonding ---")
     staking_manager.finalize_unbonding(relayer2_addr, int(datetime.now(timezone.utc).timestamp()))

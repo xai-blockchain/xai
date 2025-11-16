@@ -1,10 +1,15 @@
 from typing import List, Set, Tuple
 
+
 class PacketFilter:
     def __init__(self, default_allowed_ports: List[int] = None):
-        self.allowed_ports: Set[int] = set(default_allowed_ports) if default_allowed_ports else set()
+        self.allowed_ports: Set[int] = (
+            set(default_allowed_ports) if default_allowed_ports else set()
+        )
         self.blocked_ips: Set[str] = set()
-        print(f"PacketFilter initialized. Allowed ports: {self.allowed_ports}, Blocked IPs: {self.blocked_ips}.")
+        print(
+            f"PacketFilter initialized. Allowed ports: {self.allowed_ports}, Blocked IPs: {self.blocked_ips}."
+        )
 
     def add_allowed_port(self, port: int):
         """Adds a port to the list of allowed destination ports."""
@@ -37,15 +42,20 @@ class PacketFilter:
         Returns True if the packet is allowed, False if blocked.
         """
         if source_ip in self.blocked_ips:
-            print(f"Packet from {source_ip} to port {destination_port} BLOCKED: Source IP is blocked.")
+            print(
+                f"Packet from {source_ip} to port {destination_port} BLOCKED: Source IP is blocked."
+            )
             return False
-        
+
         if destination_port not in self.allowed_ports:
-            print(f"Packet from {source_ip} to port {destination_port} BLOCKED: Destination port is not allowed.")
+            print(
+                f"Packet from {source_ip} to port {destination_port} BLOCKED: Destination port is not allowed."
+            )
             return False
-        
+
         print(f"Packet from {source_ip} to port {destination_port} ALLOWED.")
         return True
+
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
@@ -66,13 +76,13 @@ if __name__ == "__main__":
     filter.filter_packet("10.0.0.5", 30303)
 
     # Blocked Port
-    filter.filter_packet("1.2.3.4", 22) # SSH port, not allowed by default
+    filter.filter_packet("1.2.3.4", 22)  # SSH port, not allowed by default
     filter.filter_packet("9.9.9.9", 12345)
 
     # Add a new allowed port
     filter.add_allowed_port(22)
-    filter.filter_packet("1.2.3.4", 22) # Now allowed
+    filter.filter_packet("1.2.3.4", 22)  # Now allowed
 
     # Remove a blocked IP
     filter.remove_blocked_ip("192.168.1.100")
-    filter.filter_packet("192.168.1.100", 80) # Now allowed
+    filter.filter_packet("192.168.1.100", 80)  # Now allowed

@@ -15,7 +15,7 @@ import os
 import time
 
 # Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'core'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "core"))
 
 from token_burning_engine import TokenBurningEngine, ServiceType, SERVICE_PRICES_USD
 
@@ -23,6 +23,8 @@ from token_burning_engine import TokenBurningEngine, ServiceType, SERVICE_PRICES
 @pytest.fixture
 def burning_engine(tmp_path):
     return TokenBurningEngine(data_dir=str(tmp_path))
+
+
 from blockchain import Blockchain
 from wallet import Wallet
 
@@ -55,27 +57,25 @@ class TestServiceConsumption:
         engine = burning_engine
 
         result = engine.consume_service(
-            wallet_address="AIXN123...",
-            service_type=ServiceType.AI_QUERY_SIMPLE
+            wallet_address="AIXN123...", service_type=ServiceType.AI_QUERY_SIMPLE
         )
 
-        assert result['success'] == True, "Service consumption should succeed"
-        assert 'burn_id' in result, "Should have burn ID"
-        assert 'burned_xai' in result, "Should have burned amount"
-        assert 'to_miners_xai' in result, "Should have miner amount"
+        assert result["success"] == True, "Service consumption should succeed"
+        assert "burn_id" in result, "Should have burn ID"
+        assert "burned_xai" in result, "Should have burned amount"
+        assert "to_miners_xai" in result, "Should have miner amount"
 
     def test_burn_distribution(self, burning_engine):
         """Test 50/50 burn/miner distribution"""
         engine = burning_engine
 
         result = engine.consume_service(
-            wallet_address="AIXN123...",
-            service_type=ServiceType.AI_QUERY_SIMPLE
+            wallet_address="AIXN123...", service_type=ServiceType.AI_QUERY_SIMPLE
         )
 
-        total = result['total_cost_xai']
-        burned = result['burned_xai']
-        to_miners = result['to_miners_xai']
+        total = result["total_cost_xai"]
+        burned = result["burned_xai"]
+        to_miners = result["to_miners_xai"]
 
         # Should be 50/50 split
         assert abs(burned - total * 0.50) < 0.0001, "Burn should be 50%"
@@ -110,15 +110,14 @@ class TestBurnStatistics:
 
         # Consume a service
         engine.consume_service(
-            wallet_address="AIXN123...",
-            service_type=ServiceType.AI_QUERY_SIMPLE
+            wallet_address="AIXN123...", service_type=ServiceType.AI_QUERY_SIMPLE
         )
 
         stats = engine.get_anonymous_stats()
 
-        assert stats['total_burned'] > 0, "Should have burned XAI"
-        assert stats['total_to_miners'] > 0, "Should have miner rewards"
-        assert stats['total_services_used'] == 1, "Should have 1 service used"
+        assert stats["total_burned"] > 0, "Should have burned XAI"
+        assert stats["total_to_miners"] > 0, "Should have miner rewards"
+        assert stats["total_services_used"] == 1, "Should have 1 service used"
 
     def test_multiple_burns(self, burning_engine):
         """Test tracking multiple burns"""
@@ -127,12 +126,11 @@ class TestBurnStatistics:
         # Consume multiple services
         for i in range(5):
             engine.consume_service(
-                wallet_address="AIXN123...",
-                service_type=ServiceType.AI_QUERY_SIMPLE
+                wallet_address="AIXN123...", service_type=ServiceType.AI_QUERY_SIMPLE
             )
 
         stats = engine.get_anonymous_stats()
-        assert stats['total_services_used'] == 5, "Should have 5 services used"
+        assert stats["total_services_used"] == 5, "Should have 5 services used"
 
     def test_service_usage_breakdown(self, burning_engine):
         """Test service usage breakdown"""
@@ -143,10 +141,10 @@ class TestBurnStatistics:
         engine.consume_service("AIXN123...", ServiceType.AI_CODE_REVIEW)
 
         service_stats = engine.get_burn_by_service(ServiceType.AI_QUERY_SIMPLE)
-        assert service_stats['count'] == 1, "Should have 1 simple query"
+        assert service_stats["count"] == 1, "Should have 1 simple query"
 
         service_stats2 = engine.get_burn_by_service(ServiceType.AI_CODE_REVIEW)
-        assert service_stats2['count'] == 1, "Should have 1 code review"
+        assert service_stats2["count"] == 1, "Should have 1 code review"
 
 
 class TestAnonymity:
@@ -157,28 +155,26 @@ class TestAnonymity:
         engine = burning_engine
 
         result = engine.consume_service(
-            wallet_address="AIXN123...",
-            service_type=ServiceType.AI_QUERY_SIMPLE
+            wallet_address="AIXN123...", service_type=ServiceType.AI_QUERY_SIMPLE
         )
 
         # Should have UTC timestamp
-        assert 'timestamp_utc' in result, "Should have UTC timestamp"
+        assert "timestamp_utc" in result, "Should have UTC timestamp"
 
         # Should NOT have personal identifiers
-        assert 'ip_address' not in result, "Should not have IP"
-        assert 'user_name' not in result, "Should not have user name"
-        assert 'location' not in result, "Should not have location"
+        assert "ip_address" not in result, "Should not have IP"
+        assert "user_name" not in result, "Should not have user name"
+        assert "location" not in result, "Should not have location"
 
     def test_utc_timestamps(self, burning_engine):
         """Test that timestamps are in UTC"""
         engine = burning_engine
 
         result = engine.consume_service(
-            wallet_address="AIXN123...",
-            service_type=ServiceType.AI_QUERY_SIMPLE
+            wallet_address="AIXN123...", service_type=ServiceType.AI_QUERY_SIMPLE
         )
 
-        timestamp = result['timestamp_utc']
+        timestamp = result["timestamp_utc"]
 
         # Should be reasonable Unix timestamp
         assert timestamp > 1700000000, "Should be recent timestamp"
@@ -195,8 +191,7 @@ class TestBurnHistory:
         # Create some burns
         for i in range(3):
             engine.consume_service(
-                wallet_address="AIXN123...",
-                service_type=ServiceType.AI_QUERY_SIMPLE
+                wallet_address="AIXN123...", service_type=ServiceType.AI_QUERY_SIMPLE
             )
 
         recent = engine.get_recent_burns(limit=10)
@@ -207,18 +202,17 @@ class TestBurnHistory:
         engine = burning_engine
 
         engine.consume_service(
-            wallet_address="AIXN123...",
-            service_type=ServiceType.AI_QUERY_SIMPLE
+            wallet_address="AIXN123...", service_type=ServiceType.AI_QUERY_SIMPLE
         )
 
         recent = engine.get_recent_burns(limit=1)
         burn = recent[0]
 
-        assert 'burn_id' in burn, "Should have burn ID"
-        assert 'wallet_address' in burn, "Should have wallet address"
-        assert 'service_type' in burn, "Should have service type"
-        assert 'burned_xai' not in burn or 'burn_amount' in burn, "Should have burn amount"
-        assert 'timestamp_utc' in burn, "Should have UTC timestamp"
+        assert "burn_id" in burn, "Should have burn ID"
+        assert "wallet_address" in burn, "Should have wallet address"
+        assert "service_type" in burn, "Should have service type"
+        assert "burned_xai" not in burn or "burn_amount" in burn, "Should have burn amount"
+        assert "timestamp_utc" in burn, "Should have UTC timestamp"
 
 
 class TestDevelopmentFunding:
@@ -229,21 +223,20 @@ class TestDevelopmentFunding:
         engine = burning_engine
 
         result = engine.consume_service(
-            wallet_address="AIXN123...",
-            service_type=ServiceType.AI_QUERY_SIMPLE
+            wallet_address="AIXN123...", service_type=ServiceType.AI_QUERY_SIMPLE
         )
 
         # Should have burn and miner amounts
-        assert 'burned_xai' in result
-        assert 'to_miners_xai' in result
+        assert "burned_xai" in result
+        assert "to_miners_xai" in result
 
         # Should NOT have treasury amount
-        assert 'to_treasury_xai' not in result or result.get('to_treasury_xai') == 0
+        assert "to_treasury_xai" not in result or result.get("to_treasury_xai") == 0
 
         # Verify 50/50 split (no third party)
-        total = result['total_cost_xai']
-        burned = result['burned_xai']
-        to_miners = result['to_miners_xai']
+        total = result["total_cost_xai"]
+        burned = result["burned_xai"]
+        to_miners = result["to_miners_xai"]
 
         assert abs((burned + to_miners) - total) < 0.0001, "Burn + miners should equal total"
 
@@ -254,10 +247,13 @@ class TestDevelopmentFunding:
         stats = engine.get_anonymous_stats()
 
         # Should mention development funding source
-        assert 'development_funding' in stats or 'distribution' in stats
-        if 'development_funding' in stats:
-            assert 'Pre-mine' in stats['development_funding'] or 'AI API' in stats['development_funding']
+        assert "development_funding" in stats or "distribution" in stats
+        if "development_funding" in stats:
+            assert (
+                "Pre-mine" in stats["development_funding"]
+                or "AI API" in stats["development_funding"]
+            )
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

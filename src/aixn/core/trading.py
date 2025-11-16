@@ -10,10 +10,10 @@ from aixn.core.trading import (
 )
 
 __all__ = [
-    'SwapOrderType',
-    'TradeOrder',
-    'OrderStatus',
-    'TradeMatch',
-    'TradeMatchStatus',
-    'TradeManager',
+    "SwapOrderType",
+    "TradeOrder",
+    "OrderStatus",
+    "TradeMatch",
+    "TradeMatchStatus",
+    "TradeManager",
 ]

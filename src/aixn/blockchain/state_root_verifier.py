@@ -1,5 +1,6 @@
 from typing import Dict, Any, List, Tuple
-from src.aixn.blockchain.merkle import MerkleTree # Import MerkleTree
+from src.aixn.blockchain.merkle import MerkleTree  # Import MerkleTree
+
 
 class StateRootVerifier:
     def __init__(self):
@@ -15,7 +16,7 @@ class StateRootVerifier:
             "SourceChainB": {
                 50: "x1y2z3w4e5r6t7y8u9i0o1p2a3s4d5f6g7h8j9k0l1z2x3c4v5b6n7m8q9w0e1",
                 51: "y2z3w4e5r6t7y8u9i0o1p2a3s4d5f6g7h8j9k0l1z2x3c4v5b6n7m8q9w0e2",
-            }
+            },
         }
 
     def add_trusted_state_root(self, chain_id: str, block_number: int, state_root: str):
@@ -23,7 +24,9 @@ class StateRootVerifier:
         if chain_id not in self.trusted_state_roots:
             self.trusted_state_roots[chain_id] = {}
         self.trusted_state_roots[chain_id][block_number] = state_root
-        print(f"Added trusted state root for {chain_id} at block {block_number}: {state_root[:10]}...")
+        print(
+            f"Added trusted state root for {chain_id} at block {block_number}: {state_root[:10]}..."
+        )
 
     def get_state_root(self, chain_id: str, block_number: int) -> str:
         """Retrieves a trusted state root for a given chain and block number."""
@@ -35,8 +38,9 @@ class StateRootVerifier:
             raise ValueError(f"No trusted state root found for {chain_id} at block {block_number}")
         return state_root
 
-    def verify_inclusion(self, data: Any, merkle_proof: List[Tuple[str, str]],
-                         chain_id: str, block_number: int) -> bool:
+    def verify_inclusion(
+        self, data: Any, merkle_proof: List[Tuple[str, str]], chain_id: str, block_number: int
+    ) -> bool:
         """
         Verifies that a piece of data is included in the state of a source chain
         at a specific block number, using a Merkle proof and a trusted state root.
@@ -50,11 +54,14 @@ class StateRootVerifier:
         is_included = MerkleTree.verify_merkle_proof(data, trusted_root, merkle_proof)
 
         if is_included:
-            print(f"Data successfully verified for inclusion in {chain_id} at block {block_number}.")
+            print(
+                f"Data successfully verified for inclusion in {chain_id} at block {block_number}."
+            )
         else:
             print(f"Data FAILED verification for inclusion in {chain_id} at block {block_number}.")
-        
+
         return is_included
+
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
@@ -62,20 +69,22 @@ if __name__ == "__main__":
 
     # Simulate some data on SourceChainA at block 101
     transaction_data = {"from": "Alice", "to": "Bob", "amount": 50, "asset": "TokenX"}
-    
+
     # To generate a Merkle proof, we need a Merkle tree from the source chain's state
     # For this example, let's assume the state root at block 101 was built from these leaves:
     mock_source_chain_leaves = [
         {"from": "Charlie", "to": "David", "amount": 100, "asset": "TokenY"},
-        transaction_data, # Our transaction is included here
+        transaction_data,  # Our transaction is included here
         {"from": "Eve", "to": "Frank", "amount": 20, "asset": "TokenZ"},
     ]
     mock_merkle_tree = MerkleTree(mock_source_chain_leaves)
-    
+
     # Ensure the mock_merkle_tree's root matches the trusted_state_roots for block 101
     # In a real system, this would be a critical check.
     if mock_merkle_tree.get_root() != verifier.get_state_root("SourceChainA", 101):
-        print("Warning: Mock Merkle tree root does not match trusted state root. Adjusting for example.")
+        print(
+            "Warning: Mock Merkle tree root does not match trusted state root. Adjusting for example."
+        )
         # For the example to work, we'll update the trusted root to match our mock tree
         verifier.add_trusted_state_root("SourceChainA", 101, mock_merkle_tree.get_root())
 
@@ -86,17 +95,22 @@ if __name__ == "__main__":
         data=transaction_data,
         merkle_proof=merkle_proof_for_tx,
         chain_id="SourceChainA",
-        block_number=101
+        block_number=101,
     )
     print(f"Is transaction validly included? {is_valid_tx}")
 
     print("\n--- Verifying a tampered transaction ---")
-    tampered_transaction_data = {"from": "Alice", "to": "Bob", "amount": 51, "asset": "TokenX"} # Tampered amount
+    tampered_transaction_data = {
+        "from": "Alice",
+        "to": "Bob",
+        "amount": 51,
+        "asset": "TokenX",
+    }  # Tampered amount
     is_tampered_tx_valid = verifier.verify_inclusion(
         data=tampered_transaction_data,
-        merkle_proof=merkle_proof_for_tx, # Same proof, but data is different
+        merkle_proof=merkle_proof_for_tx,  # Same proof, but data is different
         chain_id="SourceChainA",
-        block_number=101
+        block_number=101,
     )
     print(f"Is tampered transaction validly included? {is_tampered_tx_valid}")
 
@@ -107,7 +121,7 @@ if __name__ == "__main__":
             data=unknown_data,
             merkle_proof=[],
             chain_id="SourceChainA",
-            block_number=999 # Unknown block
+            block_number=999,  # Unknown block
         )
     except ValueError as e:
         print(f"Error (expected): {e}")

@@ -4,9 +4,12 @@ from functools import wraps
 
 RBAC_CONFIG_FILE = "rbac_config.json"
 
+
 class RBAC:
     def __init__(self, config_file=RBAC_CONFIG_FILE):
-        self.config_file = os.path.join("config", config_file) # Store config in the 'config' directory
+        self.config_file = os.path.join(
+            "config", config_file
+        )  # Store config in the 'config' directory
         self.roles = {}
         self.user_roles = {}
         self._load_config()
@@ -22,9 +25,9 @@ class RBAC:
             self.roles = {
                 "admin": ["create_node", "register_peer", "manage_users", "manage_roles"],
                 "validator": ["validate_block", "propose_block"],
-                "user": ["send_transaction", "view_balance"]
+                "user": ["send_transaction", "view_balance"],
             }
-            self.user_roles = {} # No users assigned by default
+            self.user_roles = {}  # No users assigned by default
             self._save_config()
 
     def _save_config(self):
@@ -68,10 +71,15 @@ class RBAC:
             @wraps(func)
             def wrapper(user_id, *args, **kwargs):
                 if not self.has_permission(user_id, permission):
-                    raise PermissionError(f"User '{user_id}' does not have permission '{permission}'.")
+                    raise PermissionError(
+                        f"User '{user_id}' does not have permission '{permission}'."
+                    )
                 return func(user_id, *args, **kwargs)
+
             return wrapper
+
         return decorator
+
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
@@ -80,11 +88,17 @@ if __name__ == "__main__":
     # Assign a user to a role
     print("Assigning 'admin_user' to 'admin' role...")
     rbac_manager.assign_role("admin_user_pubkey_hex", "admin")
-    print(f"Permissions for admin_user: {rbac_manager.get_user_permissions('admin_user_pubkey_hex')}")
+    print(
+        f"Permissions for admin_user: {rbac_manager.get_user_permissions('admin_user_pubkey_hex')}"
+    )
 
     # Check permissions
-    print(f"Admin user has 'create_node' permission: {rbac_manager.has_permission('admin_user_pubkey_hex', 'create_node')}")
-    print(f"Admin user has 'send_transaction' permission: {rbac_manager.has_permission('admin_user_pubkey_hex', 'send_transaction')}")
+    print(
+        f"Admin user has 'create_node' permission: {rbac_manager.has_permission('admin_user_pubkey_hex', 'create_node')}"
+    )
+    print(
+        f"Admin user has 'send_transaction' permission: {rbac_manager.has_permission('admin_user_pubkey_hex', 'send_transaction')}"
+    )
 
     # Try to use a permission-protected function
     @rbac_manager.permission_required("create_node")
@@ -108,7 +122,9 @@ if __name__ == "__main__":
     # Assign a 'user' role and test
     print("\nAssigning 'regular_user' to 'user' role...")
     rbac_manager.assign_role("regular_user_pubkey_hex", "user")
-    print(f"Permissions for regular_user: {rbac_manager.get_user_permissions('regular_user_pubkey_hex')}")
+    print(
+        f"Permissions for regular_user: {rbac_manager.get_user_permissions('regular_user_pubkey_hex')}"
+    )
 
     try:
         create_node_action("regular_user_pubkey_hex", "node_beta")
@@ -123,4 +139,6 @@ if __name__ == "__main__":
     # Remove a role
     print("\nRemoving 'admin' role from 'admin_user'...")
     rbac_manager.remove_role("admin_user_pubkey_hex", "admin")
-    print(f"Permissions for admin_user after removal: {rbac_manager.get_user_permissions('admin_user_pubkey_hex')}")
+    print(
+        f"Permissions for admin_user after removal: {rbac_manager.get_user_permissions('admin_user_pubkey_hex')}"
+    )

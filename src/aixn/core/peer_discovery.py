@@ -42,7 +42,8 @@ class PeerInfo:
     def _extract_ip(self, url: str) -> str:
         """Extract IP address from URL"""
         import re
-        ip_match = re.search(r'(\d+\.\d+\.\d+\.\d+)', url)
+
+        ip_match = re.search(r"(\d+\.\d+\.\d+\.\d+)", url)
         return ip_match.group(1) if ip_match else "unknown"
 
     def update_success(self, response_time: float = None):
@@ -89,18 +90,18 @@ class PeerInfo:
     def to_dict(self) -> dict:
         """Convert to dictionary"""
         return {
-            'url': self.url,
-            'ip_address': self.ip_address,
-            'last_seen': self.last_seen,
-            'quality_score': self.quality_score,
-            'reliability': self.get_reliability(),
-            'avg_response_time': self.get_avg_response_time(),
-            'uptime_hours': self.get_uptime_hours(),
-            'success_count': self.success_count,
-            'failure_count': self.failure_count,
-            'is_bootstrap': self.is_bootstrap,
-            'version': self.version,
-            'chain_height': self.chain_height
+            "url": self.url,
+            "ip_address": self.ip_address,
+            "last_seen": self.last_seen,
+            "quality_score": self.quality_score,
+            "reliability": self.get_reliability(),
+            "avg_response_time": self.get_avg_response_time(),
+            "uptime_hours": self.get_uptime_hours(),
+            "success_count": self.success_count,
+            "failure_count": self.failure_count,
+            "is_bootstrap": self.is_bootstrap,
+            "version": self.version,
+            "chain_height": self.chain_height,
         }
 
 
@@ -144,7 +145,7 @@ class BootstrapNodes:
         network_map = {
             "mainnet": cls.MAINNET_SEEDS,
             "testnet": cls.TESTNET_SEEDS,
-            "devnet": cls.DEVNET_SEEDS
+            "devnet": cls.DEVNET_SEEDS,
         }
         return network_map.get(network_type.lower(), cls.MAINNET_SEEDS)
 
@@ -165,14 +166,11 @@ class PeerDiscoveryProtocol:
             List of peer URLs or None if failed
         """
         try:
-            response = requests.get(
-                f"{peer_url}/peers/list",
-                timeout=timeout
-            )
+            response = requests.get(f"{peer_url}/peers/list", timeout=timeout)
 
             if response.status_code == 200:
                 data = response.json()
-                return data.get('peers', [])
+                return data.get("peers", [])
 
         except Exception as e:
             print(f"[PeerDiscovery] Failed to get peers from {peer_url}: {e}")
@@ -194,9 +192,7 @@ class PeerDiscoveryProtocol:
         """
         try:
             response = requests.post(
-                f"{peer_url}/peers/announce",
-                json={'peer_url': my_url},
-                timeout=timeout
+                f"{peer_url}/peers/announce", json={"peer_url": my_url}, timeout=timeout
             )
 
             return response.status_code == 200
@@ -220,10 +216,7 @@ class PeerDiscoveryProtocol:
         """
         try:
             start = time.time()
-            response = requests.get(
-                f"{peer_url}/",
-                timeout=timeout
-            )
+            response = requests.get(f"{peer_url}/", timeout=timeout)
             response_time = time.time() - start
 
             return response.status_code == 200, response_time
@@ -244,10 +237,7 @@ class PeerDiscoveryProtocol:
             Peer info dict or None
         """
         try:
-            response = requests.get(
-                f"{peer_url}/stats",
-                timeout=timeout
-            )
+            response = requests.get(f"{peer_url}/stats", timeout=timeout)
 
             if response.status_code == 200:
                 return response.json()
@@ -273,7 +263,7 @@ class PeerDiversityManager:
         Returns:
             IP prefix string
         """
-        parts = ip_address.split('.')
+        parts = ip_address.split(".")
         if prefix_length == 16 and len(parts) >= 2:
             return f"{parts[0]}.{parts[1]}"
         elif prefix_length == 24 and len(parts) >= 3:
@@ -314,9 +304,7 @@ class PeerDiversityManager:
 
     @staticmethod
     def select_diverse_peers(
-        peers: List[PeerInfo],
-        count: int,
-        prefer_quality: bool = True
+        peers: List[PeerInfo], count: int, prefer_quality: bool = True
     ) -> List[PeerInfo]:
         """
         Select diverse set of peers
@@ -381,7 +369,7 @@ class PeerDiscoveryManager:
         network_type: str = "mainnet",
         my_url: str = None,
         max_peers: int = 50,
-        discovery_interval: int = 300  # 5 minutes
+        discovery_interval: int = 300,  # 5 minutes
     ):
         """
         Initialize peer discovery manager
@@ -516,7 +504,8 @@ class PeerDiscoveryManager:
 
         # Get available peers (not already connected)
         available = [
-            peer for url, peer in self.known_peers.items()
+            peer
+            for url, peer in self.known_peers.items()
             if url not in self.connected_peers and not peer.is_dead()
         ]
 
@@ -524,11 +513,7 @@ class PeerDiscoveryManager:
             return []
 
         # Select diverse, high-quality peers
-        selected = PeerDiversityManager.select_diverse_peers(
-            available,
-            count,
-            prefer_quality=True
-        )
+        selected = PeerDiversityManager.select_diverse_peers(available, count, prefer_quality=True)
 
         connected = []
 
@@ -558,10 +543,7 @@ class PeerDiscoveryManager:
         Returns:
             Number of peers removed
         """
-        dead_peers = [
-            url for url, peer in self.known_peers.items()
-            if peer.is_dead(timeout)
-        ]
+        dead_peers = [url for url, peer in self.known_peers.items() if peer.is_dead(timeout)]
 
         for url in dead_peers:
             # Disconnect if connected
@@ -607,16 +589,10 @@ class PeerDiscoveryManager:
         connected = list(self.connected_peers)
 
         # Add best known peers
-        other_peers = [
-            url for url in self.known_peers.keys()
-            if url not in self.connected_peers
-        ]
+        other_peers = [url for url in self.known_peers.keys() if url not in self.connected_peers]
 
         # Sort by quality
-        other_peers.sort(
-            key=lambda url: self.known_peers[url].quality_score,
-            reverse=True
-        )
+        other_peers.sort(key=lambda url: self.known_peers[url].quality_score, reverse=True)
 
         # Return up to 50 peers
         return (connected + other_peers)[:50]
@@ -669,10 +645,7 @@ class PeerDiscoveryManager:
 
         # Start background discovery
         self.is_running = True
-        self.discovery_thread = threading.Thread(
-            target=self._discovery_loop,
-            daemon=True
-        )
+        self.discovery_thread = threading.Thread(target=self._discovery_loop, daemon=True)
         self.discovery_thread.start()
 
         print("[PeerDiscovery] Peer discovery service started")
@@ -697,26 +670,26 @@ class PeerDiscoveryManager:
         )
 
         connected_peers = [
-            self.known_peers[url] for url in self.connected_peers
-            if url in self.known_peers
+            self.known_peers[url] for url in self.connected_peers if url in self.known_peers
         ]
 
         avg_quality = (
             sum(p.quality_score for p in connected_peers) / len(connected_peers)
-            if connected_peers else 0
+            if connected_peers
+            else 0
         )
 
         return {
-            'network_type': self.network_type,
-            'connected_peers': len(self.connected_peers),
-            'known_peers': len(self.known_peers),
-            'max_peers': self.max_peers,
-            'diversity_score': diversity_score,
-            'avg_peer_quality': avg_quality,
-            'total_discoveries': self.total_discoveries,
-            'total_connections': self.total_connections,
-            'total_failed_connections': self.total_failed_connections,
-            'is_running': self.is_running
+            "network_type": self.network_type,
+            "connected_peers": len(self.connected_peers),
+            "known_peers": len(self.known_peers),
+            "max_peers": self.max_peers,
+            "diversity_score": diversity_score,
+            "avg_peer_quality": avg_quality,
+            "total_discoveries": self.total_discoveries,
+            "total_connections": self.total_connections,
+            "total_failed_connections": self.total_failed_connections,
+            "is_running": self.is_running,
         }
 
     def get_peer_details(self) -> List[dict]:
@@ -733,73 +706,48 @@ def setup_peer_discovery_api(app, node):
         node: BlockchainNode instance
     """
 
-    @app.route('/peers/list', methods=['GET'])
+    @app.route("/peers/list", methods=["GET"])
     def get_peer_list():
         """Get list of known peers (for peer exchange)"""
-        if hasattr(node, 'peer_discovery_manager'):
+        if hasattr(node, "peer_discovery_manager"):
             peers = node.peer_discovery_manager.get_peer_list()
-            return {
-                'success': True,
-                'count': len(peers),
-                'peers': peers
-            }
+            return {"success": True, "count": len(peers), "peers": peers}
         else:
-            return {
-                'success': True,
-                'count': len(node.peers),
-                'peers': list(node.peers)
-            }
+            return {"success": True, "count": len(node.peers), "peers": list(node.peers)}
 
-    @app.route('/peers/announce', methods=['POST'])
+    @app.route("/peers/announce", methods=["POST"])
     def announce_peer():
         """Accept peer announcement"""
         data = request.json
 
-        if 'peer_url' not in data:
-            return {'error': 'Missing peer_url'}, 400
+        if "peer_url" not in data:
+            return {"error": "Missing peer_url"}, 400
 
-        peer_url = data['peer_url']
+        peer_url = data["peer_url"]
 
         # Add peer using node's add_peer method (includes security checks)
         if node.add_peer(peer_url):
-            return {
-                'success': True,
-                'message': f'Peer {peer_url} added'
-            }
+            return {"success": True, "message": f"Peer {peer_url} added"}
         else:
-            return {
-                'success': False,
-                'message': 'Peer rejected by security checks'
-            }, 403
+            return {"success": False, "message": "Peer rejected by security checks"}, 403
 
-    @app.route('/peers/discovery/stats', methods=['GET'])
+    @app.route("/peers/discovery/stats", methods=["GET"])
     def get_discovery_stats():
         """Get peer discovery statistics"""
-        if hasattr(node, 'peer_discovery_manager'):
+        if hasattr(node, "peer_discovery_manager"):
             stats = node.peer_discovery_manager.get_stats()
-            return {
-                'success': True,
-                'stats': stats
-            }
+            return {"success": True, "stats": stats}
         else:
-            return {
-                'error': 'Peer discovery not enabled'
-            }, 503
+            return {"error": "Peer discovery not enabled"}, 503
 
-    @app.route('/peers/discovery/details', methods=['GET'])
+    @app.route("/peers/discovery/details", methods=["GET"])
     def get_peer_details():
         """Get detailed peer information"""
-        if hasattr(node, 'peer_discovery_manager'):
+        if hasattr(node, "peer_discovery_manager"):
             details = node.peer_discovery_manager.get_peer_details()
-            return {
-                'success': True,
-                'count': len(details),
-                'peers': details
-            }
+            return {"success": True, "count": len(details), "peers": details}
         else:
-            return {
-                'error': 'Peer discovery not enabled'
-            }, 503
+            return {"error": "Peer discovery not enabled"}, 503
 
     print("[PeerDiscovery] API endpoints registered")
 
@@ -810,9 +758,7 @@ if __name__ == "__main__":
 
     # Create discovery manager
     manager = PeerDiscoveryManager(
-        network_type="testnet",
-        my_url="http://127.0.0.1:5555",
-        max_peers=20
+        network_type="testnet", my_url="http://127.0.0.1:5555", max_peers=20
     )
 
     # Start discovery

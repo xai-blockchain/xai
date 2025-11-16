@@ -18,27 +18,29 @@ from aixn.core.anonymous_logger import log_info
 class FiatUnlockGovernance:
     def __init__(self, data_dir: str):
         self.data_dir = data_dir
-        self.votes_file = os.path.join(self.data_dir, 'fiat_unlock_votes.json')
+        self.votes_file = os.path.join(self.data_dir, "fiat_unlock_votes.json")
         os.makedirs(self.data_dir, exist_ok=True)
         self.votes: Dict[str, bool] = {}
         self._load_votes()
 
     def _load_votes(self):
         if os.path.exists(self.votes_file):
-            with open(self.votes_file, 'r') as f:
+            with open(self.votes_file, "r") as f:
                 try:
                     self.votes = json.load(f)
                 except json.JSONDecodeError:
                     self.votes = {}
 
     def _save_votes(self):
-        with open(self.votes_file, 'w') as f:
+        with open(self.votes_file, "w") as f:
             json.dump(self.votes, f, indent=2)
 
     def can_start_voting(self) -> bool:
         return datetime.now(timezone.utc) >= Config.FIAT_UNLOCK_GOVERNANCE_START
 
-    def cast_vote(self, address: str, support: bool, reason: Optional[str] = None) -> Dict[str, object]:
+    def cast_vote(
+        self, address: str, support: bool, reason: Optional[str] = None
+    ) -> Dict[str, object]:
         if not self.can_start_voting():
             raise ValueError("Voting window does not open until March 12, 2026 UTC")
 

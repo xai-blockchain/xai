@@ -37,39 +37,39 @@ def create_mock_blockchain(num_blocks: int = 5) -> dict:
 
     for i in range(num_blocks):
         block = {
-            'index': i,
-            'timestamp': time.time(),
-            'transactions': [
+            "index": i,
+            "timestamp": time.time(),
+            "transactions": [
                 {
-                    'txid': f'tx_{i}_0',
-                    'sender': 'COINBASE' if i == 0 else f'sender_{i}',
-                    'recipient': f'recipient_{i}',
-                    'amount': 12.0,
-                    'fee': 0.0 if i == 0 else 0.24,
-                    'timestamp': time.time(),
-                    'signature': f'sig_{i}',
-                    'public_key': f'pubkey_{i}',
-                    'tx_type': 'normal',
-                    'nonce': i
+                    "txid": f"tx_{i}_0",
+                    "sender": "COINBASE" if i == 0 else f"sender_{i}",
+                    "recipient": f"recipient_{i}",
+                    "amount": 12.0,
+                    "fee": 0.0 if i == 0 else 0.24,
+                    "timestamp": time.time(),
+                    "signature": f"sig_{i}",
+                    "public_key": f"pubkey_{i}",
+                    "tx_type": "normal",
+                    "nonce": i,
                 }
             ],
-            'previous_hash': '0' if i == 0 else f'hash_{i-1}',
-            'merkle_root': f'merkle_{i}',
-            'nonce': i * 1000,
-            'hash': f'hash_{i}',
-            'difficulty': 4
+            "previous_hash": "0" if i == 0 else f"hash_{i-1}",
+            "merkle_root": f"merkle_{i}",
+            "nonce": i * 1000,
+            "hash": f"hash_{i}",
+            "difficulty": 4,
         }
         chain.append(block)
 
     return {
-        'chain': chain,
-        'pending_transactions': [],
-        'difficulty': 4,
-        'stats': {
-            'blocks': num_blocks,
-            'total_transactions': num_blocks,
-            'pending_transactions': 0
-        }
+        "chain": chain,
+        "pending_transactions": [],
+        "difficulty": 4,
+        "stats": {
+            "blocks": num_blocks,
+            "total_transactions": num_blocks,
+            "pending_transactions": 0,
+        },
     }
 
 
@@ -100,8 +100,8 @@ def test_save_and_load(storage):
     print(f"Load: {loaded} - {message}")
     assert loaded, "Load failed"
 
-    assert len(loaded_data['chain']) == len(blockchain_data['chain'])
-    assert loaded_data['chain'][-1]['hash'] == blockchain_data['chain'][-1]['hash']
+    assert len(loaded_data["chain"]) == len(blockchain_data["chain"])
+    assert loaded_data["chain"][-1]["hash"] == blockchain_data["chain"][-1]["hash"]
 
     print("[PASS] Save and load test PASSED")
 
@@ -117,14 +117,14 @@ def test_checksum_verification(storage):
     # Corrupt the blockchain file by modifying it directly
     blockchain_file = storage.blockchain_file
 
-    with open(blockchain_file, 'r') as f:
+    with open(blockchain_file, "r") as f:
         package = json.load(f)
 
     # Corrupt a block hash
-    package['blockchain']['chain'][2]['hash'] = 'CORRUPTED_HASH'
+    package["blockchain"]["chain"][2]["hash"] = "CORRUPTED_HASH"
 
     # Write corrupted data (without updating checksum)
-    with open(blockchain_file, 'w') as f:
+    with open(blockchain_file, "w") as f:
         json.dump(package, f, indent=2)
 
     # Try to load - should detect corruption
@@ -159,19 +159,21 @@ def test_backup_creation(storage):
     assert len(backups) > 0, "No backups found"
 
     for backup in backups:
-        print(f"  - {backup['filename']} (height: {backup['block_height']}, size: {backup['size_mb']:.2f} MB)")
+        print(
+            f"  - {backup['filename']} (height: {backup['block_height']}, size: {backup['size_mb']:.2f} MB)"
+        )
 
     # Find the backup with height 10 (the one we just created)
     backup_file = None
     for backup in backups:
-        if backup['block_height'] == 10:
-            backup_file = backup['filename']
+        if backup["block_height"] == 10:
+            backup_file = backup["filename"]
             break
 
     # If no 10-block backup found, use the most recent one
     if not backup_file:
         print("Warning: No 10-block backup found, using most recent")
-        backup_file = backups[0]['filename']
+        backup_file = backups[0]["filename"]
 
     # Restore from backup
     success, restored_data, message = storage.restore_from_backup(backup_file)
@@ -180,12 +182,14 @@ def test_backup_creation(storage):
 
     # Verify restored data (should be 10 blocks if we found the right backup)
     expected_blocks = 10
-    actual_blocks = len(restored_data['chain'])
+    actual_blocks = len(restored_data["chain"])
     print(f"Restored {actual_blocks} blocks (expected {expected_blocks})")
 
     # Only assert if we found the right backup
-    if backup_file and any(b['block_height'] == 10 for b in backups):
-        assert actual_blocks == expected_blocks, f"Expected {expected_blocks} blocks, got {actual_blocks}"
+    if backup_file and any(b["block_height"] == 10 for b in backups):
+        assert (
+            actual_blocks == expected_blocks
+        ), f"Expected {expected_blocks} blocks, got {actual_blocks}"
 
     print("[PASS] Backup creation and restoration test PASSED")
 
@@ -256,7 +260,7 @@ def test_atomic_write(storage):
     assert success, "Save failed"
 
     # Verify temp file doesn't exist (should be cleaned up)
-    temp_file = storage.blockchain_file + '.tmp'
+    temp_file = storage.blockchain_file + ".tmp"
     assert not os.path.exists(temp_file), "Temp file not cleaned up"
 
     print("[PASS] Atomic write test PASSED")
@@ -290,5 +294,3 @@ def test_concurrent_save(storage):
     assert all(results), "Some concurrent saves failed"
 
     print(f"[PASS] Thread-safe operations test PASSED ({len(results)} concurrent saves)")
-
-

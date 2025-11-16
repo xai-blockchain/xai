@@ -2,4 +2,4 @@
 
 from src.aixn.core.blockchain_ai_bridge import BlockchainAIBridge
 
-__all__ = ['BlockchainAIBridge']
+__all__ = ["BlockchainAIBridge"]

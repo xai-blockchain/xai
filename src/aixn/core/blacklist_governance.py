@@ -14,6 +14,7 @@ from enum import Enum
 
 class VoteOption(Enum):
     """Blacklist update policy options"""
+
     OPTIONAL = "optional"  # Keep optional forever
     MANDATORY_24H = "mandatory_24h"  # Mandatory every 24 hours
     MANDATORY_48H = "mandatory_48h"  # Mandatory every 48 hours
@@ -56,8 +57,7 @@ class BlacklistGovernanceVote:
         """Check if voting can start"""
         return time.time() >= self.vote_start_time
 
-    def cast_vote(self, node_id: str, vote: VoteOption,
-                  node_is_active: bool = True) -> Dict:
+    def cast_vote(self, node_id: str, vote: VoteOption, node_is_active: bool = True) -> Dict:
         """
         Cast vote (only active nodes can vote)
 
@@ -74,41 +74,34 @@ class BlacklistGovernanceVote:
         if not self.is_voting_active():
             if not self.can_vote_start():
                 return {
-                    'success': False,
-                    'error': 'VOTING_NOT_STARTED',
-                    'days_until_vote': (self.vote_start_time - time.time()) / 86400
+                    "success": False,
+                    "error": "VOTING_NOT_STARTED",
+                    "days_until_vote": (self.vote_start_time - time.time()) / 86400,
                 }
             else:
-                return {
-                    'success': False,
-                    'error': 'VOTING_ENDED'
-                }
+                return {"success": False, "error": "VOTING_ENDED"}
 
         # Check if already voted
         if node_id in self.votes:
             return {
-                'success': False,
-                'error': 'ALREADY_VOTED',
-                'previous_vote': self.votes[node_id].vote.value
+                "success": False,
+                "error": "ALREADY_VOTED",
+                "previous_vote": self.votes[node_id].vote.value,
             }
 
         # Check node eligibility (must be active)
         if not node_is_active:
             return {
-                'success': False,
-                'error': 'NODE_NOT_ACTIVE',
-                'message': 'Only nodes with 30+ days uptime can vote'
+                "success": False,
+                "error": "NODE_NOT_ACTIVE",
+                "message": "Only nodes with 30+ days uptime can vote",
             }
 
         # Record vote
         node_vote = NodeVote(node_id, vote, time.time())
         self.votes[node_id] = node_vote
 
-        return {
-            'success': True,
-            'vote_recorded': vote.value,
-            'signature': node_vote.signature
-        }
+        return {"success": True, "vote_recorded": vote.value, "signature": node_vote.signature}
 
     def get_vote_tally(self) -> Dict:
         """Get current vote counts"""
@@ -117,18 +110,18 @@ class BlacklistGovernanceVote:
             VoteOption.OPTIONAL: 0,
             VoteOption.MANDATORY_24H: 0,
             VoteOption.MANDATORY_48H: 0,
-            VoteOption.MANDATORY_WEEKLY: 0
+            VoteOption.MANDATORY_WEEKLY: 0,
         }
 
         for vote in self.votes.values():
             tally[vote.vote] += 1
 
         return {
-            'optional': tally[VoteOption.OPTIONAL],
-            'mandatory_24h': tally[VoteOption.MANDATORY_24H],
-            'mandatory_48h': tally[VoteOption.MANDATORY_48H],
-            'mandatory_weekly': tally[VoteOption.MANDATORY_WEEKLY],
-            'total_votes': len(self.votes)
+            "optional": tally[VoteOption.OPTIONAL],
+            "mandatory_24h": tally[VoteOption.MANDATORY_24H],
+            "mandatory_48h": tally[VoteOption.MANDATORY_48H],
+            "mandatory_weekly": tally[VoteOption.MANDATORY_WEEKLY],
+            "total_votes": len(self.votes),
         }
 
     def close_vote(self) -> Dict:
@@ -139,16 +132,13 @@ class BlacklistGovernanceVote:
         """
 
         if self.is_voting_active():
-            return {
-                'success': False,
-                'error': 'VOTING_STILL_ACTIVE'
-            }
+            return {"success": False, "error": "VOTING_STILL_ACTIVE"}
 
         if self.vote_closed:
             return {
-                'success': True,
-                'result': self.decided_result,
-                'message': 'Vote already closed'
+                "success": True,
+                "result": self.decided_result,
+                "message": "Vote already closed",
             }
 
         # Count votes
@@ -168,11 +158,11 @@ class BlacklistGovernanceVote:
         self.decided_result = winner
 
         return {
-            'success': True,
-            'result': winner.value if winner else 'optional',
-            'vote_counts': tally,
-            'winning_votes': max_votes,
-            'total_votes': tally['total_votes']
+            "success": True,
+            "result": winner.value if winner else "optional",
+            "vote_counts": tally,
+            "winning_votes": max_votes,
+            "total_votes": tally["total_votes"],
         }
 
     def get_current_policy(self) -> str:
@@ -182,11 +172,11 @@ class BlacklistGovernanceVote:
 
         # Before vote starts: Optional
         if current_time < self.vote_start_time:
-            return 'optional'
+            return "optional"
 
         # During voting: Still optional
         if self.is_voting_active():
-            return 'optional'
+            return "optional"
 
         # After voting: Use result
         if self.vote_closed and self.decided_result:
@@ -197,20 +187,20 @@ class BlacklistGovernanceVote:
         if self.decided_result:
             return self.decided_result.value
 
-        return 'optional'
+        return "optional"
 
     def get_update_frequency_hours(self) -> int:
         """Get required update frequency based on policy"""
 
         policy = self.get_current_policy()
 
-        if policy == 'optional':
+        if policy == "optional":
             return 0  # No requirement
-        elif policy == 'mandatory_24h':
+        elif policy == "mandatory_24h":
             return 24
-        elif policy == 'mandatory_48h':
+        elif policy == "mandatory_48h":
             return 48
-        elif policy == 'mandatory_weekly':
+        elif policy == "mandatory_weekly":
             return 168  # 7 days
         else:
             return 0

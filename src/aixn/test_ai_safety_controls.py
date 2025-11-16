@@ -33,7 +33,7 @@ def test_personal_ai_cancellation():
         user_address=user_address,
         operation="atomic_swap",
         ai_provider="anthropic",
-        ai_model="claude-opus-4"
+        ai_model="claude-opus-4",
     )
     print(f"   Registered: {result}")
 
@@ -112,10 +112,7 @@ def test_governance_task_pause():
     proposal_id = "prop_123"
 
     result = safety.register_governance_task(
-        task_id=task_id,
-        proposal_id=proposal_id,
-        task_type="code_implementation",
-        ai_count=3
+        task_id=task_id, proposal_id=proposal_id, task_type="code_implementation", ai_count=3
     )
     print(f"   Registered: {result}")
 
@@ -163,14 +160,10 @@ def test_global_emergency_stop():
     safety.register_personal_ai_request(
         "req_001", "XAI1user1", "atomic_swap", "anthropic", "claude-opus-4"
     )
-    safety.register_personal_ai_request(
-        "req_002", "XAI1user2", "smart_contract", "openai", "gpt-4"
-    )
+    safety.register_personal_ai_request("req_002", "XAI1user2", "smart_contract", "openai", "gpt-4")
 
     # Governance tasks
-    safety.register_governance_task(
-        "task_001", "prop_123", "code_implementation", 3
-    )
+    safety.register_governance_task("task_001", "prop_123", "code_implementation", 3)
 
     # Trading bots
     class MockBot:
@@ -194,7 +187,7 @@ def test_global_emergency_stop():
     stop_result = safety.activate_emergency_stop(
         reason=StopReason.SECURITY_THREAT,
         details="Test emergency stop activation",
-        activator="test_system"
+        activator="test_system",
     )
     print(f"\n   Result: {stop_result['message']}")
 
@@ -275,6 +268,7 @@ def main():
     except Exception as e:
         print(f"\n❌ TEST FAILED: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

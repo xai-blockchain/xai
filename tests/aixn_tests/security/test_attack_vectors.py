@@ -11,7 +11,7 @@ import time
 from unittest.mock import Mock, patch
 
 # Add core directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'core'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
 from blockchain import Blockchain, Transaction, Block
 from wallet import Wallet
@@ -410,12 +410,14 @@ class TestInflationAttack:
 
         # Inject utxo set that exceeds the cap
         overflow_amount = validator.max_supply + 1_000_000
-        bc.utxo_set["overflow_wallet"] = [{
-            'txid': 'overflow',
-            'amount': float(overflow_amount),
-            'spent': False,
-            'unlock_height': 0
-        }]
+        bc.utxo_set["overflow_wallet"] = [
+            {
+                "txid": "overflow",
+                "amount": float(overflow_amount),
+                "spent": False,
+                "unlock_height": 0,
+            }
+        ]
 
         is_valid, total = validator.validate_total_supply(bc)
 
@@ -493,5 +495,5 @@ class TestReplayAttack:
         assert tx1.txid != tx2.txid
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v', '-s'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "-s"])

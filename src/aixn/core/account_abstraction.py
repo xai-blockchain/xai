@@ -23,21 +23,21 @@ class EmbeddedWalletRecord:
 
     def to_dict(self) -> Dict[str, str]:
         return {
-            'alias': self.alias,
-            'contact': self.contact,
-            'wallet_name': self.wallet_name,
-            'address': self.address,
-            'secret_hash': self.secret_hash
+            "alias": self.alias,
+            "contact": self.contact,
+            "wallet_name": self.wallet_name,
+            "address": self.address,
+            "secret_hash": self.secret_hash,
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, str]) -> "EmbeddedWalletRecord":
         return cls(
-            alias=data['alias'],
-            contact=data['contact'],
-            wallet_name=data['wallet_name'],
-            address=data['address'],
-            secret_hash=data['secret_hash']
+            alias=data["alias"],
+            contact=data["contact"],
+            wallet_name=data["wallet_name"],
+            address=data["address"],
+            secret_hash=data["secret_hash"],
         )
 
 
@@ -63,14 +63,14 @@ class AccountAbstractionManager:
 
     def _load(self):
         if os.path.exists(self.records_file):
-            with open(self.records_file, 'r', encoding='utf-8') as f:
+            with open(self.records_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 for entry in data:
                     record = EmbeddedWalletRecord.from_dict(entry)
                     self.records[record.alias] = record
 
     def _save(self):
-        with open(self.records_file, 'w', encoding='utf-8') as f:
+        with open(self.records_file, "w", encoding="utf-8") as f:
             json.dump([rec.to_dict() for rec in self.records.values()], f, indent=2)
 
     def create_embedded_wallet(self, alias: str, contact: str, secret: str) -> EmbeddedWalletRecord:
@@ -85,7 +85,7 @@ class AccountAbstractionManager:
             contact=contact,
             wallet_name=wallet_name,
             address=wallet.address,
-            secret_hash=self._hash_secret(secret)
+            secret_hash=self._hash_secret(secret),
         )
         self.records[alias] = record
         self.sessions[alias] = secrets.token_hex(16)

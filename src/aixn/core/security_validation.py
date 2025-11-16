@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 
 
 # Security logger setup
-security_logger = logging.getLogger('aixn.security')
+security_logger = logging.getLogger("aixn.security")
 security_logger.setLevel(logging.INFO)
 
 # Create handler if not exists
@@ -27,14 +27,13 @@ if not security_logger.handlers:
     handler = logging.StreamHandler()
     handler.setLevel(logging.INFO)
     formatter = logging.Formatter(
-        '%(asctime)s - SECURITY - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        "%(asctime)s - SECURITY - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
     handler.setFormatter(formatter)
     security_logger.addHandler(handler)
 
 
-def log_security_event(event_type: str, details: Dict[str, Any], severity: str = 'INFO'):
+def log_security_event(event_type: str, details: Dict[str, Any], severity: str = "INFO"):
     """
     Log security-related events in structured format
 
@@ -44,19 +43,19 @@ def log_security_event(event_type: str, details: Dict[str, Any], severity: str =
         severity: Log level (INFO, WARNING, ERROR, CRITICAL)
     """
     log_entry = {
-        'timestamp': datetime.utcnow().isoformat(),
-        'event_type': event_type,
-        'severity': severity,
-        'details': details
+        "timestamp": datetime.utcnow().isoformat(),
+        "event_type": event_type,
+        "severity": severity,
+        "details": details,
     }
 
     log_message = json.dumps(log_entry)
 
-    if severity == 'CRITICAL':
+    if severity == "CRITICAL":
         security_logger.critical(log_message)
-    elif severity == 'ERROR':
+    elif severity == "ERROR":
         security_logger.error(log_message)
-    elif severity == 'WARNING':
+    elif severity == "WARNING":
         security_logger.warning(log_message)
     else:
         security_logger.info(log_message)
@@ -64,6 +63,7 @@ def log_security_event(event_type: str, details: Dict[str, Any], severity: str =
 
 class ValidationError(Exception):
     """Validation error - safe to expose to users"""
+
     pass
 
 
@@ -82,7 +82,7 @@ class SecurityValidator:
     MIN_AMOUNT = 0.00000001  # 1 satoshi equivalent
 
     # Address validation
-    VALID_PREFIXES = ['XAI', 'AIXN', 'TXAI']
+    VALID_PREFIXES = ["XAI", "AIXN", "TXAI"]
     MIN_ADDRESS_LENGTH = 40
     MAX_ADDRESS_LENGTH = 100
 
@@ -119,7 +119,7 @@ class SecurityValidator:
         if not (amount == amount):  # NaN check
             raise ValidationError(f"{field_name} cannot be NaN")
 
-        if amount == float('inf') or amount == float('-inf'):
+        if amount == float("inf") or amount == float("-inf"):
             raise ValidationError(f"{field_name} cannot be infinite")
 
         # Range validation
@@ -127,10 +127,14 @@ class SecurityValidator:
             raise ValidationError(f"{field_name} cannot be negative")
 
         if amount < SecurityValidator.MIN_AMOUNT and amount != 0:
-            raise ValidationError(f"{field_name} too small (minimum: {SecurityValidator.MIN_AMOUNT})")
+            raise ValidationError(
+                f"{field_name} too small (minimum: {SecurityValidator.MIN_AMOUNT})"
+            )
 
         if amount > SecurityValidator.MAX_TRANSACTION_AMOUNT:
-            raise ValidationError(f"{field_name} exceeds maximum ({SecurityValidator.MAX_TRANSACTION_AMOUNT})")
+            raise ValidationError(
+                f"{field_name} exceeds maximum ({SecurityValidator.MAX_TRANSACTION_AMOUNT})"
+            )
 
         # Precision check (max 8 decimal places)
         if round(amount, 8) != amount:
@@ -164,33 +168,37 @@ class SecurityValidator:
 
         # Length check
         if len(address) < SecurityValidator.MIN_ADDRESS_LENGTH:
-            raise ValidationError(f"{field_name} is too short (minimum {SecurityValidator.MIN_ADDRESS_LENGTH} characters)")
+            raise ValidationError(
+                f"{field_name} is too short (minimum {SecurityValidator.MIN_ADDRESS_LENGTH} characters)"
+            )
 
         if len(address) > SecurityValidator.MAX_ADDRESS_LENGTH:
-            raise ValidationError(f"{field_name} is too long (maximum {SecurityValidator.MAX_ADDRESS_LENGTH} characters)")
+            raise ValidationError(
+                f"{field_name} is too long (maximum {SecurityValidator.MAX_ADDRESS_LENGTH} characters)"
+            )
 
         # Injection pattern detection - SECURITY ENHANCEMENT
         dangerous_patterns = [
-            (r"['\";<>&|`$(){}]", 'sql_injection_chars'),  # SQL injection, command injection chars
-            (r"<script", 'xss_attempt'),           # XSS attempts
-            (r"javascript:", 'javascript_protocol'),       # JavaScript protocol
-            (r"\.\.\/", 'path_traversal'),           # Path traversal
-            (r"\\x[0-9a-fA-F]{2}", 'hex_escape'),  # Hex escape sequences
-            (r"%[0-9a-fA-F]{2}", 'url_encoding'),  # URL encoding
+            (r"['\";<>&|`$(){}]", "sql_injection_chars"),  # SQL injection, command injection chars
+            (r"<script", "xss_attempt"),  # XSS attempts
+            (r"javascript:", "javascript_protocol"),  # JavaScript protocol
+            (r"\.\.\/", "path_traversal"),  # Path traversal
+            (r"\\x[0-9a-fA-F]{2}", "hex_escape"),  # Hex escape sequences
+            (r"%[0-9a-fA-F]{2}", "url_encoding"),  # URL encoding
         ]
 
         for pattern, attack_type in dangerous_patterns:
             if re.search(pattern, address, re.IGNORECASE):
                 # Log security event
                 log_security_event(
-                    'injection_attempt_detected',
+                    "injection_attempt_detected",
                     {
-                        'field': field_name,
-                        'attack_type': attack_type,
-                        'input_length': len(address),
-                        'pattern_matched': pattern
+                        "field": field_name,
+                        "attack_type": attack_type,
+                        "input_length": len(address),
+                        "pattern_matched": pattern,
                     },
-                    severity='WARNING'
+                    severity="WARNING",
                 )
                 raise ValidationError(f"{field_name} contains invalid or dangerous characters")
 
@@ -209,9 +217,11 @@ class SecurityValidator:
         # Remove the prefix and check the rest is hexadecimal
         for prefix in SecurityValidator.VALID_PREFIXES:
             if address.startswith(prefix):
-                remainder = address[len(prefix):]
-                if not re.match(r'^[0-9a-fA-F]+$', remainder):
-                    raise ValidationError(f"{field_name} must contain only hexadecimal characters after the prefix")
+                remainder = address[len(prefix) :]
+                if not re.match(r"^[0-9a-fA-F]+$", remainder):
+                    raise ValidationError(
+                        f"{field_name} must contain only hexadecimal characters after the prefix"
+                    )
                 break
 
         return address
@@ -265,7 +275,7 @@ class SecurityValidator:
             raise ValidationError(f"{field_name} is too long (maximum: {max_len} characters)")
 
         # No control characters
-        if any(ord(c) < 32 for c in value if c not in '\n\r\t'):
+        if any(ord(c) < 32 for c in value if c not in "\n\r\t"):
             raise ValidationError(f"{field_name} contains invalid characters")
 
         # Strip whitespace
@@ -363,7 +373,7 @@ class SecurityValidator:
             raise ValidationError(f"{field_name} must be a string")
 
         # Hex validation
-        if not re.match(r'^[0-9a-fA-F]+$', value):
+        if not re.match(r"^[0-9a-fA-F]+$", value):
             raise ValidationError(f"{field_name} must be hexadecimal")
 
         # Length check
@@ -391,7 +401,7 @@ class SecurityValidator:
 
         network = network.lower().strip()
 
-        if network not in ['testnet', 'mainnet']:
+        if network not in ["testnet", "mainnet"]:
             raise ValidationError("Network must be 'testnet' or 'mainnet'")
 
         return network
@@ -409,14 +419,14 @@ class SecurityValidator:
         """
         if isinstance(data, dict):
             # Remove sensitive keys
-            sensitive_keys = ['ip', 'ip_address', 'user', 'email', 'phone', 'location', 'geo']
+            sensitive_keys = ["ip", "ip_address", "user", "email", "phone", "location", "geo"]
             sanitized = {k: v for k, v in data.items() if k.lower() not in sensitive_keys}
 
             # Truncate addresses for privacy
-            if 'address' in sanitized and isinstance(sanitized['address'], str):
-                addr = sanitized['address']
+            if "address" in sanitized and isinstance(sanitized["address"], str):
+                addr = sanitized["address"]
                 if len(addr) > 20:
-                    sanitized['address'] = f"{addr[:10]}...{addr[-6:]}"
+                    sanitized["address"] = f"{addr[:10]}...{addr[-6:]}"
 
             return str(sanitized)
 
@@ -431,6 +441,7 @@ class SecurityValidator:
 
 
 # Convenience functions for common validations
+
 
 def validate_transaction_data(data: dict) -> dict:
     """
@@ -448,25 +459,25 @@ def validate_transaction_data(data: dict) -> dict:
     validator = SecurityValidator()
 
     # Required fields
-    if 'sender' not in data:
+    if "sender" not in data:
         raise ValidationError("Missing required field: sender")
-    if 'recipient' not in data:
+    if "recipient" not in data:
         raise ValidationError("Missing required field: recipient")
-    if 'amount' not in data:
+    if "amount" not in data:
         raise ValidationError("Missing required field: amount")
 
     # Validate each field
     validated = {
-        'sender': validator.validate_address(data['sender'], 'sender'),
-        'recipient': validator.validate_address(data['recipient'], 'recipient'),
-        'amount': validator.validate_amount(data['amount'], 'amount'),
-        'fee': validator.validate_fee(data.get('fee', 0.24))
+        "sender": validator.validate_address(data["sender"], "sender"),
+        "recipient": validator.validate_address(data["recipient"], "recipient"),
+        "amount": validator.validate_amount(data["amount"], "amount"),
+        "fee": validator.validate_fee(data.get("fee", 0.24)),
     }
 
     # Optional fields
-    if 'private_key' in data:
-        validated['private_key'] = validator.validate_hex_string(
-            data['private_key'], 'private_key', exact_length=64
+    if "private_key" in data:
+        validated["private_key"] = validator.validate_hex_string(
+            data["private_key"], "private_key", exact_length=64
         )
 
     return validated
@@ -488,6 +499,7 @@ def validate_api_request(data: dict, max_size: int = SecurityValidator.MAX_JSON_
     """
     # Size check
     import json
+
     json_str = json.dumps(data)
     if len(json_str) > max_size:
         raise ValidationError(f"Request too large (maximum: {max_size} bytes)")

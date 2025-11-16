@@ -19,13 +19,15 @@ import json
 from typing import Dict, List, Optional, Tuple
 from enum import Enum
 import secrets
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-CORE_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, '..', 'core'))
+CORE_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "core"))
 if CORE_DIR not in sys.path:
     sys.path.insert(0, CORE_DIR)
 
 from src.aixn.core.ai_pool_with_strict_limits import StrictAIPoolManager, AIProvider
 from src.aixn.core.secure_api_key_manager import SecureAPIKeyManager
+
 
 class AIModel(Enum):
     """Supported AI models for development"""
@@ -53,26 +55,24 @@ class AIModel(Enum):
     COHERE_COMMAND = "command-r-plus"
     DEEPSEEK_CODER = "deepseek-coder"
 
+
 # Cost per million tokens (approximate USD)
 MODEL_COSTS = {
     AIModel.CLAUDE_OPUS: {"input": 15.0, "output": 75.0},
     AIModel.CLAUDE_SONNET: {"input": 3.0, "output": 15.0},
     AIModel.CLAUDE_HAIKU: {"input": 0.25, "output": 1.25},
-
     AIModel.GPT4_TURBO: {"input": 10.0, "output": 30.0},
     AIModel.GPT4: {"input": 30.0, "output": 60.0},
     AIModel.GPT35_TURBO: {"input": 0.5, "output": 1.5},
     AIModel.O1_PREVIEW: {"input": 15.0, "output": 60.0},
     AIModel.O1_MINI: {"input": 3.0, "output": 12.0},
-
     AIModel.GEMINI_ULTRA: {"input": 12.5, "output": 37.5},
     AIModel.GEMINI_PRO: {"input": 0.5, "output": 1.5},
     AIModel.GEMINI_FLASH: {"input": 0.075, "output": 0.30},
-
     AIModel.LLAMA_70B: {"input": 0.9, "output": 0.9},
     AIModel.MISTRAL_LARGE: {"input": 4.0, "output": 12.0},
     AIModel.COHERE_COMMAND: {"input": 3.0, "output": 15.0},
-    AIModel.DEEPSEEK_CODER: {"input": 0.14, "output": 0.28}
+    AIModel.DEEPSEEK_CODER: {"input": 0.14, "output": 0.28},
 }
 
 # Best models for different task types
@@ -82,7 +82,7 @@ MODEL_SPECIALIZATIONS = {
     "documentation": [AIModel.CLAUDE_SONNET, AIModel.GPT4_TURBO, AIModel.GEMINI_PRO],
     "optimization": [AIModel.O1_PREVIEW, AIModel.CLAUDE_OPUS, AIModel.DEEPSEEK_CODER],
     "security_audit": [AIModel.CLAUDE_OPUS, AIModel.GPT4, AIModel.O1_PREVIEW],
-    "testing": [AIModel.CLAUDE_SONNET, AIModel.GPT4_TURBO, AIModel.DEEPSEEK_CODER]
+    "testing": [AIModel.CLAUDE_SONNET, AIModel.GPT4_TURBO, AIModel.DEEPSEEK_CODER],
 }
 
 
@@ -101,19 +101,21 @@ MODEL_PROVIDER_MAP = {
     AIModel.LLAMA_70B: AIProvider.ANTHROPIC,
     AIModel.MISTRAL_LARGE: AIProvider.ANTHROPIC,
     AIModel.COHERE_COMMAND: AIProvider.ANTHROPIC,
-    AIModel.DEEPSEEK_CODER: AIProvider.ANTHROPIC
+    AIModel.DEEPSEEK_CODER: AIProvider.ANTHROPIC,
 }
 
 
 class AIDonation:
     """Represents a single AI credit donation"""
 
-    def __init__(self,
-                 donor_address: str,
-                 ai_model: AIModel,
-                 api_key_encrypted: str,
-                 donated_tokens: int,
-                 usd_value: float):
+    def __init__(
+        self,
+        donor_address: str,
+        ai_model: AIModel,
+        api_key_encrypted: str,
+        donated_tokens: int,
+        usd_value: float,
+    ):
 
         self.donor_address = donor_address
         self.ai_model = ai_model
@@ -133,26 +135,22 @@ class AIDonation:
     def to_dict(self) -> Dict:
         """Convert to dictionary for blockchain storage"""
         return {
-            'donation_id': self.donation_id,
-            'donor_address': self.donor_address,
-            'ai_model': self.ai_model.value,
-            'api_key_encrypted': self.api_key_encrypted,
-            'donated_tokens': self.donated_tokens,
-            'usd_value': self.usd_value,
-            'timestamp': self.timestamp,
-            'used_tokens': self.used_tokens,
-            'tasks_completed': self.tasks_completed
+            "donation_id": self.donation_id,
+            "donor_address": self.donor_address,
+            "ai_model": self.ai_model.value,
+            "api_key_encrypted": self.api_key_encrypted,
+            "donated_tokens": self.donated_tokens,
+            "usd_value": self.usd_value,
+            "timestamp": self.timestamp,
+            "used_tokens": self.used_tokens,
+            "tasks_completed": self.tasks_completed,
         }
 
 
 class DevelopmentTask:
     """A task that AI will autonomously complete"""
 
-    def __init__(self,
-                 task_type: str,
-                 description: str,
-                 estimated_tokens: int,
-                 priority: int = 5):
+    def __init__(self, task_type: str, description: str, estimated_tokens: int, priority: int = 5):
 
         self.task_id = secrets.token_hex(8)
         self.task_type = task_type
@@ -168,16 +166,16 @@ class DevelopmentTask:
 
     def to_dict(self) -> Dict:
         return {
-            'task_id': self.task_id,
-            'task_type': self.task_type,
-            'description': self.description,
-            'estimated_tokens': self.estimated_tokens,
-            'priority': self.priority,
-            'status': self.status,
-            'assigned_model': self.assigned_model.value if self.assigned_model else None,
-            'created_at': self.created_at,
-            'completed_at': self.completed_at,
-            'tokens_used': self.tokens_used
+            "task_id": self.task_id,
+            "task_type": self.task_type,
+            "description": self.description,
+            "estimated_tokens": self.estimated_tokens,
+            "priority": self.priority,
+            "status": self.status,
+            "assigned_model": self.assigned_model.value if self.assigned_model else None,
+            "created_at": self.created_at,
+            "completed_at": self.completed_at,
+            "tokens_used": self.tokens_used,
         }
 
 
@@ -186,7 +184,7 @@ class AIDevelopmentPool:
     Manages AI credit donations and autonomous development
     """
 
-    def __init__(self, blockchain_seed: str = 'xai_genesis_block_hash'):
+    def __init__(self, blockchain_seed: str = "xai_genesis_block_hash"):
         self.donations: List[AIDonation] = []
         self.task_queue: List[DevelopmentTask] = []
         self.completed_tasks: List[DevelopmentTask] = []
@@ -198,11 +196,9 @@ class AIDevelopmentPool:
         self.model_leaderboard: Dict[AIModel, int] = {}  # model -> total tokens
         self.model_task_count: Dict[AIModel, int] = {}  # model -> tasks completed
 
-    def donate_ai_credits(self,
-                         donor_address: str,
-                         ai_model: AIModel,
-                         api_key: str,
-                         token_amount: int) -> Dict:
+    def donate_ai_credits(
+        self, donor_address: str, ai_model: AIModel, api_key: str, token_amount: int
+    ) -> Dict:
         """
         Donate AI API credits to the development pool
 
@@ -222,17 +218,17 @@ class AIDevelopmentPool:
             provider=provider,
             api_key=api_key,
             donated_tokens=token_amount,
-            donated_minutes=None
+            donated_minutes=None,
         )
 
-        if not submission.get('success'):
+        if not submission.get("success"):
             return submission
 
-        key_id = submission['key_id']
+        key_id = submission["key_id"]
 
         # Calculate USD value for leaderboard
         model_cost = MODEL_COSTS[ai_model]
-        avg_cost_per_token = (model_cost['input'] + model_cost['output']) / 2 / 1_000_000
+        avg_cost_per_token = (model_cost["input"] + model_cost["output"]) / 2 / 1_000_000
         usd_value = token_amount * avg_cost_per_token
 
         donation = AIDonation(
@@ -240,36 +236,36 @@ class AIDevelopmentPool:
             ai_model=ai_model,
             api_key_encrypted=key_id,
             donated_tokens=token_amount,
-            usd_value=usd_value
+            usd_value=usd_value,
         )
 
         self.donations.append(donation)
 
-        self.donor_leaderboard[donor_address] =             self.donor_leaderboard.get(donor_address, 0) + token_amount
+        self.donor_leaderboard[donor_address] = (
+            self.donor_leaderboard.get(donor_address, 0) + token_amount
+        )
 
-        self.model_leaderboard[ai_model] =             self.model_leaderboard.get(ai_model, 0) + token_amount
+        self.model_leaderboard[ai_model] = self.model_leaderboard.get(ai_model, 0) + token_amount
 
         self._process_task_queue()
 
         return {
-            'success': True,
-            'donation_id': donation.donation_id,
-            'donor_address': donor_address,
-            'ai_model': ai_model.value,
-            'key_reference': key_id,
-            'donated_tokens': token_amount,
-            'usd_value': round(usd_value, 2),
-            'your_total_donated': self.donor_leaderboard[donor_address],
-            'your_rank': self.get_donor_rank(donor_address),
-            'model_total': self.model_leaderboard[ai_model],
-            'model_rank': self.get_model_rank(ai_model)
+            "success": True,
+            "donation_id": donation.donation_id,
+            "donor_address": donor_address,
+            "ai_model": ai_model.value,
+            "key_reference": key_id,
+            "donated_tokens": token_amount,
+            "usd_value": round(usd_value, 2),
+            "your_total_donated": self.donor_leaderboard[donor_address],
+            "your_rank": self.get_donor_rank(donor_address),
+            "model_total": self.model_leaderboard[ai_model],
+            "model_rank": self.get_model_rank(ai_model),
         }
 
-    def create_development_task(self,
-                               task_type: str,
-                               description: str,
-                               estimated_tokens: int,
-                               priority: int = 5) -> Dict:
+    def create_development_task(
+        self, task_type: str, description: str, estimated_tokens: int, priority: int = 5
+    ) -> Dict:
         """
         Create a new development task for AI to complete
 
@@ -287,7 +283,7 @@ class AIDevelopmentPool:
             task_type=task_type,
             description=description,
             estimated_tokens=estimated_tokens,
-            priority=priority
+            priority=priority,
         )
 
         self.task_queue.append(task)
@@ -299,13 +295,13 @@ class AIDevelopmentPool:
         self._process_task_queue()
 
         return {
-            'success': True,
-            'task_id': task.task_id,
-            'task_type': task_type,
-            'estimated_tokens': estimated_tokens,
-            'queue_position': self.task_queue.index(task) + 1,
-            'total_queued_tasks': len(self.task_queue),
-            'status': 'Will execute when sufficient credits available'
+            "success": True,
+            "task_id": task.task_id,
+            "task_type": task_type,
+            "estimated_tokens": estimated_tokens,
+            "queue_position": self.task_queue.index(task) + 1,
+            "total_queued_tasks": len(self.task_queue),
+            "status": "Will execute when sufficient credits available",
         }
 
     def _process_task_queue(self):
@@ -317,8 +313,7 @@ class AIDevelopmentPool:
         for task in self.task_queue[:]:
             # Find best model for this task type
             suitable_models = MODEL_SPECIALIZATIONS.get(
-                task.task_type,
-                [AIModel.CLAUDE_SONNET]  # Default
+                task.task_type, [AIModel.CLAUDE_SONNET]  # Default
             )
 
             # Check if we have credits for any suitable model
@@ -361,7 +356,6 @@ class AIDevelopmentPool:
             if remaining <= 0:
                 break
 
-
     def _execute_task(self, task: DevelopmentTask, model: AIModel):
         """
         Execute a development task using AI providers via the strict pool
@@ -378,98 +372,89 @@ class AIDevelopmentPool:
             task_description=prompt,
             estimated_tokens=task.estimated_tokens,
             provider=provider,
-            max_tokens_override=task.estimated_tokens + 2048
+            max_tokens_override=task.estimated_tokens + 2048,
         )
 
-        execution_result.setdefault('provider', provider.value)
+        execution_result.setdefault("provider", provider.value)
         task.assigned_model = model
-        task.tokens_used = execution_result.get('tokens_used', 0)
+        task.tokens_used = execution_result.get("tokens_used", 0)
         task.result = execution_result
         task.completed_at = time.time()
 
-        if execution_result.get('success'):
-            task.status = 'completed'
+        if execution_result.get("success"):
+            task.status = "completed"
             self.completed_tasks.append(task)
             self.model_task_count[model] = self.model_task_count.get(model, 0) + 1
             self._apply_token_usage(model, task.tokens_used)
         else:
-            task.status = 'failed'
-    def _simulate_ai_task(self, task: DevelopmentTask,
-                         model: AIModel, api_key: str) -> Dict:
+            task.status = "failed"
+
+    def _simulate_ai_task(self, task: DevelopmentTask, model: AIModel, api_key: str) -> Dict:
         """
         Simulate AI task execution
         In production, this would call actual AI APIs
         """
 
         return {
-            'task_type': task.task_type,
-            'model_used': model.value,
-            'execution_time': round(time.time() - task.created_at, 2),
-            'tokens_used': task.estimated_tokens,
-            'status': 'completed',
-            'output': f'Task {task.task_id} completed by {model.value}'
+            "task_type": task.task_type,
+            "model_used": model.value,
+            "execution_time": round(time.time() - task.created_at, 2),
+            "tokens_used": task.estimated_tokens,
+            "status": "completed",
+            "output": f"Task {task.task_id} completed by {model.value}",
         }
 
     def get_donor_leaderboard(self, top_n: int = 10) -> List[Dict]:
         """Get top donors by tokens contributed"""
 
-        sorted_donors = sorted(
-            self.donor_leaderboard.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )[:top_n]
+        sorted_donors = sorted(self.donor_leaderboard.items(), key=lambda x: x[1], reverse=True)[
+            :top_n
+        ]
 
         leaderboard = []
         for rank, (address, tokens) in enumerate(sorted_donors, 1):
             # Calculate USD value across all their donations
-            usd_value = sum(
-                d.usd_value for d in self.donations
-                if d.donor_address == address
-            )
+            usd_value = sum(d.usd_value for d in self.donations if d.donor_address == address)
 
-            leaderboard.append({
-                'rank': rank,
-                'address': address,
-                'total_tokens': tokens,
-                'usd_value': round(usd_value, 2),
-                'donations_count': sum(1 for d in self.donations if d.donor_address == address)
-            })
+            leaderboard.append(
+                {
+                    "rank": rank,
+                    "address": address,
+                    "total_tokens": tokens,
+                    "usd_value": round(usd_value, 2),
+                    "donations_count": sum(1 for d in self.donations if d.donor_address == address),
+                }
+            )
 
         return leaderboard
 
     def get_model_leaderboard(self) -> List[Dict]:
         """Get AI model competition leaderboard"""
 
-        sorted_models = sorted(
-            self.model_leaderboard.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )
+        sorted_models = sorted(self.model_leaderboard.items(), key=lambda x: x[1], reverse=True)
 
         leaderboard = []
         for rank, (model, tokens) in enumerate(sorted_models, 1):
             tasks_completed = self.model_task_count.get(model, 0)
             available_tokens = self._get_available_tokens(model)
 
-            leaderboard.append({
-                'rank': rank,
-                'model': model.value,
-                'total_donated_tokens': tokens,
-                'available_tokens': available_tokens,
-                'used_tokens': tokens - available_tokens,
-                'tasks_completed': tasks_completed,
-                'efficiency': round(tasks_completed / tokens * 1000, 2) if tokens > 0 else 0
-            })
+            leaderboard.append(
+                {
+                    "rank": rank,
+                    "model": model.value,
+                    "total_donated_tokens": tokens,
+                    "available_tokens": available_tokens,
+                    "used_tokens": tokens - available_tokens,
+                    "tasks_completed": tasks_completed,
+                    "efficiency": round(tasks_completed / tokens * 1000, 2) if tokens > 0 else 0,
+                }
+            )
 
         return leaderboard
 
     def get_donor_rank(self, address: str) -> int:
         """Get rank of specific donor"""
-        sorted_donors = sorted(
-            self.donor_leaderboard.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )
+        sorted_donors = sorted(self.donor_leaderboard.items(), key=lambda x: x[1], reverse=True)
 
         for rank, (addr, _) in enumerate(sorted_donors, 1):
             if addr == address:
@@ -479,11 +464,7 @@ class AIDevelopmentPool:
 
     def get_model_rank(self, model: AIModel) -> int:
         """Get rank of specific AI model"""
-        sorted_models = sorted(
-            self.model_leaderboard.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )
+        sorted_models = sorted(self.model_leaderboard.items(), key=lambda x: x[1], reverse=True)
 
         for rank, (m, _) in enumerate(sorted_models, 1):
             if m == model:
@@ -499,17 +480,25 @@ class AIDevelopmentPool:
         total_usd_value = sum(d.usd_value for d in self.donations)
 
         return {
-            'total_donations': len(self.donations),
-            'unique_donors': len(self.donor_leaderboard),
-            'total_donated_tokens': total_donated_tokens,
-            'total_used_tokens': total_used_tokens,
-            'available_tokens': total_donated_tokens - total_used_tokens,
-            'total_usd_value': round(total_usd_value, 2),
-            'tasks_completed': len(self.completed_tasks),
-            'tasks_pending': len(self.task_queue),
-            'models_active': len(self.model_leaderboard),
-            'top_donor': max(self.donor_leaderboard.items(), key=lambda x: x[1])[0] if self.donor_leaderboard else None,
-            'top_model': max(self.model_leaderboard.items(), key=lambda x: x[1])[0].value if self.model_leaderboard else None
+            "total_donations": len(self.donations),
+            "unique_donors": len(self.donor_leaderboard),
+            "total_donated_tokens": total_donated_tokens,
+            "total_used_tokens": total_used_tokens,
+            "available_tokens": total_donated_tokens - total_used_tokens,
+            "total_usd_value": round(total_usd_value, 2),
+            "tasks_completed": len(self.completed_tasks),
+            "tasks_pending": len(self.task_queue),
+            "models_active": len(self.model_leaderboard),
+            "top_donor": (
+                max(self.donor_leaderboard.items(), key=lambda x: x[1])[0]
+                if self.donor_leaderboard
+                else None
+            ),
+            "top_model": (
+                max(self.model_leaderboard.items(), key=lambda x: x[1])[0].value
+                if self.model_leaderboard
+                else None
+            ),
         }
 
 
@@ -517,12 +506,14 @@ class AIDevelopmentPool:
 class AIDonationTransaction:
     """Special transaction type for AI donations"""
 
-    def __init__(self,
-                 sender: str,
-                 ai_model: str,
-                 api_key_encrypted: str,
-                 token_amount: int,
-                 usd_value: float):
+    def __init__(
+        self,
+        sender: str,
+        ai_model: str,
+        api_key_encrypted: str,
+        token_amount: int,
+        usd_value: float,
+    ):
 
         self.sender = sender
         self.tx_type = "ai_donation"
@@ -539,14 +530,14 @@ class AIDonationTransaction:
 
     def to_dict(self) -> Dict:
         return {
-            'txid': self.txid,
-            'sender': self.sender,
-            'tx_type': self.tx_type,
-            'ai_model': self.ai_model,
-            'api_key_encrypted': self.api_key_encrypted,
-            'token_amount': self.token_amount,
-            'usd_value': self.usd_value,
-            'timestamp': self.timestamp
+            "txid": self.txid,
+            "sender": self.sender,
+            "tx_type": self.tx_type,
+            "ai_model": self.ai_model,
+            "api_key_encrypted": self.api_key_encrypted,
+            "token_amount": self.token_amount,
+            "usd_value": self.usd_value,
+            "timestamp": self.timestamp,
         }
 
 
@@ -569,7 +560,12 @@ if __name__ == "__main__":
         ("XAI9e2f1b4d7a3c6e8f2b4d9a1c7e3f6b8d2a9c", AIModel.CLAUDE_SONNET, "sk-ant-xxxxx", 1000000),
         ("XAI3c6e8f1b4d7a2c9e4f2b8d1a6c3e7f9b2d4a", AIModel.GEMINI_PRO, "xxxxx", 2000000),
         ("XAI8d2a9c4e6f1b3d7a2c9e8f4b1d6a3c7e2f9b", AIModel.DEEPSEEK_CODER, "xxxxx", 3000000),
-        ("XAI7f3a9c2e1b8d4f6a5c9e2d1f8b4a7c3e9d2f1b", AIModel.CLAUDE_OPUS, "sk-ant-xxxxx", 300000),  # Same donor again!
+        (
+            "XAI7f3a9c2e1b8d4f6a5c9e2d1f8b4a7c3e9d2f1b",
+            AIModel.CLAUDE_OPUS,
+            "sk-ant-xxxxx",
+            300000,
+        ),  # Same donor again!
         ("XAI2f9b4d6a1c8e3f7b2d9a4c6e1f8b3d7a2c9e", AIModel.O1_PREVIEW, "sk-xxxxx", 400000),
     ]
 
@@ -638,7 +634,8 @@ if __name__ == "__main__":
 
     print("\n\n🎯 COMPETITIVE DYNAMICS")
     print("=" * 80)
-    print("""
+    print(
+        """
 The AI Development Pool creates natural competition:
 
 1. DONOR COMPETITION:
@@ -666,4 +663,5 @@ The AI Development Pool creates natural competition:
    - Fully decentralized dev team
 
 This has NEVER been done before!
-    """)
+    """
+    )

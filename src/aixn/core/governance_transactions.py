@@ -19,6 +19,7 @@ from enum import Enum
 
 class GovernanceTxType(Enum):
     """Governance transaction types"""
+
     SUBMIT_PROPOSAL = "submit_proposal"
     CAST_VOTE = "cast_vote"
     SUBMIT_CODE_REVIEW = "submit_code_review"
@@ -34,8 +35,9 @@ class GovernanceTransaction:
     Stored permanently in blockchain
     """
 
-    def __init__(self, tx_type: GovernanceTxType, submitter: str,
-                 proposal_id: str = None, data: Dict = None):
+    def __init__(
+        self, tx_type: GovernanceTxType, submitter: str, proposal_id: str = None, data: Dict = None
+    ):
         self.tx_type = tx_type.value
         self.submitter = submitter
         self.proposal_id = proposal_id
@@ -46,11 +48,11 @@ class GovernanceTransaction:
     def _calculate_txid(self) -> str:
         """Calculate unique transaction ID"""
         tx_data = {
-            'tx_type': self.tx_type,
-            'submitter': self.submitter,
-            'proposal_id': self.proposal_id,
-            'data': json.dumps(self.data, sort_keys=True),
-            'timestamp': self.timestamp
+            "tx_type": self.tx_type,
+            "submitter": self.submitter,
+            "proposal_id": self.proposal_id,
+            "data": json.dumps(self.data, sort_keys=True),
+            "timestamp": self.timestamp,
         }
         tx_string = json.dumps(tx_data, sort_keys=True)
         return hashlib.sha256(tx_string.encode()).hexdigest()
@@ -58,25 +60,25 @@ class GovernanceTransaction:
     def to_dict(self) -> Dict:
         """Convert to dictionary for blockchain storage"""
         return {
-            'txid': self.txid,
-            'tx_type': self.tx_type,
-            'submitter': self.submitter,
-            'proposal_id': self.proposal_id,
-            'data': self.data,
-            'timestamp': self.timestamp
+            "txid": self.txid,
+            "tx_type": self.tx_type,
+            "submitter": self.submitter,
+            "proposal_id": self.proposal_id,
+            "data": self.data,
+            "timestamp": self.timestamp,
         }
 
     @staticmethod
-    def from_dict(data: Dict) -> 'GovernanceTransaction':
+    def from_dict(data: Dict) -> "GovernanceTransaction":
         """Reconstruct from blockchain data"""
         tx = GovernanceTransaction(
-            tx_type=GovernanceTxType(data['tx_type']),
-            submitter=data['submitter'],
-            proposal_id=data.get('proposal_id'),
-            data=data.get('data', {})
+            tx_type=GovernanceTxType(data["tx_type"]),
+            submitter=data["submitter"],
+            proposal_id=data.get("proposal_id"),
+            data=data.get("data", {}),
         )
-        tx.timestamp = data['timestamp']
-        tx.txid = data['txid']
+        tx.timestamp = data["timestamp"]
+        tx.txid = data["txid"]
         return tx
 
 
@@ -86,8 +88,15 @@ class OnChainProposal:
     All state changes are transactions
     """
 
-    def __init__(self, proposal_id: str, title: str, description: str,
-                 proposal_type: str, submitter: str, submitter_voting_power: float):
+    def __init__(
+        self,
+        proposal_id: str,
+        title: str,
+        description: str,
+        proposal_type: str,
+        submitter: str,
+        submitter_voting_power: float,
+    ):
         self.proposal_id = proposal_id
         self.title = title
         self.description = description
@@ -105,25 +114,25 @@ class OnChainProposal:
         self.rollback_txid = None  # If rolled back
 
         # Current state (derived from transactions)
-        self.status = 'proposed'
+        self.status = "proposed"
 
     def to_dict(self) -> Dict:
         """Serialize for blockchain storage"""
         return {
-            'proposal_id': self.proposal_id,
-            'title': self.title,
-            'description': self.description,
-            'proposal_type': self.proposal_type,
-            'submitter': self.submitter,
-            'submitter_voting_power': self.submitter_voting_power,
-            'created_at': self.created_at,
-            'submission_txid': self.submission_txid,
-            'vote_txids': self.vote_txids,
-            'review_txids': self.review_txids,
-            'implementation_vote_txids': self.implementation_vote_txids,
-            'execution_txid': self.execution_txid,
-            'rollback_txid': self.rollback_txid,
-            'status': self.status
+            "proposal_id": self.proposal_id,
+            "title": self.title,
+            "description": self.description,
+            "proposal_type": self.proposal_type,
+            "submitter": self.submitter,
+            "submitter_voting_power": self.submitter_voting_power,
+            "created_at": self.created_at,
+            "submission_txid": self.submission_txid,
+            "vote_txids": self.vote_txids,
+            "review_txids": self.review_txids,
+            "implementation_vote_txids": self.implementation_vote_txids,
+            "execution_txid": self.execution_txid,
+            "rollback_txid": self.rollback_txid,
+            "status": self.status,
         }
 
 
@@ -152,7 +161,9 @@ class GovernanceState:
         self.approval_percent = 66  # Need 66% approval
         self.max_individual_power_percent = 20  # Max 20% from one voter
         self.min_code_reviewers = 5  # Minimum code reviewers required
-        self.implementation_approval_percent = 50  # 50% of original voters must approve implementation
+        self.implementation_approval_percent = (
+            50  # 50% of original voters must approve implementation
+        )
 
         # Track votes for validation (voter -> proposal_id -> vote_data)
         self.votes = {}  # proposal_id -> {voter: vote_data}
@@ -166,28 +177,24 @@ class GovernanceState:
         proposal_data = tx.data
         proposal = OnChainProposal(
             proposal_id=tx.proposal_id,
-            title=proposal_data['title'],
-            description=proposal_data['description'],
-            proposal_type=proposal_data['proposal_type'],
+            title=proposal_data["title"],
+            description=proposal_data["description"],
+            proposal_type=proposal_data["proposal_type"],
             submitter=tx.submitter,
-            submitter_voting_power=proposal_data.get('submitter_voting_power', 0)
+            submitter_voting_power=proposal_data.get("submitter_voting_power", 0),
         )
 
         proposal.submission_txid = tx.txid
         self.proposals[tx.proposal_id] = proposal
         self.active_proposals.add(tx.proposal_id)
 
-        return {
-            'success': True,
-            'proposal_id': tx.proposal_id,
-            'status': 'active'
-        }
+        return {"success": True, "proposal_id": tx.proposal_id, "status": "active"}
 
     def cast_vote(self, tx: GovernanceTransaction) -> Dict:
         """Process vote transaction"""
 
         if tx.proposal_id not in self.proposals:
-            return {'success': False, 'error': 'Proposal not found'}
+            return {"success": False, "error": "Proposal not found"}
 
         proposal = self.proposals[tx.proposal_id]
         proposal.execution_txid = tx.txid
@@ -198,13 +205,13 @@ class GovernanceState:
             self.votes[tx.proposal_id] = {}
 
         self.votes[tx.proposal_id][tx.submitter] = {
-            'vote': tx.data.get('vote'),
-            'voting_power': tx.data.get('voting_power', 0),
-            'txid': tx.txid
+            "vote": tx.data.get("vote"),
+            "voting_power": tx.data.get("voting_power", 0),
+            "txid": tx.txid,
         }
 
         # Track original voters who voted yes (for implementation approval later)
-        if tx.data.get('vote') == 'yes':
+        if tx.data.get("vote") == "yes":
             if tx.proposal_id not in self.original_voters:
                 self.original_voters[tx.proposal_id] = set()
             self.original_voters[tx.proposal_id].add(tx.submitter)
@@ -212,21 +219,21 @@ class GovernanceState:
         # Check if proposal is approved
         approved, reason, details = self._check_proposal_approved(tx.proposal_id)
         if approved:
-            proposal.status = 'approved_voting'
+            proposal.status = "approved_voting"
             self.approved_proposals.add(tx.proposal_id)
 
         return {
-            'success': True,
-            'vote_count': len(proposal.vote_txids),
-            'approved': approved,
-            'approval_details': details if approved else None
+            "success": True,
+            "vote_count": len(proposal.vote_txids),
+            "approved": approved,
+            "approval_details": details if approved else None,
         }
 
     def submit_code_review(self, tx: GovernanceTransaction) -> Dict:
         """Process code review transaction"""
 
         if tx.proposal_id not in self.proposals:
-            return {'success': False, 'error': 'Proposal not found'}
+            return {"success": False, "error": "Proposal not found"}
 
         proposal = self.proposals[tx.proposal_id]
         proposal.review_txids.append(tx.txid)
@@ -236,41 +243,40 @@ class GovernanceState:
             self.reviews[tx.proposal_id] = {}
 
         self.reviews[tx.proposal_id][tx.submitter] = {
-            'approved': tx.data.get('approved'),
-            'comments': tx.data.get('comments'),
-            'voting_power': tx.data.get('voting_power', 0),
-            'txid': tx.txid
+            "approved": tx.data.get("approved"),
+            "comments": tx.data.get("comments"),
+            "voting_power": tx.data.get("voting_power", 0),
+            "txid": tx.txid,
         }
 
         # Check if enough reviewers and approval
         review_count = len(self.reviews[tx.proposal_id])
         if review_count >= self.min_code_reviewers:
             # Calculate approval percentage
-            total_power = sum(r['voting_power'] for r in self.reviews[tx.proposal_id].values())
-            approved_power = sum(r['voting_power'] for r in self.reviews[tx.proposal_id].values() if r['approved'])
+            total_power = sum(r["voting_power"] for r in self.reviews[tx.proposal_id].values())
+            approved_power = sum(
+                r["voting_power"] for r in self.reviews[tx.proposal_id].values() if r["approved"]
+            )
             approval_pct = (approved_power / total_power * 100) if total_power > 0 else 0
 
             if approval_pct >= 66:  # 66% approval from reviewers
-                proposal.status = 'code_review_passed'
+                proposal.status = "code_review_passed"
 
-        return {
-            'success': True,
-            'review_count': review_count
-        }
+        return {"success": True, "review_count": review_count}
 
     def vote_implementation(self, tx: GovernanceTransaction) -> Dict:
         """Process implementation approval vote transaction"""
 
         if tx.proposal_id not in self.proposals:
-            return {'success': False, 'error': 'Proposal not found'}
+            return {"success": False, "error": "Proposal not found"}
 
         # Check if voter was an original approver
         original_voters_set = self.original_voters.get(tx.proposal_id, set())
         if tx.submitter not in original_voters_set:
             return {
-                'success': False,
-                'error': 'NOT_ORIGINAL_VOTER',
-                'message': 'Only voters who approved starting this work can approve implementation'
+                "success": False,
+                "error": "NOT_ORIGINAL_VOTER",
+                "message": "Only voters who approved starting this work can approve implementation",
             }
 
         proposal = self.proposals[tx.proposal_id]
@@ -280,111 +286,117 @@ class GovernanceState:
         if tx.proposal_id not in self.implementation_votes:
             self.implementation_votes[tx.proposal_id] = {}
 
-        self.implementation_votes[tx.proposal_id][tx.submitter] = tx.data.get('approved', False)
+        self.implementation_votes[tx.proposal_id][tx.submitter] = tx.data.get("approved", False)
 
         # Check if 50% of original voters approved implementation
         approved, reason, details = self._check_implementation_approved(tx.proposal_id)
         if approved:
-            proposal.status = 'implementation_approved'
+            proposal.status = "implementation_approved"
 
         return {
-            'success': True,
-            'implementation_vote_count': len(proposal.implementation_vote_txids),
-            'approved': approved,
-            'approval_details': details if approved else None
+            "success": True,
+            "implementation_vote_count": len(proposal.implementation_vote_txids),
+            "approved": approved,
+            "approval_details": details if approved else None,
         }
 
     def execute_proposal(self, tx: GovernanceTransaction) -> Dict:
         """Process proposal execution transaction - VALIDATES ALL REQUIREMENTS"""
 
         if tx.proposal_id not in self.proposals:
-            return {'success': False, 'error': 'Proposal not found'}
+            return {"success": False, "error": "Proposal not found"}
 
         proposal = self.proposals[tx.proposal_id]
 
         # REQUIREMENT 1: Must have voting approval (250+ voters, 66% approval)
-        voting_approved, voting_reason, voting_details = self._check_proposal_approved(tx.proposal_id)
+        voting_approved, voting_reason, voting_details = self._check_proposal_approved(
+            tx.proposal_id
+        )
         if not voting_approved:
             return {
-                'success': False,
-                'error': 'VOTING_NOT_APPROVED',
-                'reason': voting_reason,
-                'details': voting_details
+                "success": False,
+                "error": "VOTING_NOT_APPROVED",
+                "reason": voting_reason,
+                "details": voting_details,
             }
 
         # REQUIREMENT 2: Must have code reviews (250+ reviewers, 66% approval)
         review_count = len(self.reviews.get(tx.proposal_id, {}))
         if review_count < self.min_code_reviewers:
             return {
-                'success': False,
-                'error': 'INSUFFICIENT_REVIEWERS',
-                'reason': f"Need {self.min_code_reviewers} reviewers, have {review_count}"
+                "success": False,
+                "error": "INSUFFICIENT_REVIEWERS",
+                "reason": f"Need {self.min_code_reviewers} reviewers, have {review_count}",
             }
 
         # Check reviewer approval percentage
         reviews = self.reviews.get(tx.proposal_id, {})
-        total_review_power = sum(r['voting_power'] for r in reviews.values())
-        approved_review_power = sum(r['voting_power'] for r in reviews.values() if r['approved'])
-        review_approval_pct = (approved_review_power / total_review_power * 100) if total_review_power > 0 else 0
+        total_review_power = sum(r["voting_power"] for r in reviews.values())
+        approved_review_power = sum(r["voting_power"] for r in reviews.values() if r["approved"])
+        review_approval_pct = (
+            (approved_review_power / total_review_power * 100) if total_review_power > 0 else 0
+        )
 
         if review_approval_pct < 66:
             return {
-                'success': False,
-                'error': 'CODE_REVIEW_REJECTED',
-                'reason': f"Need 66% reviewer approval, have {review_approval_pct:.1f}%"
+                "success": False,
+                "error": "CODE_REVIEW_REJECTED",
+                "reason": f"Need 66% reviewer approval, have {review_approval_pct:.1f}%",
             }
 
         # REQUIREMENT 3: Must have implementation approval (50% of original voters)
-        impl_approved, impl_reason, impl_details = self._check_implementation_approved(tx.proposal_id)
+        impl_approved, impl_reason, impl_details = self._check_implementation_approved(
+            tx.proposal_id
+        )
         if not impl_approved:
             return {
-                'success': False,
-                'error': 'IMPLEMENTATION_NOT_APPROVED',
-                'reason': impl_reason,
-                'details': impl_details
+                "success": False,
+                "error": "IMPLEMENTATION_NOT_APPROVED",
+                "reason": impl_reason,
+                "details": impl_details,
             }
 
         # ALL REQUIREMENTS MET - Execute proposal
         proposal.execution_txid = tx.txid
-        proposal.status = 'executed'
+        proposal.status = "executed"
 
         self.active_proposals.discard(tx.proposal_id)
         self.executed_proposals.add(tx.proposal_id)
 
         # If parameter change, update state
-        if proposal.proposal_type == 'parameter_change':
-            param_data = tx.data.get('parameter_change', {})
-            param_name = param_data.get('param_name')
-            new_value = param_data.get('new_value')
+        if proposal.proposal_type == "parameter_change":
+            param_data = tx.data.get("parameter_change", {})
+            param_name = param_data.get("param_name")
+            new_value = param_data.get("new_value")
             if param_name and new_value is not None:
                 self.current_parameters[param_name] = new_value
 
         return {
-            'success': True,
-            'status': 'executed',
-            'execution_txid': tx.txid,
-            'validation': {
-                'voting': voting_details,
-                'reviews': {'count': review_count, 'approval_pct': review_approval_pct},
-                'implementation': impl_details
-            }
+            "success": True,
+            "status": "executed",
+            "execution_txid": tx.txid,
+            "validation": {
+                "voting": voting_details,
+                "reviews": {"count": review_count, "approval_pct": review_approval_pct},
+                "implementation": impl_details,
+            },
         }
 
     def rollback_change(self, tx: GovernanceTransaction) -> Dict:
         """Process rollback transaction"""
 
-        original_proposal_id = tx.data.get('original_proposal_id')
+        original_proposal_id = tx.data.get("original_proposal_id")
         if original_proposal_id not in self.proposals:
-            return {'success': False, 'error': 'Original proposal not found'}
+            return {"success": False, "error": "Original proposal not found"}
 
         original_proposal = self.proposals[original_proposal_id]
         original_proposal.rollback_txid = tx.txid
-        original_proposal.status = 'rolled_back'
+        original_proposal.status = "rolled_back"
 
         return {
-            'success': True,
-            'original_proposal': original_proposal_id,
-            'rollback_txid': tx.txid
+            "success": True,
+            "original_proposal": original_proposal_id,
+            "rollback_txid": tx.txid,
         }
 
     def _check_proposal_approved(self, proposal_id: str) -> Tuple[bool, str, Dict]:
@@ -396,43 +408,53 @@ class GovernanceState:
         votes = self.votes[proposal_id]
 
         # Calculate voting power totals
-        total_yes_power = sum(v['voting_power'] for v in votes.values() if v['vote'] == 'yes')
-        total_no_power = sum(v['voting_power'] for v in votes.values() if v['vote'] == 'no')
+        total_yes_power = sum(v["voting_power"] for v in votes.values() if v["vote"] == "yes")
+        total_no_power = sum(v["voting_power"] for v in votes.values() if v["vote"] == "no")
         total_power = total_yes_power + total_no_power
 
         # Count unique voters
-        yes_voters = [v for v in votes.values() if v['vote'] == 'yes']
+        yes_voters = [v for v in votes.values() if v["vote"] == "yes"]
         voter_count = len(yes_voters)
 
         # Check minimum voters requirement - FIXED AT 500
         if voter_count < self.min_voters:
-            return False, f"Need {self.min_voters} yes voters, have {voter_count}", {
-                'required_voters': self.min_voters,
-                'current_voters': voter_count
-            }
+            return (
+                False,
+                f"Need {self.min_voters} yes voters, have {voter_count}",
+                {"required_voters": self.min_voters, "current_voters": voter_count},
+            )
 
         # Check approval percentage
         approval_pct = (total_yes_power / total_power * 100) if total_power > 0 else 0
         if approval_pct < self.approval_percent:
-            return False, f"Need {self.approval_percent}% approval, have {approval_pct:.1f}%", {
-                'required_percent': self.approval_percent,
-                'current_percent': approval_pct
-            }
+            return (
+                False,
+                f"Need {self.approval_percent}% approval, have {approval_pct:.1f}%",
+                {"required_percent": self.approval_percent, "current_percent": approval_pct},
+            )
 
         # Check max individual power
         for voter, vote_data in votes.items():
-            if vote_data['vote'] == 'yes':
-                individual_pct = (vote_data['voting_power'] / total_yes_power * 100) if total_yes_power > 0 else 0
+            if vote_data["vote"] == "yes":
+                individual_pct = (
+                    (vote_data["voting_power"] / total_yes_power * 100)
+                    if total_yes_power > 0
+                    else 0
+                )
                 if individual_pct > self.max_individual_power_percent:
-                    return False, f"Voter {voter[:8]}... has {individual_pct:.1f}% (max {self.max_individual_power_percent}%)", {}
+                    return (
+                        False,
+                        f"Voter {voter[:8]}... has {individual_pct:.1f}% (max {self.max_individual_power_percent}%)",
+                        {},
+                    )
 
         details = {
-            'voter_count': voter_count,
-            'required_voters': self.min_voters,
-            'approval_percent': approval_pct,
-            'required_percent': self.approval_percent,
-            'total_yes_power': total_yes_power,
-            'total_no_power': total_no_power
+            "voter_count": voter_count,
+            "required_voters": self.min_voters,
+            "approval_percent": approval_pct,
+            "required_percent": self.approval_percent,
+            "total_yes_power": total_yes_power,
+            "total_no_power": total_no_power,
         }
 
         return True, f"Approved with {voter_count} voters ({approval_pct:.1f}% approval)", details
@@ -447,16 +469,18 @@ class GovernanceState:
         impl_votes = self.implementation_votes.get(proposal_id, {})
 
         # Count yes votes from original voters
-        yes_count = sum(1 for voter, approved in impl_votes.items() if approved and voter in original_voters_set)
+        yes_count = sum(
+            1 for voter, approved in impl_votes.items() if approved and voter in original_voters_set
+        )
 
         # Calculate percentage of original voters who voted yes
         required_yes = int(len(original_voters_set) * (self.implementation_approval_percent / 100))
 
         details = {
-            'original_voters': len(original_voters_set),
-            'required_yes': required_yes,
-            'yes_votes': yes_count,
-            'required_percent': self.implementation_approval_percent
+            "original_voters": len(original_voters_set),
+            "required_yes": required_yes,
+            "yes_votes": yes_count,
+            "required_percent": self.implementation_approval_percent,
         }
 
         if yes_count >= required_yes:
@@ -514,11 +538,11 @@ if __name__ == "__main__":
         submitter="alice_address",
         proposal_id="prop_001",
         data={
-            'title': 'Add privacy features',
-            'description': 'Implement zk-SNARKs',
-            'proposal_type': 'ai_improvement',
-            'submitter_voting_power': 42.5
-        }
+            "title": "Add privacy features",
+            "description": "Implement zk-SNARKs",
+            "proposal_type": "ai_improvement",
+            "submitter_voting_power": 42.5,
+        },
     )
 
     result = gov_state.submit_proposal(submit_tx)
@@ -530,18 +554,17 @@ if __name__ == "__main__":
     print("\n2. CAST VOTE TRANSACTIONS")
     print("-" * 70)
 
-    for i, voter in enumerate(['bob', 'carol', 'dave', 'eve']):
+    for i, voter in enumerate(["bob", "carol", "dave", "eve"]):
         vote_tx = GovernanceTransaction(
             tx_type=GovernanceTxType.CAST_VOTE,
             submitter=f"{voter}_address",
             proposal_id="prop_001",
-            data={
-                'vote': 'yes' if i < 3 else 'no',
-                'voting_power': 30.0 + (i * 5)
-            }
+            data={"vote": "yes" if i < 3 else "no", "voting_power": 30.0 + (i * 5)},
         )
         result = gov_state.cast_vote(vote_tx)
-        print(f"{voter}: voted, total votes = {result['vote_count']}, txid = {vote_tx.txid[:16]}...")
+        print(
+            f"{voter}: voted, total votes = {result['vote_count']}, txid = {vote_tx.txid[:16]}..."
+        )
 
     # 3. Submit code reviews (on-chain transactions)
     print("\n3. CODE REVIEW TRANSACTIONS")
@@ -553,10 +576,10 @@ if __name__ == "__main__":
             submitter=f"reviewer_{i}_address",
             proposal_id="prop_001",
             data={
-                'approved': i < 4,
-                'comments': 'Looks good' if i < 4 else 'Needs work',
-                'voting_power': 25.0
-            }
+                "approved": i < 4,
+                "comments": "Looks good" if i < 4 else "Needs work",
+                "voting_power": 25.0,
+            },
         )
         result = gov_state.submit_code_review(review_tx)
 
@@ -572,7 +595,7 @@ if __name__ == "__main__":
             tx_type=GovernanceTxType.VOTE_IMPLEMENTATION,
             submitter=f"original_voter_{i}_address",
             proposal_id="prop_001",
-            data={'approved': i < 8}
+            data={"approved": i < 8},
         )
         result = gov_state.vote_implementation(impl_tx)
 
@@ -587,7 +610,7 @@ if __name__ == "__main__":
         tx_type=GovernanceTxType.EXECUTE_PROPOSAL,
         submitter="protocol_address",
         proposal_id="prop_001",
-        data={'executed_at': time.time()}
+        data={"executed_at": time.time()},
     )
     result = gov_state.execute_proposal(exec_tx)
     print(f"Proposal executed: {result['status']}")

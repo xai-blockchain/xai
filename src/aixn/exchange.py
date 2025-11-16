@@ -11,27 +11,35 @@ from dataclasses import dataclass, field
 from enum import Enum
 import json
 
+
 class OrderType(Enum):
     """Order types"""
+
     LIMIT = "limit"
     MARKET = "market"
     STOP_LIMIT = "stop_limit"
 
+
 class OrderSide(Enum):
     """Order sides"""
+
     BUY = "buy"
     SELL = "sell"
 
+
 class OrderStatus(Enum):
     """Order status"""
+
     PENDING = "pending"
     PARTIAL = "partial"
     FILLED = "filled"
     CANCELLED = "cancelled"
 
+
 @dataclass
 class Order:
     """Represents a trading order"""
+
     id: str
     user_address: str
     pair: str  # e.g., "AXN/USD", "BTC/USD"
@@ -39,7 +47,7 @@ class Order:
     order_type: OrderType
     price: Decimal  # Limit price (0 for market orders)
     amount: Decimal  # Amount to buy/sell
-    filled: Decimal = Decimal('0')  # Amount filled
+    filled: Decimal = Decimal("0")  # Amount filled
     status: OrderStatus = OrderStatus.PENDING
     timestamp: float = field(default_factory=time.time)
     pay_fee_with_axn: bool = False
@@ -55,23 +63,25 @@ class Order:
     def to_dict(self) -> dict:
         """Convert to dictionary"""
         return {
-            'id': self.id,
-            'user_address': self.user_address,
-            'pair': self.pair,
-            'side': self.side.value,
-            'type': self.order_type.value,
-            'price': float(self.price),
-            'amount': float(self.amount),
-            'filled': float(self.filled),
-            'remaining': float(self.remaining()),
-            'status': self.status.value,
-            'timestamp': self.timestamp,
-            'pay_fee_with_axn': self.pay_fee_with_axn
+            "id": self.id,
+            "user_address": self.user_address,
+            "pair": self.pair,
+            "side": self.side.value,
+            "type": self.order_type.value,
+            "price": float(self.price),
+            "amount": float(self.amount),
+            "filled": float(self.filled),
+            "remaining": float(self.remaining()),
+            "status": self.status.value,
+            "timestamp": self.timestamp,
+            "pay_fee_with_axn": self.pay_fee_with_axn,
         }
+
 
 @dataclass
 class Trade:
     """Represents an executed trade"""
+
     id: str
     pair: str
     buy_order_id: str
@@ -85,17 +95,18 @@ class Trade:
     def to_dict(self) -> dict:
         """Convert to dictionary"""
         return {
-            'id': self.id,
-            'pair': self.pair,
-            'buy_order_id': self.buy_order_id,
-            'sell_order_id': self.sell_order_id,
-            'buyer': self.buyer_address,
-            'seller': self.seller_address,
-            'price': float(self.price),
-            'amount': float(self.amount),
-            'total': float(self.price * self.amount),
-            'timestamp': self.timestamp
+            "id": self.id,
+            "pair": self.pair,
+            "buy_order_id": self.buy_order_id,
+            "sell_order_id": self.sell_order_id,
+            "buyer": self.buyer_address,
+            "seller": self.seller_address,
+            "price": float(self.price),
+            "amount": float(self.amount),
+            "total": float(self.price * self.amount),
+            "timestamp": self.timestamp,
         }
+
 
 class OrderBook:
     """Order book for a single trading pair"""
@@ -151,32 +162,35 @@ class OrderBook:
     def to_dict(self) -> dict:
         """Convert order book to dictionary"""
         return {
-            'pair': self.pair,
-            'bids': [
+            "pair": self.pair,
+            "bids": [
                 {
-                    'price': float(o.price),
-                    'amount': float(o.remaining()),
-                    'total': float(o.price * o.remaining())
+                    "price": float(o.price),
+                    "amount": float(o.remaining()),
+                    "total": float(o.price * o.remaining()),
                 }
                 for o in self.buy_orders[:20]  # Top 20 bids
             ],
-            'asks': [
+            "asks": [
                 {
-                    'price': float(o.price),
-                    'amount': float(o.remaining()),
-                    'total': float(o.price * o.remaining())
+                    "price": float(o.price),
+                    "amount": float(o.remaining()),
+                    "total": float(o.price * o.remaining()),
                 }
                 for o in self.sell_orders[:20]  # Top 20 asks
             ],
-            'best_bid': float(self.get_best_bid()) if self.get_best_bid() else None,
-            'best_ask': float(self.get_best_ask()) if self.get_best_ask() else None,
-            'spread': float(self.get_spread()) if self.get_spread() else None
+            "best_bid": float(self.get_best_bid()) if self.get_best_bid() else None,
+            "best_ask": float(self.get_best_ask()) if self.get_best_ask() else None,
+            "spread": float(self.get_spread()) if self.get_spread() else None,
         }
+
 
 class MatchingEngine:
     """Order matching engine"""
 
-    def __init__(self, fee_rate: Decimal = Decimal('0.001'), axn_fee_discount: Decimal = Decimal('0.5')):
+    def __init__(
+        self, fee_rate: Decimal = Decimal("0.001"), axn_fee_discount: Decimal = Decimal("0.5")
+    ):
         self.order_books: Dict[str, OrderBook] = {}
         self.active_orders: Dict[str, Order] = {}  # All active orders
         self.trade_history: List[Trade] = []
@@ -190,8 +204,16 @@ class MatchingEngine:
             self.order_books[pair] = OrderBook(pair)
         return self.order_books[pair]
 
-    def place_order(self, user_address: str, pair: str, side: str, order_type: str,
-                   price: float, amount: float, pay_fee_with_axn: bool = False) -> Order:
+    def place_order(
+        self,
+        user_address: str,
+        pair: str,
+        side: str,
+        order_type: str,
+        price: float,
+        amount: float,
+        pay_fee_with_axn: bool = False,
+    ) -> Order:
         """Place a new order"""
         # Generate order ID
         order_id = str(uuid.uuid4())
@@ -203,9 +225,9 @@ class MatchingEngine:
             pair=pair,
             side=OrderSide(side.lower()),
             order_type=OrderType(order_type.lower()),
-            price=Decimal(str(price)) if price > 0 else Decimal('0'),
+            price=Decimal(str(price)) if price > 0 else Decimal("0"),
             amount=Decimal(str(amount)),
-            pay_fee_with_axn=pay_fee_with_axn
+            pay_fee_with_axn=pay_fee_with_axn,
         )
 
         # Add to active orders
@@ -300,7 +322,7 @@ class MatchingEngine:
             buyer_address=buy_order.user_address,
             seller_address=sell_order.user_address,
             price=price,
-            amount=amount
+            amount=amount,
         )
 
         # Update order filled amounts
@@ -387,9 +409,9 @@ class MatchingEngine:
     def get_stats(self) -> dict:
         """Get exchange statistics"""
         return {
-            'total_pairs': len(self.order_books),
-            'active_orders': len(self.active_orders),
-            'total_trades': len(self.trade_history),
-            'unique_traders': len(self.user_orders),
-            'pairs': list(self.order_books.keys())
+            "total_pairs": len(self.order_books),
+            "active_orders": len(self.active_orders),
+            "total_trades": len(self.trade_history),
+            "unique_traders": len(self.user_orders),
+            "pairs": list(self.order_books.keys()),
         }

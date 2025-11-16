@@ -18,6 +18,7 @@ from enum import Enum
 
 class BlockStatus(Enum):
     """Block validation status"""
+
     VALID = "valid"
     ORPHAN = "orphan"
     INVALID = "invalid"
@@ -67,17 +68,21 @@ class BlockPropagationMonitor:
 
             # Update peer latency (exponential moving average)
             if peer_url in self.peer_latency:
-                self.peer_latency[peer_url] = 0.7 * self.peer_latency[peer_url] + 0.3 * propagation_time
+                self.peer_latency[peer_url] = (
+                    0.7 * self.peer_latency[peer_url] + 0.3 * propagation_time
+                )
             else:
                 self.peer_latency[peer_url] = propagation_time
 
             # Record in history
-            self.propagation_history.append({
-                'block_hash': block_hash,
-                'peer': peer_url,
-                'propagation_time': propagation_time,
-                'timestamp': current_time
-            })
+            self.propagation_history.append(
+                {
+                    "block_hash": block_hash,
+                    "peer": peer_url,
+                    "propagation_time": propagation_time,
+                    "timestamp": current_time,
+                }
+            )
 
     def get_peer_performance(self, peer_url: str) -> Dict:
         """
@@ -90,11 +95,7 @@ class BlockPropagationMonitor:
             dict: Performance metrics
         """
         if peer_url not in self.block_propagation_times:
-            return {
-                'avg_latency': None,
-                'block_count': 0,
-                'performance_score': 0
-            }
+            return {"avg_latency": None, "block_count": 0, "performance_score": 0}
 
         times = self.block_propagation_times[peer_url]
         avg_latency = sum(times) / len(times)
@@ -104,28 +105,24 @@ class BlockPropagationMonitor:
         performance_score = max(0, 100 - (avg_latency * 10))
 
         return {
-            'avg_latency': avg_latency,
-            'block_count': len(times),
-            'performance_score': performance_score
+            "avg_latency": avg_latency,
+            "block_count": len(times),
+            "performance_score": performance_score,
         }
 
     def get_network_stats(self) -> Dict:
         """Get overall network propagation statistics"""
         if not self.propagation_history:
-            return {
-                'avg_propagation_time': 0,
-                'total_blocks_tracked': 0,
-                'active_peers': 0
-            }
+            return {"avg_propagation_time": 0, "total_blocks_tracked": 0, "active_peers": 0}
 
-        all_times = [event['propagation_time'] for event in self.propagation_history]
+        all_times = [event["propagation_time"] for event in self.propagation_history]
 
         return {
-            'avg_propagation_time': sum(all_times) / len(all_times),
-            'min_propagation_time': min(all_times),
-            'max_propagation_time': max(all_times),
-            'total_blocks_tracked': len(self.block_first_seen),
-            'active_peers': len(self.peer_latency)
+            "avg_propagation_time": sum(all_times) / len(all_times),
+            "min_propagation_time": min(all_times),
+            "max_propagation_time": max(all_times),
+            "total_blocks_tracked": len(self.block_first_seen),
+            "active_peers": len(self.peer_latency),
         }
 
 
@@ -161,7 +158,7 @@ class OrphanBlockPool:
 
         block_hash = block.hash
         if parent_hash is None:
-            parent_hash = getattr(block, 'previous_hash', None)
+            parent_hash = getattr(block, "previous_hash", None)
 
         # Store orphan
         self.orphan_blocks[block_hash] = block
@@ -203,8 +200,7 @@ class OrphanBlockPool:
             # Remove from parent index
             if parent_hash in self.orphan_by_parent:
                 self.orphan_by_parent[parent_hash] = [
-                    b for b in self.orphan_by_parent[parent_hash]
-                    if b.hash != block_hash
+                    b for b in self.orphan_by_parent[parent_hash] if b.hash != block_hash
                 ]
 
             return block
@@ -222,7 +218,8 @@ class OrphanBlockPool:
         """Remove orphans that have timed out"""
         current_time = time.time()
         expired = [
-            block_hash for block_hash, timestamp in self.orphan_timestamps.items()
+            block_hash
+            for block_hash, timestamp in self.orphan_timestamps.items()
             if current_time - timestamp > self.orphan_timeout
         ]
 
@@ -232,14 +229,15 @@ class OrphanBlockPool:
     def get_stats(self) -> Dict:
         """Get orphan pool statistics"""
         return {
-            'total_orphans': len(self.orphan_blocks),
-            'max_capacity': self.max_orphans,
-            'parents_tracked': len(self.orphan_by_parent)
+            "total_orphans": len(self.orphan_blocks),
+            "max_capacity": self.max_orphans,
+            "parents_tracked": len(self.orphan_by_parent),
         }
 
 
 class OrphanBlockManager(OrphanBlockPool):
     """Alias used by legacy tests and integrations."""
+
     pass
 
 
@@ -281,11 +279,13 @@ class TransactionOrdering:
                 regular.append(tx)
 
         # Sort regular transactions
-        regular.sort(key=lambda tx: (
-            -tx.fee,  # Higher fee first (negative for descending)
-            tx.timestamp,  # Older first
-            tx.txid  # Deterministic tiebreaker
-        ))
+        regular.sort(
+            key=lambda tx: (
+                -tx.fee,  # Higher fee first (negative for descending)
+                tx.timestamp,  # Older first
+                tx.txid,  # Deterministic tiebreaker
+            )
+        )
 
         # Coinbase first, then regular
         return coinbase + regular
@@ -386,13 +386,13 @@ class FinalityTracker:
             finality_percent = min(40, confirmations * 10)
 
         return {
-            'confirmations': confirmations,
-            'finality_level': finality_level,
-            'finality_percent': finality_percent,
-            'reversible': confirmations < self.FINALITY_HARD,
-            'safe_for_small_tx': confirmations >= self.FINALITY_SOFT,
-            'safe_for_medium_tx': confirmations >= self.FINALITY_MEDIUM,
-            'safe_for_large_tx': confirmations >= self.FINALITY_HARD
+            "confirmations": confirmations,
+            "finality_level": finality_level,
+            "finality_percent": finality_percent,
+            "reversible": confirmations < self.FINALITY_HARD,
+            "safe_for_small_tx": confirmations >= self.FINALITY_SOFT,
+            "safe_for_medium_tx": confirmations >= self.FINALITY_MEDIUM,
+            "safe_for_large_tx": confirmations >= self.FINALITY_HARD,
         }
 
     def mark_finalized(self, block_index: int):
@@ -407,16 +407,20 @@ class FinalityTracker:
         """Get overall finality statistics"""
         chain_height = len(blockchain.chain)
 
-        soft_finalized = sum(1 for i in range(max(0, chain_height - self.FINALITY_SOFT), chain_height))
-        medium_finalized = sum(1 for i in range(max(0, chain_height - self.FINALITY_MEDIUM), chain_height))
+        soft_finalized = sum(
+            1 for i in range(max(0, chain_height - self.FINALITY_SOFT), chain_height)
+        )
+        medium_finalized = sum(
+            1 for i in range(max(0, chain_height - self.FINALITY_MEDIUM), chain_height)
+        )
         hard_finalized = len(self.finalized_blocks)
 
         return {
-            'total_blocks': chain_height,
-            'hard_finalized': hard_finalized,
-            'medium_finalized': medium_finalized,
-            'soft_finalized': soft_finalized,
-            'pending': max(0, chain_height - self.FINALITY_SOFT)
+            "total_blocks": chain_height,
+            "hard_finalized": hard_finalized,
+            "medium_finalized": medium_finalized,
+            "soft_finalized": soft_finalized,
+            "pending": max(0, chain_height - self.FINALITY_SOFT),
         }
 
 
@@ -493,8 +497,7 @@ class DynamicDifficultyAdjustment:
 
         # Limit adjustment magnitude
         adjustment_ratio = max(
-            1 / self.max_adjustment_factor,
-            min(self.max_adjustment_factor, adjustment_ratio)
+            1 / self.max_adjustment_factor, min(self.max_adjustment_factor, adjustment_ratio)
         )
 
         # Calculate new difficulty
@@ -536,10 +539,10 @@ class DynamicDifficultyAdjustment:
 
         if chain_length < 2:
             return {
-                'current_difficulty': blockchain.difficulty,
-                'avg_block_time': 0,
-                'target_block_time': self.target_block_time,
-                'blocks_until_adjustment': self.adjustment_window
+                "current_difficulty": blockchain.difficulty,
+                "avg_block_time": 0,
+                "target_block_time": self.target_block_time,
+                "blocks_until_adjustment": self.adjustment_window,
             }
 
         # Calculate average block time from recent blocks
@@ -552,12 +555,12 @@ class DynamicDifficultyAdjustment:
         blocks_until_adjustment = self.adjustment_window - (chain_length % self.adjustment_window)
 
         return {
-            'current_difficulty': blockchain.difficulty,
-            'avg_block_time': avg_block_time,
-            'target_block_time': self.target_block_time,
-            'blocks_until_adjustment': blocks_until_adjustment,
-            'adjustment_window': self.adjustment_window,
-            'recommended_difficulty': self.calculate_new_difficulty(blockchain)
+            "current_difficulty": blockchain.difficulty,
+            "avg_block_time": avg_block_time,
+            "target_block_time": self.target_block_time,
+            "blocks_until_adjustment": blocks_until_adjustment,
+            "adjustment_window": self.adjustment_window,
+            "recommended_difficulty": self.calculate_new_difficulty(blockchain),
         }
 
 
@@ -665,9 +668,7 @@ class AdvancedConsensusManager:
         Returns:
             list: Ordered transactions
         """
-        return self.transaction_ordering.order_transactions(
-            self.blockchain.pending_transactions
-        )
+        return self.transaction_ordering.order_transactions(self.blockchain.pending_transactions)
 
     def adjust_difficulty_if_needed(self):
         """Check and adjust difficulty if needed"""
@@ -691,8 +692,8 @@ class AdvancedConsensusManager:
     def get_consensus_stats(self) -> Dict:
         """Get comprehensive consensus statistics"""
         return {
-            'propagation': self.propagation_monitor.get_network_stats(),
-            'orphan_pool': self.orphan_pool.get_stats(),
-            'finality': self.finality_tracker.get_finality_stats(self.blockchain),
-            'difficulty': self.difficulty_adjuster.get_difficulty_stats(self.blockchain)
+            "propagation": self.propagation_monitor.get_network_stats(),
+            "orphan_pool": self.orphan_pool.get_stats(),
+            "finality": self.finality_tracker.get_finality_stats(self.blockchain),
+            "difficulty": self.difficulty_adjuster.get_difficulty_stats(self.blockchain),
         }

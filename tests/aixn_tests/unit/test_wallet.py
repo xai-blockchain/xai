@@ -12,7 +12,7 @@ import tempfile
 from pathlib import Path
 
 # Add core directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'core'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
 from wallet import Wallet
 
@@ -168,12 +168,12 @@ class TestWalletFileOperations:
             assert os.path.exists(filename)
 
             # Verify file contents
-            with open(filename, 'r') as f:
+            with open(filename, "r") as f:
                 data = json.load(f)
 
-            assert data['private_key'] == wallet.private_key
-            assert data['public_key'] == wallet.public_key
-            assert data['address'] == wallet.address
+            assert data["private_key"] == wallet.private_key
+            assert data["public_key"] == wallet.public_key
+            assert data["address"] == wallet.address
 
     def test_load_wallet_from_file(self):
         """Test loading wallet from saved file"""
@@ -184,10 +184,10 @@ class TestWalletFileOperations:
             wallet1.save_to_file(filename)
 
             # Load wallet from file
-            with open(filename, 'r') as f:
+            with open(filename, "r") as f:
                 data = json.load(f)
 
-            wallet2 = Wallet(private_key=data['private_key'])
+            wallet2 = Wallet(private_key=data["private_key"])
 
             assert wallet2.private_key == wallet1.private_key
             assert wallet2.address == wallet1.address
@@ -204,15 +204,15 @@ class TestWalletFileOperations:
             assert os.path.exists(filename)
 
             # Verify file contains encrypted payload
-            with open(filename, 'r', encoding='utf-8') as f:
+            with open(filename, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
-            assert data.get('encrypted') is True
-            payload = data.get('payload') or data.get('data')
+            assert data.get("encrypted") is True
+            payload = data.get("payload") or data.get("data")
             assert payload and isinstance(payload, dict)
-            assert payload.get('ciphertext')
-            assert payload.get('nonce')
-            assert payload.get('salt')
+            assert payload.get("ciphertext")
+            assert payload.get("nonce")
+            assert payload.get("salt")
 
 
 class TestAddressGeneration:
@@ -241,7 +241,7 @@ class TestAddressGeneration:
         address_hex = wallet.address[3:]
 
         # Should be valid hex
-        assert all(c in '0123456789abcdef' for c in address_hex)
+        assert all(c in "0123456789abcdef" for c in address_hex)
 
 
 class TestKeyPairGeneration:
@@ -289,8 +289,8 @@ class TestEncryptionDecryption:
         payload = wallet._encrypt_payload(data, password)
 
         assert isinstance(payload, dict)
-        assert {'ciphertext', 'nonce', 'salt'}.issubset(set(payload.keys()))
-        assert payload['ciphertext']
+        assert {"ciphertext", "nonce", "salt"}.issubset(set(payload.keys()))
+        assert payload["ciphertext"]
 
     def test_decrypt_data(self):
         """Test data decryption"""
@@ -368,5 +368,5 @@ class TestWalletSecurity:
         assert not is_valid
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

@@ -35,10 +35,10 @@ class BlacklistSource:
         """Update blacklist from source"""
         if not self.needs_update():
             return {
-                'source': self.name,
-                'status': 'cached',
-                'count': len(self.cached_addresses),
-                'last_update': self.last_update
+                "source": self.name,
+                "status": "cached",
+                "count": len(self.cached_addresses),
+                "last_update": self.last_update,
             }
 
         try:
@@ -47,17 +47,17 @@ class BlacklistSource:
             self.last_update = time.time()
 
             return {
-                'source': self.name,
-                'status': 'updated',
-                'count': len(addresses),
-                'last_update': self.last_update
+                "source": self.name,
+                "status": "updated",
+                "count": len(addresses),
+                "last_update": self.last_update,
             }
         except Exception as e:
             return {
-                'source': self.name,
-                'status': 'failed',
-                'error': str(e),
-                'last_update': self.last_update
+                "source": self.name,
+                "status": "failed",
+                "error": str(e),
+                "last_update": self.last_update,
             }
 
 
@@ -68,7 +68,7 @@ class OFACBlacklist(BlacklistSource):
         super().__init__(
             name="OFAC",
             url="https://www.treasury.gov/ofac/downloads/sanctions/1.0/sdn_advanced.xml",
-            update_frequency_hours=24
+            update_frequency_hours=24,
         )
 
     def fetch_addresses(self) -> Set[str]:
@@ -102,11 +102,7 @@ class OFACBlacklist(BlacklistSource):
         """
 
         # MOCK data for testing (no external call):
-        return {
-            'OFAC_MOCK_ADDRESS_1',
-            'OFAC_MOCK_ADDRESS_2',
-            'OFAC_MOCK_ADDRESS_3'
-        }
+        return {"OFAC_MOCK_ADDRESS_1", "OFAC_MOCK_ADDRESS_2", "OFAC_MOCK_ADDRESS_3"}
 
 
 class CommunityBlacklist(BlacklistSource):
@@ -116,7 +112,7 @@ class CommunityBlacklist(BlacklistSource):
         super().__init__(
             name="Community",
             url="https://raw.githubusercontent.com/xai-blockchain/blacklist/main/addresses.json",
-            update_frequency_hours=6
+            update_frequency_hours=6,
         )
 
     def fetch_addresses(self) -> Set[str]:
@@ -143,10 +139,7 @@ class CommunityBlacklist(BlacklistSource):
         """
 
         # MOCK data:
-        return {
-            'COMMUNITY_MOCK_1',
-            'COMMUNITY_MOCK_2'
-        }
+        return {"COMMUNITY_MOCK_1", "COMMUNITY_MOCK_2"}
 
 
 class RansomwareTrackerBlacklist(BlacklistSource):
@@ -156,7 +149,7 @@ class RansomwareTrackerBlacklist(BlacklistSource):
         super().__init__(
             name="RansomwareTracker",
             url="https://ransomwaretracker.abuse.ch/downloads/RW_CRYPTO.txt",
-            update_frequency_hours=24
+            update_frequency_hours=24,
         )
 
     def fetch_addresses(self) -> Set[str]:
@@ -186,10 +179,7 @@ class RansomwareTrackerBlacklist(BlacklistSource):
         """
 
         # MOCK data:
-        return {
-            'RANSOMWARE_MOCK_1',
-            'RANSOMWARE_MOCK_2'
-        }
+        return {"RANSOMWARE_MOCK_1", "RANSOMWARE_MOCK_2"}
 
 
 class BlacklistManager:
@@ -200,11 +190,7 @@ class BlacklistManager:
     """
 
     def __init__(self):
-        self.sources = [
-            OFACBlacklist(),
-            CommunityBlacklist(),
-            RansomwareTrackerBlacklist()
-        ]
+        self.sources = [OFACBlacklist(), CommunityBlacklist(), RansomwareTrackerBlacklist()]
 
         # Governance settings
         self.genesis_time = 1704067200.0  # Nov 6, 2024
@@ -218,27 +204,27 @@ class BlacklistManager:
         """Update from all sources"""
 
         results = {
-            'timestamp': time.time(),
-            'sources': [],
-            'total_addresses': 0,
-            'new_addresses': 0
+            "timestamp": time.time(),
+            "sources": [],
+            "total_addresses": 0,
+            "new_addresses": 0,
         }
 
         old_count = len(self.consolidated_blacklist)
 
         for source in self.sources:
             result = source.update()
-            results['sources'].append(result)
+            results["sources"].append(result)
 
-            if result['status'] == 'updated':
+            if result["status"] == "updated":
                 self.consolidated_blacklist.update(source.cached_addresses)
 
         # Also add cached addresses from sources that didn't update
         for source in self.sources:
             self.consolidated_blacklist.update(source.cached_addresses)
 
-        results['total_addresses'] = len(self.consolidated_blacklist)
-        results['new_addresses'] = len(self.consolidated_blacklist) - old_count
+        results["total_addresses"] = len(self.consolidated_blacklist)
+        results["new_addresses"] = len(self.consolidated_blacklist) - old_count
 
         self.last_full_update = time.time()
         self.update_history.append(results)
@@ -263,28 +249,30 @@ class BlacklistManager:
         Used for consensus - nodes must have matching hash
         """
         sorted_addresses = sorted(list(self.consolidated_blacklist))
-        data = '|'.join(sorted_addresses)
+        data = "|".join(sorted_addresses)
         return hashlib.sha256(data.encode()).hexdigest()
 
     def get_update_status(self) -> Dict:
         """Get update status for all sources"""
 
         status = {
-            'last_full_update': self.last_full_update,
-            'hours_since_update': (time.time() - self.last_full_update) / 3600,
-            'total_addresses': len(self.consolidated_blacklist),
-            'blacklist_hash': self.get_blacklist_hash(),
-            'sources': []
+            "last_full_update": self.last_full_update,
+            "hours_since_update": (time.time() - self.last_full_update) / 3600,
+            "total_addresses": len(self.consolidated_blacklist),
+            "blacklist_hash": self.get_blacklist_hash(),
+            "sources": [],
         }
 
         for source in self.sources:
-            status['sources'].append({
-                'name': source.name,
-                'last_update': source.last_update,
-                'hours_since_update': (time.time() - source.last_update) / 3600,
-                'needs_update': source.needs_update(),
-                'address_count': len(source.cached_addresses)
-            })
+            status["sources"].append(
+                {
+                    "name": source.name,
+                    "last_update": source.last_update,
+                    "hours_since_update": (time.time() - source.last_update) / 3600,
+                    "needs_update": source.needs_update(),
+                    "address_count": len(source.cached_addresses),
+                }
+            )
 
         return status
 
@@ -299,23 +287,23 @@ class BlacklistManager:
     def export_blacklist(self, filepath: str):
         """Export blacklist to file"""
         data = {
-            'updated': time.time(),
-            'updated_readable': datetime.fromtimestamp(time.time()).isoformat(),
-            'total_addresses': len(self.consolidated_blacklist),
-            'blacklist_hash': self.get_blacklist_hash(),
-            'addresses': sorted(list(self.consolidated_blacklist))
+            "updated": time.time(),
+            "updated_readable": datetime.fromtimestamp(time.time()).isoformat(),
+            "total_addresses": len(self.consolidated_blacklist),
+            "blacklist_hash": self.get_blacklist_hash(),
+            "addresses": sorted(list(self.consolidated_blacklist)),
         }
 
-        with open(filepath, 'w') as f:
+        with open(filepath, "w") as f:
             json.dump(data, f, indent=2)
 
     def import_blacklist(self, filepath: str):
         """Import blacklist from file (for quick startup)"""
-        with open(filepath, 'r') as f:
+        with open(filepath, "r") as f:
             data = json.load(f)
 
-        self.consolidated_blacklist = set(data['addresses'])
-        self.last_full_update = data['updated']
+        self.consolidated_blacklist = set(data["addresses"])
+        self.last_full_update = data["updated"]
 
 
 class ConsensusBlacklistValidator:
@@ -327,9 +315,9 @@ class ConsensusBlacklistValidator:
     def __init__(self, max_stale_hours: int = 48):
         self.max_stale_hours = max_stale_hours
 
-    def validate_node_blacklist(self, node_blacklist_hash: str,
-                                node_last_update: float,
-                                current_blacklist_hash: str) -> Dict:
+    def validate_node_blacklist(
+        self, node_blacklist_hash: str, node_last_update: float, current_blacklist_hash: str
+    ) -> Dict:
         """
         Validate node's blacklist is current
 
@@ -341,25 +329,22 @@ class ConsensusBlacklistValidator:
         # Check if too stale
         if hours_since > self.max_stale_hours:
             return {
-                'valid': False,
-                'reason': 'BLACKLIST_TOO_STALE',
-                'hours_since_update': round(hours_since, 2),
-                'max_allowed': self.max_stale_hours
+                "valid": False,
+                "reason": "BLACKLIST_TOO_STALE",
+                "hours_since_update": round(hours_since, 2),
+                "max_allowed": self.max_stale_hours,
             }
 
         # Check if hash matches (same blacklist)
         if node_blacklist_hash != current_blacklist_hash:
             return {
-                'valid': False,
-                'reason': 'BLACKLIST_MISMATCH',
-                'node_hash': node_blacklist_hash[:16],
-                'expected_hash': current_blacklist_hash[:16]
+                "valid": False,
+                "reason": "BLACKLIST_MISMATCH",
+                "node_hash": node_blacklist_hash[:16],
+                "expected_hash": current_blacklist_hash[:16],
             }
 
-        return {
-            'valid': True,
-            'hours_since_update': round(hours_since, 2)
-        }
+        return {"valid": True, "hours_since_update": round(hours_since, 2)}
 
 
 # Example usage
@@ -384,7 +369,7 @@ if __name__ == "__main__":
     print(f"  New addresses: {results['new_addresses']}")
 
     print(f"\nSource Status:")
-    for source in results['sources']:
+    for source in results["sources"]:
         print(f"  {source['source']}: {source['status']} - {source.get('count', 0)} addresses")
 
     # Get status
@@ -404,18 +389,18 @@ if __name__ == "__main__":
     validator = ConsensusBlacklistValidator()
 
     valid_result = validator.validate_node_blacklist(
-        node_blacklist_hash=status['blacklist_hash'],
+        node_blacklist_hash=status["blacklist_hash"],
         node_last_update=time.time(),
-        current_blacklist_hash=status['blacklist_hash']
+        current_blacklist_hash=status["blacklist_hash"],
     )
 
     print(f"\nConsensus Validation (Current):")
     print(f"  Valid: {valid_result['valid']}")
 
     stale_result = validator.validate_node_blacklist(
-        node_blacklist_hash=status['blacklist_hash'],
+        node_blacklist_hash=status["blacklist_hash"],
         node_last_update=time.time() - (50 * 3600),  # 50 hours old
-        current_blacklist_hash=status['blacklist_hash']
+        current_blacklist_hash=status["blacklist_hash"],
     )
 
     print(f"\nConsensus Validation (Stale):")

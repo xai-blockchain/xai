@@ -15,14 +15,12 @@ class LightClientService:
     def __init__(self, blockchain):
         self.blockchain = blockchain
 
-    def get_recent_headers(self, count: int = 20, start_index: Optional[int] = None) -> Dict[str, Any]:
+    def get_recent_headers(
+        self, count: int = 20, start_index: Optional[int] = None
+    ) -> Dict[str, Any]:
         chain = self.blockchain.chain
         if not chain:
-            return {
-                'latest_height': -1,
-                'headers': [],
-                'range': {'start': 0, 'end': -1}
-            }
+            return {"latest_height": -1, "headers": [], "range": {"start": 0, "end": -1}}
 
         latest_height = len(chain) - 1
         count = max(1, min(count, 200))
@@ -33,32 +31,25 @@ class LightClientService:
         start_index = max(0, min(start_index, latest_height))
         end_index = min(latest_height, start_index + count - 1)
 
-        headers = [
-            self._serialize_header(chain[i])
-            for i in range(start_index, end_index + 1)
-        ]
+        headers = [self._serialize_header(chain[i]) for i in range(start_index, end_index + 1)]
 
         return {
-            'latest_height': latest_height,
-            'headers': headers,
-            'range': {'start': start_index, 'end': end_index}
+            "latest_height": latest_height,
+            "headers": headers,
+            "range": {"start": start_index, "end": end_index},
         }
 
     def get_checkpoint(self) -> Dict[str, Any]:
         """Return the latest header and pending transaction count."""
         chain = self.blockchain.chain
         if not chain:
-            return {
-                'latest_header': None,
-                'height': -1,
-                'pending_transactions': 0
-            }
+            return {"latest_header": None, "height": -1, "pending_transactions": 0}
 
         latest_block = chain[-1]
         return {
-            'latest_header': self._serialize_header(latest_block),
-            'height': latest_block.index,
-            'pending_transactions': len(self.blockchain.pending_transactions)
+            "latest_header": self._serialize_header(latest_block),
+            "height": latest_block.index,
+            "pending_transactions": len(self.blockchain.pending_transactions),
         }
 
     def get_transaction_proof(self, txid: str) -> Optional[Dict[str, Any]]:
@@ -73,12 +64,12 @@ class LightClientService:
                 continue
 
             return {
-                'block_index': block.index,
-                'block_hash': block.hash,
-                'merkle_root': block.merkle_root,
-                'header': self._serialize_header(block),
-                'transaction': target_tx.to_dict(),
-                'proof': proof
+                "block_index": block.index,
+                "block_hash": block.hash,
+                "merkle_root": block.merkle_root,
+                "header": self._serialize_header(block),
+                "transaction": target_tx.to_dict(),
+                "proof": proof,
             }
 
         return None
@@ -88,13 +79,13 @@ class LightClientService:
         # Some historical blocks may not have hash precomputed.
         block_hash = block.hash or block.calculate_hash()
         return {
-            'index': block.index,
-            'hash': block_hash,
-            'previous_hash': block.previous_hash,
-            'merkle_root': block.merkle_root,
-            'timestamp': block.timestamp,
-            'difficulty': block.difficulty,
-            'nonce': block.nonce,
+            "index": block.index,
+            "hash": block_hash,
+            "previous_hash": block.previous_hash,
+            "merkle_root": block.merkle_root,
+            "timestamp": block.timestamp,
+            "difficulty": block.difficulty,
+            "nonce": block.nonce,
         }
 
     def _build_merkle_proof(self, block, txid: str) -> Optional[List[Dict[str, str]]]:
@@ -116,10 +107,9 @@ class LightClientService:
             sibling_index = index - 1 if is_right else index + 1
             sibling_index = min(sibling_index, len(working_layer) - 1)
 
-            proof.append({
-                'position': 'left' if is_right else 'right',
-                'hash': working_layer[sibling_index]
-            })
+            proof.append(
+                {"position": "left" if is_right else "right", "hash": working_layer[sibling_index]}
+            )
 
             index //= 2
 

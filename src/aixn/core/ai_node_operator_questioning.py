@@ -30,34 +30,38 @@ from enum import Enum
 
 class QuestionPriority(Enum):
     """Priority levels for AI questions"""
-    BLOCKING = "blocking"      # AI cannot proceed without answer
-    HIGH = "high"             # Important decision, affects architecture
-    MEDIUM = "medium"         # Nice to have guidance
-    LOW = "low"              # Optional input
+
+    BLOCKING = "blocking"  # AI cannot proceed without answer
+    HIGH = "high"  # Important decision, affects architecture
+    MEDIUM = "medium"  # Nice to have guidance
+    LOW = "low"  # Optional input
 
 
 class QuestionType(Enum):
     """Types of questions AI can ask"""
-    MULTIPLE_CHOICE = "multiple_choice"    # Pre-defined options
-    YES_NO = "yes_no"                     # Simple yes/no
-    NUMERIC = "numeric"                    # Number value (fees, timeouts, etc.)
-    FREE_FORM = "free_form"               # Open-ended text response
-    RANKED_CHOICE = "ranked_choice"       # Rank options in order
+
+    MULTIPLE_CHOICE = "multiple_choice"  # Pre-defined options
+    YES_NO = "yes_no"  # Simple yes/no
+    NUMERIC = "numeric"  # Number value (fees, timeouts, etc.)
+    FREE_FORM = "free_form"  # Open-ended text response
+    RANKED_CHOICE = "ranked_choice"  # Rank options in order
 
 
 class QuestionStatus(Enum):
     """Lifecycle of a question"""
-    SUBMITTED = "submitted"           # AI just asked
-    OPEN_FOR_VOTING = "open"         # Node operators can vote
-    MIN_REACHED = "min_reached"      # 25+ operators voted
+
+    SUBMITTED = "submitted"  # AI just asked
+    OPEN_FOR_VOTING = "open"  # Node operators can vote
+    MIN_REACHED = "min_reached"  # 25+ operators voted
     CONSENSUS_REACHED = "consensus"  # Clear majority
-    TIMEOUT = "timeout"              # Not enough votes in time
-    ANSWERED = "answered"            # AI received answer and continued
+    TIMEOUT = "timeout"  # Not enough votes in time
+    ANSWERED = "answered"  # AI received answer and continued
 
 
 @dataclass
 class AnswerOption:
     """A possible answer to a question"""
+
     option_id: str
     option_text: str
     votes: int = 0
@@ -68,14 +72,15 @@ class AnswerOption:
 @dataclass
 class NodeOperatorAnswer:
     """Individual node operator's answer"""
+
     node_address: str
     timestamp: float
 
     # Vote details
     selected_option_id: Optional[str] = None  # For multiple choice
-    numeric_value: Optional[float] = None      # For numeric
-    free_form_text: Optional[str] = None       # For free-form
-    ranked_options: Optional[List[str]] = None # For ranked choice
+    numeric_value: Optional[float] = None  # For numeric
+    free_form_text: Optional[str] = None  # For free-form
+    ranked_options: Optional[List[str]] = None  # For ranked choice
 
     # Weight (stake + reputation)
     xai_stake: float = 0.0
@@ -168,7 +173,7 @@ class AINodeOperatorQuestioning:
         context: str,
         options: Optional[List[str]] = None,
         min_operators: Optional[int] = None,
-        timeout_seconds: Optional[int] = None
+        timeout_seconds: Optional[int] = None,
     ) -> str:
         """
         AI submits a question during task execution
@@ -195,14 +200,13 @@ class AINodeOperatorQuestioning:
         answer_options = []
         if options and question_type in [QuestionType.MULTIPLE_CHOICE, QuestionType.RANKED_CHOICE]:
             for idx, option_text in enumerate(options):
-                answer_options.append(AnswerOption(
-                    option_id=f"option_{idx}",
-                    option_text=option_text
-                ))
+                answer_options.append(
+                    AnswerOption(option_id=f"option_{idx}", option_text=option_text)
+                )
         elif question_type == QuestionType.YES_NO:
             answer_options = [
                 AnswerOption(option_id="yes", option_text="Yes"),
-                AnswerOption(option_id="no", option_text="No")
+                AnswerOption(option_id="no", option_text="No"),
             ]
 
         # Create question
@@ -216,7 +220,7 @@ class AINodeOperatorQuestioning:
             context=context,
             options=answer_options,
             min_node_operators=min_operators or self.min_node_operators,
-            timeout_seconds=timeout_seconds or self.default_timeout
+            timeout_seconds=timeout_seconds or self.default_timeout,
         )
 
         # Store question
@@ -252,7 +256,7 @@ class AINodeOperatorQuestioning:
         selected_option_id: Optional[str] = None,
         numeric_value: Optional[float] = None,
         free_form_text: Optional[str] = None,
-        ranked_options: Optional[List[str]] = None
+        ranked_options: Optional[List[str]] = None,
     ) -> Dict:
         """
         Node operator submits an answer to a question
@@ -271,27 +275,27 @@ class AINodeOperatorQuestioning:
 
         # Validate question exists
         if question_id not in self.questions:
-            return {'success': False, 'error': 'QUESTION_NOT_FOUND'}
+            return {"success": False, "error": "QUESTION_NOT_FOUND"}
 
         question = self.questions[question_id]
 
         # Check if voting is still open
         if question.status not in [QuestionStatus.OPEN_FOR_VOTING, QuestionStatus.SUBMITTED]:
-            return {'success': False, 'error': 'VOTING_CLOSED'}
+            return {"success": False, "error": "VOTING_CLOSED"}
 
         # Check timeout
         elapsed = time.time() - question.voting_opened_at
         if elapsed > question.timeout_seconds:
             question.status = QuestionStatus.TIMEOUT
-            return {'success': False, 'error': 'VOTING_TIMEOUT'}
+            return {"success": False, "error": "VOTING_TIMEOUT"}
 
         # Verify node operator
         if not self._verify_node_operator(node_address):
-            return {'success': False, 'error': 'NOT_A_NODE_OPERATOR'}
+            return {"success": False, "error": "NOT_A_NODE_OPERATOR"}
 
         # Prevent double voting
         if node_address in question.answers:
-            return {'success': False, 'error': 'ALREADY_VOTED'}
+            return {"success": False, "error": "ALREADY_VOTED"}
 
         # Get node operator's weight (stake + reputation)
         weight = self._calculate_vote_weight(node_address)
@@ -307,12 +311,12 @@ class AINodeOperatorQuestioning:
             xai_stake=self.blockchain.get_balance(node_address),
             reputation_score=self.node_reputation.get(node_address, 50.0),
             total_weight=weight,
-            response_time_seconds=elapsed
+            response_time_seconds=elapsed,
         )
 
         # Validate answer matches question type
         if not self._validate_answer(question, answer):
-            return {'success': False, 'error': 'INVALID_ANSWER_FORMAT'}
+            return {"success": False, "error": "INVALID_ANSWER_FORMAT"}
 
         # Store answer
         question.answers[node_address] = answer
@@ -330,7 +334,9 @@ class AINodeOperatorQuestioning:
         if len(question.answers) >= question.min_node_operators:
             if question.status == QuestionStatus.OPEN_FOR_VOTING:
                 question.status = QuestionStatus.MIN_REACHED
-                print(f"\n✅ Minimum {question.min_node_operators} node operators reached for question {question_id}")
+                print(
+                    f"\n✅ Minimum {question.min_node_operators} node operators reached for question {question_id}"
+                )
 
         # Check if consensus reached
         self._check_consensus(question)
@@ -340,12 +346,12 @@ class AINodeOperatorQuestioning:
         print(f"   Vote weight: {weight:.2f}")
 
         return {
-            'success': True,
-            'question_id': question_id,
-            'total_votes': len(question.answers),
-            'min_required': question.min_node_operators,
-            'consensus_reached': question.status == QuestionStatus.CONSENSUS_REACHED,
-            'current_leading_answer': self._get_leading_answer(question)
+            "success": True,
+            "question_id": question_id,
+            "total_votes": len(question.answers),
+            "min_required": question.min_node_operators,
+            "consensus_reached": question.status == QuestionStatus.CONSENSUS_REACHED,
+            "current_leading_answer": self._get_leading_answer(question),
         }
 
     def get_consensus_answer(self, question_id: str, ai_task_id: str) -> Dict:
@@ -361,13 +367,13 @@ class AINodeOperatorQuestioning:
         """
 
         if question_id not in self.questions:
-            return {'success': False, 'error': 'QUESTION_NOT_FOUND'}
+            return {"success": False, "error": "QUESTION_NOT_FOUND"}
 
         question = self.questions[question_id]
 
         # Verify this AI task asked this question
         if question.task_id != ai_task_id:
-            return {'success': False, 'error': 'UNAUTHORIZED_TASK'}
+            return {"success": False, "error": "UNAUTHORIZED_TASK"}
 
         # Check if minimum operators reached
         if len(question.answers) < question.min_node_operators:
@@ -376,18 +382,18 @@ class AINodeOperatorQuestioning:
             if elapsed > question.timeout_seconds:
                 question.status = QuestionStatus.TIMEOUT
                 return {
-                    'success': False,
-                    'error': 'TIMEOUT_INSUFFICIENT_VOTES',
-                    'votes_received': len(question.answers),
-                    'min_required': question.min_node_operators
+                    "success": False,
+                    "error": "TIMEOUT_INSUFFICIENT_VOTES",
+                    "votes_received": len(question.answers),
+                    "min_required": question.min_node_operators,
                 }
             else:
                 return {
-                    'success': False,
-                    'error': 'WAITING_FOR_VOTES',
-                    'votes_received': len(question.answers),
-                    'min_required': question.min_node_operators,
-                    'time_remaining': question.timeout_seconds - elapsed
+                    "success": False,
+                    "error": "WAITING_FOR_VOTES",
+                    "votes_received": len(question.answers),
+                    "min_required": question.min_node_operators,
+                    "time_remaining": question.timeout_seconds - elapsed,
                 }
 
         # Calculate consensus
@@ -400,14 +406,14 @@ class AINodeOperatorQuestioning:
         question.status = QuestionStatus.ANSWERED
 
         return {
-            'success': True,
-            'question_id': question_id,
-            'consensus_answer': question.consensus_answer,
-            'confidence': question.consensus_confidence,
-            'total_votes': len(question.answers),
-            'vote_weight': question.total_vote_weight,
-            'consensus_reached_at': question.consensus_reached_at,
-            'answer_breakdown': self._get_answer_breakdown(question)
+            "success": True,
+            "question_id": question_id,
+            "consensus_answer": question.consensus_answer,
+            "confidence": question.consensus_confidence,
+            "total_votes": len(question.answers),
+            "vote_weight": question.total_vote_weight,
+            "consensus_reached_at": question.consensus_reached_at,
+            "answer_breakdown": self._get_answer_breakdown(question),
         }
 
     def _check_consensus(self, question: AIQuestion) -> bool:
@@ -421,10 +427,17 @@ class AINodeOperatorQuestioning:
         if len(question.answers) < question.min_node_operators:
             return False
 
-        if question.question_type == QuestionType.MULTIPLE_CHOICE or question.question_type == QuestionType.YES_NO:
+        if (
+            question.question_type == QuestionType.MULTIPLE_CHOICE
+            or question.question_type == QuestionType.YES_NO
+        ):
             # Find option with highest weighted votes
             leading_option = max(question.options, key=lambda x: x.vote_weight)
-            leading_weight_percent = leading_option.vote_weight / question.total_vote_weight if question.total_vote_weight > 0 else 0
+            leading_weight_percent = (
+                leading_option.vote_weight / question.total_vote_weight
+                if question.total_vote_weight > 0
+                else 0
+            )
 
             if leading_weight_percent >= question.consensus_threshold:
                 question.consensus_answer = leading_option.option_text
@@ -447,16 +460,25 @@ class AINodeOperatorQuestioning:
                 if answer.numeric_value is not None
             )
 
-            weighted_avg = total_weighted_value / question.total_vote_weight if question.total_vote_weight > 0 else 0
+            weighted_avg = (
+                total_weighted_value / question.total_vote_weight
+                if question.total_vote_weight > 0
+                else 0
+            )
 
             # Calculate standard deviation to assess confidence
-            variance = sum(
-                ((answer.numeric_value - weighted_avg) ** 2) * answer.total_weight
-                for answer in question.answers.values()
-                if answer.numeric_value is not None
-            ) / question.total_vote_weight if question.total_vote_weight > 0 else 0
+            variance = (
+                sum(
+                    ((answer.numeric_value - weighted_avg) ** 2) * answer.total_weight
+                    for answer in question.answers.values()
+                    if answer.numeric_value is not None
+                )
+                / question.total_vote_weight
+                if question.total_vote_weight > 0
+                else 0
+            )
 
-            std_dev = variance ** 0.5
+            std_dev = variance**0.5
 
             # Confidence is inversely related to standard deviation
             # Lower std_dev = higher confidence
@@ -485,7 +507,11 @@ class AINodeOperatorQuestioning:
 
             if answer_weights:
                 leading_answer = max(answer_weights.items(), key=lambda x: x[1])
-                leading_weight_percent = leading_answer[1] / question.total_vote_weight if question.total_vote_weight > 0 else 0
+                leading_weight_percent = (
+                    leading_answer[1] / question.total_vote_weight
+                    if question.total_vote_weight > 0
+                    else 0
+                )
 
                 if leading_weight_percent >= question.consensus_threshold:
                     question.consensus_answer = leading_answer[0]
@@ -537,7 +563,10 @@ class AINodeOperatorQuestioning:
     def _validate_answer(self, question: AIQuestion, answer: NodeOperatorAnswer) -> bool:
         """Validate answer format matches question type"""
 
-        if question.question_type == QuestionType.MULTIPLE_CHOICE or question.question_type == QuestionType.YES_NO:
+        if (
+            question.question_type == QuestionType.MULTIPLE_CHOICE
+            or question.question_type == QuestionType.YES_NO
+        ):
             if not answer.selected_option_id:
                 return False
             # Verify option exists
@@ -572,7 +601,11 @@ class AINodeOperatorQuestioning:
                     for answer in question.answers.values()
                     if answer.numeric_value is not None
                 )
-                weighted_avg = total_weighted_value / question.total_vote_weight if question.total_vote_weight > 0 else 0
+                weighted_avg = (
+                    total_weighted_value / question.total_vote_weight
+                    if question.total_vote_weight > 0
+                    else 0
+                )
                 return str(weighted_avg)
 
         return None
@@ -583,19 +616,25 @@ class AINodeOperatorQuestioning:
         if question.question_type in [QuestionType.MULTIPLE_CHOICE, QuestionType.YES_NO]:
             return {
                 opt.option_text: {
-                    'votes': opt.votes,
-                    'weight': opt.vote_weight,
-                    'percentage': (opt.vote_weight / question.total_vote_weight * 100) if question.total_vote_weight > 0 else 0
+                    "votes": opt.votes,
+                    "weight": opt.vote_weight,
+                    "percentage": (
+                        (opt.vote_weight / question.total_vote_weight * 100)
+                        if question.total_vote_weight > 0
+                        else 0
+                    ),
                 }
                 for opt in question.options
             }
         elif question.question_type == QuestionType.NUMERIC:
-            values = [a.numeric_value for a in question.answers.values() if a.numeric_value is not None]
+            values = [
+                a.numeric_value for a in question.answers.values() if a.numeric_value is not None
+            ]
             return {
-                'min': min(values) if values else 0,
-                'max': max(values) if values else 0,
-                'average': sum(values) / len(values) if values else 0,
-                'median': sorted(values)[len(values) // 2] if values else 0
+                "min": min(values) if values else 0,
+                "max": max(values) if values else 0,
+                "average": sum(values) / len(values) if values else 0,
+                "median": sorted(values)[len(values) // 2] if values else 0,
             }
 
         return {}
@@ -624,7 +663,7 @@ class AINodeOperatorQuestioning:
 
 
 # Example usage and demonstration
-if __name__ == '__main__':
+if __name__ == "__main__":
     print("=" * 80)
     print("AI NODE OPERATOR QUESTIONING SYSTEM - DEMONSTRATION")
     print("=" * 80)
@@ -669,10 +708,10 @@ if __name__ == '__main__':
         options=[
             "Asynchronous validation (faster, more complex)",
             "Synchronous validation (simpler, potential delays)",
-            "Hybrid approach (async for non-critical, sync for critical)"
+            "Hybrid approach (async for non-critical, sync for critical)",
         ],
         min_operators=25,
-        timeout_seconds=86400
+        timeout_seconds=86400,
     )
 
     # Simulate node operators voting
@@ -682,16 +721,16 @@ if __name__ == '__main__':
 
     # 30 node operators vote (exceeds minimum of 25)
     votes = [
-        ("XAI_Node_0", "option_0"),   # Async
-        ("XAI_Node_1", "option_2"),   # Hybrid
-        ("XAI_Node_2", "option_2"),   # Hybrid
-        ("XAI_Node_3", "option_1"),   # Sync
-        ("XAI_Node_4", "option_2"),   # Hybrid
-        ("XAI_Node_5", "option_2"),   # Hybrid
-        ("XAI_Node_6", "option_0"),   # Async
-        ("XAI_Node_7", "option_2"),   # Hybrid
-        ("XAI_Node_8", "option_2"),   # Hybrid
-        ("XAI_Node_9", "option_2"),   # Hybrid
+        ("XAI_Node_0", "option_0"),  # Async
+        ("XAI_Node_1", "option_2"),  # Hybrid
+        ("XAI_Node_2", "option_2"),  # Hybrid
+        ("XAI_Node_3", "option_1"),  # Sync
+        ("XAI_Node_4", "option_2"),  # Hybrid
+        ("XAI_Node_5", "option_2"),  # Hybrid
+        ("XAI_Node_6", "option_0"),  # Async
+        ("XAI_Node_7", "option_2"),  # Hybrid
+        ("XAI_Node_8", "option_2"),  # Hybrid
+        ("XAI_Node_9", "option_2"),  # Hybrid
         ("XAI_Node_10", "option_2"),  # Hybrid
         ("XAI_Node_11", "option_1"),  # Sync
         ("XAI_Node_12", "option_2"),  # Hybrid
@@ -716,9 +755,7 @@ if __name__ == '__main__':
 
     for node_addr, option_id in votes:
         result = questioning.submit_answer(
-            question_id=question_id,
-            node_address=node_addr,
-            selected_option_id=option_id
+            question_id=question_id, node_address=node_addr, selected_option_id=option_id
         )
 
     # AI retrieves consensus answer
@@ -727,18 +764,17 @@ if __name__ == '__main__':
     print("=" * 80)
 
     answer = questioning.get_consensus_answer(
-        question_id=question_id,
-        ai_task_id="task_atomic_swap_cardano"
+        question_id=question_id, ai_task_id="task_atomic_swap_cardano"
     )
 
-    if answer['success']:
+    if answer["success"]:
         print(f"\n✅ AI received consensus answer:")
         print(f"   Answer: {answer['consensus_answer']}")
         print(f"   Confidence: {answer['confidence'] * 100:.1f}%")
         print(f"   Total votes: {answer['total_votes']}")
         print(f"   Vote weight: {answer['vote_weight']:.2f}")
         print(f"\n   Answer breakdown:")
-        for option, details in answer['answer_breakdown'].items():
+        for option, details in answer["answer_breakdown"].items():
             print(f"      {option}: {details['votes']} votes ({details['percentage']:.1f}%)")
 
     # Scenario 2: AI asks numeric question
@@ -753,7 +789,7 @@ if __name__ == '__main__':
         question_type=QuestionType.NUMERIC,
         priority=QuestionPriority.MEDIUM,
         context="I need to set a default fee for Cardano atomic swaps. Too high will discourage usage, too low won't cover infrastructure costs.",
-        min_operators=25
+        min_operators=25,
     )
 
     # Node operators submit numeric answers
@@ -761,34 +797,63 @@ if __name__ == '__main__':
     print("Node operators submitting fee proposals...")
     print("-" * 80)
 
-    fee_proposals = [0.5, 0.5, 0.75, 1.0, 0.5, 0.5, 1.0, 0.75, 0.5, 0.5,
-                    0.75, 1.0, 0.5, 0.5, 0.75, 0.5, 0.5, 1.0, 0.75, 0.5,
-                    0.5, 0.75, 0.5, 0.5, 1.0, 0.75, 0.5, 0.5, 0.75, 0.5]
+    fee_proposals = [
+        0.5,
+        0.5,
+        0.75,
+        1.0,
+        0.5,
+        0.5,
+        1.0,
+        0.75,
+        0.5,
+        0.5,
+        0.75,
+        1.0,
+        0.5,
+        0.5,
+        0.75,
+        0.5,
+        0.5,
+        1.0,
+        0.75,
+        0.5,
+        0.5,
+        0.75,
+        0.5,
+        0.5,
+        1.0,
+        0.75,
+        0.5,
+        0.5,
+        0.75,
+        0.5,
+    ]
 
     for i, fee in enumerate(fee_proposals):
         questioning.submit_answer(
-            question_id=question_id_2,
-            node_address=f"XAI_Node_{i}",
-            numeric_value=fee
+            question_id=question_id_2, node_address=f"XAI_Node_{i}", numeric_value=fee
         )
 
     # AI retrieves consensus
     answer_2 = questioning.get_consensus_answer(
-        question_id=question_id_2,
-        ai_task_id="task_atomic_swap_cardano"
+        question_id=question_id_2, ai_task_id="task_atomic_swap_cardano"
     )
 
-    if answer_2['success']:
+    if answer_2["success"]:
         print(f"\n✅ AI received consensus answer:")
         print(f"   Fee: {float(answer_2['consensus_answer']):.4f} XAI")
         print(f"   Confidence: {answer_2['confidence'] * 100:.1f}%")
-        print(f"   Range: {answer_2['answer_breakdown']['min']:.2f} - {answer_2['answer_breakdown']['max']:.2f} XAI")
+        print(
+            f"   Range: {answer_2['answer_breakdown']['min']:.2f} - {answer_2['answer_breakdown']['max']:.2f} XAI"
+        )
         print(f"   Median: {answer_2['answer_breakdown']['median']:.2f} XAI")
 
     print("\n\n" + "=" * 80)
     print("BENEFITS OF AI QUESTIONING SYSTEM")
     print("=" * 80)
-    print("""
+    print(
+        """
 1. ✅ AI gets expert human guidance on critical decisions
 2. ✅ Node operators provide oversight during implementation
 3. ✅ Consensus ensures no single person controls AI decisions
@@ -801,4 +866,5 @@ if __name__ == '__main__':
 10. ✅ Timeout mechanisms prevent indefinite blocking
 
 This creates a collaborative AI + human development system!
-    """)
+    """
+    )

@@ -11,7 +11,7 @@ import time
 from decimal import Decimal
 
 # Add core directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'core'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
 from blockchain_security import (
     BlockchainSecurityConfig,
@@ -19,7 +19,7 @@ from blockchain_security import (
     SupplyValidator,
     ResourceLimiter,
     TimeValidator,
-    OverflowProtection
+    OverflowProtection,
 )
 from blockchain import Blockchain, Transaction, Block
 from wallet import Wallet
@@ -434,5 +434,5 @@ class TestInputValidation:
         bc.validate_transaction(tx)
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

@@ -12,7 +12,6 @@ from typing import Tuple, Optional
 from datetime import datetime
 
 
-
 from aixn.core.blockchain_persistence import BlockchainStorage
 from aixn.core.chain_validator import validate_blockchain_on_startup, ValidationReport
 
@@ -29,8 +28,12 @@ class BlockchainLoader:
     - Safe fallback to checkpoints
     """
 
-    def __init__(self, data_dir: str = None, max_supply: float = 121000000.0,
-                 expected_genesis_hash: Optional[str] = None):
+    def __init__(
+        self,
+        data_dir: str = None,
+        max_supply: float = 121000000.0,
+        expected_genesis_hash: Optional[str] = None,
+    ):
         """
         Initialize blockchain loader
 
@@ -91,7 +94,7 @@ class BlockchainLoader:
             blockchain_data,
             max_supply=self.max_supply,
             expected_genesis_hash=self.expected_genesis_hash,
-            verbose=verbose
+            verbose=verbose,
         )
 
         # Step 3: Handle validation results
@@ -154,7 +157,7 @@ class BlockchainLoader:
 
                 # Try to restore from this backup
                 success, blockchain_data, message = self.storage.restore_from_backup(
-                    backup['filename']
+                    backup["filename"]
                 )
 
                 if not success:
@@ -170,7 +173,7 @@ class BlockchainLoader:
                     blockchain_data,
                     max_supply=self.max_supply,
                     expected_genesis_hash=self.expected_genesis_hash,
-                    verbose=False
+                    verbose=False,
                 )
 
                 if is_valid:
@@ -214,16 +217,13 @@ class BlockchainLoader:
                     print(f"  Timestamp: {checkpoint['timestamp']}")
 
                 # Load checkpoint file manually
-                checkpoint_path = os.path.join(
-                    self.storage.checkpoint_dir,
-                    checkpoint['filename']
-                )
+                checkpoint_path = os.path.join(self.storage.checkpoint_dir, checkpoint["filename"])
 
                 try:
-                    with open(checkpoint_path, 'r') as f:
+                    with open(checkpoint_path, "r") as f:
                         checkpoint_data = json.load(f)
 
-                    blockchain_data = checkpoint_data.get('blockchain')
+                    blockchain_data = checkpoint_data.get("blockchain")
 
                     if not blockchain_data:
                         if verbose:
@@ -238,7 +238,7 @@ class BlockchainLoader:
                         blockchain_data,
                         max_supply=self.max_supply,
                         expected_genesis_hash=self.expected_genesis_hash,
-                        verbose=False
+                        verbose=False,
                     )
 
                     if is_valid:
@@ -257,7 +257,11 @@ class BlockchainLoader:
                         # Save recovery report
                         self._save_validation_report(report, "checkpoint_recovery")
 
-                        return True, blockchain_data, f"Recovered from checkpoint: {checkpoint['filename']}"
+                        return (
+                            True,
+                            blockchain_data,
+                            f"Recovered from checkpoint: {checkpoint['filename']}",
+                        )
                     else:
                         if verbose:
                             print(f"  ✗ Checkpoint validation failed")
@@ -293,13 +297,12 @@ class BlockchainLoader:
             report_type: Type of report (e.g., 'validation_success', 'validation_failed')
         """
         try:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             report_file = os.path.join(
-                self.storage.data_dir,
-                f'validation_report_{report_type}_{timestamp}.json'
+                self.storage.data_dir, f"validation_report_{report_type}_{timestamp}.json"
             )
 
-            with open(report_file, 'w') as f:
+            with open(report_file, "w") as f:
                 json.dump(report.to_dict(), f, indent=2)
 
             print(f"Validation report saved: {os.path.basename(report_file)}")
@@ -317,10 +320,12 @@ class BlockchainLoader:
         return self.validation_report
 
 
-def load_blockchain_with_validation(data_dir: str = None,
-                                    max_supply: float = 121000000.0,
-                                    expected_genesis_hash: Optional[str] = None,
-                                    verbose: bool = True) -> Tuple[bool, Optional[dict], str]:
+def load_blockchain_with_validation(
+    data_dir: str = None,
+    max_supply: float = 121000000.0,
+    expected_genesis_hash: Optional[str] = None,
+    verbose: bool = True,
+) -> Tuple[bool, Optional[dict], str]:
     """
     Convenience function to load and validate blockchain
 
@@ -336,9 +341,7 @@ def load_blockchain_with_validation(data_dir: str = None,
         tuple: (success: bool, blockchain_data: dict or None, message: str)
     """
     loader = BlockchainLoader(
-        data_dir=data_dir,
-        max_supply=max_supply,
-        expected_genesis_hash=expected_genesis_hash
+        data_dir=data_dir, max_supply=max_supply, expected_genesis_hash=expected_genesis_hash
     )
 
     return loader.load_and_validate(verbose=verbose)
@@ -350,8 +353,7 @@ if __name__ == "__main__":
 
     # Load and validate blockchain
     success, blockchain_data, message = load_blockchain_with_validation(
-        max_supply=121000000.0,
-        verbose=True
+        max_supply=121000000.0, verbose=True
     )
 
     if success:

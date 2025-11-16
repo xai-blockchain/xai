@@ -14,7 +14,11 @@ class XAITokenSupply:
     Manages the supply of XAI tokens, including minting, burning, and tracking.
     """
 
-    def __init__(self, token_manager: Optional[XAITokenManager] = None, logger: Optional[StructuredLogger] = None):
+    def __init__(
+        self,
+        token_manager: Optional[XAITokenManager] = None,
+        logger: Optional[StructuredLogger] = None,
+    ):
         self.token_manager = token_manager or get_xai_token_manager()
         self.logger = logger or get_structured_logger()
         self.burned_tokens = 0.0
@@ -31,7 +35,7 @@ class XAITokenSupply:
         Calculates and returns the circulating supply of XAI tokens.
         This excludes tokens held in vesting schedules or burned.
         """
-        return self.token_manager.get_token_metrics()['circulating_supply'] - self.burned_tokens
+        return self.token_manager.get_token_metrics()["circulating_supply"] - self.burned_tokens
 
     def get_supply_cap(self) -> float:
         """
@@ -51,18 +55,31 @@ class XAITokenSupply:
             True if burning was successful, False otherwise.
         """
         if amount <= 0:
-            self.logger.warn("Attempted to burn non-positive amount.", address=address, amount=amount)
+            self.logger.warn(
+                "Attempted to burn non-positive amount.", address=address, amount=amount
+            )
             return False
 
         current_balance = self.token_manager.get_balance(address)
         if current_balance < amount:
-            self.logger.warn(f"Insufficient balance to burn {amount} XAI from {address}.", address=address, amount=amount, balance=current_balance)
+            self.logger.warn(
+                f"Insufficient balance to burn {amount} XAI from {address}.",
+                address=address,
+                amount=amount,
+                balance=current_balance,
+            )
             return False
 
         # Deduct from balance
         self.token_manager.xai_token.balances[address] -= amount
         self.burned_tokens += amount
-        self.logger.info(f"Burned {amount} XAI from {address}.", address=address, amount=amount, new_balance=self.token_manager.get_balance(address), total_burned=self.burned_tokens)
+        self.logger.info(
+            f"Burned {amount} XAI from {address}.",
+            address=address,
+            amount=amount,
+            new_balance=self.token_manager.get_balance(address),
+            total_burned=self.burned_tokens,
+        )
         return True
 
     def get_burned_tokens(self) -> float:
@@ -77,17 +94,24 @@ class XAITokenSupply:
         """
         token_metrics = self.token_manager.get_token_metrics()
         return {
-            'total_supply': token_metrics['total_supply'],
-            'supply_cap': token_metrics['supply_cap'],
-            'circulating_supply': self.get_circulating_supply(),
-            'burned_tokens': self.burned_tokens,
-            'vested_tokens': token_metrics['total_supply'] - token_metrics['circulating_supply'] # This is the non-circulating part due to vesting
+            "total_supply": token_metrics["total_supply"],
+            "supply_cap": token_metrics["supply_cap"],
+            "circulating_supply": self.get_circulating_supply(),
+            "burned_tokens": self.burned_tokens,
+            "vested_tokens": token_metrics["total_supply"]
+            - token_metrics[
+                "circulating_supply"
+            ],  # This is the non-circulating part due to vesting
         }
+
 
 # Global instance for convenience
 _global_xai_token_supply = None
 
-def get_xai_token_supply(token_manager: Optional[XAITokenManager] = None, logger: Optional[StructuredLogger] = None) -> XAITokenSupply:
+
+def get_xai_token_supply(
+    token_manager: Optional[XAITokenManager] = None, logger: Optional[StructuredLogger] = None
+) -> XAITokenSupply:
     """
     Get global XAITokenSupply instance.
     """

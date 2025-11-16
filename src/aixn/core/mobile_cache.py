@@ -19,7 +19,9 @@ class MobileCacheService:
         self._last_summary: Optional[Dict[str, Any]] = None
         self._last_built_at: float = 0.0
 
-    def build_summary(self, address: Optional[str] = None, use_cache: bool = True) -> Dict[str, Any]:
+    def build_summary(
+        self, address: Optional[str] = None, use_cache: bool = True
+    ) -> Dict[str, Any]:
         now = time.time()
         if (
             use_cache
@@ -38,33 +40,33 @@ class MobileCacheService:
             snapshot = None
 
         summary = dict(summary)
-        summary['address_risk'] = snapshot
+        summary["address_risk"] = snapshot
         return summary
 
     def _build_fresh_summary(self) -> Dict[str, Any]:
         blockchain = self.node.blockchain
         latest_block = blockchain.get_latest_block()
-        wallet_tracker = getattr(self.node, 'wallet_claiming_tracker', None)
+        wallet_tracker = getattr(self.node, "wallet_claiming_tracker", None)
         pending_claims = wallet_tracker.pending_claims_summary() if wallet_tracker else []
 
         return {
-            'timestamp': time.time(),
-            'latest_block': {
-                'index': latest_block.index,
-                'hash': latest_block.hash,
-                'timestamp': latest_block.timestamp,
-                'pending_transactions': len(blockchain.pending_transactions),
+            "timestamp": time.time(),
+            "latest_block": {
+                "index": latest_block.index,
+                "hash": latest_block.hash,
+                "timestamp": latest_block.timestamp,
+                "pending_transactions": len(blockchain.pending_transactions),
             },
-            'wallet_claims_pending': len(pending_claims),
-            'notifications_due': [
+            "wallet_claims_pending": len(pending_claims),
+            "notifications_due": [
                 {
-                    'identifier': claim['identifier'],
-                    'next_notification_due': claim['next_notification_due_iso']
+                    "identifier": claim["identifier"],
+                    "next_notification_due": claim["next_notification_due_iso"],
                 }
                 for claim in pending_claims[:10]
             ],
-            'mining': {
-                'difficulty': blockchain.difficulty,
-                'queue_depth': len(blockchain.pending_transactions)
-            }
+            "mining": {
+                "difficulty": blockchain.difficulty,
+                "queue_depth": len(blockchain.pending_transactions),
+            },
         }

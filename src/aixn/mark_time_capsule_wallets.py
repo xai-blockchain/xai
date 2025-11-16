@@ -12,10 +12,11 @@ import json
 import random
 import os
 
+
 def mark_time_capsule_wallets():
     """Mark 920 random standard wallets for time capsule eligibility"""
 
-    wallet_file = 'standard_wallets_PRIVATE.json'
+    wallet_file = "standard_wallets_PRIVATE.json"
 
     if not os.path.exists(wallet_file):
         print(f"[ERROR] {wallet_file} not found!")
@@ -23,7 +24,7 @@ def mark_time_capsule_wallets():
         return False
 
     # Load standard wallets
-    with open(wallet_file, 'r') as f:
+    with open(wallet_file, "r") as f:
         wallets = json.load(f)
 
     print(f"Loaded {len(wallets)} standard wallets")
@@ -41,17 +42,17 @@ def mark_time_capsule_wallets():
 
     # Mark selected wallets
     for i in time_capsule_indices:
-        wallets[i]['time_capsule_eligible'] = True
-        wallets[i]['time_capsule_bonus'] = 450  # Bonus to add (50 + 450 = 500)
-        wallets[i]['time_capsule_claimed'] = False
+        wallets[i]["time_capsule_eligible"] = True
+        wallets[i]["time_capsule_bonus"] = 450  # Bonus to add (50 + 450 = 500)
+        wallets[i]["time_capsule_claimed"] = False
 
     # Mark remaining wallets as not eligible
     for i in range(len(wallets)):
         if i not in time_capsule_indices:
-            wallets[i]['time_capsule_eligible'] = False
+            wallets[i]["time_capsule_eligible"] = False
 
     # Save updated wallets
-    with open(wallet_file, 'w') as f:
+    with open(wallet_file, "w") as f:
         json.dump(wallets, f, indent=2)
 
     print(f"✓ Successfully marked 920 wallets as time capsule eligible")
@@ -60,6 +61,7 @@ def mark_time_capsule_wallets():
     print(f"✓ Updated {wallet_file}")
 
     return True
+
 
 if __name__ == "__main__":
     print("=" * 70)

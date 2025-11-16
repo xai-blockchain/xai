@@ -15,12 +15,18 @@ class XAITokenVesting:
     Manages vesting schedules for XAI tokens.
     """
 
-    def __init__(self, token_manager: Optional[XAITokenManager] = None, logger: Optional[StructuredLogger] = None):
+    def __init__(
+        self,
+        token_manager: Optional[XAITokenManager] = None,
+        logger: Optional[StructuredLogger] = None,
+    ):
         self.token_manager = token_manager or get_xai_token_manager()
         self.logger = logger or get_structured_logger()
         self.logger.info("XAITokenVesting initialized.")
 
-    def create_vesting_schedule(self, address: str, amount: float, cliff_duration: int, total_duration: int) -> bool:
+    def create_vesting_schedule(
+        self, address: str, amount: float, cliff_duration: int, total_duration: int
+    ) -> bool:
         """
         Creates a vesting schedule for a given address.
 
@@ -34,14 +40,30 @@ class XAITokenVesting:
             True if the vesting schedule was created successfully, False otherwise.
         """
         if amount <= 0 or cliff_duration < 0 or total_duration <= cliff_duration:
-            self.logger.warn("Invalid parameters for vesting schedule creation.", address=address, amount=amount, cliff_duration=cliff_duration, total_duration=total_duration)
+            self.logger.warn(
+                "Invalid parameters for vesting schedule creation.",
+                address=address,
+                amount=amount,
+                cliff_duration=cliff_duration,
+                total_duration=total_duration,
+            )
             return False
 
-        if self.token_manager.create_vesting_schedule(address, amount, cliff_duration, total_duration):
-            self.logger.info(f"Vesting schedule created for {address} for {amount} XAI.", address=address, amount=amount, cliff_duration=cliff_duration, total_duration=total_duration)
+        if self.token_manager.create_vesting_schedule(
+            address, amount, cliff_duration, total_duration
+        ):
+            self.logger.info(
+                f"Vesting schedule created for {address} for {amount} XAI.",
+                address=address,
+                amount=amount,
+                cliff_duration=cliff_duration,
+                total_duration=total_duration,
+            )
             return True
         else:
-            self.logger.error(f"Failed to create vesting schedule for {address}.", address=address, amount=amount)
+            self.logger.error(
+                f"Failed to create vesting schedule for {address}.", address=address, amount=amount
+            )
             return False
 
     def get_vesting_status(self, address: str) -> Optional[Dict[str, Any]]:
@@ -71,31 +93,39 @@ class XAITokenVesting:
             return 0.0
 
         current_time = time.time()
-        if current_time < schedule['cliff_end']:
+        if current_time < schedule["cliff_end"]:
             return 0.0  # Still in cliff period
 
-        total_vested_amount = schedule['amount']
-        total_duration = schedule['end_date'] - (schedule['cliff_end'] - schedule['cliff_duration']) # Recalculate total duration from start of vesting
-        
-        if total_duration <= 0: # Avoid division by zero if total_duration is somehow invalid
+        total_vested_amount = schedule["amount"]
+        total_duration = schedule["end_date"] - (
+            schedule["cliff_end"] - schedule["cliff_duration"]
+        )  # Recalculate total duration from start of vesting
+
+        if total_duration <= 0:  # Avoid division by zero if total_duration is somehow invalid
             return 0.0
 
-        time_elapsed_since_cliff = current_time - schedule['cliff_end']
-        
+        time_elapsed_since_cliff = current_time - schedule["cliff_end"]
+
         # Calculate the proportion of tokens that should have vested by now
         vested_proportion = min(1.0, time_elapsed_since_cliff / total_duration)
-        
+
         # Total amount that should have vested
         should_have_vested = total_vested_amount * vested_proportion
-        
+
         # Amount to release now
-        to_release = should_have_vested - schedule['released']
+        to_release = should_have_vested - schedule["released"]
 
         if to_release > 0:
             # Update balance and released amount
-            self.token_manager.transfer_tokens("vesting_contract_address", address, to_release) # Assuming a generic vesting contract address
-            schedule['released'] += to_release
-            self.logger.info(f"Released {to_release} vested XAI to {address}.", address=address, released_amount=to_release)
+            self.token_manager.transfer_tokens(
+                "vesting_contract_address", address, to_release
+            )  # Assuming a generic vesting contract address
+            schedule["released"] += to_release
+            self.logger.info(
+                f"Released {to_release} vested XAI to {address}.",
+                address=address,
+                released_amount=to_release,
+            )
             return to_release
         return 0.0
 
@@ -105,13 +135,17 @@ class XAITokenVesting:
         """
         total = 0.0
         for schedule in self.token_manager.xai_token.vesting_schedules.values():
-            total += schedule['amount'] - schedule['released']
+            total += schedule["amount"] - schedule["released"]
         return total
+
 
 # Global instance for convenience
 _global_xai_token_vesting = None
 
-def get_xai_token_vesting(token_manager: Optional[XAITokenManager] = None, logger: Optional[StructuredLogger] = None) -> XAITokenVesting:
+
+def get_xai_token_vesting(
+    token_manager: Optional[XAITokenManager] = None, logger: Optional[StructuredLogger] = None
+) -> XAITokenVesting:
     """
     Get global XAITokenVesting instance.
     """

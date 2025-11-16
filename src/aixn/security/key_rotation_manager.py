@@ -3,6 +3,7 @@ import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 
+
 class KeyRotationManager:
     def __init__(self, key_length_bytes: int = 32, rotation_interval_days: int = 30):
         if not isinstance(key_length_bytes, int) or key_length_bytes <= 0:
@@ -41,27 +42,36 @@ class KeyRotationManager:
             self.historical_keys[self.active_key_id] = {
                 "key": self.active_key,
                 "rotation_timestamp": self.last_rotation_timestamp,
-                "deactivation_timestamp": current_timestamp
+                "deactivation_timestamp": current_timestamp,
             }
             print(f"Archived old key: {self.active_key_id}")
 
         self.active_key = new_key
         self.active_key_id = new_key_id
         self.last_rotation_timestamp = current_timestamp
-        print(f"New active key generated: {self.active_key_id} at {datetime.fromtimestamp(current_timestamp)}")
+        print(
+            f"New active key generated: {self.active_key_id} at {datetime.fromtimestamp(current_timestamp)}"
+        )
 
     def rotate_key(self, force: bool = False):
         """
         Rotates the active key if the rotation interval has passed or if forced.
         """
         current_timestamp = int(time.time())
-        if force or (self.last_rotation_timestamp is None or 
-                     (current_timestamp - self.last_rotation_timestamp) >= (self.rotation_interval_days * 24 * 3600)):
+        if force or (
+            self.last_rotation_timestamp is None
+            or (current_timestamp - self.last_rotation_timestamp)
+            >= (self.rotation_interval_days * 24 * 3600)
+        ):
             print(f"Initiating key rotation...")
             self._generate_new_key()
         else:
-            next_rotation_time = self.last_rotation_timestamp + (self.rotation_interval_days * 24 * 3600)
-            print(f"Key rotation not due yet. Next rotation scheduled for: {datetime.fromtimestamp(next_rotation_time)}")
+            next_rotation_time = self.last_rotation_timestamp + (
+                self.rotation_interval_days * 24 * 3600
+            )
+            print(
+                f"Key rotation not due yet. Next rotation scheduled for: {datetime.fromtimestamp(next_rotation_time)}"
+            )
 
     def get_active_key(self) -> bytes:
         """Returns the current active key."""
@@ -73,7 +83,7 @@ class KeyRotationManager:
         """Retrieves a key (active or historical) by its ID."""
         if key_id == self.active_key_id:
             return self.active_key
-        
+
         historical_entry = self.historical_keys.get(key_id)
         if historical_entry:
             return historical_entry["key"]
@@ -83,10 +93,11 @@ class KeyRotationManager:
         """Returns all historical keys."""
         return self.historical_keys
 
+
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
     # Set a short rotation interval for demonstration
-    manager = KeyRotationManager(rotation_interval_days=1) # Rotate every day
+    manager = KeyRotationManager(rotation_interval_days=1)  # Rotate every day
 
     print(f"Initial active key ID: {manager.active_key_id}")
     print(f"Last rotation: {datetime.fromtimestamp(manager.last_rotation_timestamp)}")
@@ -102,7 +113,7 @@ if __name__ == "__main__":
 
     # Simulate passage of time for automated rotation
     print("\n--- Simulating time passage for automated rotation ---")
-    time.sleep(2) # Simulate 2 days passing (since interval is 1 day)
+    time.sleep(2)  # Simulate 2 days passing (since interval is 1 day)
     manager.rotate_key()
     print(f"Active key ID: {manager.active_key_id}")
     print(f"Historical keys: {manager.get_historical_keys()}")

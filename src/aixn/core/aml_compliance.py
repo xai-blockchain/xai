@@ -13,15 +13,17 @@ from enum import Enum
 
 class RiskLevel(Enum):
     """Risk level classifications"""
-    CLEAN = "clean"           # 0-20
-    LOW = "low"               # 21-40
-    MEDIUM = "medium"         # 41-60
-    HIGH = "high"             # 61-80
-    CRITICAL = "critical"     # 81-100
+
+    CLEAN = "clean"  # 0-20
+    LOW = "low"  # 21-40
+    MEDIUM = "medium"  # 41-60
+    HIGH = "high"  # 61-80
+    CRITICAL = "critical"  # 81-100
 
 
 class FlagReason(Enum):
     """Reasons for transaction flagging"""
+
     LARGE_AMOUNT = "large_amount"
     RAPID_SUCCESSION = "rapid_succession"
     STRUCTURING = "structuring"
@@ -48,8 +50,9 @@ class TransactionRiskScore:
         self.blacklisted_addresses = set()
         self.sanctioned_addresses = set()
 
-    def calculate_risk_score(self, transaction: Dict,
-                            sender_history: List[Dict] = None) -> Tuple[int, List[str]]:
+    def calculate_risk_score(
+        self, transaction: Dict, sender_history: List[Dict] = None
+    ) -> Tuple[int, List[str]]:
         """
         Calculate risk score (0-100) and flag reasons
 
@@ -61,13 +64,13 @@ class TransactionRiskScore:
         reasons = []
 
         # Check 1: Large amount
-        if transaction.get('amount_usd', 0) >= self.LARGE_AMOUNT_USD:
+        if transaction.get("amount_usd", 0) >= self.LARGE_AMOUNT_USD:
             score += 30
             reasons.append(FlagReason.LARGE_AMOUNT.value)
 
         # Check 2: Blacklisted address
-        sender = transaction.get('sender')
-        recipient = transaction.get('recipient')
+        sender = transaction.get("sender")
+        recipient = transaction.get("recipient")
 
         if sender in self.blacklisted_addresses or recipient in self.blacklisted_addresses:
             score += 50
@@ -94,13 +97,15 @@ class TransactionRiskScore:
 
         # Check 6: New account with large transaction
         if sender_history and len(sender_history) < 5:
-            account_age_days = (time.time() - sender_history[0].get('timestamp', time.time())) / 86400
-            if account_age_days < self.NEW_ACCOUNT_DAYS and transaction.get('amount_usd', 0) > 5000:
+            account_age_days = (
+                time.time() - sender_history[0].get("timestamp", time.time())
+            ) / 86400
+            if account_age_days < self.NEW_ACCOUNT_DAYS and transaction.get("amount_usd", 0) > 5000:
                 score += 35
                 reasons.append(FlagReason.NEW_ACCOUNT_LARGE_TX.value)
 
         # Check 7: Round amount pattern (common in money laundering)
-        amount = transaction.get('amount', 0)
+        amount = transaction.get("amount", 0)
         if self._is_round_amount(amount):
             score += 10
             reasons.append(FlagReason.ROUND_AMOUNT.value)
@@ -119,14 +124,13 @@ class TransactionRiskScore:
     def _get_recent_transactions(self, history: List[Dict], window: int) -> List[Dict]:
         """Get transactions within time window"""
         cutoff = time.time() - window
-        return [tx for tx in history if tx.get('timestamp', 0) > cutoff]
+        return [tx for tx in history if tx.get("timestamp", 0) > cutoff]
 
     def _detect_structuring(self, recent_txs: List[Dict], current_tx: Dict) -> bool:
         """Detect structuring pattern (multiple txs just under threshold)"""
         # Multiple transactions just under $10k in 24 hours
         near_threshold = [
-            tx for tx in recent_txs
-            if 8000 <= tx.get('amount_usd', 0) <= self.STRUCTURING_THRESHOLD
+            tx for tx in recent_txs if 8000 <= tx.get("amount_usd", 0) <= self.STRUCTURING_THRESHOLD
         ]
 
         if len(near_threshold) >= 3:
@@ -148,7 +152,7 @@ class TransactionRiskScore:
         # Average transaction frequency
         time_diffs = []
         for i in range(1, len(history)):
-            diff = history[i]['timestamp'] - history[i-1]['timestamp']
+            diff = history[i]["timestamp"] - history[i - 1]["timestamp"]
             time_diffs.append(diff)
 
         if not time_diffs:
@@ -157,7 +161,7 @@ class TransactionRiskScore:
         avg_diff = sum(time_diffs) / len(time_diffs)
 
         # Current transaction is 10x faster than average
-        last_diff = current_tx['timestamp'] - history[-1]['timestamp']
+        last_diff = current_tx["timestamp"] - history[-1]["timestamp"]
         if last_diff < avg_diff / 10:
             return True
 
@@ -194,18 +198,11 @@ class AddressBlacklist:
 
     def add_blacklist(self, address: str, reason: str, added_by: str = "protocol"):
         """Add address to blacklist"""
-        self.blacklist[address] = {
-            'reason': reason,
-            'added_by': added_by,
-            'timestamp': time.time()
-        }
+        self.blacklist[address] = {"reason": reason, "added_by": added_by, "timestamp": time.time()}
 
     def add_sanction(self, address: str, country: str):
         """Add sanctioned address"""
-        self.sanctions[address] = {
-            'country': country,
-            'timestamp': time.time()
-        }
+        self.sanctions[address] = {"country": country, "timestamp": time.time()}
 
     def is_blacklisted(self, address: str) -> bool:
         """Check if address is blacklisted"""
@@ -234,32 +231,33 @@ class RegulatorDashboard:
         self.blockchain = blockchain
         self.risk_scorer = TransactionRiskScore()
 
-    def get_flagged_transactions(self, min_score: int = 61,
-                                 limit: int = 1000) -> List[Dict]:
+    def get_flagged_transactions(self, min_score: int = 61, limit: int = 1000) -> List[Dict]:
         """Get all flagged transactions above risk threshold"""
 
         flagged = []
 
         # Scan blockchain for flagged transactions
         for block in self.blockchain.chain:
-            for tx in block.get('transactions', []):
-                score = tx.get('risk_score', 0)
+            for tx in block.get("transactions", []):
+                score = tx.get("risk_score", 0)
                 if score >= min_score:
-                    flagged.append({
-                        'transaction_hash': tx.get('hash'),
-                        'block': block.get('index'),
-                        'timestamp': tx.get('timestamp'),
-                        'sender': tx.get('sender'),
-                        'recipient': tx.get('recipient'),
-                        'amount': tx.get('amount'),
-                        'amount_usd': tx.get('amount_usd'),
-                        'risk_score': score,
-                        'risk_level': tx.get('risk_level'),
-                        'flag_reasons': tx.get('flag_reasons', [])
-                    })
+                    flagged.append(
+                        {
+                            "transaction_hash": tx.get("hash"),
+                            "block": block.get("index"),
+                            "timestamp": tx.get("timestamp"),
+                            "sender": tx.get("sender"),
+                            "recipient": tx.get("recipient"),
+                            "amount": tx.get("amount"),
+                            "amount_usd": tx.get("amount_usd"),
+                            "risk_score": score,
+                            "risk_level": tx.get("risk_level"),
+                            "flag_reasons": tx.get("flag_reasons", []),
+                        }
+                    )
 
         # Return most recent first
-        flagged.sort(key=lambda x: x['timestamp'], reverse=True)
+        flagged.sort(key=lambda x: x["timestamp"], reverse=True)
         return flagged[:limit]
 
     def get_high_risk_addresses(self, min_score: int = 70) -> List[Dict]:
@@ -268,10 +266,10 @@ class RegulatorDashboard:
         address_scores = {}
 
         for block in self.blockchain.chain:
-            for tx in block.get('transactions', []):
-                score = tx.get('risk_score', 0)
+            for tx in block.get("transactions", []):
+                score = tx.get("risk_score", 0)
                 if score >= min_score:
-                    sender = tx.get('sender')
+                    sender = tx.get("sender")
                     if sender not in address_scores:
                         address_scores[sender] = []
                     address_scores[sender].append(score)
@@ -281,15 +279,17 @@ class RegulatorDashboard:
         for address, scores in address_scores.items():
             avg_score = sum(scores) / len(scores)
             if avg_score >= min_score:
-                high_risk.append({
-                    'address': address,
-                    'average_risk_score': round(avg_score, 2),
-                    'flagged_transaction_count': len(scores),
-                    'max_risk_score': max(scores)
-                })
+                high_risk.append(
+                    {
+                        "address": address,
+                        "average_risk_score": round(avg_score, 2),
+                        "flagged_transaction_count": len(scores),
+                        "max_risk_score": max(scores),
+                    }
+                )
 
         # Sort by average score
-        high_risk.sort(key=lambda x: x['average_risk_score'], reverse=True)
+        high_risk.sort(key=lambda x: x["average_risk_score"], reverse=True)
         return high_risk
 
     def get_address_risk_profile(self, address: str) -> Dict[str, Any]:
@@ -300,7 +300,7 @@ class RegulatorDashboard:
                 "risk_score": 0,
                 "risk_level": RiskLevel.CLEAN.value,
                 "flag_reasons": [],
-                "last_seen": None
+                "last_seen": None,
             }
 
         best = {
@@ -308,7 +308,7 @@ class RegulatorDashboard:
             "risk_score": 0,
             "risk_level": RiskLevel.CLEAN.value,
             "flag_reasons": [],
-            "last_seen": None
+            "last_seen": None,
         }
 
         for block in reversed(self.blockchain.chain):
@@ -317,12 +317,14 @@ class RegulatorDashboard:
                     continue
                 score = tx.get("risk_score", 0)
                 if score >= best["risk_score"]:
-                    best.update({
-                        "risk_score": score,
-                        "risk_level": tx.get("risk_level", RiskLevel.CLEAN.value),
-                        "flag_reasons": tx.get("flag_reasons", []),
-                        "last_seen": tx.get("timestamp"),
-                    })
+                    best.update(
+                        {
+                            "risk_score": score,
+                            "risk_level": tx.get("risk_level", RiskLevel.CLEAN.value),
+                            "flag_reasons": tx.get("flag_reasons", []),
+                            "last_seen": tx.get("timestamp"),
+                        }
+                    )
 
         return best
 
@@ -330,13 +332,13 @@ class RegulatorDashboard:
         """Export full compliance report for date range"""
 
         report = {
-            'report_generated': time.time(),
-            'period_start': start_date,
-            'period_end': end_date,
-            'summary': {},
-            'flagged_transactions': [],
-            'high_risk_addresses': [],
-            'blacklisted_addresses': []
+            "report_generated": time.time(),
+            "period_start": start_date,
+            "period_end": end_date,
+            "summary": {},
+            "flagged_transactions": [],
+            "high_risk_addresses": [],
+            "blacklisted_addresses": [],
         }
 
         total_txs = 0
@@ -345,48 +347,48 @@ class RegulatorDashboard:
         flagged_volume = 0
 
         for block in self.blockchain.chain:
-            block_time = block.get('timestamp', 0)
+            block_time = block.get("timestamp", 0)
             if start_date <= block_time <= end_date:
-                for tx in block.get('transactions', []):
+                for tx in block.get("transactions", []):
                     total_txs += 1
-                    total_volume += tx.get('amount_usd', 0)
+                    total_volume += tx.get("amount_usd", 0)
 
-                    score = tx.get('risk_score', 0)
+                    score = tx.get("risk_score", 0)
                     if score >= 61:
                         flagged_txs += 1
-                        flagged_volume += tx.get('amount_usd', 0)
-                        report['flagged_transactions'].append(tx)
+                        flagged_volume += tx.get("amount_usd", 0)
+                        report["flagged_transactions"].append(tx)
 
-        report['summary'] = {
-            'total_transactions': total_txs,
-            'flagged_transactions': flagged_txs,
-            'flag_percentage': round(flagged_txs / total_txs * 100, 2) if total_txs > 0 else 0,
-            'total_volume_usd': total_volume,
-            'flagged_volume_usd': flagged_volume
+        report["summary"] = {
+            "total_transactions": total_txs,
+            "flagged_transactions": flagged_txs,
+            "flag_percentage": round(flagged_txs / total_txs * 100, 2) if total_txs > 0 else 0,
+            "total_volume_usd": total_volume,
+            "flagged_volume_usd": flagged_volume,
         }
 
-        report['high_risk_addresses'] = self.get_high_risk_addresses()
+        report["high_risk_addresses"] = self.get_high_risk_addresses()
 
         return report
 
-    def search_transactions(self, address: str = None,
-                          min_amount: float = None,
-                          risk_level: RiskLevel = None) -> List[Dict]:
+    def search_transactions(
+        self, address: str = None, min_amount: float = None, risk_level: RiskLevel = None
+    ) -> List[Dict]:
         """Search transactions with filters"""
 
         results = []
 
         for block in self.blockchain.chain:
-            for tx in block.get('transactions', []):
+            for tx in block.get("transactions", []):
                 match = True
 
-                if address and tx.get('sender') != address and tx.get('recipient') != address:
+                if address and tx.get("sender") != address and tx.get("recipient") != address:
                     match = False
 
-                if min_amount and tx.get('amount_usd', 0) < min_amount:
+                if min_amount and tx.get("amount_usd", 0) < min_amount:
                     match = False
 
-                if risk_level and tx.get('risk_level') != risk_level.value:
+                if risk_level and tx.get("risk_level") != risk_level.value:
                     match = False
 
                 if match:
@@ -408,16 +410,16 @@ class PublicExplorerAPI:
         """Get transaction (no risk info shown publicly)"""
 
         for block in self.blockchain.chain:
-            for tx in block.get('transactions', []):
-                if tx.get('hash') == tx_hash:
+            for tx in block.get("transactions", []):
+                if tx.get("hash") == tx_hash:
                     # Return transaction without risk scores
                     return {
-                        'hash': tx.get('hash'),
-                        'sender': tx.get('sender'),
-                        'recipient': tx.get('recipient'),
-                        'amount': tx.get('amount'),
-                        'timestamp': tx.get('timestamp'),
-                        'block': block.get('index')
+                        "hash": tx.get("hash"),
+                        "sender": tx.get("sender"),
+                        "recipient": tx.get("recipient"),
+                        "amount": tx.get("amount"),
+                        "timestamp": tx.get("timestamp"),
+                        "block": block.get("index"),
                     }
 
         return None
@@ -428,15 +430,17 @@ class PublicExplorerAPI:
         transactions = []
 
         for block in reversed(self.blockchain.chain):
-            for tx in block.get('transactions', []):
-                transactions.append({
-                    'hash': tx.get('hash'),
-                    'sender': tx.get('sender'),
-                    'recipient': tx.get('recipient'),
-                    'amount': tx.get('amount'),
-                    'timestamp': tx.get('timestamp'),
-                    'block': block.get('index')
-                })
+            for tx in block.get("transactions", []):
+                transactions.append(
+                    {
+                        "hash": tx.get("hash"),
+                        "sender": tx.get("sender"),
+                        "recipient": tx.get("recipient"),
+                        "amount": tx.get("amount"),
+                        "timestamp": tx.get("timestamp"),
+                        "block": block.get("index"),
+                    }
+                )
                 if len(transactions) >= limit:
                     return transactions
 
@@ -454,11 +458,11 @@ if __name__ == "__main__":
 
     # Normal transaction
     normal_tx = {
-        'sender': 'XAI123',
-        'recipient': 'XAI456',
-        'amount': 100,
-        'amount_usd': 20,
-        'timestamp': time.time()
+        "sender": "XAI123",
+        "recipient": "XAI456",
+        "amount": 100,
+        "amount_usd": 20,
+        "timestamp": time.time(),
     }
 
     score, reasons = scorer.calculate_risk_score(normal_tx)
@@ -469,11 +473,11 @@ if __name__ == "__main__":
 
     # Large transaction
     large_tx = {
-        'sender': 'XAI789',
-        'recipient': 'XAI012',
-        'amount': 50000,
-        'amount_usd': 11500,
-        'timestamp': time.time()
+        "sender": "XAI789",
+        "recipient": "XAI012",
+        "amount": 50000,
+        "amount_usd": 11500,
+        "timestamp": time.time(),
     }
 
     score, reasons = scorer.calculate_risk_score(large_tx)
@@ -484,17 +488,17 @@ if __name__ == "__main__":
 
     # Structuring pattern
     history = [
-        {'amount_usd': 9000, 'timestamp': time.time() - 3600},
-        {'amount_usd': 8900, 'timestamp': time.time() - 1800},
-        {'amount_usd': 9100, 'timestamp': time.time() - 900}
+        {"amount_usd": 9000, "timestamp": time.time() - 3600},
+        {"amount_usd": 8900, "timestamp": time.time() - 1800},
+        {"amount_usd": 9100, "timestamp": time.time() - 900},
     ]
 
     structuring_tx = {
-        'sender': 'XAI345',
-        'recipient': 'XAI678',
-        'amount': 9000,
-        'amount_usd': 8950,
-        'timestamp': time.time()
+        "sender": "XAI345",
+        "recipient": "XAI678",
+        "amount": 9000,
+        "amount_usd": 8950,
+        "timestamp": time.time(),
     }
 
     score, reasons = scorer.calculate_risk_score(structuring_tx, history)

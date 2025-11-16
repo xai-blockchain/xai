@@ -52,8 +52,8 @@ class MiniAppRegistry:
                 metadata={
                     "aml_cues": ["low-risk-fill", "safe-mode"],
                     "iframe_hint": {"width": "100%", "height": "420px"},
-                    "extras": {"icon": "poll", "status_badge": "trusted"}
-                }
+                    "extras": {"icon": "poll", "status_badge": "trusted"},
+                },
             ),
             MiniAppManifestEntry(
                 id="atomic-vote",
@@ -65,8 +65,8 @@ class MiniAppRegistry:
                 triggers=["vote", "swaps", "governance"],
                 metadata={
                     "aml_cues": ["medium-risk-check", "dual-confirm"],
-                    "extras": {"icon": "vote", "status_badge": "tempo"}
-                }
+                    "extras": {"icon": "vote", "status_badge": "tempo"},
+                },
             ),
             MiniAppManifestEntry(
                 id="treasure-game",
@@ -79,8 +79,8 @@ class MiniAppRegistry:
                 metadata={
                     "aml_cues": ["high-risk-guard", "disclosure-overlay"],
                     "iframe_hint": {"width": "100%", "height": "520px"},
-                    "extras": {"icon": "map", "status_badge": "adventures"}
-                }
+                    "extras": {"icon": "map", "status_badge": "adventures"},
+                },
             ),
             MiniAppManifestEntry(
                 id="aml-guard",
@@ -93,12 +93,14 @@ class MiniAppRegistry:
                 metadata={
                     "aml_cues": ["high-risk-guard", "notify"],
                     "iframe_hint": {"width": "100%", "height": "360px"},
-                    "extras": {"icon": "shield", "status_badge": "guarded"}
-                }
+                    "extras": {"icon": "shield", "status_badge": "guarded"},
+                },
             ),
         ]
 
-    def _recommend_flow(self, entry: MiniAppManifestEntry, risk_level: str, risk_score: float) -> str:
+    def _recommend_flow(
+        self, entry: MiniAppManifestEntry, risk_level: str, risk_score: float
+    ) -> str:
         """Derive a simple flow hint based on the caller's risk context."""
         rl = risk_level.lower()
         if rl in self.HIGH_RISK_LEVELS:

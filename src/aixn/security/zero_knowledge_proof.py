@@ -7,11 +7,14 @@ from typing import Tuple, Optional, Any
 # Its purpose is to illustrate the concept of proving knowledge without revealing the secret.
 # DO NOT use this for any production or security-sensitive applications.
 
+
 class ZKP_Simulator:
     def __init__(self):
         pass
 
-    def generate_proof(self, secret_number: int, public_statement: str) -> Optional[Tuple[str, str]]:
+    def generate_proof(
+        self, secret_number: int, public_statement: str
+    ) -> Optional[Tuple[str, str]]:
         """
         Simulates a prover generating a proof that they know a secret_number
         that satisfies a public_statement, without revealing the secret_number.
@@ -28,7 +31,7 @@ class ZKP_Simulator:
         # A simple conceptual "proof" could be a hash of the secret and the statement
         # plus a random nonce to prevent replay attacks and make the proof non-deterministic.
         nonce = str(random.randint(100000, 999999))
-        
+
         # The "proof" is a hash that the verifier can check
         proof_data = f"{secret_number}-{public_statement}-{nonce}"
         conceptual_proof = hashlib.sha256(proof_data.encode()).hexdigest()
@@ -38,7 +41,13 @@ class ZKP_Simulator:
         # The secret_number itself is NOT sent.
         return conceptual_proof, nonce
 
-    def verify_proof(self, conceptual_proof: str, public_statement: str, nonce: str, expected_secret_property: Any) -> bool:
+    def verify_proof(
+        self,
+        conceptual_proof: str,
+        public_statement: str,
+        nonce: str,
+        expected_secret_property: Any,
+    ) -> bool:
         """
         Simulates a verifier checking a proof against a public statement,
         without knowing the original secret_number.
@@ -101,6 +110,7 @@ class ZKP_Simulator:
             print("Proof verification failed (conceptually).")
             return False
 
+
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
     zkp_sim = ZKP_Simulator()
@@ -108,30 +118,32 @@ if __name__ == "__main__":
     # Scenario 1: Successful Proof
     secret_val_1 = 12345
     public_stmt_1 = "I know a number whose SHA256 hash starts with 'a'"
-    
+
     proof_1, nonce_1 = zkp_sim.generate_proof(secret_val_1, public_stmt_1)
-    
+
     # Verifier checks the proof. In a real ZKP, the verifier would NOT know secret_val_1.
     # Here, for conceptual verification, we pass it as 'expected_secret_property'.
     is_valid_1 = zkp_sim.verify_proof(proof_1, public_stmt_1, nonce_1, secret_val_1)
     print(f"Verification Result 1: {is_valid_1}")
 
     # Scenario 2: Failed Proof (wrong secret)
-    secret_val_2 = 54321 # Different secret
+    secret_val_2 = 54321  # Different secret
     public_stmt_2 = "I know a number whose SHA256 hash starts with 'b'"
-    
+
     proof_2, nonce_2 = zkp_sim.generate_proof(secret_val_2, public_stmt_2)
-    
+
     # Verifier tries to verify with a different expected secret
-    is_valid_2 = zkp_sim.verify_proof(proof_2, public_stmt_2, nonce_2, 99999) # Incorrect expected secret
+    is_valid_2 = zkp_sim.verify_proof(
+        proof_2, public_stmt_2, nonce_2, 99999
+    )  # Incorrect expected secret
     print(f"Verification Result 2: {is_valid_2}")
 
     # Scenario 3: Failed Proof (wrong nonce)
     secret_val_3 = 67890
     public_stmt_3 = "I know a number whose SHA256 hash starts with 'c'"
-    
+
     proof_3, nonce_3 = zkp_sim.generate_proof(secret_val_3, public_stmt_3)
-    
+
     # Verifier tries to verify with a wrong nonce
     is_valid_3 = zkp_sim.verify_proof(proof_3, public_stmt_3, "wrong_nonce", secret_val_3)
     print(f"Verification Result 3: {is_valid_3}")

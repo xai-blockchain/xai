@@ -2,9 +2,16 @@ from typing import Dict, Any
 from datetime import datetime, timedelta, timezone
 import uuid
 
+
 class PendingWithdrawal:
-    def __init__(self, withdrawal_id: str, user_address: str, amount: float,
-                 initiation_timestamp: int, release_timestamp: int):
+    def __init__(
+        self,
+        withdrawal_id: str,
+        user_address: str,
+        amount: float,
+        initiation_timestamp: int,
+        release_timestamp: int,
+    ):
         if not withdrawal_id:
             raise ValueError("Withdrawal ID cannot be empty.")
         if not user_address:
@@ -21,7 +28,7 @@ class PendingWithdrawal:
         self.amount = amount
         self.initiation_timestamp = initiation_timestamp
         self.release_timestamp = release_timestamp
-        self.status = "pending" # pending, cancelled, confirmed, expired
+        self.status = "pending"  # pending, cancelled, confirmed, expired
 
     def is_releasable(self, current_timestamp: int) -> bool:
         return self.status == "pending" and current_timestamp >= self.release_timestamp
@@ -47,20 +54,25 @@ class PendingWithdrawal:
             "amount": self.amount,
             "initiation_timestamp": self.initiation_timestamp,
             "release_timestamp": self.release_timestamp,
-            "status": self.status
+            "status": self.status,
         }
 
     def __repr__(self):
         return (
             f"PendingWithdrawal(id='{self.withdrawal_id[:8]}...', user='{self.user_address[:8]}...', "
-            f"amount={self.amount}, status='{self.status}', release_at={datetime.fromtimestamp(self.release_timestamp, timezone.utc)})")
+            f"amount={self.amount}, status='{self.status}', release_at={datetime.fromtimestamp(self.release_timestamp, timezone.utc)})"
+        )
+
 
 class TimeLockedWithdrawalManager:
-    DEFAULT_THRESHOLD = 1000.0 # Amount in some currency unit
-    DEFAULT_TIME_LOCK_SECONDS = 3600 # 1 hour
+    DEFAULT_THRESHOLD = 1000.0  # Amount in some currency unit
+    DEFAULT_TIME_LOCK_SECONDS = 3600  # 1 hour
 
-    def __init__(self, withdrawal_threshold: float = DEFAULT_THRESHOLD,
-                 time_lock_seconds: int = DEFAULT_TIME_LOCK_SECONDS):
+    def __init__(
+        self,
+        withdrawal_threshold: float = DEFAULT_THRESHOLD,
+        time_lock_seconds: int = DEFAULT_TIME_LOCK_SECONDS,
+    ):
         if not isinstance(withdrawal_threshold, (int, float)) or withdrawal_threshold <= 0:
             raise ValueError("Withdrawal threshold must be a positive number.")
         if not isinstance(time_lock_seconds, int) or time_lock_seconds <= 0:
@@ -76,19 +88,25 @@ class TimeLockedWithdrawalManager:
 
         if amount >= self.withdrawal_threshold:
             release_timestamp = current_timestamp + self.time_lock_seconds
-            withdrawal = PendingWithdrawal(withdrawal_id, user_address, amount,
-                                           current_timestamp, release_timestamp)
+            withdrawal = PendingWithdrawal(
+                withdrawal_id, user_address, amount, current_timestamp, release_timestamp
+            )
             self.pending_withdrawals[withdrawal_id] = withdrawal
-            print(f"Large withdrawal requested for {user_address} of {amount}. "
-                  f"Time-lock applied. Release at: {datetime.fromtimestamp(release_timestamp, timezone.utc)} UTC.")
+            print(
+                f"Large withdrawal requested for {user_address} of {amount}. "
+                f"Time-lock applied. Release at: {datetime.fromtimestamp(release_timestamp, timezone.utc)} UTC."
+            )
         else:
             # For smaller amounts, withdrawal can be processed immediately (conceptually)
-            release_timestamp = current_timestamp # No actual time lock
-            withdrawal = PendingWithdrawal(withdrawal_id, user_address, amount,
-                                           current_timestamp, release_timestamp)
-            withdrawal.confirm() # Immediately confirm small withdrawals
-            print(f"Small withdrawal requested for {user_address} of {amount}. Processed immediately.")
-        
+            release_timestamp = current_timestamp  # No actual time lock
+            withdrawal = PendingWithdrawal(
+                withdrawal_id, user_address, amount, current_timestamp, release_timestamp
+            )
+            withdrawal.confirm()  # Immediately confirm small withdrawals
+            print(
+                f"Small withdrawal requested for {user_address} of {amount}. Processed immediately."
+            )
+
         return withdrawal
 
     def cancel_withdrawal(self, withdrawal_id: str, user_address: str):
@@ -97,9 +115,11 @@ class TimeLockedWithdrawalManager:
             print(f"Error: Withdrawal {withdrawal_id} not found.")
             return False
         if withdrawal.user_address != user_address:
-            print(f"Error: User {user_address} is not authorized to cancel withdrawal {withdrawal_id}.")
+            print(
+                f"Error: User {user_address} is not authorized to cancel withdrawal {withdrawal_id}."
+            )
             return False
-        
+
         withdrawal.cancel()
         return True
 
@@ -108,24 +128,35 @@ class TimeLockedWithdrawalManager:
         Checks for and processes withdrawals that are past their time-lock.
         In a real system, this would be called by a cron job or a dedicated service.
         """
-        print(f"\n--- Processing releasable withdrawals at {datetime.fromtimestamp(current_timestamp, timezone.utc)} UTC ---")
+        print(
+            f"\n--- Processing releasable withdrawals at {datetime.fromtimestamp(current_timestamp, timezone.utc)} UTC ---"
+        )
         processed_count = 0
-        for withdrawal_id, withdrawal in list(self.pending_withdrawals.items()): # Iterate over a copy
+        for withdrawal_id, withdrawal in list(
+            self.pending_withdrawals.items()
+        ):  # Iterate over a copy
             if withdrawal.is_releasable(current_timestamp):
                 withdrawal.confirm()
                 # In a real system, funds would be transferred here.
                 # For this mock, we just change the status.
                 processed_count += 1
-            elif withdrawal.status == "pending" and current_timestamp < withdrawal.release_timestamp:
-                print(f"Withdrawal {withdrawal_id} for {withdrawal.user_address} still time-locked. "
-                      f"Releases in {withdrawal.release_timestamp - current_timestamp} seconds.")
+            elif (
+                withdrawal.status == "pending" and current_timestamp < withdrawal.release_timestamp
+            ):
+                print(
+                    f"Withdrawal {withdrawal_id} for {withdrawal.user_address} still time-locked. "
+                    f"Releases in {withdrawal.release_timestamp - current_timestamp} seconds."
+                )
         if processed_count == 0:
             print("No withdrawals currently releasable.")
         return processed_count
 
+
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
-    manager = TimeLockedWithdrawalManager(withdrawal_threshold=1000, time_lock_seconds=5) # 5-second lock for testing
+    manager = TimeLockedWithdrawalManager(
+        withdrawal_threshold=1000, time_lock_seconds=5
+    )  # 5-second lock for testing
 
     user1 = "0xUserA"
     user2 = "0xUserB"
@@ -153,7 +184,8 @@ if __name__ == "__main__":
 
     print("\n--- Waiting for time lock to expire ---")
     import time
-    time.sleep(6) # Wait for 5-second time lock to pass
+
+    time.sleep(6)  # Wait for 5-second time lock to pass
 
     print("\n--- Processing after time lock ---")
     manager.process_releasable_withdrawals(int(datetime.now(timezone.utc).timestamp()))

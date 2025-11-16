@@ -23,8 +23,10 @@ from datetime import datetime, timezone
 from typing import Dict, Optional, List
 from enum import Enum
 
+
 class ServiceType(Enum):
     """Types of services that consume XAI"""
+
     # AI Services
     AI_QUERY_SIMPLE = "ai_query_simple"
     AI_QUERY_COMPLEX = "ai_query_complex"
@@ -46,29 +48,28 @@ class ServiceType(Enum):
     TIME_CAPSULE_FEE = "time_capsule_fee"
     TRANSACTION_FEE = "transaction_fee"
 
+
 # Service pricing in USD (converted to XAI dynamically)
 SERVICE_PRICES_USD = {
     # AI Services (affordable for all users)
-    ServiceType.AI_QUERY_SIMPLE: 0.10,        # $0.10 per simple query
-    ServiceType.AI_QUERY_COMPLEX: 0.50,       # $0.50 per complex analysis
-    ServiceType.AI_CODE_REVIEW: 5.00,         # $5 per file review
-    ServiceType.AI_SECURITY_AUDIT: 25.00,     # $25 per security audit
-    ServiceType.AI_CODE_GENERATION: 10.00,    # $10 per code generation
-
+    ServiceType.AI_QUERY_SIMPLE: 0.10,  # $0.10 per simple query
+    ServiceType.AI_QUERY_COMPLEX: 0.50,  # $0.50 per complex analysis
+    ServiceType.AI_CODE_REVIEW: 5.00,  # $5 per file review
+    ServiceType.AI_SECURITY_AUDIT: 25.00,  # $25 per security audit
+    ServiceType.AI_CODE_GENERATION: 10.00,  # $10 per code generation
     # Governance (stake to participate)
-    ServiceType.GOVERNANCE_VOTE: 1.00,        # $1 per vote (prevents spam)
+    ServiceType.GOVERNANCE_VOTE: 1.00,  # $1 per vote (prevents spam)
     ServiceType.GOVERNANCE_PROPOSAL: 100.00,  # $100 deposit (refunded if approved)
     ServiceType.GOVERNANCE_SECURITY_REVIEW: 50.00,  # $50 for AI security review
-
     # Trading (subscription model)
-    ServiceType.TRADING_BOT_DAILY: 10.00,     # $10/day subscription
+    ServiceType.TRADING_BOT_DAILY: 10.00,  # $10/day subscription
     ServiceType.TRADING_BOT_STRATEGY: 50.00,  # $50 per custom strategy
-    ServiceType.DEX_TRADING_FEE: 0.003,       # 0.3% of trade value
-
+    ServiceType.DEX_TRADING_FEE: 0.003,  # 0.3% of trade value
     # Special
-    ServiceType.TIME_CAPSULE_FEE: 10.00,      # $10 protocol fee
-    ServiceType.TRANSACTION_FEE: 0.24,        # 0.24% of transaction
+    ServiceType.TIME_CAPSULE_FEE: 10.00,  # $10 protocol fee
+    ServiceType.TRANSACTION_FEE: 0.24,  # 0.24% of transaction
 }
+
 
 class BurnTransaction:
     """
@@ -83,13 +84,15 @@ class BurnTransaction:
     NO personal data, NO identifying information!
     """
 
-    def __init__(self,
-                 wallet_address: str,
-                 service_type: ServiceType,
-                 xai_amount: float,
-                 burn_amount: float,
-                 miner_amount: float,
-                 treasury_amount: float):
+    def __init__(
+        self,
+        wallet_address: str,
+        service_type: ServiceType,
+        xai_amount: float,
+        burn_amount: float,
+        miner_amount: float,
+        treasury_amount: float,
+    ):
 
         self.wallet_address = wallet_address  # Anonymous address only
         self.service_type = service_type.value
@@ -103,22 +106,26 @@ class BurnTransaction:
     def _generate_burn_id(self) -> str:
         """Generate anonymous burn transaction ID"""
         import hashlib
+
         data = f"{self.wallet_address}{self.service_type}{self.timestamp_utc}"
         return hashlib.sha256(data.encode()).hexdigest()[:16]
 
     def to_dict(self) -> dict:
         """Convert to anonymous dictionary (UTC timestamp only!)"""
         return {
-            'burn_id': self.burn_id,
-            'wallet_address': self.wallet_address,  # Anonymous only
-            'service_type': self.service_type,
-            'xai_amount': self.xai_amount,
-            'burn_amount': self.burn_amount,
-            'miner_amount': self.miner_amount,
-            'treasury_amount': self.treasury_amount,
-            'timestamp_utc': self.timestamp_utc,
-            'date_utc': datetime.fromtimestamp(self.timestamp_utc, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+            "burn_id": self.burn_id,
+            "wallet_address": self.wallet_address,  # Anonymous only
+            "service_type": self.service_type,
+            "xai_amount": self.xai_amount,
+            "burn_amount": self.burn_amount,
+            "miner_amount": self.miner_amount,
+            "treasury_amount": self.treasury_amount,
+            "timestamp_utc": self.timestamp_utc,
+            "date_utc": datetime.fromtimestamp(self.timestamp_utc, tz=timezone.utc).strftime(
+                "%Y-%m-%d %H:%M:%S UTC"
+            ),
         }
+
 
 class TokenBurningEngine:
     """
@@ -144,11 +151,11 @@ class TokenBurningEngine:
         self.data_dir = data_dir
 
         # Anonymous burn records
-        self.burn_history_file = os.path.join(data_dir, 'burn_history.json')
-        self.burn_stats_file = os.path.join(data_dir, 'burn_statistics.json')
+        self.burn_history_file = os.path.join(data_dir, "burn_history.json")
+        self.burn_stats_file = os.path.join(data_dir, "burn_statistics.json")
 
         # Distribution percentages (NO TREASURY - dev funded by pre-mine + AI donations!)
-        self.burn_percentage = 0.50   # 50% burned (deflationary)
+        self.burn_percentage = 0.50  # 50% burned (deflationary)
         self.miner_percentage = 0.50  # 50% to miners (security incentive)
 
         # NOTE: Development is funded by:
@@ -166,35 +173,35 @@ class TokenBurningEngine:
     def _load_burn_history(self):
         """Load anonymous burn history"""
         if os.path.exists(self.burn_history_file):
-            with open(self.burn_history_file, 'r') as f:
+            with open(self.burn_history_file, "r") as f:
                 self.burn_history = json.load(f)
         else:
             self.burn_history = []
 
     def _save_burn_history(self):
         """Save anonymous burn history (UTC timestamps only)"""
-        with open(self.burn_history_file, 'w') as f:
+        with open(self.burn_history_file, "w") as f:
             json.dump(self.burn_history, f, indent=2)
 
     def _load_burn_stats(self):
         """Load anonymous burn statistics"""
         if os.path.exists(self.burn_stats_file):
-            with open(self.burn_stats_file, 'r') as f:
+            with open(self.burn_stats_file, "r") as f:
                 self.burn_stats = json.load(f)
         else:
             self.burn_stats = {
-                'total_burned': 0.0,
-                'total_to_miners': 0.0,
-                'total_services_used': 0,
-                'service_usage': {},
-                'last_updated_utc': datetime.now(timezone.utc).timestamp(),
-                'note': 'Development funded by 10M XAI pre-mine + donated AI API minutes'
+                "total_burned": 0.0,
+                "total_to_miners": 0.0,
+                "total_services_used": 0,
+                "service_usage": {},
+                "last_updated_utc": datetime.now(timezone.utc).timestamp(),
+                "note": "Development funded by 10M XAI pre-mine + donated AI API minutes",
             }
 
     def _save_burn_stats(self):
         """Save anonymous burn statistics (UTC only)"""
-        self.burn_stats['last_updated_utc'] = datetime.now(timezone.utc).timestamp()
-        with open(self.burn_stats_file, 'w') as f:
+        self.burn_stats["last_updated_utc"] = datetime.now(timezone.utc).timestamp()
+        with open(self.burn_stats_file, "w") as f:
             json.dump(self.burn_stats, f, indent=2)
 
     def update_xai_price(self, price_usd: float):
@@ -221,10 +228,9 @@ class TokenBurningEngine:
         xai_cost = usd_price / self.xai_price_usd
         return xai_cost
 
-    def consume_service(self,
-                       wallet_address: str,
-                       service_type: ServiceType,
-                       custom_amount: Optional[float] = None) -> dict:
+    def consume_service(
+        self, wallet_address: str, service_type: ServiceType, custom_amount: Optional[float] = None
+    ) -> dict:
         """
         Consume XAI for service usage
 
@@ -255,8 +261,8 @@ class TokenBurningEngine:
             balance = self.blockchain.get_balance(wallet_address)
             if balance < xai_amount:
                 return {
-                    'success': False,
-                    'error': f'Insufficient balance. Required: {xai_amount} XAI, Available: {balance} XAI'
+                    "success": False,
+                    "error": f"Insufficient balance. Required: {xai_amount} XAI, Available: {balance} XAI",
                 }
 
         # Calculate distribution (50/50 split - NO treasury!)
@@ -270,7 +276,7 @@ class TokenBurningEngine:
             xai_amount=xai_amount,
             burn_amount=burn_amount,
             miner_amount=miner_amount,
-            treasury_amount=0.0  # No treasury - dev funded separately!
+            treasury_amount=0.0,  # No treasury - dev funded separately!
         )
 
         # Execute burn (if blockchain available)
@@ -284,32 +290,29 @@ class TokenBurningEngine:
         self._save_burn_history()
 
         # Update anonymous statistics (NO treasury stats!)
-        self.burn_stats['total_burned'] += burn_amount
-        self.burn_stats['total_to_miners'] += miner_amount
-        self.burn_stats['total_services_used'] += 1
+        self.burn_stats["total_burned"] += burn_amount
+        self.burn_stats["total_to_miners"] += miner_amount
+        self.burn_stats["total_services_used"] += 1
 
         # Track service usage (anonymous aggregation)
         service_key = service_type.value
-        if service_key not in self.burn_stats['service_usage']:
-            self.burn_stats['service_usage'][service_key] = {
-                'count': 0,
-                'total_burned': 0.0
-            }
+        if service_key not in self.burn_stats["service_usage"]:
+            self.burn_stats["service_usage"][service_key] = {"count": 0, "total_burned": 0.0}
 
-        self.burn_stats['service_usage'][service_key]['count'] += 1
-        self.burn_stats['service_usage'][service_key]['total_burned'] += burn_amount
+        self.burn_stats["service_usage"][service_key]["count"] += 1
+        self.burn_stats["service_usage"][service_key]["total_burned"] += burn_amount
 
         self._save_burn_stats()
 
         return {
-            'success': True,
-            'burn_id': burn_tx.burn_id,
-            'service_type': service_type.value,
-            'total_cost_xai': xai_amount,
-            'burned_xai': burn_amount,
-            'to_miners_xai': miner_amount,
-            'timestamp_utc': burn_tx.timestamp_utc,
-            'message': f'Service consumed. {burn_amount} XAI burned (deflationary), {miner_amount} XAI to miners (security).'
+            "success": True,
+            "burn_id": burn_tx.burn_id,
+            "service_type": service_type.value,
+            "total_cost_xai": xai_amount,
+            "burned_xai": burn_amount,
+            "to_miners_xai": miner_amount,
+            "timestamp_utc": burn_tx.timestamp_utc,
+            "message": f"Service consumed. {burn_amount} XAI burned (deflationary), {miner_amount} XAI to miners (security).",
         }
 
     def get_anonymous_stats(self) -> dict:
@@ -324,23 +327,22 @@ class TokenBurningEngine:
         if self.blockchain:
             circulating_supply = self.blockchain.get_total_circulating_supply()
 
-        total_burned = self.burn_stats['total_burned']
+        total_burned = self.burn_stats["total_burned"]
         burn_percentage = (total_burned / circulating_supply) * 100 if circulating_supply > 0 else 0
 
         return {
-            'total_burned': total_burned,
-            'total_to_miners': self.burn_stats['total_to_miners'],
-            'total_services_used': self.burn_stats['total_services_used'],
-            'circulating_supply': circulating_supply,
-            'burn_percentage_of_supply': burn_percentage,
-            'service_usage': self.burn_stats['service_usage'],
-            'distribution': '50% burn (deflationary) + 50% miners (security)',
-            'development_funding': 'Pre-mine (10M XAI) + AI API donations (encrypted keys)',
-            'last_updated_utc': self.burn_stats['last_updated_utc'],
-            'last_updated_date_utc': datetime.fromtimestamp(
-                self.burn_stats['last_updated_utc'],
-                tz=timezone.utc
-            ).strftime('%Y-%m-%d %H:%M:%S UTC')
+            "total_burned": total_burned,
+            "total_to_miners": self.burn_stats["total_to_miners"],
+            "total_services_used": self.burn_stats["total_services_used"],
+            "circulating_supply": circulating_supply,
+            "burn_percentage_of_supply": burn_percentage,
+            "service_usage": self.burn_stats["service_usage"],
+            "distribution": "50% burn (deflationary) + 50% miners (security)",
+            "development_funding": "Pre-mine (10M XAI) + AI API donations (encrypted keys)",
+            "last_updated_utc": self.burn_stats["last_updated_utc"],
+            "last_updated_date_utc": datetime.fromtimestamp(
+                self.burn_stats["last_updated_utc"], tz=timezone.utc
+            ).strftime("%Y-%m-%d %H:%M:%S UTC"),
         }
 
     def get_recent_burns(self, limit: int = 100) -> List[dict]:
@@ -361,10 +363,7 @@ class TokenBurningEngine:
         """Get anonymous burn statistics for specific service"""
         service_key = service_type.value
 
-        if service_key in self.burn_stats['service_usage']:
-            return self.burn_stats['service_usage'][service_key]
+        if service_key in self.burn_stats["service_usage"]:
+            return self.burn_stats["service_usage"][service_key]
         else:
-            return {
-                'count': 0,
-                'total_burned': 0.0
-            }
+            return {"count": 0, "total_burned": 0.0}
