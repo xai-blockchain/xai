@@ -12,13 +12,22 @@ Then visit: http://localhost:8080
 
 import os
 import sys
-from flask import Flask, render_template, request, jsonify
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+import requests
 import yaml
+from flask import Flask, jsonify, render_template, request
 from flask_cors import CORS
 
 
-def get_allowed_origins():
-    """Get allowed origins from config file"""
+def get_allowed_origins() -> List[str]:
+    """
+    Get allowed origins from config file.
+
+    Returns:
+        List of allowed CORS origins
+    """
     cors_config_path = os.path.join(os.path.dirname(__file__), "..", "..", "config", "cors.yaml")
     if os.path.exists(cors_config_path):
         with open(cors_config_path, "r") as f:
@@ -35,8 +44,16 @@ CORS(app, origins=allowed_origins)
 NODE_URL = os.getenv("XAI_NODE_URL", "http://localhost:8545")
 
 
-def get_from_node(endpoint):
-    """Fetch data from XAI node"""
+def get_from_node(endpoint: str) -> Optional[Dict[str, Any]]:
+    """
+    Fetch data from XAI node.
+
+    Args:
+        endpoint: API endpoint path
+
+    Returns:
+        JSON response as dictionary or None on error
+    """
     try:
         response = requests.get(f"{NODE_URL}{endpoint}", timeout=5)
         response.raise_for_status()
@@ -46,8 +63,17 @@ def get_from_node(endpoint):
         return None
 
 
-def post_to_node(endpoint, data):
-    """Post data to XAI node"""
+def post_to_node(endpoint: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Post data to XAI node.
+
+    Args:
+        endpoint: API endpoint path
+        data: Data to post as JSON
+
+    Returns:
+        JSON response as dictionary or None on error
+    """
     try:
         response = requests.post(f"{NODE_URL}{endpoint}", json=data, timeout=5)
         response.raise_for_status()
@@ -57,16 +83,32 @@ def post_to_node(endpoint, data):
         return None
 
 
-def format_timestamp(timestamp):
-    """Convert timestamp to readable UTC format"""
+def format_timestamp(timestamp: Optional[float]) -> str:
+    """
+    Convert timestamp to readable UTC format.
+
+    Args:
+        timestamp: Unix timestamp
+
+    Returns:
+        Formatted timestamp string
+    """
     if timestamp:
         dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
         return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
     return "N/A"
 
 
-def format_amount(amount):
-    """Format XAI amount"""
+def format_amount(amount: Optional[float]) -> str:
+    """
+    Format XAI amount.
+
+    Args:
+        amount: Amount to format
+
+    Returns:
+        Formatted amount string with 4 decimal places
+    """
     return f"{amount:,.4f}" if amount else "0.0000"
 
 
