@@ -10,6 +10,7 @@ Usage:
 Then visit: http://localhost:8080
 """
 
+import logging
 import os
 import sys
 from datetime import datetime, timezone
@@ -19,6 +20,13 @@ import requests
 import yaml
 from flask import Flask, jsonify, render_template, request
 from flask_cors import CORS
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
 def get_allowed_origins() -> List[str]:
@@ -58,8 +66,20 @@ def get_from_node(endpoint: str) -> Optional[Dict[str, Any]]:
         response = requests.get(f"{NODE_URL}{endpoint}", timeout=5)
         response.raise_for_status()
         return response.json()
+    except requests.exceptions.Timeout:
+        logger.error(f"Timeout fetching {endpoint} from node")
+        return None
+    except requests.exceptions.ConnectionError:
+        logger.error(f"Connection error fetching {endpoint} - is the node running?")
+        return None
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error fetching {endpoint}: {e.response.status_code}")
+        return None
+    except ValueError as e:
+        logger.error(f"Invalid JSON response from {endpoint}: {e}")
+        return None
     except Exception as e:
-        print(f"Error fetching {endpoint}: {e}")
+        logger.error(f"Unexpected error fetching {endpoint}: {e}")
         return None
 
 
@@ -78,8 +98,20 @@ def post_to_node(endpoint: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]
         response = requests.post(f"{NODE_URL}{endpoint}", json=data, timeout=5)
         response.raise_for_status()
         return response.json()
+    except requests.exceptions.Timeout:
+        logger.error(f"Timeout posting to {endpoint}")
+        return None
+    except requests.exceptions.ConnectionError:
+        logger.error(f"Connection error posting to {endpoint} - is the node running?")
+        return None
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error posting to {endpoint}: {e.response.status_code}")
+        return None
+    except ValueError as e:
+        logger.error(f"Invalid JSON response from {endpoint}: {e}")
+        return None
     except Exception as e:
-        print(f"Error posting to {endpoint}: {e}")
+        logger.error(f"Unexpected error posting to {endpoint}: {e}")
         return None
 
 
