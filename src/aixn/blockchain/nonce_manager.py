@@ -1,23 +1,61 @@
+"""
+Nonce Manager Module
+
+Manages transaction nonces to prevent replay attacks and ensure proper
+transaction ordering in the blockchain.
+
+Each sender address has an incrementing nonce that must be used sequentially
+to prevent duplicate transaction processing and replay attacks.
+"""
+
 from typing import Dict
 
 
 class NonceManager:
-    def __init__(self):
+    """
+    Manages nonces for blockchain transactions.
+
+    Maintains the last processed nonce for each sender address and validates
+    incoming transaction nonces to prevent replay attacks and ensure proper
+    transaction sequencing.
+
+    Attributes:
+        last_nonces: Dictionary mapping sender addresses to their last processed nonce
+    """
+
+    def __init__(self) -> None:
+        """Initialize the NonceManager with an empty nonce tracking dictionary."""
         # Stores the last successfully processed nonce for each sender address
         self.last_nonces: Dict[str, int] = {}
 
     def get_current_nonce(self, sender_address: str) -> int:
         """
-        Returns the expected next nonce for a given sender address.
-        If no nonce has been seen for this address, it returns 0 (or 1, depending on convention).
-        We'll use 0 as the initial state, meaning the first valid nonce should be 1.
+        Get the current nonce for a sender address.
+
+        Args:
+            sender_address: The blockchain address of the sender
+
+        Returns:
+            The last processed nonce for the address, or 0 if no transactions
+            have been processed yet. The first valid nonce should be 1.
         """
         return self.last_nonces.get(sender_address, 0)
 
     def check_and_increment_nonce(self, sender_address: str, incoming_nonce: int) -> bool:
         """
-        Checks if the incoming nonce is valid for the sender and, if so, increments the stored nonce.
-        Returns True if the nonce is valid and processed, False otherwise.
+        Validate and process an incoming transaction nonce.
+
+        Args:
+            sender_address: The blockchain address of the sender
+            incoming_nonce: The nonce from the incoming transaction
+
+        Returns:
+            True if the nonce is valid and has been processed, False otherwise
+
+        Note:
+            - Nonces must be sequential (expected_nonce + 1)
+            - Lower nonces are rejected as potential replay attacks
+            - Higher nonces are rejected to prevent out-of-order execution
         """
         expected_nonce = self.get_current_nonce(sender_address) + 1
 
