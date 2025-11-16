@@ -14,6 +14,7 @@ import logging
 import os
 import sys
 from datetime import datetime, timezone
+from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -28,13 +29,79 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Cache configuration
+CACHE_TTL = int(os.getenv("XAI_CACHE_TTL", "60"))  # seconds
+CACHE_SIZE = int(os.getenv("XAI_CACHE_SIZE", "128"))  # max cached items
 
+
+class SimpleCache:
+    """
+    Simple time-based cache for API responses.
+
+    Stores responses with timestamps and evicts entries older than TTL.
+    """
+
+    def __init__(self, ttl: int = CACHE_TTL, max_size: int = CACHE_SIZE):
+        """
+        Initialize the cache.
+
+        Args:
+            ttl: Time-to-live in seconds for cached entries
+            max_size: Maximum number of entries to cache
+        """
+        self.ttl = ttl
+        self.max_size = max_size
+        self.cache: Dict[str, tuple[Any, float]] = {}
+
+    def get(self, key: str) -> Optional[Any]:
+        """
+        Get a cached value if it exists and is not expired.
+
+        Args:
+            key: Cache key
+
+        Returns:
+            Cached value or None if not found or expired
+        """
+        if key in self.cache:
+            value, timestamp = self.cache[key]
+            if datetime.now().timestamp() - timestamp < self.ttl:
+                return value
+            else:
+                # Expired, remove it
+                del self.cache[key]
+        return None
+
+    def set(self, key: str, value: Any) -> None:
+        """
+        Set a cache value with current timestamp.
+
+        Args:
+            key: Cache key
+            value: Value to cache
+        """
+        # Simple eviction: if at max size, remove oldest
+        if len(self.cache) >= self.max_size:
+            oldest_key = min(self.cache.keys(), key=lambda k: self.cache[k][1])
+            del self.cache[oldest_key]
+
+        self.cache[key] = (value, datetime.now().timestamp())
+
+
+# Global cache instance
+response_cache = SimpleCache()
+
+
+@lru_cache(maxsize=1)
 def get_allowed_origins() -> List[str]:
     """
-    Get allowed origins from config file.
+    Get allowed origins from config file (cached).
 
     Returns:
         List of allowed CORS origins
+
+    Note:
+        This function is cached to avoid repeated file I/O operations.
     """
     cors_config_path = os.path.join(os.path.dirname(__file__), "..", "..", "config", "cors.yaml")
     if os.path.exists(cors_config_path):
@@ -52,20 +119,38 @@ CORS(app, origins=allowed_origins)
 NODE_URL = os.getenv("XAI_NODE_URL", "http://localhost:8545")
 
 
-def get_from_node(endpoint: str) -> Optional[Dict[str, Any]]:
+def get_from_node(endpoint: str, use_cache: bool = True) -> Optional[Dict[str, Any]]:
     """
-    Fetch data from XAI node.
+    Fetch data from XAI node with optional caching.
 
     Args:
         endpoint: API endpoint path
+        use_cache: Whether to use cached response if available
 
     Returns:
         JSON response as dictionary or None on error
+
+    Note:
+        Caching reduces load on the node and improves response times.
+        Cache TTL is configurable via XAI_CACHE_TTL environment variable.
     """
+    # Check cache first
+    if use_cache:
+        cached = response_cache.get(endpoint)
+        if cached is not None:
+            logger.debug(f"Cache hit for {endpoint}")
+            return cached
+
     try:
         response = requests.get(f"{NODE_URL}{endpoint}", timeout=5)
         response.raise_for_status()
-        return response.json()
+        data = response.json()
+
+        # Cache successful response
+        if use_cache and data is not None:
+            response_cache.set(endpoint, data)
+
+        return data
     except requests.exceptions.Timeout:
         logger.error(f"Timeout fetching {endpoint} from node")
         return None
