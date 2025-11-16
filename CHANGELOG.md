@@ -12,15 +12,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Security policy and vulnerability reporting guidelines
 - Contribution guidelines
 - Code of conduct
+- Comprehensive testing guide (TESTING.md)
+- PEP 561 py.typed marker for type checking support
+- Missing __init__.py files across all packages
 
 ### Changed
 - Reorganized project structure for better maintainability
-
-### Deprecated
-
-### Removed
+- Updated test imports to use proper aixn.core module paths
+- Improved pytest configuration with test markers and discovery
+- Enhanced test infrastructure with proper src/ path setup
 
 ### Fixed
+- Black formatter compliance across all Python files
+- Markdown lint violations in CI/CD documentation
+- Duplicate nonce parameter in mobile_wallet_bridge.py
+- Module import errors in 21+ test files
+- Test configuration for proper module resolution
 
 ### Security
 
