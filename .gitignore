@@ -23,3 +23,16 @@ __pycache__/
 /aixn/data_testnet/
 /aixn/data_test/backups/
 /.tmp.*
+
+# Test coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+
+# Test artifacts
+.tox/
+.pytest_cache/
+.mypy_cache/
+.hypothesis/
