@@ -19,10 +19,10 @@ class AIDevelopmentPool:
     def add_task(self, task: Dict[str, Any]) -> str:
         """
         Add a new development task to the pool.
-        
+
         Args:
             task: Task details
-            
+
         Returns:
             Task ID
         """
@@ -34,10 +34,10 @@ class AIDevelopmentPool:
     def get_task(self, task_id: str) -> Dict[str, Any]:
         """
         Get a task by ID.
-        
+
         Args:
             task_id: ID of the task
-            
+
         Returns:
             Task details or None
         """
@@ -49,7 +49,7 @@ class AIDevelopmentPool:
     def list_tasks(self) -> List[Dict[str, Any]]:
         """
         List all tasks in the pool.
-        
+
         Returns:
             List of tasks
         """

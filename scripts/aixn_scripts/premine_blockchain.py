@@ -8,6 +8,7 @@ Distributes mining rewards across 1,373 premium wallets with:
 - Realistic transaction patterns
 - Clean metadata for anonymous release
 """
+
 import json
 import sys
 import os
@@ -32,20 +33,22 @@ DOUBLE_REWARD = 120.0
 # Transaction frequency (create tx between wallets occasionally)
 TX_PROBABILITY = 0.15  # 15% chance of inter-wallet tx per block
 
+
 def load_premium_wallets():
     """Load premium wallets for mining"""
-    wallet_file = os.path.join(os.path.dirname(__file__), '..', 'premium_wallets_PRIVATE.json')
+    wallet_file = os.path.join(os.path.dirname(__file__), "..", "premium_wallets_PRIVATE.json")
 
     if not os.path.exists(wallet_file):
         print("ERROR: premium_wallets_PRIVATE.json not found!")
         print("Run generate_early_adopter_wallets.py first")
         sys.exit(1)
 
-    with open(wallet_file, 'r') as f:
+    with open(wallet_file, "r") as f:
         wallets = json.load(f)
 
     print(f"Loaded {len(wallets)} premium wallets")
     return wallets
+
 
 def create_weighted_miner_pool(wallets):
     """
@@ -64,6 +67,7 @@ def create_weighted_miner_pool(wallets):
 
     print(f"Created weighted miner pool: {len(weighted_pool)} entries")
     return weighted_pool
+
 
 def select_miner(weighted_pool, block_index, used_indices):
     """
@@ -89,27 +93,29 @@ def select_miner(weighted_pool, block_index, used_indices):
     idx = random.randint(0, len(weighted_pool) - 1)
     return weighted_pool[idx]
 
+
 def create_inter_wallet_transaction(wallets, current_timestamp):
     """Create realistic transaction between wallets"""
     sender = random.choice(wallets)
-    recipient = random.choice([w for w in wallets if w['address'] != sender['address']])
+    recipient = random.choice([w for w in wallets if w["address"] != sender["address"]])
 
     # Random amount (0.1 to 100 XAI)
     amount = round(random.uniform(0.1, 100), 2)
     fee = round(amount * 0.0024, 4)  # 0.24% fee
 
     tx = Transaction(
-        sender=sender['address'],
-        recipient=recipient['address'],
+        sender=sender["address"],
+        recipient=recipient["address"],
         amount=amount,
         fee=fee,
-        public_key=sender['public_key']
+        public_key=sender["public_key"],
     )
 
     # Sign with sender's private key
-    tx.sign_transaction(sender['private_key'])
+    tx.sign_transaction(sender["private_key"])
 
     return tx
+
 
 def premine_blockchain(blocks_to_mine=BLOCKS_TO_MINE):
     """Pre-mine blockchain with distributed rewards"""
@@ -135,7 +141,7 @@ def premine_blockchain(blocks_to_mine=BLOCKS_TO_MINE):
     blockchain = Blockchain()
 
     # Track mining statistics
-    wallet_mining_stats = {w['address']: {'blocks_mined': 0, 'rewards': 0} for w in wallets}
+    wallet_mining_stats = {w["address"]: {"blocks_mined": 0, "rewards": 0} for w in wallets}
 
     current_timestamp = GENESIS_TIMESTAMP
 
@@ -146,7 +152,7 @@ def premine_blockchain(blocks_to_mine=BLOCKS_TO_MINE):
     for block_num in range(1, blocks_to_mine + 1):
         # Select miner for this block
         miner_wallet = select_miner(weighted_pool, block_num, used_indices)
-        miner_address = miner_wallet['address']
+        miner_address = miner_wallet["address"]
 
         # Determine reward
         if block_num <= DOUBLE_REWARD_BLOCKS:
@@ -174,12 +180,14 @@ def premine_blockchain(blocks_to_mine=BLOCKS_TO_MINE):
         new_block = Block(
             index=len(blockchain.chain),
             transactions=blockchain.pending_transactions.copy(),
-            previous_hash=previous_block.hash
+            previous_hash=previous_block.hash,
         )
         new_block.timestamp = current_timestamp
 
         # Calculate nonce (fake PoW for realistic appearance)
-        new_block.nonce = secrets.randbelow(9899999) + 100000  # Use a cryptographically secure generator
+        new_block.nonce = (
+            secrets.randbelow(9899999) + 100000
+        )  # Use a cryptographically secure generator
         new_block.hash = new_block.calculate_hash()
 
         # Add to chain
@@ -187,22 +195,24 @@ def premine_blockchain(blocks_to_mine=BLOCKS_TO_MINE):
         blockchain.pending_transactions = []
 
         # Update statistics
-        wallet_mining_stats[miner_address]['blocks_mined'] += 1
-        wallet_mining_stats[miner_address]['rewards'] += reward
+        wallet_mining_stats[miner_address]["blocks_mined"] += 1
+        wallet_mining_stats[miner_address]["rewards"] += reward
 
         # Update wallet balances
         for wallet in wallets:
-            if wallet['address'] == miner_address:
-                wallet['mining_proceeds'] += reward
-                wallet['total_balance'] += reward
+            if wallet["address"] == miner_address:
+                wallet["mining_proceeds"] += reward
+                wallet["total_balance"] += reward
 
         # Progress reporting
         if block_num % 1000 == 0:
-            unique_miners = len([s for s in wallet_mining_stats.values() if s['blocks_mined'] > 0])
-            total_rewards = sum(s['rewards'] for s in wallet_mining_stats.values())
-            print(f"  Block {block_num:,}/{blocks_to_mine:,} | "
-                  f"Unique miners: {unique_miners}/{len(wallets)} | "
-                  f"Total rewards: {total_rewards:,.2f} XAI")
+            unique_miners = len([s for s in wallet_mining_stats.values() if s["blocks_mined"] > 0])
+            total_rewards = sum(s["rewards"] for s in wallet_mining_stats.values())
+            print(
+                f"  Block {block_num:,}/{blocks_to_mine:,} | "
+                f"Unique miners: {unique_miners}/{len(wallets)} | "
+                f"Total rewards: {total_rewards:,.2f} XAI"
+            )
 
         if block_num % 10000 == 0:
             # Checkpoint save
@@ -214,11 +224,11 @@ def premine_blockchain(blocks_to_mine=BLOCKS_TO_MINE):
     print(f"{'='*70}")
 
     # Calculate final statistics
-    unique_miners = len([s for s in wallet_mining_stats.values() if s['blocks_mined'] > 0])
-    total_rewards = sum(s['rewards'] for s in wallet_mining_stats.values())
+    unique_miners = len([s for s in wallet_mining_stats.values() if s["blocks_mined"] > 0])
+    total_rewards = sum(s["rewards"] for s in wallet_mining_stats.values())
     avg_rewards = total_rewards / len(wallets)
 
-    miners_with_proceeds = [w for w in wallets if w['mining_proceeds'] > 0]
+    miners_with_proceeds = [w for w in wallets if w["mining_proceeds"] > 0]
 
     print(f"Total blocks mined: {blocks_to_mine:,}")
     print(f"Unique miners: {unique_miners}/{len(wallets)}")
@@ -227,25 +237,33 @@ def premine_blockchain(blocks_to_mine=BLOCKS_TO_MINE):
     print(f"\nWallets with mining proceeds: {len(miners_with_proceeds)}/{len(wallets)}")
 
     if len(miners_with_proceeds) < len(wallets):
-        print(f"\n⚠️  WARNING: {len(wallets) - len(miners_with_proceeds)} wallets have no mining proceeds!")
+        print(
+            f"\n⚠️  WARNING: {len(wallets) - len(miners_with_proceeds)} wallets have no mining proceeds!"
+        )
     else:
         print(f"\n✓ ALL wallets received mining proceeds!")
 
     return blockchain, wallets, wallet_mining_stats
 
+
 def save_checkpoint(blockchain, wallets, block_num):
     """Save checkpoint during pre-mining"""
-    checkpoint_dir = os.path.join(os.path.dirname(__file__), '..', 'checkpoints')
+    checkpoint_dir = os.path.join(os.path.dirname(__file__), "..", "checkpoints")
     os.makedirs(checkpoint_dir, exist_ok=True)
 
-    checkpoint_file = os.path.join(checkpoint_dir, f'checkpoint_block_{block_num}.json')
+    checkpoint_file = os.path.join(checkpoint_dir, f"checkpoint_block_{block_num}.json")
 
-    with open(checkpoint_file, 'w') as f:
-        json.dump({
-            'block_height': block_num,
-            'chain_length': len(blockchain.chain),
-            'timestamp': time.time()
-        }, f, indent=2)
+    with open(checkpoint_file, "w") as f:
+        json.dump(
+            {
+                "block_height": block_num,
+                "chain_length": len(blockchain.chain),
+                "timestamp": time.time(),
+            },
+            f,
+            indent=2,
+        )
+
 
 def save_blockchain_data(blockchain, wallets, stats):
     """Save final blockchain and updated wallet data"""
@@ -255,57 +273,61 @@ def save_blockchain_data(blockchain, wallets, stats):
     print(f"{'='*70}")
 
     # 1. Save blockchain
-    blockchain_dir = os.path.join(os.path.dirname(__file__), '..', 'blockchain_data')
+    blockchain_dir = os.path.join(os.path.dirname(__file__), "..", "blockchain_data")
     os.makedirs(blockchain_dir, exist_ok=True)
 
-    blocks_file = os.path.join(blockchain_dir, 'blocks.json')
+    blocks_file = os.path.join(blockchain_dir, "blocks.json")
     blocks_data = [block.to_dict() for block in blockchain.chain]
 
-    with open(blocks_file, 'w') as f:
+    with open(blocks_file, "w") as f:
         json.dump(blocks_data, f, indent=2)
     print(f"✓ Blockchain saved: {blocks_file}")
     print(f"  Blocks: {len(blocks_data):,}")
     print(f"  File size: {os.path.getsize(blocks_file) / (1024*1024):.2f} MB")
 
     # 2. Update premium wallets with mining proceeds
-    wallet_file = os.path.join(os.path.dirname(__file__), '..', 'premium_wallets_PRIVATE.json')
-    with open(wallet_file, 'w') as f:
+    wallet_file = os.path.join(os.path.dirname(__file__), "..", "premium_wallets_PRIVATE.json")
+    with open(wallet_file, "w") as f:
         json.dump(wallets, f, indent=2)
     print(f"✓ Updated wallets: {wallet_file}")
 
     # 3. Save mining statistics
-    stats_file = os.path.join(blockchain_dir, 'mining_stats.json')
-    with open(stats_file, 'w') as f:
+    stats_file = os.path.join(blockchain_dir, "mining_stats.json")
+    with open(stats_file, "w") as f:
         json.dump(stats, f, indent=2)
     print(f"✓ Mining stats: {stats_file}")
 
     # 4. Create distribution summary
     summary = {
-        'total_blocks': len(blockchain.chain),
-        'genesis_timestamp': GENESIS_TIMESTAMP,
-        'final_timestamp': blockchain.chain[-1].timestamp,
-        'duration_days': (blockchain.chain[-1].timestamp - GENESIS_TIMESTAMP) / 86400,
-        'unique_miners': len([s for s in stats.values() if s['blocks_mined'] > 0]),
-        'total_wallets': len(wallets),
-        'total_rewards': sum(s['rewards'] for s in stats.values()),
-        'avg_reward_per_wallet': sum(s['rewards'] for s in stats.values()) / len(wallets)
+        "total_blocks": len(blockchain.chain),
+        "genesis_timestamp": GENESIS_TIMESTAMP,
+        "final_timestamp": blockchain.chain[-1].timestamp,
+        "duration_days": (blockchain.chain[-1].timestamp - GENESIS_TIMESTAMP) / 86400,
+        "unique_miners": len([s for s in stats.values() if s["blocks_mined"] > 0]),
+        "total_wallets": len(wallets),
+        "total_rewards": sum(s["rewards"] for s in stats.values()),
+        "avg_reward_per_wallet": sum(s["rewards"] for s in stats.values()) / len(wallets),
     }
 
-    summary_file = os.path.join(blockchain_dir, 'premine_summary.json')
-    with open(summary_file, 'w') as f:
+    summary_file = os.path.join(blockchain_dir, "premine_summary.json")
+    with open(summary_file, "w") as f:
         json.dump(summary, f, indent=2)
     print(f"✓ Summary: {summary_file}")
 
     print(f"\n{'='*70}")
 
+
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description='Pre-mine XAI blockchain')
-    parser.add_argument('--blocks', type=int, default=BLOCKS_TO_MINE,
-                       help=f'Number of blocks to mine (default: {BLOCKS_TO_MINE:,})')
-    parser.add_argument('--quick-test', action='store_true',
-                       help='Quick test with 100 blocks')
+    parser = argparse.ArgumentParser(description="Pre-mine XAI blockchain")
+    parser.add_argument(
+        "--blocks",
+        type=int,
+        default=BLOCKS_TO_MINE,
+        help=f"Number of blocks to mine (default: {BLOCKS_TO_MINE:,})",
+    )
+    parser.add_argument("--quick-test", action="store_true", help="Quick test with 100 blocks")
 
     args = parser.parse_args()
 

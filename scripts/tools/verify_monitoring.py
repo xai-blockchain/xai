@@ -13,21 +13,23 @@ import time
 from pathlib import Path
 
 # Set UTF-8 encoding for Windows console
-if sys.platform == 'win32':
+if sys.platform == "win32":
     import codecs
-    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
-    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+
+    sys.stdout = codecs.getwriter("utf-8")(sys.stdout.buffer, "strict")
+    sys.stderr = codecs.getwriter("utf-8")(sys.stderr.buffer, "strict")
 
 
 class Colors:
     """ANSI color codes"""
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    RED = '\033[91m'
-    BLUE = '\033[94m'
-    CYAN = '\033[96m'
-    RESET = '\033[0m'
-    BOLD = '\033[1m'
+
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    RED = "\033[91m"
+    BLUE = "\033[94m"
+    CYAN = "\033[96m"
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
 
 
 def print_header(text):
@@ -61,10 +63,10 @@ def check_python_packages():
     print_header("Checking Python Packages")
 
     packages = {
-        'prometheus_client': 'prometheus-client',
-        'grafana_api': 'grafana-api',
-        'pythonjsonlogger': 'python-json-logger',
-        'psutil': 'psutil'
+        "prometheus_client": "prometheus-client",
+        "grafana_api": "grafana-api",
+        "pythonjsonlogger": "python-json-logger",
+        "psutil": "psutil",
     }
 
     all_installed = True
@@ -88,15 +90,15 @@ def check_file_structure():
     project_root = script_dir.parent.parent
 
     required_files = [
-        'src/aixn/core/prometheus_metrics.py',
-        'prometheus/prometheus.yml',
-        'prometheus/alerts/blockchain_alerts.yml',
-        'prometheus/recording_rules/blockchain_rules.yml',
-        'prometheus/docker-compose.yml',
-        'prometheus/README.md',
-        'dashboards/grafana/aixn_blockchain_overview.json',
-        'dashboards/grafana/aixn_network_health.json',
-        'dashboards/grafana/aixn_api_performance.json',
+        "src/aixn/core/prometheus_metrics.py",
+        "prometheus/prometheus.yml",
+        "prometheus/alerts/blockchain_alerts.yml",
+        "prometheus/recording_rules/blockchain_rules.yml",
+        "prometheus/docker-compose.yml",
+        "prometheus/README.md",
+        "dashboards/grafana/aixn_blockchain_overview.json",
+        "dashboards/grafana/aixn_network_health.json",
+        "dashboards/grafana/aixn_api_performance.json",
     ]
 
     all_exist = True
@@ -127,9 +129,9 @@ def check_metrics_endpoint(port=8000, timeout=2):
             # Check for AIXN-specific metrics
             content = response.text
             aixn_metrics = [
-                'aixn_block_height',
-                'aixn_peers_connected',
-                'aixn_transactions_total',
+                "aixn_block_height",
+                "aixn_peers_connected",
+                "aixn_transactions_total",
             ]
 
             metrics_found = []
@@ -179,7 +181,7 @@ def check_prometheus(port=9090):
             targets_response = requests.get(targets_url, timeout=2)
             if targets_response.status_code == 200:
                 data = targets_response.json()
-                active_targets = data.get('data', {}).get('activeTargets', [])
+                active_targets = data.get("data", {}).get("activeTargets", [])
                 print_success(f"Found {len(active_targets)} active targets")
             return True
         else:
@@ -257,12 +259,12 @@ def main():
     results = {}
 
     # Run all checks
-    results['packages'] = check_python_packages()
-    results['files'] = check_file_structure()
-    results['metrics'] = check_metrics_endpoint()
-    results['prometheus'] = check_prometheus()
-    results['grafana'] = check_grafana()
-    results['alertmanager'] = check_alertmanager()
+    results["packages"] = check_python_packages()
+    results["files"] = check_file_structure()
+    results["metrics"] = check_metrics_endpoint()
+    results["prometheus"] = check_prometheus()
+    results["grafana"] = check_grafana()
+    results["alertmanager"] = check_alertmanager()
 
     # Summary
     print_header("Verification Summary")

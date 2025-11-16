@@ -1,6 +1,5 @@
 """Stub for metrics module."""
 
-
 _metrics_data = {}
 
 

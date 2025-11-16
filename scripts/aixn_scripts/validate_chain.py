@@ -23,34 +23,17 @@ from src.aixn.config_manager import Config
 
 def main():
     """Main validation script"""
-    parser = argparse.ArgumentParser(description='XAI Blockchain Validator')
+    parser = argparse.ArgumentParser(description="XAI Blockchain Validator")
+    parser.add_argument("--quiet", "-q", action="store_true", help="Minimal output (quiet mode)")
     parser.add_argument(
-        '--quiet', '-q',
-        action='store_true',
-        help='Minimal output (quiet mode)'
+        "--report", "-r", action="store_true", help="Save detailed validation report"
+    )
+    parser.add_argument("--data-dir", "-d", type=str, default=None, help="Custom data directory")
+    parser.add_argument(
+        "--max-supply", type=float, default=121000000.0, help="Maximum supply cap (default: 121M)"
     )
     parser.add_argument(
-        '--report', '-r',
-        action='store_true',
-        help='Save detailed validation report'
-    )
-    parser.add_argument(
-        '--data-dir', '-d',
-        type=str,
-        default=None,
-        help='Custom data directory'
-    )
-    parser.add_argument(
-        '--max-supply',
-        type=float,
-        default=121000000.0,
-        help='Maximum supply cap (default: 121M)'
-    )
-    parser.add_argument(
-        '--genesis-hash',
-        type=str,
-        default=None,
-        help='Expected genesis hash for strict validation'
+        "--genesis-hash", type=str, default=None, help="Expected genesis hash for strict validation"
     )
 
     args = parser.parse_args()
@@ -72,12 +55,10 @@ def main():
         loader = BlockchainLoader(
             data_dir=args.data_dir,
             max_supply=args.max_supply,
-            expected_genesis_hash=args.genesis_hash
+            expected_genesis_hash=args.genesis_hash,
         )
 
-        success, blockchain_data, message = loader.load_and_validate(
-            verbose=not args.quiet
-        )
+        success, blockchain_data, message = loader.load_and_validate(verbose=not args.quiet)
 
         # Get validation report
         report = loader.get_validation_report()
@@ -85,13 +66,10 @@ def main():
         # Save report if requested
         if args.report and report:
             storage = BlockchainStorage(args.data_dir)
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            report_file = os.path.join(
-                storage.data_dir,
-                f'validation_report_{timestamp}.json'
-            )
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            report_file = os.path.join(storage.data_dir, f"validation_report_{timestamp}.json")
 
-            with open(report_file, 'w') as f:
+            with open(report_file, "w") as f:
                 json.dump(report.to_dict(), f, indent=2)
 
             print(f"\nDetailed report saved to: {report_file}")
@@ -134,7 +112,11 @@ def main():
                     if critical:
                         print(f"\nCritical Issues:")
                         for issue in critical[:10]:
-                            block_str = f"Block {issue.block_index}" if issue.block_index is not None else "Chain"
+                            block_str = (
+                                f"Block {issue.block_index}"
+                                if issue.block_index is not None
+                                else "Chain"
+                            )
                             print(f"  - [{block_str}] {issue.description}")
                         if len(critical) > 10:
                             print(f"  ... and {len(critical) - 10} more")
@@ -149,6 +131,7 @@ def main():
         print(f"\n✗ ERROR: Validation script failed: {str(e)}")
         if not args.quiet:
             import traceback
+
             traceback.print_exc()
         return 2  # Error exit code
 

@@ -2,12 +2,14 @@
 XAI Blockchain Launch Sequence
 Initialize and launch the XAI blockchain with all components
 """
+
 import os
 import sys
 import json
 import time
 import argparse
 from datetime import datetime
+
 # Removed: from aixn.core.proof_of_intelligence import ProofOfIntelligence
 # Removed: from aixn.core.xai_token import XAIToken
 from aixn.core.blockchain import Blockchain
@@ -31,12 +33,12 @@ class XAILauncher:
 
     def initialize_components(self):
         """Initialize all blockchain components"""
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("XAI BLOCKCHAIN LAUNCH SEQUENCE")
-        print("="*50)
+        print("=" * 50)
         print(f"Mode: {self.mode.upper()}")
         print(f"Launch Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print("="*50 + "\n")
+        print("=" * 50 + "\n")
 
         # Step 1: Initialize blockchain
         print("[1/8] Initializing blockchain...")
@@ -92,9 +94,9 @@ class XAILauncher:
         self._save_launch_config()
         print("✓ Launch configuration saved")
 
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("LAUNCH SEQUENCE COMPLETE!")
-        print("="*50)
+        print("=" * 50)
 
     def _allocate_founder_tokens(self):
         """Allocate initial tokens to founder"""
@@ -104,7 +106,7 @@ class XAILauncher:
         vesting_duration = 4 * 365 * 24 * 3600  # 4 years total
 
         # Placeholder for when token contract is fully removed
-        success = True 
+        success = True
 
         if success:
             print(f"✓ Vesting schedule created")
@@ -114,34 +116,36 @@ class XAILauncher:
 
         # Allocate initial liquidity tokens (for founder to provide liquidity)
         liquidity_amount = 10_000_000
-        print(f"✓ Initial liquidity allocated: {liquidity_amount:,} XAI (minting functionality not available due to missing XAIToken class)")
+        print(
+            f"✓ Initial liquidity allocated: {liquidity_amount:,} XAI (minting functionality not available due to missing XAIToken class)"
+        )
 
     def _save_launch_config(self):
         """Save launch configuration"""
         config = {
-            'launch_time': time.time(),
-            'mode': self.mode,
-            'blockchain': {
-                'height': len(self.blockchain.chain),
-                'difficulty': self.blockchain.difficulty,
-                'total_supply': self.blockchain.get_stats()['total_supply']
+            "launch_time": time.time(),
+            "mode": self.mode,
+            "blockchain": {
+                "height": len(self.blockchain.chain),
+                "difficulty": self.blockchain.difficulty,
+                "total_supply": self.blockchain.get_stats()["total_supply"],
             },
-            'founder': {
-                'address': self.founder_wallet.address,
-                'vested_tokens': 100_000_000,
-                'liquid_tokens': 10_000_000
+            "founder": {
+                "address": self.founder_wallet.address,
+                "vested_tokens": 100_000_000,
+                "liquid_tokens": 10_000_000,
             },
-            'ai_agents': len(self.ai_traders)
+            "ai_agents": len(self.ai_traders),
         }
 
-        with open('launch_config.json', 'w') as f:
+        with open("launch_config.json", "w") as f:
             json.dump(config, f, indent=2)
 
     def start_mining(self):
         """Start mining blocks"""
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("STARTING MINING OPERATIONS")
-        print("="*50)
+        print("=" * 50)
 
         miner_address = self.founder_wallet.address
         blocks_mined = 0
@@ -153,11 +157,11 @@ class XAILauncher:
         try:
             while True:
                 # Generate AI task for consensus
-                task = {'task_id': 'simulated_task', 'difficulty': 1} # Placeholder
+                task = {"task_id": "simulated_task", "difficulty": 1}  # Placeholder
                 print(f"\n[Block {blocks_mined + 1}] AI Task: {task['task_id']}")
 
                 # Simulate AI computation
-                is_valid = True # Placeholder as consensus class is removed
+                is_valid = True  # Placeholder as consensus class is removed
 
                 if is_valid:
                     print(f"✓ AI Proof Valid (Simulated)")
@@ -165,18 +169,22 @@ class XAILauncher:
                     # Mine block
                     new_block = self.blockchain.mine_block(miner_address)
                     blocks_mined += 1
-                    reward = self.blockchain.get_block_reward(new_block.index) # Use method from Blockchain
+                    reward = self.blockchain.get_block_reward(
+                        new_block.index
+                    )  # Use method from Blockchain
 
                     # Mint rewards
                     total_rewards += reward
 
                     print(f"✓ Block mined: {new_block.hash[:16]}...")
                     print(f"  - Height: {new_block.index}")
-                    print(f"  - Reward: {reward} XAI (minting not available due to missing XAIToken class)")
+                    print(
+                        f"  - Reward: {reward} XAI (minting not available due to missing XAIToken class)"
+                    )
                     print(f"  - Total earned: {total_rewards:,} XAI")
 
                     # Update wallet balance
-                    self.founder_wallet.balance += reward # Simplified balance update
+                    self.founder_wallet.balance += reward  # Simplified balance update
 
                 else:
                     print(f"✗ AI Proof Invalid")
@@ -191,9 +199,9 @@ class XAILauncher:
 
     def run_ai_trading_simulation(self):
         """Run AI trading simulation"""
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("AI TRADING SIMULATION")
-        print("="*50)
+        print("=" * 50)
 
         if not self.ai_traders:
             print("No AI traders deployed.")
@@ -207,18 +215,20 @@ class XAILauncher:
 
         print("\nGenerating market data...")
         for i in range(100):
-            price = base_price * (1 + (i/1000) + random.uniform(-0.05, 0.05))
+            price = base_price * (1 + (i / 1000) + random.uniform(-0.05, 0.05))
             volume = 100000 * random.uniform(0.5, 2.0)
 
-            market_data.append(MarketData(
-                symbol="XAI/USDC",
-                price=price,
-                volume=volume,
-                change_24h=random.uniform(-10, 10),
-                high_24h=price * 1.1,
-                low_24h=price * 0.9,
-                timestamp=time.time() + i * 60
-            ))
+            market_data.append(
+                MarketData(
+                    symbol="XAI/USDC",
+                    price=price,
+                    volume=volume,
+                    change_24h=random.uniform(-10, 10),
+                    high_24h=price * 1.1,
+                    low_24h=price * 0.9,
+                    timestamp=time.time() + i * 60,
+                )
+            )
 
         print(f"✓ Generated {len(market_data)} data points")
 
@@ -230,7 +240,7 @@ class XAILauncher:
         print(f"  - Signal: {analysis['signal'].value}")
         print(f"  - Confidence: {analysis['confidence']*100:.1f}%")
 
-        indicators = analysis['indicators']
+        indicators = analysis["indicators"]
         print(f"\nTechnical Indicators:")
         print(f"  - MA Short: ${indicators['ma_short']:.6f}")
         print(f"  - MA Long: ${indicators['ma_long']:.6f}")
@@ -264,9 +274,9 @@ class XAILauncher:
 
     def show_dashboard(self):
         """Display blockchain dashboard"""
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("XAI BLOCKCHAIN DASHBOARD")
-        print("="*50)
+        print("=" * 50)
 
         # Blockchain stats
         chain_stats = self.blockchain.get_stats()
@@ -295,15 +305,13 @@ class XAILauncher:
 
 def main():
     """Main entry point"""
-    parser = argparse.ArgumentParser(description='XAI Blockchain Launch Sequence')
-    parser.add_argument('--mode', choices=['local', 'testnet', 'mainnet'],
-                       default='local', help='Launch mode')
-    parser.add_argument('--mine', action='store_true',
-                       help='Start mining after launch')
-    parser.add_argument('--trade', action='store_true',
-                       help='Run AI trading simulation')
-    parser.add_argument('--dashboard', action='store_true',
-                       help='Show dashboard only')
+    parser = argparse.ArgumentParser(description="XAI Blockchain Launch Sequence")
+    parser.add_argument(
+        "--mode", choices=["local", "testnet", "mainnet"], default="local", help="Launch mode"
+    )
+    parser.add_argument("--mine", action="store_true", help="Start mining after launch")
+    parser.add_argument("--trade", action="store_true", help="Run AI trading simulation")
+    parser.add_argument("--dashboard", action="store_true", help="Show dashboard only")
 
     args = parser.parse_args()
 
@@ -323,14 +331,15 @@ def main():
     # Optional: run trading simulation
     if args.trade:
         import random
+
         launcher.run_ai_trading_simulation()
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print("XAI Blockchain is ready!")
     print("Next steps:")
     print("  1. Run 'python launch_sequence.py --mine' to start mining")
     print("  2. Run 'python launch_sequence.py --trade' for AI trading demo")
     print("  3. Check wallets/ directory for your founder wallet")
-    print("="*50)
+    print("=" * 50)
 
 
 if __name__ == "__main__":

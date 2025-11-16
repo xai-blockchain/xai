@@ -11,6 +11,7 @@ TIER 2: 10,000 Standard Wallets (50 XAI each)
 - Auto-assigned to next 10,000 adopters
 - Instant participation
 """
+
 import json
 import sys
 import os
@@ -30,6 +31,7 @@ STANDARD_COUNT = 10000
 STANDARD_AMOUNT = 50  # XAI per wallet
 
 INITIAL_XAI_PRICE = 0.05  # $0.05 per XAI
+
 
 def generate_premium_wallets(count=1373):
     """Generate premium wallets for early miners/node operators"""
@@ -51,22 +53,22 @@ def generate_premium_wallets(count=1373):
         tier = "miner" if i < 1150 else "reserved"
 
         wallet_data = {
-            'index': i + 1,
-            'address': wallet.address,
-            'public_key': wallet.public_key,
-            'private_key': wallet.private_key,
-            'tier': tier,
-            'initial_balance': round(initial_amount, 2),
-            'usd_value': round(initial_amount * INITIAL_XAI_PRICE, 2),
-            'mining_proceeds': 0.0,  # Will be updated during pre-mining
-            'total_balance': round(initial_amount, 2),
-            'claimed': False,
-            'claimed_by': None,
-            'claimed_timestamp': None,
-            'claim_method': 'proof_of_mining',  # Must mine 1 block to claim
-            'atomic_swap_enabled': True,  # All 11 currencies
-            'double_rewards_eligible': True,  # First 6 months
-            'created_timestamp': 1704067200  # Jan 1, 2024
+            "index": i + 1,
+            "address": wallet.address,
+            "public_key": wallet.public_key,
+            "private_key": wallet.private_key,
+            "tier": tier,
+            "initial_balance": round(initial_amount, 2),
+            "usd_value": round(initial_amount * INITIAL_XAI_PRICE, 2),
+            "mining_proceeds": 0.0,  # Will be updated during pre-mining
+            "total_balance": round(initial_amount, 2),
+            "claimed": False,
+            "claimed_by": None,
+            "claimed_timestamp": None,
+            "claim_method": "proof_of_mining",  # Must mine 1 block to claim
+            "atomic_swap_enabled": True,  # All 11 currencies
+            "double_rewards_eligible": True,  # First 6 months
+            "created_timestamp": 1704067200,  # Jan 1, 2024
         }
 
         wallets.append(wallet_data)
@@ -77,11 +79,11 @@ def generate_premium_wallets(count=1373):
     print(f"\n✓ {count} premium wallets generated")
 
     # Statistics
-    miner_wallets = [w for w in wallets if w['tier'] == 'miner']
-    reserved_wallets = [w for w in wallets if w['tier'] == 'reserved']
+    miner_wallets = [w for w in wallets if w["tier"] == "miner"]
+    reserved_wallets = [w for w in wallets if w["tier"] == "reserved"]
 
-    total_xai = sum(w['initial_balance'] for w in wallets)
-    total_usd = sum(w['usd_value'] for w in wallets)
+    total_xai = sum(w["initial_balance"] for w in wallets)
+    total_usd = sum(w["usd_value"] for w in wallets)
 
     print(f"\n  Distribution:")
     print(f"    Miner tier: {len(miner_wallets)} wallets")
@@ -92,6 +94,7 @@ def generate_premium_wallets(count=1373):
     print(f"    Avg per wallet: {total_xai/count:,.2f} XAI (${total_usd/count:,.2f})")
 
     return wallets
+
 
 def generate_standard_wallets(count=10000):
     """Generate standard wallets for rapid onboarding"""
@@ -106,21 +109,21 @@ def generate_standard_wallets(count=10000):
         wallet = Wallet()
 
         wallet_data = {
-            'index': i + 1,
-            'address': wallet.address,
-            'public_key': wallet.public_key,
-            'private_key': wallet.private_key,
-            'tier': 'standard',
-            'initial_balance': STANDARD_AMOUNT,
-            'usd_value': STANDARD_AMOUNT * INITIAL_XAI_PRICE,
-            'total_balance': STANDARD_AMOUNT,
-            'claimed': False,
-            'claimed_by': None,
-            'claimed_timestamp': None,
-            'claim_method': 'auto_assign',  # Automatic on node start
-            'atomic_swap_enabled': True,
-            'double_rewards_eligible': False,
-            'created_timestamp': 1704067200  # Jan 1, 2024
+            "index": i + 1,
+            "address": wallet.address,
+            "public_key": wallet.public_key,
+            "private_key": wallet.private_key,
+            "tier": "standard",
+            "initial_balance": STANDARD_AMOUNT,
+            "usd_value": STANDARD_AMOUNT * INITIAL_XAI_PRICE,
+            "total_balance": STANDARD_AMOUNT,
+            "claimed": False,
+            "claimed_by": None,
+            "claimed_timestamp": None,
+            "claim_method": "auto_assign",  # Automatic on node start
+            "atomic_swap_enabled": True,
+            "double_rewards_eligible": False,
+            "created_timestamp": 1704067200,  # Jan 1, 2024
         }
 
         wallets.append(wallet_data)
@@ -139,6 +142,7 @@ def generate_standard_wallets(count=10000):
 
     return wallets
 
+
 def save_wallets(premium_wallets, standard_wallets):
     """Save wallet data to multiple files"""
 
@@ -147,66 +151,75 @@ def save_wallets(premium_wallets, standard_wallets):
     print(f"{'='*70}")
 
     # 1. Full premium wallets (KEEP PRIVATE until release)
-    premium_file = os.path.join(os.path.dirname(__file__), '..', 'premium_wallets_PRIVATE.json')
-    with open(premium_file, 'w') as f:
+    premium_file = os.path.join(os.path.dirname(__file__), "..", "premium_wallets_PRIVATE.json")
+    with open(premium_file, "w") as f:
         json.dump(premium_wallets, f, indent=2)
     print(f"✓ Premium wallets (full): {premium_file}")
 
     # 2. Full standard wallets (KEEP PRIVATE until release)
-    standard_file = os.path.join(os.path.dirname(__file__), '..', 'standard_wallets_PRIVATE.json')
-    with open(standard_file, 'w') as f:
+    standard_file = os.path.join(os.path.dirname(__file__), "..", "standard_wallets_PRIVATE.json")
+    with open(standard_file, "w") as f:
         json.dump(standard_wallets, f, indent=2)
     print(f"✓ Standard wallets (full): {standard_file}")
 
     # 3. Miner tier only (1,150 wallets for public release)
-    miner_wallets = [w for w in premium_wallets if w['tier'] == 'miner']
+    miner_wallets = [w for w in premium_wallets if w["tier"] == "miner"]
     miner_public = []
     for w in miner_wallets:
-        miner_public.append({
-            'index': w['index'],
-            'address': w['address'],
-            'initial_balance': w['initial_balance'],
-            'claimed': False
-        })
+        miner_public.append(
+            {
+                "index": w["index"],
+                "address": w["address"],
+                "initial_balance": w["initial_balance"],
+                "claimed": False,
+            }
+        )
 
-    miner_file = os.path.join(os.path.dirname(__file__), '..', 'miner_wallets_public.json')
-    with open(miner_file, 'w') as f:
+    miner_file = os.path.join(os.path.dirname(__file__), "..", "miner_wallets_public.json")
+    with open(miner_file, "w") as f:
         json.dump(miner_public, f, indent=2)
     print(f"✓ Miner wallets (public list): {miner_file}")
 
     # 4. Standard wallets public list (addresses only)
     standard_public = []
     for w in standard_wallets:
-        standard_public.append({
-            'index': w['index'],
-            'address': w['address'],
-            'balance': w['initial_balance'],
-            'claimed': False
-        })
+        standard_public.append(
+            {
+                "index": w["index"],
+                "address": w["address"],
+                "balance": w["initial_balance"],
+                "claimed": False,
+            }
+        )
 
-    standard_pub_file = os.path.join(os.path.dirname(__file__), '..', 'standard_wallets_public.json')
-    with open(standard_pub_file, 'w') as f:
+    standard_pub_file = os.path.join(
+        os.path.dirname(__file__), "..", "standard_wallets_public.json"
+    )
+    with open(standard_pub_file, "w") as f:
         json.dump(standard_public, f, indent=2)
     print(f"✓ Standard wallets (public list): {standard_pub_file}")
 
     # 5. Reserved wallets (YOUR 223 wallets)
-    reserved_wallets = [w for w in premium_wallets if w['tier'] == 'reserved']
-    reserved_file = os.path.join(os.path.dirname(__file__), '..', 'reserved_wallets_YOURS.json')
-    with open(reserved_file, 'w') as f:
+    reserved_wallets = [w for w in premium_wallets if w["tier"] == "reserved"]
+    reserved_file = os.path.join(os.path.dirname(__file__), "..", "reserved_wallets_YOURS.json")
+    with open(reserved_file, "w") as f:
         json.dump(reserved_wallets, f, indent=2)
     print(f"✓ Reserved wallets (YOUR 223): {reserved_file}")
 
     # 6. Merkle root for verification
-    all_addresses = [w['address'] for w in premium_wallets] + [w['address'] for w in standard_wallets]
+    all_addresses = [w["address"] for w in premium_wallets] + [
+        w["address"] for w in standard_wallets
+    ]
     merkle_root = calculate_merkle_root(all_addresses)
 
-    merkle_file = os.path.join(os.path.dirname(__file__), '..', 'wallet_merkle_root.txt')
-    with open(merkle_file, 'w') as f:
+    merkle_file = os.path.join(os.path.dirname(__file__), "..", "wallet_merkle_root.txt")
+    with open(merkle_file, "w") as f:
         f.write(f"Premium Wallets: {len(premium_wallets)}\n")
         f.write(f"Standard Wallets: {len(standard_wallets)}\n")
         f.write(f"Total Wallets: {len(all_addresses)}\n")
         f.write(f"Merkle Root: {merkle_root}\n")
     print(f"✓ Merkle root: {merkle_file}")
+
 
 def calculate_merkle_root(items):
     """Calculate merkle root of wallet addresses"""
@@ -229,6 +242,7 @@ def calculate_merkle_root(items):
 
     return hashes[0]
 
+
 def display_summary(premium_wallets, standard_wallets):
     """Display comprehensive summary"""
 
@@ -237,11 +251,11 @@ def display_summary(premium_wallets, standard_wallets):
     print(f"{'='*70}")
 
     # Premium breakdown
-    miner_wallets = [w for w in premium_wallets if w['tier'] == 'miner']
-    reserved_wallets = [w for w in premium_wallets if w['tier'] == 'reserved']
+    miner_wallets = [w for w in premium_wallets if w["tier"] == "miner"]
+    reserved_wallets = [w for w in premium_wallets if w["tier"] == "reserved"]
 
-    premium_xai = sum(w['initial_balance'] for w in premium_wallets)
-    standard_xai = sum(w['initial_balance'] for w in standard_wallets)
+    premium_xai = sum(w["initial_balance"] for w in premium_wallets)
+    standard_xai = sum(w["initial_balance"] for w in standard_wallets)
     total_xai = premium_xai + standard_xai
 
     print(f"\nTIER 1: PREMIUM WALLETS ({len(premium_wallets)} total)")
@@ -312,6 +326,7 @@ def display_summary(premium_wallets, standard_wallets):
     print(f"  - wallet_merkle_root.txt (verification)")
 
     print(f"\n{'='*70}")
+
 
 if __name__ == "__main__":
     print(f"\n{'#'*70}")

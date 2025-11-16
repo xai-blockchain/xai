@@ -8,12 +8,14 @@ import time
 
 class SwapOrderType(Enum):
     """Type of swap order"""
+
     BUY = "buy"
     SELL = "sell"
 
 
 class OrderStatus(Enum):
     """Status of a trade order"""
+
     PENDING = "pending"
     MATCHED = "matched"
     COMPLETED = "completed"
@@ -23,6 +25,7 @@ class OrderStatus(Enum):
 
 class TradeMatchStatus(Enum):
     """Status of a trade match"""
+
     PENDING = "pending"
     CONFIRMED = "confirmed"
     SETTLED = "settled"
@@ -32,6 +35,7 @@ class TradeMatchStatus(Enum):
 @dataclass
 class TradeOrder:
     """Represents a trade order"""
+
     order_id: str
     order_type: SwapOrderType
     amount: float
@@ -60,6 +64,7 @@ class TradeOrder:
 @dataclass
 class TradeMatch:
     """Represents a matched trade"""
+
     match_id: str
     buy_order_id: str
     sell_order_id: str

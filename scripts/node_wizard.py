@@ -48,7 +48,7 @@ def main():
         "rpc_port": rpc_port,
         "p2p_port": p2p_port,
         "data_dir": str(data_dir.resolve()),
-        "network": "testnet"
+        "network": "testnet",
     }
 
     config_path = write_node_config(data_dir, node_payload)
@@ -57,11 +57,17 @@ def main():
         print(f"Peer discovery record persisted to {peer_path}")
 
     print("\nDone! Here are your next steps:")
-    print(f"1) Start the node:\n   python core/node.py --miner {miner} --data-dir {data_dir} --rpc-port {rpc_port} --p2p-port {p2p_port}")
-    print(f"2) Hit the mining API:\n   curl -X POST http://localhost:{rpc_port}/mining/start -H 'Content-Type: application/json' -d '{{\"miner_address\":\"{miner}\",\"threads\":2}}'")
+    print(
+        f"1) Start the node:\n   python core/node.py --miner {miner} --data-dir {data_dir} --rpc-port {rpc_port} --p2p-port {p2p_port}"
+    )
+    print(
+        f'2) Hit the mining API:\n   curl -X POST http://localhost:{rpc_port}/mining/start -H \'Content-Type: application/json\' -d \'{{"miner_address":"{miner}","threads":2}}\''
+    )
     print(f"3) Watch metrics: http://localhost:{rpc_port}/metrics")
     print(f"4) Monitor Time Capsules: http://localhost:{rpc_port}/time-capsule/pending")
-    print("\nKeep this terminal open to see logs, and point your Grafana at /metrics for live status.")
+    print(
+        "\nKeep this terminal open to see logs, and point your Grafana at /metrics for live status."
+    )
 
 
 if __name__ == "__main__":

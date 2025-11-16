@@ -9,6 +9,7 @@ from src.aixn.core.hot_cold_wallet_manager import HotColdWalletManager
 import hashlib
 import time
 
+
 def generate_wallet_address(currency: str, wallet_type: str) -> str:
     """Generate a wallet address for a currency"""
     # In production, use proper HD wallet derivation (BIP32/BIP44)
@@ -18,30 +19,30 @@ def generate_wallet_address(currency: str, wallet_type: str) -> str:
     address_hash = hashlib.sha256(seed.encode()).hexdigest()
 
     # Format address based on currency
-    if currency in ['BTC', 'LTC', 'DOGE']:
-        if currency == 'BTC':
+    if currency in ["BTC", "LTC", "DOGE"]:
+        if currency == "BTC":
             return f"bc1q{address_hash[:40]}"
-        elif currency == 'LTC':
+        elif currency == "LTC":
             return f"ltc1q{address_hash[:40]}"
-        elif currency == 'DOGE':
+        elif currency == "DOGE":
             return f"D{address_hash[:33]}"
 
-    elif currency in ['ETH', 'USDT', 'SHIB', 'MATIC', 'LINK', 'UNI', 'BNB', 'AVAX']:
+    elif currency in ["ETH", "USDT", "SHIB", "MATIC", "LINK", "UNI", "BNB", "AVAX"]:
         return f"0x{address_hash[:40]}"
 
-    elif currency == 'XAI':
+    elif currency == "XAI":
         return f"XAI{address_hash[:40]}"
 
-    elif currency == 'SOL':
+    elif currency == "SOL":
         return f"{address_hash[:44]}"
 
-    elif currency == 'XRP':
+    elif currency == "XRP":
         return f"r{address_hash[:33]}"
 
-    elif currency == 'DOT':
+    elif currency == "DOT":
         return f"1{address_hash[:47]}"
 
-    elif currency == 'ADA':
+    elif currency == "ADA":
         return f"addr1{address_hash[:55]}"
 
     else:
@@ -57,9 +58,22 @@ def main():
     manager = HotColdWalletManager()
 
     currencies = [
-        'XAI', 'BTC', 'ETH', 'USDT', 'LTC', 'BNB',
-        'SOL', 'XRP', 'DOGE', 'SHIB', 'MATIC', 'DOT',
-        'AVAX', 'LINK', 'UNI', 'ADA'
+        "XAI",
+        "BTC",
+        "ETH",
+        "USDT",
+        "LTC",
+        "BNB",
+        "SOL",
+        "XRP",
+        "DOGE",
+        "SHIB",
+        "MATIC",
+        "DOT",
+        "AVAX",
+        "LINK",
+        "UNI",
+        "ADA",
     ]
 
     print(f"Initializing wallets for {len(currencies)} currencies...")
@@ -71,24 +85,24 @@ def main():
         print(f"Initializing {currency}...")
 
         # Generate addresses
-        hot_address = generate_wallet_address(currency, 'HOT')
-        cold_address = generate_wallet_address(currency, 'COLD')
+        hot_address = generate_wallet_address(currency, "HOT")
+        cold_address = generate_wallet_address(currency, "COLD")
 
         try:
             result = manager.initialize_wallets(
-                currency=currency,
-                hot_address=hot_address,
-                cold_address=cold_address
+                currency=currency, hot_address=hot_address, cold_address=cold_address
             )
 
-            results.append({
-                'currency': currency,
-                'status': 'SUCCESS',
-                'hot_address': hot_address,
-                'cold_address': cold_address,
-                'hot_min': result['hot_wallet']['min_reserve'],
-                'hot_max': result['hot_wallet']['max_reserve']
-            })
+            results.append(
+                {
+                    "currency": currency,
+                    "status": "SUCCESS",
+                    "hot_address": hot_address,
+                    "cold_address": cold_address,
+                    "hot_min": result["hot_wallet"]["min_reserve"],
+                    "hot_max": result["hot_wallet"]["max_reserve"],
+                }
+            )
 
             print(f"  Hot Wallet:  {hot_address}")
             print(f"  Cold Wallet: {cold_address}")
@@ -97,11 +111,7 @@ def main():
             print(f"  Status: SUCCESS")
 
         except Exception as e:
-            results.append({
-                'currency': currency,
-                'status': 'FAILED',
-                'error': str(e)
-            })
+            results.append({"currency": currency, "status": "FAILED", "error": str(e)})
             print(f"  Status: FAILED - {e}")
 
         print()
@@ -112,8 +122,8 @@ def main():
     print("=" * 80)
     print()
 
-    successful = [r for r in results if r['status'] == 'SUCCESS']
-    failed = [r for r in results if r['status'] == 'FAILED']
+    successful = [r for r in results if r["status"] == "SUCCESS"]
+    failed = [r for r in results if r["status"] == "FAILED"]
 
     print(f"Total Currencies: {len(currencies)}")
     print(f"Successful: {len(successful)}")
@@ -124,7 +134,9 @@ def main():
         print("Successfully Initialized:")
         print("-" * 80)
         for r in successful:
-            print(f"  {r['currency']:6s} - Hot: {r['hot_address'][:20]}... | Cold: {r['cold_address'][:20]}...")
+            print(
+                f"  {r['currency']:6s} - Hot: {r['hot_address'][:20]}... | Cold: {r['cold_address'][:20]}..."
+            )
         print()
 
     if failed:
@@ -142,7 +154,9 @@ def main():
 
     report = manager.get_custody_report()
 
-    print(f"Initialized Currencies: {report['initialized_currencies']}/{report['total_currencies']}")
+    print(
+        f"Initialized Currencies: {report['initialized_currencies']}/{report['total_currencies']}"
+    )
     print()
 
     print("Current Balances:")
@@ -150,9 +164,11 @@ def main():
     print(f"{'Currency':<10} {'Total':>15} {'Hot':>15} {'Cold':>15} {'Hot %':>10}")
     print("-" * 80)
 
-    for currency, data in report['currencies'].items():
-        print(f"{currency:<10} {data['total']:>15.8f} {data['hot']:>15.8f} "
-              f"{data['cold']:>15.8f} {data['hot_percentage']:>9.2f}%")
+    for currency, data in report["currencies"].items():
+        print(
+            f"{currency:<10} {data['total']:>15.8f} {data['hot']:>15.8f} "
+            f"{data['cold']:>15.8f} {data['hot_percentage']:>9.2f}%"
+        )
 
     print()
     print("=" * 80)
@@ -182,5 +198,5 @@ def main():
     print()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

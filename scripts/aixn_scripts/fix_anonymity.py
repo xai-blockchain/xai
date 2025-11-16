@@ -9,6 +9,7 @@ Automatically fixes critical anonymity issues:
 
 Run this BEFORE generating wallets and uploading to GitHub.
 """
+
 import os
 import sys
 import re
@@ -18,13 +19,14 @@ import json
 SAFE_GENESIS_TIMESTAMP = 1704067200
 OLD_GENESIS_TIMESTAMP = 1730851200  # Nov 6, 2024 (original identifying timestamp)
 
+
 def fix_timestamp_in_file(file_path, description):
     """Replace genesis timestamp in a file"""
     if not os.path.exists(file_path):
         print(f"[WARN]  {description}: File not found - {file_path}")
         return False
 
-    with open(file_path, 'r', encoding='utf-8') as f:
+    with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
 
     # Check if old timestamp exists
@@ -35,11 +37,12 @@ def fix_timestamp_in_file(file_path, description):
     # Replace old timestamp with safe timestamp
     new_content = content.replace(str(OLD_GENESIS_TIMESTAMP), str(SAFE_GENESIS_TIMESTAMP))
 
-    with open(file_path, 'w', encoding='utf-8') as f:
+    with open(file_path, "w", encoding="utf-8") as f:
         f.write(new_content)
 
     print(f"[OK] {description}: Genesis timestamp updated")
     return True
+
 
 def create_gitignore(auto_yes=False):
     """Create comprehensive .gitignore"""
@@ -166,24 +169,24 @@ $RECYCLE.BIN/
 Icon
 """
 
-    gitignore_path = os.path.join(os.path.dirname(__file__), '..', '.gitignore')
+    gitignore_path = os.path.join(os.path.dirname(__file__), "..", ".gitignore")
 
     if os.path.exists(gitignore_path):
         print("[WARN]  .gitignore already exists")
         if not auto_yes:
             response = input("   Overwrite? (y/n): ")
-            if response.lower() != 'y':
+            if response.lower() != "y":
                 print("   Skipped .gitignore creation")
                 return False
         else:
             print("   Overwriting in auto mode")
 
-
-    with open(gitignore_path, 'w', encoding='utf-8') as f:
+    with open(gitignore_path, "w", encoding="utf-8") as f:
         f.write(gitignore_content)
 
     print("[OK] .gitignore created")
     return True
+
 
 def check_for_identifying_info():
     """Scan for potential identifying information"""
@@ -194,34 +197,34 @@ def check_for_identifying_info():
 
     # Check for common identifying patterns
     patterns = {
-        'email': r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}',
-        'ip': r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b',
-        'path': r'C:\\Users\\[^\\]+|/Users/[^/]+|/home/[^/]+'
+        "email": r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
+        "ip": r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b",
+        "path": r"C:\\Users\\[^\\]+|/Users/[^/]+|/home/[^/]+",
     }
 
     exclude_patterns = [
-        'noreply@protonmail.com',  # Generic example
-        '127.0.0.1',                # Localhost
-        '0.0.0.0',                  # Any address
-        'example.com',              # Generic example
-        'localhost'                 # Localhost
+        "noreply@protonmail.com",  # Generic example
+        "127.0.0.1",  # Localhost
+        "0.0.0.0",  # Any address
+        "example.com",  # Generic example
+        "localhost",  # Localhost
     ]
 
     # Scan Python and JSON files
-    root_dir = os.path.join(os.path.dirname(__file__), '..')
+    root_dir = os.path.join(os.path.dirname(__file__), "..")
 
     for root, dirs, files in os.walk(root_dir):
         # Skip certain directories
-        if any(skip in root for skip in ['.git', '__pycache__', 'venv', 'env', 'node_modules']):
+        if any(skip in root for skip in [".git", "__pycache__", "venv", "env", "node_modules"]):
             continue
 
         for file in files:
-            if file.endswith(('.py', '.json', '.md')):
+            if file.endswith((".py", ".json", ".md")):
                 file_path = os.path.join(root, file)
                 relative_path = os.path.relpath(file_path, root_dir)
 
                 try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
+                    with open(file_path, "r", encoding="utf-8") as f:
                         content = f.read()
 
                     # Check for old timestamp
@@ -233,16 +236,21 @@ def check_for_identifying_info():
                         matches = re.findall(pattern, content)
                         for match in matches:
                             if not any(exclude in match for exclude in exclude_patterns):
-                                if pattern_name == 'ip':
+                                if pattern_name == "ip":
                                     # IPs are usually OK if they're examples
-                                    warnings.append(f"[WARNING] {relative_path}: Found IP address: {match}")
+                                    warnings.append(
+                                        f"[WARNING] {relative_path}: Found IP address: {match}"
+                                    )
                                 else:
-                                    warnings.append(f"[WARNING] {relative_path}: Found {pattern_name}: {match}")
+                                    warnings.append(
+                                        f"[WARNING] {relative_path}: Found {pattern_name}: {match}"
+                                    )
 
                 except Exception as e:
                     pass  # Skip files that can't be read
 
     return issues, warnings
+
 
 def verify_git_config():
     """Check if git is configured anonymously"""
@@ -252,7 +260,7 @@ def verify_git_config():
         import subprocess
 
         # Check if git is initialized
-        git_dir = os.path.join(os.path.dirname(__file__), '..', '.git')
+        git_dir = os.path.join(os.path.dirname(__file__), "..", ".git")
         if not os.path.exists(git_dir):
             print("[INFO]  Git not initialized yet (this is good)")
             print("   When you run 'git init', use these commands:")
@@ -261,10 +269,10 @@ def verify_git_config():
             return True
 
         # Check git config
-        result_name = subprocess.run(['git', 'config', 'user.name'],
-                                    capture_output=True, text=True)
-        result_email = subprocess.run(['git', 'config', 'user.email'],
-                                     capture_output=True, text=True)
+        result_name = subprocess.run(["git", "config", "user.name"], capture_output=True, text=True)
+        result_email = subprocess.run(
+            ["git", "config", "user.email"], capture_output=True, text=True
+        )
 
         name = result_name.stdout.strip()
         email = result_email.stdout.strip()
@@ -285,6 +293,7 @@ def verify_git_config():
         print(f"[WARN]  Could not check git config: {e}")
         return True
 
+
 def main(auto_yes=False):
     """Main execution"""
     print("=" * 70)
@@ -299,7 +308,7 @@ def main(auto_yes=False):
 
     if not auto_yes:
         response = input("Continue? (y/n): ")
-        if response.lower() != 'y':
+        if response.lower() != "y":
             print("Aborted.")
             return
 
@@ -307,15 +316,15 @@ def main(auto_yes=False):
     print("STEP 1: Fixing Genesis Timestamps")
     print("=" * 70)
 
-    base_dir = os.path.join(os.path.dirname(__file__), '..')
+    base_dir = os.path.join(os.path.dirname(__file__), "..")
 
     files_to_fix = [
-        (os.path.join(base_dir, 'aixn-blockchain', 'genesis_new.json'),
-         "Genesis block JSON"),
-        (os.path.join(base_dir, 'scripts', 'premine_blockchain.py'),
-         "Pre-mining script"),
-        (os.path.join(base_dir, 'scripts', 'generate_early_adopter_wallets.py'),
-         "Wallet generation script"),
+        (os.path.join(base_dir, "aixn-blockchain", "genesis_new.json"), "Genesis block JSON"),
+        (os.path.join(base_dir, "scripts", "premine_blockchain.py"), "Pre-mining script"),
+        (
+            os.path.join(base_dir, "scripts", "generate_early_adopter_wallets.py"),
+            "Wallet generation script",
+        ),
     ]
 
     for file_path, description in files_to_fix:
@@ -371,7 +380,9 @@ def main(auto_yes=False):
     print("\nSee ANONYMITY_COMPLIANCE_AUDIT.md for full checklist")
     print("=" * 70 + "\n")
 
+
 if __name__ == "__main__":
     import sys
-    auto_yes = '--auto' in sys.argv or '-y' in sys.argv
+
+    auto_yes = "--auto" in sys.argv or "-y" in sys.argv
     main(auto_yes=auto_yes)

@@ -3,6 +3,7 @@ Generate 1,373 Unclaimed Wallets for Early Adopter Distribution
 These wallets will receive mining rewards during pre-mining
 Early node operators can claim them first-come-first-served
 """
+
 import json
 import sys
 import os
@@ -11,6 +12,7 @@ import ecdsa
 import base58
 
 from src.aixn.core.wallet import Wallet
+
 
 def generate_unclaimed_wallets(count=1373):
     """Generate wallets for early adopter distribution"""
@@ -25,14 +27,14 @@ def generate_unclaimed_wallets(count=1373):
         wallet = Wallet()
 
         wallet_data = {
-            'index': i + 1,
-            'address': wallet.address,
-            'public_key': wallet.public_key,
-            'private_key': wallet.private_key,
-            'claimed': False,
-            'claimed_by': None,
-            'claimed_timestamp': None,
-            'balance': 0.0  # Will be updated during pre-mining
+            "index": i + 1,
+            "address": wallet.address,
+            "public_key": wallet.public_key,
+            "private_key": wallet.private_key,
+            "claimed": False,
+            "claimed_by": None,
+            "claimed_timestamp": None,
+            "balance": 0.0,  # Will be updated during pre-mining
         }
 
         wallets.append(wallet_data)
@@ -43,19 +45,19 @@ def generate_unclaimed_wallets(count=1373):
     print(f"\n✓ {count} wallets generated")
 
     # Save to JSON
-    output_file = os.path.join(os.path.dirname(__file__), '..', 'unclaimed_wallets.json')
-    with open(output_file, 'w') as f:
+    output_file = os.path.join(os.path.dirname(__file__), "..", "unclaimed_wallets.json")
+    with open(output_file, "w") as f:
         json.dump(wallets, f, indent=2)
 
     print(f"✓ Saved to: {output_file}")
 
     # Generate wallet claim merkle root for verification
-    addresses = [w['address'] for w in wallets]
+    addresses = [w["address"] for w in wallets]
     merkle_root = calculate_merkle_root(addresses)
 
     # Save merkle root separately (for verification)
-    merkle_file = os.path.join(os.path.dirname(__file__), '..', 'wallet_merkle_root.txt')
-    with open(merkle_file, 'w') as f:
+    merkle_file = os.path.join(os.path.dirname(__file__), "..", "wallet_merkle_root.txt")
+    with open(merkle_file, "w") as f:
         f.write(merkle_root)
 
     print(f"✓ Merkle root: {merkle_root[:32]}...")
@@ -64,14 +66,10 @@ def generate_unclaimed_wallets(count=1373):
     # Create public list (addresses only, no private keys)
     public_list = []
     for w in wallets:
-        public_list.append({
-            'index': w['index'],
-            'address': w['address'],
-            'claimed': False
-        })
+        public_list.append({"index": w["index"], "address": w["address"], "claimed": False})
 
-    public_file = os.path.join(os.path.dirname(__file__), '..', 'unclaimed_wallets_public.json')
-    with open(public_file, 'w') as f:
+    public_file = os.path.join(os.path.dirname(__file__), "..", "unclaimed_wallets_public.json")
+    with open(public_file, "w") as f:
         json.dump(public_list, f, indent=2)
 
     print(f"✓ Public list saved to: {public_file}")
@@ -91,6 +89,7 @@ def generate_unclaimed_wallets(count=1373):
     print("\n" + "=" * 60)
 
     return wallets
+
 
 def calculate_merkle_root(items):
     """Calculate merkle root of wallet addresses"""
@@ -117,13 +116,14 @@ def calculate_merkle_root(items):
 
     return hashes[0]
 
+
 def get_statistics(wallets):
     """Get wallet distribution statistics"""
 
     total = len(wallets)
-    claimed = sum(1 for w in wallets if w['claimed'])
+    claimed = sum(1 for w in wallets if w["claimed"])
     unclaimed = total - claimed
-    total_balance = sum(w['balance'] for w in wallets)
+    total_balance = sum(w["balance"] for w in wallets)
 
     print("\n" + "=" * 60)
     print("WALLET STATISTICS")
@@ -134,6 +134,7 @@ def get_statistics(wallets):
     print(f"Total balance: {total_balance:,.2f} XAI")
     print(f"Avg balance: {total_balance/total:,.2f} XAI per wallet")
     print("=" * 60)
+
 
 if __name__ == "__main__":
     # Generate 1,373 wallets

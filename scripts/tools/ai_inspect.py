@@ -1,4 +1,5 @@
 """CLI helpers for AI observability"""
+
 import argparse
 import requests
 
@@ -38,6 +39,7 @@ def main():
             if not args.watch:
                 break
             import time
+
             time.sleep(30)
     except KeyboardInterrupt:
         print("Stopped")
@@ -45,5 +47,5 @@ def main():
         print(f"Request failed: {exc}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

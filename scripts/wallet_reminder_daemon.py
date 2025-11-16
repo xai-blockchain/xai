@@ -28,16 +28,19 @@ def _dispatch_webhook(url: str, payload: dict):
 def main():
     tracker = WalletClaimingTracker()
     pending = tracker.pending_claims_summary()
-    webhook_url = os.getenv('XAI_NOTIFICATION_WEBHOOK', '').strip()
+    webhook_url = os.getenv("XAI_NOTIFICATION_WEBHOOK", "").strip()
 
     if pending:
         summary_msg = f"[SUMMARY] {len(pending)} unclaimed wallets tracked; next reminders scheduled at per-identifier cadence."
         print(summary_msg)
-        _dispatch_webhook(webhook_url, {
-            'type': 'wallet_reminder_summary',
-            'pending_count': len(pending),
-            'pending': pending[:10]
-        })
+        _dispatch_webhook(
+            webhook_url,
+            {
+                "type": "wallet_reminder_summary",
+                "pending_count": len(pending),
+                "pending": pending[:10],
+            },
+        )
     else:
         print("[SUMMARY] No pending wallet claims right now.")
 
@@ -47,14 +50,10 @@ def main():
             print(f"[REMINDER] {identifier}: {note['message']}")
             print(f"  Details: {note['details']}")
             print(f"  Try: {note['action']}")
-            payload = {
-                'type': 'wallet_reminder',
-                'identifier': identifier,
-                'notification': note
-            }
+            payload = {"type": "wallet_reminder", "identifier": identifier, "notification": note}
             if webhook_url:
                 _dispatch_webhook(webhook_url, payload)
-            elif os.getenv('XAI_NOTIFICATION_LOG_JSON') == '1':
+            elif os.getenv("XAI_NOTIFICATION_LOG_JSON") == "1":
                 print(json.dumps(payload))
 
 

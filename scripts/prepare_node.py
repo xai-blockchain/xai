@@ -23,9 +23,15 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Prepare an XAI node profile.")
     parser.add_argument("--miner", required=True, help="Miner address (XAI1...)")
     parser.add_argument("--rpc-port", type=int, default=DEFAULT_RPC_PORT, help="RPC/Web API port")
-    parser.add_argument("--p2p-port", type=int, default=DEFAULT_P2P_PORT, help="P2P port for the node")
-    parser.add_argument("--data-dir", default=DEFAULT_DATA_DIR, help="Directory to host blockchain data")
-    parser.add_argument("--register-peer", action="store_true", help="Emit a discovery file for explorers")
+    parser.add_argument(
+        "--p2p-port", type=int, default=DEFAULT_P2P_PORT, help="P2P port for the node"
+    )
+    parser.add_argument(
+        "--data-dir", default=DEFAULT_DATA_DIR, help="Directory to host blockchain data"
+    )
+    parser.add_argument(
+        "--register-peer", action="store_true", help="Emit a discovery file for explorers"
+    )
     return parser.parse_args()
 
 
@@ -37,7 +43,7 @@ def main():
         "rpc_port": args.rpc_port,
         "p2p_port": args.p2p_port,
         "data_dir": str(data_dir.resolve()),
-        "network": os.getenv("XAI_NETWORK", "testnet")
+        "network": os.getenv("XAI_NETWORK", "testnet"),
     }
 
     config_path = write_node_config(data_dir, node_payload)
@@ -57,7 +63,7 @@ def main():
     print("\nStart mining via the API:")
     print(
         f"  curl -X POST http://localhost:{args.rpc_port}/mining/start "
-        f"-H 'Content-Type: application/json' -d '{{\"miner_address\":\"{args.miner}\",\"threads\":2}}'"
+        f'-H \'Content-Type: application/json\' -d \'{{"miner_address":"{args.miner}","threads":2}}\''
     )
     print("\nTrack metrics or Time Capsules:")
     print(f"  Prometheus: http://localhost:{args.rpc_port}/metrics")
