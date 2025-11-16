@@ -1,183 +1,380 @@
 # XAI Blockchain
 
-A proof-of-work blockchain with AI governance capabilities and integrated wallet functionality.
+![Build](https://github.com/decristofaroj/xai/workflows/Comprehensive%20CI%2FCD%20Pipeline/badge.svg)
+![Coverage](https://codecov.io/gh/decristofaroj/xai/branch/main/graph/badge.svg)
+![Quality](https://sonarcloud.io/api/project_badges/measure?project=decristofaroj_xai&metric=alert_status)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-## Overview
+## A Proof-of-Work Blockchain with AI Governance and Integrated Wallets
 
-XAI is a blockchain implementation featuring proof-of-work consensus, smart contracts, atomic swap support for multiple cryptocurrencies, and an AI-based governance system. The project includes wallet management, time-locked transactions, and compliance tooling.
-
-**Current Status**: Version 0.2.0 - Testnet active, mainnet in preparation
+XAI is a production-ready blockchain implementation featuring proof-of-work consensus, intelligent AI-based governance, atomic swap support for cross-chain trading, and comprehensive wallet management. Built for both individual users and enterprise compliance needs.
 
 ## Key Features
 
-- **Consensus**: Proof-of-work with SHA-256 mining
-- **Supply**: 121 million XAI maximum supply
-- **Block Time**: 2 minutes target
-- **Atomic Swaps**: Cross-chain trading with 11 cryptocurrencies
-- **Smart Contracts**: On-chain programmable logic
-- **AI Governance**: Proposal and voting system with AI analysis
-- **Time Capsules**: Time-locked coin storage
-- **Multi-signature Wallets**: Shared wallet control
-- **Token Burning**: Supply reduction mechanism
-- **AML Compliance**: Built-in transaction monitoring and reporting
+- **Proof-of-Work Consensus** - SHA-256 mining with adjustable difficulty targeting 2-minute block times
+- **AI Governance System** - Intelligent proposal analysis and voting mechanism with AI-generated insights
+- **Cross-Chain Atomic Swaps** - Direct trading with 11+ cryptocurrencies without intermediaries
+- **Smart Contracts** - On-chain programmable logic for complex transaction flows
+- **Multi-Signature Wallets** - Shared wallet control with configurable signature thresholds
+- **Time-Locked Transactions** - Scheduled coin releases and time capsule functionality
+- **AML Compliance** - Built-in transaction monitoring, reporting, and risk assessment tools
 
-## Quick Start
+## Quick Start (< 5 Minutes)
 
 ### Prerequisites
 
-- Python 3.9+
-- 2GB+ RAM
-- 10GB+ disk space
+- Python 3.10 or higher
+- 2GB RAM minimum
+- 10GB+ disk space for blockchain data
+- Git
 
 ### Installation
 
 ```bash
+# Clone the repository
 git clone https://github.com/decristofaroj/xai.git
 cd xai
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Verify installation
+python -m pytest --co -q
 ```
 
-### Run a Node
+### Start a Node
 
 ```bash
+# Set network (testnet by default)
+export XAI_NETWORK=testnet
+
+# Run a node
 python src/aixn/core/node.py
 ```
 
-The node will start on port 8545 (mainnet) or 18545 (testnet).
+The node will start on port 18545 (testnet) or 8545 (mainnet).
 
 ### Start Mining
 
 ```bash
-python src/aixn/core/node.py --miner YOUR_XAI_ADDRESS
+# Generate a wallet address first (or use existing)
+python src/aixn/wallet/cli.py generate-address
+
+# Start mining with your address
+export MINER_ADDRESS=YOUR_XAI_ADDRESS
+python src/aixn/core/node.py --miner $MINER_ADDRESS
 ```
 
-Replace `YOUR_XAI_ADDRESS` with your wallet address.
+### Get Test Coins
 
-### Configuration
-
-Set the network environment variable:
+**Testnet only**: Use the built-in faucet to receive 100 test XAI:
 
 ```bash
-# For testnet (default)
+python src/aixn/wallet/cli.py request-faucet --address YOUR_XAI_ADDRESS
+```
+
+## Configuration
+
+### Network Selection
+
+```bash
+# Testnet (default) - Network ID: 0xABCD
 export XAI_NETWORK=testnet
+export XAI_RPC_PORT=18546
 
-# For mainnet
+# Mainnet - Network ID: 0x5841
 export XAI_NETWORK=mainnet
+export XAI_RPC_PORT=8546
 ```
 
-Additional configuration options are available in `src/aixn/config/` and can be overridden via environment variables. See `docs/README.md` for configuration details.
+### Environment Variables
 
-## Documentation
-
-- **[Whitepaper](WHITEPAPER.md)** - Comprehensive technical overview
-- **[Technical Specifications](TECHNICAL.md)** - Detailed system specifications
-- **[Project Structure](PROJECT_STRUCTURE.md)** - Codebase organization
-- **[Documentation Hub](docs/README.md)** - All documentation and guides
-- **[API Documentation](docs/api/)** - REST API reference
-- **[Security Policy](SECURITY.md)** - Vulnerability reporting
-
-## Architecture
-
-```
-crypto/
-├── src/aixn/          # Core blockchain implementation
-│   ├── core/          # Consensus, mining, validation
-│   ├── ai/            # AI governance and assistant
-│   ├── wallets/       # Wallet management
-│   └── config/        # Configuration files
-├── tests/             # Test suite
-├── scripts/           # Deployment and utility scripts
-├── docs/              # Documentation
-└── exchange/          # Trading interface (frontend)
+```bash
+XAI_NETWORK          # testnet or mainnet (default: testnet)
+XAI_PORT             # P2P port (default: 18545 testnet, 8545 mainnet)
+XAI_RPC_PORT         # RPC port (default: 18546 testnet, 8546 mainnet)
+XAI_LOG_LEVEL        # DEBUG, INFO, WARNING, ERROR (default: INFO)
+XAI_DATA_DIR         # Blockchain data directory
+MINER_ADDRESS        # Address to receive mining rewards
 ```
 
-## Network Information
+See `src/aixn/config/` for additional configuration options.
 
-### Testnet
-- Network ID: `0xABCD`
-- Port: `18545`
-- RPC Port: `18546`
-- Address Prefix: `TXAI`
-- Faucet: Enabled (100 test XAI)
+## Basic Usage Examples
 
-### Mainnet
-- Network ID: `0x5841`
-- Port: `8545`
-- RPC Port: `8546`
-- Address Prefix: `AIXN`
+### Create and Manage Wallets
+
+```bash
+# Generate a new wallet
+python src/aixn/wallet/cli.py generate-address
+
+# Check wallet balance
+python src/aixn/wallet/cli.py balance --address YOUR_ADDRESS
+
+# Export private key (secure this safely!)
+python src/aixn/wallet/cli.py export-key --address YOUR_ADDRESS
+```
+
+### Send Transactions
+
+```bash
+# Simple transaction
+python src/aixn/wallet/cli.py send \
+  --from YOUR_ADDRESS \
+  --to RECIPIENT_ADDRESS \
+  --amount 10.5 \
+  --private-key YOUR_PRIVATE_KEY
+
+# Multi-signature transaction
+python src/aixn/wallet/cli.py send-multisig \
+  --multisig-address MULTISIG_ADDRESS \
+  --to RECIPIENT_ADDRESS \
+  --amount 5.0
+```
+
+### Atomic Swaps
+
+```bash
+# Initiate swap with Bitcoin
+python src/aixn/core/atomic_swap.py initiate \
+  --asset BTC \
+  --amount 0.5 \
+  --recipient btc_address_here
+
+# Complete swap
+python src/aixn/core/atomic_swap.py complete \
+  --swap-id SWAP_ID \
+  --secret SECRET_HASH
+```
+
+### Query Blockchain Data
+
+```bash
+# Get block information
+curl http://localhost:18546/block/12345
+
+# Get transaction status
+curl http://localhost:18546/transaction/tx_hash
+
+# Get account balance
+curl http://localhost:18546/account/YOUR_ADDRESS
+```
+
+## Architecture Overview
+
+### System Components
+
+```
+XAI Blockchain
+├── Consensus Layer
+│   ├── Proof-of-Work (SHA-256)
+│   ├── Difficulty Adjustment
+│   └── Block Validation
+├── Core Modules
+│   ├── Transaction Pool (Mempool)
+│   ├── UTXO Management
+│   └── State Database
+├── Features
+│   ├── Smart Contracts Engine
+│   ├── Atomic Swap Handler
+│   ├── AI Governance System
+│   └── AML Compliance Tools
+├── Wallet Layer
+│   ├── Key Management
+│   ├── Multi-Signature Support
+│   └── HD Wallet (BIP-32/BIP-39)
+└── P2P Network
+    ├── Peer Discovery
+    ├── Message Broadcasting
+    └── Blockchain Sync
+```
+
+### Network Topology
+
+- **Testnet**: Independent test network with relaxed parameters for experimentation
+- **Mainnet**: Production network with strict validation rules and permanent consensus
+- **RPC Interface**: RESTful API for wallet integration and dApp development
 
 ## Testing
 
-Run the test suite:
+Run the comprehensive test suite:
 
 ```bash
-# Quick tests
+# Quick test run
 python -m pytest
 
-# All tests including slow tests
-python -m pytest -m slow
+# Full test suite including slow tests
+python -m pytest -m "not slow"
 
-# Specific test module
-python -m pytest tests/aixn_tests/test_blockchain.py
+# Coverage report
+python -m pytest --cov=src --cov-report=html
+
+# Specific module tests
+python -m pytest tests/aixn_tests/test_blockchain.py -v
 ```
 
-## Development
+## Development Setup
 
-### Setting Up Development Environment
+### Prerequisites for Development
 
-1. Clone the repository
-2. Install development dependencies: `pip install -r requirements.txt`
-3. Configure testnet: `export XAI_NETWORK=testnet`
-4. Run tests to verify setup: `python -m pytest`
+- Python 3.10+
+- pip with virtual environment support
+- Git
 
-### Contributing
+### Initial Setup
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+```bash
+# Clone and setup
+git clone https://github.com/decristofaroj/xai.git
+cd xai
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dev dependencies
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+
+# Run tests
+python -m pytest
+
+# Format code
+black src tests
+isort src tests
+
+# Lint code
+pylint src
+mypy src
+```
+
+### Pre-commit Hooks
+
+```bash
+# Install pre-commit
+pip install pre-commit
+
+# Setup hooks
+pre-commit install
+
+# Manual run
+pre-commit run --all-files
+```
+
+## Documentation
+
+- **[Whitepaper](WHITEPAPER.md)** - Complete technical specification and design rationale
+- **[Technical Specifications](TECHNICAL.md)** - Detailed system documentation
+- **[Project Structure](PROJECT_STRUCTURE.md)** - Codebase organization and module descriptions
+- **[API Documentation](docs/api/)** - REST API endpoint reference
+- **[Security Policy](SECURITY.md)** - Vulnerability disclosure and security best practices
+- **[Contributing Guide](CONTRIBUTING.md)** - Development guidelines and contribution process
+
+## Network Parameters
+
+### Testnet Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Network ID | 0xABCD |
+| Port | 18545 |
+| RPC Port | 18546 |
+| Address Prefix | TXAI |
+| Block Time | 2 minutes |
+| Max Supply | 121,000,000 XAI |
+
+### Mainnet Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Network ID | 0x5841 |
+| Port | 8545 |
+| RPC Port | 8546 |
+| Address Prefix | AIXN |
+| Block Time | 2 minutes |
+| Max Supply | 121,000,000 XAI |
 
 ## Roadmap
 
 ### Completed (v0.1.0 - v0.2.0)
-- Core blockchain implementation
-- Proof-of-work consensus
-- Atomic swap support
-- Smart contracts
+- Core blockchain with proof-of-work consensus
+- Atomic swap functionality for 11+ cryptocurrencies
+- Smart contract engine
 - AI governance system
 - Time capsule functionality
-- Directory-based blockchain storage
-- Electron desktop wallet
+- Desktop wallet (Electron)
 - Block explorer
 
 ### In Progress
 - Multi-node network deployment
-- Enhanced security audits
-- Documentation improvements
+- Security audit completion
 - Performance optimization
+- Documentation expansion
 
 ### Planned
-- Hardware wallet integration (Ledger)
+- Hardware wallet support (Ledger, Trezor)
 - Light client implementation
 - Mobile wallet bridge
 - Embedded wallet solutions
-- Fiat on-ramp integration (post-Nov 2026)
+- Fiat on-ramp integration (Q4 2026+)
+
+## Contributing
+
+We welcome contributions from developers, researchers, and blockchain enthusiasts.
+
+**Before contributing, please:**
+
+1. Read [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines
+2. Review [SECURITY.md](SECURITY.md) for security considerations
+3. Check existing issues and pull requests
+4. Follow the code style and testing requirements
+
+**Contribution areas:**
+- Bug fixes and optimizations
+- Documentation improvements
+- Test coverage expansion
+- Feature implementations
+- Security audits
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the complete contribution guidelines.
 
 ## License
 
-MIT License - See [LICENSE](LICENSE) file for details
+MIT License - See [LICENSE](LICENSE) file for complete text.
 
-## Security
+This project is released under the MIT License, allowing both commercial and non-commercial use.
 
-Report security vulnerabilities to the maintainers. See [SECURITY.md](SECURITY.md) for details.
+## Contact & Support
+
+- **GitHub Issues**: [Report bugs and request features](https://github.com/decristofaroj/xai/issues)
+- **Discussions**: [Community discussions and Q&A](https://github.com/decristofaroj/xai/discussions)
+- **Email**: Contact maintainers through GitHub issues or discussions
+- **Documentation**: [Full documentation site](docs/README.md)
+
+## Security Notice
+
+**Important**: This software is experimental and under active development. Cryptocurrency systems carry inherent risks:
+
+- Test thoroughly on testnet before mainnet use
+- Secure your private keys carefully
+- Never share seed phrases or private keys
+- Understand the technology before committing funds
+- Review [SECURITY.md](SECURITY.md) for vulnerability reporting
+
+For security concerns, see [SECURITY.md](SECURITY.md).
 
 ## Disclaimer
 
-This software is experimental. Users should understand the risks involved in cryptocurrency systems. The network is under active development and should be used with appropriate caution.
+XAI is a proof-of-concept blockchain implementation. While striving for production quality, users should understand the experimental nature of cryptocurrency systems. The network is under active development and should be used with appropriate caution. The developers make no guarantees regarding future viability, feature availability, or network stability.
 
-## Links
+## Additional Resources
 
-- **GitHub**: https://github.com/decristofaroj/xai
-- **Documentation**: [docs/README.md](docs/README.md)
+- **GitHub Repository**: https://github.com/decristofaroj/xai
 - **Issue Tracker**: https://github.com/decristofaroj/xai/issues
+- **Documentation**: [docs/README.md](docs/README.md)
+- **Whitepaper**: [WHITEPAPER.md](WHITEPAPER.md)
+- **Community Guidelines**: [docs/aixn_docs/community_expectations.md](docs/aixn_docs/community_expectations.md)
 
-## Community Guidelines
+---
 
-See [docs/aixn_docs/community_expectations.md](docs/aixn_docs/community_expectations.md) for security, transparency, and privacy expectations.
+**Latest Update**: January 2025 | **Version**: 0.2.0 | **Status**: Testnet Active

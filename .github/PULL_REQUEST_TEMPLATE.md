@@ -1,171 +1,44 @@
 ## Description
+Please include a summary of the changes and related context. Explain the "why" behind these changes.
 
-<!-- Provide a clear and concise description of the changes in this PR -->
-
-### Type of Change
-
-<!-- Mark the relevant option with an "x" -->
-
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+## Type of Change
+- [ ] Bug fix (non-breaking change that fixes an issue)
+- [ ] New feature (non-breaking change that adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to change)
 - [ ] Documentation update
-- [ ] Performance improvement
-- [ ] Code refactoring
-- [ ] Security enhancement
+- [ ] Security patch
 - [ ] Dependency update
-- [ ] CI/CD improvement
 
 ## Related Issues
+Closes #(issue number)
 
-<!-- Link to related issues. Use "Fixes #123" to auto-close issues when merged -->
-
-Fixes #
-Related to #
-
-## Motivation and Context
-
-<!-- Why is this change required? What problem does it solve? -->
-
-## Changes Made
-
-<!-- Provide a detailed list of changes -->
-
--
--
--
-
-## Testing
-
-### Test Coverage
-
+## Testing Checklist
 - [ ] Unit tests added/updated
 - [ ] Integration tests added/updated
-- [ ] All existing tests pass
 - [ ] Manual testing completed
+- [ ] All tests pass locally
+- [ ] Tested on testnet (if applicable)
 
-### Test Details
+## Code Quality Checklist
+- [ ] Code follows project style guidelines
+- [ ] Code is self-documenting with clear variable/function names
+- [ ] Comments added for complex logic
+- [ ] Documentation updated (README, docstrings, etc.)
+- [ ] No debug code or print statements left
+- [ ] Test coverage maintained or improved
+- [ ] No new warnings introduced
 
-<!-- Describe the tests you ran and provide instructions to reproduce -->
+## Security Checklist (if applicable)
+- [ ] No sensitive data (keys, secrets) committed
+- [ ] Input validation implemented
+- [ ] Dependencies checked for vulnerabilities
+- [ ] Security implications considered
 
-**Test Configuration**:
-- OS:
-- Python Version:
-- Node Version (if applicable):
-
-**Test Results**:
-```
-# Paste relevant test output here
-```
-
-## Screenshots/Recordings
-
-<!-- If applicable, add screenshots or recordings to help explain your changes -->
-
-## Checklist
-
-### Code Quality
-
-- [ ] My code follows the project's style guidelines (PEP 8)
-- [ ] I have run `black` to format my code
-- [ ] I have run `flake8` and fixed all issues
-- [ ] I have run `mypy` for type checking
-- [ ] I have performed a self-review of my own code
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] My changes generate no new warnings
-
-### Documentation
-
-- [ ] I have updated the documentation accordingly
-- [ ] I have added docstrings to new functions/classes
-- [ ] I have updated relevant README files
-- [ ] I have updated CHANGELOG.md
-
-### Security
-
-- [ ] I have reviewed my code for security vulnerabilities
-- [ ] No sensitive data (keys, passwords, tokens) is hardcoded
-- [ ] I have validated all user inputs
-- [ ] Dependencies have been checked for known vulnerabilities
-
-### Blockchain-Specific
-
-<!-- Only if applicable -->
-
-- [ ] Consensus mechanism impact has been considered
-- [ ] Backward compatibility with existing blockchain data maintained
-- [ ] Transaction validation logic tested thoroughly
-- [ ] No breaking changes to the blockchain protocol (or documented if required)
-- [ ] Mining/validation performance impact assessed
-
-### Dependencies
-
-- [ ] I have updated requirements.txt (if dependencies changed)
-- [ ] All new dependencies are necessary and well-maintained
-- [ ] License compatibility verified for new dependencies
+## Screenshots/Demo (if applicable)
+Add screenshots, gifs, or descriptions of changes visible to users.
 
 ## Breaking Changes
-
-<!-- If this is a breaking change, describe the impact and migration path -->
-
-**Impact**:
-
-**Migration Guide**:
-
-## Performance Impact
-
-<!-- Describe any performance implications of this change -->
-
-- [ ] No performance impact
-- [ ] Performance improved
-- [ ] Performance degraded (explain why this is acceptable)
-
-**Benchmark Results** (if applicable):
-```
-# Paste benchmark results
-```
+Describe any breaking changes and migration path for users.
 
 ## Additional Notes
-
-<!-- Add any additional information that reviewers should know -->
-
-## Reviewer Notes
-
-<!-- Specific areas you'd like reviewers to focus on -->
-
-Please pay special attention to:
--
--
-
-## Post-Merge Actions
-
-<!-- Any actions that need to be taken after merging -->
-
-- [ ] Update documentation website
-- [ ] Create release notes
-- [ ] Notify community
-- [ ] Deploy to testnet
-- [ ] Other:
-
----
-
-## For Maintainers
-
-<!-- Maintainers: Complete before merging -->
-
-- [ ] Code review completed
-- [ ] All CI checks passing
-- [ ] Documentation reviewed
-- [ ] Security review completed (if applicable)
-- [ ] Changelog updated
-- [ ] Version bumped (if applicable)
-
-### Merge Strategy
-
-- [ ] Squash and merge
-- [ ] Create merge commit
-- [ ] Rebase and merge
-
----
-
-**By submitting this pull request, I confirm that my contribution is made under the terms of the project's license.**
+Any additional information reviewers should know.
