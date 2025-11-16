@@ -100,6 +100,18 @@ MINER_ADDRESS        # Address to receive mining rewards
 
 See `src/aixn/config/` for additional configuration options.
 
+## Performance Optimizations
+
+XAI includes several performance optimizations for production use:
+
+- **Response Caching**: Block explorer uses intelligent caching to reduce node load (configurable TTL)
+- **LRU Cache**: Config file loading is cached to avoid repeated I/O operations
+- **Connection Pooling**: Efficient HTTP connection reuse for API calls
+- **Async Operations**: Support for asynchronous blockchain operations
+- **Optimized Validation**: Fast nonce verification and transaction validation
+
+Performance can be tuned via environment variables - see Configuration section.
+
 ## Basic Usage Examples
 
 ### Create and Manage Wallets
@@ -212,6 +224,29 @@ python -m pytest --cov=src --cov-report=html
 # Specific module tests
 python -m pytest tests/aixn_tests/test_blockchain.py -v
 ```
+
+## Configuration
+
+### Environment Variables
+
+XAI supports extensive configuration through environment variables:
+
+```bash
+# Network Configuration
+export XAI_NETWORK=testnet          # Network type: testnet/mainnet
+export XAI_NODE_URL=http://localhost:8545  # Node RPC endpoint
+
+# Block Explorer Configuration
+export XAI_CACHE_TTL=60             # Response cache TTL in seconds (default: 60)
+export XAI_CACHE_SIZE=128           # Maximum cached items (default: 128)
+
+# Node Configuration
+export XAI_ENVIRONMENT=development  # Environment: development/staging/production
+export XAI_NETWORK_PORT=8545        # Network port
+export XAI_NETWORK_RPC_PORT=8546    # RPC port
+```
+
+See `.env.example` for complete configuration options.
 
 ## Development Setup
 
