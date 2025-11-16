@@ -125,7 +125,6 @@ class MobileWalletBridge:
             amount=float(unsigned_tx["amount"]),
             fee=float(unsigned_tx["fee"]),
             nonce=unsigned_tx["nonce"],
-            nonce=unsigned_tx["nonce"],
             metadata=unsigned_tx.get("metadata") or {},
         )
         tx.timestamp = unsigned_tx["timestamp"]
