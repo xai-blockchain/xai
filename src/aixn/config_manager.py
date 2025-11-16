@@ -57,10 +57,20 @@ class NetworkConfig:
             raise ValueError(f"Invalid port: {self.port}. Must be between 1024-65535")
         if not (1024 <= self.rpc_port <= 65535):
             raise ValueError(f"Invalid RPC port: {self.rpc_port}. Must be between 1024-65535")
+        if self.port == self.rpc_port:
+            raise ValueError(
+                f"Port and RPC port must be different: both set to {self.port}"
+            )
         if self.max_peers < 1:
             raise ValueError(f"Invalid max_peers: {self.max_peers}. Must be >= 1")
+        if self.max_peers > 10000:
+            raise ValueError(
+                f"Invalid max_peers: {self.max_peers}. Must be <= 10000 for performance"
+            )
         if self.peer_timeout < 1:
             raise ValueError(f"Invalid peer_timeout: {self.peer_timeout}. Must be >= 1")
+        if self.sync_interval < 1:
+            raise ValueError(f"Invalid sync_interval: {self.sync_interval}. Must be >= 1")
 
 
 @dataclass
@@ -92,6 +102,18 @@ class BlockchainConfig:
             raise ValueError(f"Invalid max_supply: {self.max_supply}. Must be > 0")
         if self.max_block_size < 1024:
             raise ValueError(f"Invalid max_block_size: {self.max_block_size}. Must be >= 1024")
+        if self.max_block_size > 10485760:  # 10MB
+            raise ValueError(
+                f"Invalid max_block_size: {self.max_block_size}. Must be <= 10MB for security"
+            )
+        if self.min_transaction_fee < 0:
+            raise ValueError(
+                f"Invalid min_transaction_fee: {self.min_transaction_fee}. Must be >= 0"
+            )
+        if self.transaction_fee_percent < 0 or self.transaction_fee_percent > 100:
+            raise ValueError(
+                f"Invalid transaction_fee_percent: {self.transaction_fee_percent}. Must be 0-100"
+            )
 
 
 @dataclass
