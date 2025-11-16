@@ -9,7 +9,6 @@ import time
 from unittest.mock import Mock
 
 # Add parent directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "core"))
 
 from xai_token import XAIToken
 

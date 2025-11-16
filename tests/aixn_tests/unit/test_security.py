@@ -11,9 +11,8 @@ import time
 from decimal import Decimal
 
 # Add core directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
-from blockchain_security import (
+from aixn.core.blockchain_security import (
     BlockchainSecurityConfig,
     ReorganizationProtection,
     SupplyValidator,
@@ -21,8 +20,8 @@ from blockchain_security import (
     TimeValidator,
     OverflowProtection,
 )
-from blockchain import Blockchain, Transaction, Block
-from wallet import Wallet
+from aixn.core.blockchain import Blockchain, Transaction, Block
+from aixn.core.wallet import Wallet
 
 
 class TestSecurityConfiguration:

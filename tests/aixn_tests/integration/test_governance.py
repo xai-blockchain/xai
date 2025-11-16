@@ -10,11 +10,10 @@ import os
 import time
 
 # Add core directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
 from ai_governance import AIGovernance, VoterType, VotingPowerDisplay
-from blockchain import Blockchain, Transaction
-from wallet import Wallet
+from aixn.core.blockchain import Blockchain, Transaction
+from aixn.core.wallet import Wallet
 
 
 class TestGovernanceInitialization:

@@ -14,9 +14,6 @@ import sys
 import os
 import time
 
-# Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "core"))
-
 from token_burning_engine import TokenBurningEngine, ServiceType, SERVICE_PRICES_USD
 
 
@@ -25,8 +22,8 @@ def burning_engine(tmp_path):
     return TokenBurningEngine(data_dir=str(tmp_path))
 
 
-from blockchain import Blockchain
-from wallet import Wallet
+from aixn.core.blockchain import Blockchain
+from aixn.core.wallet import Wallet
 
 
 class TestBurningEngine:

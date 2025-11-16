@@ -14,9 +14,6 @@ import time
 import unittest
 from typing import List, Dict, Tuple
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 from core.blockchain import Blockchain, Transaction, Block
 from core.wallet import Wallet
 from core.blockchain_security import BlockchainSecurityManager, BlockchainSecurityConfig

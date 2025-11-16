@@ -16,11 +16,8 @@ import sys
 import os
 import time
 
-# Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "core"))
-
-from blockchain import Blockchain, Transaction, Block
-from wallet import Wallet
+from aixn.core.blockchain import Blockchain, Transaction, Block
+from aixn.core.wallet import Wallet
 
 
 class TestBlockchainCore:

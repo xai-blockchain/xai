@@ -11,9 +11,6 @@ import json
 import hashlib
 import time
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 from core.chain_validator import (
     ChainValidator,
     ValidationReport,

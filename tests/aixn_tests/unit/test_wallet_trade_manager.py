@@ -7,12 +7,11 @@ import tempfile
 import pytest
 
 # Add core directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
 from exchange_wallet import ExchangeWalletManager
 from nonce_tracker import NonceTracker
 from trading import SwapOrderType, TradeMatchStatus
-from wallet_trade_manager import WalletTradeManager
+from aixn.core.wallet_trade_manager import WalletTradeManager
 
 
 def test_wallet_trade_settlement(tmp_path):

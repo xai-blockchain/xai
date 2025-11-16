@@ -12,10 +12,9 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 # Add core directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
-from blockchain import Blockchain, Transaction
-from wallet import Wallet
+from aixn.core.blockchain import Blockchain, Transaction
+from aixn.core.wallet import Wallet
 
 
 @pytest.mark.slow

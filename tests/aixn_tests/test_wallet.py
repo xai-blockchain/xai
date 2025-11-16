@@ -16,11 +16,8 @@ import time
 import base64
 from cryptography.fernet import Fernet
 
-# Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "core"))
-
-from wallet import Wallet, WalletManager
-from blockchain import Transaction
+from aixn.core.wallet import Wallet, WalletManager
+from aixn.core.blockchain import Transaction
 
 
 class TestWalletCreation:

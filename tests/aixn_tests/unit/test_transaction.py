@@ -10,10 +10,9 @@ import os
 import time
 
 # Add core directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
-from blockchain import Transaction, Blockchain
-from wallet import Wallet
+from aixn.core.blockchain import Transaction, Blockchain
+from aixn.core.wallet import Wallet
 
 
 class TestTransactionCreation:

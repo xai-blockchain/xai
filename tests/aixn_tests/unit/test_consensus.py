@@ -10,7 +10,6 @@ import os
 import time
 
 # Add core directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
 from advanced_consensus import (
     BlockStatus,
@@ -20,8 +19,8 @@ from advanced_consensus import (
     FinalityMechanism,
     DifficultyAdjustment,
 )
-from blockchain import Blockchain, Block
-from wallet import Wallet
+from aixn.core.blockchain import Blockchain, Block
+from aixn.core.wallet import Wallet
 
 
 class TestBlockPropagationMonitor:

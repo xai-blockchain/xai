@@ -9,14 +9,13 @@ import time
 from unittest.mock import Mock, MagicMock
 
 # Add parent directory to path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "core"))
 
-from blockchain import Transaction, Block  # Import Block and Transaction for context
-from wallet import Wallet
+from aixn.core.blockchain import Transaction, Block  # Import Block and Transaction for context
+from aixn.core.wallet import Wallet
 from security_validation import ValidationError
 from nonce_tracker import NonceTracker
 from structured_logger import StructuredLogger
-from transaction_validator import TransactionValidator, get_transaction_validator
+from aixn.core.transaction_validator import TransactionValidator, get_transaction_validator
 
 
 # Fixture for a mock blockchain

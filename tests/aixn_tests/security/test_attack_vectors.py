@@ -11,11 +11,10 @@ import time
 from unittest.mock import Mock, patch
 
 # Add core directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
-from blockchain import Blockchain, Transaction, Block
-from wallet import Wallet
-from blockchain_security import ReorganizationProtection
+from aixn.core.blockchain import Blockchain, Transaction, Block
+from aixn.core.wallet import Wallet
+from aixn.core.blockchain_security import ReorganizationProtection
 
 
 class TestDoubleSpendingAttack:
