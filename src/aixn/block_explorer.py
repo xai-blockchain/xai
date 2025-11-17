@@ -369,4 +369,7 @@ if __name__ == "__main__":
     print("\nNOTE: This is for LOCAL TESTING ONLY!")
     print("      Not intended for production use.\n")
 
-    app.run(host="0.0.0.0", port=8080, debug=True)
+    # Use debug mode only if explicitly enabled via environment variable
+    import os
+    debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"
+    app.run(host="0.0.0.0", port=8080, debug=debug_mode)

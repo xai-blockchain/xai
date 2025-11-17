@@ -234,4 +234,8 @@ if __name__ == "__main__":
     print(f"Explorer: http://localhost:{port}")
     print(f"Node API: {NODE_URL}")
     print("=" * 60)
-    app.run(host="0.0.0.0", port=port, debug=True)
+
+    # Use debug mode only if explicitly enabled via environment variable
+    import os
+    debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"
+    app.run(host="0.0.0.0", port=port, debug=debug_mode)
