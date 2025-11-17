@@ -6,9 +6,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "a
 
 import pytest
 
-from ai_metrics import metrics, reset_metrics
-from core.blockchain_ai_bridge import BlockchainAIBridge
-from ai_governance_dao import AIGovernanceDAO, ProposalCategory, ProposalStatus
+from aixn.core.ai_metrics import metrics, reset_metrics
+from aixn.core.blockchain_ai_bridge import BlockchainAIBridge
+from aixn.core.ai_governance import AIGovernance, VoterType, VotingPowerDisplay
 
 
 class DummyBlockchain:

@@ -12,7 +12,7 @@ import pytest
 import sys
 import os
 
-from config import Config, TestnetConfig, MainnetConfig, NetworkType
+from aixn.core.config import Config, TestnetConfig, MainnetConfig, NetworkType
 
 
 class TestConfiguration:

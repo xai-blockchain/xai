@@ -12,9 +12,9 @@ from unittest.mock import Mock, MagicMock
 
 from aixn.core.blockchain import Transaction, Block  # Import Block and Transaction for context
 from aixn.core.wallet import Wallet
-from security_validation import ValidationError
-from nonce_tracker import NonceTracker
-from structured_logger import StructuredLogger
+from aixn.core.security_validation import ValidationError
+from aixn.core.nonce_tracker import NonceTracker
+from aixn.core.structured_logger import StructuredLogger
 from aixn.core.transaction_validator import TransactionValidator, get_transaction_validator
 
 

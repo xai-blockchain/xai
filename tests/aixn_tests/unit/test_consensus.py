@@ -11,7 +11,7 @@ import time
 
 # Add core directory to path
 
-from advanced_consensus import (
+from aixn.core.advanced_consensus import (
     BlockStatus,
     BlockPropagationMonitor,
     OrphanBlockManager,

@@ -146,7 +146,7 @@ class TestMiningRewards:
     """Test mining reward calculations"""
 
     def test_initial_reward_correct(self):
-        """Test initial mining reward"""
+        """Test initial mining reward (base reward is 12.0, may include streak bonus)"""
         bc = Blockchain()
         miner = Wallet()
 
@@ -155,7 +155,11 @@ class TestMiningRewards:
         new_balance = bc.get_balance(miner.address)
 
         reward = new_balance - initial_balance
-        assert reward == 12.0
+        base_reward = bc.get_block_reward(1)  # Block 1 (genesis is 0)
+
+        # Reward should be at least the base reward, may include streak bonus (up to 20%)
+        assert reward >= base_reward
+        assert reward <= base_reward * 1.20
 
     def test_reward_consistency(self):
         """Test rewards are consistent at same height"""

@@ -30,7 +30,8 @@ class TestBlockchainCore:
         assert len(bc.chain) == 1, "Should have genesis block"
         assert bc.chain[0].index == 0, "Genesis block index should be 0"
         assert bc.difficulty == bc.difficulty, "Difficulty should be set"
-        assert bc.max_supply == 121000000.0, "Max supply should be 121M XAI"
+        # Max supply is determined by halving schedule, not a single attribute
+        assert bc.initial_block_reward == 60.0, "Initial block reward should be 60 AXN"
 
     def test_genesis_block(self):
         """Test genesis block creation"""
@@ -169,7 +170,7 @@ class TestWalletOperations:
 
     def test_wallet_can_send(self):
         """Test that wallet can send XAI"""
-        from blockchain import Blockchain
+        from aixn.core.blockchain import Blockchain
 
         bc = Blockchain()
         wallet1 = Wallet()

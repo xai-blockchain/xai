@@ -11,10 +11,11 @@ Consensus mechanism for AI-driven development:
 - Changeable governance parameters
 """
 
+from __future__ import annotations
 import time
 import hashlib
 import math
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from enum import Enum
 
 # Import governance parameters
@@ -94,7 +95,7 @@ class VotingPower:
     Prevents whale dominance while rewarding contribution
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Time decay: contributions lose 10% voting power per month
         self.monthly_decay_rate = 0.10
 
@@ -208,12 +209,12 @@ class AIWorkloadDistribution:
     Distribute AI workload proportionally among contributors
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.contributor_pool = {}  # address -> contribution data
 
     def add_contributor(
         self, address: str, ai_model: str, minutes_contributed: float, timestamp: float
-    ):
+    ) -> None:
         """Record AI minutes contribution"""
 
         if address not in self.contributor_pool:
@@ -310,7 +311,7 @@ class ConsensusRules:
     Prevents whale control through power caps and approval voter count
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Single approval threshold
         self.approval_percent = 66  # Supermajority
 
@@ -431,9 +432,9 @@ class AIGovernanceProposal:
         estimated_minutes: float,
         proposal_type: ProposalType = ProposalType.AI_IMPROVEMENT,
         parameter_change: Optional[Dict] = None,
-        submitter_address: str = None,
+        submitter_address: Optional[str] = None,
         submitter_voting_power: float = 0,
-    ):
+    ) -> None:
         self.proposal_id = hashlib.sha256(f"{title}{time.time()}".encode()).hexdigest()[:16]
         self.title = title
         self.category = category
@@ -466,7 +467,7 @@ class AIGovernanceProposal:
         self.execution_result = None
         self.code_review_status = None
 
-    def cast_vote(self, voter_address: str, vote: str, voting_power: float):
+    def cast_vote(self, voter_address: str, vote: str, voting_power: float) -> None:
         """Record vote with voting power"""
 
         self.votes[voter_address] = {
@@ -619,7 +620,7 @@ class AIGovernanceProposal:
 class AIGovernance:
     """Simplified AI governance facade used by the pytest suite."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.proposals: Dict[str, Dict] = {}
         self.parameters: Dict[str, float] = {"quorum": 0.5, "timelock_days": 1.0}
         self.voter_type_weights = {

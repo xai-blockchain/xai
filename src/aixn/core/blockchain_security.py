@@ -9,10 +9,15 @@ Protection against:
 - Time manipulation (median-time-past)
 """
 
+from __future__ import annotations
+
 import time
 import json
 import os
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from aixn.core.blockchain import Blockchain, Block, Transaction
 from decimal import Decimal, getcontext
 
 from aixn.core.config import Config
@@ -58,13 +63,13 @@ class ReorganizationProtection:
     Prevent deep chain reorganizations (51% attack mitigation)
     """
 
-    def __init__(self, max_depth: int = BlockchainSecurityConfig.MAX_REORG_DEPTH):
+    def __init__(self, max_depth: int = BlockchainSecurityConfig.MAX_REORG_DEPTH) -> None:
         self.max_depth = max_depth
         self.checkpoints: Dict[int, str] = {}  # block_index -> block_hash
         self.checkpoint_file = "data/checkpoints.json"
         self._load_checkpoints()
 
-    def _load_checkpoints(self):
+    def _load_checkpoints(self) -> None:
         """Load checkpoints from disk"""
         if os.path.exists(self.checkpoint_file):
             try:
@@ -74,13 +79,13 @@ class ReorganizationProtection:
             except Exception:
                 self.checkpoints = {}
 
-    def _save_checkpoints(self):
+    def _save_checkpoints(self) -> None:
         """Save checkpoints to disk"""
         os.makedirs(os.path.dirname(self.checkpoint_file), exist_ok=True)
         with open(self.checkpoint_file, "w") as f:
             json.dump(self.checkpoints, f, indent=2)
 
-    def add_checkpoint(self, block_index: int, block_hash: str):
+    def add_checkpoint(self, block_index: int, block_hash: str) -> None:
         """
         Add checkpoint (blocks before this cannot be reorganized)
 
@@ -131,7 +136,7 @@ class SupplyValidator:
     Validate total supply never exceeds cap (inflation bug protection)
     """
 
-    def __init__(self, max_supply: float = BlockchainSecurityConfig.MAX_SUPPLY):
+    def __init__(self, max_supply: float = BlockchainSecurityConfig.MAX_SUPPLY) -> None:
         self.max_supply = max_supply
         self.last_checked_height = 0
         self.last_known_supply = 0.0
@@ -159,7 +164,7 @@ class SupplyValidator:
 
         return True
 
-    def validate_total_supply(self, blockchain) -> Tuple[bool, float]:
+    def validate_total_supply(self, blockchain: Union[Blockchain, float]) -> Tuple[bool, Union[float, str]]:
         """
         Calculate and validate total supply
 
@@ -211,7 +216,7 @@ class OverflowProtection:
     Protect against integer/float overflow in calculations
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.max_money = Decimal(str(BlockchainSecurityConfig.MAX_MONEY))
         self.safe_limit = self.max_money / Decimal("100")
 
@@ -261,12 +266,12 @@ class MempoolManager:
     Manage pending transaction pool with size limits
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.max_count = BlockchainSecurityConfig.MAX_MEMPOOL_SIZE
         self.max_bytes = BlockchainSecurityConfig.MAX_MEMPOOL_BYTES
         self.current_bytes = 0
 
-    def can_add_transaction(self, tx, pending_transactions: List) -> Tuple[bool, Optional[str]]:
+    def can_add_transaction(self, tx: Transaction, pending_transactions: List[Transaction]) -> Tuple[bool, Optional[str]]:
         """
         Check if transaction can be added to mempool
 
@@ -289,17 +294,17 @@ class MempoolManager:
 
         return True, None
 
-    def add_transaction(self, tx):
+    def add_transaction(self, tx: Transaction) -> None:
         """Track transaction addition"""
         tx_size = len(json.dumps(tx.to_dict()).encode())
         self.current_bytes += tx_size
 
-    def remove_transaction(self, tx):
+    def remove_transaction(self, tx: Transaction) -> None:
         """Track transaction removal"""
         tx_size = len(json.dumps(tx.to_dict()).encode())
         self.current_bytes = max(0, self.current_bytes - tx_size)
 
-    def clear(self):
+    def clear(self) -> None:
         """Clear mempool tracking"""
         self.current_bytes = 0
 
@@ -310,7 +315,7 @@ class BlockSizeValidator:
     """
 
     @staticmethod
-    def validate_transaction_size(tx) -> Tuple[bool, Optional[str]]:
+    def validate_transaction_size(tx: Transaction) -> Tuple[bool, Optional[str]]:
         """
         Validate single transaction size
 
@@ -332,7 +337,7 @@ class BlockSizeValidator:
         return True, None
 
     @staticmethod
-    def validate_block_size(block) -> Tuple[bool, Optional[str]]:
+    def validate_block_size(block: Block) -> Tuple[bool, Optional[str]]:
         """
         Validate block size
 
@@ -366,10 +371,10 @@ class BlockSizeValidator:
 class ResourceLimiter:
     """Guardrails for mempool/memory/resource limits."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.max_mempool_size = BlockchainSecurityConfig.MAX_MEMPOOL_SIZE
 
-    def validate_transaction_size(self, tx) -> Tuple[bool, Optional[str]]:
+    def validate_transaction_size(self, tx: Transaction) -> Tuple[bool, Optional[str]]:
         """Validate transaction payload size."""
         try:
             return BlockSizeValidator.validate_transaction_size(tx)
@@ -380,7 +385,7 @@ class ResourceLimiter:
                 return False, "Resource limiter: transaction too large"
             return True, None
 
-    def validate_block_size(self, block) -> Tuple[bool, Optional[str]]:
+    def validate_block_size(self, block: Block) -> Tuple[bool, Optional[str]]:
         """Validate block size using existing validator."""
         return BlockSizeValidator.validate_block_size(block)
 
@@ -425,10 +430,10 @@ class MedianTimePast:
     Prevents time manipulation attacks
     """
 
-    def __init__(self, span: int = BlockchainSecurityConfig.MEDIAN_TIME_SPAN):
+    def __init__(self, span: int = BlockchainSecurityConfig.MEDIAN_TIME_SPAN) -> None:
         self.span = span
 
-    def get_median_time_past(self, blockchain) -> float:
+    def get_median_time_past(self, blockchain: Blockchain) -> float:
         """
         Calculate median time of last N blocks
 
@@ -455,7 +460,7 @@ class MedianTimePast:
         else:
             return timestamps[mid]
 
-    def validate_block_timestamp(self, block, blockchain) -> Tuple[bool, Optional[str]]:
+    def validate_block_timestamp(self, block: Block, blockchain: Blockchain) -> Tuple[bool, Optional[str]]:
         """
         Validate block timestamp using median-time-past
 
@@ -486,11 +491,11 @@ class MedianTimePast:
 class TimeValidator:
     """Time validation helpers consumed by tests."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.median_time_span = BlockchainSecurityConfig.MEDIAN_TIME_SPAN
         self.max_future_block_time = BlockchainSecurityConfig.MAX_FUTURE_BLOCK_TIME
 
-    def calculate_median_time_past(self, chain) -> float:
+    def calculate_median_time_past(self, chain: List[Block]) -> float:
         timestamps = [
             block.timestamp
             for block in chain[-self.median_time_span :]
@@ -506,7 +511,7 @@ class TimeValidator:
             return (timestamps[mid - 1] + timestamps[mid]) / 2
         return timestamps[mid]
 
-    def validate_block_time(self, block, chain) -> Tuple[bool, Optional[str]]:
+    def validate_block_time(self, block: Block, chain: List[Block]) -> Tuple[bool, Optional[str]]:
         median_time = self.calculate_median_time_past(chain)
         current_time = time.time()
 
@@ -525,11 +530,11 @@ class EmergencyGovernanceTimelock:
     Prevents instant malicious governance execution
     """
 
-    def __init__(self, emergency_timelock: int = 144):  # ~5 hours at 2min/block
+    def __init__(self, emergency_timelock: int = 144) -> None:  # ~5 hours at 2min/block
         self.emergency_timelock = emergency_timelock  # blocks
         self.pending_emergency_actions = {}  # proposal_id -> expiry_block
 
-    def schedule_emergency_action(self, proposal_id: str, current_block_height: int):
+    def schedule_emergency_action(self, proposal_id: str, current_block_height: int) -> None:
         """
         Schedule emergency action with timelock
 
@@ -564,7 +569,7 @@ class EmergencyGovernanceTimelock:
 
         return True, None
 
-    def cancel_emergency_action(self, proposal_id: str):
+    def cancel_emergency_action(self, proposal_id: str) -> None:
         """Cancel pending emergency action"""
         if proposal_id in self.pending_emergency_actions:
             del self.pending_emergency_actions[proposal_id]
@@ -575,7 +580,7 @@ class BlockchainSecurityManager:
     Unified security management for blockchain
     """
 
-    def __init__(self, blockchain):
+    def __init__(self, blockchain: Blockchain) -> None:
         self.blockchain = blockchain
         self.reorg_protection = ReorganizationProtection()
         self.supply_validator = SupplyValidator()
@@ -586,7 +591,7 @@ class BlockchainSecurityManager:
         self.median_time_past = MedianTimePast()
         self.emergency_timelock = EmergencyGovernanceTimelock()
 
-    def validate_new_transaction(self, tx) -> Tuple[bool, Optional[str]]:
+    def validate_new_transaction(self, tx: Transaction) -> Tuple[bool, Optional[str]]:
         """
         Comprehensive transaction validation
 
@@ -625,7 +630,7 @@ class BlockchainSecurityManager:
 
         return True, None
 
-    def validate_new_block(self, block) -> Tuple[bool, Optional[str]]:
+    def validate_new_block(self, block: Block) -> Tuple[bool, Optional[str]]:
         """
         Comprehensive block validation
 
@@ -664,7 +669,7 @@ class BlockchainSecurityManager:
 
         return True, None
 
-    def add_checkpoint(self, block_index: int, block_hash: str):
+    def add_checkpoint(self, block_index: int, block_hash: str) -> None:
         """Add checkpoint"""
         self.reorg_protection.add_checkpoint(block_index, block_hash)
 

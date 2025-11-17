@@ -9,9 +9,14 @@ Medium Priority Security/Robustness Features:
 - Difficulty adjustment algorithm
 """
 
+from __future__ import annotations
+
 import time
 import hashlib
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from aixn.core.blockchain import Block, Transaction, Blockchain
 from collections import defaultdict, deque
 from enum import Enum
 
@@ -35,13 +40,13 @@ class BlockPropagationMonitor:
     - Peer performance
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.block_first_seen = {}  # block_hash -> timestamp
         self.block_propagation_times = defaultdict(list)  # peer_url -> [propagation_times]
         self.peer_latency = defaultdict(float)  # peer_url -> avg_latency
         self.propagation_history = deque(maxlen=1000)  # Recent propagation events
 
-    def record_block_first_seen(self, block_hash: str):
+    def record_block_first_seen(self, block_hash: str) -> None:
         """
         Record when a block was first seen by this node
 
@@ -51,7 +56,7 @@ class BlockPropagationMonitor:
         if block_hash not in self.block_first_seen:
             self.block_first_seen[block_hash] = time.time()
 
-    def record_block_from_peer(self, block_hash: str, peer_url: str):
+    def record_block_from_peer(self, block_hash: str, peer_url: str) -> None:
         """
         Record receiving a block from a peer
 
@@ -84,7 +89,7 @@ class BlockPropagationMonitor:
                 }
             )
 
-    def get_peer_performance(self, peer_url: str) -> Dict:
+    def get_peer_performance(self, peer_url: str) -> Dict[str, Any]:
         """
         Get performance metrics for a peer
 
@@ -110,7 +115,7 @@ class BlockPropagationMonitor:
             "performance_score": performance_score,
         }
 
-    def get_network_stats(self) -> Dict:
+    def get_network_stats(self) -> Dict[str, Any]:
         """Get overall network propagation statistics"""
         if not self.propagation_history:
             return {"avg_propagation_time": 0, "total_blocks_tracked": 0, "active_peers": 0}
@@ -133,7 +138,7 @@ class OrphanBlockPool:
     Orphan blocks are temporarily stored until their parent arrives
     """
 
-    def __init__(self, max_orphans: int = 100, max_orphan_age: int = 3600):
+    def __init__(self, max_orphans: int = 100, max_orphan_age: int = 3600) -> None:
         self.orphan_blocks = {}  # block_hash -> block
         self.orphan_by_parent = defaultdict(list)  # parent_hash -> [orphan_blocks]
         self.orphan_by_previous = self.orphan_by_parent
@@ -141,7 +146,7 @@ class OrphanBlockPool:
         self.orphan_timestamps = {}  # block_hash -> timestamp
         self.orphan_timeout = max_orphan_age
 
-    def add_orphan(self, block, parent_hash: Optional[str] = None) -> bool:
+    def add_orphan(self, block: Block, parent_hash: Optional[str] = None) -> bool:
         """
         Add orphan block to pool
 
@@ -167,7 +172,7 @@ class OrphanBlockPool:
 
         return True
 
-    def get_orphans_by_parent(self, parent_hash: str) -> List:
+    def get_orphans_by_parent(self, parent_hash: str) -> List[Block]:
         """
         Get orphan blocks that depend on a specific parent
 
@@ -179,15 +184,15 @@ class OrphanBlockPool:
         """
         return self.orphan_by_parent.get(parent_hash, [])
 
-    def get_orphan(self, block_hash: str):
+    def get_orphan(self, block_hash: str) -> Optional[Block]:
         """Get a specific orphan block"""
         return self.orphan_blocks.get(block_hash)
 
-    def get_orphans_by_previous(self, previous_hash: str) -> List:
+    def get_orphans_by_previous(self, previous_hash: str) -> List[Block]:
         """Get orphans indexed by previous hash (legacy alias)"""
         return self.get_orphans_by_parent(previous_hash)
 
-    def remove_orphan(self, block_hash: str):
+    def remove_orphan(self, block_hash: str) -> Optional[Block]:
         """Remove orphan block from pool"""
         if block_hash in self.orphan_blocks:
             block = self.orphan_blocks[block_hash]
@@ -205,7 +210,7 @@ class OrphanBlockPool:
 
             return block
 
-    def _remove_oldest_orphan(self):
+    def _remove_oldest_orphan(self) -> None:
         """Remove oldest orphan to make space"""
         if not self.orphan_timestamps:
             return
@@ -214,7 +219,7 @@ class OrphanBlockPool:
         oldest_hash = min(self.orphan_timestamps.items(), key=lambda x: x[1])[0]
         self.remove_orphan(oldest_hash)
 
-    def cleanup_expired_orphans(self):
+    def cleanup_expired_orphans(self) -> None:
         """Remove orphans that have timed out"""
         current_time = time.time()
         expired = [
@@ -226,7 +231,7 @@ class OrphanBlockPool:
         for block_hash in expired:
             self.remove_orphan(block_hash)
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> Dict[str, Any]:
         """Get orphan pool statistics"""
         return {
             "total_orphans": len(self.orphan_blocks),
@@ -249,7 +254,7 @@ class TransactionOrdering:
     """
 
     @staticmethod
-    def order_transactions(transactions: List) -> List:
+    def order_transactions(transactions: List[Transaction]) -> List[Transaction]:
         """
         Order transactions deterministically
 
@@ -291,7 +296,7 @@ class TransactionOrdering:
         return coinbase + regular
 
     @staticmethod
-    def validate_transaction_order(transactions: List) -> bool:
+    def validate_transaction_order(transactions: List[Transaction]) -> bool:
         """
         Validate that transactions are in correct order
 
@@ -328,14 +333,14 @@ class TransactionOrderingRules:
     """Simple ordering helpers used by the unit tests."""
 
     @staticmethod
-    def order_by_fee(transactions: List) -> List:
+    def order_by_fee(transactions: List[Transaction]) -> List[Transaction]:
         return sorted(transactions, key=lambda tx: tx.fee, reverse=True)
 
     @staticmethod
-    def order_by_timestamp(transactions: List) -> List:
+    def order_by_timestamp(transactions: List[Transaction]) -> List[Transaction]:
         return sorted(transactions, key=lambda tx: tx.timestamp)
 
-    def prioritize(self, transactions: List) -> List:
+    def prioritize(self, transactions: List[Transaction]) -> List[Transaction]:
         return sorted(transactions, key=lambda tx: (-tx.fee, tx.timestamp))
 
 
@@ -347,7 +352,7 @@ class FinalityTracker:
     Provides different finality levels for different use cases
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Finality thresholds
         self.FINALITY_SOFT = 6  # Soft finality (low-value transactions)
         self.FINALITY_MEDIUM = 20  # Medium finality (normal transactions)
@@ -355,7 +360,7 @@ class FinalityTracker:
 
         self.finalized_blocks = set()  # Blocks with hard finality
 
-    def get_block_finality(self, block_index: int, chain_height: int) -> Dict:
+    def get_block_finality(self, block_index: int, chain_height: int) -> Dict[str, Any]:
         """
         Get finality status of a block
 
@@ -395,7 +400,7 @@ class FinalityTracker:
             "safe_for_large_tx": confirmations >= self.FINALITY_HARD,
         }
 
-    def mark_finalized(self, block_index: int):
+    def mark_finalized(self, block_index: int) -> None:
         """Mark block as having hard finality"""
         self.finalized_blocks.add(block_index)
 
@@ -403,7 +408,7 @@ class FinalityTracker:
         """Check if block has hard finality"""
         return block_index in self.finalized_blocks
 
-    def get_finality_stats(self, blockchain) -> Dict:
+    def get_finality_stats(self, blockchain: Blockchain) -> Dict[str, Any]:
         """Get overall finality statistics"""
         chain_height = len(blockchain.chain)
 
@@ -427,7 +432,7 @@ class FinalityTracker:
 class FinalityMechanism:
     """Lightweight finality helper required by the test suite."""
 
-    def __init__(self, confirmation_depth: int = 6):
+    def __init__(self, confirmation_depth: int = 6) -> None:
         self.confirmation_depth = confirmation_depth
 
     def is_block_final(self, block_index: int, chain_height: int) -> bool:
@@ -450,7 +455,7 @@ class DynamicDifficultyAdjustment:
     - Recent block times
     """
 
-    def __init__(self, target_block_time: int = 120):
+    def __init__(self, target_block_time: int = 120) -> None:
         """
         Initialize difficulty adjustment
 
@@ -463,7 +468,7 @@ class DynamicDifficultyAdjustment:
         self.min_difficulty = 1
         self.max_difficulty = 10
 
-    def calculate_new_difficulty(self, blockchain) -> int:
+    def calculate_new_difficulty(self, blockchain: Blockchain) -> int:
         """
         Calculate new difficulty based on recent block times
 
@@ -510,7 +515,7 @@ class DynamicDifficultyAdjustment:
 
         return new_difficulty
 
-    def should_adjust_difficulty(self, blockchain) -> bool:
+    def should_adjust_difficulty(self, blockchain: Blockchain) -> bool:
         """
         Check if difficulty should be adjusted
 
@@ -525,7 +530,7 @@ class DynamicDifficultyAdjustment:
         # Adjust every adjustment_window blocks
         return chain_length > 0 and chain_length % self.adjustment_window == 0
 
-    def get_difficulty_stats(self, blockchain) -> Dict:
+    def get_difficulty_stats(self, blockchain: Blockchain) -> Dict[str, Any]:
         """
         Get difficulty adjustment statistics
 
@@ -567,13 +572,13 @@ class DynamicDifficultyAdjustment:
 class DifficultyAdjustment:
     """Compatibility wrapper providing a simpler adjustment interface."""
 
-    def __init__(self, target_block_time: int = 120, adjustment_interval: int = 10):
+    def __init__(self, target_block_time: int = 120, adjustment_interval: int = 10) -> None:
         self.target_block_time = target_block_time
         self.adjustment_interval = adjustment_interval
         self.min_difficulty = 0.1
         self.max_difficulty = 100.0
 
-    def calculate_difficulty(self, chain: List, current_difficulty: float) -> float:
+    def calculate_difficulty(self, chain: List[Block], current_difficulty: float) -> float:
         if len(chain) < 2:
             return max(1.0, current_difficulty)
 
@@ -595,7 +600,7 @@ class AdvancedConsensusManager:
     Unified manager for advanced consensus features
     """
 
-    def __init__(self, blockchain):
+    def __init__(self, blockchain: Blockchain) -> None:
         """
         Initialize advanced consensus manager
 
@@ -609,7 +614,7 @@ class AdvancedConsensusManager:
         self.finality_tracker = FinalityTracker()
         self.difficulty_adjuster = DynamicDifficultyAdjustment()
 
-    def process_new_block(self, block, from_peer: Optional[str] = None) -> Tuple[bool, str]:
+    def process_new_block(self, block: Block, from_peer: Optional[str] = None) -> Tuple[bool, str]:
         """
         Process newly received block with orphan handling
 
@@ -641,7 +646,7 @@ class AdvancedConsensusManager:
         # (This would integrate with blockchain's existing validation)
         return True, "Block accepted"
 
-    def process_orphans_after_block(self, block_hash: str):
+    def process_orphans_after_block(self, block_hash: str) -> None:
         """
         Process orphan blocks that were waiting for this block
 
@@ -661,7 +666,7 @@ class AdvancedConsensusManager:
                 # Check for more orphans depending on this one
                 self.process_orphans_after_block(orphan.hash)
 
-    def order_pending_transactions(self) -> List:
+    def order_pending_transactions(self) -> List[Transaction]:
         """
         Order pending transactions for next block
 
@@ -670,7 +675,7 @@ class AdvancedConsensusManager:
         """
         return self.transaction_ordering.order_transactions(self.blockchain.pending_transactions)
 
-    def adjust_difficulty_if_needed(self):
+    def adjust_difficulty_if_needed(self) -> None:
         """Check and adjust difficulty if needed"""
         if self.difficulty_adjuster.should_adjust_difficulty(self.blockchain):
             new_difficulty = self.difficulty_adjuster.calculate_new_difficulty(self.blockchain)
@@ -680,7 +685,7 @@ class AdvancedConsensusManager:
                 self.blockchain.difficulty = new_difficulty
                 print(f"Difficulty adjusted: {old_difficulty} -> {new_difficulty}")
 
-    def mark_finalized_blocks(self):
+    def mark_finalized_blocks(self) -> None:
         """Mark blocks that have achieved hard finality"""
         chain_height = len(self.blockchain.chain)
 
@@ -689,7 +694,7 @@ class AdvancedConsensusManager:
             if not self.finality_tracker.is_finalized(i):
                 self.finality_tracker.mark_finalized(i)
 
-    def get_consensus_stats(self) -> Dict:
+    def get_consensus_stats(self) -> Dict[str, Any]:
         """Get comprehensive consensus statistics"""
         return {
             "propagation": self.propagation_monitor.get_network_stats(),

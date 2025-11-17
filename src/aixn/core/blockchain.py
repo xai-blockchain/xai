@@ -3,11 +3,13 @@ AXN Blockchain Core - Production Implementation
 Real cryptocurrency blockchain with transactions, mining, and consensus
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import time
 import os
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple, Any, Union
 from datetime import datetime
 import ecdsa
 import base58
@@ -34,12 +36,12 @@ class Transaction:
         recipient: str,
         amount: float,
         fee: float = 0.0,
-        public_key: str = None,
+        public_key: Optional[str] = None,
         tx_type: str = "normal",
         nonce: Optional[int] = None,
-        inputs: Optional[List[Dict]] = None,
-        outputs: Optional[List[Dict]] = None,
-    ):
+        inputs: Optional[List[Dict[str, Any]]] = None,
+        outputs: Optional[List[Dict[str, Any]]] = None,
+    ) -> None:
         self.sender = sender
         self.recipient = recipient  # For simplicity, still keep a primary recipient, but outputs will define actual distribution
         self.amount = amount  # This will represent the primary output amount
@@ -76,7 +78,7 @@ class Transaction:
         tx_string = json.dumps(tx_data, sort_keys=True)
         return hashlib.sha256(tx_string.encode()).hexdigest()
 
-    def sign_transaction(self, private_key: str):
+    def sign_transaction(self, private_key: str) -> None:
         """Sign transaction with sender's private key"""
         if self.sender == "COINBASE":
             # Coinbase transactions don't need signatures
@@ -108,7 +110,7 @@ class Transaction:
 
             # Verify the address matches this public key
             pub_hash = hashlib.sha256(self.public_key.encode()).hexdigest()
-            expected_address = f"AXN{pub_hash[:40]}"
+            expected_address = f"XAI{pub_hash[:40]}"
             if expected_address != self.sender:
                 print(f"Address mismatch: expected {expected_address}, got {self.sender}")
                 return False
@@ -121,7 +123,7 @@ class Transaction:
             print(f"Signature verification error: {e}")
             return False
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
         return {
             "txid": self.txid,
@@ -144,7 +146,7 @@ class Block:
 
     def __init__(
         self, index: int, transactions: List[Transaction], previous_hash: str, difficulty: int = 4
-    ):
+    ) -> None:
         self.index = index
         self.timestamp = time.time()
         self.transactions = transactions
@@ -199,7 +201,7 @@ class Block:
                 return self.hash
             self.nonce += 1
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
         return {
             "index": self.index,
@@ -216,15 +218,16 @@ class Block:
 class Blockchain:
     """AXN Blockchain - Real cryptocurrency implementation"""
 
-    def __init__(self, data_dir: str = "data"):
+    def __init__(self, data_dir: str = "data") -> None:
         self.storage = BlockchainStorage(data_dir)
         self.chain: List[Block] = (
             []
         )  # This will be a cache of loaded blocks, not the primary storage
         self.pending_transactions: List[Transaction] = []
         self.difficulty = 4
-        self.initial_block_reward = 60.0
-        self.halving_interval = 194400
+        self.initial_block_reward = 12.0  # Per WHITEPAPER: Initial Block Reward is 12 XAI
+        self.halving_interval = 262800  # Per WHITEPAPER: Halving every 262,800 blocks
+        self.max_supply = 121_000_000.0  # Per WHITEPAPER: Maximum Supply is 121 million XAI
         self.transaction_fee_percent = 0.24
         self.utxo_manager = UTXOManager()
 
@@ -254,7 +257,7 @@ class Blockchain:
         print(f"Loaded {len(self.chain)} blocks from disk.")
         return True
 
-    def create_genesis_block(self):
+    def create_genesis_block(self) -> None:
         """Create or load the genesis block"""
         import os
 
@@ -325,12 +328,12 @@ class Blockchain:
     def get_block_reward(self, block_height: int) -> float:
         """Calculate block reward with halving every 1 year (262,800 blocks at 2min/block)
 
-        Emission schedule:
-        - Year 1 (blocks 0-262,799): 60 AXN/block → ~15.8M AXN
-        - Year 2 (blocks 262,800-525,599): 30 AXN/block → ~7.9M AXN
-        - Year 3 (blocks 525,600-788,399): 15 AXN/block → ~3.9M AXN
-        - Year 4 (blocks 788,400-1,051,199): 7.5 AXN/block → ~2.0M AXN
-        - Continues halving until mining pool exhausted (72.6M AXN total)
+        Emission schedule (per WHITEPAPER):
+        - Year 1 (blocks 0-262,799): 12 XAI/block → ~3.15M XAI
+        - Year 2 (blocks 262,800-525,599): 6 XAI/block → ~1.58M XAI
+        - Year 3 (blocks 525,600-788,399): 3 XAI/block → ~0.79M XAI
+        - Year 4 (blocks 788,400-1,051,199): 1.5 XAI/block → ~0.39M XAI
+        - Continues halving until reaching max supply (121M XAI total)
         """
         halvings = block_height // self.halving_interval
         reward = self.initial_block_reward / (2**halvings)
@@ -350,7 +353,7 @@ class Blockchain:
         self.pending_transactions.append(transaction)
         return True
 
-    def mine_pending_transactions(self, miner_address: str) -> Block:
+    def mine_pending_transactions(self, miner_address: str) -> Optional[Block]:
         """Mine a new block with pending transactions"""
         # Calculate block reward based on current chain height (with halving)
         block_height = len(self.chain)
@@ -408,7 +411,7 @@ class Blockchain:
         self.storage.save_state_to_disk(self.utxo_manager, self.pending_transactions)
         return new_block
 
-    def _process_gamification_features(self, block: Block, miner_address: str):
+    def _process_gamification_features(self, block: Block, miner_address: str) -> None:
         """Process all gamification features after mining a block"""
         block_height = block.index
 
@@ -446,6 +449,24 @@ class Blockchain:
     def get_balance(self, address: str) -> float:
         """Get balance of an address"""
         return self.utxo_manager.get_balance(address)
+
+    @property
+    def utxo_set(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Expose UTXO set for tests and external access"""
+        return self.utxo_manager.utxos
+
+    def get_circulating_supply(self) -> float:
+        """Calculate current circulating supply of AXN tokens"""
+        # Sum all UTXOs (all coins currently in circulation)
+        total = 0.0
+        for address, utxos in self.utxo_manager.utxos.items():
+            for utxo in utxos:
+                total += utxo.get("amount", 0.0)
+        return total
+
+    def get_total_supply(self) -> float:
+        """Get total supply (same as circulating supply for now)"""
+        return self.get_circulating_supply()
 
     def validate_chain(self) -> bool:
         """Validate entire blockchain by loading blocks from disk."""
@@ -498,7 +519,7 @@ class Blockchain:
             previous_block = current_block
         return True
 
-    def get_transaction_history(self, address: str) -> List[dict]:
+    def get_transaction_history(self, address: str) -> List[Dict[str, Any]]:
         """Get all transactions involving an address by iterating through blocks on disk."""
         history = []
         block_files = sorted(
@@ -530,7 +551,7 @@ class Blockchain:
                         )
         return history
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> Dict[str, Any]:
         """Get blockchain statistics."""
         block_files = [
             f
@@ -559,7 +580,7 @@ class Blockchain:
             "latest_block_hash": self.get_latest_block().hash,
         }
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Export entire blockchain by loading blocks from disk."""
         block_files = sorted(
             [
@@ -587,8 +608,8 @@ class Blockchain:
         }
 
     def submit_governance_proposal(
-        self, submitter: str, title: str, description: str, proposal_type: str, proposal_data: dict
-    ) -> dict:
+        self, submitter: str, title: str, description: str, proposal_type: str, proposal_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Submit a governance proposal on-chain.
 
@@ -632,7 +653,7 @@ class Blockchain:
 
     def cast_governance_vote(
         self, voter: str, proposal_id: str, vote: str, voting_power: float
-    ) -> dict:
+    ) -> Dict[str, Any]:
         """
         Cast a vote on a governance proposal.
 
@@ -675,7 +696,7 @@ class Blockchain:
 
         return {"txid": tx.txid, "status": "recorded", "vote_count": vote_count}
 
-    def submit_code_review(self, reviewer: str, proposal_id: str, review_data: dict) -> dict:
+    def submit_code_review(self, reviewer: str, proposal_id: str, review_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Submit a code review for a governance proposal.
 
@@ -707,7 +728,7 @@ class Blockchain:
 
         return {"txid": tx.txid, "status": "submitted", "proposal_id": proposal_id}
 
-    def execute_proposal(self, executor: str, proposal_id: str) -> dict:
+    def execute_proposal(self, executor: str, proposal_id: str) -> Dict[str, Any]:
         """
         Execute an approved governance proposal.
 

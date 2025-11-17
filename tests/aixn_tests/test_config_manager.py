@@ -10,7 +10,7 @@ import tempfile
 import yaml
 from pathlib import Path
 
-from config_manager import (
+from aixn.config_manager import (
     ConfigManager,
     get_config_manager,
     Environment,

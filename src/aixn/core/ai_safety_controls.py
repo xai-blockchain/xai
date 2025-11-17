@@ -12,7 +12,7 @@ Philosophy: Users MUST have instant control over AI affecting their assets
 
 import time
 import threading
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Any
 from enum import Enum
 
 
@@ -49,7 +49,7 @@ class AISafetyControls:
     - Global AI operations (emergency)
     """
 
-    def __init__(self, blockchain, authorized_callers: Optional[Set[str]] = None):
+    def __init__(self, blockchain: Any, authorized_callers: Optional[Set[str]] = None) -> None:
         """
         Initialize AI safety controls
 
@@ -57,28 +57,28 @@ class AISafetyControls:
             blockchain: Reference to blockchain
             authorized_callers: Optional identifiers that can change safety level
         """
-        self.blockchain = blockchain
+        self.blockchain: Any = blockchain
 
         # Global safety level
-        self.safety_level = AISafetyLevel.NORMAL
+        self.safety_level: AISafetyLevel = AISafetyLevel.NORMAL
 
         # Active operations tracking
-        self.personal_ai_requests: Dict[str, Dict] = {}  # request_id -> request info
-        self.governance_tasks: Dict[str, Dict] = {}  # task_id -> task info
-        self.trading_bots: Dict[str, object] = {}  # user_address -> bot instance
+        self.personal_ai_requests: Dict[str, Dict[str, Any]] = {}  # request_id -> request info
+        self.governance_tasks: Dict[str, Dict[str, Any]] = {}  # task_id -> task info
+        self.trading_bots: Dict[str, Any] = {}  # user_address -> bot instance
 
         # Cancellation tracking
         self.cancelled_requests: Set[str] = set()  # request_ids to cancel
         self.paused_tasks: Set[str] = set()  # task_ids paused
 
         # Emergency stop
-        self.emergency_stop_active = False
-        self.emergency_stop_reason = None
-        self.emergency_stop_time = None
+        self.emergency_stop_active: bool = False
+        self.emergency_stop_reason: Optional[StopReason] = None
+        self.emergency_stop_time: Optional[float] = None
 
         # Statistics
-        self.total_stops = 0
-        self.total_cancellations = 0
+        self.total_stops: int = 0
+        self.total_cancellations: int = 0
 
         # Authorized safety callers (lowercase normalized)
         self.authorized_callers: Set[str] = {
@@ -93,7 +93,7 @@ class AISafetyControls:
             self.authorized_callers.update(c.lower() for c in authorized_callers)
 
         # Lock for thread safety
-        self.lock = threading.Lock()
+        self.lock: threading.Lock = threading.Lock()
 
     # ===== PERSONAL AI CONTROLS =====
 
@@ -171,7 +171,7 @@ class AISafetyControls:
         """Check if a request has been cancelled"""
         return request_id in self.cancelled_requests
 
-    def complete_personal_ai_request(self, request_id: str):
+    def complete_personal_ai_request(self, request_id: str) -> None:
         """Mark request as completed (cleanup)"""
         with self.lock:
             if request_id in self.personal_ai_requests:
@@ -180,7 +180,7 @@ class AISafetyControls:
 
     # ===== TRADING BOT CONTROLS =====
 
-    def register_trading_bot(self, user_address: str, bot_instance) -> bool:
+    def register_trading_bot(self, user_address: str, bot_instance: Any) -> bool:
         """
         Register a trading bot for emergency stop capability
 
@@ -226,7 +226,7 @@ class AISafetyControls:
             "bot_result": result,
         }
 
-    def stop_all_trading_bots(self, reason: StopReason) -> Dict:
+    def stop_all_trading_bots(self, reason: StopReason) -> Dict[str, Any]:
         """
         Stop ALL trading bots (emergency)
 
@@ -237,8 +237,8 @@ class AISafetyControls:
             Stop results
         """
 
-        stopped_count = 0
-        errors = []
+        stopped_count: int = 0
+        errors: List[str] = []
 
         with self.lock:
             for user_address, bot in self.trading_bots.items():
@@ -257,7 +257,7 @@ class AISafetyControls:
             "reason": reason.value,
         }
 
-    def authorize_safety_caller(self, identifier: str) -> Dict:
+    def authorize_safety_caller(self, identifier: str) -> Dict[str, Any]:
         """Add an identifier that can change safety level"""
 
         if not identifier:
@@ -272,7 +272,7 @@ class AISafetyControls:
             "message": "Authorized caller can now change AI safety level",
         }
 
-    def revoke_safety_caller(self, identifier: str) -> Dict:
+    def revoke_safety_caller(self, identifier: str) -> Dict[str, Any]:
         """Remove an identifier from safety level changes"""
 
         if not identifier:
@@ -329,7 +329,7 @@ class AISafetyControls:
 
         return True
 
-    def pause_governance_task(self, task_id: str, pauser: str) -> Dict:
+    def pause_governance_task(self, task_id: str, pauser: str) -> Dict[str, Any]:
         """
         Pause a Governance AI task (requires authorization)
 
@@ -360,7 +360,7 @@ class AISafetyControls:
             "proposal_id": task["proposal_id"],
         }
 
-    def resume_governance_task(self, task_id: str) -> Dict:
+    def resume_governance_task(self, task_id: str) -> Dict[str, Any]:
         """Resume a paused Governance AI task"""
 
         with self.lock:
@@ -387,7 +387,7 @@ class AISafetyControls:
 
     def activate_emergency_stop(
         self, reason: StopReason, details: str = "", activator: str = "system"
-    ) -> Dict:
+    ) -> Dict[str, Any]:
         """
         EMERGENCY STOP - Immediately halt ALL AI operations
 
@@ -418,9 +418,9 @@ class AISafetyControls:
         print("=" * 70)
 
         with self.lock:
-            self.emergency_stop_active = True
-            self.emergency_stop_reason = reason
-            self.emergency_stop_time = time.time()
+            self.emergency_stop_active: bool = True
+            self.emergency_stop_reason: StopReason = reason
+            self.emergency_stop_time: float = time.time()
 
             # Stop all Personal AI requests
             for request_id in list(self.personal_ai_requests.keys()):
@@ -433,7 +433,7 @@ class AISafetyControls:
                 self.governance_tasks[task_id]["paused"] = True
 
         # Stop all trading bots
-        trading_bot_result = self.stop_all_trading_bots(reason)
+        trading_bot_result: Dict[str, Any] = self.stop_all_trading_bots(reason)
 
         print(f"Reason: {reason.value}")
         print(f"Details: {details}")
@@ -456,7 +456,7 @@ class AISafetyControls:
             "trading_bots_stopped": trading_bot_result["stopped_count"],
         }
 
-    def deactivate_emergency_stop(self, deactivator: str) -> Dict:
+    def deactivate_emergency_stop(self, deactivator: str) -> Dict[str, Any]:
         """
         Deactivate emergency stop (allow AI operations to resume)
 
@@ -475,8 +475,8 @@ class AISafetyControls:
             }
 
         with self.lock:
-            self.emergency_stop_active = False
-            duration = time.time() - self.emergency_stop_time
+            self.emergency_stop_active: bool = False
+            duration: float = time.time() - (self.emergency_stop_time or 0)
 
         print("\n" + "=" * 70)
         print("[OK] EMERGENCY STOP DEACTIVATED")
@@ -493,7 +493,7 @@ class AISafetyControls:
             "duration_seconds": duration,
         }
 
-    def set_safety_level(self, level: AISafetyLevel, setter: str) -> Dict:
+    def set_safety_level(self, level: AISafetyLevel, setter: str) -> Dict[str, Any]:
         """
         Set global AI safety level
 
@@ -512,7 +512,7 @@ class AISafetyControls:
                 "message": f"{setter} is not authorized to change safety level",
             }
 
-        old_level = self.safety_level
+        old_level: AISafetyLevel = self.safety_level
 
         with self.lock:
             self.safety_level = level
@@ -536,11 +536,11 @@ class AISafetyControls:
 
     # ===== STATUS & MONITORING =====
 
-    def get_status(self) -> Dict:
+    def get_status(self) -> Dict[str, Any]:
         """Get current AI safety status"""
 
         with self.lock:
-            status = {
+            status: Dict[str, Any] = {
                 "safety_level": self.safety_level.value,
                 "emergency_stop_active": self.emergency_stop_active,
                 "personal_ai": {
@@ -562,7 +562,7 @@ class AISafetyControls:
                 },
             }
 
-            if self.emergency_stop_active:
+            if self.emergency_stop_active and self.emergency_stop_reason and self.emergency_stop_time:
                 status["emergency_stop"] = {
                     "reason": self.emergency_stop_reason.value,
                     "duration_seconds": time.time() - self.emergency_stop_time,
@@ -573,7 +573,7 @@ class AISafetyControls:
 
         return status
 
-    def get_active_operations(self) -> Dict:
+    def get_active_operations(self) -> Dict[str, List[Dict[str, Any]]]:
         """Get list of all active AI operations"""
 
         with self.lock:

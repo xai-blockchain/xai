@@ -16,10 +16,10 @@ except ImportError:
     requests = None
     RequestException = Exception
 
-from src.aixn.config import Config
+from aixn.core.config import Config
 
 try:
-    from src.aixn.core.additional_ai_providers import (
+    from aixn.core.additional_ai_providers import (
         DeepSeekProvider,
         FireworksAIProvider,
         GroqProvider,

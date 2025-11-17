@@ -4,7 +4,9 @@ XAI Blockchain - Transaction Validator
 Validates incoming transactions against a set of rules to ensure network integrity.
 """
 
-from typing import Dict, Any, Optional, TYPE_CHECKING
+from __future__ import annotations
+
+from typing import Dict, Any, Optional, TYPE_CHECKING, List
 
 if TYPE_CHECKING:
     from aixn.core.blockchain import Transaction
@@ -183,7 +185,7 @@ class TransactionValidator:
             )
             return False
 
-    def _validate_time_capsule_lock(self, transaction: "Transaction"):
+    def _validate_time_capsule_lock(self, transaction: "Transaction") -> None:
         """
         Validates a time_capsule_lock transaction.
         """
@@ -200,7 +202,7 @@ class TransactionValidator:
         # Further checks could involve ensuring the recipient is a valid capsule address
         # and that the amount is positive.
 
-    def _validate_governance_vote(self, transaction: "Transaction"):
+    def _validate_governance_vote(self, transaction: "Transaction") -> None:
         """
         Validates a governance_vote transaction.
         """

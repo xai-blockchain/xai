@@ -11,7 +11,7 @@ import time
 
 # Add core directory to path
 
-from ai_governance import AIGovernance, VoterType, VotingPowerDisplay
+from aixn.core.ai_governance import AIGovernance, VoterType, VotingPowerDisplay
 from aixn.core.blockchain import Blockchain, Transaction
 from aixn.core.wallet import Wallet
 

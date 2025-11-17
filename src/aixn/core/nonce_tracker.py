@@ -4,6 +4,8 @@ XAI Blockchain - Transaction Nonce Tracking
 Prevents replay attacks by tracking sequential nonces per address.
 """
 
+from __future__ import annotations
+
 import json
 import os
 from typing import Dict, Optional
@@ -18,7 +20,7 @@ class NonceTracker:
     Transactions must have nonce = current_nonce + 1.
     """
 
-    def __init__(self, data_dir: str = None):
+    def __init__(self, data_dir: Optional[str] = None) -> None:
         """
         Initialize nonce tracker
 
@@ -39,7 +41,7 @@ class NonceTracker:
         # Load existing nonces
         self._load_nonces()
 
-    def _load_nonces(self):
+    def _load_nonces(self) -> None:
         """Load nonces from file"""
         if os.path.exists(self.nonce_file):
             try:
@@ -48,7 +50,7 @@ class NonceTracker:
             except Exception:
                 self.nonces = {}
 
-    def _save_nonces(self):
+    def _save_nonces(self) -> None:
         """Save nonces to file"""
         try:
             with open(self.nonce_file, "w") as f:
@@ -107,7 +109,7 @@ class NonceTracker:
             expected = self._get_effective_nonce(address) + 1
             return nonce == expected
 
-    def reserve_nonce(self, address: str, nonce: int):
+    def reserve_nonce(self, address: str, nonce: int) -> None:
         """
         Track a nonce that has been accepted into the mempool so the next
         transaction from the same address can use nonce+1 even before confirmation.
@@ -118,7 +120,7 @@ class NonceTracker:
                 return
             self.pending_nonces[address] = nonce
 
-    def increment_nonce(self, address: str, nonce: Optional[int] = None):
+    def increment_nonce(self, address: str, nonce: Optional[int] = None) -> None:
         """
         Increment nonce after successful transaction
 
@@ -138,7 +140,7 @@ class NonceTracker:
 
             self._save_nonces()
 
-    def reset_nonce(self, address: str):
+    def reset_nonce(self, address: str) -> None:
         """
         Reset nonce to 0 (for testing only)
 
@@ -197,7 +199,7 @@ def validate_transaction_nonce(address: str, nonce: int) -> bool:
     return tracker.validate_nonce(address, nonce)
 
 
-def increment_transaction_nonce(address: str, nonce: Optional[int] = None):
+def increment_transaction_nonce(address: str, nonce: Optional[int] = None) -> None:
     """
     Convenience function to increment nonce
 

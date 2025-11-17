@@ -2,12 +2,14 @@
 AXN Wallet - Real cryptocurrency wallet with ECDSA cryptography
 """
 
+from __future__ import annotations
+
 import ecdsa
 import hashlib
 import json
 import os
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple, Any, List
 
 
 import base64
@@ -17,7 +19,7 @@ from cryptography.fernet import Fernet
 class Wallet:
     """Real cryptocurrency wallet with public/private key cryptography"""
 
-    def __init__(self, private_key: Optional[str] = None):
+    def __init__(self, private_key: Optional[str] = None) -> None:
         if private_key:
             # Load existing wallet
             self.private_key = private_key
@@ -28,7 +30,7 @@ class Wallet:
 
         self.address = self._generate_address(self.public_key)
 
-    def _generate_keypair(self) -> tuple:
+    def _generate_keypair(self) -> Tuple[str, str]:
         """
         Generates a new ECDSA keypair using the SECP256k1 curve.
 
@@ -59,20 +61,20 @@ class Wallet:
 
     def _generate_address(self, public_key: str) -> str:
         """
-        Generates an AXN address from a public key.
+        Generates an XAI address from a public key.
 
-        The address format is 'AXN' followed by the first 40 characters of the SHA256 hash
+        The address format is 'XAI' followed by the first 40 characters of the SHA256 hash
         of the public key.
 
         Args:
             public_key: The public key as a hex string.
 
         Returns:
-            The generated AXN address string.
+            The generated XAI address string.
         """
-        # AXN addresses: AXN + first 40 chars of public key hash
+        # XAI addresses: XAI + first 40 chars of public key hash
         pub_hash = hashlib.sha256(public_key.encode()).hexdigest()
-        return f"AXN{pub_hash[:40]}"
+        return f"XAI{pub_hash[:40]}"
 
     def sign_message(self, message: str) -> str:
         """
@@ -110,7 +112,7 @@ class Wallet:
             print(f"An unexpected error occurred during signature verification: {e}")
             return False
 
-    def save_to_file(self, filename: str, password: Optional[str] = None):
+    def save_to_file(self, filename: str, password: Optional[str] = None) -> None:
         """Save wallet to encrypted file"""
         wallet_data = {
             "private_key": self.private_key,
@@ -164,15 +166,15 @@ class Wallet:
         decrypted_data = f.decrypt(encrypted_data.encode())
         return decrypted_data.decode()
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, str]:
         """Export public wallet data only (alias for to_public_dict)."""
         return self.to_public_dict()
 
-    def to_public_dict(self) -> dict:
+    def to_public_dict(self) -> Dict[str, str]:
         """Export public wallet data only"""
         return {"address": self.address, "public_key": self.public_key}
 
-    def to_full_dict_unsafe(self) -> dict:
+    def to_full_dict_unsafe(self) -> Dict[str, str]:
         """
         Export full wallet data including the private key.
         WARNING: This method exposes the private key and should be used with extreme caution.
@@ -187,7 +189,7 @@ class Wallet:
 class WalletManager:
     """Manage multiple wallets"""
 
-    def __init__(self, data_dir: str = None):
+    def __init__(self, data_dir: Optional[str] = None) -> None:
         if data_dir is None:
             self.data_dir = Path.home() / ".aixn" / "wallets"
         else:
@@ -219,7 +221,7 @@ class WalletManager:
 
         return wallet
 
-    def list_wallets(self) -> list:
+    def list_wallets(self) -> List[str]:
         """List all wallet files"""
         return [f.stem for f in self.data_dir.glob("*.wallet")]
 

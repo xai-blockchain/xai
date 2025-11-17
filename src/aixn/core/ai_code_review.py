@@ -9,9 +9,10 @@ Multi-stage review process before AI changes go live:
 5. Reversible via new vote
 """
 
+from __future__ import annotations
 import time
 import hashlib
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from enum import Enum
 
 
@@ -48,11 +49,11 @@ class AICodeSubmission:
     def __init__(
         self,
         proposal_id: str,
-        code_changes: Dict,
+        code_changes: Dict[str, Any],
         description: str,
         files_modified: List[str],
-        original_approvers: List[str] = None,
-    ):
+        original_approvers: Optional[List[str]] = None,
+    ) -> None:
         self.submission_id = hashlib.sha256(f"{proposal_id}{time.time()}".encode()).hexdigest()[:16]
         self.proposal_id = proposal_id
         self.code_changes = code_changes  # file -> {old_code, new_code}
@@ -217,7 +218,7 @@ class AICodeSubmission:
 
         return test_results
 
-    def prepare_rollback(self):
+    def prepare_rollback(self) -> None:
         """Store original code for potential reversal"""
         for file_path, changes in self.code_changes.items():
             self.rollback_code[file_path] = changes.get("old_code", "")
@@ -319,7 +320,7 @@ class RollbackProposal:
     Any change can be reversed via new vote
     """
 
-    def __init__(self, original_submission_id: str, reason: str):
+    def __init__(self, original_submission_id: str, reason: str) -> None:
         self.rollback_id = hashlib.sha256(
             f"rollback_{original_submission_id}{time.time()}".encode()
         ).hexdigest()[:16]

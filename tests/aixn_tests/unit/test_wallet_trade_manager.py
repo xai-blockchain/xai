@@ -8,9 +8,9 @@ import pytest
 
 # Add core directory to path
 
-from exchange_wallet import ExchangeWalletManager
-from nonce_tracker import NonceTracker
-from trading import SwapOrderType, TradeMatchStatus
+from aixn.core.exchange_wallet import ExchangeWalletManager
+from aixn.core.nonce_tracker import NonceTracker
+from aixn.core.trading import SwapOrderType, TradeMatchStatus
 from aixn.core.wallet_trade_manager import WalletTradeManager
 
 

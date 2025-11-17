@@ -5,10 +5,12 @@ Handles all disk I/O operations for the blockchain, including saving and loading
 blocks, the UTXO set, and pending transactions.
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import os
-from typing import List, Dict, Optional, TYPE_CHECKING
+from typing import List, Dict, Optional, TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from aixn.core.blockchain import Block, Transaction
@@ -19,7 +21,7 @@ class BlockchainStorage:
     Manages the persistence of blockchain data to disk.
     """
 
-    def __init__(self, data_dir: str = "data"):
+    def __init__(self, data_dir: str = "data") -> None:
         self.data_dir = data_dir
         os.makedirs(self.data_dir, exist_ok=True)
         self.blocks_dir = os.path.join(self.data_dir, "blocks")
@@ -27,13 +29,13 @@ class BlockchainStorage:
         self.utxo_file = os.path.join(self.data_dir, "utxo_set.json")
         self.pending_tx_file = os.path.join(self.data_dir, "pending_transactions.json")
 
-    def _save_block_to_disk(self, block: "Block"):
+    def _save_block_to_disk(self, block: Block) -> None:
         """Save a single block to its file."""
         block_file = os.path.join(self.blocks_dir, f"block_{block.index}.json")
         with open(block_file, "w") as f:
             json.dump(block.to_dict(), f, indent=2)
 
-    def save_state_to_disk(self, utxo_manager, pending_transactions: List["Transaction"]):
+    def save_state_to_disk(self, utxo_manager: Any, pending_transactions: List[Transaction]) -> None:
         """Save the blockchain state (UTXO set and pending transactions) to disk."""
         # Save UTXO set
         with open(self.utxo_file, "w") as f:
@@ -44,7 +46,7 @@ class BlockchainStorage:
         with open(self.pending_tx_file, "w") as f:
             json.dump(pending_tx_data, f, indent=2)
 
-    def _load_block_from_disk(self, block_index: int) -> Optional["Block"]:
+    def _load_block_from_disk(self, block_index: int) -> Optional[Block]:
         """Load a single block from its file."""
         from aixn.core.blockchain import Block, Transaction
 
@@ -87,7 +89,7 @@ class BlockchainStorage:
             print(f"Error loading block {block_index} from disk: {e}")
             return None
 
-    def load_state_from_disk(self) -> Dict:
+    def load_state_from_disk(self) -> Dict[str, Any]:
         """Load the blockchain state (UTXO set and pending transactions) from disk."""
         from aixn.core.blockchain import Transaction
 
@@ -130,7 +132,7 @@ class BlockchainStorage:
 
         return {"utxo_set": utxo_set, "pending_transactions": pending_transactions}
 
-    def load_chain_from_disk(self) -> List["Block"]:
+    def load_chain_from_disk(self) -> List[Block]:
         """Load the entire blockchain (all blocks) from disk."""
         block_files = sorted(
             [
@@ -153,7 +155,7 @@ class BlockchainStorage:
                 return []
         return chain
 
-    def get_latest_block_from_disk(self) -> Optional["Block"]:
+    def get_latest_block_from_disk(self) -> Optional[Block]:
         """Get the last block in the chain by loading it from disk."""
         block_files = sorted(
             [

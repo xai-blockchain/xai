@@ -4,6 +4,8 @@ XAI Blockchain Configuration
 Supports testnet and mainnet with separate configurations.
 """
 
+from __future__ import annotations
+
 import os
 from datetime import datetime, timezone
 from enum import Enum

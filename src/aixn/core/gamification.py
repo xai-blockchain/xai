@@ -33,8 +33,15 @@ class AirdropManager:
     def _load_airdrop_history(self) -> List[dict]:
         """Load airdrop history from file"""
         if self.airdrop_file.exists():
-            with open(self.airdrop_file, "r") as f:
-                return json.load(f)
+            try:
+                with open(self.airdrop_file, "r") as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"Warning: Corrupted airdrop file, resetting: {e}")
+                # Backup corrupted file
+                backup_path = str(self.airdrop_file) + ".corrupted"
+                self.airdrop_file.rename(backup_path)
+                return []
         return []
 
     def _save_airdrop_history(self):
@@ -184,8 +191,15 @@ class StreakTracker:
     def _load_streaks(self) -> Dict[str, dict]:
         """Load mining streaks from file"""
         if self.streak_file.exists():
-            with open(self.streak_file, "r") as f:
-                return json.load(f)
+            try:
+                with open(self.streak_file, "r") as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, ValueError) as e:
+                print(f"Warning: Corrupted streak file, resetting: {e}")
+                # Backup corrupted file
+                backup_path = str(self.streak_file) + ".corrupted"
+                self.streak_file.rename(backup_path)
+                return {}
         return {}
 
     def _save_streaks(self):
@@ -826,7 +840,7 @@ if __name__ == "__main__":
 
     # Test streak bonus calculation
     print("\n[TEST] Testing streak bonus...")
-    test_miner = "AXN" + "1" * 40
+    test_miner = "XAI" + "1" * 40
     managers["streak"].update_miner_streak(test_miner, time.time())
     bonus = managers["streak"].get_streak_bonus(test_miner)
     print(f"  Streak bonus: {bonus * 100:.1f}%")

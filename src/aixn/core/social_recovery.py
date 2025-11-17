@@ -104,7 +104,7 @@ class SocialRecoveryManager:
             ValueError: If configuration is invalid
         """
         # Validation
-        if not owner_address or not owner_address.startswith("AXN"):
+        if not owner_address or not owner_address.startswith("XAI"):
             raise ValueError("Invalid owner address")
 
         if len(guardian_addresses) < self.min_guardians:
@@ -119,7 +119,7 @@ class SocialRecoveryManager:
 
         # Validate guardian addresses
         for guardian in guardian_addresses:
-            if not guardian or not guardian.startswith("AXN"):
+            if not guardian or not guardian.startswith("XAI"):
                 raise ValueError(f"Invalid guardian address: {guardian}")
             if guardian == owner_address:
                 raise ValueError("Owner cannot be their own guardian")
@@ -194,7 +194,7 @@ class SocialRecoveryManager:
         if not config:
             raise ValueError("No recovery configuration found for this address")
 
-        if not new_address or not new_address.startswith("AXN"):
+        if not new_address or not new_address.startswith("XAI"):
             raise ValueError("Invalid new address")
 
         if new_address == owner_address:

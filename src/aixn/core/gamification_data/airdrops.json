@@ -1,272 +1,135 @@
 [
   {
     "block_height": 100,
-    "block_hash": "00f505c1ab24ce64262d3531ff22298a5dc23f40fe81bd466928de9c04f5a68e",
-    "timestamp": 1762749607.3494413,
+    "block_hash": "00009ef031d0356c0d2e15b4abfd84c99c68ef4e54aeb9d459fa79182eed0780",
+    "timestamp": 1763352585.2239156,
     "winners": {
-      "XAI618b5fdd752462dc5a5ca799a80f7d6e17322133": 7.76
+      "AXNd9c971df7e721110e0fed09fe53d9b501dae4594": 3.36,
+      "AXN7ba034a5af3cdd8a2bf028479fa0e0eb4b121b61": 2.43,
+      "AXNf57f8f2aff9d1cef8477c189069f1acfef24df89": 2.0,
+      "AXN8de22d84814e91573f55279bf1f5d985236cf08e": 4.0,
+      "AXNc0161e054ef1e1ae1e572fcdc4e12e86eac16b65": 7.4,
+      "AXNb5305394545c446ad394f30b1c4640e2f383c002": 2.2,
+      "AXN8e99143e46e0a726ce3130949ad2340502404cc5": 2.63,
+      "AXNc737cb8df0d6629bc00153db9f1745eb1e84550c": 4.92,
+      "AXN534bfe700dffc16c03b5baf497cbb5a34d8b784a": 3.31,
+      "AXN9afb601f4cff8939f2a1b276b25cc48e506b27cf": 2.95
     },
-    "total_distributed": 7.76,
-    "winner_count": 1
+    "total_distributed": 35.2,
+    "winner_count": 10
   },
   {
-    "block_height": 100,
-    "block_hash": "00a1c9e2a6808ba407ae0984a1237fa421d093d3298575bb7e30e671ac0c270a",
-    "timestamp": 1762749642.426029,
+    "block_height": 200,
+    "block_hash": "0000d1705d886565190c0b14f1afb7db9596370600c3be3ea6e5b4ed3eddbffb",
+    "timestamp": 1763352718.764742,
     "winners": {
-      "XAI873f897e60cf5ade871ef778c08dafe7d1fb815f": 7.14
+      "AXNf7b229bf55238a45452b088647fff0d908fda477": 8.53,
+      "AXN28130cc2ab8014613b714ff27b9bdacc12180a3d": 7.31,
+      "AXN937d1798c33d57cf457962009d07f2f98c89a025": 4.87,
+      "AXNea29df675135e372742d69e1884769fe58bb69b2": 3.28,
+      "AXNa4b96a8dc719ad9c981887449b6afce295159311": 3.02,
+      "AXN75a0b8d5b864931c5eb8bb4287e756207c36fc30": 9.35,
+      "AXN032b32d9600c76a455fb03aa754d86cb099f4f3f": 7.03,
+      "AXN6a50a1405b842eada51015939ec3e3912072596d": 9.71,
+      "AXN4ea930e909409e273a3a03797b934b97f1288c81": 8.56,
+      "AXN580c94d8c6d12c980a4760f1b03ac57d210d5e6a": 7.03
     },
-    "total_distributed": 7.14,
-    "winner_count": 1
+    "total_distributed": 68.69,
+    "winner_count": 10
   },
   {
-    "block_height": 100,
-    "block_hash": "0010ad42a64fe853ca2e7d97f7d276b6dfe46cefcc228b29ae31303c84559291",
-    "timestamp": 1762750184.2278047,
+    "block_height": 300,
+    "block_hash": "0000edfaf6fe69d27b498ecbadd7857bf51636e098d59d07970e8bfa36b293a7",
+    "timestamp": 1763352802.052283,
     "winners": {
-      "XAI881495bc3266d095f11bc5680eb5c2bd6ce83761": 8.57
+      "AXNcce24009d01933a13c56447d4582424a73e58615": 2.48,
+      "AXN7823df4e1a1463ec31ea46d7a5b4b2e190675a32": 4.53,
+      "AXN39e34ca67c604338875d5f38d153a52c0d4e0179": 5.73,
+      "AXN03439382f048cd4dcd1c326b97fedbd265f16126": 2.42,
+      "AXNd1947b7f61c018aba78afef3db37dc32eb4035fe": 7.9,
+      "AXN5c58ba6c5e7507d2f2a90164b7e0c6f4f4921845": 6.64,
+      "AXNee35c334cfa8ca183e726618a79e9ee114dbcd5c": 4.61,
+      "AXN22f68fe396c54bdae8cd95c981736502a2c6c900": 2.57,
+      "AXN1ce2efe3ef7f7630ca15bf0a9a08100cc9f8975a": 8.97,
+      "AXNe9cee66b815d9d0e3479f9a3924356aa88f19c7b": 9.25
     },
-    "total_distributed": 8.57,
-    "winner_count": 1
+    "total_distributed": 55.1,
+    "winner_count": 10
   },
   {
-    "block_height": 100,
-    "block_hash": "001221b287c52b3ebb752ac3eb84597e60af8dcab919f60d05adc89764f9d799",
-    "timestamp": 1762750533.0611181,
+    "block_height": 400,
+    "block_hash": "000097dec510d4b61affb293df885bf2d93ae0e64e1bb7b4fb663cdca66d5c49",
+    "timestamp": 1763352856.4306116,
     "winners": {
-      "XAI4cc2446d63e3231d05084290b554f5df0847327a": 4.51
+      "AXN7ca90765cb55610bdccf1420dbbdbf64626e972d": 3.99,
+      "AXN1ea4a4291f8c8069b6e56113c210e145a42a06f5": 6.29,
+      "AXN5d03b3cd2b60b3c5e3193a72e86f04101d218379": 7.17,
+      "AXN1010998002e11b4b5c16eb00c6abe3985664a0b0": 1.45,
+      "AXN216b6ba18664c56f71e2912695e7540b58791c86": 3.78,
+      "AXN565a278da6ff05f59c3ea5ea74355c88286de3ca": 2.0,
+      "AXN3b5f0f0a554fcc4cc4f93a1f5ce06a1ba8a7b91f": 4.38,
+      "AXN0d840a1dbb41f0446e752c8c08001e28ba221091": 9.19,
+      "AXNdaf3888809ea75dca10dcffcb748d44fe1132172": 8.4,
+      "AXNdeb7e6be7fec5611a449d603a9d1dbb6867d13cb": 7.6
     },
-    "total_distributed": 4.51,
-    "winner_count": 1
+    "total_distributed": 54.25,
+    "winner_count": 10
   },
   {
-    "block_height": 100,
-    "block_hash": "00f1e6b12010ed7ad714640596c0c3f056d0cb99c6f0c1dfbc1b4f9b515f881a",
-    "timestamp": 1762751047.019221,
+    "block_height": 500,
+    "block_hash": "000079dfb77c0de9c5ac1463279091bdfe7e61de5e9a74e65dd9a6790d6e589d",
+    "timestamp": 1763352917.5181913,
     "winners": {
-      "XAI3a6d5ec702c9e087fe5ea1f6c7190634769735d5": 6.32
+      "AXNd34f5d137c4d0ca19991610aa64567f058e18d2a": 3.19,
+      "AXNf1996b27aa5cd00f03a8bd747acbe620cb084f98": 4.34,
+      "AXN7f1e0c3fa7e4c9fcd18179d6e689b6d28cc2e238": 7.72,
+      "AXNe5d3ffccce7c22195249069ecd7b8ad0686185f4": 4.19,
+      "AXN3046c249531089e824b3f0a3c816be06ca68f6cf": 9.35,
+      "AXNe62aee8390175e5c450f22ebab99df3c28fd4f53": 7.33,
+      "AXN5b347bb70189f36ad1c77aad7b623fa0e84b047b": 7.75,
+      "AXN170a5824a43bc9d7013587f28d4479ee68cd864c": 7.54,
+      "AXN998ffeaa4613ada22c26385c575371b1014f0092": 4.75,
+      "AXN6daaf0628489d3682957b59ec3f8e826c0eeff47": 3.8
     },
-    "total_distributed": 6.32,
-    "winner_count": 1
+    "total_distributed": 59.96,
+    "winner_count": 10
   },
   {
-    "block_height": 100,
-    "block_hash": "00efe943369fd713d1cc891f39ad9c9957eca9640ff2b048389a2c98242cde61",
-    "timestamp": 1762752876.64271,
+    "block_height": 600,
+    "block_hash": "0000a190c9bf7428399bf6acb4377c921efe64001886befb8b2dc55246b84906",
+    "timestamp": 1763353006.5920265,
     "winners": {
-      "XAIc7bf1a77b9bd3af6bfca4969990af797c476972e": 6.48
+      "AXN849300c4c5b888b03713e53836702cd622ba1359": 3.79,
+      "AXN6cdcfb1956c0a9f41f39dfe3fd0548a05cd918cb": 3.57,
+      "AXN9cb3e243665bc40f57890a24ecd1e2aca2ad7985": 9.73,
+      "AXN65c1564fd36cf174f5f68e7528fbd619ec7dab3d": 3.44,
+      "AXN6434a81dad75a89bf9582ebef30a9d747d2a2b46": 3.09,
+      "AXNeb09dff788e568325eb115ba92733ac8e8f97ea0": 2.79,
+      "AXN43dfdcdc5a6ff849587a39e87dc8ea219ca58ffb": 1.48,
+      "AXN4a73a0222fe866c9314a068dc66374cf154547af": 7.99,
+      "AXN990d6ec580c8d3d74701d2f742eaf9ad2131c8fd": 5.64,
+      "AXN7244db21dd2153eebfb4e11cc9a7e74199147fc5": 5.91
     },
-    "total_distributed": 6.48,
-    "winner_count": 1
+    "total_distributed": 47.43,
+    "winner_count": 10
   },
   {
-    "block_height": 100,
-    "block_hash": "0014b543f2a45cabdfb9692f2c70c1365ca91283ef2a31dcb49c4c1622ecc95d",
-    "timestamp": 1762753282.672878,
+    "block_height": 700,
+    "block_hash": "0000bdc5e5b2e51910ddd0ce9eb884c888f2aaa349af89c79c09997dd978cba9",
+    "timestamp": 1763353087.5446606,
     "winners": {
-      "XAI5d29f118e94f2ceb9c259caef825da62f1dd95f5": 1.67
+      "AXN17798027bc479057b1ec52454e64d1aee4fc73cf": 4.53,
+      "AXN861b50bc35ad8a469ca813263fc8e3e676b46759": 3.39,
+      "AXNc7dcba1725ef17f67c3b0fbaa8576edf16a2c7cd": 2.32,
+      "AXN05a49e6da217c6bf862bf372883721cd358e0ee4": 3.35,
+      "AXN69b2bc810654652240d7dfe0365272508e0152e3": 7.2,
+      "AXNdd821e8f3866d6b8218edc9c8118f19ca4547e51": 4.6,
+      "AXN8eadfda87a8c8e3047a6b1f91dbda6062b93b3bc": 8.42,
+      "AXN54944083f02e06adb7ec6613504c4be49056f39a": 5.18,
+      "AXNc94c3852d4d863d001fbbb8c92c9ac0780e099d2": 5.93,
+      "AXNd5090ba665d844d3e6941c69e1e486ef32ffd6b8": 3.88
     },
-    "total_distributed": 1.67,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "00b107c0ef7e6471d944aa413788d405e3244b12dbd33120b004d351cdf873d7",
-    "timestamp": 1762753325.6136372,
-    "winners": {
-      "XAI86722e1b182528f2293a3f6d7619671035a349cf": 6.09
-    },
-    "total_distributed": 6.09,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "002498bb0a5fec33660631ea27b3b2bd7b20c2d1ba1ae1a248a9201f4bf3ad97",
-    "timestamp": 1762753402.8028586,
-    "winners": {
-      "XAI4dfcafb968468c354cdd6eb9becbd7b1a1fa9cf9": 3.13
-    },
-    "total_distributed": 3.13,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "00c86d314ea64f1b4916cbd78f7b9421a3f42293b613a1d2663e2b3ab5a8698e",
-    "timestamp": 1762753550.122897,
-    "winners": {
-      "XAI0a0a184a4449eb3f79229323e3939117928667a4": 8.91
-    },
-    "total_distributed": 8.91,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "003df791b03caf6e888dcfe5b89ff8fc35beb56c2474ed555d93ebf85d233b09",
-    "timestamp": 1762753987.1012855,
-    "winners": {
-      "XAI4c2570f334aee36d5414a425fe177943cca72b10": 2.19
-    },
-    "total_distributed": 2.19,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "004f4bd0f760bd1191ba0160128a42880597e6f28002845290587c176427f715",
-    "timestamp": 1762754129.5086956,
-    "winners": {
-      "XAI17f4470780ed846af0b9d58fe7dddcbb53135317": 3.0
-    },
-    "total_distributed": 3.0,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "0067f288d5fa1df286c8b5405f1fd476cb821138aa439d66fd0f513afa0abb5e",
-    "timestamp": 1762754193.835071,
-    "winners": {
-      "XAI1f9f818331a40e13eeea5902a27adc4467bb4385": 9.85
-    },
-    "total_distributed": 9.85,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "00b5c3dc3158f300a5f9593646a76a1208a313b4ee7512f7d5a16b2d31a4e303",
-    "timestamp": 1762754317.0834804,
-    "winners": {
-      "XAI0d0b1222735fa6069136584e1a7a3eefebb79d9a": 3.2
-    },
-    "total_distributed": 3.2,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "00fe6d0b20558783b58beed23aa6559a333c17650b3b66d8bef1a54dc7ce306f",
-    "timestamp": 1762754662.0440786,
-    "winners": {
-      "XAIe7039905ce0882378621a3a0e40b544ba1a3afc9": 2.12
-    },
-    "total_distributed": 2.12,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "0069403d4a93b18dbdfc76ba8ef706f16f7f12376b1a751e51d52f6d46623e1a",
-    "timestamp": 1762754823.184937,
-    "winners": {
-      "XAIf7217b54f1e892ef89aef8bb978867a9f2508fa1": 9.96
-    },
-    "total_distributed": 9.96,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "00447107dc6675982c51cff2d8e5a61b31e559ebd7cec14b6f1db5c2a4006e18",
-    "timestamp": 1762755057.9024296,
-    "winners": {
-      "XAIcb827598ee1f19ea506d308de3b1681f1aa0f743": 8.29
-    },
-    "total_distributed": 8.29,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "00684d1a5fd9e9d3aa40a1fdd158503656109280655fdef849be0fa83da57294",
-    "timestamp": 1762755437.128882,
-    "winners": {
-      "XAI1ee200d0d131a8cc1c5f386016d976dfd04f2b57": 5.77
-    },
-    "total_distributed": 5.77,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "004d83ddbbbe8d916aeec4bd5bb9da454fbf91d9635b0602602398dd90c1767c",
-    "timestamp": 1762755591.2075324,
-    "winners": {
-      "XAI2d427c281b74a770e6ba7b4e2bd4353f6d8218d0": 4.67
-    },
-    "total_distributed": 4.67,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "0033486492a54d2b03a0df5cfe0d720b5c589a7ed1fafe751d09a4eca799d81e",
-    "timestamp": 1762755740.068831,
-    "winners": {
-      "XAI2bb12eaa0ea5b5e1cd594b6f4a1c7d903f215c12": 1.18
-    },
-    "total_distributed": 1.18,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "00854af1471d193bb0f564f815ee52ead2f1effdc9901511e29e364161e0efa5",
-    "timestamp": 1762755939.3553746,
-    "winners": {
-      "XAI43f2e3a104a844dcea3390835d43a8565e5484c9": 5.71
-    },
-    "total_distributed": 5.71,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "00ac4df771ed112d15eb0bf35418331d8c833b4887eea1c0e1f1125993c67e4e",
-    "timestamp": 1762756153.85313,
-    "winners": {
-      "XAI96c1e1585fa86f2439d87e671af90566e11c7073": 3.73
-    },
-    "total_distributed": 3.73,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "00ebbcbbd8b3d2b407dc63fef35785a09082eb709205b94f024b6b7a89a01d93",
-    "timestamp": 1762756418.351622,
-    "winners": {
-      "XAId238c3ffd2e54681e8956007b1ab0f160492c979": 4.23
-    },
-    "total_distributed": 4.23,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "00bce3f2af39f1b1df2edd603055de9594b7c2f2db3483b6bbce5b5c0f7c3f93",
-    "timestamp": 1762756610.9710257,
-    "winners": {
-      "XAIa7c52d70fa0f4a0ae90eef926a9a56d658442456": 9.25
-    },
-    "total_distributed": 9.25,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "001c9a84c1621b57c604ec4a54e412a87bc7291b68d78673c6bbaa30e02dfff5",
-    "timestamp": 1762800965.7304928,
-    "winners": {
-      "XAI2a7000e022bfaedd5c95070225cd66ee9ae13122": 9.08
-    },
-    "total_distributed": 9.08,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "001ae31db248d4d3a3336fa975e9c49bd70dbb05acd0cddb334acb9a389839de",
-    "timestamp": 1762801538.0700576,
-    "winners": {
-      "XAIa78485fe885468693de90dce20713112ee57e7bb": 2.29
-    },
-    "total_distributed": 2.29,
-    "winner_count": 1
-  },
-  {
-    "block_height": 100,
-    "block_hash": "0039ea501d085c911b91e9b3a7d76e3f9746f9b3b72e0d4ee0a59cdd2c86910d",
-    "timestamp": 1762801659.8376923,
-    "winners": {
-      "XAId23e40aa410865845332a7b9e0e4d3261f719bb6": 5.47
-    },
-    "total_distributed": 5.47,
-    "winner_count": 1
+    "total_distributed": 48.8,
+    "winner_count": 10
   }
 ]

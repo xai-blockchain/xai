@@ -14,10 +14,10 @@ import time
 import unittest
 from typing import List, Dict, Tuple
 
-from core.blockchain import Blockchain, Transaction, Block
-from core.wallet import Wallet
-from core.blockchain_security import BlockchainSecurityManager, BlockchainSecurityConfig
-from core.advanced_consensus import AdvancedConsensusManager
+from aixn.core.blockchain import Blockchain, Transaction, Block
+from aixn.core.wallet import Wallet
+from aixn.core.blockchain_security import BlockchainSecurityManager, BlockchainSecurityConfig
+from aixn.core.advanced_consensus import AdvancedConsensusManager
 
 
 class FrameworkResult:

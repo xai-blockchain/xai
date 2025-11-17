@@ -2,10 +2,10 @@ import json
 
 import pytest
 
-from core import api_extensions
-from core.api_extensions import extend_node_api
-from core.node import BlockchainNode
-from ai_assistant.personal_ai_assistant import PersonalAIAssistant
+from aixn.core import api_extensions
+from aixn.core.api_extensions import extend_node_api
+from aixn.core.node import BlockchainNode
+from aixn.ai.ai_assistant.personal_ai_assistant import PersonalAIAssistant
 
 VALID_TEST_ADDRESS = "XAI1integration" + "0" * 25
 VALID_RECIPIENT_ADDRESS = "XAI1recipient" + "0" * 27

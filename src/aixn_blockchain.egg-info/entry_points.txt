@@ -1,0 +1,4 @@
+[console_scripts]
+aixn = aixn.cli.main:main
+aixn-node = aixn.core.node:main
+aixn-wallet = aixn.wallet.cli:main

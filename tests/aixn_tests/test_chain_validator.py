@@ -11,7 +11,7 @@ import json
 import hashlib
 import time
 
-from core.chain_validator import (
+from aixn.core.chain_validator import (
     ChainValidator,
     ValidationReport,
     ValidationIssue,
