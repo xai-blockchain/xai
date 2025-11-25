@@ -95,7 +95,7 @@ pydantic-core==2.41.5
     # via pydantic
 python-dateutil==2.8.2
     # via -r src/xai/requirements.in
-python-dotenv==1.0.1
+python-dotenv==1.2.1
     # via -r src/xai/requirements.in
 python-json-logger==4.0.0
     # via -r src/xai/requirements.in
