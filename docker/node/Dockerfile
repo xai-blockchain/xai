@@ -1,4 +1,4 @@
-# AIXN Blockchain Node - Node-Specific Dockerfile
+# XAI Blockchain Node - Node-Specific Dockerfile
 # Optimized for standalone node deployment
 
 # ============================================================================
@@ -21,11 +21,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy and install Python dependencies
 COPY requirements.txt ./
-COPY src/aixn/requirements.txt ./aixn-requirements.txt
+COPY src/xai/requirements.txt src/xai/requirements.txt
 
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir -r aixn-requirements.txt
+    pip install --no-cache-dir -r requirements.txt
 
 # ============================================================================
 # Stage 2: Runtime
@@ -33,21 +32,21 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 FROM python:3.11-slim
 
 # Metadata
-LABEL maintainer="AIXN Blockchain Team"
-LABEL description="AIXN Blockchain Node - Standalone Deployment"
+LABEL maintainer="XAI Blockchain Team"
+LABEL description="XAI Blockchain Node - Standalone Deployment"
 LABEL version="1.0.0"
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/app \
-    AIXN_ENV=production \
-    AIXN_DATA_DIR=/data \
-    AIXN_LOG_DIR=/logs \
-    AIXN_CONFIG_DIR=/config \
-    AIXN_NODE_PORT=8333 \
-    AIXN_API_PORT=8080 \
-    AIXN_METRICS_PORT=9090
+    PYTHONPATH=/app/src \
+    XAI_ENV=production \
+    XAI_DATA_DIR=/data \
+    XAI_LOG_DIR=/logs \
+    XAI_CONFIG_DIR=/config \
+    XAI_NODE_PORT=8333 \
+    XAI_API_PORT=8080 \
+    XAI_METRICS_PORT=9090
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -58,8 +57,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN groupadd -r aixn -g 1000 && \
-    useradd -r -u 1000 -g aixn -m -d /home/aixn -s /bin/bash aixn
+RUN groupadd -r xai -g 1000 && \
+    useradd -r -u 1000 -g xai -m -d /home/xai -s /bin/bash xai
 
 # Create application directories
 RUN mkdir -p \
@@ -69,7 +68,7 @@ RUN mkdir -p \
     /data/state \
     /logs/node \
     /config && \
-    chown -R aixn:aixn /app /data /logs /config
+    chown -R xai:xai /app /data /logs /config
 
 WORKDIR /app
 
@@ -78,22 +77,22 @@ COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
-COPY --chown=aixn:aixn src/ ./src/
-COPY --chown=aixn:aixn config/ /config/
+COPY --chown=xai:xai src/ ./src/
+COPY --chown=xai:xai config/ /config/
 
 # Copy node-specific scripts
-COPY --chown=aixn:aixn scripts/aixn_scripts/ ./scripts/
-COPY --chown=aixn:aixn docker/node/entrypoint.sh /entrypoint.sh
+COPY --chown=xai:xai scripts/aixn_scripts/ ./scripts/
+COPY --chown=xai:xai docker/node/entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh && \
-    chown aixn:aixn /entrypoint.sh
+    chown xai:xai /entrypoint.sh
 
 # Switch to non-root user
-USER aixn
+USER xai
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
-    CMD curl -f http://localhost:${AIXN_API_PORT}/health || exit 1
+    CMD curl -f http://localhost:${XAI_API_PORT}/health || exit 1
 
 # Expose ports
 EXPOSE 8333 8080 9090

@@ -5,7 +5,7 @@ Generates wallet addresses and sets up custody infrastructure
 
 import sys
 import os
-from src.aixn.core.hot_cold_wallet_manager import HotColdWalletManager
+from src.xai.core.hot_cold_wallet_manager import HotColdWalletManager
 import hashlib
 import time
 

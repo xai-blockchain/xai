@@ -1,0 +1,5 @@
+ERROR: usage: pytest [options] [file_or_dir] [file_or_dir] [...]
+pytest: error: unrecognized arguments: -n 4
+  inifile: C:\Users\decri\GitClones\Crypto\pytest.ini
+  rootdir: C:\Users\decri\GitClones\Crypto
+

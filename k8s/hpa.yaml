@@ -1,0 +1,268 @@
+---
+# Horizontal Pod Autoscaler for XAI Blockchain Nodes
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: xai-blockchain-hpa
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    component: autoscaling
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: xai-blockchain-node
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    # CPU-based scaling
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    # Memory-based scaling
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 75
+    # Custom metric: number of connected peers
+    - type: Pods
+      pods:
+        metric:
+          name: blockchain_connected_peers
+        target:
+          type: AverageValue
+          averageValue: "45"  # Scale up if avg peers < 45
+    # Custom metric: block sync lag
+    - type: Pods
+      pods:
+        metric:
+          name: blockchain_block_sync_lag
+        target:
+          type: AverageValue
+          averageValue: "10"  # Scale up if avg lag > 10 blocks
+    # Custom metric: transaction pool size
+    - type: Pods
+      pods:
+        metric:
+          name: blockchain_tx_pool_size
+        target:
+          type: AverageValue
+          averageValue: "500"  # Scale up if avg pool > 500 txs
+
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 50  # Scale up by 50% max
+          periodSeconds: 60
+        - type: Pods
+          value: 2   # Or add 2 pods max
+          periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50  # Scale down by 50% max
+          periodSeconds: 120
+        - type: Pods
+          value: 1   # Or remove 1 pod max
+          periodSeconds: 120
+      selectPolicy: Min
+
+---
+# ServiceMonitor for Prometheus metrics collection
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: xai-blockchain-monitor
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: xai-blockchain
+      component: node
+  endpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      path: /metrics
+      scheme: http
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_pod_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_label_app]
+          targetLabel: app
+        - sourceLabels: [__meta_kubernetes_pod_ordinal]
+          targetLabel: replica
+
+---
+# PrometheusRule for alerting
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: xai-blockchain-alerts
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    component: alerting
+spec:
+  groups:
+    - name: xai-blockchain.rules
+      interval: 30s
+      rules:
+        # Node availability alerts
+        - alert: XAIBlockchainNodeDown
+          expr: up{job="xai-blockchain"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: blockchain-node
+          annotations:
+            summary: "XAI Blockchain node is down: {{ $labels.pod }}"
+            description: "Node {{ $labels.pod }} in namespace {{ $labels.namespace }} has been down for more than 2 minutes"
+
+        # Memory usage alerts
+        - alert: XAIBlockchainMemoryUsageHigh
+          expr: |
+            (container_memory_usage_bytes{pod=~"xai-blockchain-node-.*"} /
+             container_spec_memory_limit_bytes{pod=~"xai-blockchain-node-.*"}) > 0.9
+          for: 5m
+          labels:
+            severity: warning
+            component: blockchain-node
+          annotations:
+            summary: "High memory usage on XAI node: {{ $labels.pod }}"
+            description: "Memory usage is above 90% on {{ $labels.pod }}"
+
+        # CPU usage alerts
+        - alert: XAIBlockchainCPUUsageHigh
+          expr: |
+            rate(container_cpu_usage_seconds_total{pod=~"xai-blockchain-node-.*"}[5m]) > 0.9
+          for: 5m
+          labels:
+            severity: warning
+            component: blockchain-node
+          annotations:
+            summary: "High CPU usage on XAI node: {{ $labels.pod }}"
+            description: "CPU usage is above 90% on {{ $labels.pod }}"
+
+        # Disk usage alerts
+        - alert: XAIBlockchainDiskUsageHigh
+          expr: |
+            (kubelet_volume_stats_used_bytes{persistentvolumeclaim=~"xai-blockchain-.*"} /
+             kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~"xai-blockchain-.*"}) > 0.85
+          for: 5m
+          labels:
+            severity: warning
+            component: blockchain-storage
+          annotations:
+            summary: "High disk usage on XAI blockchain storage: {{ $labels.persistentvolumeclaim }}"
+            description: "Disk usage is above 85%"
+
+        # Blockchain sync alerts
+        - alert: XAIBlockchainSyncLagHigh
+          expr: blockchain_block_sync_lag > 50
+          for: 10m
+          labels:
+            severity: warning
+            component: blockchain-sync
+          annotations:
+            summary: "XAI blockchain sync lag is high: {{ $labels.pod }}"
+            description: "Node {{ $labels.pod }} is {{ $value }} blocks behind the chain tip"
+
+        # Low peer count alert
+        - alert: XAIBlockchainLowPeerCount
+          expr: blockchain_connected_peers < 2
+          for: 5m
+          labels:
+            severity: critical
+            component: blockchain-p2p
+          annotations:
+            summary: "XAI blockchain node has low peer count: {{ $labels.pod }}"
+            description: "Node {{ $labels.pod }} has only {{ $value }} connected peers (minimum 2 required)"
+
+        # Transaction pool stuck alert
+        - alert: XAIBlockchainTxPoolStuck
+          expr: |
+            rate(blockchain_tx_processed_total[5m]) < 0.1 and blockchain_tx_pool_size > 100
+          for: 10m
+          labels:
+            severity: warning
+            component: blockchain-mempool
+          annotations:
+            summary: "XAI blockchain transaction pool may be stuck: {{ $labels.pod }}"
+            description: "Low transaction processing rate with {{ $value }} transactions pending"
+
+        # Network partition alert
+        - alert: XAIBlockchainNetworkPartition
+          expr: count(up{job="xai-blockchain"} == 1) < 2
+          for: 5m
+          labels:
+            severity: critical
+            component: blockchain-network
+          annotations:
+            summary: "Possible network partition in XAI blockchain cluster"
+            description: "Less than 2 nodes are healthy - possible cluster split"
+
+        # PVC almost full alert
+        - alert: XAIBlockchainPVCAlmostFull
+          expr: |
+            (kubelet_volume_stats_used_bytes{persistentvolumeclaim=~"xai-blockchain-.*"} /
+             kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~"xai-blockchain-.*"}) > 0.95
+          for: 5m
+          labels:
+            severity: critical
+            component: blockchain-storage
+          annotations:
+            summary: "XAI blockchain PVC almost full: {{ $labels.persistentvolumeclaim }}"
+            description: "Storage is 95% full - immediate action required"
+
+        # Mining difficulty alert (if difficulty becomes too high)
+        - alert: XAIBlockchainMiningDifficultyHigh
+          expr: blockchain_mining_difficulty > 1000000
+          for: 30m
+          labels:
+            severity: info
+            component: blockchain-mining
+          annotations:
+            summary: "XAI blockchain mining difficulty is high: {{ $value }}"
+            description: "Mining difficulty has increased to {{ $value }}"
+
+---
+# Prometheus recording rules for performance optimization
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: xai-blockchain-recording-rules
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    component: metrics
+spec:
+  groups:
+    - name: xai-blockchain.recording-rules
+      interval: 30s
+      rules:
+        - record: blockchain:node:cpu:5m
+          expr: rate(container_cpu_usage_seconds_total{pod=~"xai-blockchain-node-.*"}[5m])
+        - record: blockchain:node:memory:5m
+          expr: avg_over_time(container_memory_usage_bytes{pod=~"xai-blockchain-node-.*"}[5m])
+        - record: blockchain:tx:rate:5m
+          expr: rate(blockchain_tx_processed_total[5m])
+        - record: blockchain:block:rate:5m
+          expr: rate(blockchain_blocks_mined_total[5m])
+        - record: blockchain:peers:avg:5m
+          expr: avg(blockchain_connected_peers)

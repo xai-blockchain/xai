@@ -1,0 +1,4 @@
+[console_scripts]
+xai = xai.cli.main:main
+xai-node = xai.core.node:main
+xai-wallet = xai.wallet.cli:main

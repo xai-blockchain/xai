@@ -57,7 +57,7 @@ Copy and paste these badges into your main README.md file. Replace `USERNAME` an
 ## Inline Badges (Simpler)
 
 ```markdown
-# AIXN Blockchain
+# XAI Blockchain
 
 ![Code Quality](https://github.com/USERNAME/REPO/actions/workflows/quality.yml/badge.svg)
 ![Security Scan](https://github.com/USERNAME/REPO/actions/workflows/security.yml/badge.svg)
@@ -234,7 +234,7 @@ Copy and paste these badges into your main README.md file. Replace `USERNAME` an
 [![Smart Contracts](https://img.shields.io/badge/smart%20contracts-enabled-brightgreen.svg)](https://github.com/USERNAME/REPO)
 
 <!-- Cryptocurrency -->
-[![Cryptocurrency](https://img.shields.io/badge/cryptocurrency-AIXN-gold.svg)](https://github.com/USERNAME/REPO)
+[![Cryptocurrency](https://img.shields.io/badge/cryptocurrency-XAI-gold.svg)](https://github.com/USERNAME/REPO)
 ```
 
 ### Community & Social
@@ -262,7 +262,7 @@ You can create custom badges using [shields.io](https://shields.io/):
 ![Custom](https://img.shields.io/badge/label-message-color)
 
 <!-- Examples -->
-![Blockchain](https://img.shields.io/badge/Blockchain-AIXN-blue)
+![Blockchain](https://img.shields.io/badge/Blockchain-XAI-blue)
 ![AI Powered](https://img.shields.io/badge/AI-Powered-brightgreen)
 ![Status](https://img.shields.io/badge/Status-Production-success)
 ```
@@ -272,7 +272,7 @@ You can create custom badges using [shields.io](https://shields.io/):
 ```markdown
 <div align="center">
 
-# AIXN Blockchain
+# XAI Blockchain
 
 ![Code Quality](https://github.com/USERNAME/REPO/actions/workflows/quality.yml/badge.svg)
 ![Security Scan](https://github.com/USERNAME/REPO/actions/workflows/security.yml/badge.svg)
@@ -375,9 +375,9 @@ Common colors for shields.io badges:
 ```markdown
 <div align="center">
 
-<img src="docs/images/logo.png" alt="AIXN Logo" width="200"/>
+<img src="docs/images/logo.png" alt="XAI Logo" width="200"/>
 
-# AIXN Blockchain
+# XAI Blockchain
 
 **AI-Powered Decentralized Blockchain Platform**
 

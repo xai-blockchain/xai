@@ -1,0 +1,129 @@
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: None
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+[main]	INFO	running on Python 3.13.6
+[warnings]	WARNING	invalid escape sequence '\s'
+
+[warnings]	WARNING	invalid escape sequence '\.'
+
+[warnings]	WARNING	invalid escape sequence '\s'
+
+Working... ---------------------------------------- 100% 0:00:11
+Run started:2025-11-20 17:16:02.650413
+
+Test results:
+>> Issue: [B104:hardcoded_bind_all_interfaces] Possible binding to all interfaces.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-605 (https://cwe.mitre.org/data/definitions/605.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.10/plugins/b104_hardcoded_bind_all_interfaces.html
+   Location: src/xai\block_explorer.py:375:17
+374	    debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"
+375	    app.run(host="0.0.0.0", port=8080, debug=debug_mode)
+
+--------------------------------------------------
+>> Issue: [B104:hardcoded_bind_all_interfaces] Possible binding to all interfaces.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-605 (https://cwe.mitre.org/data/definitions/605.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.10/plugins/b104_hardcoded_bind_all_interfaces.html
+   Location: src/xai\config_manager.py:47:16
+46	    port: int = 8545
+47	    host: str = "0.0.0.0"
+48	    rpc_port: int = 8546
+
+--------------------------------------------------
+>> Issue: [B108:hardcoded_tmp_directory] Probable insecure usage of temp file/directory.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-377 (https://cwe.mitre.org/data/definitions/377.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.10/plugins/b108_hardcoded_tmp_directory.html
+   Location: src/xai\core\logging_config.py:343:17
+342	        name="xai.test",
+343	        log_file="/tmp/xai-test.json",
+344	        level="INFO",
+
+--------------------------------------------------
+>> Issue: [B108:hardcoded_tmp_directory] Probable insecure usage of temp file/directory.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-377 (https://cwe.mitre.org/data/definitions/377.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.10/plugins/b108_hardcoded_tmp_directory.html
+   Location: src/xai\core\logging_config.py:356:49
+355	    # Example 3: Get logger for module
+356	    api_logger = get_logger("xai.api", log_file="/tmp/api.json")
+357	    api_logger.info("API request", endpoint="/blocks", method="GET", status=200)
+
+--------------------------------------------------
+>> Issue: [B108:hardcoded_tmp_directory] Probable insecure usage of temp file/directory.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-377 (https://cwe.mitre.org/data/definitions/377.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.10/plugins/b108_hardcoded_tmp_directory.html
+   Location: src/xai\core\metrics.py:819:17
+818	        node_id="test-node-001",
+819	        log_file="/tmp/xai-metrics.json",
+820	    )
+
+--------------------------------------------------
+>> Issue: [B104:hardcoded_bind_all_interfaces] Possible binding to all interfaces.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-605 (https://cwe.mitre.org/data/definitions/605.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.10/plugins/b104_hardcoded_bind_all_interfaces.html
+   Location: src/xai\core\node_utils.py:16:20
+15	NODE_VERSION: str = "2.0.0"
+16	DEFAULT_HOST: str = "0.0.0.0"
+17	DEFAULT_PORT: int = 8545
+
+--------------------------------------------------
+>> Issue: [B102:exec_used] Use of exec detected.
+   Severity: Medium   Confidence: High
+   CWE: CWE-78 (https://cwe.mitre.org/data/definitions/78.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.10/plugins/b102_exec_used.html
+   Location: src/xai\electron\node_modules\dmg-builder\vendor\dmgbuild\core.py:266:4
+265	    f =  "icon_locations = {\n" + os.environ['iconLocations'] + "\n}"
+266	    exec (f, options, options)
+267	
+
+--------------------------------------------------
+>> Issue: [B104:hardcoded_bind_all_interfaces] Possible binding to all interfaces.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-605 (https://cwe.mitre.org/data/definitions/605.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.10/plugins/b104_hardcoded_bind_all_interfaces.html
+   Location: src/xai\explorer.py:256:17
+255	    debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"
+256	    app.run(host="0.0.0.0", port=port, debug=debug_mode)
+
+--------------------------------------------------
+>> Issue: [B104:hardcoded_bind_all_interfaces] Possible binding to all interfaces.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-605 (https://cwe.mitre.org/data/definitions/605.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.10/plugins/b104_hardcoded_bind_all_interfaces.html
+   Location: src/xai\explorer_backend.py:1064:17
+1063	
+1064	    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
+
+--------------------------------------------------
+>> Issue: [B104:hardcoded_bind_all_interfaces] Possible binding to all interfaces.
+   Severity: Medium   Confidence: Medium
+   CWE: CWE-605 (https://cwe.mitre.org/data/definitions/605.html)
+   More Info: https://bandit.readthedocs.io/en/1.7.10/plugins/b104_hardcoded_bind_all_interfaces.html
+   Location: src/xai\integrate_ai_systems.py:96:45
+95	        # Use environment variables for network configuration
+96	        host = host or os.getenv("XAI_HOST", "0.0.0.0")
+97	        port = port or int(os.getenv("XAI_PORT", "8545"))
+
+--------------------------------------------------
+
+Code scanned:
+	Total lines of code: 54372
+	Total lines skipped (#nosec): 0
+
+Run metrics:
+	Total issues (by severity):
+		Undefined: 0
+		Low: 90
+		Medium: 10
+		High: 0
+	Total issues (by confidence):
+		Undefined: 0
+		Low: 0
+		Medium: 31
+		High: 69
+Files skipped (0):

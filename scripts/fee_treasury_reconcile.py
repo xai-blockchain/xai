@@ -11,7 +11,7 @@ import sys
 
 SCRIPT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, SCRIPT_ROOT)
-sys.path.insert(0, os.path.join(SCRIPT_ROOT, "aixn"))
+sys.path.insert(0, os.path.join(SCRIPT_ROOT, "xai"))
 
 from core.blockchain import Blockchain
 from config import Config

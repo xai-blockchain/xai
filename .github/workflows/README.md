@@ -1,6 +1,6 @@
 # GitHub Actions CI/CD Workflows
 
-This directory contains comprehensive CI/CD pipelines for the AIXN Blockchain project.
+This directory contains comprehensive CI/CD pipelines for the XAI Blockchain project.
 
 ## Workflow Files
 
@@ -128,7 +128,7 @@ The workflows require these permissions (configured in each workflow):
 Add these to your main README.md:
 
 ```markdown
-# AIXN Blockchain
+# XAI Blockchain
 
 ![Code Quality](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/quality.yml/badge.svg)
 ![Security Scan](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/security.yml/badge.svg)
@@ -154,8 +154,8 @@ Before pushing, you can test locally using:
 ```bash
 # Code quality
 black --check src/ tests/ scripts/
-pylint src/aixn/core/
-mypy src/aixn/core/
+pylint src/xai/core/
+mypy src/xai/core/
 
 # Security
 bandit -r src/
@@ -163,10 +163,10 @@ safety check
 semgrep --config=auto src/
 
 # Tests
-pytest tests/aixn_tests/unit/ -v --cov=src/aixn/core
-pytest tests/aixn_tests/integration/ -v
-pytest tests/aixn_tests/performance/ --benchmark-only
-pytest tests/aixn_tests/security/ -v
+pytest tests/xai_tests/unit/ -v --cov=src/xai/core
+pytest tests/xai_tests/integration/ -v
+pytest tests/xai_tests/performance/ --benchmark-only
+pytest tests/xai_tests/security/ -v
 ```
 
 ### Pre-commit Hooks

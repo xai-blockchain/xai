@@ -1,6 +1,7 @@
 """
 Test configuration and fixtures
 """
+
 import sys
 import os
 from pathlib import Path

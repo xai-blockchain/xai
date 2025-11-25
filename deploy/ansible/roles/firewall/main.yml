@@ -1,0 +1,142 @@
+---
+# ============================================================================
+# Firewall Configuration Role
+# ============================================================================
+
+- name: Enable UFW
+  ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+  when: firewall_enabled | default(true)
+
+- name: Configure UFW default policies
+  ufw:
+    direction: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - { direction: 'incoming', policy: 'deny' }
+    - { direction: 'outgoing', policy: 'allow' }
+    - { direction: 'routed', policy: 'allow' }
+  when: firewall_enabled | default(true)
+
+- name: Allow SSH access
+  ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+    comment: "SSH access"
+  when: firewall_enabled | default(true)
+
+- name: Allow blockchain node P2P port
+  ufw:
+    rule: allow
+    port: "{{ blockchain_node_port }}"
+    proto: tcp
+    comment: "Blockchain P2P"
+  when: firewall_enabled | default(true)
+
+- name: Allow blockchain API port (restricted)
+  ufw:
+    rule: allow
+    port: "{{ blockchain_api_port }}"
+    from_ip: "{{ item }}"
+    proto: tcp
+    comment: "Blockchain API"
+  loop: "{{ api_allowed_ips | default(['10.0.0.0/8']) }}"
+  when: firewall_enabled | default(true)
+
+- name: Allow WebSocket port (restricted)
+  ufw:
+    rule: allow
+    port: "{{ blockchain_ws_port }}"
+    from_ip: "{{ item }}"
+    proto: tcp
+    comment: "Blockchain WebSocket"
+  loop: "{{ api_allowed_ips | default(['10.0.0.0/8']) }}"
+  when: firewall_enabled | default(true)
+
+- name: Allow metrics port (restricted)
+  ufw:
+    rule: allow
+    port: "{{ blockchain_metrics_port }}"
+    from_ip: "10.0.0.0/8"
+    proto: tcp
+    comment: "Metrics"
+  when: firewall_enabled | default(true) and monitoring_enabled | default(true)
+
+- name: Allow HTTP (load balancer)
+  ufw:
+    rule: allow
+    port: "80"
+    proto: tcp
+    comment: "HTTP"
+  when: firewall_enabled | default(true) and "'load-balancers' in group_names"
+
+- name: Allow HTTPS (load balancer)
+  ufw:
+    rule: allow
+    port: "443"
+    proto: tcp
+    comment: "HTTPS"
+  when: firewall_enabled | default(true) and "'load-balancers' in group_names"
+
+- name: Allow Prometheus port (monitoring only)
+  ufw:
+    rule: allow
+    port: "9090"
+    from_ip: "10.0.0.0/8"
+    proto: tcp
+    comment: "Prometheus"
+  when: firewall_enabled | default(true) and "'monitoring-servers' in group_names"
+
+- name: Allow Grafana port (monitoring only)
+  ufw:
+    rule: allow
+    port: "3000"
+    from_ip: "10.0.0.0/8"
+    proto: tcp
+    comment: "Grafana"
+  when: firewall_enabled | default(true) and "'monitoring-servers' in group_names"
+
+- name: Configure UFW logging
+  ufw:
+    logging: "on"
+    log_level: low
+  when: firewall_enabled | default(true)
+
+- name: Install and configure fail2ban
+  block:
+    - name: Install fail2ban
+      package:
+        name: fail2ban
+        state: present
+    
+    - name: Create fail2ban local configuration
+      template:
+        src: jail.local.j2
+        dest: /etc/fail2ban/jail.local
+        owner: root
+        group: root
+        mode: "0644"
+      notify: restart fail2ban
+    
+    - name: Enable and start fail2ban
+      systemd:
+        name: fail2ban
+        enabled: yes
+        state: started
+  when: firewall_enabled | default(true)
+
+- name: Display firewall configuration
+  debug:
+    msg: |
+      Firewall Configuration
+      - UFW Enabled: {{ firewall_enabled | default(false) }}
+      - Default Incoming Policy: DENY
+      - SSH Port: 22
+      - P2P Port: {{ blockchain_node_port }}
+      - API Port: {{ blockchain_api_port }} (restricted)
+      - WebSocket Port: {{ blockchain_ws_port }} (restricted)
+      - Metrics Port: {{ blockchain_metrics_port }} (restricted)
+      - Fail2Ban: Enabled

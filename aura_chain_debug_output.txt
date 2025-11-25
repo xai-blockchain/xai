@@ -1,0 +1,901 @@
+=== Aura/Paw Go Test Debugger ===
+
+Project: chain
+
+1. Searching for init() functions that might panic...
+
+2. Checking for import cycles...
+  No import cycles detected
+
+3. Verifying module integrity...
+all modules verified
+
+4. Checking for broken dependencies...
+go: downloading gotest.tools/v3 v3.5.2
+go: downloading github.com/linxGnu/grocksdb v1.8.14
+go: downloading go.uber.org/mock v0.5.2
+go: downloading github.com/google/gofuzz v1.2.0
+go: downloading github.com/frankban/quicktest v1.14.6
+go: downloading github.com/pascaldekloe/goe v0.1.0
+go: downloading github.com/magiconair/properties v1.8.10
+go: downloading go.yaml.in/yaml/v3 v3.0.3
+go: downloading github.com/onsi/ginkgo v1.16.5
+go: downloading github.com/onsi/gomega v1.26.0
+go: downloading github.com/cockroachdb/datadriven v1.0.3-0.20230413201302-be42291fc80f
+go: downloading pgregory.net/rapid v1.2.0
+go: downloading github.com/fortytw2/leaktest v1.3.0
+go: downloading github.com/cheekybits/is v0.0.0-20150225183255-68e9c0620927
+go: downloading github.com/btcsuite/btcd/btcutil v1.1.6
+go: downloading github.com/prometheus/procfs v0.15.1
+go: downloading gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
+go: downloading go.opentelemetry.io/otel v1.34.0
+go: downloading go.opentelemetry.io/otel/sdk/metric v1.34.0
+go: downloading github.com/golang/mock v1.6.0
+go: downloading github.com/decred/dcrd/crypto/blake256 v1.1.0
+go: downloading github.com/hashicorp/go-uuid v1.0.1
+go: downloading go.opentelemetry.io/otel/sdk v1.34.0
+go: downloading github.com/DataDog/zstd v1.5.7
+go: downloading github.com/sasha-s/go-deadlock v0.3.5
+go: downloading github.com/go-errors/errors v1.4.2
+go: downloading github.com/pingcap/errors v0.11.4
+go: downloading go.uber.org/goleak v1.3.0
+go: downloading github.com/stretchr/objx v0.5.2
+go: downloading github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4
+go: downloading github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2
+go: downloading github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c
+go: downloading github.com/cosmos/ledger-cosmos-go v0.14.0
+go: downloading github.com/jhump/protoreflect v1.17.0
+go: downloading github.com/huandu/go-assert v1.1.5
+go: downloading go.uber.org/multierr v1.10.0
+go: downloading go.opentelemetry.io/otel/metric v1.34.0
+go: downloading go.opentelemetry.io/otel/trace v1.34.0
+go: downloading github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f
+go: downloading github.com/jmhodges/levigo v1.0.0
+go: downloading github.com/dgraph-io/badger/v4 v4.2.0
+go: downloading go.etcd.io/bbolt v1.4.0-alpha.0.0.20240404170359-43604f3112c5
+go: downloading github.com/VividCortex/gohistogram v1.0.0
+go: downloading github.com/petermattis/goid v0.0.0-20240813172612-4fcff4a6cae7
+go: downloading github.com/manifoldco/promptui v0.9.0
+go: downloading github.com/kylelemons/godebug v1.1.0
+go: downloading github.com/zondax/ledger-go v0.14.3
+go: downloading github.com/btcsuite/btcd/btcec/v2 v2.3.2
+go: downloading github.com/gin-gonic/gin v1.6.3
+go: downloading github.com/gobwas/ws v1.0.2
+go: downloading github.com/adlio/schema v1.3.6
+go: downloading github.com/ory/dockertest v3.3.5+incompatible
+go: downloading github.com/bits-and-blooms/bitset v1.22.0
+go: downloading github.com/nxadm/tail v1.4.11
+go: downloading github.com/chzyer/readline v1.5.1
+go: downloading github.com/zondax/hid v0.9.2
+go: downloading github.com/go-logr/logr v1.4.2
+go: downloading github.com/go-logr/stdr v1.2.2
+go: downloading go.opentelemetry.io/auto/sdk v1.1.0
+go: downloading github.com/google/uuid v1.6.0
+go: downloading github.com/gobwas/httphead v0.0.0-20180130184737-2c6c146eadee
+go: downloading github.com/gobwas/pool v0.2.0
+go: downloading gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
+go: downloading github.com/cockroachdb/apd/v2 v2.0.2
+go: downloading github.com/bufbuild/protocompile v0.14.1
+go: downloading github.com/gin-contrib/sse v0.1.0
+go: downloading github.com/go-playground/validator/v10 v10.2.0
+go: downloading github.com/ugorji/go/codec v1.1.7
+go: downloading gopkg.in/yaml.v2 v2.4.0
+go: downloading github.com/json-iterator/go v1.1.12
+go: downloading github.com/cenkalti/backoff v2.2.1+incompatible
+go: downloading github.com/docker/go-units v0.5.0
+go: downloading github.com/Microsoft/go-winio v0.6.1
+go: downloading github.com/opencontainers/runc v1.1.12
+go: downloading github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5
+go: downloading github.com/sirupsen/logrus v1.9.3
+go: downloading github.com/opencontainers/image-spec v1.1.0-rc2
+go: downloading github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161
+go: downloading github.com/docker/go-connections v0.4.0
+go: downloading github.com/containerd/continuity v0.3.0
+go: downloading github.com/go-playground/universal-translator v0.17.0
+go: downloading github.com/ugorji/go v1.1.7
+go: downloading github.com/leodido/go-urn v1.2.0
+go: downloading github.com/dgraph-io/ristretto v0.1.1
+go: downloading github.com/dustin/go-humanize v1.0.1
+go: downloading go.opencensus.io v0.24.0
+go: downloading github.com/google/flatbuffers v1.12.1
+go: downloading github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
+go: downloading github.com/modern-go/reflect2 v1.0.2
+go: downloading github.com/go-playground/locales v0.13.0
+go: downloading github.com/opencontainers/go-digest v1.0.0
+go: downloading golang.org/x/tools v0.34.0
+go: downloading github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13
+go: downloading github.com/golang/glog v1.2.4
+go: downloading github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
+go: downloading golang.org/x/mod v0.25.0
+
+5. Listing all packages...
+github.com/aequitas/aura/chain/app
+github.com/aequitas/aura/chain/cmd/aurad
+github.com/aequitas/aura/chain/cmd/aurad/cmd
+github.com/aequitas/aura/chain/testing/benchmark
+github.com/aequitas/aura/chain/testing/chaos
+github.com/aequitas/aura/chain/testing/coverage
+github.com/aequitas/aura/chain/testing/e2e
+github.com/aequitas/aura/chain/testing/genesis
+github.com/aequitas/aura/chain/testing/integration
+github.com/aequitas/aura/chain/testing/simulation
+github.com/aequitas/aura/chain/testing/stress
+github.com/aequitas/aura/chain/testing/testutil
+github.com/aequitas/aura/chain/testing/testutil/keeper
+github.com/aequitas/aura/chain/tests/e2e
+github.com/aequitas/aura/chain/tests/integration
+github.com/aequitas/aura/chain/testutil/keeper
+github.com/aequitas/aura/chain/testutil/mocks
+github.com/aequitas/aura/chain/testutil/suite
+github.com/aequitas/aura/chain/x/auth
+github.com/aequitas/aura/chain/x/auth/client/cli
+github.com/aequitas/aura/chain/x/auth/keeper
+github.com/aequitas/aura/chain/x/auth/types
+github.com/aequitas/aura/chain/x/bridge
+github.com/aequitas/aura/chain/x/bridge/client/cli
+github.com/aequitas/aura/chain/x/bridge/keeper
+github.com/aequitas/aura/chain/x/bridge/types
+github.com/aequitas/aura/chain/x/common/security
+github.com/aequitas/aura/chain/x/compliance
+github.com/aequitas/aura/chain/x/compliance/client/cli
+github.com/aequitas/aura/chain/x/compliance/keeper
+github.com/aequitas/aura/chain/x/compliance/types
+github.com/aequitas/aura/chain/x/confidencescore
+github.com/aequitas/aura/chain/x/confidencescore/client/cli
+github.com/aequitas/aura/chain/x/confidencescore/keeper
+github.com/aequitas/aura/chain/x/confidencescore/params
+github.com/aequitas/aura/chain/x/confidencescore/types
+github.com/aequitas/aura/chain/x/cryptography
+github.com/aequitas/aura/chain/x/cryptography/client/cli
+github.com/aequitas/aura/chain/x/cryptography/keeper
+github.com/aequitas/aura/chain/x/cryptography/types
+github.com/aequitas/aura/chain/x/dataregistry
+github.com/aequitas/aura/chain/x/dataregistry/client/cli
+github.com/aequitas/aura/chain/x/dataregistry/ipfs
+github.com/aequitas/aura/chain/x/dataregistry/keeper
+github.com/aequitas/aura/chain/x/dataregistry/params
+github.com/aequitas/aura/chain/x/dataregistry/types
+github.com/aequitas/aura/chain/x/dex
+github.com/aequitas/aura/chain/x/dex/client/cli
+github.com/aequitas/aura/chain/x/dex/keeper
+github.com/aequitas/aura/chain/x/dex/types
+github.com/aequitas/aura/chain/x/economicsecurity
+github.com/aequitas/aura/chain/x/economicsecurity/client/cli
+github.com/aequitas/aura/chain/x/economicsecurity/keeper
+github.com/aequitas/aura/chain/x/economicsecurity/params
+github.com/aequitas/aura/chain/x/economicsecurity/types
+github.com/aequitas/aura/chain/x/governance
+github.com/aequitas/aura/chain/x/governance/client/cli
+github.com/aequitas/aura/chain/x/governance/keeper
+github.com/aequitas/aura/chain/x/governance/types
+github.com/aequitas/aura/chain/x/identitychange
+github.com/aequitas/aura/chain/x/identitychange/client/cli
+github.com/aequitas/aura/chain/x/identitychange/keeper
+github.com/aequitas/aura/chain/x/identitychange/params
+github.com/aequitas/aura/chain/x/identitychange/types
+github.com/aequitas/aura/chain/x/incidentresponse
+github.com/aequitas/aura/chain/x/incidentresponse/client/cli
+github.com/aequitas/aura/chain/x/incidentresponse/keeper
+github.com/aequitas/aura/chain/x/incidentresponse/types
+github.com/aequitas/aura/chain/x/inclusionroutines
+github.com/aequitas/aura/chain/x/inclusionroutines/client/cli
+github.com/aequitas/aura/chain/x/inclusionroutines/keeper
+github.com/aequitas/aura/chain/x/inclusionroutines/params
+github.com/aequitas/aura/chain/x/inclusionroutines/types
+github.com/aequitas/aura/chain/x/monitoring
+github.com/aequitas/aura/chain/x/monitoring/alerting
+github.com/aequitas/aura/chain/x/monitoring/client/cli
+github.com/aequitas/aura/chain/x/monitoring/keeper
+github.com/aequitas/aura/chain/x/monitoring/metrics
+github.com/aequitas/aura/chain/x/monitoring/ml
+github.com/aequitas/aura/chain/x/monitoring/params
+github.com/aequitas/aura/chain/x/monitoring/siem
+github.com/aequitas/aura/chain/x/monitoring/types
+github.com/aequitas/aura/chain/x/networksecurity
+github.com/aequitas/aura/chain/x/networksecurity/client/cli
+github.com/aequitas/aura/chain/x/networksecurity/keeper
+github.com/aequitas/aura/chain/x/networksecurity/types
+github.com/aequitas/aura/chain/x/prevalidation
+github.com/aequitas/aura/chain/x/prevalidation/client/cli
+github.com/aequitas/aura/chain/x/prevalidation/keeper
+github.com/aequitas/aura/chain/x/prevalidation/params
+github.com/aequitas/aura/chain/x/prevalidation/types
+github.com/aequitas/aura/chain/x/privacy
+github.com/aequitas/aura/chain/x/privacy/client/cli
+github.com/aequitas/aura/chain/x/privacy/keeper
+github.com/aequitas/aura/chain/x/privacy/types
+github.com/aequitas/aura/chain/x/validatorsecurity
+github.com/aequitas/aura/chain/x/validatorsecurity/client/cli
+github.com/aequitas/aura/chain/x/validatorsecurity/keeper
+github.com/aequitas/aura/chain/x/validatorsecurity/types
+github.com/aequitas/aura/chain/x/vcregistry
+github.com/aequitas/aura/chain/x/vcregistry/client/cli
+github.com/aequitas/aura/chain/x/vcregistry/keeper
+github.com/aequitas/aura/chain/x/vcregistry/params
+github.com/aequitas/aura/chain/x/vcregistry/types
+github.com/aequitas/aura/chain/x/walletsecurity
+github.com/aequitas/aura/chain/x/walletsecurity/client/cli
+github.com/aequitas/aura/chain/x/walletsecurity/keeper
+github.com/aequitas/aura/chain/x/walletsecurity/types
+
+6. Testing packages individually (to isolate problem)...
+  Testing: github.com/aequitas/aura/chain/app
+net: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/cmd/aurad
+vendor/golang.org/x/crypto/cryptobyte: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+html/template: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+github.com/bytedance/sonic/internal/native/avx2: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+github.com/bytedance/sonic/internal/native/sse: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/cmd/aurad/cmd
+crypto/x509: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+github.com/bytedance/sonic/internal/decoder/optdec: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/testing/benchmark
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/testing/chaos
+net/http: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/testing/coverage
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/testing/e2e
+go/doc: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+github.com/cosmos/gogoproto/types: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+golang.org/x/text/internal/language/compact: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/testing/genesis
+github.com/cometbft/cometbft/proto/tendermint/types: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+google.golang.org/grpc: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/testing/integration
+github.com/syndtr/goleveldb/leveldb/journal: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+github.com/cosmos/iavl/cache: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+github.com/prometheus/client_golang/prometheus: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+github.com/cometbft/cometbft/abci/types: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/testing/simulation
+cosmossdk.io/api/tendermint/abci: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/testing/stress
+github.com/twitchyliquid64/golang-asm/obj/s390x: C:\Program Files\Go\pkg\tool\windows_amd64\vet.exe: exit status 143
+cosmossdk.io/api/cosmos/base/abci/v1beta1: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/testing/testutil
+github.com/cockroachdb/pebble: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/testing/testutil/keeper
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/tests/e2e
+github.com/pelletier/go-toml/v2/internal/tracker: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+github.com/spf13/afero: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/tests/integration
+github.com/cosmos/cosmos-sdk/types/msgservice: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+github.com/klauspost/compress/flate: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/testutil/keeper
+golang.org/x/crypto/sha3: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+database/sql/driver: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+github.com/cosmos/cosmos-sdk/x/authz: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/testutil/mocks
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/testutil/suite
+github.com/aequitas/aura/proto/aura/prevalidation/v1beta1: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/auth
+github.com/aequitas/aura/chain/x/auth: C:\Program Files\Go\pkg\tool\windows_amd64\vet.exe: exit status 143
+FAIL	github.com/aequitas/aura/chain/x/auth [build failed]
+FAIL
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/auth/client/cli
+github.com/aequitas/aura/chain/x/auth/client/cli.test: C:\Program Files\Go\pkg\tool\windows_amd64\link.exe: exit status 143
+FAIL	github.com/aequitas/aura/chain/x/auth/client/cli [build failed]
+FAIL
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/auth/keeper
+=== RUN   TestGetAuditLogs_WithTimeFilters
+--- PASS: TestGetAuditLogs_WithTimeFilters (0.00s)
+=== RUN   TestSearchAuditLogs_UnknownCriteria
+--- PASS: TestSearchAuditLogs_UnknownCriteria (0.00s)
+=== RUN   TestCleanupOldAuditLogs_Deletion
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/auth/types
+=== RUN   TestValidateRole
+=== RUN   TestValidateRole/valid_role
+=== RUN   TestValidateRole/empty_name
+=== RUN   TestValidateRole/no_permissions
+=== RUN   TestValidateRole/nil_permissions
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/bridge
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/bridge/client/cli
+?   	github.com/aequitas/aura/chain/x/bridge/client/cli	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/bridge/keeper
+=== RUN   TestGetParams_WithParamstore
+--- PASS: TestGetParams_WithParamstore (0.00s)
+=== RUN   TestGetParams_WithoutParamstore
+--- PASS: TestGetParams_WithoutParamstore (0.00s)
+=== RUN   TestExecuteWithdrawal_NotFound
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/bridge/types
+=== RUN   TestValidateBool
+=== RUN   TestValidateBool/valid_true
+=== RUN   TestValidateBool/valid_false
+=== RUN   TestValidateBool/invalid_string
+=== RUN   TestValidateBool/invalid_int
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/common/security
+=== RUN   TestReentrancyGuard
+--- PASS: TestReentrancyGuard (0.00s)
+=== RUN   TestPauseGuard
+--- PASS: TestPauseGuard (0.00s)
+=== RUN   TestInputValidator
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/compliance
+=== RUN   TestNewAppModule
+--- PASS: TestNewAppModule (0.00s)
+=== RUN   TestAppModule_Name
+--- PASS: TestAppModule_Name (0.00s)
+=== RUN   TestAppModule_Name_NotEmpty
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/compliance/client/cli
+=== RUN   TestGetQueryCmd
+=== RUN   TestGetQueryCmd/root_command_exists
+=== RUN   TestGetQueryCmd/has_all_subcommands
+--- PASS: TestGetQueryCmd (0.00s)
+    --- PASS: TestGetQueryCmd/root_command_exists (0.00s)
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/compliance/keeper
+=== RUN   TestSetGetKYCRecord
+--- PASS: TestSetGetKYCRecord (0.00s)
+=== RUN   TestGetKYCRecord_NotFound
+--- PASS: TestGetKYCRecord_NotFound (0.00s)
+=== RUN   TestGetAllKYCRecords
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/compliance/types
+=== RUN   TestValidateParams_Valid
+--- PASS: TestValidateParams_Valid (0.00s)
+=== RUN   TestValidateParams_EmptyParams
+--- PASS: TestValidateParams_EmptyParams (0.00s)
+=== RUN   TestValidateParams_PartialParams
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/confidencescore
+=== RUN   TestAppModule_Name
+--- PASS: TestAppModule_Name (0.00s)
+=== RUN   TestAppModule_InitExportGenesis
+--- PASS: TestAppModule_InitExportGenesis (0.00s)
+=== RUN   TestAppModule_BeginBlock
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/confidencescore/client/cli
+?   	github.com/aequitas/aura/chain/x/confidencescore/client/cli	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/confidencescore/keeper
+=== RUN   TestRecordIRCompletion_Success
+--- PASS: TestRecordIRCompletion_Success (0.00s)
+=== RUN   TestRecordIRCompletion_InvalidInputs
+=== RUN   TestRecordIRCompletion_InvalidInputs/empty_wallet_address
+=== RUN   TestRecordIRCompletion_InvalidInputs/empty_IR_ID
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/confidencescore/params
+=== RUN   TestStore_GetParams
+--- PASS: TestStore_GetParams (0.00s)
+=== RUN   TestStore_SetParams
+--- PASS: TestStore_SetParams (0.00s)
+=== RUN   TestStore_SetParams_Invalid
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/confidencescore/types
+=== RUN   TestArenaScoreToProto
+--- PASS: TestArenaScoreToProto (0.00s)
+=== RUN   TestAnchorInfoToProto
+--- PASS: TestAnchorInfoToProto (0.00s)
+=== RUN   TestIRCompletionToProto
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/cryptography
+?   	github.com/aequitas/aura/chain/x/cryptography	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/cryptography/client/cli
+=== RUN   TestQueryTestSuite
+=== RUN   TestQueryTestSuite/TestAllQueryCommandsHaveExamples
+=== RUN   TestQueryTestSuite/TestAllQueryCommandsHaveHelp
+=== RUN   TestQueryTestSuite/TestCmdQueryCertificatePin
+=== RUN   TestQueryTestSuite/TestCmdQueryKeyRotationSchedule
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/cryptography/keeper
+=== RUN   TestKeeperBasics
+=== RUN   TestKeeperBasics/Logger
+=== RUN   TestKeeperBasics/GetParams_and_SetParams
+=== RUN   TestKeeperBasics/SetParams_with_invalid_params
+=== RUN   TestKeeperBasics/UpdateParams_with_authority
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/cryptography/types
+=== RUN   TestErrors
+=== RUN   TestErrors/ErrInvalidInput
+=== RUN   TestErrors/ErrInvalidKeyID
+=== RUN   TestErrors/ErrKeyRotationScheduleNotFound
+=== RUN   TestErrors/ErrInvalidRotationInterval
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/dataregistry
+?   	github.com/aequitas/aura/chain/x/dataregistry	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/dataregistry/client/cli
+=== RUN   TestGetQueryCmd
+--- PASS: TestGetQueryCmd (0.00s)
+=== RUN   TestCmdShowDataItem
+=== RUN   TestCmdShowDataItem/valid_data_ID
+=== RUN   TestCmdShowDataItem/no_args
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/dataregistry/ipfs
+=== RUN   TestMockClient_Upload
+--- PASS: TestMockClient_Upload (0.00s)
+=== RUN   TestMockClient_Download
+--- PASS: TestMockClient_Download (0.00s)
+=== RUN   TestMockClient_Pin
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/dataregistry/keeper
+=== RUN   TestNewKeeper
+--- PASS: TestNewKeeper (0.00s)
+=== RUN   TestStoreDataItem
+--- PASS: TestStoreDataItem (0.00s)
+=== RUN   TestUpdateDataItem
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/dataregistry/params
+?   	github.com/aequitas/aura/chain/x/dataregistry/params	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/dataregistry/types
+=== RUN   TestErrors
+=== RUN   TestErrors/ErrInvalidDataID
+=== RUN   TestErrors/ErrDataItemNotFound
+=== RUN   TestErrors/ErrInvalidOwner
+=== RUN   TestErrors/ErrUnauthorized
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/dex
+?   	github.com/aequitas/aura/chain/x/dex	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/dex/client/cli
+?   	github.com/aequitas/aura/chain/x/dex/client/cli	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/dex/keeper
+=== RUN   TestDEXKeeperTestSuite
+=== RUN   TestDEXKeeperTestSuite/TestGetParams
+=== RUN   TestDEXKeeperTestSuite/TestSetParams
+--- PASS: TestDEXKeeperTestSuite (0.00s)
+    --- PASS: TestDEXKeeperTestSuite/TestGetParams (0.00s)
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/dex/types
+=== RUN   TestErrors
+=== RUN   TestErrors/ErrInvalidParam
+=== RUN   TestErrors/ErrInvalidRequest
+=== RUN   TestErrors/ErrPoolAlreadyExists
+=== RUN   TestErrors/ErrPoolNotFound
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/economicsecurity
+?   	github.com/aequitas/aura/chain/x/economicsecurity	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/economicsecurity/client/cli
+github.com/aequitas/aura/chain/x/economicsecurity/client/cli.test: C:\Program Files\Go\pkg\tool\windows_amd64\link.exe: exit status 143
+FAIL	github.com/aequitas/aura/chain/x/economicsecurity/client/cli [build failed]
+FAIL
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/economicsecurity/keeper
+=== RUN   TestDynamicFeesDebug
+blockUtilization length: 0
+Before adjustment:
+  CurrentMultiplier: 10000
+  TargetUtilization: 7000
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/economicsecurity/params
+?   	github.com/aequitas/aura/chain/x/economicsecurity/params	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/economicsecurity/types
+=== RUN   TestErrors
+=== RUN   TestErrors/ErrUnauthorized
+=== RUN   TestErrors/ErrInvalidAmount
+=== RUN   TestErrors/ErrInvalidAddress
+=== RUN   TestErrors/ErrInvalidDuration
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/governance
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/governance/client/cli
+?   	github.com/aequitas/aura/chain/x/governance/client/cli	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/governance/keeper
+=== RUN   TestSubmitProposal
+=== RUN   TestSubmitProposal/valid_text_proposal
+=== RUN   TestSubmitProposal/valid_emergency_proposal
+=== RUN   TestSubmitProposal/insufficient_deposit_for_immediate_voting
+=== RUN   TestSubmitProposal/empty_title
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/governance/types
+=== RUN   TestGovernanceErrors
+=== RUN   TestGovernanceErrors/ErrInvalidProposal
+=== RUN   TestGovernanceErrors/ErrInsufficientDeposit
+=== RUN   TestGovernanceErrors/ErrInvalidVote
+=== RUN   TestGovernanceErrors/ErrProposalNotFound
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/identitychange
+=== RUN   TestAppModuleRegisterServices
+--- PASS: TestAppModuleRegisterServices (0.00s)
+PASS
+ok  	github.com/aequitas/aura/chain/x/identitychange	0.061s
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/identitychange/client/cli
+=== RUN   TestGetQueryCmd
+--- PASS: TestGetQueryCmd (0.00s)
+=== RUN   TestCmdQueryIdentityRecord
+=== RUN   TestCmdQueryIdentityRecord/valid_DID
+=== RUN   TestCmdQueryIdentityRecord/no_args
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/identitychange/keeper
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/identitychange/params
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/identitychange/types
+=== RUN   TestDefaultGenesisState
+--- PASS: TestDefaultGenesisState (0.00s)
+=== RUN   TestValidateGenesisState_Valid
+--- PASS: TestValidateGenesisState_Valid (0.00s)
+=== RUN   TestValidateGenesisState_Nil
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/incidentresponse
+?   	github.com/aequitas/aura/chain/x/incidentresponse	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/incidentresponse/client/cli
+?   	github.com/aequitas/aura/chain/x/incidentresponse/client/cli	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/incidentresponse/keeper
+=== RUN   TestNewKeeper
+--- PASS: TestNewKeeper (0.00s)
+=== RUN   TestReportIncident
+Emergency notification sent for incident INC-1
+--- PASS: TestReportIncident (0.00s)
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/incidentresponse/types
+?   	github.com/aequitas/aura/chain/x/incidentresponse/types	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/inclusionroutines
+=== RUN   TestAppModuleBasic
+--- PASS: TestAppModuleBasic (0.00s)
+=== RUN   TestNewAppModule
+--- PASS: TestNewAppModule (0.00s)
+=== RUN   TestRegisterServicesPanic
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/inclusionroutines/client/cli
+github.com/aequitas/aura/chain/x/inclusionroutines/client/cli.test: C:\Program Files\Go\pkg\tool\windows_amd64\link.exe: exit status 143
+FAIL	github.com/aequitas/aura/chain/x/inclusionroutines/client/cli [build failed]
+FAIL
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/inclusionroutines/keeper
+=== RUN   TestListIRs
+--- PASS: TestListIRs (0.00s)
+=== RUN   TestUpdateIR
+--- PASS: TestUpdateIR (0.00s)
+=== RUN   TestUpdateIRNotFound
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/inclusionroutines/params
+=== RUN   TestNewStore
+--- PASS: TestNewStore (0.00s)
+=== RUN   TestSetParams
+--- PASS: TestSetParams (0.00s)
+=== RUN   TestSetParamsValidation
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/inclusionroutines/types
+=== RUN   TestDefaultGenesisState
+--- PASS: TestDefaultGenesisState (0.00s)
+=== RUN   TestDefaultGenesis
+--- PASS: TestDefaultGenesis (0.00s)
+=== RUN   TestIRStoreKey
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/monitoring
+?   	github.com/aequitas/aura/chain/x/monitoring	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/monitoring/alerting
+=== RUN   TestNewAlertManager
+--- PASS: TestNewAlertManager (0.00s)
+=== RUN   TestCreateAlert
+--- PASS: TestCreateAlert (0.00s)
+=== RUN   TestAlertCooldown
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/monitoring/client/cli
+=== RUN   TestGetQueryCmd
+--- PASS: TestGetQueryCmd (0.00s)
+=== RUN   TestCmdQueryParams
+--- PASS: TestCmdQueryParams (0.00s)
+=== RUN   TestCmdQueryAlerts
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/monitoring/keeper
+=== RUN   TestNewKeeper
+--- PASS: TestNewKeeper (0.00s)
+=== RUN   TestMonitorTransaction
+--- PASS: TestMonitorTransaction (0.00s)
+=== RUN   TestLargeTransactionAlert
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/monitoring/metrics
+?   	github.com/aequitas/aura/chain/x/monitoring/metrics	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/monitoring/ml
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/monitoring/params
+?   	github.com/aequitas/aura/chain/x/monitoring/params	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/monitoring/siem
+?   	github.com/aequitas/aura/chain/x/monitoring/siem	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/monitoring/types
+=== RUN   TestMonitoringErrors
+=== RUN   TestMonitoringErrors/ErrInvalidTransaction
+=== RUN   TestMonitoringErrors/ErrAlertNotFound
+=== RUN   TestMonitoringErrors/ErrAnomalyDetectionFailed
+=== RUN   TestMonitoringErrors/ErrValidatorNotFound
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/networksecurity
+?   	github.com/aequitas/aura/chain/x/networksecurity	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/networksecurity/client/cli
+=== RUN   TestQueryCLITestSuite
+    query_test.go:15: Network security CLI tests require a live node; skipping in unit runs
+--- SKIP: TestQueryCLITestSuite (0.00s)
+=== RUN   TestTxCLITestSuite
+    tx_test.go:15: Network security CLI tests require a live node; skipping in unit runs
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/networksecurity/keeper
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/networksecurity/types
+=== RUN   TestDefaultGenesisState
+--- PASS: TestDefaultGenesisState (0.00s)
+=== RUN   TestValidateGenesisState_Valid
+--- PASS: TestValidateGenesisState_Valid (0.00s)
+=== RUN   TestValidateGenesisState_InvalidParams
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/prevalidation
+?   	github.com/aequitas/aura/chain/x/prevalidation	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/prevalidation/client/cli
+=== RUN   TestGetQueryCmd
+--- PASS: TestGetQueryCmd (0.00s)
+=== RUN   TestCmdQueryPreValidatedTransaction
+=== RUN   TestCmdQueryPreValidatedTransaction/valid_tx_ID
+=== RUN   TestCmdQueryPreValidatedTransaction/no_args
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/prevalidation/keeper
+=== RUN   TestPrevalidationKeeperTestSuite
+=== RUN   TestPrevalidationKeeperTestSuite/TestGetParams
+=== RUN   TestPrevalidationKeeperTestSuite/TestSetParams
+--- PASS: TestPrevalidationKeeperTestSuite (0.00s)
+    --- PASS: TestPrevalidationKeeperTestSuite/TestGetParams (0.00s)
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/prevalidation/params
+?   	github.com/aequitas/aura/chain/x/prevalidation/params	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/prevalidation/types
+=== RUN   TestDefaultGenesis
+--- PASS: TestDefaultGenesis (0.00s)
+=== RUN   TestGenesisState_EmptyCollections
+--- PASS: TestGenesisState_EmptyCollections (0.00s)
+=== RUN   TestTransactionType_Constants
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/privacy
+=== RUN   TestRingSigner_SignAndVerify
+--- PASS: TestRingSigner_SignAndVerify (0.00s)
+=== RUN   TestRingSigner_InvalidRingSize
+--- PASS: TestRingSigner_InvalidRingSize (0.00s)
+=== RUN   TestMLSAGSigner_SignAndVerify
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/privacy/client/cli
+=== RUN   TestQueryCLITestSuite
+    query_test.go:15: Privacy CLI query tests require a live node; skipping in unit runs
+--- SKIP: TestQueryCLITestSuite (0.00s)
+=== RUN   TestTxCLITestSuite
+    tx_test.go:15: Privacy CLI tx tests require a live node; skipping in unit runs
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/privacy/keeper
+=== RUN   TestPrivacyKeeperTestSuite
+=== RUN   TestPrivacyKeeperTestSuite/TestGetParams
+=== RUN   TestPrivacyKeeperTestSuite/TestSetParams
+--- PASS: TestPrivacyKeeperTestSuite (0.00s)
+    --- PASS: TestPrivacyKeeperTestSuite/TestGetParams (0.00s)
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/privacy/types
+=== RUN   TestErrors_Defined
+--- PASS: TestErrors_Defined (0.00s)
+=== RUN   TestErrors_Messages
+=== RUN   TestErrors_Messages/invalid_ring_size
+=== RUN   TestErrors_Messages/invalid_mixing_params
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/validatorsecurity
+?   	github.com/aequitas/aura/chain/x/validatorsecurity	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/validatorsecurity/client/cli
+=== RUN   TestQueryCLITestSuite
+    query_test.go:15: Validatorsecurity CLI tests require a live node; skipping in unit runs
+--- SKIP: TestQueryCLITestSuite (0.00s)
+=== RUN   TestTxCLITestSuite
+    tx_test.go:15: Validatorsecurity CLI tests require a live node; skipping in unit runs
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/validatorsecurity/keeper
+=== RUN   TestKeeperTestSuite
+    keeper_test.go:32: Validatorsecurity keeper tests require full staking context; skipping in this run
+--- SKIP: TestKeeperTestSuite (0.00s)
+PASS
+ok  	github.com/aequitas/aura/chain/x/validatorsecurity/keeper	0.059s
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/validatorsecurity/types
+=== RUN   TestDefaultParams
+--- PASS: TestDefaultParams (0.00s)
+=== RUN   TestValidateParams_Valid
+--- PASS: TestValidateParams_Valid (0.00s)
+=== RUN   TestValidateParams_NilParams
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/vcregistry
+?   	github.com/aequitas/aura/chain/x/vcregistry	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/vcregistry/client/cli
+=== RUN   TestQueryTestSuite
+=== RUN   TestQueryTestSuite/TestBatchVCStatus_IDParsing
+=== RUN   TestQueryTestSuite/TestBatchVCStatus_IDParsing/single_VC_ID
+=== RUN   TestQueryTestSuite/TestBatchVCStatus_IDParsing/multiple_VC_IDs
+=== RUN   TestQueryTestSuite/TestBatchVCStatus_IDParsing/IDs_with_spaces
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/vcregistry/keeper
+=== RUN   TestNewKeeper
+=== RUN   TestNewKeeper/with_nil_params_store
+=== RUN   TestNewKeeper/with_initialized_params_store
+--- PASS: TestNewKeeper (0.00s)
+    --- PASS: TestNewKeeper/with_nil_params_store (0.00s)
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/vcregistry/params
+?   	github.com/aequitas/aura/chain/x/vcregistry/params	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/vcregistry/types
+=== RUN   TestVCPolicyFromProto_Nil
+--- PASS: TestVCPolicyFromProto_Nil (0.00s)
+=== RUN   TestVCPolicyFromProto_Valid
+--- PASS: TestVCPolicyFromProto_Valid (0.00s)
+=== RUN   TestVerificationMethodFromProto_Nil
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/walletsecurity
+?   	github.com/aequitas/aura/chain/x/walletsecurity	[no test files]
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/walletsecurity/client/cli
+=== RUN   TestQueryCLITestSuite
+    query_test.go:14: CLI query tests require a live node; skipping in unit runs
+--- SKIP: TestQueryCLITestSuite (0.00s)
+=== RUN   TestTxCLITestSuite
+    tx_test.go:14: CLI transaction tests require a live node; skipping in unit runs
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/walletsecurity/keeper
+cosmossdk.io/api/cosmos/reflection/v1: C:\Program Files\Go\pkg\tool\windows_amd64\vet.exe: exit status 143
+cosmossdk.io/api/cosmos/bank/v1beta1: C:\Program Files\Go\pkg\tool\windows_amd64\compile.exe: exit status 143
+  ✅ PASS
+
+  Testing: github.com/aequitas/aura/chain/x/walletsecurity/types
+=== RUN   TestHardwareWalletErrors_Defined
+--- PASS: TestHardwareWalletErrors_Defined (0.00s)
+=== RUN   TestMultiSigWalletErrors_Defined
+--- PASS: TestMultiSigWalletErrors_Defined (0.00s)
+=== RUN   TestSocialRecoveryErrors_Defined
+  ✅ PASS
+
+7. Checking for package-level panics...
+  No build-time panics detected
+
+8. Testing with maximum verbosity...
+  Run this manually: go test -v -x -work ./...
+
+9. Checking for test file issues...
+
+=== Debug Complete ===
+
+If a package was identified with exit 192, investigate:
+  1. Check that package's init() functions
+  2. Check package-level variable initialization
+  3. Check for global state that fails
+  4. Try: go test -c <package> to see compilation errors

@@ -11,11 +11,11 @@ import hashlib
 import argparse
 from datetime import datetime
 
-from src.aixn.core.blockchain import Blockchain
+from src.xai.core.blockchain import Blockchain
 
 # from blockchain.consensus import ProofOfIntelligence
-from src.aixn.core.wallet import Wallet
-from src.aixn.core.ai.api_rotator import AIAPIRotator
+from src.xai.core.wallet import Wallet
+from src.xai.core.ai.api_rotator import AIAPIRotator
 
 
 class XAIMiner:
@@ -99,7 +99,7 @@ class XAIMiner:
             "blocks_mined": self.blocks_mined,
             "total_rewards": self.total_rewards,
             "avg_block_time": elapsed / self.blocks_mined if self.blocks_mined > 0 else 0,
-            "aixn_per_hour": self.total_rewards / hours_elapsed if hours_elapsed > 0 else 0,
+            "xai_per_hour": self.total_rewards / hours_elapsed if hours_elapsed > 0 else 0,
             "uptime": elapsed,
             "success_rate": (self.blocks_mined / max(1, self.blocks_mined + 5)) * 100,  # Estimate
         }
@@ -113,7 +113,7 @@ class XAIMiner:
         print("-" * 40)
         print(f"Blocks Mined: {stats['blocks_mined']}")
         print(f"Total XAI Earned: {stats['total_rewards']:.2f}")
-        print(f"XAI/Hour: {stats['aixn_per_hour']:.2f}")
+        print(f"XAI/Hour: {stats['xai_per_hour']:.2f}")
         print(f"Avg Block Time: {stats['avg_block_time']:.1f}s")
         print(f"Success Rate: {stats['success_rate']:.1f}%")
         print(f"Uptime: {stats['uptime']:.0f}s")

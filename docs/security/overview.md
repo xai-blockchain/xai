@@ -196,7 +196,7 @@ def verify_transaction(transaction):
     tx_hash = hash_transaction(transaction)
 
     # Verify signature
-    is_valid = ecdsa_verify(public_key, tx_hash, signature)
+    is_valid = verify_signature(public_key, tx_hash, signature)
 
     return is_valid
 ```

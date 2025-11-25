@@ -10,12 +10,12 @@ import time
 import argparse
 from datetime import datetime
 
-# Removed: from aixn.core.proof_of_intelligence import ProofOfIntelligence
-# Removed: from aixn.core.xai_token import XAIToken
-from aixn.core.blockchain import Blockchain
-from aixn.core.wallet import Wallet, WalletManager
-from aixn.core.ai.agents.momentum_trader import MomentumTrader, MarketData
-from aixn.core.ai.api_rotator import AIAPIRotator
+# Removed: from xai.core.proof_of_intelligence import ProofOfIntelligence
+# Removed: from xai.core.xai_token import XAIToken
+from xai.core.blockchain import Blockchain
+from xai.core.wallet import Wallet, WalletManager
+from xai.core.ai.agents.momentum_trader import MomentumTrader, MarketData
+from xai.core.ai.api_rotator import AIAPIRotator
 
 
 class XAILauncher:

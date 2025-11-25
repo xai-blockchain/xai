@@ -16,9 +16,9 @@ import argparse
 import json
 from datetime import datetime
 
-from src.aixn.core.blockchain_loader import load_blockchain_with_validation, BlockchainLoader
-from src.aixn.core.blockchain_persistence import BlockchainStorage
-from src.aixn.config_manager import Config
+from src.xai.core.blockchain_loader import load_blockchain_with_validation, BlockchainLoader
+from src.xai.core.blockchain_persistence import BlockchainStorage
+from src.xai.config_manager import Config
 
 
 def main():

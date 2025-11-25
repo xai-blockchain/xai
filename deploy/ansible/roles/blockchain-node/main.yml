@@ -1,0 +1,111 @@
+---
+# ============================================================================
+# Blockchain Node Deployment Role
+# ============================================================================
+
+- name: Create application directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0755"
+  loop:
+    - "{{ app_home }}"
+    - "{{ app_data }}"
+    - "{{ app_logs }}"
+    - "{{ app_data }}/blockchain"
+    - "{{ app_data }}/wallets"
+    - "{{ app_data }}/deposits"
+    - "{{ app_data }}/mining_data"
+
+- name: Pull blockchain node Docker image
+  docker_image:
+    name: "xai-blockchain:{{ app_version }}"
+    source: pull
+    state: present
+  register: image_pull
+  retries: 3
+  delay: 10
+
+- name: Create blockchain node systemd service
+  template:
+    src: xai-node.service.j2
+    dest: /etc/systemd/system/xai-node.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart xai-node
+
+- name: Create blockchain node environment file
+  template:
+    src: .env.blockchain.j2
+    dest: "{{ app_home }}/.env.blockchain"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0600"
+  notify: restart xai-node
+
+- name: Create blockchain configuration file
+  template:
+    src: blockchain.conf.j2
+    dest: "{{ app_home }}/blockchain.conf"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0600"
+  notify: restart xai-node
+
+- name: Enable and start blockchain node service
+  systemd:
+    name: xai-node
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+- name: Wait for blockchain node to be ready
+  wait_for:
+    host: localhost
+    port: "{{ blockchain_node_port }}"
+    timeout: 60
+    delay: 5
+
+- name: Wait for API endpoint to be healthy
+  uri:
+    url: "http://localhost:{{ blockchain_api_port }}/health"
+    method: GET
+    status_code: 200
+  register: api_health
+  retries: 10
+  delay: 5
+  until: api_health is succeeded
+
+- name: Verify blockchain node is syncing
+  uri:
+    url: "http://localhost:{{ blockchain_api_port }}/api/v1/blockchain/info"
+    method: GET
+  register: blockchain_info
+
+- name: Display blockchain info
+  debug:
+    msg: |
+      Blockchain Node Started
+      - Node ID: {{ node_id }}
+      - Network: {{ network_name }}
+      - Status: {{ blockchain_info.json.is_synced | default('syncing') }}
+      - Block Height: {{ blockchain_info.json.block_height | default('N/A') }}
+
+- name: Configure log rotation
+  template:
+    src: logrotate.d-xai.j2
+    dest: /etc/logrotate.d/xai
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Set up metrics collection
+  cron:
+    name: "Collect blockchain metrics"
+    minute: "*/5"
+    job: "curl -s http://localhost:{{ blockchain_metrics_port }}/metrics > {{ app_logs }}/metrics.txt"
+    user: "{{ app_user }}"
+    state: present

@@ -21,8 +21,8 @@ Welcome to the documentation hub for the XAI Blockchain project. This directory 
 
 ## Feature Documentation
 
-*   **AIXN Specifics**: In-depth documentation for the AIXN blockchain.
-    *   [AIXN Marketing Campaign Plan](AIXN_Marketing_Campaign_Plan.md)
+*   **XAI Specifics**: In-depth documentation for the XAI blockchain.
+    *   [XAI Marketing Campaign Plan](XAI_Marketing_Campaign_Plan.md)
     *   [AML Reporting](AML_REPORTING.md)
     *   [Embedded Wallets](EMBEDDED_WALLETS.md)
     *   [Fiat On-Ramps Roadmap](fiat_onramps_roadmap.md)
@@ -38,12 +38,12 @@ Welcome to the documentation hub for the XAI Blockchain project. This directory 
 *   **Time Capsules**: Information on the time capsule feature.
     *   (Refer to `onboarding.md` for initial info, or add a dedicated file if needed)
 *   **Token Burning**: Details on the token burning mechanism.
-    *   (Refer to `src/aixn/core/token_burning_api_endpoints.py` or add a dedicated file)
+    *   (Refer to `src/xai/core/token_burning_api_endpoints.py` or add a dedicated file)
 
 ## Development & Testing
 
 *   **Testing Framework**: How to run and contribute to tests.
-    *   [README_TESTING.md](../tests/aixn_tests/README_TESTING.md)
+    *   [README_TESTING.md](../tests/xai_tests/README_TESTING.md)
 *   **Examples**: Code examples and usage demonstrations.
     *   [Examples Directory](examples/)
 
@@ -70,7 +70,7 @@ The XAI Blockchain node's behavior is controlled by a layered configuration syst
     *   Use the `scripts/deploy/config.template.env` file as a template to create your `.env` file.
     *   Ensure your `.env` file is added to `.gitignore` to prevent accidental commits of sensitive data.
 
-2.  **Environment-Specific YAML Files**: Configuration settings are defined in YAML files located in `src/aixn/config/`. These files allow for environment-specific tuning:
+2.  **Environment-Specific YAML Files**: Configuration settings are defined in YAML files located in `src/xai/config/`. These files allow for environment-specific tuning:
     *   `default.yaml`: Contains the base default settings.
     *   `development.yaml`: Overrides defaults for local development.
     *   `staging.yaml`: Overrides defaults for staging environments.
@@ -83,8 +83,8 @@ The XAI Blockchain node's behavior is controlled by a layered configuration syst
 
 ### Loading Mechanism
 
-The application utilizes a configuration manager (likely `src/aixn/core/config_manager.py`) that orchestrates the loading process. It typically:
-1.  Loads default settings from `src/aixn/config/default.yaml`.
+The application utilizes a configuration manager (likely `src/xai/core/config_manager.py`) that orchestrates the loading process. It typically:
+1.  Loads default settings from `src/xai/config/default.yaml`.
 2.  Loads environment-specific settings from the corresponding YAML file (e.g., `development.yaml`).
 3.  Loads settings from a `.env` file (if present) and system environment variables, overriding any previous settings.
 

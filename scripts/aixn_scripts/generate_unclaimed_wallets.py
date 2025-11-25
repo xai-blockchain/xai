@@ -8,10 +8,8 @@ import json
 import sys
 import os
 import hashlib
-import ecdsa
-import base58
 
-from src.aixn.core.wallet import Wallet
+from src.xai.core.wallet import Wallet
 
 
 def generate_unclaimed_wallets(count=1373):

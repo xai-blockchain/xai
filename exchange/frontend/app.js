@@ -1,4 +1,4 @@
-// AIXN P2P Exchange Frontend Application
+// XAI P2P Exchange Frontend Application
 // API and WebSocket Configuration
 const API_BASE_URL = 'http://localhost:5000/api';
 const WS_URL = 'ws://localhost:5000';
@@ -13,7 +13,7 @@ let reconnectTimeout = null;
 
 // Initialize Application
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('AIXN Exchange initializing...');
+    console.log('XAI Exchange initializing...');
 
     // Check for existing session
     authToken = localStorage.getItem('authToken');
@@ -317,7 +317,7 @@ async function loadUserBalance() {
         const data = await response.json();
 
         if (response.ok) {
-            document.getElementById('aixnBalance').textContent = parseFloat(data.aixn_balance).toFixed(2);
+            document.getElementById('xaiBalance').textContent = parseFloat(data.xai_balance).toFixed(2);
             document.getElementById('usdBalance').textContent = `$${parseFloat(data.usd_balance).toFixed(2)}`;
         }
     } catch (error) {
@@ -607,13 +607,13 @@ function showSuccess(elementId, message) {
 
 function setLoading(type, isLoading) {
     if (type === 'buy') {
-        document.getElementById('buyBtnText').textContent = isLoading ? 'Processing...' : 'Buy AIXN';
+        document.getElementById('buyBtnText').textContent = isLoading ? 'Processing...' : 'Buy XAI';
         document.getElementById('buySpinner').classList.toggle('hidden', !isLoading);
         document.getElementById('buyForm').querySelectorAll('input, button').forEach(el => {
             el.disabled = isLoading;
         });
     } else if (type === 'sell') {
-        document.getElementById('sellBtnText').textContent = isLoading ? 'Processing...' : 'Sell AIXN';
+        document.getElementById('sellBtnText').textContent = isLoading ? 'Processing...' : 'Sell XAI';
         document.getElementById('sellSpinner').classList.toggle('hidden', !isLoading);
         document.getElementById('sellForm').querySelectorAll('input, button').forEach(el => {
             el.disabled = isLoading;

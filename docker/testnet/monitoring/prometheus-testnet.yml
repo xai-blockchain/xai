@@ -1,17 +1,17 @@
-# Prometheus Configuration for AIXN Testnet
+# Prometheus Configuration for XAI Testnet
 
 global:
   scrape_interval: 10s
   evaluation_interval: 10s
   external_labels:
-    cluster: 'aixn-testnet'
+    cluster: 'xai-testnet'
     environment: 'testnet'
 
 scrape_configs:
   # Bootstrap Node
   - job_name: 'testnet-bootstrap'
     static_configs:
-      - targets: ['aixn-testnet-bootstrap:9090']
+      - targets: ['xai-testnet-bootstrap:9090']
         labels:
           node_type: 'bootstrap'
           instance: 'bootstrap-node'
@@ -19,7 +19,7 @@ scrape_configs:
   # Testnet Node 1
   - job_name: 'testnet-node1'
     static_configs:
-      - targets: ['aixn-testnet-node1:9090']
+      - targets: ['xai-testnet-node1:9090']
         labels:
           node_type: 'peer'
           instance: 'node-1'
@@ -27,7 +27,7 @@ scrape_configs:
   # Testnet Node 2
   - job_name: 'testnet-node2'
     static_configs:
-      - targets: ['aixn-testnet-node2:9090']
+      - targets: ['xai-testnet-node2:9090']
         labels:
           node_type: 'peer'
           instance: 'node-2'

@@ -16,7 +16,7 @@ pre-commit install
 pre-commit run --all-files
 
 # Run tests
-pytest tests/aixn_tests/unit/ -v
+pytest tests/xai_tests/unit/ -v
 ```
 
 ## Step 3: Push to GitHub (1 minute)

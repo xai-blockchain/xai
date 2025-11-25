@@ -1,0 +1,134 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: xai-blockchain-config
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    component: config
+data:
+  # Network Configuration
+  NODE_HOST: "0.0.0.0"
+  NODE_PORT: "8545"
+  RPC_PORT: "8546"
+  P2P_PORT: "30303"
+  WS_PORT: "8547"
+
+  # Blockchain Configuration
+  BLOCKCHAIN_DIFFICULTY: "4"
+  BLOCK_TIME_TARGET: "120"
+  INITIAL_BLOCK_REWARD: "12.0"
+  HALVING_INTERVAL: "262800"
+  MAX_SUPPLY: "121000000.0"
+  MAX_BLOCK_SIZE: "1048576"
+  MIN_TRANSACTION_FEE: "0.0001"
+  TRANSACTION_FEE_PERCENT: "0.24"
+
+  # Network Configuration
+  MAX_PEERS: "50"
+  PEER_TIMEOUT: "30"
+  SYNC_INTERVAL: "60"
+  P2P_ENABLED: "true"
+
+  # Consensus Configuration
+  CONSENSUS_TIMEOUT: "30"
+  MIN_PEERS_FOR_CONSENSUS: "2"
+
+  # Storage Configuration
+  BLOCKCHAIN_DATA_DIR: "/data/blockchain"
+  STATE_DB_PATH: "/data/blockchain/state.db"
+
+  # Environment
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  DEBUG_MODE: "false"
+
+  # Mining Configuration
+  MINING_ENABLED: "true"
+  MINING_THREADS: "2"
+  MINER_ADDRESS: ""  # Will be set per pod
+
+  # Security
+  ENABLE_SECURITY_VALIDATION: "true"
+  ENABLE_RATE_LIMITING: "true"
+  RATE_LIMIT_PER_SECOND: "100"
+
+  # Monitoring
+  METRICS_ENABLED: "true"
+  METRICS_PORT: "9090"
+  PROMETHEUS_ENABLED: "true"
+
+  # API Configuration
+  CORS_ENABLED: "true"
+  ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:8080"
+
+  # Genesis Configuration
+  NETWORK_ID: "1"
+  CHAIN_NAME: "xai-mainnet"
+
+  # Application Configuration
+  FLASK_ENV: "production"
+  WORKERS: "4"
+
+  # File storage locations
+  genesis-config.json: |
+    {
+      "network_id": 1,
+      "chain_name": "xai-mainnet",
+      "genesis_block": {
+        "timestamp": 1704067200,
+        "difficulty": 4,
+        "nonce": 0,
+        "miner": "genesis",
+        "reward": 0
+      },
+      "initial_accounts": [
+        {
+          "address": "genesis",
+          "balance": 121000000.0
+        }
+      ],
+      "network_config": {
+        "port": 8545,
+        "rpc_port": 8546,
+        "ws_port": 8547,
+        "max_peers": 50
+      }
+    }
+
+  # Application startup script
+  startup.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "XAI Blockchain Node Startup"
+    echo "============================"
+
+    # Set pod-specific miner address
+    POD_ORDINAL=${HOSTNAME##*-}
+    export MINER_ADDRESS="miner-${POD_ORDINAL}-$(hostname -f)"
+
+    echo "Pod Ordinal: $POD_ORDINAL"
+    echo "Miner Address: $MINER_ADDRESS"
+    echo "Data Directory: $BLOCKCHAIN_DATA_DIR"
+
+    # Initialize data directory if it doesn't exist
+    if [ ! -d "$BLOCKCHAIN_DATA_DIR" ]; then
+      echo "Initializing blockchain data directory..."
+      mkdir -p "$BLOCKCHAIN_DATA_DIR"
+    fi
+
+    # Copy genesis configuration if it doesn't exist
+    if [ ! -f "$BLOCKCHAIN_DATA_DIR/genesis.json" ]; then
+      echo "Setting up genesis configuration..."
+      cp /config/genesis-config.json "$BLOCKCHAIN_DATA_DIR/genesis.json"
+    fi
+
+    echo "Starting XAI Blockchain Node..."
+
+    # Start the node with Python application
+    exec python -m xai.core.node \
+      --host "$NODE_HOST" \
+      --port "$NODE_PORT" \
+      --miner-address "$MINER_ADDRESS" \
+      --environment "$ENVIRONMENT"

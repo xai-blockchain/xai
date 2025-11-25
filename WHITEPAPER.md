@@ -362,7 +362,7 @@ Time capsules allow users to lock coins until a specified future timestamp. Lock
 ### 10.2 Address Format
 
 - **Testnet**: TXAI prefix + base58 encoded public key hash
-- **Mainnet**: AIXN prefix + base58 encoded public key hash
+- **Mainnet**: XAI prefix + base58 encoded public key hash
 
 ### 10.3 Key Management
 
@@ -546,7 +546,7 @@ Payment card integration (locked until November 2026):
 | Halving Interval | 262,800 blocks (~1 year) |
 | Mainnet Port | 8545 |
 | Testnet Port | 18545 |
-| Address Prefix (Mainnet) | AIXN |
+| Address Prefix (Mainnet) | XAI |
 | Address Prefix (Testnet) | TXAI |
 | Network ID (Mainnet) | 0x5841 |
 | Network ID (Testnet) | 0xABCD |

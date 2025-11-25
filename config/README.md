@@ -1,1 +1,1 @@
-# AIXN Configuration Files
+# XAI Configuration Files

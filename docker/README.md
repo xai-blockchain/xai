@@ -1,6 +1,6 @@
-# AIXN Blockchain - Docker Deployment Guide
+# XAI Blockchain - Docker Deployment Guide
 
-This directory contains Docker configurations for deploying AIXN blockchain nodes in various environments.
+This directory contains Docker configurations for deploying XAI blockchain nodes in various environments.
 
 ## Table of Contents
 
@@ -39,7 +39,7 @@ cp .env.example .env
 
 ```bash
 # Minimal development configuration
-AIXN_ENV=development
+XAI_ENV=development
 LOG_LEVEL=DEBUG
 POSTGRES_PASSWORD=your_secure_password
 ```
@@ -53,7 +53,7 @@ docker-compose up -d
 5. **Check node status:**
 
 ```bash
-docker-compose logs -f aixn-node
+docker-compose logs -f xai-node
 ```
 
 6. **Access services:**
@@ -85,8 +85,8 @@ This starts:
 ### Container Structure
 
 ```
-aixn-blockchain/
-├── aixn-node          # Main blockchain node
+xai-blockchain/
+├── xai-node          # Main blockchain node
 ├── postgres           # PostgreSQL database
 ├── redis              # Cache & message broker
 ├── prometheus         # Metrics collection
@@ -110,7 +110,7 @@ aixn-blockchain/
     ┌────────────┴────────────┐
     │                         │
 ┌───▼────┐            ┌───────▼──────┐
-│ AIXN   │            │ Block        │
+│ XAI   │            │ Block        │
 │ Node   │◄───────────┤ Explorer     │
 │ (8080) │            │ (8082)       │
 └───┬────┘            └──────────────┘
@@ -131,10 +131,10 @@ Key configuration options in `.env`:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `AIXN_ENV` | Environment (development/production/testnet) | development |
-| `AIXN_NODE_PORT` | P2P network port | 8333 |
-| `AIXN_API_PORT` | REST API port | 8080 |
-| `AIXN_ENABLE_MINING` | Enable mining | false |
+| `XAI_ENV` | Environment (development/production/testnet) | development |
+| `XAI_NODE_PORT` | P2P network port | 8333 |
+| `XAI_API_PORT` | REST API port | 8080 |
+| `XAI_ENABLE_MINING` | Enable mining | false |
 | `POSTGRES_PASSWORD` | Database password | Required |
 | `LOG_LEVEL` | Logging level | INFO |
 
@@ -155,7 +155,7 @@ Persistent data is stored in Docker volumes:
 ### 1. Single Node (Development)
 
 ```bash
-docker-compose up -d aixn-node postgres redis
+docker-compose up -d xai-node postgres redis
 ```
 
 Minimal setup for development and testing.
@@ -180,10 +180,10 @@ Three interconnected nodes for network testing.
 ### 4. Mining Node
 
 ```bash
-AIXN_ENABLE_MINING=true \
-AIXN_MINING_ADDRESS=your_address \
-AIXN_MINING_THREADS=4 \
-docker-compose up -d aixn-node
+XAI_ENABLE_MINING=true \
+XAI_MINING_ADDRESS=your_address \
+XAI_MINING_THREADS=4 \
+docker-compose up -d xai-node
 ```
 
 ## Monitoring
@@ -193,10 +193,10 @@ docker-compose up -d aixn-node
 Access Prometheus at http://localhost:9091
 
 Key metrics:
-- `aixn_blocks_total` - Total blocks mined
-- `aixn_transactions_total` - Total transactions
-- `aixn_peers_active` - Active peer connections
-- `aixn_block_time_seconds` - Block generation time
+- `xai_blocks_total` - Total blocks mined
+- `xai_transactions_total` - Total transactions
+- `xai_peers_active` - Active peer connections
+- `xai_block_time_seconds` - Block generation time
 
 ### Grafana Dashboards
 
@@ -228,7 +228,7 @@ docker-compose exec redis redis-cli ping
 ### Production Checklist
 
 - [ ] Change all default passwords in `.env`
-- [ ] Enable TLS (`AIXN_TLS_ENABLED=true`)
+- [ ] Enable TLS (`XAI_TLS_ENABLED=true`)
 - [ ] Configure firewall rules
 - [ ] Set up API key authentication
 - [ ] Enable rate limiting in nginx
@@ -277,10 +277,10 @@ ufw enable
 
 ```bash
 # Check logs
-docker-compose logs aixn-node
+docker-compose logs xai-node
 
 # Verify permissions
-docker-compose exec aixn-node ls -la /data
+docker-compose exec xai-node ls -la /data
 
 # Reset and restart
 docker-compose down
@@ -317,10 +317,10 @@ docker system prune -a --volumes
 curl http://localhost:8080/api/v1/peers
 
 # Increase peer limit
-AIXN_MAX_PEERS=200 docker-compose up -d
+XAI_MAX_PEERS=200 docker-compose up -d
 
 # Check network connectivity
-docker-compose exec aixn-node ping 8.8.8.8
+docker-compose exec xai-node ping 8.8.8.8
 ```
 
 ### Logs
@@ -332,13 +332,13 @@ Access logs:
 docker-compose logs -f
 
 # Specific service
-docker-compose logs -f aixn-node
+docker-compose logs -f xai-node
 
 # Last 100 lines
-docker-compose logs --tail=100 aixn-node
+docker-compose logs --tail=100 xai-node
 
 # Follow with timestamps
-docker-compose logs -f -t aixn-node
+docker-compose logs -f -t xai-node
 ```
 
 ### Performance Tuning
@@ -349,7 +349,7 @@ Edit `docker-compose.yml`:
 
 ```yaml
 services:
-  aixn-node:
+  xai-node:
     deploy:
       resources:
         limits:
@@ -364,7 +364,7 @@ services:
 
 ```bash
 # Increase PostgreSQL cache
-docker-compose exec postgres psql -U aixn -c \
+docker-compose exec postgres psql -U xai -c \
   "ALTER SYSTEM SET shared_buffers = '512MB';"
 docker-compose restart postgres
 ```
@@ -381,7 +381,7 @@ docker run --rm \
   ubuntu tar czf /backup/blockchain-$(date +%Y%m%d).tar.gz /data
 
 # Backup database
-docker-compose exec postgres pg_dump -U aixn aixn_blockchain > \
+docker-compose exec postgres pg_dump -U xai xai_blockchain > \
   backups/db-$(date +%Y%m%d).sql
 ```
 
@@ -396,7 +396,7 @@ docker run --rm \
 
 # Restore database
 cat backups/db-20250112.sql | \
-  docker-compose exec -T postgres psql -U aixn aixn_blockchain
+  docker-compose exec -T postgres psql -U xai xai_blockchain
 ```
 
 ## Upgrading
@@ -418,21 +418,21 @@ docker image prune -a
 
 ```bash
 # Scale up with new version
-docker-compose up -d --scale aixn-node=2
+docker-compose up -d --scale xai-node=2
 
 # Wait for health check
 sleep 30
 
 # Remove old container
-docker-compose up -d --scale aixn-node=1
+docker-compose up -d --scale xai-node=1
 ```
 
 ## Support
 
 For issues and questions:
-- GitHub Issues: [Repository Issues](https://github.com/aixn-blockchain/crypto/issues)
-- Documentation: [Full Documentation](https://docs.aixn.network)
-- Community: [Discord Server](https://discord.gg/aixn)
+- GitHub Issues: [Repository Issues](https://github.com/xai-blockchain/crypto/issues)
+- Documentation: [Full Documentation](https://docs.xai.network)
+- Community: [Discord Server](https://discord.gg/xai)
 
 ## License
 

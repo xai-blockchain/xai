@@ -30,7 +30,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install bandit safety semgrep
-        if [ -f src/aixn/requirements.txt ]; then pip install -r src/aixn/requirements.txt; fi
+        if [ -f src/xai/requirements.txt ]; then pip install -r src/xai/requirements.txt; fi
 
     - name: Run Bandit security linter
       run: |

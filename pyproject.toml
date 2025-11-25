@@ -6,9 +6,9 @@ requires = ["setuptools>=65.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "aixn-blockchain"
+name = "xai-blockchain"
 version = "0.1.0"
-description = "AIXN - AI-Enhanced Blockchain Platform"
+description = "XAI - AI-Enhanced Blockchain Platform"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -40,7 +40,6 @@ dependencies = [
     "flask>=3.0.0",
     "requests>=2.31.0",
     "cryptography>=41.0.0",
-    "ecdsa>=0.18.0",
     "pyyaml>=6.0.1",
     "prometheus-client>=0.19.0",
 ]
@@ -94,15 +93,15 @@ ai = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/aixn-blockchain"
-Documentation = "https://aixn-blockchain.readthedocs.io"
-Repository = "https://github.com/yourusername/aixn-blockchain"
-"Bug Tracker" = "https://github.com/yourusername/aixn-blockchain/issues"
+Homepage = "https://github.com/yourusername/xai-blockchain"
+Documentation = "https://xai-blockchain.readthedocs.io"
+Repository = "https://github.com/yourusername/xai-blockchain"
+"Bug Tracker" = "https://github.com/yourusername/xai-blockchain/issues"
 
 [project.scripts]
-aixn = "aixn.cli.main:main"
-aixn-node = "aixn.core.node:main"
-aixn-wallet = "aixn.wallet.cli:main"
+xai = "xai.cli.main:main"
+xai-node = "xai.core.node:main"
+xai-wallet = "xai.wallet.cli:main"
 
 # Black configuration
 [tool.black]
@@ -253,10 +252,10 @@ version_files = [
 
 # Setuptools configuration
 [tool.setuptools]
-packages = ["src.aixn"]
+packages = ["xai"]
 
 [tool.setuptools.package-dir]
 "" = "src"
 
 [tool.setuptools.package-data]
-aixn = ["py.typed", "*.yaml", "*.json"]
+xai = ["py.typed", "*.yaml", "*.json"]

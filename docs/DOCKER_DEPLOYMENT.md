@@ -1,6 +1,6 @@
-# AIXN Blockchain - Docker Deployment Guide
+# XAI Blockchain - Docker Deployment Guide
 
-Complete guide for deploying AIXN blockchain using Docker and Docker Compose.
+Complete guide for deploying XAI blockchain using Docker and Docker Compose.
 
 ## Table of Contents
 
@@ -18,7 +18,7 @@ Complete guide for deploying AIXN blockchain using Docker and Docker Compose.
 
 ## Overview
 
-The AIXN blockchain Docker deployment provides:
+The XAI blockchain Docker deployment provides:
 
 - **Multi-stage builds** for optimized image sizes
 - **Non-root user** execution for security
@@ -84,7 +84,7 @@ sudo usermod -aG docker $USER
 ```bash
 cd C:\Users\decri\GitClones\Crypto
 # or
-git clone https://github.com/aixn-blockchain/crypto.git
+git clone https://github.com/xai-blockchain/crypto.git
 cd crypto
 ```
 
@@ -101,7 +101,7 @@ cp .env.example .env
 
 **Minimal `.env` configuration:**
 ```env
-AIXN_ENV=development
+XAI_ENV=development
 POSTGRES_PASSWORD=secure_password_here
 LOG_LEVEL=INFO
 ```
@@ -148,34 +148,34 @@ Create a `.env` file in the project root:
 # ============================================================================
 # Environment
 # ============================================================================
-AIXN_ENV=development
+XAI_ENV=development
 # Options: development, staging, production, testnet
 
 # ============================================================================
 # Node Configuration
 # ============================================================================
-AIXN_NODE_PORT=8333
-AIXN_API_PORT=8080
-AIXN_WS_PORT=8081
-AIXN_METRICS_PORT=9090
+XAI_NODE_PORT=8333
+XAI_API_PORT=8080
+XAI_WS_PORT=8081
+XAI_METRICS_PORT=9090
 
 # Network Settings
-AIXN_NETWORK_ID=1
-AIXN_MAX_PEERS=125
-AIXN_MIN_PEERS=8
+XAI_NETWORK_ID=1
+XAI_MAX_PEERS=125
+XAI_MIN_PEERS=8
 
 # Mining Settings
-AIXN_ENABLE_MINING=false
-AIXN_MINING_THREADS=2
-AIXN_MINING_ADDRESS=
+XAI_ENABLE_MINING=false
+XAI_MINING_THREADS=2
+XAI_MINING_ADDRESS=
 
 # ============================================================================
 # Database
 # ============================================================================
 POSTGRES_HOST=postgres
 POSTGRES_PORT=5432
-POSTGRES_DB=aixn_blockchain
-POSTGRES_USER=aixn
+POSTGRES_DB=xai_blockchain
+POSTGRES_USER=xai
 POSTGRES_PASSWORD=CHANGE_THIS_PASSWORD
 
 # ============================================================================
@@ -194,8 +194,8 @@ LOG_LEVEL=INFO
 # ============================================================================
 # Security
 # ============================================================================
-AIXN_TLS_ENABLED=false
-AIXN_API_KEY=
+XAI_TLS_ENABLED=false
+XAI_API_KEY=
 ```
 
 ### Volume Configuration
@@ -227,10 +227,10 @@ Minimal setup for local development:
 
 ```bash
 # Start only essential services
-docker-compose up -d aixn-node postgres redis
+docker-compose up -d xai-node postgres redis
 
 # View logs
-docker-compose logs -f aixn-node
+docker-compose logs -f xai-node
 ```
 
 **Use case:** Local development, testing, debugging
@@ -248,7 +248,7 @@ make prod-up
 ```
 
 **Includes:**
-- AIXN node
+- XAI node
 - PostgreSQL database
 - Redis cache
 - Prometheus monitoring
@@ -290,19 +290,19 @@ Deploy a dedicated mining node:
 
 ```bash
 # Set mining environment variables
-export AIXN_ENABLE_MINING=true
-export AIXN_MINING_ADDRESS=your_wallet_address
-export AIXN_MINING_THREADS=4
+export XAI_ENABLE_MINING=true
+export XAI_MINING_ADDRESS=your_wallet_address
+export XAI_MINING_THREADS=4
 
 # Start node
-docker-compose up -d aixn-node
+docker-compose up -d xai-node
 ```
 
 Or edit `.env`:
 ```env
-AIXN_ENABLE_MINING=true
-AIXN_MINING_ADDRESS=AXN1234...
-AIXN_MINING_THREADS=4
+XAI_ENABLE_MINING=true
+XAI_MINING_ADDRESS=AXN1234...
+XAI_MINING_THREADS=4
 ```
 
 ## Architecture
@@ -314,11 +314,11 @@ AIXN_MINING_THREADS=4
 │           Docker Host System                │
 │                                             │
 │  ┌──────────────────────────────────────┐  │
-│  │   Docker Network: aixn-network       │  │
+│  │   Docker Network: xai-network       │  │
 │  │   Subnet: 172.20.0.0/16              │  │
 │  │                                      │  │
 │  │  ┌────────────┐   ┌──────────────┐  │  │
-│  │  │ AIXN Node  │   │  PostgreSQL  │  │  │
+│  │  │ XAI Node  │   │  PostgreSQL  │  │  │
 │  │  │            │───│              │  │  │
 │  │  │ Port: 8333 │   │  Port: 5432  │  │  │
 │  │  │ Port: 8080 │   └──────────────┘  │  │
@@ -356,7 +356,7 @@ External Request
       │
       ▼
 ┌─────────────┐
-│  AIXN Node  │
+│  XAI Node  │
 │  REST API   │◄──┐
 │  Port: 8080 │   │
 └─────────────┘   │
@@ -377,25 +377,25 @@ External Request
 Access: http://localhost:9091
 
 **Key metrics available:**
-- `aixn_blocks_total` - Total blocks in chain
-- `aixn_transactions_total` - Total transactions processed
-- `aixn_peers_active` - Current peer count
-- `aixn_block_time_seconds` - Average block time
-- `aixn_mempool_size` - Pending transactions
-- `aixn_wallet_balance` - Total wallet balances
+- `xai_blocks_total` - Total blocks in chain
+- `xai_transactions_total` - Total transactions processed
+- `xai_peers_active` - Current peer count
+- `xai_block_time_seconds` - Average block time
+- `xai_mempool_size` - Pending transactions
+- `xai_wallet_balance` - Total wallet balances
 - `go_memstats_alloc_bytes` - Memory usage
 - `process_cpu_seconds_total` - CPU usage
 
 **Sample queries:**
 ```promql
 # Average block time over 1 hour
-rate(aixn_block_time_seconds_sum[1h]) / rate(aixn_block_time_seconds_count[1h])
+rate(xai_block_time_seconds_sum[1h]) / rate(xai_block_time_seconds_count[1h])
 
 # Transactions per second
-rate(aixn_transactions_total[5m])
+rate(xai_transactions_total[5m])
 
 # Peer connections trend
-avg_over_time(aixn_peers_active[1h])
+avg_over_time(xai_peers_active[1h])
 ```
 
 ### Grafana Dashboards
@@ -421,13 +421,13 @@ Access: http://localhost:3000
 docker-compose logs -f
 
 # Specific service
-docker-compose logs -f aixn-node
+docker-compose logs -f xai-node
 
 # Last 100 lines
-docker-compose logs --tail=100 aixn-node
+docker-compose logs --tail=100 xai-node
 
 # With timestamps
-docker-compose logs -f -t aixn-node
+docker-compose logs -f -t xai-node
 ```
 
 **Log locations:**
@@ -453,7 +453,7 @@ docker-compose logs -f -t aixn-node
 
 - [ ] **Enable TLS/SSL**
   ```env
-  AIXN_TLS_ENABLED=true
+  XAI_TLS_ENABLED=true
   ```
 
 - [ ] **Configure firewall rules**
@@ -474,7 +474,7 @@ docker-compose logs -f -t aixn-node
 
 - [ ] **Enable API authentication**
   ```env
-  AIXN_API_KEY=generate_secure_random_key
+  XAI_API_KEY=generate_secure_random_key
   ```
 
 - [ ] **Use read-only config mounts**
@@ -589,7 +589,7 @@ DATE=$(date +%Y%m%d-%H%M%S)
 mkdir -p $BACKUP_DIR
 
 # Backup database
-docker-compose exec -T postgres pg_dump -U aixn aixn_blockchain > \
+docker-compose exec -T postgres pg_dump -U xai xai_blockchain > \
   $BACKUP_DIR/db-$DATE.sql
 
 # Backup blockchain data
@@ -621,7 +621,7 @@ make backup
 **Manual commands:**
 ```bash
 # Backup database
-docker-compose exec -T postgres pg_dump -U aixn aixn_blockchain > \
+docker-compose exec -T postgres pg_dump -U xai xai_blockchain > \
   backups/db-$(date +%Y%m%d).sql
 
 # Backup blockchain volume
@@ -640,7 +640,7 @@ docker-compose down
 
 # Restore database
 cat backups/db-20250112.sql | \
-  docker-compose exec -T postgres psql -U aixn aixn_blockchain
+  docker-compose exec -T postgres psql -U xai xai_blockchain
 
 # Restart services
 docker-compose up -d
@@ -673,7 +673,7 @@ docker-compose up -d
 ```bash
 # 1. Install Docker and Docker Compose on new system
 # 2. Clone repository
-git clone https://github.com/aixn-blockchain/crypto.git
+git clone https://github.com/xai-blockchain/crypto.git
 cd crypto
 
 # 3. Restore configuration
@@ -688,7 +688,7 @@ docker run --rm -v crypto_blockchain-data:/data -v $(pwd)/backups:/backup \
 
 # 6. Restore database
 cat backups/db-latest.sql | \
-  docker-compose run --rm -T postgres psql -U aixn aixn_blockchain
+  docker-compose run --rm -T postgres psql -U xai xai_blockchain
 
 # 7. Start services
 docker-compose up -d
@@ -708,10 +708,10 @@ make health
 **Solution:**
 ```bash
 # Check logs
-docker-compose logs aixn-node
+docker-compose logs xai-node
 
 # Check file permissions
-docker-compose exec aixn-node ls -la /data
+docker-compose exec xai-node ls -la /data
 
 # Reset and restart
 docker-compose down
@@ -726,13 +726,13 @@ docker-compose up -d
 **Solution:**
 ```bash
 # Check database status
-docker-compose exec postgres pg_isready -U aixn
+docker-compose exec postgres pg_isready -U xai
 
 # Restart database
 docker-compose restart postgres
 
 # Check credentials
-docker-compose exec postgres psql -U aixn -d aixn_blockchain -c "SELECT 1"
+docker-compose exec postgres psql -U xai -d xai_blockchain -c "SELECT 1"
 
 # Reset database
 docker-compose down postgres
@@ -754,7 +754,7 @@ docker system df -v
 docker system prune -a --volumes
 
 # Remove old logs
-docker-compose exec aixn-node find /logs -type f -mtime +7 -delete
+docker-compose exec xai-node find /logs -type f -mtime +7 -delete
 
 # Increase disk allocation (Docker Desktop)
 # Settings > Resources > Disk image size
@@ -771,13 +771,13 @@ curl http://localhost:8080/api/v1/peers
 
 # Increase peer limit
 # Edit .env:
-AIXN_MAX_PEERS=200
+XAI_MAX_PEERS=200
 
 # Restart node
-docker-compose restart aixn-node
+docker-compose restart xai-node
 
 # Check network connectivity
-docker-compose exec aixn-node ping 8.8.8.8
+docker-compose exec xai-node ping 8.8.8.8
 ```
 
 #### High Memory Usage
@@ -805,13 +805,13 @@ Enable detailed logging:
 ```bash
 # Set in .env
 LOG_LEVEL=DEBUG
-AIXN_DEBUG=true
+XAI_DEBUG=true
 
 # Restart
-docker-compose restart aixn-node
+docker-compose restart xai-node
 
 # View debug logs
-docker-compose logs -f aixn-node
+docker-compose logs -f xai-node
 ```
 
 ### Health Checks
@@ -897,9 +897,9 @@ docker-compose exec redis redis-cli ping
 - [Prometheus Documentation](https://prometheus.io/docs/)
 - [Grafana Documentation](https://grafana.com/docs/)
 
-### AIXN Resources
+### XAI Resources
 
-- Project Repository: https://github.com/aixn-blockchain/crypto
+- Project Repository: https://github.com/xai-blockchain/crypto
 - Documentation: `docs/` directory
 - Issue Tracker: GitHub Issues
 - Community: Discord/Telegram
@@ -915,4 +915,4 @@ For issues and questions:
 
 **Version:** 1.0
 **Last Updated:** January 2025
-**Maintained by:** AIXN Blockchain Team
+**Maintained by:** XAI Blockchain Team

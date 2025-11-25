@@ -1,5 +1,7 @@
-# AIXN Blockchain - Docker Ignore Rules
-# Exclude unnecessary files from Docker build context
+# ============================================================================
+# Docker Build Context Exclusions
+# Reduces build context size and improves build performance
+# ============================================================================
 
 # ============================================================================
 # Version Control
@@ -10,7 +12,7 @@
 .github/
 
 # ============================================================================
-# Python
+# Python Runtime & Cache
 # ============================================================================
 __pycache__/
 *.py[cod]
@@ -24,17 +26,27 @@ build/
 .pytest_cache/
 .mypy_cache/
 .coverage
+.coverage.*
 htmlcov/
 *.log
+pip-log.txt
+pip-delete-this-directory.txt
+*.pyc
+.Python
 
-# Virtual environments
+# ============================================================================
+# Virtual Environments
+# ============================================================================
 venv/
 env/
 ENV/
 .venv
+.venv313
+.venv_wsl
+.env.local
 
 # ============================================================================
-# Development & Testing
+# IDE & Editor Files
 # ============================================================================
 .vscode/
 .idea/
@@ -43,13 +55,27 @@ ENV/
 *~
 .DS_Store
 Thumbs.db
+*.sublime-*
+.project
+.settings/
+.classpath
+*.iml
+.vscode
+launch.json
+settings.json
 
-# Test data
+# ============================================================================
+# Development & Testing
+# ============================================================================
 tests/
 test_*.py
 *_test.py
 pytest.ini
 .pytest_cache/
+.tox/
+coverage.json
+htmlcov/
+.hypothesis/
 
 # ============================================================================
 # Documentation
@@ -60,32 +86,43 @@ README*
 CHANGELOG*
 LICENSE
 CONTRIBUTING*
+.sphinx/
 
 # ============================================================================
 # Blockchain Data (use volumes instead)
 # ============================================================================
-data/
-*.db
-*.sqlite
-*.json.backup
 blockchain_data/
+data/
 wallets/
 crypto_deposits/
 gamification_data/
 mining_data/
 recovery_data/
 exchange_data/
+*.db
+*.sqlite
+*.sqlite3
+*.json.backup
+*.json.corrupted
 
 # ============================================================================
-# Logs
+# Logs & Temporary Files
 # ============================================================================
 logs/
 *.log
 *.log.*
 log_*.txt
+temp/
+tmp/
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+*.cache
 
 # ============================================================================
-# Secure Keys (NEVER include in images)
+# Secure Keys & Secrets (CRITICAL: NEVER include in images)
 # ============================================================================
 secure_keys/
 *.pem
@@ -93,115 +130,172 @@ secure_keys/
 *.crt
 *.p12
 *.pfx
+*.jks
 keystore/
 .env
 .env.*
+.env.local
+.env.*.local
 config/*.secret
 secrets/
+.secrets/
+.security/
+private_keys/
 
 # ============================================================================
-# Docker files (already in context)
+# Monitoring & Metrics Data (configure via volumes)
+# ============================================================================
+prometheus/
+prometheus-data/
+grafana/data/
+grafana-data/
+metrics/
+
+# ============================================================================
+# CI/CD Configuration
+# ============================================================================
+.github/
+.gitlab-ci.yml
+.travis.yml
+azure-pipelines.yml
+.circleci/
+.drone.yml
+Jenkinsfile
+*.tfvars
+
+# ============================================================================
+# Docker Files (already in build context)
 # ============================================================================
 Dockerfile*
 docker-compose*.yml
 .dockerignore
 
 # ============================================================================
-# CI/CD
+# Archives & Compressed Files
 # ============================================================================
-.github/
-.gitlab-ci.yml
-.travis.yml
-azure-pipelines.yml
-
-# ============================================================================
-# Temporary Files
-# ============================================================================
-tmp/
-temp/
-*.tmp
-*.temp
-*.bak
-*.backup
-*.old
-
-# ============================================================================
-# Archives
-# ============================================================================
-archived_*/
 *.zip
 *.tar
 *.tar.gz
 *.tgz
 *.rar
 *.7z
+*.gz
+*.bz2
 
 # ============================================================================
-# Node Modules (if any JavaScript tools)
+# Node Modules & JavaScript Build Artifacts
 # ============================================================================
 node_modules/
 npm-debug.log
+npm-debug.log.*
 yarn-error.log
+yarn-error.log.*
 package-lock.json
 yarn.lock
+.npm/
 
 # ============================================================================
-# IDE & Editor files
-# ============================================================================
-.vscode/
-.idea/
-*.sublime-*
-.project
-.settings/
-.classpath
-
-# ============================================================================
-# Monitoring & Metrics (configure via volumes)
-# ============================================================================
-prometheus/data/
-grafana/data/
-
-# ============================================================================
-# Project-specific exclusions
+# Project Specific Exclusions
 # ============================================================================
 # Archived directories
-archived_C_UsersdecriGitClonesCryptoaixn/
-archived_UsersdecriGitClonesCryptoaixn/
+archived_*/
+archived_C_UsersdecriGitClonesCryptoxai/
+archived_UsersdecriGitClonesCryptoxai/
 XAI/
 
 # Development scripts
 scripts/tools/
 scripts/grant_codex_permissions.ps1
+local-ci.ps1
+local-ci.sh
 
 # Electron build artifacts
 electron/node_modules/
 electron/dist/
 electron/out/
+electron/build/
 
 # Browser extension
 browser_wallet_extension/
 
-# Benchmarks
+# Benchmarks & Examples
 benchmarks/
-
-# Examples
 examples/
 docs/examples/
 
-# Session files
+# Session & Temporary Documentation
 *PROGRESS.md
 SESSION_*.md
 frozen.txt
 new-tools.txt
 launch_config.json
 temp_response.html
+nul
 
-# PowerShell scripts
+# Reports & Analysis
+*_report.txt
+*_report.json
+*_results.txt
+bandit-report*.json
+coverage*.json
+mypy_results.txt
+black_results.txt
+ci_output.txt
+test_output.txt
+test_results*.txt
+
+# PowerShell & Batch Scripts (except deployment)
 *.ps1
-
-# Batch files
+!scripts/deploy/*.ps1
 *.bat
+!scripts/deploy/*.bat
 
-# Shell scripts (except deployment scripts)
+# Shell scripts (except deployment)
 *.sh
 !scripts/deploy/*.sh
+
+# Dashboards
+dashboards/
+*.html
+
+# Exchange & Electron
+exchange/
+browser_wallet_extension/
+
+# ============================================================================
+# Build Artifacts (from CI/CD)
+# ============================================================================
+.venv313/
+.mypy_cache/
+htmlcov/
+dist/
+build/
+*.egg-info/
+.coverage
+.coverage.*
+coverage.xml
+junit.xml
+
+# ============================================================================
+# macOS Specific
+# ============================================================================
+.DS_Store
+.AppleDouble
+.LSOverride
+*.swp
+._*
+
+# ============================================================================
+# Windows Specific
+# ============================================================================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ============================================================================
+# Linux Specific
+# ============================================================================
+.directory
+*~
+.fuse_hidden*

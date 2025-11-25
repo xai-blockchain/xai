@@ -1,7 +1,7 @@
 {
   "dashboard": {
-    "title": "AIXN Blockchain - Network Health",
-    "tags": ["blockchain", "aixn", "network"],
+    "title": "XAI Blockchain - Network Health",
+    "tags": ["blockchain", "xai", "network"],
     "timezone": "browser",
     "schemaVersion": 16,
     "version": 1,
@@ -18,7 +18,7 @@
         "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
         "targets": [
           {
-            "expr": "aixn_peers_connected",
+            "expr": "xai_peers_connected",
             "legendFormat": "Connected Peers"
           }
         ],
@@ -37,11 +37,11 @@
         "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
         "targets": [
           {
-            "expr": "aixn:network_latency:p50",
+            "expr": "xai:network_latency:p50",
             "legendFormat": "50th percentile"
           },
           {
-            "expr": "aixn:network_latency:p95",
+            "expr": "xai:network_latency:p95",
             "legendFormat": "95th percentile"
           }
         ],
@@ -57,7 +57,7 @@
         "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
         "targets": [
           {
-            "expr": "rate(aixn_network_messages_total[1m])",
+            "expr": "rate(xai_network_messages_total[1m])",
             "legendFormat": "{{message_type}}"
           }
         ],
@@ -73,15 +73,15 @@
         "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
         "targets": [
           {
-            "expr": "aixn:network_bandwidth_sent:rate1m",
+            "expr": "xai:network_bandwidth_sent:rate1m",
             "legendFormat": "Sent"
           },
           {
-            "expr": "aixn:network_bandwidth_received:rate1m",
+            "expr": "xai:network_bandwidth_received:rate1m",
             "legendFormat": "Received"
           },
           {
-            "expr": "aixn:network_bandwidth_total:rate1m",
+            "expr": "xai:network_bandwidth_total:rate1m",
             "legendFormat": "Total"
           }
         ],
@@ -97,7 +97,7 @@
         "gridPos": {"h": 4, "w": 8, "x": 0, "y": 16},
         "targets": [
           {
-            "expr": "aixn_network_bandwidth_sent_bytes_total"
+            "expr": "xai_network_bandwidth_sent_bytes_total"
           }
         ],
         "options": {
@@ -117,7 +117,7 @@
         "gridPos": {"h": 4, "w": 8, "x": 8, "y": 16},
         "targets": [
           {
-            "expr": "aixn_network_bandwidth_received_bytes_total"
+            "expr": "xai_network_bandwidth_received_bytes_total"
           }
         ],
         "options": {
@@ -137,7 +137,7 @@
         "gridPos": {"h": 4, "w": 8, "x": 16, "y": 16},
         "targets": [
           {
-            "expr": "aixn:network_latency:p50"
+            "expr": "xai:network_latency:p50"
           }
         ],
         "options": {

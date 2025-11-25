@@ -1,4 +1,4 @@
-# AIXN Blockchain - Start Monitoring Stack (PowerShell)
+# XAI Blockchain - Start Monitoring Stack (PowerShell)
 # Starts Prometheus, Grafana, and Alertmanager using Docker Compose
 
 $ErrorActionPreference = "Stop"
@@ -7,7 +7,7 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PrometheusDir = Join-Path $ScriptDir "..\..\prometheus"
 
 Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "AIXN Blockchain - Monitoring Stack" -ForegroundColor Cyan
+Write-Host "XAI Blockchain - Monitoring Stack" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 

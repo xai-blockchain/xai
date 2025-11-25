@@ -82,7 +82,7 @@ receivers:
     # email_configs:
     #   - to: 'critical-alerts@yourblockchain.network'
     #     headers:
-    #       Subject: '[CRITICAL] AIXN Blockchain Alert: {{ .GroupLabels.alertname }}'
+    #       Subject: '[CRITICAL] XAI Blockchain Alert: {{ .GroupLabels.alertname }}'
 
     # Slack notification
     # slack_configs:

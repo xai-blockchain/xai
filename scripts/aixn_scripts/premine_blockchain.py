@@ -17,8 +17,8 @@ import random
 import hashlib
 import secrets
 
-from src.aixn.core.blockchain import Blockchain, Transaction, Block
-from src.aixn.core.wallet import Wallet
+from src.xai.core.blockchain import Blockchain, Transaction, Block
+from src.xai.core.wallet import Wallet
 
 # Configuration
 BLOCKS_TO_MINE = 64800  # 6 months at 2 min/block (270 days * 24 * 30)

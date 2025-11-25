@@ -1,7 +1,7 @@
 import argparse
 import json
 import os
-from src.aixn.wallet.multisig_wallet import MultiSigWallet
+from src.xai.wallet.multisig_wallet import MultiSigWallet
 
 # Directory to store wallet data (private keys, public keys, multisig configs)
 WALLET_DATA_DIR = "multisig_data"
@@ -70,7 +70,7 @@ def load_transaction(filename):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Multi-signature Wallet CLI for AIXN Blockchain.")
+    parser = argparse.ArgumentParser(description="Multi-signature Wallet CLI for XAI Blockchain.")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # Generate Key Pair

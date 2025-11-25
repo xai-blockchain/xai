@@ -1,0 +1,506 @@
+name: Continuous Security Monitoring
+
+on:
+  # Run on every push to main/develop
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/**'
+      - 'scripts/**'
+      - 'requirements.txt'
+      - '.github/workflows/security-monitoring.yml'
+      - '.security/config.yml'
+
+  # Run on every PR
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'src/**'
+      - 'scripts/**'
+      - 'requirements.txt'
+
+  # Daily comprehensive scan
+  schedule:
+    - cron: '0 2 * * *'   # 2 AM UTC daily
+
+  # Weekly comprehensive scan
+    - cron: '0 3 * * 0'   # 3 AM UTC on Sundays
+
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      scan_mode:
+        description: 'Scan mode'
+        required: true
+        default: 'standard'
+        type: choice
+        options:
+          - quick
+          - standard
+          - comprehensive
+
+permissions:
+  contents: read
+  security-events: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  # Quick scan - Bandit only
+  bandit-scan:
+    name: Bandit Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event.schedule == '0 2 * * *'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit[toml]
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run Bandit security scan
+        id: bandit
+        run: |
+          bandit -r src/ -f json -o bandit-report.json || echo "BANDIT_FAILED=1" >> $GITHUB_ENV
+          bandit -r src/ -f txt
+
+      - name: Upload Bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+          retention-days: 30
+
+      - name: Comment on PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('bandit-report.json', 'utf8'));
+            const vulnerabilities = report.results || [];
+
+            let comment = `## Bandit Security Scan\n\n`;
+            comment += `**Total Issues:** ${vulnerabilities.length}\n\n`;
+
+            if (vulnerabilities.length > 0) {
+              comment += `### Issues Found\n`;
+              vulnerabilities.slice(0, 10).forEach(v => {
+                comment += `- ${v.issue_text} (${v.severity}) in ${v.filename}:${v.line_number}\n`;
+              });
+              if (vulnerabilities.length > 10) {
+                comment += `- ... and ${vulnerabilities.length - 10} more\n`;
+              }
+            } else {
+              comment += `✅ No security issues found\n`;
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  # Safety dependency check
+  safety-scan:
+    name: Safety Dependency Scan
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' || github.event.schedule == '0 2 * * *'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Safety
+        run: pip install safety
+
+      - name: Run Safety check
+        id: safety
+        run: |
+          safety check --json --output safety-report.json || true
+
+      - name: Upload Safety report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: safety-report
+          path: safety-report.json
+          retention-days: 30
+
+  # pip-audit dependency audit
+  pip-audit-scan:
+    name: pip-audit Dependency Audit
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' || github.event.schedule == '0 2 * * *'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit
+        id: pip_audit
+        run: |
+          pip-audit --format json --output pip-audit-report.json || true
+
+      - name: Upload pip-audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
+          retention-days: 30
+
+  # Semgrep SAST
+  semgrep-scan:
+    name: Semgrep SAST Analysis
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event.schedule == '0 3 * * 0'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/owasp-top-ten
+            p/python
+          generateSarif: true
+
+      - name: Upload SARIF report
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+
+  # CodeQL analysis
+  codeql-analysis:
+    name: CodeQL Security Analysis
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'python' ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{matrix.language}}"
+
+  # Trivy container scan
+  trivy-scan:
+    name: Trivy Security Scan
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 3 * * 0'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy SARIF to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # OWASP Dependency-Check
+  dependency-check:
+    name: OWASP Dependency Check
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 3 * * 0'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          path: '.'
+          format: 'JSON'
+          args: >
+            --scan .
+            --exclude .git
+            --exclude .venv
+            --exclude __pycache__
+            --enable-retired
+
+      - name: Upload Dependency-Check report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-check-report
+          path: 'dependency-check-results.json'
+          retention-days: 30
+
+  # Consolidated monitoring script
+  security-monitor:
+    name: Security Monitoring Script
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+    needs: [bandit-scan, safety-scan, pip-audit-scan]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run security monitor
+        id: monitor
+        run: |
+          python scripts/security_monitor.py --mode standard --output security_reports/
+
+      - name: Upload monitoring reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-monitoring-reports
+          path: security_reports/
+          retention-days: 90
+
+      - name: Download all scan reports
+        uses: actions/download-artifact@v4
+        with:
+          path: all-reports/
+
+      - name: Generate combined report
+        if: always()
+        run: |
+          mkdir -p security_reports/
+          cp -r all-reports/*/* security_reports/ 2>/dev/null || true
+
+  # Create security issues for critical findings
+  security-issues:
+    name: Create Security Issues
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    needs: [bandit-scan, safety-scan, pip-audit-scan]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Download scan reports
+        uses: actions/download-artifact@v4
+        with:
+          name: bandit-report
+          path: ./
+
+      - name: Check for critical issues
+        id: check_issues
+        run: |
+          python << 'EOF'
+          import json
+
+          try:
+            with open('bandit-report.json') as f:
+              report = json.load(f)
+          except:
+            exit(0)
+
+          critical_issues = [v for v in report.get('results', []) if v.get('severity') == 'HIGH']
+
+          if critical_issues:
+            print(f"::set-output name=has_critical::true")
+            print(f"::set-output name=issue_count::{len(critical_issues)}")
+          else:
+            print(f"::set-output name=has_critical::false")
+          EOF
+
+      - name: Create GitHub issue for critical findings
+        if: steps.check_issues.outputs.has_critical == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let reportContent = "No report found";
+            try {
+              const report = JSON.parse(fs.readFileSync('bandit-report.json', 'utf8'));
+              const critical = report.results.filter(r => r.severity === 'HIGH');
+
+              reportContent = critical.map(v =>
+                `- **${v.issue_text}** in ${v.filename}:${v.line_number}`
+              ).join('\n');
+            } catch (e) {
+              console.log('Error reading report:', e);
+            }
+
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[SECURITY] Critical vulnerabilities found in ${{ github.event.ref }}`,
+              body: `## Security Alert\n\nCritical security issues were detected:\n\n${reportContent}\n\n**Action Required:** Please review and remediate these issues.`,
+              labels: ['security', 'critical', 'automated']
+            });
+
+  # Update security dashboard
+  update-dashboard:
+    name: Update Security Dashboard
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    needs: [security-monitor]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all reports
+        uses: actions/download-artifact@v4
+        with:
+          path: security_reports/
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Generate dashboard
+        run: |
+          python << 'EOF'
+          import json
+          from datetime import datetime
+          from pathlib import Path
+
+          dashboard_lines = [
+            "# Security Dashboard",
+            f"\nLast Updated: {datetime.now().isoformat()}",
+            "\n## Current Status\n"
+          ]
+
+          # Aggregate reports
+          total_vulns = 0
+          reports_dir = Path('security_reports')
+
+          for report_file in reports_dir.glob('**/security_report_*.json'):
+            try:
+              with open(report_file) as f:
+                report = json.load(f)
+                for tool, result in report.get('results', {}).items():
+                  total_vulns += len(result.get('vulnerabilities', []))
+            except:
+              pass
+
+          max_score = 100
+          score = max(0, max_score - (total_vulns * 2))
+          dashboard_lines.append(f"**Security Score: {score}/100**\n")
+
+          dashboard_lines.extend([
+            "## Recent Scans\n",
+            "- Bandit: Python security scanner",
+            "- Safety: Dependency vulnerability scanner",
+            "- pip-audit: Package auditor",
+            "- Semgrep: Static analysis",
+            "- CodeQL: Advanced analysis",
+            "- Trivy: Container/filesystem scanning\n"
+          ])
+
+          with open('SECURITY-DASHBOARD.md', 'w') as f:
+            f.write('\n'.join(dashboard_lines))
+
+          print("Dashboard updated")
+          EOF
+
+      - name: Commit dashboard changes
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.email "security-bot@xai.crypto"
+          git config --local user.name "Security Bot"
+          git add SECURITY-DASHBOARD.md || true
+          git commit -m "chore: update security dashboard" || true
+          git push || true
+
+  # Summary job
+  security-summary:
+    name: Security Scan Summary
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [bandit-scan, safety-scan, pip-audit-scan, semgrep-scan, codeql-analysis]
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-reports/
+
+      - name: Generate summary
+        run: |
+          echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Scans Completed:**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Bandit: ${{ needs.bandit-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Safety: ${{ needs.safety-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ pip-audit: ${{ needs.pip-audit-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Semgrep: ${{ needs.semgrep-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ CodeQL: ${{ needs.codeql-analysis.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Reports:** All reports are available in the artifacts section" >> $GITHUB_STEP_SUMMARY

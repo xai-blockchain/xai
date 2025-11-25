@@ -1,6 +1,6 @@
-# AIXN Blockchain - Prometheus Monitoring Setup
+# XAI Blockchain - Prometheus Monitoring Setup
 
-Complete monitoring infrastructure for the AIXN blockchain using Prometheus and Grafana.
+Complete monitoring infrastructure for the XAI blockchain using Prometheus and Grafana.
 
 ## Table of Contents
 
@@ -16,7 +16,7 @@ Complete monitoring infrastructure for the AIXN blockchain using Prometheus and 
 
 ## Overview
 
-This monitoring setup provides comprehensive observability for the AIXN blockchain, including:
+This monitoring setup provides comprehensive observability for the XAI blockchain, including:
 
 - **Block production metrics** - Block height, mining time, difficulty
 - **Transaction metrics** - Throughput, mempool size, fees
@@ -29,7 +29,7 @@ This monitoring setup provides comprehensive observability for the AIXN blockcha
 
 ```
 ┌─────────────────┐
-│  AIXN Node      │
+│  XAI Node      │
 │  (Port 8000)    │──┐
 └─────────────────┘  │
                      │    ┌──────────────┐      ┌──────────────┐
@@ -65,8 +65,8 @@ pip install prometheus-client grafana-api python-json-logger
 ### 2. Start Metrics Collection
 
 ```python
-# In your AIXN node startup code
-from src.aixn.core.prometheus_metrics import initialize_metrics
+# In your XAI node startup code
+from src.xai.core.prometheus_metrics import initialize_metrics
 
 # Initialize metrics server
 metrics = initialize_metrics(
@@ -111,9 +111,9 @@ Access Grafana at: http://localhost:3000
 1. Open Grafana (http://localhost:3000)
 2. Go to **Dashboards** → **Import**
 3. Upload JSON files from `dashboards/grafana/`:
-   - `aixn_blockchain_overview.json`
-   - `aixn_network_health.json`
-   - `aixn_api_performance.json`
+   - `xai_blockchain_overview.json`
+   - `xai_network_health.json`
+   - `xai_api_performance.json`
 
 ## Installation
 
@@ -217,7 +217,7 @@ scrape_configs:
 
 ```yaml
 scrape_configs:
-  - job_name: 'aixn-cluster'
+  - job_name: 'xai-cluster'
     static_configs:
       - targets:
         - 'node1.example.com:8000'
@@ -230,7 +230,7 @@ scrape_configs:
 #### Basic Integration
 
 ```python
-from src.aixn.core.prometheus_metrics import get_metrics
+from src.xai.core.prometheus_metrics import get_metrics
 
 metrics = get_metrics()
 
@@ -258,7 +258,7 @@ metrics.update_peer_count(8)
 
 ```python
 import time
-from src.aixn.core.prometheus_metrics import get_metrics
+from src.xai.core.prometheus_metrics import get_metrics
 
 metrics = get_metrics()
 
@@ -307,57 +307,57 @@ def mine_block():
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `aixn_blocks_total` | Counter | Total blocks mined |
-| `aixn_block_height` | Gauge | Current blockchain height |
-| `aixn_block_size_bytes` | Histogram | Block size distribution |
-| `aixn_block_mining_time_seconds` | Histogram | Mining time distribution |
-| `aixn_block_difficulty` | Gauge | Current mining difficulty |
-| `aixn_block_production_rate_per_minute` | Gauge | Blocks produced per minute |
+| `xai_blocks_total` | Counter | Total blocks mined |
+| `xai_block_height` | Gauge | Current blockchain height |
+| `xai_block_size_bytes` | Histogram | Block size distribution |
+| `xai_block_mining_time_seconds` | Histogram | Mining time distribution |
+| `xai_block_difficulty` | Gauge | Current mining difficulty |
+| `xai_block_production_rate_per_minute` | Gauge | Blocks produced per minute |
 
 ### Transaction Metrics
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `aixn_transactions_total{status}` | Counter | Total transactions by status |
-| `aixn_transaction_pool_size` | Gauge | Mempool size |
-| `aixn_transaction_throughput_per_second` | Gauge | TX/s throughput |
-| `aixn_transaction_value_aixn` | Histogram | Transaction value distribution |
-| `aixn_transaction_fee_aixn` | Histogram | Transaction fee distribution |
+| `xai_transactions_total{status}` | Counter | Total transactions by status |
+| `xai_transaction_pool_size` | Gauge | Mempool size |
+| `xai_transaction_throughput_per_second` | Gauge | TX/s throughput |
+| `xai_transaction_value_xai` | Histogram | Transaction value distribution |
+| `xai_transaction_fee_xai` | Histogram | Transaction fee distribution |
 
 ### Network Metrics
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `aixn_peers_connected` | Gauge | Connected peer count |
-| `aixn_network_bandwidth_sent_bytes_total` | Counter | Total bytes sent |
-| `aixn_network_bandwidth_received_bytes_total` | Counter | Total bytes received |
-| `aixn_network_latency_seconds` | Histogram | Network latency distribution |
-| `aixn_network_messages_total{message_type}` | Counter | Network messages by type |
+| `xai_peers_connected` | Gauge | Connected peer count |
+| `xai_network_bandwidth_sent_bytes_total` | Counter | Total bytes sent |
+| `xai_network_bandwidth_received_bytes_total` | Counter | Total bytes received |
+| `xai_network_latency_seconds` | Histogram | Network latency distribution |
+| `xai_network_messages_total{message_type}` | Counter | Network messages by type |
 
 ### API Metrics
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `aixn_api_requests_total{endpoint,method,status}` | Counter | API requests |
-| `aixn_api_request_duration_seconds{endpoint,method}` | Histogram | API response times |
-| `aixn_api_active_connections` | Gauge | Active API connections |
+| `xai_api_requests_total{endpoint,method,status}` | Counter | API requests |
+| `xai_api_request_duration_seconds{endpoint,method}` | Histogram | API response times |
+| `xai_api_active_connections` | Gauge | Active API connections |
 
 ### System Metrics
 
 | Metric | Type | Description |
 |--------|------|-------------|
-| `aixn_system_cpu_usage_percent` | Gauge | CPU usage % |
-| `aixn_system_memory_usage_bytes` | Gauge | Memory usage bytes |
-| `aixn_system_memory_percent` | Gauge | Memory usage % |
-| `aixn_system_disk_usage_bytes` | Gauge | Disk usage bytes |
-| `aixn_system_disk_percent` | Gauge | Disk usage % |
-| `aixn_process_uptime_seconds` | Gauge | Process uptime |
+| `xai_system_cpu_usage_percent` | Gauge | CPU usage % |
+| `xai_system_memory_usage_bytes` | Gauge | Memory usage bytes |
+| `xai_system_memory_percent` | Gauge | Memory usage % |
+| `xai_system_disk_usage_bytes` | Gauge | Disk usage bytes |
+| `xai_system_disk_percent` | Gauge | Disk usage % |
+| `xai_process_uptime_seconds` | Gauge | Process uptime |
 
 ## Dashboards
 
-### AIXN Blockchain Overview
+### XAI Blockchain Overview
 
-**File:** `dashboards/grafana/aixn_blockchain_overview.json`
+**File:** `dashboards/grafana/xai_blockchain_overview.json`
 
 Key panels:
 - Blockchain height over time
@@ -368,7 +368,7 @@ Key panels:
 
 ### Network Health
 
-**File:** `dashboards/grafana/aixn_network_health.json`
+**File:** `dashboards/grafana/xai_network_health.json`
 
 Key panels:
 - Peer connections
@@ -378,7 +378,7 @@ Key panels:
 
 ### API Performance
 
-**File:** `dashboards/grafana/aixn_api_performance.json`
+**File:** `dashboards/grafana/xai_api_performance.json`
 
 Key panels:
 - Request rate by endpoint
@@ -458,7 +458,7 @@ alerting:
 
 ### Metrics Not Appearing
 
-**Problem:** Prometheus shows no metrics from AIXN node
+**Problem:** Prometheus shows no metrics from XAI node
 
 **Solutions:**
 1. Check metrics endpoint is accessible:
@@ -467,7 +467,7 @@ alerting:
    ```
 2. Verify Prometheus target is up:
    - Go to http://localhost:9090/targets
-   - Check if `aixn-node` target is UP
+   - Check if `xai-node` target is UP
 3. Check firewall rules allow port 8000
 
 ### High Memory Usage
@@ -518,7 +518,7 @@ alerting:
 
 ### 1. Metric Naming
 
-- Use consistent prefixes (`aixn_`)
+- Use consistent prefixes (`xai_`)
 - Follow Prometheus naming conventions
 - Include units in names (`_seconds`, `_bytes`, `_total`)
 
@@ -546,41 +546,41 @@ alerting:
 
 ```promql
 # Average blocks per minute (last hour)
-rate(aixn_blocks_total[1h]) * 60
+rate(xai_blocks_total[1h]) * 60
 
 # Time since last block
-time() - timestamp(aixn_block_height)
+time() - timestamp(xai_block_height)
 
 # Average block size (last 24h)
-avg_over_time(aixn_block_size_bytes[24h])
+avg_over_time(xai_block_size_bytes[24h])
 ```
 
 ### Network Health
 
 ```promql
 # Peer count change
-delta(aixn_peers_connected[1h])
+delta(xai_peers_connected[1h])
 
 # Network bandwidth (last 5 minutes)
-rate(aixn_network_bandwidth_sent_bytes_total[5m])
+rate(xai_network_bandwidth_sent_bytes_total[5m])
 
 # 95th percentile latency
-histogram_quantile(0.95, rate(aixn_network_latency_seconds_bucket[5m]))
+histogram_quantile(0.95, rate(xai_network_latency_seconds_bucket[5m]))
 ```
 
 ### Transaction Throughput
 
 ```promql
 # Transactions per second
-rate(aixn_transactions_total[1m])
+rate(xai_transactions_total[1m])
 
 # Transaction success rate
-rate(aixn_transactions_total{status="confirmed"}[5m]) /
-rate(aixn_transactions_total[5m])
+rate(xai_transactions_total{status="confirmed"}[5m]) /
+rate(xai_transactions_total[5m])
 
 # Average transaction fee
-rate(aixn_transaction_fee_aixn_sum[5m]) /
-rate(aixn_transaction_fee_aixn_count[5m])
+rate(xai_transaction_fee_xai_sum[5m]) /
+rate(xai_transaction_fee_xai_count[5m])
 ```
 
 ## Advanced Features
@@ -605,7 +605,7 @@ scrape_configs:
     metrics_path: '/federate'
     params:
       'match[]':
-        - '{job="aixn-node"}'
+        - '{job="xai-node"}'
     static_configs:
       - targets:
         - 'dc1-prometheus:9090'

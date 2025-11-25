@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AIXN Testnet Faucet
+XAI Testnet Faucet
 Provides free testnet tokens for development purposes
 """
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 
 # Configuration
-AIXN_API_URL = os.getenv('AIXN_API_URL', 'http://aixn-testnet-bootstrap:8080')
+XAI_API_URL = os.getenv('XAI_API_URL', 'http://xai-testnet-bootstrap:8080')
 FAUCET_PORT = int(os.getenv('FAUCET_PORT', '8086'))
 FAUCET_AMOUNT = float(os.getenv('FAUCET_AMOUNT', '100'))
 FAUCET_COOLDOWN = int(os.getenv('FAUCET_COOLDOWN', '3600'))  # 1 hour in seconds
@@ -31,7 +31,7 @@ TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>AIXN Testnet Faucet</title>
+    <title>XAI Testnet Faucet</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -89,13 +89,13 @@ TEMPLATE = """
 </head>
 <body>
     <div class="container">
-        <h1>AIXN Testnet Faucet</h1>
+        <h1>XAI Testnet Faucet</h1>
         <div class="info message">
-            <p>Get {{ amount }} testnet AIXN tokens for development.</p>
+            <p>Get {{ amount }} testnet XAI tokens for development.</p>
             <p>Cooldown: {{ cooldown }} seconds between requests.</p>
         </div>
         <form id="faucetForm">
-            <input type="text" id="address" placeholder="Enter your AIXN address" required>
+            <input type="text" id="address" placeholder="Enter your XAI address" required>
             <button type="submit">Request Tokens</button>
         </form>
         <div id="result"></div>
@@ -148,10 +148,10 @@ def check_cooldown(address: str) -> tuple[bool, int]:
 
 
 def send_tokens(address: str, amount: float) -> dict:
-    """Send tokens to the specified address via AIXN API"""
+    """Send tokens to the specified address via XAI API"""
     try:
         response = requests.post(
-            f"{AIXN_API_URL}/api/faucet",
+            f"{XAI_API_URL}/api/faucet",
             json={"address": address, "amount": amount},
             timeout=10
         )
@@ -184,7 +184,7 @@ def request_tokens():
 
     # Validate address format (basic check)
     if not address.startswith('AXN') or len(address) < 40:
-        return jsonify({'success': False, 'error': 'Invalid AIXN address'}), 400
+        return jsonify({'success': False, 'error': 'Invalid XAI address'}), 400
 
     # Check cooldown
     can_request, remaining = check_cooldown(address)
@@ -201,7 +201,7 @@ def request_tokens():
         request_history[address] = time.time()
         return jsonify({
             'success': True,
-            'message': f'Successfully sent {FAUCET_AMOUNT} AIXN to {address}',
+            'message': f'Successfully sent {FAUCET_AMOUNT} XAI to {address}',
             'txid': result.get('txid', 'N/A')
         })
     else:
@@ -218,9 +218,9 @@ def health():
 
 
 if __name__ == '__main__':
-    logger.info(f"Starting AIXN Testnet Faucet on port {FAUCET_PORT}")
-    logger.info(f"Faucet amount: {FAUCET_AMOUNT} AIXN")
+    logger.info(f"Starting XAI Testnet Faucet on port {FAUCET_PORT}")
+    logger.info(f"Faucet amount: {FAUCET_AMOUNT} XAI")
     logger.info(f"Cooldown period: {FAUCET_COOLDOWN} seconds")
-    logger.info(f"AIXN API URL: {AIXN_API_URL}")
+    logger.info(f"XAI API URL: {XAI_API_URL}")
 
     app.run(host='0.0.0.0', port=FAUCET_PORT, debug=False)

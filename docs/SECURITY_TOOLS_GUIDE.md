@@ -1,6 +1,6 @@
 # Security Tools Quick Start Guide
 
-This guide covers the Python security tools installed for the AIXN blockchain project.
+This guide covers the Python security tools installed for the XAI blockchain project.
 
 ## Installed Tools
 
@@ -25,13 +25,13 @@ pip install -r requirements-dev.txt
 #### Scan for Dependency Vulnerabilities
 ```bash
 # Scan requirements file
-pip-audit -r src/aixn/requirements.txt
+pip-audit -r src/xai/requirements.txt
 
 # Scan with fixes suggested
-pip-audit -r src/aixn/requirements.txt --fix
+pip-audit -r src/xai/requirements.txt --fix
 
 # Output to JSON
-pip-audit -r src/aixn/requirements.txt --format json -o pip-audit-report.json
+pip-audit -r src/xai/requirements.txt --format json -o pip-audit-report.json
 ```
 
 #### Run Static Security Analysis (Semgrep)
@@ -66,7 +66,7 @@ bandit -r src/ -c .bandit -f json -o bandit-report.json
 bandit -r src/ -ll
 
 # Scan specific file
-bandit src/aixn/core/wallet.py
+bandit src/xai/core/wallet.py
 ```
 
 ### 3. Code Quality Checks
@@ -74,31 +74,31 @@ bandit src/aixn/core/wallet.py
 #### Run Pylint
 ```bash
 # Check all code
-pylint src/aixn
+pylint src/xai
 
 # Check specific module
-pylint src/aixn/core/blockchain.py
+pylint src/xai/core/blockchain.py
 
 # With custom rcfile
-pylint --rcfile=.pylintrc src/aixn
+pylint --rcfile=.pylintrc src/xai
 
 # JSON output
-pylint src/aixn --output-format=json
+pylint src/xai --output-format=json
 ```
 
 #### Run MyPy (Type Checking)
 ```bash
 # Type check entire project
-mypy src/aixn
+mypy src/xai
 
 # Ignore missing imports
-mypy src/aixn --ignore-missing-imports
+mypy src/xai --ignore-missing-imports
 
 # Strict mode
-mypy src/aixn --strict
+mypy src/xai --strict
 
 # Check specific file
-mypy src/aixn/core/wallet.py
+mypy src/xai/core/wallet.py
 ```
 
 #### Format Code with Black
@@ -110,7 +110,7 @@ black --check src/
 black src/
 
 # Format specific file
-black src/aixn/core/blockchain.py
+black src/xai/core/blockchain.py
 
 # Show diff
 black --diff src/
@@ -125,7 +125,7 @@ flake8 src/
 flake8 --config=.flake8 src/
 
 # Check specific file
-flake8 src/aixn/core/wallet.py
+flake8 src/xai/core/wallet.py
 ```
 
 ## Configuration Files
@@ -147,14 +147,14 @@ Location: `C:\Users\decri\GitClones\Crypto\.semgrepignore`
 # Run all checks before committing
 black --check src/
 flake8 src/
-mypy src/aixn --ignore-missing-imports
+mypy src/xai --ignore-missing-imports
 bandit -r src/ -ll
 ```
 
 ### Full Security Audit
 ```bash
 # Complete security scan
-pip-audit -r src/aixn/requirements.txt
+pip-audit -r src/xai/requirements.txt
 semgrep --config auto src/
 bandit -r src/ -c .bandit
 ```
@@ -306,4 +306,4 @@ Security scan reports are generated in the project root:
 ---
 
 **Last Updated:** 2025-11-12
-**Maintained by:** AIXN Security Team
+**Maintained by:** XAI Security Team

@@ -1,0 +1,9 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.6, pytest-8.3.3, pluggy-1.6.0
+rootdir: C:\Users\decri\GitClones\Crypto
+configfile: pytest.ini
+plugins: anyio-4.11.0, hypothesis-6.148.2, cov-6.0.0, mock-3.14.0, timeout-2.4.0, xdist-3.8.0
+collected 2821 items / 16 deselected / 2805 selected
+
+tests\xai_tests\integration\test_chain_reorg.py sssss.Fss               [  0%]
+tests\xai_tests\integration\test_chain_reorg_comprehensive.py ..

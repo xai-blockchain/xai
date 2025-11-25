@@ -1,9 +1,9 @@
-# AIXN Testnet Faucet - Dockerfile
+# XAI Testnet Faucet - Dockerfile
 
 FROM python:3.11-slim
 
-LABEL maintainer="AIXN Blockchain Team"
-LABEL description="AIXN Testnet Faucet for Development"
+LABEL maintainer="XAI Blockchain Team"
+LABEL description="XAI Testnet Faucet for Development"
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -23,7 +23,7 @@ RUN groupadd -r faucet -g 1002 && \
 WORKDIR /app
 
 # Copy requirements
-COPY src/aixn/requirements.txt .
+COPY src/xai/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy faucet application (placeholder - create if needed)

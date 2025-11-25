@@ -1,0 +1,151 @@
+{
+  "dashboard": {
+    "title": "XAI Withdrawal Threshold History",
+    "tags": [
+      "xai",
+      "security",
+      "withdrawals"
+    ],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "5m",
+    "time": {
+      "from": "now-7d",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "environment",
+          "type": "query",
+          "datasource": "Loki",
+          "refresh": 1,
+          "query": "label_values(job=\"withdrawal_threshold_history\", environment)",
+          "current": {
+            "text": "staging",
+            "value": "staging"
+          }
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Withdrawal Rate Thresholds",
+        "type": "graph",
+        "gridPos": {
+          "h": 9,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "max_over_time({job=\"withdrawal_threshold_history\", environment=\"$environment\"} | json | unwrap recommended_rate[$__interval])",
+            "legendFormat": "Recommended rate",
+            "refId": "A",
+            "datasource": "Loki"
+          },
+          {
+            "expr": "max_over_time({job=\"withdrawal_threshold_history\", environment=\"$environment\"} | json | unwrap current_rate_threshold[$__interval])",
+            "legendFormat": "Configured rate",
+            "refId": "B",
+            "datasource": "Loki"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "withdrawals/min",
+            "logBase": 1
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "lines": true,
+        "linewidth": 2,
+        "legend": {
+          "show": true
+        }
+      },
+      {
+        "id": 2,
+        "title": "Time-lock Backlog Thresholds",
+        "type": "graph",
+        "gridPos": {
+          "h": 9,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "max_over_time({job=\"withdrawal_threshold_history\", environment=\"$environment\"} | json | unwrap recommended_backlog[$__interval])",
+            "legendFormat": "Recommended backlog",
+            "refId": "A",
+            "datasource": "Loki"
+          },
+          {
+            "expr": "max_over_time({job=\"withdrawal_threshold_history\", environment=\"$environment\"} | json | unwrap current_backlog_threshold[$__interval])",
+            "legendFormat": "Configured backlog",
+            "refId": "B",
+            "datasource": "Loki"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "pending withdrawals",
+            "logBase": 1
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "lines": true,
+        "linewidth": 2,
+        "legend": {
+          "show": true
+        }
+      },
+      {
+        "id": 3,
+        "title": "Recent Calibrations",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 9
+        },
+        "targets": [
+          {
+            "expr": "{job=\"withdrawal_threshold_history\", environment=\"$environment\"} | json | line_format \"{{.generated_at}}|{{.recommended_rate}}|{{.current_rate_threshold}}|{{.recommended_backlog}}|{{.current_backlog_threshold}}|{{.alert_required}}\"",
+            "refId": "A",
+            "datasource": "Loki"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "labelsToFields",
+            "options": {
+              "valueLabel": "line"
+            }
+          },
+          {
+            "id": "extractFields",
+            "options": {
+              "source": "line"
+            }
+          }
+        ],
+        "columns": [],
+        "options": {
+          "showHeader": true
+        }
+      }
+    ]
+  }
+}

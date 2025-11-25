@@ -1,4 +1,4 @@
-# AIXN Blockchain Docker - Quick Reference Card
+# XAI Blockchain Docker - Quick Reference Card
 
 ## Quick Start
 
@@ -44,13 +44,13 @@ docker-compose down -v
 docker-compose logs -f
 
 # Specific service
-docker-compose logs -f aixn-node
+docker-compose logs -f xai-node
 
 # Last 100 lines
-docker-compose logs --tail=100 aixn-node
+docker-compose logs --tail=100 xai-node
 
 # Search logs
-docker-compose logs aixn-node | grep ERROR
+docker-compose logs xai-node | grep ERROR
 ```
 
 ### Make Commands
@@ -74,7 +74,7 @@ make clean          # Clean up resources
 | Block Explorer | http://localhost:8082 | - |
 | Grafana | http://localhost:3000 | admin/admin |
 | Prometheus | http://localhost:9091 | - |
-| PostgreSQL | localhost:5432 | aixn/[password] |
+| PostgreSQL | localhost:5432 | xai/[password] |
 | Redis | localhost:6379 | - |
 
 ## Testnet
@@ -107,13 +107,13 @@ make testnet-down
 
 ```bash
 # Open PostgreSQL shell
-docker-compose exec postgres psql -U aixn -d aixn_blockchain
+docker-compose exec postgres psql -U xai -d xai_blockchain
 
 # Backup database
-docker-compose exec postgres pg_dump -U aixn aixn_blockchain > backup.sql
+docker-compose exec postgres pg_dump -U xai xai_blockchain > backup.sql
 
 # Restore database
-cat backup.sql | docker-compose exec -T postgres psql -U aixn aixn_blockchain
+cat backup.sql | docker-compose exec -T postgres psql -U xai xai_blockchain
 
 # Check database status
 docker-compose exec postgres pg_isready
@@ -123,7 +123,7 @@ docker-compose exec postgres pg_isready
 
 ```bash
 # Node shell
-docker-compose exec aixn-node /bin/bash
+docker-compose exec xai-node /bin/bash
 
 # Database shell
 docker-compose exec postgres /bin/bash
@@ -145,7 +145,7 @@ curl http://localhost:8080/health
 curl http://localhost:9090/metrics
 
 # View specific service stats
-docker stats aixn-node
+docker stats xai-node
 ```
 
 ## Backup & Restore
@@ -155,7 +155,7 @@ docker stats aixn-node
 make backup
 
 # Manual database backup
-docker-compose exec -T postgres pg_dump -U aixn aixn_blockchain > \
+docker-compose exec -T postgres pg_dump -U xai xai_blockchain > \
   backups/db-$(date +%Y%m%d).sql
 
 # Manual blockchain backup
@@ -186,17 +186,17 @@ docker-compose exec redis redis-cli ping
 
 ```bash
 # Check recent errors
-docker-compose logs --tail=50 aixn-node | grep -i error
+docker-compose logs --tail=50 xai-node | grep -i error
 
 # Follow error logs
-docker-compose logs -f aixn-node | grep -i "error\|fail\|exception"
+docker-compose logs -f xai-node | grep -i "error\|fail\|exception"
 ```
 
 ### Restart Specific Service
 
 ```bash
 # Restart node only
-docker-compose restart aixn-node
+docker-compose restart xai-node
 
 # Restart database
 docker-compose restart postgres
@@ -221,14 +221,14 @@ Essential `.env` variables:
 
 ```env
 # Environment
-AIXN_ENV=development
+XAI_ENV=development
 
 # Database
 POSTGRES_PASSWORD=secure_password
 
 # Mining (optional)
-AIXN_ENABLE_MINING=false
-AIXN_MINING_ADDRESS=
+XAI_ENABLE_MINING=false
+XAI_MINING_ADDRESS=
 
 # Logging
 LOG_LEVEL=INFO
@@ -257,7 +257,7 @@ docker volume prune
 docker network ls
 
 # Inspect network
-docker network inspect crypto_aixn-network
+docker network inspect crypto_xai-network
 
 # View container IPs
 docker inspect -f '{{.Name}} - {{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $(docker ps -q)
@@ -319,7 +319,7 @@ netstat -ano | findstr :8080  # Windows
 lsof -i :8080                 # Linux/Mac
 
 # Change port in .env
-AIXN_API_PORT=8090
+XAI_API_PORT=8090
 ```
 
 ## Performance Tuning
@@ -329,7 +329,7 @@ AIXN_API_PORT=8090
 Edit `docker-compose.yml`:
 ```yaml
 services:
-  aixn-node:
+  xai-node:
     deploy:
       resources:
         limits:
@@ -343,7 +343,7 @@ services:
 ### Optimize PostgreSQL
 
 ```bash
-docker-compose exec postgres psql -U aixn -d aixn_blockchain -c \
+docker-compose exec postgres psql -U xai -d xai_blockchain -c \
   "ALTER SYSTEM SET shared_buffers = '512MB';"
 docker-compose restart postgres
 ```
@@ -361,7 +361,7 @@ docker-compose top
 docker-compose pull
 
 # Scan for vulnerabilities (requires Docker Scout)
-docker scout cves aixn-node
+docker scout cves xai-node
 ```
 
 ## API Quick Tests
@@ -434,7 +434,7 @@ docker --version
 docker-compose --version
 
 # View container details
-docker inspect aixn-node
+docker inspect xai-node
 ```
 
 ---

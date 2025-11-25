@@ -1,0 +1,117 @@
+BLOCKCHAIN MODULES WITHOUT TESTS
+================================================================================
+
+Total blockchain modules: 37
+Blockchain modules WITHOUT tests: 37
+
+anti_whale_manager
+  -> src\xai\blockchain\anti_whale_manager.py
+
+bridge_fees_insurance
+  -> src\xai\blockchain\bridge_fees_insurance.py
+
+cross_chain_messaging
+  -> src\xai\blockchain\cross_chain_messaging.py
+
+double_sign_detector
+  -> src\xai\blockchain\double_sign_detector.py
+
+downtime_penalty_manager
+  -> src\xai\blockchain\downtime_penalty_manager.py
+
+dust_prevention
+  -> src\xai\blockchain\dust_prevention.py
+
+emergency_pause
+  -> src\xai\blockchain\emergency_pause.py
+
+flash_loan_protection
+  -> src\xai\blockchain\flash_loan_protection.py
+
+fork_detector
+  -> src\xai\blockchain\fork_detector.py
+
+fraud_proofs
+  -> src\xai\blockchain\fraud_proofs.py
+
+front_running_protection
+  -> src\xai\blockchain\front_running_protection.py
+
+impermanent_loss_protection
+  -> src\xai\blockchain\impermanent_loss_protection.py
+
+inflation_monitor
+  -> src\xai\blockchain\inflation_monitor.py
+
+insurance_fund
+  -> src\xai\blockchain\insurance_fund.py
+
+light_client
+  -> src\xai\blockchain\light_client.py
+
+liquidity_locker
+  -> src\xai\blockchain\liquidity_locker.py
+
+liquidity_mining_manager
+  -> src\xai\blockchain\liquidity_mining_manager.py
+
+merkle
+  -> src\xai\blockchain\merkle.py
+
+mev_mitigation
+  -> src\xai\blockchain\mev_mitigation.py
+
+mev_redistributor
+  -> src\xai\blockchain\mev_redistributor.py
+
+nonce_manager
+  -> src\xai\blockchain\nonce_manager.py
+
+oracle_manipulation_detection
+  -> src\xai\blockchain\oracle_manipulation_detection.py
+
+order_book_manipulation_detection
+  -> src\xai\blockchain\order_book_manipulation_detection.py
+
+pool_creation_manager
+  -> src\xai\blockchain\pool_creation_manager.py
+
+relayer_staking
+  -> src\xai\blockchain\relayer_staking.py
+
+slashing
+  -> src\xai\blockchain\slashing.py
+
+slashing_manager
+  -> src\xai\blockchain\slashing_manager.py
+
+slippage_limits
+  -> src\xai\blockchain\slippage_limits.py
+
+state_root_verifier
+  -> src\xai\blockchain\state_root_verifier.py
+
+sync_validator
+  -> src\xai\blockchain\sync_validator.py
+
+token_supply_manager
+  -> src\xai\blockchain\token_supply_manager.py
+
+tombstone_manager
+  -> src\xai\blockchain\tombstone_manager.py
+
+transfer_tax_manager
+  -> src\xai\blockchain\transfer_tax_manager.py
+
+twap_oracle
+  -> src\xai\blockchain\twap_oracle.py
+
+validator_rotation
+  -> src\xai\blockchain\validator_rotation.py
+
+vesting_manager
+  -> src\xai\blockchain\vesting_manager.py
+
+wash_trading_detection
+  -> src\xai\blockchain\wash_trading_detection.py
+

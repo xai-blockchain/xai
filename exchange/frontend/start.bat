@@ -1,6 +1,6 @@
 @echo off
 echo ============================================
-echo AIXN P2P Exchange - Frontend Quick Start
+echo XAI P2P Exchange - Frontend Quick Start
 echo ============================================
 echo.
 echo Starting local web server on port 8080...

@@ -17,11 +17,11 @@ Use this checklist to ensure your CI/CD pipeline is properly configured and oper
   ```
 - [ ] Run local tests to ensure they pass
   ```bash
-  pytest tests/aixn_tests/unit/ -v
+  pytest tests/xai_tests/unit/ -v
   ```
 - [ ] Verify Docker builds successfully
   ```bash
-  docker build -t aixn-blockchain .
+  docker build -t xai-blockchain .
   ```
 
 ## GitHub Repository Configuration
@@ -182,8 +182,8 @@ Use this checklist to ensure your CI/CD pipeline is properly configured and oper
 - [ ] Fix any issues found
 - [ ] Run tests locally
   ```bash
-  pytest tests/aixn_tests/unit/ -v --cov=src/aixn/core
-  pytest tests/aixn_tests/integration/ -v
+  pytest tests/xai_tests/unit/ -v --cov=src/xai/core
+  pytest tests/xai_tests/integration/ -v
   ```
 - [ ] Run security scans locally
   ```bash
@@ -193,8 +193,8 @@ Use this checklist to ensure your CI/CD pipeline is properly configured and oper
 - [ ] Run code quality checks
   ```bash
   black --check src/ tests/ scripts/
-  pylint src/aixn/core/
-  mypy src/aixn/core/
+  pylint src/xai/core/
+  mypy src/xai/core/
   ```
 
 ### Create Test Pull Request
@@ -414,12 +414,12 @@ _________________________________________________________________
 pre-commit run --all-files
 
 # Run tests
-pytest tests/aixn_tests/unit/ -v
+pytest tests/xai_tests/unit/ -v
 
 # Check code quality
 black --check src/
-pylint src/aixn/core/
-mypy src/aixn/core/
+pylint src/xai/core/
+mypy src/xai/core/
 
 # Security scan
 bandit -r src/
@@ -442,10 +442,10 @@ gh pr create  # if using GitHub CLI
 ### Docker
 ```bash
 # Build image
-docker build -t aixn-blockchain .
+docker build -t xai-blockchain .
 
 # Run container
-docker run -p 8333:8333 -p 8080:8080 aixn-blockchain
+docker run -p 8333:8333 -p 8080:8080 xai-blockchain
 
 # Check logs
 docker logs <container-id>

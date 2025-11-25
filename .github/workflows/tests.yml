@@ -40,12 +40,12 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install pytest pytest-cov pytest-xdist pytest-timeout
-        pip install -r src/aixn/requirements.txt
-        pip install -r tests/aixn_tests/requirements_test.txt
+        pip install -r src/xai/requirements.txt
+        pip install -r tests/xai_tests/requirements_test.txt
 
     - name: Run unit tests
       run: |
-        pytest tests/aixn_tests/unit/ -v --cov=src/aixn/core --cov-report=xml --cov-report=term --cov-report=html -n auto
+        pytest tests/xai_tests/unit/ -v --cov=src/xai/core --cov-report=xml --cov-report=term --cov-report=html -n auto
       timeout-minutes: 10
 
     - name: Upload coverage to Codecov
@@ -82,12 +82,12 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install pytest pytest-cov pytest-timeout
-        pip install -r src/aixn/requirements.txt
-        pip install -r tests/aixn_tests/requirements_test.txt
+        pip install -r src/xai/requirements.txt
+        pip install -r tests/xai_tests/requirements_test.txt
 
     - name: Run integration tests
       run: |
-        pytest tests/aixn_tests/integration/ -v --cov=src/aixn --cov-report=xml --cov-report=term
+        pytest tests/xai_tests/integration/ -v --cov=src/xai --cov-report=xml --cov-report=term
       timeout-minutes: 20
 
     - name: Upload coverage to Codecov
@@ -116,12 +116,12 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install pytest pytest-benchmark
-        pip install -r src/aixn/requirements.txt
-        pip install -r tests/aixn_tests/requirements_test.txt
+        pip install -r src/xai/requirements.txt
+        pip install -r tests/xai_tests/requirements_test.txt
 
     - name: Run performance tests
       run: |
-        pytest tests/aixn_tests/performance/ -v --benchmark-only --benchmark-json=benchmark.json
+        pytest tests/xai_tests/performance/ -v --benchmark-only --benchmark-json=benchmark.json
       timeout-minutes: 15
       continue-on-error: true
 
@@ -153,12 +153,12 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install pytest pytest-cov
-        pip install -r src/aixn/requirements.txt
-        pip install -r tests/aixn_tests/requirements_test.txt
+        pip install -r src/xai/requirements.txt
+        pip install -r tests/xai_tests/requirements_test.txt
 
     - name: Run security tests
       run: |
-        pytest tests/aixn_tests/security/ -v --cov=src/aixn --cov-report=xml --cov-report=term
+        pytest tests/xai_tests/security/ -v --cov=src/xai --cov-report=xml --cov-report=term
       timeout-minutes: 15
 
     - name: Upload coverage to Codecov

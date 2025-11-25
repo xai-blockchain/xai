@@ -1,0 +1,133 @@
+---
+# ============================================================================
+# Block Explorer Deployment Role
+# ============================================================================
+
+- name: Create explorer directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0755"
+  loop:
+    - /opt/explorer
+    - /opt/explorer/config
+    - /var/lib/explorer
+    - /var/log/explorer
+
+- name: Pull block explorer Docker image
+  docker_image:
+    name: "xai-explorer:{{ app_version }}"
+    source: pull
+    state: present
+  register: explorer_image_pull
+  retries: 3
+  delay: 10
+
+- name: Create explorer environment file
+  template:
+    src: .env.explorer.j2
+    dest: /opt/explorer/.env
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0600"
+  notify: restart explorer
+
+- name: Create explorer configuration file
+  template:
+    src: explorer.conf.j2
+    dest: /opt/explorer/config/explorer.conf
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0644"
+  notify: restart explorer
+
+- name: Create explorer systemd service
+  template:
+    src: xai-explorer.service.j2
+    dest: /etc/systemd/system/xai-explorer.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart explorer
+
+- name: Enable and start explorer service
+  systemd:
+    name: xai-explorer
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+- name: Wait for explorer to be ready
+  uri:
+    url: "http://localhost:{{ explorer_port }}/health"
+    method: GET
+    status_code: 200
+  register: explorer_health
+  retries: 10
+  delay: 5
+  until: explorer_health is succeeded
+
+- name: Verify explorer API connectivity
+  uri:
+    url: "http://localhost:{{ explorer_port }}/api/v1/blockchain/info"
+    method: GET
+  register: explorer_api
+
+- name: Configure explorer nginx reverse proxy
+  template:
+    src: explorer-nginx.conf.j2
+    dest: /etc/nginx/sites-available/explorer
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart nginx
+
+- name: Enable explorer nginx site
+  file:
+    src: /etc/nginx/sites-available/explorer
+    dest: /etc/nginx/sites-enabled/explorer
+    state: link
+  notify: reload nginx
+
+- name: Configure explorer database
+  postgresql_db:
+    name: "{{ explorer_db_name | default('xai_explorer') }}"
+    owner: "{{ postgres_user }}"
+    encoding: UTF8
+    state: present
+  when: explorer_db_host == 'localhost'
+
+- name: Run explorer database migrations
+  command: "docker exec xai-explorer python manage.py migrate"
+  retries: 3
+  delay: 5
+  ignore_errors: yes
+
+- name: Configure explorer search indexing
+  cron:
+    name: "Explorer index refresh"
+    minute: "*/5"
+    job: "docker exec xai-explorer python manage.py search_index --rebuild"
+    user: root
+    state: present
+
+- name: Set up explorer log rotation
+  template:
+    src: logrotate.d-explorer.j2
+    dest: /etc/logrotate.d/explorer
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Display explorer information
+  debug:
+    msg: |
+      Block Explorer Deployed
+      - Explorer ID: {{ explorer_id }}
+      - Port: {{ explorer_port }}
+      - URL: http://{{ ansible_host }}:{{ explorer_port }}
+      - Backend API: http://localhost:{{ blockchain_api_port }}
+      - Database: {{ explorer_db_host }}:{{ explorer_db_port | default(5432) }}
+      - Status: Running

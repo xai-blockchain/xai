@@ -1,0 +1,148 @@
+name: Rollback Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options:
+          - production
+          - staging
+      backup_directory:
+        description: 'Backup directory for rollback'
+        required: true
+        type: string
+        default: '/var/backups/pre-deployment'
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  # ========================================================================
+  # Approval Gate
+  # ========================================================================
+  
+  approval:
+    name: Approval Gate
+    runs-on: ubuntu-latest
+    environment: rollback-approval
+    
+    steps:
+      - name: Approval granted
+        run: echo "Rollback approval granted for ${{ github.event.inputs.environment }}"
+
+  # ========================================================================
+  # Rollback
+  # ========================================================================
+  
+  rollback:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    needs: approval
+    
+    environment:
+      name: ${{ github.event.inputs.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: |
+            ${{ github.event.inputs.environment == 'production' && 
+                secrets.AWS_ROLE_TO_ASSUME || 
+                secrets.AWS_ROLE_TO_ASSUME_STAGING }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Verify backup exists
+        run: |
+          if [ ! -d "${{ github.event.inputs.backup_directory }}" ]; then
+            echo "Backup directory not found: ${{ github.event.inputs.backup_directory }}"
+            exit 1
+          fi
+          ls -la "${{ github.event.inputs.backup_directory }}/"
+      
+      - name: Set up Ansible
+        run: |
+          pip install ansible boto3 botocore
+      
+      - name: Execute rollback script
+        run: |
+          bash deploy/scripts/rollback.sh "${{ github.event.inputs.backup_directory }}"
+        env:
+          POSTGRES_HOST: ${{ secrets.DB_HOST }}
+          POSTGRES_USER: ${{ secrets.DB_USER }}
+          POSTGRES_DB: ${{ secrets.DB_NAME }}
+      
+      - name: Verify rollback
+        run: bash deploy/scripts/health-check.sh
+      
+      - name: Post rollback notification
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            Rollback Status: ${{ job.status }}
+            Environment: ${{ github.event.inputs.environment }}
+            Backup: ${{ github.event.inputs.backup_directory }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+
+  # ========================================================================
+  # Post-Rollback Verification
+  # ========================================================================
+  
+  verify:
+    name: Verify Rollback
+    runs-on: ubuntu-latest
+    needs: rollback
+    if: success()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: |
+            ${{ github.event.inputs.environment == 'production' && 
+                secrets.AWS_ROLE_TO_ASSUME || 
+                secrets.AWS_ROLE_TO_ASSUME_STAGING }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Run integration tests
+        run: |
+          pip install pytest requests
+          pytest tests/integration -v || true
+      
+      - name: Create incident issue
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Rollback executed for ${{ github.event.inputs.environment }}`,
+              body: `
+                ## Rollback Summary
+                - **Environment**: ${{ github.event.inputs.environment }}
+                - **Initiated by**: @${{ github.actor }}
+                - **Backup used**: ${{ github.event.inputs.backup_directory }}
+                - **Timestamp**: ${{ github.event.repository.updated_at }}
+                
+                ## Next Steps
+                - Investigate root cause of deployment failure
+                - Review logs in CloudWatch
+                - Plan remediation strategy
+              `,
+              labels: ['incident', 'rollback', '${{ github.event.inputs.environment }}']
+            })

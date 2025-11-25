@@ -1,13 +1,13 @@
 """
-AIXN Blockchain - Monitoring Integration Example
+XAI Blockchain - Monitoring Integration Example
 
 This example demonstrates how to integrate Prometheus metrics
-into your AIXN blockchain node.
+into your XAI blockchain node.
 """
 
 import time
 import random
-from src.aixn.core.prometheus_metrics import initialize_metrics, get_metrics
+from src.xai.core.prometheus_metrics import initialize_metrics, get_metrics
 
 
 class BlockchainNodeExample:
@@ -77,7 +77,7 @@ class BlockchainNodeExample:
         # Random success/failure
         if random.random() < 0.95:  # 95% success rate
             status = 'confirmed'
-            print(f"✓ Transaction confirmed: {tx_value:.4f} AIXN (fee: {tx_fee:.6f})")
+            print(f"✓ Transaction confirmed: {tx_value:.4f} XAI (fee: {tx_fee:.6f})")
         else:
             status = 'failed'
             print(f"✗ Transaction failed")
@@ -161,7 +161,7 @@ class BlockchainNodeExample:
             duration_seconds: How long to run the simulation (default: 5 minutes)
         """
         print("=" * 60)
-        print("AIXN Blockchain Node - Monitoring Example")
+        print("XAI Blockchain Node - Monitoring Example")
         print("=" * 60)
         print(f"\nMetrics endpoint: http://localhost:8000/metrics")
         print(f"Running for {duration_seconds} seconds...\n")

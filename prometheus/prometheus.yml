@@ -1,4 +1,4 @@
-# Prometheus Configuration for AIXN Blockchain
+# Prometheus Configuration for XAI Blockchain
 # https://prometheus.io/docs/prometheus/latest/configuration/configuration/
 
 global:
@@ -8,7 +8,7 @@ global:
 
   # Labels to add to all metrics
   external_labels:
-    cluster: 'aixn-blockchain'
+    cluster: 'xai-blockchain'
     environment: 'production'
 
 # Alertmanager configuration (optional - configure if using alerting)
@@ -25,21 +25,21 @@ rule_files:
 
 # Scrape configurations
 scrape_configs:
-  # ==================== AIXN BLOCKCHAIN NODE ====================
-  - job_name: 'aixn-node'
+  # ==================== XAI BLOCKCHAIN NODE ====================
+  - job_name: 'xai-node'
     static_configs:
       - targets: ['localhost:8000']
         labels:
           node_type: 'full_node'
-          instance: 'aixn-node-1'
+          instance: 'xai-node-1'
 
   # Multiple nodes (if running cluster)
-  # - job_name: 'aixn-nodes'
+  # - job_name: 'xai-nodes'
   #   static_configs:
   #     - targets:
-  #       - 'node1.aixn.network:8000'
-  #       - 'node2.aixn.network:8000'
-  #       - 'node3.aixn.network:8000'
+  #       - 'node1.xai.network:8000'
+  #       - 'node2.xai.network:8000'
+  #       - 'node3.xai.network:8000'
 
   # ==================== PROMETHEUS SELF-MONITORING ====================
   - job_name: 'prometheus'
@@ -53,7 +53,7 @@ scrape_configs:
   #     - targets: ['localhost:9100']
 
   # ==================== BLOCK EXPLORER API ====================
-  - job_name: 'aixn-explorer'
+  - job_name: 'xai-explorer'
     metrics_path: '/metrics'
     static_configs:
       - targets: ['localhost:5001']
@@ -68,7 +68,7 @@ scrape_configs:
 
   # ==================== AI SERVICES ====================
   # Monitor AI task execution if exposed
-  - job_name: 'aixn-ai-services'
+  - job_name: 'xai-ai-services'
     metrics_path: '/metrics'
     scrape_interval: 30s  # Less frequent for AI services
     static_configs:

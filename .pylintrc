@@ -25,8 +25,8 @@ ignore=CVS,
        node_modules,
        venv,
        env,
-       archived_C_UsersdecriGitClonesCryptoaixn,
-       archived_UsersdecriGitClonesCryptoaixn,
+       archived_C_UsersdecriGitClonesCryptoxai,
+       archived_UsersdecriGitClonesCryptoxai,
        XAI
 
 # Files or directories matching regex patterns are skipped

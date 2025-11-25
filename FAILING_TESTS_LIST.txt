@@ -1,0 +1,114 @@
+FAILING TESTS - QUICK REFERENCE
+Generated: 2025-11-20
+
+TOTAL IDENTIFIED FAILURES: 44+ (from initial 7% of test run)
+PLUS 4 ERROR tests (fixture/setup issues)
+
+================================================================================
+CONSENSUS & CHAIN REORGANIZATION (11 failures)
+================================================================================
+1. tests/xai_tests/integration/test_chain_reorg.py::TestBlockchainReorganization::test_reorg_protection
+2. tests/xai_tests/integration/test_chain_reorg_comprehensive.py::TestSimpleChainReorg::test_single_block_fork_resolution
+3. tests/xai_tests/integration/test_chain_reorg_comprehensive.py::TestSimpleChainReorg::test_two_block_fork_resolution
+4. tests/xai_tests/integration/test_chain_reorg_comprehensive.py::TestSimpleChainReorg::test_equal_length_fork_uses_work
+5. tests/xai_tests/integration/test_chain_reorg_comprehensive.py::TestDeepChainReorg::test_ten_block_reorganization
+6. tests/xai_tests/integration/test_chain_reorg_comprehensive.py::TestDeepChainReorg::test_deep_reorg_validates_all_blocks
+7. tests/xai_tests/integration/test_chain_reorg_comprehensive.py::TestTransactionHandlingDuringReorg::test_double_spend_prevented_after_reorg
+8. tests/xai_tests/integration/test_chain_reorg_comprehensive.py::TestOrphanBlockHandling::test_orphan_block_stored_until_parent_arrives
+9. tests/xai_tests/integration/test_chain_reorg_comprehensive.py::TestOrphanBlockHandling::test_orphan_block_processed_when_parent_arrives
+10. tests/xai_tests/integration/test_chain_reorg_comprehensive.py::TestCompetingChains::test_three_way_fork_resolution
+11. tests/xai_tests/integration/test_chain_reorg_comprehensive.py::TestCompetingChains::test_competing_chains_with_invalid
+
+================================================================================
+MINING OPERATIONS (10 failures)
+================================================================================
+12. tests/xai_tests/integration/test_mining.py::TestMiningWorkflow::test_mine_empty_block
+13. tests/xai_tests/integration/test_mining.py::TestMiningWorkflow::test_mining_reward_distribution
+14. tests/xai_tests/integration/test_mining.py::TestMiningWorkflow::test_transaction_fees_to_miner
+15. tests/xai_tests/integration/test_mining.py::TestMiningWithTransactions::test_multiple_senders_one_block
+16. tests/xai_tests/integration/test_mining.py::TestMiningWithTransactions::test_chain_transaction_flow
+17. tests/xai_tests/integration/test_mining.py::TestMiningValidation::test_valid_mined_block
+18. tests/xai_tests/integration/test_mining.py::TestMiningValidation::test_block_linking_integrity
+19. tests/xai_tests/integration/test_mining.py::TestMiningValidation::test_utxo_consistency
+20. tests/xai_tests/integration/test_mining.py::TestMiningPerformance::test_mining_time_reasonable
+21. tests/xai_tests/integration/test_mining.py::TestMiningPerformance::test_difficulty_affects_time
+
+================================================================================
+MULTI-NODE CONSENSUS (9 failures + 3 errors)
+================================================================================
+22. tests/xai_tests/integration/test_multi_node_consensus.py::TestMultiNodeConsensus::test_double_spend_prevention [ERROR]
+23. tests/xai_tests/integration/test_multi_node_consensus.py::TestMultiNodeConsensus::test_consensus_manager_operations [ERROR]
+24. tests/xai_tests/integration/test_multi_node_consensus.py::TestMultiNodeConsensus::test_fork_resolution [ERROR]
+25. tests/xai_tests/integration/test_multi_node_consensus.py::TestConsensusEdgeCases::test_single_node_network
+26. tests/xai_tests/integration/test_multi_node_consensus_comprehensive.py::TestThreeNodeConsensus::test_three_nodes_reach_consensus
+27. tests/xai_tests/integration/test_multi_node_consensus_comprehensive.py::TestThreeNodeConsensus::test_three_nodes_concurrent_mining
+28. tests/xai_tests/integration/test_multi_node_consensus_comprehensive.py::TestFiveNodeConsensus::test_five_nodes_majority_consensus
+29. tests/xai_tests/integration/test_multi_node_consensus_comprehensive.py::TestFiveNodeConsensus::test_byzantine_minority_rejected
+30. tests/xai_tests/integration/test_multi_node_consensus_comprehensive.py::TestTransactionPropagation::test_transaction_reaches_all_nodes
+31. tests/xai_tests/integration/test_multi_node_consensus_comprehensive.py::TestNetworkPartitions::test_network_split_creates_forks
+32. tests/xai_tests/integration/test_multi_node_consensus_comprehensive.py::TestNetworkPartitions::test_network_heal_resolves_forks
+33. tests/xai_tests/integration/test_multi_node_consensus_comprehensive.py::TestConsensusFairness::test_all_nodes_can_mine
+34. tests/xai_tests/integration/test_multi_node_consensus_comprehensive.py::TestConsensusFairness::test_no_mining_monopoly
+35. tests/xai_tests/integration/test_multi_node_consensus_comprehensive.py::TestConsensusMetrics::test_consensus_info_accuracy
+
+================================================================================
+NETWORK & TRANSACTION PROPAGATION (8 failures + 1 error)
+================================================================================
+36. tests/xai_tests/integration/test_transaction_propagation.py::TestTransactionPropagation::test_single_transaction_propagation
+37. tests/xai_tests/integration/test_transaction_propagation.py::TestTransactionPropagation::test_transaction_ordering
+38. tests/xai_tests/integration/test_transaction_propagation.py::TestTransactionPropagation::test_transaction_rejection_propagation
+39. tests/xai_tests/integration/test_network.py::TestChainConsensus::test_reject_invalid_chain
+40. tests/xai_tests/integration/test_network.py::TestTransactionPropagation::test_transaction_broadcast
+41. tests/xai_tests/integration/test_network_comprehensive.py::TestChainSynchronization::test_sync_adopts_longer_chain [ERROR]
+42. tests/xai_tests/integration/test_network_comprehensive.py::TestChainSynchronization::test_sync_keeps_own_chain_if_longest
+
+================================================================================
+WALLET OPERATIONS (2 failures)
+================================================================================
+43. tests/xai_tests/integration/test_wallet_integration.py::TestWalletIntegration::test_wallet_multiple_transactions
+44. tests/xai_tests/integration/test_wallet_integration.py::TestWalletIntegration::test_wallet_insufficient_funds
+
+================================================================================
+PRIORITY FIX ORDER
+================================================================================
+
+CRITICAL (Phase 1 - Foundation):
+- test_mine_empty_block (mining completely broken)
+- test_single_block_fork_resolution (consensus broken)
+- test_transaction_broadcast (network broken)
+- test_consensus_manager_operations (ERROR - infrastructure missing)
+
+HIGH (Phase 2 - Blockchain Logic):
+- test_two_block_fork_resolution
+- test_equal_length_fork_uses_work
+- test_utxo_consistency
+- test_reject_invalid_chain
+
+MEDIUM (Phase 3 - Mining):
+- test_mining_reward_distribution
+- test_transaction_fees_to_miner
+- test_valid_mined_block
+
+MEDIUM-LOW (Phase 4 - Distributed):
+- test_three_nodes_reach_consensus
+- test_orphan_block_stored_until_parent_arrives
+- test_wallet_multiple_transactions
+
+================================================================================
+QUICK COMMANDS TO RUN FAILING TESTS
+================================================================================
+
+Run all mining failures:
+pytest tests/xai_tests/integration/test_mining.py -v --tb=short
+
+Run all consensus failures:
+pytest tests/xai_tests/integration/test_chain_reorg_comprehensive.py -v --tb=short
+
+Run single critical failure with details:
+pytest tests/xai_tests/integration/test_mining.py::TestMiningWorkflow::test_mine_empty_block -vv --tb=long
+
+Run all integration failures:
+pytest tests/xai_tests/integration/ -v --tb=short
+
+Run specific category:
+pytest tests/xai_tests/integration/test_multi_node_consensus_comprehensive.py -v --tb=short

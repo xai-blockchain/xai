@@ -18,11 +18,17 @@ __pycache__/
 /.claude/
 /.playwright-mcp/
 /.tmp.*
-/aixn/data/
-/aixn/data_test/
-/aixn/data_testnet/
-/aixn/data_test/backups/
+/xai/data/
+/xai/data_test/
+/xai/data_testnet/
+/xai/data_test/backups/
 /.tmp.*
+
+# Virtual environments and installed packages
+venv/
+.venv/
+env/
+.envrc
 
 # Test coverage
 .coverage
@@ -36,3 +42,11 @@ coverage.xml
 .pytest_cache/
 .mypy_cache/
 .hypothesis/
+
+# Local CI/CD reports (keep for reference, don't commit)
+bandit-report.json
+safety-report.json
+pip-audit-report.json
+semgrep-report.json
+benchmark.json
+junit-*.xml

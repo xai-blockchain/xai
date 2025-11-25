@@ -1,7 +1,7 @@
 {
   "dashboard": {
-    "title": "AIXN Blockchain - API Performance",
-    "tags": ["blockchain", "aixn", "api"],
+    "title": "XAI Blockchain - API Performance",
+    "tags": ["blockchain", "xai", "api"],
     "timezone": "browser",
     "schemaVersion": 16,
     "version": 1,
@@ -18,7 +18,7 @@
         "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
         "targets": [
           {
-            "expr": "sum(rate(aixn_api_requests_total[1m])) by (endpoint)",
+            "expr": "sum(rate(xai_api_requests_total[1m])) by (endpoint)",
             "legendFormat": "{{endpoint}}"
           }
         ],
@@ -34,15 +34,15 @@
         "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
         "targets": [
           {
-            "expr": "aixn:api_latency:p50",
+            "expr": "xai:api_latency:p50",
             "legendFormat": "p50"
           },
           {
-            "expr": "aixn:api_latency:p95",
+            "expr": "xai:api_latency:p95",
             "legendFormat": "p95"
           },
           {
-            "expr": "aixn:api_latency:p99",
+            "expr": "xai:api_latency:p99",
             "legendFormat": "p99"
           }
         ],
@@ -58,7 +58,7 @@
         "gridPos": {"h": 8, "w": 8, "x": 0, "y": 8},
         "targets": [
           {
-            "expr": "aixn:api_success_rate:5m * 100"
+            "expr": "xai:api_success_rate:5m * 100"
           }
         ],
         "options": {
@@ -88,7 +88,7 @@
         "gridPos": {"h": 8, "w": 8, "x": 8, "y": 8},
         "targets": [
           {
-            "expr": "aixn:api_error_rate:5m * 100",
+            "expr": "xai:api_error_rate:5m * 100",
             "legendFormat": "Error Rate %"
           }
         ],
@@ -107,7 +107,7 @@
         "gridPos": {"h": 8, "w": 8, "x": 16, "y": 8},
         "targets": [
           {
-            "expr": "aixn_api_active_connections"
+            "expr": "xai_api_active_connections"
           }
         ],
         "options": {
@@ -122,7 +122,7 @@
         "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
         "targets": [
           {
-            "expr": "sum(rate(aixn_api_requests_total[1m])) by (status)",
+            "expr": "sum(rate(xai_api_requests_total[1m])) by (status)",
             "legendFormat": "{{status}}"
           }
         ],
@@ -138,7 +138,7 @@
         "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
         "targets": [
           {
-            "expr": "sum(increase(aixn_api_requests_total[5m])) by (method)"
+            "expr": "sum(increase(xai_api_requests_total[5m])) by (method)"
           }
         ],
         "options": {
@@ -150,13 +150,55 @@
         }
       },
       {
+        "id": 9,
+        "title": "Faucet Success Rate",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "100 * (increase(xai_faucet_claims_total[5m]) / (increase(xai_faucet_claims_total[5m]) + increase(xai_faucet_errors_total[5m]) + 1e-6))"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 90, "color": "yellow"},
+                {"value": 98, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Faucet Errors per Minute",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "targets": [
+          {
+            "expr": "60 * rate(xai_faucet_errors_total[5m])",
+            "legendFormat": "Errors/min"
+          }
+        ],
+        "yaxes": [
+          {"format": "reqps", "label": "Errors/min"},
+          {"format": "short"}
+        ]
+      },
+      {
         "id": 8,
         "title": "Top 10 Slowest Endpoints",
         "type": "table",
-        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32},
         "targets": [
           {
-            "expr": "topk(10, histogram_quantile(0.95, sum(rate(aixn_api_request_duration_seconds_bucket[5m])) by (endpoint, le)))",
+            "expr": "topk(10, histogram_quantile(0.95, sum(rate(xai_api_request_duration_seconds_bucket[5m])) by (endpoint, le)))",
             "format": "table",
             "instant": true
           }

@@ -9,8 +9,8 @@ from flask_limiter.util import get_remote_address
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.aixn.security.ip_whitelist import IPWhitelist
-from src.aixn.security.audit_logger import AuditLogger # Import AuditLogger
+from src.xai.security.ip_whitelist import IPWhitelist
+from src.xai.security.audit_logger import AuditLogger # Import AuditLogger
 
 app = Flask(__name__)
 # IMPORTANT: Replace with a strong, randomly generated secret key in a real application
@@ -44,7 +44,7 @@ def login_required(f):
 
 @app.route('/')
 def index():
-    return "AIXN Node is running."
+    return "XAI Node is running."
 
 @app.route('/login', methods=['POST'])
 @ip_whitelist.whitelist_required() # Protect login endpoint with IP whitelist
@@ -86,13 +86,13 @@ def public_data():
     return jsonify({"data": "This is public data."})
 
 def main():
-    parser = argparse.ArgumentParser(description="AIXN Blockchain Node.")
+    parser = argparse.ArgumentParser(description="XAI Blockchain Node.")
     parser.add_argument("--host", default="127.0.0.1", help="Host address for the node's API.")
     parser.add_argument("--rpc-port", type=int, default=18545, help="RPC/Web API port.")
     
     args = parser.parse_args()
 
-    print(f"Starting AIXN Node API on http://{args.host}:{args.rpc_port}")
+    print(f"Starting XAI Node API on http://{args.host}:{args.rpc_port}")
     print(f"Admin endpoints are protected by IP Whitelist. Whitelisted IPs: {[str(ip) for ip in ip_whitelist.whitelisted_ips]}")
     app.run(host=args.host, port=args.rpc_port)
 

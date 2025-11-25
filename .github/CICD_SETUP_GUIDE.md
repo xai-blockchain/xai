@@ -1,6 +1,6 @@
-# CI/CD Setup Guide for AIXN Blockchain
+# CI/CD Setup Guide for XAI Blockchain
 
-This guide will help you set up and configure the complete CI/CD pipeline for the AIXN Blockchain project.
+This guide will help you set up and configure the complete CI/CD pipeline for the XAI Blockchain project.
 
 ## Quick Start
 
@@ -18,8 +18,8 @@ pip install pre-commit
 pre-commit install
 
 # 2. Install development dependencies
-pip install -r src/aixn/requirements.txt
-pip install -r tests/aixn_tests/requirements_test.txt
+pip install -r src/xai/requirements.txt
+pip install -r tests/xai_tests/requirements_test.txt
 pip install black pylint mypy bandit safety semgrep
 
 # 3. Test pre-commit hooks
@@ -103,13 +103,13 @@ gh run list  # if gh CLI is installed
 black src/ tests/ scripts/
 
 # Check what Pylint complains about
-pylint src/aixn/core/ --rcfile=.pylintrc
+pylint src/xai/core/ --rcfile=.pylintrc
 
 # Adjust .pylintrc to disable specific warnings:
 # disable=C0103,C0111,W0212
 
 # Check MyPy errors
-mypy src/aixn/core/ --ignore-missing-imports
+mypy src/xai/core/ --ignore-missing-imports
 ```
 
 ### Security Workflow (`security.yml`)
@@ -171,10 +171,10 @@ git log -p | grep -E "(password|secret|key|token)" -i
 **How to fix:**
 ```bash
 # Run tests locally first
-pytest tests/aixn_tests/unit/ -v
+pytest tests/xai_tests/unit/ -v
 
 # Check for import errors
-python -c "import sys; sys.path.insert(0, 'src'); from aixn.core.blockchain import Blockchain"
+python -c "import sys; sys.path.insert(0, 'src'); from xai.core.blockchain import Blockchain"
 
 # Mark slow tests
 # Add to test function:
@@ -210,10 +210,10 @@ pytest -m "not slow"
 **How to fix:**
 ```bash
 # Test Docker build locally
-docker build -t aixn-blockchain .
+docker build -t xai-blockchain .
 
 # If build fails, check Dockerfile
-docker build -t aixn-blockchain . --progress=plain
+docker build -t xai-blockchain . --progress=plain
 
 # Test deployment scripts
 bash scripts/deploy/deploy.sh staging
@@ -257,7 +257,7 @@ Add to README.md:
 Add these to the top of your README.md:
 
 ```markdown
-# AIXN Blockchain
+# XAI Blockchain
 
 [![Code Quality](https://github.com/USERNAME/REPO/actions/workflows/quality.yml/badge.svg)](https://github.com/USERNAME/REPO/actions/workflows/quality.yml)
 [![Security Scan](https://github.com/USERNAME/REPO/actions/workflows/security.yml/badge.svg)](https://github.com/USERNAME/REPO/actions/workflows/security.yml)

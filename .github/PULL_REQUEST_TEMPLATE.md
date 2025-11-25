@@ -1,3 +1,31 @@
+## ⚠️ MANDATORY: Local Testing Confirmation
+
+**CRITICAL**: All testing MUST be done locally before pushing to GitHub to save CI minutes.
+
+- [ ] **I ran `make ci` or `.\local-ci.ps1` locally** - ALL tests passed
+- [ ] **I ran `make quick` at minimum** - All checks passed
+- [ ] **I reviewed local test output** - No errors or warnings
+
+**If you did NOT run local tests:**
+```bash
+# Windows
+.\local-ci.ps1
+
+# Linux/Mac
+./local-ci.sh
+
+# Using Make
+make ci
+```
+
+**Paste local test results below:**
+```bash
+# Paste output from your local CI run here
+
+```
+
+---
+
 ## Description
 Please include a summary of the changes and related context. Explain the "why" behind these changes.
 
@@ -42,3 +70,13 @@ Describe any breaking changes and migration path for users.
 
 ## Additional Notes
 Any additional information reviewers should know.
+
+---
+
+## 💰 Cost Savings Reminder
+
+By running tests locally before pushing, you help save GitHub Actions minutes (which cost money!).
+
+**Thank you for testing locally first!** 🎉
+
+See [DEVELOPMENT-WORKFLOW.md](../DEVELOPMENT-WORKFLOW.md) for complete local testing guide.

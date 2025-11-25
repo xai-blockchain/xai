@@ -1,6 +1,6 @@
-# AIXN P2P Exchange - Frontend
+# XAI P2P Exchange - Frontend
 
-A complete, production-ready web frontend for the AIXN peer-to-peer cryptocurrency exchange.
+A complete, production-ready web frontend for the XAI peer-to-peer cryptocurrency exchange.
 
 ## Features
 
@@ -11,10 +11,10 @@ A complete, production-ready web frontend for the AIXN peer-to-peer cryptocurren
 - JWT token-based authentication
 
 ### Trading Interface
-- **Buy/Sell AIXN**: Place market orders with real-time price calculation
+- **Buy/Sell XAI**: Place market orders with real-time price calculation
 - **Order Book**: Live order book display with bids and asks
 - **Price Ticker**: Real-time price updates with 24h change, high, and low
-- **Wallet Balance**: Display user's AIXN and USD balances
+- **Wallet Balance**: Display user's XAI and USD balances
 - **Recent Trades**: Live feed of recent trades with timestamps
 
 ### Real-time Updates
@@ -77,23 +77,23 @@ npx http-server -p 8080
 3. You'll be redirected to the trading dashboard
 
 ### Step 4: Check Your Balance
-- Your wallet balances (AIXN and USD) are displayed at the top
+- Your wallet balances (XAI and USD) are displayed at the top
 - New accounts typically start with some test balance
 
 ### Step 5: Place a Buy Order
 1. Click the "Buy" tab (should be selected by default)
-2. Enter the price per AIXN in USD
-3. Enter the amount of AIXN you want to buy
+2. Enter the price per XAI in USD
+3. Enter the amount of XAI you want to buy
 4. The total cost will be calculated automatically
-5. Click "Buy AIXN"
+5. Click "Buy XAI"
 6. Check for success message and balance update
 
 ### Step 6: Place a Sell Order
 1. Click the "Sell" tab
-2. Enter the price per AIXN in USD
-3. Enter the amount of AIXN you want to sell
+2. Enter the price per XAI in USD
+3. Enter the amount of XAI you want to sell
 4. The total amount you'll receive is calculated automatically
-5. Click "Sell AIXN"
+5. Click "Sell XAI"
 6. Check for success message and balance update
 
 ### Step 7: Monitor Real-time Updates
@@ -218,7 +218,7 @@ Potential improvements:
 
 ## License
 
-This frontend is part of the AIXN P2P Exchange project.
+This frontend is part of the XAI P2P Exchange project.
 
 ## Support
 

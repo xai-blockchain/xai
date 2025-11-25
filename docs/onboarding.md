@@ -25,7 +25,7 @@ python scripts/prepare_node.py \
 ```
 
 The script writes `node_config.json` into the target `data-dir` and echoes:
-* `python src/aixn/core/node.py --miner <address> --data-dir ./data/my-node --rpc-port 18545`
+* `python src/xai/core/node.py --miner <address> --data-dir ./data/my-node --rpc-port 18545`
 * `curl` examples for `/mining/start`, `/metrics`, `/wallet-trades`, and `/time-capsule/pending`.
 It also checks the data tree for cheap verification.
 
@@ -57,7 +57,7 @@ Use the `/metrics` endpoint (Prometheus-style) to hook dashboards or `grafana/da
 * Run `python scripts/wallet_reminder_daemon.py` once a day (for example at 05:00 UTC) so every eligible miner/node hears about their pre-loaded wallet until it is claimed.
   * Linux example (cron): `0 5 * * * /usr/bin/python /path/to/Crypto/scripts/wallet_reminder_daemon.py`
   * Windows example (Task Scheduler action): `Program/script: python`, `Add arguments: C:/Users/decri/GitClones/Crypto/scripts/wallet_reminder_daemon.py`
-* The daemon now prints a summary of how many pending claims are tracked and exposes `/wallet-claims/summary`; point dashboards (including `docs/grafana_dashboard.json` or `aixn/templates/dashboard.html`) at this endpoint so operators can watch pending counts and due dates.
+* The daemon now prints a summary of how many pending claims are tracked and exposes `/wallet-claims/summary`; point dashboards (including `docs/grafana_dashboard.json` or `xai/templates/dashboard.html`) at this endpoint so operators can watch pending counts and due dates.
 * Daily reminders automatically fall back to monthly after the user dismisses them, so moving the script into your production cron or scheduler keeps the flow bullet-proof.
 
 ## 6. Next steps

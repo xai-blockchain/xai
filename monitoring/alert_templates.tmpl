@@ -1,0 +1,69 @@
+{{ define "slack.default.text" -}}
+{{ range .Alerts -}}
+{{ if eq .Status "firing" }}🚨{{ else }}✅{{ end }} {{ .Labels.alertname }}
+Severity: *{{ .Labels.severity | toUpper }}*
+Service: {{ .Labels.service }}
+{{ if .Labels.instance }}Instance: `{{ .Labels.instance }}`{{ end }}
+{{ if .Annotations.description }}Description: {{ .Annotations.description }}{{ end }}
+{{ if .Annotations.runbook }}[Runbook]({{ .Annotations.runbook }}){{ end }}
+---
+{{ end }}
+{{ end }}
+
+{{ define "slack.default.title" -}}
+[{{ .Status | toUpper }}{{ if eq .Status "firing" }} x{{ .Alerts.Firing | len }}{{ else }} ✓{{ end }}] {{ .GroupLabels.alertname }}
+{{ end }}
+
+{{ define "email.default.text" -}}
+XAI Blockchain Alert Report
+============================
+
+Alert: {{ .GroupLabels.alertname }}
+Status: {{ .Status | toUpper }}
+Time: {{ .GroupLabels.cluster }}
+
+{{ if eq .Status "firing" }}
+FIRING ALERTS:
+{{ range .Alerts.Firing }}
+  • {{ .Labels.alertname }}
+    Severity: {{ .Labels.severity }}
+    Service: {{ .Labels.service }}
+    Instance: {{ .Labels.instance }}
+    Description: {{ .Annotations.description }}
+    Started: {{ .StartsAt }}
+{{ end }}
+{{ end }}
+
+{{ if .Alerts.Resolved }}
+RESOLVED ALERTS:
+{{ range .Alerts.Resolved }}
+  • {{ .Labels.alertname }}
+    Instance: {{ .Labels.instance }}
+    Resolved: {{ .EndsAt }}
+{{ end }}
+{{ end }}
+
+For more details, check the Alertmanager UI at: {{ .ExternalURL }}
+{{ end }}
+
+{{ define "slack.critical.text" -}}
+🚨 *CRITICAL ALERT* 🚨
+{{ range .Alerts.Firing -}}
+*{{ .Labels.alertname }}*
+Severity: *CRITICAL*
+Service: {{ .Labels.service }}
+Instance: {{ .Labels.instance }}
+
+*Description:*
+{{ .Annotations.description }}
+
+*Started:* {{ .StartsAt }}
+{{ if .Annotations.runbook }}*[View Runbook]({{ .Annotations.runbook }})*{{ end }}
+{{ end }}
+{{ end }}
+
+{{ define "pagerduty.default.instances" -}}
+{{ range . -}}
+{{ .Labels.instance }}
+{{ end }}
+{{ end }}

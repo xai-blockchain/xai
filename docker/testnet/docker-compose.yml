@@ -1,7 +1,7 @@
 version: '3.8'
 
 # ============================================================================
-# AIXN Blockchain - Testnet Configuration
+# XAI Blockchain - Testnet Configuration
 # Multi-node testnet for development and testing
 # ============================================================================
 
@@ -9,31 +9,31 @@ services:
   # --------------------------------------------------------------------------
   # Bootstrap Node - Primary testnet node
   # --------------------------------------------------------------------------
-  aixn-testnet-bootstrap:
+  xai-testnet-bootstrap:
     build:
       context: ../..
       dockerfile: docker/node/Dockerfile
-    container_name: aixn-testnet-bootstrap
+    container_name: xai-testnet-bootstrap
     hostname: bootstrap-node
     restart: unless-stopped
     environment:
-      AIXN_ENV: testnet
-      AIXN_NODE_PORT: 8333
-      AIXN_API_PORT: 8080
-      AIXN_WS_PORT: 8081
-      AIXN_METRICS_PORT: 9090
-      AIXN_NETWORK_ID: 2
-      AIXN_IS_BOOTSTRAP: "true"
-      AIXN_BOOTSTRAP_NODES: ""
-      AIXN_ENABLE_MINING: "true"
-      AIXN_MINING_THREADS: 2
-      AIXN_MAX_PEERS: 50
-      AIXN_MIN_PEERS: 3
+      XAI_ENV: testnet
+      XAI_NODE_PORT: 8333
+      XAI_API_PORT: 8080
+      XAI_WS_PORT: 8081
+      XAI_METRICS_PORT: 9090
+      XAI_NETWORK_ID: 2
+      XAI_IS_BOOTSTRAP: "true"
+      XAI_BOOTSTRAP_NODES: ""
+      XAI_ENABLE_MINING: "true"
+      XAI_MINING_THREADS: 2
+      XAI_MAX_PEERS: 50
+      XAI_MIN_PEERS: 3
       LOG_LEVEL: DEBUG
       POSTGRES_HOST: testnet-postgres
       REDIS_HOST: testnet-redis
-      POSTGRES_DB: aixn_testnet
-      POSTGRES_USER: aixn_testnet
+      POSTGRES_DB: xai_testnet
+      POSTGRES_USER: xai_testnet
       POSTGRES_PASSWORD: testnet_password
     ports:
       - "8333:8333"
@@ -60,29 +60,29 @@ services:
   # --------------------------------------------------------------------------
   # Testnet Node 1 - Additional peer node
   # --------------------------------------------------------------------------
-  aixn-testnet-node1:
+  xai-testnet-node1:
     build:
       context: ../..
       dockerfile: docker/node/Dockerfile
-    container_name: aixn-testnet-node1
+    container_name: xai-testnet-node1
     hostname: testnet-node-1
     restart: unless-stopped
     environment:
-      AIXN_ENV: testnet
-      AIXN_NODE_PORT: 8333
-      AIXN_API_PORT: 8080
-      AIXN_METRICS_PORT: 9090
-      AIXN_NETWORK_ID: 2
-      AIXN_IS_BOOTSTRAP: "false"
-      AIXN_BOOTSTRAP_NODES: "172.30.0.10:8333"
-      AIXN_ENABLE_MINING: "true"
-      AIXN_MINING_THREADS: 1
-      AIXN_MAX_PEERS: 25
+      XAI_ENV: testnet
+      XAI_NODE_PORT: 8333
+      XAI_API_PORT: 8080
+      XAI_METRICS_PORT: 9090
+      XAI_NETWORK_ID: 2
+      XAI_IS_BOOTSTRAP: "false"
+      XAI_BOOTSTRAP_NODES: "172.30.0.10:8333"
+      XAI_ENABLE_MINING: "true"
+      XAI_MINING_THREADS: 1
+      XAI_MAX_PEERS: 25
       LOG_LEVEL: INFO
       POSTGRES_HOST: testnet-postgres
       REDIS_HOST: testnet-redis
-      POSTGRES_DB: aixn_testnet
-      POSTGRES_USER: aixn_testnet
+      POSTGRES_DB: xai_testnet
+      POSTGRES_USER: xai_testnet
       POSTGRES_PASSWORD: testnet_password
     ports:
       - "8334:8333"
@@ -96,35 +96,35 @@ services:
       testnet-network:
         ipv4_address: 172.30.0.11
     depends_on:
-      - aixn-testnet-bootstrap
+      - xai-testnet-bootstrap
       - testnet-postgres
       - testnet-redis
 
   # --------------------------------------------------------------------------
   # Testnet Node 2 - Additional peer node
   # --------------------------------------------------------------------------
-  aixn-testnet-node2:
+  xai-testnet-node2:
     build:
       context: ../..
       dockerfile: docker/node/Dockerfile
-    container_name: aixn-testnet-node2
+    container_name: xai-testnet-node2
     hostname: testnet-node-2
     restart: unless-stopped
     environment:
-      AIXN_ENV: testnet
-      AIXN_NODE_PORT: 8333
-      AIXN_API_PORT: 8080
-      AIXN_METRICS_PORT: 9090
-      AIXN_NETWORK_ID: 2
-      AIXN_IS_BOOTSTRAP: "false"
-      AIXN_BOOTSTRAP_NODES: "172.30.0.10:8333,172.30.0.11:8333"
-      AIXN_ENABLE_MINING: "false"
-      AIXN_MAX_PEERS: 25
+      XAI_ENV: testnet
+      XAI_NODE_PORT: 8333
+      XAI_API_PORT: 8080
+      XAI_METRICS_PORT: 9090
+      XAI_NETWORK_ID: 2
+      XAI_IS_BOOTSTRAP: "false"
+      XAI_BOOTSTRAP_NODES: "172.30.0.10:8333,172.30.0.11:8333"
+      XAI_ENABLE_MINING: "false"
+      XAI_MAX_PEERS: 25
       LOG_LEVEL: INFO
       POSTGRES_HOST: testnet-postgres
       REDIS_HOST: testnet-redis
-      POSTGRES_DB: aixn_testnet
-      POSTGRES_USER: aixn_testnet
+      POSTGRES_DB: xai_testnet
+      POSTGRES_USER: xai_testnet
       POSTGRES_PASSWORD: testnet_password
     ports:
       - "8335:8333"
@@ -138,7 +138,7 @@ services:
       testnet-network:
         ipv4_address: 172.30.0.12
     depends_on:
-      - aixn-testnet-bootstrap
+      - xai-testnet-bootstrap
       - testnet-postgres
       - testnet-redis
 
@@ -147,11 +147,11 @@ services:
   # --------------------------------------------------------------------------
   testnet-postgres:
     image: postgres:15-alpine
-    container_name: aixn-testnet-postgres
+    container_name: xai-testnet-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: aixn_testnet
-      POSTGRES_USER: aixn_testnet
+      POSTGRES_DB: xai_testnet
+      POSTGRES_USER: xai_testnet
       POSTGRES_PASSWORD: testnet_password
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
@@ -162,7 +162,7 @@ services:
       testnet-network:
         ipv4_address: 172.30.0.20
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aixn_testnet"]
+      test: ["CMD-SHELL", "pg_isready -U xai_testnet"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -172,7 +172,7 @@ services:
   # --------------------------------------------------------------------------
   testnet-redis:
     image: redis:7-alpine
-    container_name: aixn-testnet-redis
+    container_name: xai-testnet-redis
     restart: unless-stopped
     command: >
       redis-server
@@ -199,10 +199,10 @@ services:
     build:
       context: ../..
       dockerfile: docker/faucet/Dockerfile
-    container_name: aixn-testnet-faucet
+    container_name: xai-testnet-faucet
     restart: unless-stopped
     environment:
-      AIXN_API_URL: http://aixn-testnet-bootstrap:8080
+      XAI_API_URL: http://xai-testnet-bootstrap:8080
       FAUCET_PORT: 8086
       FAUCET_AMOUNT: "100"
       FAUCET_COOLDOWN: "3600"
@@ -212,7 +212,7 @@ services:
       testnet-network:
         ipv4_address: 172.30.0.30
     depends_on:
-      - aixn-testnet-bootstrap
+      - xai-testnet-bootstrap
     profiles:
       - faucet
 
@@ -223,10 +223,10 @@ services:
     build:
       context: ../..
       dockerfile: docker/explorer/Dockerfile
-    container_name: aixn-testnet-explorer
+    container_name: xai-testnet-explorer
     restart: unless-stopped
     environment:
-      AIXN_API_URL: http://aixn-testnet-bootstrap:8080
+      XAI_API_URL: http://xai-testnet-bootstrap:8080
       EXPLORER_PORT: 8087
       EXPLORER_ENV: testnet
     ports:
@@ -235,14 +235,14 @@ services:
       testnet-network:
         ipv4_address: 172.30.0.31
     depends_on:
-      - aixn-testnet-bootstrap
+      - xai-testnet-bootstrap
 
   # --------------------------------------------------------------------------
   # Prometheus Monitoring (Testnet)
   # --------------------------------------------------------------------------
   testnet-prometheus:
     image: prom/prometheus:latest
-    container_name: aixn-testnet-prometheus
+    container_name: xai-testnet-prometheus
     restart: unless-stopped
     command:
       - '--config.file=/etc/prometheus/prometheus-testnet.yml'
@@ -257,16 +257,16 @@ services:
       testnet-network:
         ipv4_address: 172.30.0.40
     depends_on:
-      - aixn-testnet-bootstrap
-      - aixn-testnet-node1
-      - aixn-testnet-node2
+      - xai-testnet-bootstrap
+      - xai-testnet-node1
+      - xai-testnet-node2
 
   # --------------------------------------------------------------------------
   # Grafana Visualization (Testnet)
   # --------------------------------------------------------------------------
   testnet-grafana:
     image: grafana/grafana:latest
-    container_name: aixn-testnet-grafana
+    container_name: xai-testnet-grafana
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: admin

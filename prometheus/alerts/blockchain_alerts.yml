@@ -1,4 +1,4 @@
-# AIXN Blockchain Alert Rules
+# XAI Blockchain Alert Rules
 # These rules define conditions that trigger alerts
 
 groups:
@@ -7,7 +7,7 @@ groups:
     rules:
       # Block production has stopped
       - alert: BlockProductionStopped
-        expr: rate(aixn_blocks_total[5m]) == 0
+        expr: rate(xai_blocks_total[5m]) == 0
         for: 5m
         labels:
           severity: critical
@@ -18,7 +18,7 @@ groups:
 
       # Low block production rate
       - alert: LowBlockProductionRate
-        expr: aixn_block_production_rate_per_minute < 0.5
+        expr: xai_block_production_rate_per_minute < 0.5
         for: 10m
         labels:
           severity: warning
@@ -29,7 +29,7 @@ groups:
 
       # High block mining time
       - alert: HighBlockMiningTime
-        expr: aixn_block_mining_time_seconds > 300
+        expr: xai_block_mining_time_seconds > 300
         for: 5m
         labels:
           severity: warning
@@ -43,7 +43,7 @@ groups:
     rules:
       # No peers connected
       - alert: NoPeersConnected
-        expr: aixn_peers_connected == 0
+        expr: xai_peers_connected == 0
         for: 2m
         labels:
           severity: critical
@@ -54,7 +54,7 @@ groups:
 
       # Low peer count
       - alert: LowPeerCount
-        expr: aixn_peers_connected < 3
+        expr: xai_peers_connected < 3
         for: 5m
         labels:
           severity: warning
@@ -65,7 +65,7 @@ groups:
 
       # High network latency
       - alert: HighNetworkLatency
-        expr: histogram_quantile(0.95, rate(aixn_network_latency_seconds_bucket[5m])) > 2
+        expr: histogram_quantile(0.95, rate(xai_network_latency_seconds_bucket[5m])) > 2
         for: 5m
         labels:
           severity: warning
@@ -79,7 +79,7 @@ groups:
     rules:
       # Large mempool
       - alert: LargeMempool
-        expr: aixn_transaction_pool_size > 10000
+        expr: xai_transaction_pool_size > 10000
         for: 10m
         labels:
           severity: warning
@@ -90,7 +90,7 @@ groups:
 
       # High transaction failure rate
       - alert: HighTransactionFailureRate
-        expr: rate(aixn_transactions_total{status="failed"}[5m]) / rate(aixn_transactions_total[5m]) > 0.1
+        expr: rate(xai_transactions_total{status="failed"}[5m]) / rate(xai_transactions_total[5m]) > 0.1
         for: 5m
         labels:
           severity: warning
@@ -99,12 +99,23 @@ groups:
           summary: "High transaction failure rate"
           description: "{{ $value | humanizePercentage }} of transactions are failing"
 
+      # Faucet error spike
+      - alert: FaucetErrorSpike
+        expr: increase(xai_faucet_errors_total[10m]) > 5 and (increase(xai_faucet_errors_total[10m]) / (increase(xai_faucet_claims_total[10m]) + 1e-6)) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+          component: faucet
+        annotations:
+          summary: "Faucet error rate elevated"
+          description: "{{ $value | humanizePercentage }} of faucet claims failed in the last 10 minutes"
+
   - name: system_health
     interval: 30s
     rules:
       # High CPU usage
       - alert: HighCPUUsage
-        expr: aixn_system_cpu_usage_percent > 90
+        expr: xai_system_cpu_usage_percent > 90
         for: 5m
         labels:
           severity: warning
@@ -115,7 +126,7 @@ groups:
 
       # High memory usage
       - alert: HighMemoryUsage
-        expr: aixn_system_memory_percent > 90
+        expr: xai_system_memory_percent > 90
         for: 5m
         labels:
           severity: warning
@@ -126,7 +137,7 @@ groups:
 
       # High disk usage
       - alert: HighDiskUsage
-        expr: aixn_system_disk_percent > 85
+        expr: xai_system_disk_percent > 85
         for: 10m
         labels:
           severity: warning
@@ -137,7 +148,7 @@ groups:
 
       # Critical disk usage
       - alert: CriticalDiskUsage
-        expr: aixn_system_disk_percent > 95
+        expr: xai_system_disk_percent > 95
         for: 5m
         labels:
           severity: critical
@@ -151,7 +162,7 @@ groups:
     rules:
       # High API error rate
       - alert: HighAPIErrorRate
-        expr: rate(aixn_api_requests_total{status=~"5.."}[5m]) / rate(aixn_api_requests_total[5m]) > 0.05
+        expr: rate(xai_api_requests_total{status=~"5.."}[5m]) / rate(xai_api_requests_total[5m]) > 0.05
         for: 5m
         labels:
           severity: warning
@@ -162,7 +173,7 @@ groups:
 
       # Slow API responses
       - alert: SlowAPIResponses
-        expr: histogram_quantile(0.95, rate(aixn_api_request_duration_seconds_bucket[5m])) > 5
+        expr: histogram_quantile(0.95, rate(xai_api_request_duration_seconds_bucket[5m])) > 5
         for: 5m
         labels:
           severity: warning
@@ -176,7 +187,7 @@ groups:
     rules:
       # Chain not synced
       - alert: ChainNotSynced
-        expr: aixn_chain_sync_status == 0
+        expr: xai_chain_sync_status == 0
         for: 10m
         labels:
           severity: warning
@@ -187,7 +198,7 @@ groups:
 
       # High orphaned block rate
       - alert: HighOrphanedBlockRate
-        expr: rate(aixn_orphaned_blocks_total[1h]) > 0.1
+        expr: rate(xai_orphaned_blocks_total[1h]) > 0.1
         for: 1h
         labels:
           severity: warning
@@ -198,7 +209,7 @@ groups:
 
       # Chain reorganization
       - alert: ChainReorganization
-        expr: increase(aixn_chain_reorgs_total[5m]) > 0
+        expr: increase(xai_chain_reorgs_total[5m]) > 0
         labels:
           severity: warning
           component: consensus
@@ -211,7 +222,7 @@ groups:
     rules:
       # High AI task failure rate
       - alert: HighAITaskFailureRate
-        expr: rate(aixn_ai_tasks_total{status="failed"}[10m]) / rate(aixn_ai_tasks_total[10m]) > 0.2
+        expr: rate(xai_ai_tasks_total{status="failed"}[10m]) / rate(xai_ai_tasks_total[10m]) > 0.2
         for: 10m
         labels:
           severity: warning
@@ -222,7 +233,7 @@ groups:
 
       # Slow AI task execution
       - alert: SlowAITasks
-        expr: histogram_quantile(0.95, rate(aixn_ai_task_duration_seconds_bucket[10m])) > 30
+        expr: histogram_quantile(0.95, rate(xai_ai_task_duration_seconds_bucket[10m])) > 30
         for: 10m
         labels:
           severity: warning

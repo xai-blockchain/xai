@@ -1,5 +1,5 @@
 #!/bin/bash
-# AIXN Blockchain - Start Monitoring Stack
+# XAI Blockchain - Start Monitoring Stack
 # Starts Prometheus, Grafana, and Alertmanager using Docker Compose
 
 set -e
@@ -8,7 +8,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROMETHEUS_DIR="$SCRIPT_DIR/../../prometheus"
 
 echo "=========================================="
-echo "AIXN Blockchain - Monitoring Stack"
+echo "XAI Blockchain - Monitoring Stack"
 echo "=========================================="
 echo ""
 

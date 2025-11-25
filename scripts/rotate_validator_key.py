@@ -3,7 +3,7 @@ import json
 import os
 from datetime import datetime, timezone
 
-from src.aixn.wallet.multisig_wallet import MultiSigWallet
+from src.xai.wallet.multisig_wallet import MultiSigWallet
 from scripts.multisig_cli import load_key_pair, save_key_pair
 from scripts.node_profile import (
     write_node_config,
@@ -13,7 +13,7 @@ from scripts.node_profile import (
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Rotate Validator Key for AIXN Node.")
+    parser = argparse.ArgumentParser(description="Rotate Validator Key for XAI Node.")
     parser.add_argument(
         "--node-data-dir",
         required=True,

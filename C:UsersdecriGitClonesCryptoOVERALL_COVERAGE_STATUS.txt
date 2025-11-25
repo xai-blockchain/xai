@@ -1,0 +1,27 @@
+Current Overall Coverage: 9.95%
+Target: 80%
+Gap: -70.05%
+Covered Statements: 2775 / 22727
+Statements Needed for 80%: 15407
+
+Top 20 Lowest Coverage Modules:
+1. advanced_rate_limiter.py - 0.00% (196 statements missing)
+2. ai_safety_controls_api.py - 0.00% (174 statements missing)
+3. block_explorer.py - 0.00% (156 statements missing)
+4. ai_task_matcher.py - 0.00% (142 statements missing)
+5. ai_code_review.py - 0.00% (132 statements missing)
+6. anonymous_treasury.py - 0.00% (113 statements missing)
+7. order_book_manipulation_detection.py - 0.00% (103 statements missing)
+8. ai_trading_bot.py - 0.00% (212 statements missing)
+9. ai_node_operator_questioning.py - 0.00% (261 statements missing)
+10. ai_pool_with_strict_limits.py - 0.00% (209 statements missing)
+11. xai_blockchain/ai_development_pool.py - 0.00% (192 statements missing)
+12. xai_blockchain/atomic_swap_11_coins.py - 0.00% (87 statements missing)
+13. anonymous_logger.py - 0.00% (83 statements missing)
+14. relayer_staking.py - 0.00% (85 statements missing)
+15. ai_executor_with_questioning.py - 0.00% (84 statements missing)
+16. account_abstraction.py - 0.00% (71 statements missing)
+17. merkle.py - 0.00% (61 statements missing)
+18. fraud_proofs.py - 0.00% (60 statements missing)
+19. front_running_protection.py - 0.00% (60 statements missing)
+20. tombstone_manager.py - 0.00% (60 statements missing)

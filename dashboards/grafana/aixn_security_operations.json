@@ -1,0 +1,223 @@
+{
+  "dashboard": {
+    "title": "XAI Security Operations",
+    "tags": [
+      "xai",
+      "security",
+      "operations"
+    ],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "version": 1,
+    "refresh": "10s",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Security Events (5m rate)",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "increase(xai_security_events_total[5m])",
+            "legendFormat": "all events"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "events",
+            "logBase": 1
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "lines": true,
+        "linewidth": 2
+      },
+      {
+        "id": 2,
+        "title": "Warnings vs Critical",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
+        "stack": true,
+        "targets": [
+          {
+            "expr": "increase(xai_security_events_warning_total[5m])",
+            "legendFormat": "warnings"
+          },
+          {
+            "expr": "increase(xai_security_events_critical_total[5m])",
+            "legendFormat": "critical"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "events",
+            "logBase": 1
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "fill": 5
+      },
+      {
+        "id": 3,
+        "title": "API Key Audit Velocity",
+        "type": "stat",
+        "gridPos": {
+          "h": 6,
+          "w": 8,
+          "x": 0,
+          "y": 8
+        },
+        "targets": [
+          {
+            "expr": "increase(xai_security_events_warning_total{event_type=\"api_key_audit\"}[1h])",
+            "legendFormat": "last hour"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": ""
+          },
+          "orientation": "horizontal",
+          "colorMode": "value"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Security Events (24h cumulative)",
+        "type": "stat",
+        "gridPos": {
+          "h": 6,
+          "w": 8,
+          "x": 8,
+          "y": 8
+        },
+        "targets": [
+          {
+            "expr": "increase(xai_security_events_total[24h])",
+            "legendFormat": "24h"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": ""
+          },
+          "orientation": "horizontal"
+        }
+      },
+      {
+        "id": 5,
+        "title": "Webhook Queue Health",
+        "type": "text",
+        "gridPos": {
+          "h": 6,
+          "w": 8,
+          "x": 16,
+          "y": 8
+        },
+        "options": {
+          "mode": "markdown",
+          "content": "Set `XAI_SECURITY_WEBHOOK_QUEUE_KEY` and monitor `_SecurityWebhookForwarder` logs for dropped events. Add Loki panel to visualize `Dropping webhook event` log lines."
+        }
+      },
+      {
+        "id": 6,
+        "title": "Withdrawal Rate (1m window)",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 14
+        },
+        "targets": [
+          {
+            "expr": "xai_withdrawals_rate_per_minute",
+            "legendFormat": "withdrawals/min"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "withdrawals",
+            "logBase": 1
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "lines": true,
+        "linewidth": 2
+      },
+      {
+        "id": 7,
+        "title": "Time-locked Backlog",
+        "type": "graph",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 14
+        },
+        "targets": [
+          {
+            "expr": "xai_withdrawals_time_locked_backlog",
+            "legendFormat": "pending"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "pending withdrawals",
+            "logBase": 1
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "lines": true,
+        "linewidth": 2
+      },
+      {
+        "id": 8,
+        "title": "Threshold Tuning Runbook",
+        "type": "text",
+        "gridPos": {
+          "h": 6,
+          "w": 24,
+          "x": 0,
+          "y": 22
+        },
+        "options": {
+          "mode": "markdown",
+          "content": "Staging deploys append a \"Withdrawal Threshold Recommendation\" section to the GitHub Actions summary. Review the suggested rate/backlog values after each deploy, then update repository variables or Prometheus rules before promoting to production. When in doubt, re-run `scripts/tools/withdrawal_threshold_calibrator.py` against the latest JSONL log for deeper context."
+        }
+      }
+    ]
+  }
+}

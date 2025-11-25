@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-We take security seriously and actively maintain the following versions of the AIXN blockchain project:
+We take security seriously and actively maintain the following versions of the XAI blockchain project:
 
 | Version | Supported          |
 | ------- | ------------------ |
@@ -13,7 +13,7 @@ We recommend always using the latest version to ensure you have the most recent 
 
 ## Reporting a Vulnerability
 
-We appreciate the security research community's efforts in helping us maintain the security of the AIXN blockchain. If you believe you have found a security vulnerability, please report it to us responsibly.
+We appreciate the security research community's efforts in helping us maintain the security of the XAI blockchain. If you believe you have found a security vulnerability, please report it to us responsibly.
 
 ### How to Report
 
@@ -21,7 +21,7 @@ We appreciate the security research community's efforts in helping us maintain t
 
 Instead, please report security vulnerabilities by:
 
-1. **Email**: Send details to **security@aixn.io** (or create a private security advisory on GitHub)
+1. **Email**: Send details to **security@xai.io** (or create a private security advisory on GitHub)
 2. **Private Security Advisory**: Use GitHub's [private vulnerability reporting feature](https://github.com/[your-org]/crypto/security/advisories/new)
 
 ### What to Include
@@ -88,7 +88,7 @@ Please include as much of the following information as possible:
 
 ## Security Features
 
-The AIXN blockchain implements multiple security layers:
+The XAI blockchain implements multiple security layers:
 
 - **Cryptographic Security**: Industry-standard encryption algorithms
 - **Multi-signature Support**: Enhanced wallet security with multi-sig capabilities
@@ -116,17 +116,33 @@ We aim for responsible disclosure that:
 
 ## Security Audits
 
-We conduct regular security audits of our codebase and welcome independent security reviews. If you're interested in conducting a security audit, please contact us at security@aixn.io.
+We conduct regular security audits of our codebase and welcome independent security reviews. If you're interested in conducting a security audit, please contact us at security@xai.io.
 
 ## Bug Bounty Program
 
-We are planning to establish a bug bounty program to reward security researchers for responsibly disclosing vulnerabilities. Details will be announced on our website and in this document.
+We operate a continuous bug bounty program so responsible researchers can report issues once they are verified on testnet or in production. Scope includes node API/auth, consensus state, monitoring pipelines, infrastructure automation, and client libraries. Targeted attack vectors such as denial of service, consensus rollback, funds theft, and sensitive-data exposure are high-impact candidates for rewards.
+
+### Submission guidelines
+- Report issues privately to **security@xai.io** (or via GitHub’s private advisories at `https://github.com/[your-org]/crypto/security/advisories/new`).
+- Provide reproduction steps, configuration, expected vs. observed behavior, and any PoC code or proof logs.
+- Include the environment you tested (devnet/staging/mainnet), chain height (if applicable), and the XAI addresses involved.
+- We prefer coordinated disclosure timelines—please avoid public disclosure until we publish a fix or advisories together.
+
+### Reward tiers
+- **Critical** (consensus failure, fund loss, private key leakage): 20,000–50,000 XAI tokens.
+- **High** (fund drainage vulnerability, persistent DoS, API misconfiguration leaking secrets): 5,000–20,000 XAI tokens.
+- **Medium** (privilege escalation, validation bypass, telemetry manipulation): 1,000–5,000 XAI tokens.
+- **Low** (info leaks, documentation gaps, minor fuzzable inputs): 250–1,000 XAI tokens.
+
+All valid reports that meet quality standards are compensated in **XAI tokens only**; no other token/payment types are supported.
+
+Rewards are ceded once we verify the issue, merge a fix, and agree on disclosure timing. We may modify payouts to reflect evolving risk or to promote important research paths.
 
 ## Contact
 
-- **Security Email**: security@aixn.io
-- **General Contact**: info@aixn.io
-- **Website**: https://aixn.io
+- **Security Email**: security@xai.io
+- **General Contact**: info@xai.io
+- **Website**: https://xai.io
 - **GitHub Security Advisories**: [Create Private Advisory](https://github.com/[your-org]/crypto/security/advisories/new)
 
 ## Updates to This Policy
@@ -137,4 +153,4 @@ We may update this security policy from time to time. Please check back regularl
 
 **Last Updated**: January 2025
 
-Thank you for helping keep AIXN and our community safe!
+Thank you for helping keep XAI and our community safe!

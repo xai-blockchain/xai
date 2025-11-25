@@ -1,7 +1,7 @@
-# AIXN Blockchain - Testnet Configuration
+# XAI Blockchain - Testnet Configuration
 
 network:
-  name: "AIXN Testnet"
+  name: "XAI Testnet"
   network_id: 2
   port: 8333
   max_peers: 50
@@ -54,7 +54,7 @@ monitoring:
   logging:
     level: "DEBUG"
     format: "json"
-    file: "/logs/node/aixn-testnet.log"
+    file: "/logs/node/xai-testnet.log"
 
 security:
   tls_enabled: false  # No TLS for testnet

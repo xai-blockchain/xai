@@ -1,10 +1,10 @@
-# AIXN Blockchain Monitoring - Quick Start
+# XAI Blockchain Monitoring - Quick Start
 
 ## 1. Install Dependencies (1 minute)
 
 ```bash
 cd C:\Users\decri\GitClones\Crypto
-pip install -r src\aixn\requirements.txt
+pip install -r src\xai\requirements.txt
 ```
 
 ## 2. Verify Setup (30 seconds)
@@ -47,14 +47,14 @@ See full instructions in `prometheus/README.md`
 2. Login: admin/admin
 3. Navigate to **Dashboards** → **Import**
 4. Upload each file from `dashboards/grafana/`:
-   - `aixn_blockchain_overview.json`
-   - `aixn_network_health.json`
-   - `aixn_api_performance.json`
+   - `xai_blockchain_overview.json`
+   - `xai_network_health.json`
+   - `xai_api_performance.json`
 
 ## 6. Integrate into Your Node
 
 ```python
-from src.aixn.core.prometheus_metrics import initialize_metrics, get_metrics
+from src.xai.core.prometheus_metrics import initialize_metrics, get_metrics
 
 # At node startup
 metrics = initialize_metrics(
@@ -89,19 +89,19 @@ metrics.update_mempool_size(len(mempool))
 ## Key Metrics to Watch
 
 ### Critical
-- `aixn_block_height` - Current blockchain height
-- `aixn_peers_connected` - Number of peers (should be >0)
-- `aixn_chain_sync_status` - Sync status (1 = synced)
+- `xai_block_height` - Current blockchain height
+- `xai_peers_connected` - Number of peers (should be >0)
+- `xai_chain_sync_status` - Sync status (1 = synced)
 
 ### Performance
-- `aixn_block_production_rate_per_minute` - Blocks/min
-- `aixn_transaction_throughput_per_second` - TX/s
-- `aixn_system_cpu_usage_percent` - CPU usage
-- `aixn_system_memory_percent` - Memory usage
+- `xai_block_production_rate_per_minute` - Blocks/min
+- `xai_transaction_throughput_per_second` - TX/s
+- `xai_system_cpu_usage_percent` - CPU usage
+- `xai_system_memory_percent` - Memory usage
 
 ### Network
-- `aixn_network_latency_seconds` - Peer latency
-- `aixn_network_bandwidth_*_bytes_total` - Network traffic
+- `xai_network_latency_seconds` - Peer latency
+- `xai_network_bandwidth_*_bytes_total` - Network traffic
 
 ## Common Commands
 

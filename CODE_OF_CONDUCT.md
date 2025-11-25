@@ -74,7 +74,7 @@ community members.
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement at:
 
-**conduct@aixn.io**
+**conduct@xai.io**
 
 All complaints will be reviewed and investigated promptly and fairly.
 
@@ -145,7 +145,7 @@ When a community leader receives a report, they will:
 ## Appeals
 
 Anyone subject to enforcement action may appeal the decision by contacting
-the project leadership at conduct@aixn.io within 14 days. Appeals will be
+the project leadership at conduct@xai.io within 14 days. Appeals will be
 reviewed by community leaders who were not involved in the original decision.
 
 ## Attribution
@@ -195,11 +195,11 @@ For answers to common questions about this code of conduct, see the FAQ at
 ## Contact
 
 For questions about this Code of Conduct:
-* **Email**: conduct@aixn.io
+* **Email**: conduct@xai.io
 * **GitHub Discussions**: [Community Discussion](https://github.com/[your-org]/crypto/discussions)
 
 ---
 
 **Last Updated**: January 2025
 
-Thank you for helping make the AIXN community welcoming and inclusive!
+Thank you for helping make the XAI community welcoming and inclusive!

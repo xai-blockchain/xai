@@ -1,9 +1,9 @@
-# AIXN Block Explorer - Dockerfile
+# XAI Block Explorer - Dockerfile
 
 FROM python:3.11-slim
 
-LABEL maintainer="AIXN Blockchain Team"
-LABEL description="AIXN Block Explorer Web Interface"
+LABEL maintainer="XAI Blockchain Team"
+LABEL description="XAI Block Explorer Web Interface"
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -24,14 +24,14 @@ RUN groupadd -r explorer -g 1001 && \
 WORKDIR /app
 
 # Copy requirements and install
-COPY src/aixn/requirements.txt .
+COPY src/xai/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application
-COPY --chown=explorer:explorer src/aixn/explorer.py ./
-COPY --chown=explorer:explorer src/aixn/block_explorer.py ./
-COPY --chown=explorer:explorer src/aixn/templates/ ./templates/
-COPY --chown=explorer:explorer src/aixn/core/ ./core/
+COPY --chown=explorer:explorer src/xai/explorer.py ./
+COPY --chown=explorer:explorer src/xai/block_explorer.py ./
+COPY --chown=explorer:explorer src/xai/templates/ ./templates/
+COPY --chown=explorer:explorer src/xai/core/ ./core/
 
 USER explorer
 

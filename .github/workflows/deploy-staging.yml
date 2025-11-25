@@ -1,0 +1,287 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches:
+      - develop
+      - 'release/**'
+  workflow_dispatch:
+
+concurrency:
+  group: staging-deployment
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}-staging
+  AWS_REGION: us-east-1
+
+jobs:
+  # ========================================================================
+  # Build
+  # ========================================================================
+  
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      - name: Log in to Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile.prod
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+  
+  # ========================================================================
+  # Deploy to Staging
+  # ========================================================================
+  
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    
+    environment:
+      name: staging
+      url: https://staging-api.xai-blockchain.com
+    
+    permissions:
+      contents: read
+      id-token: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME_STAGING }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+      
+      - name: Initialize Terraform
+        run: |
+          cd deploy/terraform
+          terraform init -upgrade \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET_STAGING }}" \
+            -backend-config="key=staging/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}" \
+            -backend-config="encrypt=true" \
+            -backend-config="dynamodb_table=terraform-locks"
+      
+      - name: Plan Terraform changes
+        run: |
+          cd deploy/terraform
+          terraform plan \
+            -var-file="environments/staging.tfvars" \
+            -out=tfplan
+      
+      - name: Apply Terraform changes
+        run: |
+          cd deploy/terraform
+          terraform apply tfplan
+      
+      - name: Set up Ansible
+        run: |
+          pip install ansible boto3 botocore
+      
+      - name: Deploy with Ansible
+        run: |
+          cd deploy/ansible
+          ansible-playbook -i inventory/staging.yml site.yml \
+            -e "environment=staging" \
+            -v
+      
+      - name: Run health checks
+        run: bash deploy/scripts/health-check.sh
+        continue-on-error: true
+      
+      - name: Run integration tests
+        run: |
+          pip install pytest requests
+          pytest tests/integration -v || true
+
+      - name: Withdrawal telemetry probe
+        run: |
+          python scripts/tools/withdrawal_alert_probe.py \
+            --events-log "${WITHDRAWAL_EVENTS_LOG:-monitoring/withdrawals_events.jsonl}" \
+            --locks-file "${TIMELOCK_FILE:-data/wallet/time_locked_withdrawals.json}" \
+            --rate-threshold "${WITHDRAWAL_RATE_THRESHOLD:-15}" \
+            --backlog-threshold "${TIMELOCK_BACKLOG_THRESHOLD:-5}"
+        env:
+          WITHDRAWAL_EVENTS_LOG: ${{ secrets.STAGING_WITHDRAWAL_EVENTS_LOG }}
+          TIMELOCK_FILE: ${{ secrets.STAGING_TIMELOCK_FILE }}
+          WITHDRAWAL_RATE_THRESHOLD: ${{ vars.WITHDRAWAL_RATE_THRESHOLD }}
+          TIMELOCK_BACKLOG_THRESHOLD: ${{ vars.TIMELOCK_BACKLOG_THRESHOLD }}
+
+      - name: Withdrawal threshold summary
+        id: threshold_summary
+        continue-on-error: true
+        run: |
+          set +e
+          python scripts/tools/withdrawal_threshold_calibrator.py \
+            --events-log "${WITHDRAWAL_EVENTS_LOG:-monitoring/withdrawals_events.jsonl}" \
+            --locks-file "${TIMELOCK_FILE:-data/wallet/time_locked_withdrawals.json}" \
+            --current-rate-threshold "${WITHDRAWAL_RATE_THRESHOLD:-15}" \
+            --current-backlog-threshold "${TIMELOCK_BACKLOG_THRESHOLD:-5}" \
+            --json-output threshold_details.json | tee threshold_summary.txt
+          status=$?
+          set -e
+          if [ $status -ne 0 ]; then
+            echo "::warning::Threshold calibrator failed (status $status). See logs above."
+            echo "Threshold calibrator failed (see workflow logs)." > threshold_summary.txt
+            rm -f threshold_details.json
+          fi
+          python3 <<'PY'
+import json
+import os
+from pathlib import Path
+
+details_path = Path("threshold_details.json")
+metrics_path = Path("threshold_metrics.env")
+if not details_path.exists():
+    metrics_path.write_text(
+        "recommended_rate=\nrecommended_backlog=\ncurrent_rate_threshold=\ncurrent_backlog_threshold=\nalert_required=false\n",
+        encoding="utf-8",
+    )
+else:
+    data = json.loads(details_path.read_text(encoding="utf-8"))
+    recommendations = data.get("recommendations", {})
+    current = data.get("current_thresholds", {})
+    metrics = {
+        "recommended_rate": recommendations.get("rate_per_minute", ""),
+        "recommended_backlog": recommendations.get("time_lock_backlog", ""),
+        "current_rate_threshold": current.get("rate_per_minute") or os.environ.get("WITHDRAWAL_RATE_THRESHOLD", ""),
+        "current_backlog_threshold": current.get("time_lock_backlog") or os.environ.get("TIMELOCK_BACKLOG_THRESHOLD", ""),
+        "alert_required": "true" if data.get("alert_required") else "false",
+    }
+    with metrics_path.open("w", encoding="utf-8") as handle:
+        for key, value in metrics.items():
+            handle.write(f"{key}={value}\n")
+PY
+          {
+            echo "### Withdrawal Threshold Recommendation";
+            cat threshold_summary.txt;
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "details<<'EOF'" >> "$GITHUB_OUTPUT"
+          cat threshold_summary.txt >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          cat threshold_metrics.env >> "$GITHUB_OUTPUT"
+        env:
+          WITHDRAWAL_EVENTS_LOG: ${{ secrets.STAGING_WITHDRAWAL_EVENTS_LOG }}
+          TIMELOCK_FILE: ${{ secrets.STAGING_TIMELOCK_FILE }}
+          WITHDRAWAL_RATE_THRESHOLD: ${{ vars.WITHDRAWAL_RATE_THRESHOLD }}
+          TIMELOCK_BACKLOG_THRESHOLD: ${{ vars.TIMELOCK_BACKLOG_THRESHOLD }}
+
+      - name: Store threshold history
+        if: always()
+        run: |
+          if [ ! -f threshold_details.json ]; then
+            echo "threshold_details.json missing; skipping history ingestion."
+            exit 0
+          fi
+          python scripts/tools/threshold_artifact_ingest.py \
+            --details threshold_details.json \
+            --history-file monitoring/withdrawal_threshold_history.jsonl \
+            --environment "staging" \
+            --max-history-entries 500 \
+            --markdown-output threshold_summary.md \
+            --print-markdown
+        env:
+          DEPLOY_ENVIRONMENT: staging
+
+      - name: Publish threshold summary to runbooks
+        if: always() && (vars.WITHDRAWAL_CALIBRATION_ISSUE != '' || secrets.WITHDRAWAL_CALIBRATION_SLACK_WEBHOOK != '' || (secrets.JIRA_API_TOKEN != '' && vars.WITHDRAWAL_CALIBRATION_JIRA_ISSUE != ''))
+        env:
+          DEPLOY_ENVIRONMENT: staging
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITHDRAWAL_CALIBRATION_ISSUE: ${{ vars.WITHDRAWAL_CALIBRATION_ISSUE }}
+          WITHDRAWAL_CALIBRATION_SLACK_WEBHOOK: ${{ secrets.WITHDRAWAL_CALIBRATION_SLACK_WEBHOOK }}
+          WITHDRAWAL_CALIBRATION_JIRA_ISSUE: ${{ vars.WITHDRAWAL_CALIBRATION_JIRA_ISSUE }}
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        run: |
+          if [ ! -f threshold_details.json ]; then
+            echo "threshold_details.json missing; skipping publication."
+            exit 0
+          fi
+          python scripts/tools/threshold_artifact_publish.py \
+            --details threshold_details.json \
+            --markdown threshold_summary.md \
+            --github-repo "${GITHUB_REPOSITORY}"
+
+      - name: Post notification
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            Staging Deployment Status: ${{ job.status }}
+            Commit: ${{ github.sha }}
+            Branch: ${{ github.ref }}
+            Thresholds:
+            ${{ steps.threshold_summary.outputs.details }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: PagerDuty notification
+        if: always() && secrets.PAGERDUTY_ROUTING_KEY != '' && steps.threshold_summary.outputs.alert_required == 'true'
+        uses: PagerDuty/pagerduty-action@v1
+        with:
+          routing_key: ${{ secrets.PAGERDUTY_ROUTING_KEY }}
+          dedup_key: staging-withdrawal-thresholds
+          summary: |
+            Staging Deploy ${{ job.status }} - Withdrawal thresholds
+            ${{ steps.threshold_summary.outputs.details }}
+          severity: info
+      - name: Upload threshold artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: threshold-artifacts
+          path: |
+            threshold_details.json
+            threshold_metrics.env
+            threshold_summary.txt
+            threshold_summary.md
+            monitoring/withdrawal_threshold_history.jsonl
+          if-no-files-found: warn

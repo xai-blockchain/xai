@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-AIXN Blockchain - Monitoring Verification Script
+XAI Blockchain - Monitoring Verification Script
 
 Verifies that all monitoring components are properly installed and configured.
 """
@@ -11,6 +11,11 @@ import os
 import requests
 import time
 from pathlib import Path
+import argparse
+import json
+import subprocess
+import shlex
+from typing import List, Optional
 
 # Set UTF-8 encoding for Windows console
 if sys.platform == "win32":
@@ -90,7 +95,7 @@ def check_file_structure():
     project_root = script_dir.parent.parent
 
     required_files = [
-        "src/aixn/core/prometheus_metrics.py",
+        "src/xai/core/prometheus_metrics.py",
         "prometheus/prometheus.yml",
         "prometheus/alerts/blockchain_alerts.yml",
         "prometheus/recording_rules/blockchain_rules.yml",
@@ -126,25 +131,25 @@ def check_metrics_endpoint(port=8000, timeout=2):
         if response.status_code == 200:
             print_success(f"Metrics endpoint is accessible at {url}")
 
-            # Check for AIXN-specific metrics
+            # Check for XAI-specific metrics
             content = response.text
-            aixn_metrics = [
-                "aixn_block_height",
-                "aixn_peers_connected",
-                "aixn_transactions_total",
+            xai_metrics = [
+                "xai_block_height",
+                "xai_peers_connected",
+                "xai_transactions_total",
             ]
 
             metrics_found = []
-            for metric in aixn_metrics:
+            for metric in xai_metrics:
                 if metric in content:
                     metrics_found.append(metric)
 
             if metrics_found:
-                print_success(f"Found {len(metrics_found)} AIXN metrics")
+                print_success(f"Found {len(metrics_found)} XAI metrics")
                 for metric in metrics_found:
                     print(f"  • {metric}")
             else:
-                print_warning("No AIXN-specific metrics found yet")
+                print_warning("No XAI-specific metrics found yet")
                 print_info("  Metrics will appear once the node is running")
 
             return True
@@ -154,7 +159,7 @@ def check_metrics_endpoint(port=8000, timeout=2):
 
     except requests.exceptions.ConnectionError:
         print_warning("Metrics endpoint is not accessible")
-        print_info("  This is normal if the AIXN node is not running")
+        print_info("  This is normal if the XAI node is not running")
         print_info(f"  The endpoint will be available at {url} when the node starts")
         return None
     except requests.exceptions.Timeout:
@@ -248,11 +253,201 @@ def check_alertmanager(port=9093):
         return False
 
 
+def check_withdrawal_history(env: str, history_path: Path, max_entries: int, loki_url: Optional[str], loki_token: Optional[str]) -> bool:
+    """Check that withdrawal threshold history is populated and, optionally, query Loki."""
+    print_header("Checking Withdrawal Threshold History")
+    if not history_path.exists():
+        print_warning(f"{history_path} not found")
+        print_info("  Run threshold_artifact_ingest.py or ensure the workflow artifacts were synced.")
+        return False
+
+    lines = [line for line in history_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if not lines:
+        print_warning("History file exists but contains no entries")
+        return False
+
+    print_success(f"History file contains {len(lines)} entries (showing latest {max_entries})")
+    for entry in lines[-max_entries:]:
+        try:
+            payload = json.loads(entry)
+        except json.JSONDecodeError:
+            print_warning(f"  (invalid JSON line skipped: {entry[:60]}...)")
+            continue
+        summary = (
+            f"  - {payload.get('generated_at')} env={payload.get('environment')} "
+            f"recommended_rate={payload.get('recommended_rate')} "
+            f"current_rate={payload.get('current_rate_threshold')} "
+            f"alert_required={payload.get('alert_required')}"
+        )
+        print_info(summary)
+
+    if loki_url:
+        query = '{job="withdrawal_threshold_history",environment="%s"}' % env
+        params = {
+            "query": query,
+            "limit": 5,
+        }
+        headers = {}
+        if loki_token:
+            headers["Authorization"] = f"Bearer {loki_token}"
+        try:
+            response = requests.get(
+                f"{loki_url.rstrip('/')}/loki/api/v1/query",
+                params=params,
+                headers=headers,
+                timeout=5,
+            )
+            response.raise_for_status()
+            data = response.json()
+            result = data.get("data", {}).get("result", [])
+            if result:
+                print_success(f"Loki query returned {len(result)} streams for environment={env}")
+            else:
+                print_warning("Loki query returned no streams; ensure promtail is shipping the JSONL file.")
+        except Exception as exc:
+            print_warning(f"Unable to query Loki: {exc}")
+    return True
+
+
+def check_remote_withdrawal_history(
+    hosts: List[str],
+    user: str,
+    ssh_key: Optional[str],
+    remote_path: str,
+    max_entries: int,
+    timeout: int,
+):
+    """Pull withdrawal threshold history from remote hosts via SSH."""
+    if not hosts:
+        return True
+
+    overall_success = True
+    for host in hosts:
+        print_header(f"Remote Withdrawal Threshold History: {host}")
+        ssh_command = [
+            "ssh",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            f"ConnectTimeout={timeout}",
+        ]
+        if ssh_key:
+            ssh_command.extend(["-i", ssh_key])
+        ssh_command.append(f"{user}@{host}")
+        remote_cmd = (
+            f"if [ -f {shlex.quote(remote_path)} ]; then tail -n {max_entries} {shlex.quote(remote_path)}; "
+            f"else echo '__MISSING__'; fi"
+        )
+        ssh_command.append(remote_cmd)
+
+        try:
+            result = subprocess.run(
+                ssh_command,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except Exception as exc:
+            print_error(f"SSH to {host} failed: {exc}")
+            overall_success = False
+            continue
+
+        if result.returncode != 0:
+            print_error(
+                f"SSH command on {host} returned {result.returncode}: {result.stderr.strip() or result.stdout.strip()}"
+            )
+            overall_success = False
+            continue
+
+        output = result.stdout.strip()
+        if output == "__MISSING__":
+            print_warning(f"{remote_path} not found on {host}")
+            overall_success = False
+            continue
+
+        lines = [line for line in output.splitlines() if line.strip()]
+        if not lines:
+            print_warning(f"{host}: file exists but returned no content")
+            overall_success = False
+            continue
+
+        print_success(f"{host}: received {len(lines)} entries (tail {max_entries})")
+        for entry in lines:
+            try:
+                payload = json.loads(entry)
+            except json.JSONDecodeError:
+                print_warning(f"  (invalid JSON from {host}: {entry[:60]}...)")
+                continue
+            print_info(
+                "  - {generated_at} env={environment} recommended_rate={recommended_rate} current_rate={current_rate_threshold} alert_required={alert_required}".format(
+                    **payload
+                )
+            )
+
+    return overall_success
+
+
 def main():
     """Main verification function"""
+    parser = argparse.ArgumentParser(description="Verify XAI monitoring stack.")
+    parser.add_argument(
+        "--environment",
+        default=os.environ.get("DEPLOY_ENVIRONMENT", "staging"),
+        help="Environment label used when querying Loki or history files.",
+    )
+    parser.add_argument(
+        "--skip-withdrawal-history",
+        action="store_true",
+        help="Skip the withdrawal threshold history check.",
+    )
+    parser.add_argument(
+        "--history-dir",
+        default=os.environ.get("WITHDRAWAL_HISTORY_DIR", "/var/lib/xai/monitoring"),
+        help="Directory that contains withdrawal_threshold_history.jsonl (defaults to /var/lib/xai/monitoring or WITHDRAWAL_HISTORY_DIR env).",
+    )
+    parser.add_argument(
+        "--history-file",
+        default=None,
+        help="Explicit path to withdrawal_threshold_history.jsonl (overrides --history-dir).",
+    )
+    parser.add_argument(
+        "--history-max-entries",
+        type=int,
+        default=5,
+        help="Number of history entries to show when verifying the file.",
+    )
+    parser.add_argument(
+        "--remote-host",
+        action="append",
+        help="SSH host (or IP) to check withdrawal history on. Can be specified multiple times.",
+    )
+    parser.add_argument(
+        "--remote-history-path",
+        default=os.environ.get("REMOTE_WITHDRAWAL_HISTORY_PATH", "/var/lib/xai/monitoring/withdrawal_threshold_history.jsonl"),
+        help="Path to withdrawal_threshold_history.jsonl on remote hosts (default /var/lib/xai/monitoring/withdrawal_threshold_history.jsonl).",
+    )
+    parser.add_argument(
+        "--ssh-user",
+        default=os.environ.get("WITHDRAWAL_SSH_USER", "ubuntu"),
+        help="SSH user for remote checks (default ubuntu or WITHDRAWAL_SSH_USER).",
+    )
+    parser.add_argument(
+        "--ssh-key",
+        default=os.environ.get("WITHDRAWAL_SSH_KEY"),
+        help="Optional path to SSH private key for remote checks (default uses SSH agent).",
+    )
+    parser.add_argument(
+        "--ssh-timeout",
+        type=int,
+        default=10,
+        help="SSH connection timeout in seconds (default 10).",
+    )
+    args = parser.parse_args()
     print(f"\n{Colors.BOLD}{Colors.CYAN}")
     print("=" * 60)
-    print("AIXN Blockchain - Monitoring Verification")
+    print("XAI Blockchain - Monitoring Verification")
     print("=" * 60)
     print(f"{Colors.RESET}")
 
@@ -265,6 +460,27 @@ def main():
     results["prometheus"] = check_prometheus()
     results["grafana"] = check_grafana()
     results["alertmanager"] = check_alertmanager()
+    if not args.skip_withdrawal_history:
+        history_path = Path(args.history_file) if args.history_file else Path(args.history_dir) / "withdrawal_threshold_history.jsonl"
+        loki_url = os.environ.get("LOKI_URL")
+        loki_token = os.environ.get("LOKI_BEARER_TOKEN")
+        results["withdrawal_history"] = check_withdrawal_history(
+            env=args.environment,
+            history_path=history_path,
+            max_entries=args.history_max_entries,
+            loki_url=loki_url,
+            loki_token=loki_token,
+        )
+        if args.remote_host:
+            remote_result = check_remote_withdrawal_history(
+                hosts=args.remote_host,
+                user=args.ssh_user,
+                ssh_key=args.ssh_key,
+                remote_path=args.remote_history_path,
+                max_entries=args.history_max_entries,
+                timeout=args.ssh_timeout,
+            )
+            results["remote_withdrawal_history"] = remote_result
 
     # Summary
     print_header("Verification Summary")

@@ -1,7 +1,7 @@
 {
   "dashboard": {
-    "title": "AIXN Blockchain - Overview",
-    "tags": ["blockchain", "aixn", "overview"],
+    "title": "XAI Blockchain - Overview",
+    "tags": ["blockchain", "xai", "overview"],
     "timezone": "browser",
     "schemaVersion": 16,
     "version": 1,
@@ -18,7 +18,7 @@
         "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
         "targets": [
           {
-            "expr": "aixn_block_height",
+            "expr": "xai_block_height",
             "legendFormat": "Block Height"
           }
         ],
@@ -34,7 +34,7 @@
         "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
         "targets": [
           {
-            "expr": "aixn:block_production_rate:1m",
+            "expr": "xai:block_production_rate:1m",
             "legendFormat": "Blocks/min"
           }
         ],
@@ -50,7 +50,7 @@
         "gridPos": {"h": 4, "w": 6, "x": 0, "y": 8},
         "targets": [
           {
-            "expr": "aixn_blocks_total"
+            "expr": "xai_blocks_total"
           }
         ],
         "options": {
@@ -65,7 +65,7 @@
         "gridPos": {"h": 4, "w": 6, "x": 6, "y": 8},
         "targets": [
           {
-            "expr": "aixn_peers_connected"
+            "expr": "xai_peers_connected"
           }
         ],
         "options": {
@@ -88,7 +88,7 @@
         "gridPos": {"h": 4, "w": 6, "x": 12, "y": 8},
         "targets": [
           {
-            "expr": "aixn_transaction_pool_size"
+            "expr": "xai_transaction_pool_size"
           }
         ],
         "options": {
@@ -111,7 +111,7 @@
         "gridPos": {"h": 4, "w": 6, "x": 18, "y": 8},
         "targets": [
           {
-            "expr": "aixn_chain_sync_status"
+            "expr": "xai_chain_sync_status"
           }
         ],
         "options": {
@@ -138,7 +138,7 @@
         "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
         "targets": [
           {
-            "expr": "aixn:transaction_throughput:1m",
+            "expr": "xai:transaction_throughput:1m",
             "legendFormat": "TX/s"
           }
         ],
@@ -154,11 +154,11 @@
         "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
         "targets": [
           {
-            "expr": "aixn:network_bandwidth_sent:rate1m",
+            "expr": "xai:network_bandwidth_sent:rate1m",
             "legendFormat": "Sent"
           },
           {
-            "expr": "aixn:network_bandwidth_received:rate1m",
+            "expr": "xai:network_bandwidth_received:rate1m",
             "legendFormat": "Received"
           }
         ],
@@ -174,7 +174,7 @@
         "gridPos": {"h": 8, "w": 8, "x": 0, "y": 20},
         "targets": [
           {
-            "expr": "aixn_system_cpu_usage_percent",
+            "expr": "xai_system_cpu_usage_percent",
             "legendFormat": "CPU %"
           }
         ],
@@ -198,7 +198,7 @@
         "gridPos": {"h": 8, "w": 8, "x": 8, "y": 20},
         "targets": [
           {
-            "expr": "aixn_system_memory_percent",
+            "expr": "xai_system_memory_percent",
             "legendFormat": "Memory %"
           }
         ],
@@ -214,7 +214,7 @@
         "gridPos": {"h": 8, "w": 8, "x": 16, "y": 20},
         "targets": [
           {
-            "expr": "aixn_system_disk_percent",
+            "expr": "xai_system_disk_percent",
             "legendFormat": "Disk %"
           }
         ],

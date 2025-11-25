@@ -1,0 +1,43 @@
+groups:
+  - name: security.operations
+    rules:
+      - alert: ApiKeyRevocations
+        expr: increase(xai_security_events_warning_total{event_type="api_key_audit"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: security
+        annotations:
+          summary: "API key rotation detected"
+          description: "api_key_audit warnings fired in the last 5 minutes. Validate planned rotation and investigate unauthorized key use."
+
+      - alert: SecurityEventStorm
+        expr: increase(xai_security_events_total[5m]) > 25
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "Security event spike"
+          description: "More than 25 security events fired within 5 minutes. Investigate potential attack or misconfiguration."
+
+      - alert: WithdrawalRateSpike
+        expr: xai_withdrawals_rate_per_minute > 15
+        for: 2m
+        labels:
+          severity: warning
+          service: withdrawals
+        annotations:
+          summary: "Withdrawal velocity exceeded baseline"
+          description: "The one-minute withdrawal rate stayed above 15/min for 2 minutes. Confirm legitimacy and throttle if required."
+          runbook: "python scripts/tools/withdrawal_alert_probe.py --events-log monitoring/withdrawals_events.jsonl --locks-file data/wallet/time_locked_withdrawals.json"
+
+      - alert: TimeLockBacklogGrowing
+        expr: xai_withdrawals_time_locked_backlog > 5
+        for: 10m
+        labels:
+          severity: warning
+          service: withdrawals
+        annotations:
+          summary: "Time-locked queue accumulating"
+          description: "Over 5 withdrawals are stuck in the time-lock queue for 10+ minutes. Run the manual-release playbook or investigate processing."
+          runbook: "python scripts/tools/withdrawal_alert_probe.py --events-log monitoring/withdrawals_events.jsonl --locks-file data/wallet/time_locked_withdrawals.json"

@@ -1,0 +1,364 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: xai-blockchain-node
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    component: node
+spec:
+  serviceName: xai-blockchain-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: xai-blockchain
+      component: node
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0
+  template:
+    metadata:
+      labels:
+        app: xai-blockchain
+        component: node
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Security Context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Pod Scheduling
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - xai-blockchain
+              topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: blockchain/xai-capable
+                    operator: In
+                    values:
+                      - "true"
+
+      # Service Account
+      serviceAccountName: xai-blockchain-sa
+      automountServiceAccountToken: true
+
+      # Init Containers
+      initContainers:
+        - name: init-blockchain-data
+          image: busybox:1.35
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /data/blockchain /data/logs
+              chmod 755 /data/blockchain /data/logs
+              echo "Data directories initialized"
+          volumeMounts:
+            - name: blockchain-data
+              mountPath: /data
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
+
+        - name: init-config
+          image: busybox:1.35
+          command:
+            - sh
+            - -c
+            - |
+              cp /config/genesis-config.json /data/blockchain/genesis.json || true
+              chmod 644 /data/blockchain/genesis.json || true
+              echo "Configuration initialized"
+          volumeMounts:
+            - name: blockchain-data
+              mountPath: /data
+            - name: config
+              mountPath: /config
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
+
+      # Containers
+      containers:
+        - name: xai-blockchain
+          image: xai-blockchain:latest  # Replace with your registry
+          imagePullPolicy: IfNotPresent
+          ports:
+            # Node P2P Port
+            - name: p2p
+              containerPort: 8545
+              protocol: TCP
+            # RPC Port
+            - name: rpc
+              containerPort: 8546
+              protocol: TCP
+            # WebSocket Port
+            - name: ws
+              containerPort: 8547
+              protocol: TCP
+            # Metrics Port
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+
+          # Environment Variables
+          env:
+            # Pod Identity
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+
+            # Load ConfigMap
+            - name: NODE_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: NODE_HOST
+            - name: NODE_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: NODE_PORT
+            - name: RPC_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: RPC_PORT
+            - name: P2P_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: P2P_PORT
+            - name: WS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: WS_PORT
+            - name: BLOCKCHAIN_DIFFICULTY
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: BLOCKCHAIN_DIFFICULTY
+            - name: BLOCK_TIME_TARGET
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: BLOCK_TIME_TARGET
+            - name: MAX_PEERS
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: MAX_PEERS
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: ENVIRONMENT
+            - name: BLOCKCHAIN_DATA_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: BLOCKCHAIN_DATA_DIR
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: LOG_LEVEL
+            - name: METRICS_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: METRICS_ENABLED
+            - name: METRICS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: METRICS_PORT
+
+            # Load Secrets
+            - name: NODE_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: xai-blockchain-secrets
+                  key: node-0-private-key  # Will be overridden per pod
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: xai-blockchain-secrets
+                  key: api-key
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: xai-blockchain-secrets
+                  key: jwt-secret
+
+            # Bootstrap Configuration
+            - name: BOOTSTRAP_PEERS
+              valueFrom:
+                secretKeyRef:
+                  name: xai-blockchain-secrets
+                  key: bootstrap-peers
+                  optional: true
+
+            # Miner Address (dynamic per pod)
+            - name: MINER_ADDRESS
+              value: "$(POD_NAME)-$(POD_NAMESPACE)"
+
+            # Python Configuration
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+
+          # Resource Requests and Limits
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 2Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+
+          # Security Context
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+
+          # Volume Mounts
+          volumeMounts:
+            # Blockchain Data
+            - name: blockchain-data
+              mountPath: /data/blockchain
+            # Configuration
+            - name: config
+              mountPath: /config
+              readOnly: true
+            # Secrets
+            - name: secrets
+              mountPath: /run/secrets
+              readOnly: true
+            # Temp directory
+            - name: tmp
+              mountPath: /tmp
+
+          # Startup Probe (pod is ready to start)
+          startupProbe:
+            httpGet:
+              path: /health
+              port: rpc
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+
+          # Readiness Probe (pod can accept traffic)
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: rpc
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+
+          # Liveness Probe (pod is still alive)
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: rpc
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          # Lifecycle Hooks
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    sleep 5
+                    # Graceful shutdown script
+                    curl -X POST http://localhost:8546/shutdown || true
+                    sleep 10
+
+      # Volumes
+      volumes:
+        - name: config
+          configMap:
+            name: xai-blockchain-config
+            defaultMode: 0644
+        - name: secrets
+          secret:
+            secretName: xai-blockchain-secrets
+            defaultMode: 0400
+        - name: tmp
+          emptyDir:
+            sizeLimit: 1Gi
+
+      # Pod DNS Configuration
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "2"
+          - name: edns0
+
+      # Restart Policy
+      restartPolicy: Always
+
+      # Termination Grace Period
+      terminationGracePeriodSeconds: 30
+
+      # Host Network (use with caution)
+      hostNetwork: false
+      hostPID: false
+      hostIPC: false
+
+  # Volume Claim Template for persistent storage
+  volumeClaimTemplates:
+    - metadata:
+        name: blockchain-data
+        labels:
+          app: xai-blockchain
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: xai-blockchain-storage
+        resources:
+          requests:
+            storage: 100Gi

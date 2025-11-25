@@ -319,7 +319,7 @@ def main(auto_yes=False):
     base_dir = os.path.join(os.path.dirname(__file__), "..")
 
     files_to_fix = [
-        (os.path.join(base_dir, "aixn-blockchain", "genesis_new.json"), "Genesis block JSON"),
+        (os.path.join(base_dir, "xai-blockchain", "genesis_new.json"), "Genesis block JSON"),
         (os.path.join(base_dir, "scripts", "premine_blockchain.py"), "Pre-mining script"),
         (
             os.path.join(base_dir, "scripts", "generate_early_adopter_wallets.py"),

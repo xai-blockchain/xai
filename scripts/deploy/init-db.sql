@@ -1,4 +1,4 @@
--- AIXN Blockchain - Database Initialization Script
+-- XAI Blockchain - Database Initialization Script
 -- PostgreSQL initialization for Docker deployment
 
 -- Create extensions
@@ -242,7 +242,7 @@ INSERT INTO blockchain.blocks (
 -- Grants and Permissions
 -- ============================================================================
 
--- Grant permissions to aixn user (will be created by Docker)
+-- Grant permissions to xai user (will be created by Docker)
 GRANT USAGE ON SCHEMA blockchain TO PUBLIC;
 GRANT USAGE ON SCHEMA wallet TO PUBLIC;
 GRANT USAGE ON SCHEMA analytics TO PUBLIC;
@@ -263,5 +263,5 @@ VACUUM ANALYZE wallet.wallets;
 -- Success message
 DO $$
 BEGIN
-    RAISE NOTICE 'AIXN Blockchain database initialized successfully';
+    RAISE NOTICE 'XAI Blockchain database initialized successfully';
 END $$;

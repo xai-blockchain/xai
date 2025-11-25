@@ -4,10 +4,25 @@
 ![Coverage](https://codecov.io/gh/decristofaroj/xai/branch/main/graph/badge.svg)
 ![Quality](https://sonarcloud.io/api/project_badges/measure?project=decristofaroj_xai&metric=alert_status)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Testnet](https://img.shields.io/badge/testnet-LIVE-success)
 
 ## A Proof-of-Work Blockchain with AI Governance and Integrated Wallets
 
 XAI is a production-ready blockchain implementation featuring proof-of-work consensus, intelligent AI-based governance, atomic swap support for cross-chain trading, and comprehensive wallet management. Built for both individual users and enterprise compliance needs.
+
+---
+
+## 🚀 **Testnet is LIVE!**
+
+Connect to our multi-region testnet deployment:
+
+- **API Endpoint:** `http://xai-api-lb-835033547.us-east-1.elb.amazonaws.com`
+- **Block Explorer:** [View Blocks](http://xai-api-lb-835033547.us-east-1.elb.amazonaws.com/explorer)
+- **Faucet:** [Get Test Tokens](http://xai-api-lb-835033547.us-east-1.elb.amazonaws.com/faucet)
+
+📖 **[Full Testnet Documentation →](TESTNET.md)**
+
+---
 
 ## Key Features
 
@@ -49,7 +64,7 @@ python -m pytest --co -q
 export XAI_NETWORK=testnet
 
 # Run a node
-python src/aixn/core/node.py
+python src/xai/core/node.py
 ```
 
 The node will start on port 18545 (testnet) or 8545 (mainnet).
@@ -58,19 +73,35 @@ The node will start on port 18545 (testnet) or 8545 (mainnet).
 
 ```bash
 # Generate a wallet address first (or use existing)
-python src/aixn/wallet/cli.py generate-address
+python src/xai/wallet/cli.py generate-address
 
 # Start mining with your address
 export MINER_ADDRESS=YOUR_XAI_ADDRESS
-python src/aixn/core/node.py --miner $MINER_ADDRESS
+python src/xai/core/node.py --miner $MINER_ADDRESS
 ```
+
+### CLI Tooling
+
+Use the installed console scripts once the package is available (`pip install -e .` inside this repo).
+
+```
+xai node run --miner $MINER_ADDRESS --peer http://peer1.local:18545
+xai node status --base-url http://localhost:18545
+xai node sync --base-url http://localhost:18545
+xai-wallet request-faucet --address YOUR_XAI_ADDRESS
+xai-wallet generate-address
+```
+
+Each CLI command has a Python fall-back for ad-hoc usage (`python src/xai/cli/main.py ...` or `python src/xai/wallet/cli.py ...`), but the `xai`/`xai-wallet` entry points are preferred for reproducible automation.
 
 ### Get Test Coins
 
 **Testnet only**: Use the built-in faucet to receive 100 test XAI:
 
 ```bash
-python src/aixn/wallet/cli.py request-faucet --address YOUR_XAI_ADDRESS
+python src/xai/wallet/cli.py request-faucet --address YOUR_XAI_ADDRESS
+# Optional: override API host (defaults to http://localhost:18545)
+# python src/xai/wallet/cli.py request-faucet --address YOUR_XAI_ADDRESS --base-url http://remote-node:18545
 ```
 
 ## Configuration
@@ -98,7 +129,7 @@ XAI_DATA_DIR         # Blockchain data directory
 MINER_ADDRESS        # Address to receive mining rewards
 ```
 
-See `src/aixn/config/` for additional configuration options.
+See `src/xai/config/` for additional configuration options.
 
 ## Performance Optimizations
 
@@ -118,27 +149,27 @@ Performance can be tuned via environment variables - see Configuration section.
 
 ```bash
 # Generate a new wallet
-python src/aixn/wallet/cli.py generate-address
+python src/xai/wallet/cli.py generate-address
 
 # Check wallet balance
-python src/aixn/wallet/cli.py balance --address YOUR_ADDRESS
+python src/xai/wallet/cli.py balance --address YOUR_ADDRESS
 
 # Export private key (secure this safely!)
-python src/aixn/wallet/cli.py export-key --address YOUR_ADDRESS
+python src/xai/wallet/cli.py export-key --address YOUR_ADDRESS
 ```
 
 ### Send Transactions
 
 ```bash
 # Simple transaction
-python src/aixn/wallet/cli.py send \
+python src/xai/wallet/cli.py send \
   --from YOUR_ADDRESS \
   --to RECIPIENT_ADDRESS \
   --amount 10.5 \
   --private-key YOUR_PRIVATE_KEY
 
 # Multi-signature transaction
-python src/aixn/wallet/cli.py send-multisig \
+python src/xai/wallet/cli.py send-multisig \
   --multisig-address MULTISIG_ADDRESS \
   --to RECIPIENT_ADDRESS \
   --amount 5.0
@@ -148,13 +179,13 @@ python src/aixn/wallet/cli.py send-multisig \
 
 ```bash
 # Initiate swap with Bitcoin
-python src/aixn/core/atomic_swap.py initiate \
+python src/xai/core/atomic_swap.py initiate \
   --asset BTC \
   --amount 0.5 \
   --recipient btc_address_here
 
 # Complete swap
-python src/aixn/core/atomic_swap.py complete \
+python src/xai/core/atomic_swap.py complete \
   --swap-id SWAP_ID \
   --secret SECRET_HASH
 ```
@@ -209,7 +240,25 @@ XAI Blockchain
 
 ## Testing
 
-Run the comprehensive test suite:
+### 🚨 MANDATORY: Local Testing Policy
+
+**ALL TESTING MUST BE DONE LOCALLY BEFORE PUSHING TO GITHUB**
+
+Save GitHub Actions minutes (costs money!) by running tests locally first:
+
+```bash
+# RECOMMENDED: Full CI pipeline (before every push)
+make ci
+
+# MINIMUM: Quick validation (1-2 minutes)
+make quick
+
+# Windows PowerShell
+.\local-ci.ps1          # Full CI
+.\local-ci.ps1 -Quick   # Quick validation
+```
+
+### Comprehensive Test Suite
 
 ```bash
 # Quick test run
@@ -222,8 +271,46 @@ python -m pytest -m "not slow"
 python -m pytest --cov=src --cov-report=html
 
 # Specific module tests
-python -m pytest tests/aixn_tests/test_blockchain.py -v
+python -m pytest tests/xai_tests/test_blockchain.py -v
+
+# Run all quality checks
+make all  # Linting + Security + Tests + Coverage
+
+# Run only security tests
+pytest -m security
+
+# Test with coverage requirement
+pytest --cov=src/xai --cov-fail-under=80
 ```
+
+### Testing Documentation
+
+| Document | Purpose |
+|----------|---------|
+| **[TESTING-GUIDE.md](TESTING-GUIDE.md)** | Complete testing guide with examples and best practices |
+| **[LOCAL-TESTING-QUICK-REF.md](LOCAL-TESTING-QUICK-REF.md)** | Quick reference for common test commands |
+
+### Test Coverage
+
+- **Minimum**: 80% overall coverage
+- **Critical Modules**: 90%+ (blockchain, consensus, wallet, security validation)
+- **Current**: Tracked in codecov dashboard
+
+### Test Organization
+
+- **Unit Tests**: `pytest -m unit` - Fast, isolated component tests
+- **Integration Tests**: `pytest -m integration` - Multi-component interaction
+- **Security Tests**: `pytest -m security` - Security validation and attack vectors
+- **Performance Tests**: `pytest -m performance` - Benchmarking and stress tests
+
+### Test Requirements for Contributors
+
+Before submitting a PR:
+- All tests pass locally: `make ci`
+- Coverage meets thresholds: `pytest --cov=src/xai --cov-fail-under=80`
+- New code has corresponding tests
+- Security tests included for security-critical code
+- Pre-commit hooks pass: `pre-commit run --all-files`
 
 ## Configuration
 
@@ -283,6 +370,23 @@ pylint src
 mypy src
 ```
 
+### Local CI/CD Setup (IMPORTANT!)
+
+**Before you start developing, set up local testing:**
+
+```bash
+# Install all development tools
+make install-dev
+
+# Setup pre-commit hooks (auto-runs checks before commits)
+make pre-commit-setup
+
+# Test that everything works
+make quick
+```
+
+This ensures all tests run locally BEFORE pushing to GitHub, saving CI minutes and catching issues early.
+
 ### Pre-commit Hooks
 
 ```bash
@@ -325,7 +429,7 @@ pre-commit run --all-files
 | Network ID | 0x5841 |
 | Port | 8545 |
 | RPC Port | 8546 |
-| Address Prefix | AIXN |
+| Address Prefix | XAI |
 | Block Time | 2 minutes |
 | Max Supply | 121,000,000 XAI |
 
@@ -408,7 +512,7 @@ XAI is a proof-of-concept blockchain implementation. While striving for producti
 - **Issue Tracker**: https://github.com/decristofaroj/xai/issues
 - **Documentation**: [docs/README.md](docs/README.md)
 - **Whitepaper**: [WHITEPAPER.md](WHITEPAPER.md)
-- **Community Guidelines**: [docs/aixn_docs/community_expectations.md](docs/aixn_docs/community_expectations.md)
+- **Community Guidelines**: [docs/xai_docs/community_expectations.md](docs/xai_docs/community_expectations.md)
 
 ---
 

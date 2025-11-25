@@ -23,7 +23,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         # Also install test dependencies if they are separate
-        if [ -f tests/aixn_tests/requirements_test.txt ]; then pip install -r tests/aixn_tests/requirements_test.txt; fi
+        if [ -f tests/xai_tests/requirements_test.txt ]; then pip install -r tests/xai_tests/requirements_test.txt; fi
 
     - name: Run tests
       run: |
@@ -31,4 +31,4 @@ jobs:
         # Assuming pytest is installed and configured via pytest.ini
         pytest
         # Alternatively, if a specific script is preferred:
-        # python tests/aixn_tests/run_tests.py
+        # python tests/xai_tests/run_tests.py

@@ -1,0 +1,79 @@
+name: Nightly Security Audit
+
+on:
+  schedule:
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    env:
+      SLACK_WEBHOOK: ${{ secrets.WITHDRAWAL_CALIBRATION_SLACK_WEBHOOK }}
+      JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+      JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+      JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+      JIRA_ISSUE: ${{ vars.WITHDRAWAL_CALIBRATION_JIRA_ISSUE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pip-audit bandit
+
+      - name: Run pip-audit
+        id: pip_audit
+        continue-on-error: true
+        run: |
+          pip-audit -r requirements.txt -f json -o pip-audit-report.json
+
+      - name: Run bandit
+        id: bandit
+        continue-on-error: true
+        run: |
+          bandit -r src -f json -o bandit-report.json
+
+      - name: Run unit tests
+        id: pytest
+        continue-on-error: true
+        run: |
+          pytest tests/xai_tests/unit
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-audit-reports
+          path: |
+            pip-audit-report.json
+            bandit-report.json
+
+      - name: Notify Slack and Jira
+        if: always()
+        run: |
+          python scripts/tools/security_audit_notifier.py \
+            --status "${{ job.status }}" \
+            --pip-audit pip-audit-report.json \
+            --bandit bandit-report.json \
+            --slack-webhook "${{ env.SLACK_WEBHOOK }}" \
+            --jira-base-url "${{ env.JIRA_BASE_URL }}" \
+            --jira-email "${{ env.JIRA_EMAIL }}" \
+            --jira-token "${{ env.JIRA_API_TOKEN }}" \
+            --jira-issue "${{ env.JIRA_ISSUE }}" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --environment "${{ github.ref_name }}"
+
+      - name: Fail workflow if any scan failed
+        if: always()
+        run: |
+          if [[ "${{ steps.pip_audit.outcome }}" != "success" || "${{ steps.bandit.outcome }}" != "success" || "${{ steps.pytest.outcome }}" != "success" ]]; then
+            echo "One or more security checks failed." >&2
+            exit 1
+          fi

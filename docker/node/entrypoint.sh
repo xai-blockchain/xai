@@ -1,6 +1,6 @@
 #!/bin/bash
-# AIXN Node Entrypoint Script
-# Handles initialization and startup of AIXN blockchain node
+# XAI Node Entrypoint Script
+# Handles initialization and startup of XAI blockchain node
 
 set -e
 
@@ -24,15 +24,15 @@ log_error() {
 }
 
 # Environment variables with defaults
-AIXN_ENV=${AIXN_ENV:-production}
-AIXN_DATA_DIR=${AIXN_DATA_DIR:-/data}
-AIXN_LOG_DIR=${AIXN_LOG_DIR:-/logs}
-AIXN_CONFIG_DIR=${AIXN_CONFIG_DIR:-/config}
-AIXN_NODE_PORT=${AIXN_NODE_PORT:-8333}
-AIXN_API_PORT=${AIXN_API_PORT:-8080}
+XAI_ENV=${XAI_ENV:-production}
+XAI_DATA_DIR=${XAI_DATA_DIR:-/data}
+XAI_LOG_DIR=${XAI_LOG_DIR:-/logs}
+XAI_CONFIG_DIR=${XAI_CONFIG_DIR:-/config}
+XAI_NODE_PORT=${XAI_NODE_PORT:-8333}
+XAI_API_PORT=${XAI_API_PORT:-8080}
 
-log_info "Starting AIXN Blockchain Node"
-log_info "Environment: $AIXN_ENV"
+log_info "Starting XAI Blockchain Node"
+log_info "Environment: $XAI_ENV"
 
 # ============================================================================
 # Pre-flight Checks
@@ -41,30 +41,30 @@ log_info "Environment: $AIXN_ENV"
 log_info "Running pre-flight checks..."
 
 # Check if data directory exists and is writable
-if [ ! -d "$AIXN_DATA_DIR" ]; then
-    log_error "Data directory does not exist: $AIXN_DATA_DIR"
+if [ ! -d "$XAI_DATA_DIR" ]; then
+    log_error "Data directory does not exist: $XAI_DATA_DIR"
     exit 1
 fi
 
-if [ ! -w "$AIXN_DATA_DIR" ]; then
-    log_error "Data directory is not writable: $AIXN_DATA_DIR"
+if [ ! -w "$XAI_DATA_DIR" ]; then
+    log_error "Data directory is not writable: $XAI_DATA_DIR"
     exit 1
 fi
 
 # Check if log directory exists and is writable
-if [ ! -d "$AIXN_LOG_DIR" ]; then
-    log_warn "Log directory does not exist, creating: $AIXN_LOG_DIR"
-    mkdir -p "$AIXN_LOG_DIR"
+if [ ! -d "$XAI_LOG_DIR" ]; then
+    log_warn "Log directory does not exist, creating: $XAI_LOG_DIR"
+    mkdir -p "$XAI_LOG_DIR"
 fi
 
 # Create necessary subdirectories
 mkdir -p \
-    "$AIXN_DATA_DIR/blockchain" \
-    "$AIXN_DATA_DIR/wallets" \
-    "$AIXN_DATA_DIR/state" \
-    "$AIXN_DATA_DIR/crypto_deposits" \
-    "$AIXN_LOG_DIR/node" \
-    "$AIXN_LOG_DIR/api"
+    "$XAI_DATA_DIR/blockchain" \
+    "$XAI_DATA_DIR/wallets" \
+    "$XAI_DATA_DIR/state" \
+    "$XAI_DATA_DIR/crypto_deposits" \
+    "$XAI_LOG_DIR/node" \
+    "$XAI_LOG_DIR/api"
 
 log_info "Directory structure verified"
 
@@ -123,15 +123,15 @@ fi
 log_info "Checking configuration..."
 
 # Use environment-specific config if available
-CONFIG_FILE="$AIXN_CONFIG_DIR/${AIXN_ENV}.yaml"
+CONFIG_FILE="$XAI_CONFIG_DIR/${XAI_ENV}.yaml"
 if [ ! -f "$CONFIG_FILE" ]; then
     log_warn "Environment config not found: $CONFIG_FILE"
-    CONFIG_FILE="$AIXN_CONFIG_DIR/default.yaml"
+    CONFIG_FILE="$XAI_CONFIG_DIR/default.yaml"
 fi
 
 if [ -f "$CONFIG_FILE" ]; then
     log_info "Using configuration: $CONFIG_FILE"
-    export AIXN_CONFIG_FILE="$CONFIG_FILE"
+    export XAI_CONFIG_FILE="$CONFIG_FILE"
 else
     log_warn "No configuration file found, using defaults"
 fi
@@ -140,7 +140,7 @@ fi
 # Initialize Blockchain (if needed)
 # ============================================================================
 
-BLOCKCHAIN_DB="$AIXN_DATA_DIR/blockchain/blockchain.db"
+BLOCKCHAIN_DB="$XAI_DATA_DIR/blockchain/blockchain.db"
 
 if [ ! -f "$BLOCKCHAIN_DB" ]; then
     log_info "Blockchain database not found, initializing..."
@@ -159,26 +159,26 @@ fi
 # Start Node
 # ============================================================================
 
-log_info "Starting AIXN node..."
-log_info "P2P Port: $AIXN_NODE_PORT"
-log_info "API Port: $AIXN_API_PORT"
+log_info "Starting XAI node..."
+log_info "P2P Port: $XAI_NODE_PORT"
+log_info "API Port: $XAI_API_PORT"
 
 # Handle different startup modes
 case "${1:-node}" in
     node)
         log_info "Starting as full node..."
-        exec python -m src.aixn.core.node
+        exec python -m xai.core.node
         ;;
 
     miner)
         log_info "Starting as mining node..."
-        export AIXN_ENABLE_MINING=true
-        exec python -m src.aixn.core.node
+        export XAI_ENABLE_MINING=true
+        exec python -m xai.core.node
         ;;
 
     api)
         log_info "Starting API server only..."
-        exec python -m src.aixn.explorer
+        exec python -m xai.explorer
         ;;
 
     shell)

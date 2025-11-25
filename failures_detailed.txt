@@ -1,0 +1,258 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.6, pytest-8.3.3, pluggy-1.6.0 -- C:\Users\decri\GitClones\Crypto\.venv313\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\decri\GitClones\Crypto
+configfile: pytest.ini
+plugins: anyio-4.11.0, cov-6.0.0, mock-3.14.0
+collecting ... collected 425 items / 16 deselected / 409 selected
+
+tests/xai_tests/integration/test_governance.py::TestGovernanceInitialization::test_create_governance PASSED [  0%]
+tests/xai_tests/integration/test_governance.py::TestGovernanceInitialization::test_governance_parameters PASSED [  0%]
+tests/xai_tests/integration/test_governance.py::TestGovernanceInitialization::test_voter_types PASSED [  0%]
+tests/xai_tests/integration/test_governance.py::TestProposalCreation::test_create_proposal PASSED [  0%]
+tests/xai_tests/integration/test_governance.py::TestProposalCreation::test_proposal_has_required_fields PASSED [  1%]
+tests/xai_tests/integration/test_governance.py::TestProposalCreation::test_multiple_proposals PASSED [  1%]
+tests/xai_tests/integration/test_governance.py::TestVotingMechanism::test_cast_vote PASSED [  1%]
+tests/xai_tests/integration/test_governance.py::TestVotingMechanism::test_vote_options PASSED [  1%]
+tests/xai_tests/integration/test_governance.py::TestVotingMechanism::test_quadratic_voting PASSED [  2%]
+tests/xai_tests/integration/test_governance.py::TestVotingMechanism::test_prevent_double_voting PASSED [  2%]
+tests/xai_tests/integration/test_governance.py::TestVotingPower::test_voting_power_display PASSED [  2%]
+tests/xai_tests/integration/test_governance.py::TestVotingPower::test_time_decay PASSED [  2%]
+tests/xai_tests/integration/test_governance.py::TestVotingPower::test_voter_type_weight PASSED [  3%]
+tests/xai_tests/integration/test_governance.py::TestVotingPower::test_hybrid_voter_bonus PASSED [  3%]
+tests/xai_tests/integration/test_governance.py::TestProposalExecution::test_proposal_passes_with_majority PASSED [  3%]
+tests/xai_tests/integration/test_governance.py::TestProposalExecution::test_proposal_fails_without_majority PASSED [  3%]
+tests/xai_tests/integration/test_governance.py::TestProposalExecution::test_proposal_timelock PASSED [  4%]
+tests/xai_tests/integration/test_governance.py::TestProposalExecution::test_execute_proposal PASSED [  4%]
+tests/xai_tests/integration/test_governance.py::TestGovernanceIntegration::test_proposal_on_blockchain PASSED [  4%]
+tests/xai_tests/integration/test_governance.py::TestGovernanceIntegration::test_voting_with_blockchain_verification PASSED [  4%]
+tests/xai_tests/integration/test_governance.py::TestGovernanceIntegration::test_governance_transaction_type PASSED [  5%]
+tests/xai_tests/integration/test_governance.py::TestGovernanceParameters::test_get_parameters PASSED [  5%]
+tests/xai_tests/integration/test_governance.py::TestGovernanceParameters::test_update_parameters PASSED [  5%]
+tests/xai_tests/integration/test_governance.py::TestGovernanceParameters::test_parameter_change_proposal PASSED [  5%]
+tests/xai_tests/integration/test_mining.py::TestMiningWorkflow::test_mine_empty_block PASSED [  6%]
+tests/xai_tests/integration/test_mining.py::TestMiningWorkflow::test_mine_block_with_transactions PASSED [  6%]
+tests/xai_tests/integration/test_mining.py::TestMiningWorkflow::test_mining_reward_distribution PASSED [  6%]
+tests/xai_tests/integration/test_mining.py::TestMiningWorkflow::test_transaction_fees_to_miner PASSED [  6%]
+tests/xai_tests/integration/test_mining.py::TestMiningWorkflow::test_multiple_transactions_in_block PASSED [  7%]
+tests/xai_tests/integration/test_mining.py::TestMiningWorkflow::test_consecutive_mining PASSED [  7%]
+tests/xai_tests/integration/test_mining.py::TestMiningRewards::test_initial_reward_correct PASSED [  7%]
+tests/xai_tests/integration/test_mining.py::TestMiningRewards::test_reward_consistency PASSED [  7%]
+tests/xai_tests/integration/test_mining.py::TestMiningRewards::test_reward_halving_integration PASSED [  8%]
+tests/xai_tests/integration/test_mining.py::TestMiningRewards::test_cumulative_rewards PASSED [  8%]
+tests/xai_tests/integration/test_mining.py::TestMiningWithTransactions::test_transaction_confirmation PASSED [  8%]
+tests/xai_tests/integration/test_mining.py::TestMiningWithTransactions::test_invalid_transaction_rejection PASSED [  8%]
+tests/xai_tests/integration/test_mining.py::TestMiningWithTransactions::test_multiple_senders_one_block PASSED [  9%]
+tests/xai_tests/integration/test_mining.py::TestMiningWithTransactions::test_chain_transaction_flow PASSED [  9%]
+tests/xai_tests/integration/test_mining.py::TestMiningValidation::test_valid_mined_block PASSED [  9%]
+tests/xai_tests/integration/test_mining.py::TestMiningValidation::test_block_linking_integrity PASSED [  9%]
+tests/xai_tests/integration/test_mining.py::TestMiningValidation::test_utxo_consistency PASSED [ 10%]
+tests/xai_tests/integration/test_mining.py::TestMiningPerformance::test_mining_time_reasonable PASSED [ 10%]
+tests/xai_tests/integration/test_mining.py::TestMiningPerformance::test_difficulty_affects_time PASSED [ 10%]
+tests/xai_tests/integration/test_network.py::TestPeerConnection::test_initialize_peer_set PASSED [ 10%]
+tests/xai_tests/integration/test_network.py::TestPeerConnection::test_add_peer PASSED [ 11%]
+tests/xai_tests/integration/test_network.py::TestPeerConnection::test_remove_peer PASSED [ 11%]
+tests/xai_tests/integration/test_network.py::TestPeerConnection::test_unique_peers PASSED [ 11%]
+tests/xai_tests/integration/test_network.py::TestBlockPropagation::test_new_block_creation PASSED [ 11%]
+tests/xai_tests/integration/test_network.py::TestBlockPropagation::test_block_serialization PASSED [ 11%]
+tests/xai_tests/integration/test_network.py::TestBlockPropagation::test_block_validation_on_receive FAILED [ 12%]
+tests/xai_tests/integration/test_network.py::TestBlockPropagation::test_chain_synchronization PASSED [ 12%]
+tests/xai_tests/integration/test_network.py::TestChainConsensus::test_longest_chain_selection PASSED [ 12%]
+tests/xai_tests/integration/test_network.py::TestChainConsensus::test_chain_replacement_validation FAILED [ 12%]
+tests/xai_tests/integration/test_network.py::TestChainConsensus::test_reject_invalid_chain FAILED [ 13%]
+tests/xai_tests/integration/test_network.py::TestTransactionPropagation::test_add_transaction_to_mempool PASSED [ 13%]
+tests/xai_tests/integration/test_network.py::TestTransactionPropagation::test_transaction_broadcast FAILED [ 13%]
+tests/xai_tests/integration/test_network.py::TestTransactionPropagation::test_duplicate_transaction_handling PASSED [ 13%]
+tests/xai_tests/integration/test_network.py::TestNetworkSynchronization::test_sync_from_genesis PASSED [ 14%]
+tests/xai_tests/integration/test_network.py::TestNetworkSynchronization::test_sync_new_blocks PASSED [ 14%]
+tests/xai_tests/integration/test_network.py::TestNetworkSynchronization::test_sync_with_transactions FAILED [ 14%]
+tests/xai_tests/integration/test_network.py::TestNetworkResilience::test_continue_after_peer_disconnect PASSED [ 14%]
+tests/xai_tests/integration/test_network.py::TestNetworkResilience::test_block_validation_prevents_corruption FAILED [ 15%]
+tests/xai_tests/integration/test_network.py::TestNetworkResilience::test_recovery_from_fork PASSED [ 15%]
+tests/xai_tests/integration/test_network.py::TestPeerDiscovery::test_bootstrap_peers PASSED [ 15%]
+tests/xai_tests/integration/test_network.py::TestPeerDiscovery::test_dynamic_peer_addition PASSED [ 15%]
+tests/xai_tests/integration/test_network.py::TestPeerDiscovery::test_peer_list_management PASSED [ 16%]
+tests/xai_tests/integration/test_network.py::TestNetworkMessaging::test_block_announcement PASSED [ 16%]
+tests/xai_tests/integration/test_network.py::TestNetworkMessaging::test_transaction_announcement FAILED [ 16%]
+tests/xai_tests/integration/test_network.py::TestNetworkMessaging::test_chain_request PASSED [ 16%]
+tests/xai_tests/security/test_attack_vectors.py::TestDoubleSpendingAttack::test_prevent_double_spend_same_block PASSED [ 17%]
+tests/xai_tests/security/test_attack_vectors.py::TestDoubleSpendingAttack::test_prevent_double_spend_different_blocks PASSED [ 17%]
+tests/xai_tests/security/test_attack_vectors.py::TestDoubleSpendingAttack::test_utxo_tracking_prevents_double_spend PASSED [ 17%]
+tests/xai_tests/security/test_attack_vectors.py::Test51PercentAttack::test_reorganization_depth_limit PASSED [ 17%]
+tests/xai_tests/security/test_attack_vectors.py::Test51PercentAttack::test_checkpoint_prevents_reorg PASSED [ 18%]
+tests/xai_tests/security/test_attack_vectors.py::Test51PercentAttack::test_longest_chain_selection PASSED [ 18%]
+tests/xai_tests/security/test_attack_vectors.py::Test51PercentAttack::test_reject_invalid_longer_chain PASSED [ 18%]
+tests/xai_tests/security/test_attack_vectors.py::TestSybilAttack::test_unique_addresses_required PASSED [ 18%]
+tests/xai_tests/security/test_attack_vectors.py::TestSybilAttack::test_stake_based_voting_prevents_sybil PASSED [ 19%]
+tests/xai_tests/security/test_attack_vectors.py::TestSybilAttack::test_identity_verification_through_signatures PASSED [ 19%]
+tests/xai_tests/security/test_attack_vectors.py::TestRaceAttack::test_transaction_confirmation_requirement FAILED [ 19%]
+tests/xai_tests/security/test_attack_vectors.py::TestRaceAttack::test_mempool_transaction_replacement PASSED [ 19%]
+tests/xai_tests/security/test_attack_vectors.py::TestTimejackAttack::test_reject_future_timestamp FAILED [ 20%]
+tests/xai_tests/security/test_attack_vectors.py::TestTimejackAttack::test_median_time_past_validation FAILED [ 20%]
+
+================================== FAILURES ===================================
+____________ TestBlockPropagation.test_block_validation_on_receive ____________
+tests\xai_tests\integration\test_network.py:101: in test_block_validation_on_receive
+    assert bc2.validate_chain()
+E   assert False
+E    +  where False = validate_chain()
+E    +    where validate_chain = <xai.core.blockchain.Blockchain object at 0x000001E8F230A510>.validate_chain
+---------------------------- Captured stdout call -----------------------------
+Loaded 2465 blocks from disk.
+Loaded 2465 blocks from disk.
+Block mined! Hash: 00005e85d9990c477150cf5304ea0b232a34e48255bd13c389de897d561a6faa
+STREAK BONUS: +0.1200 AXN (1%)
+Block 56 has invalid previous hash
+------------------------------ Captured log call ------------------------------
+INFO     XAI_Blockchain:structured_logger.py:190 UTXO set loaded.
+INFO     XAI_Blockchain:structured_logger.py:190 UTXO set loaded.
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction c11271b3d4...
+____________ TestChainConsensus.test_chain_replacement_validation _____________
+tests\xai_tests\integration\test_network.py:147: in test_chain_replacement_validation
+    assert bc1.validate_chain()
+E   assert False
+E    +  where False = validate_chain()
+E    +    where validate_chain = <xai.core.blockchain.Blockchain object at 0x000001E8F230AC10>.validate_chain
+---------------------------- Captured stdout call -----------------------------
+Loaded 2474 blocks from disk.
+Block mined! Hash: 0000d59e2feaab72299b3c8b2baaba33afdda372b59c244dc2a0fed8b5855310
+STREAK BONUS: +0.1200 AXN (1%)
+Block mined! Hash: 00001cd97c143c55196aece9a1b19777429487fc90d5de9ff75e6c691ac5677e
+STREAK BONUS: +0.1200 AXN (1%)
+Block mined! Hash: 000034a6c047247aa8baeb904cedaede02a691fcf0f783ab1cd37ab4207dd246
+STREAK BONUS: +0.1200 AXN (1%)
+Block 56 has invalid previous hash
+------------------------------ Captured log call ------------------------------
+INFO     XAI_Blockchain:structured_logger.py:190 UTXO set loaded.
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction 7dacbdd503...
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction ce7fb685c6...
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction b9d4261c66...
+________________ TestChainConsensus.test_reject_invalid_chain _________________
+tests\xai_tests\integration\test_network.py:160: in test_reject_invalid_chain
+    assert not bc.validate_chain()
+E   assert not True
+E    +  where True = validate_chain()
+E    +    where validate_chain = <xai.core.blockchain.Blockchain object at 0x000001E8F1318C90>.validate_chain
+---------------------------- Captured stdout call -----------------------------
+Loading genesis block from C:\Users\decri\GitClones\Crypto\src\xai\core\genesis.json
+Loaded 5 genesis transactions (Total: 121000000.0 AXN)
+Mining unified genesis block...
+Block mined! Hash: 00004663afae66d9a67ffb9ff0b3167988c5384af3a8d43f5b9e4d08b34a411c
+Genesis block loaded: 00004663afae66d9a67ffb9ff0b3167988c5384af3a8d43f5b9e4d08b34a411c
+Block mined! Hash: 000096092a2911e38dfb74e9e921726bbcdcb98e4a90a820961998aa279f894b
+STREAK BONUS: +0.1200 AXN (1%)
+------------------------------ Captured log call ------------------------------
+INFO     XAI_Blockchain:structured_logger.py:190 UTXO set loaded.
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction founder_im...
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction founder_ve...
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction dev_fund_1...
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction marketing_...
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction mining_poo...
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction 223dd20f15...
+____________ TestTransactionPropagation.test_transaction_broadcast ____________
+tests\xai_tests\integration\test_network.py:201: in test_transaction_broadcast
+    tx = bc.create_transaction(
+E   NameError: name 'bc' is not defined
+---------------------------- Captured stdout call -----------------------------
+Loaded 2477 blocks from disk.
+Loaded 2477 blocks from disk.
+Block mined! Hash: 0000188ba26f8eebb20ffa9c4f138c2106c8ff287f1e92d7303665f53878a7ce
+STREAK BONUS: +0.1200 AXN (1%)
+Block mined! Hash: 0000e7ac314535f72bbf59aca8d8698e7789d2fe2478ed99b74c09e040bb6954
+STREAK BONUS: +0.1200 AXN (1%)
+------------------------------ Captured log call ------------------------------
+INFO     XAI_Blockchain:structured_logger.py:190 UTXO set loaded.
+INFO     XAI_Blockchain:structured_logger.py:190 UTXO set loaded.
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction d23e5f21ed...
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction a2bd648c25...
+___________ TestNetworkSynchronization.test_sync_with_transactions ____________
+tests\xai_tests\integration\test_network.py:282: in test_sync_with_transactions
+    tx = bc.create_transaction(
+E   NameError: name 'bc' is not defined
+---------------------------- Captured stdout call -----------------------------
+Loaded 2481 blocks from disk.
+Loaded 2481 blocks from disk.
+Block mined! Hash: 000075e0218daaeef06013ed870dfb32c7f4c47d1bbbb261b2caa45cae02f6bf
+STREAK BONUS: +0.1200 AXN (1%)
+------------------------------ Captured log call ------------------------------
+INFO     XAI_Blockchain:structured_logger.py:190 UTXO set loaded.
+INFO     XAI_Blockchain:structured_logger.py:190 UTXO set loaded.
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction 937f1c95d3...
+_______ TestNetworkResilience.test_block_validation_prevents_corruption _______
+tests\xai_tests\integration\test_network.py:327: in test_block_validation_prevents_corruption
+    assert not bc.validate_chain()
+E   assert not True
+E    +  where True = validate_chain()
+E    +    where validate_chain = <xai.core.blockchain.Blockchain object at 0x000001E8F13190F0>.validate_chain
+---------------------------- Captured stdout call -----------------------------
+Loading genesis block from C:\Users\decri\GitClones\Crypto\src\xai\core\genesis.json
+Loaded 5 genesis transactions (Total: 121000000.0 AXN)
+Mining unified genesis block...
+Block mined! Hash: 00004663afae66d9a67ffb9ff0b3167988c5384af3a8d43f5b9e4d08b34a411c
+Genesis block loaded: 00004663afae66d9a67ffb9ff0b3167988c5384af3a8d43f5b9e4d08b34a411c
+Block mined! Hash: 00000c4bc706f768fdb2045f65ed0ff7b18771e28aa8148f03646f4dbdb7bc1b
+STREAK BONUS: +0.1200 AXN (1%)
+------------------------------ Captured log call ------------------------------
+INFO     XAI_Blockchain:structured_logger.py:190 UTXO set loaded.
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction founder_im...
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction founder_ve...
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction dev_fund_1...
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction marketing_...
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction mining_poo...
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction cdbedd38ed...
+_____________ TestNetworkMessaging.test_transaction_announcement ______________
+tests\xai_tests\integration\test_network.py:408: in test_transaction_announcement
+    tx = bc.create_transaction(
+E   NameError: name 'bc' is not defined
+__________ TestRaceAttack.test_transaction_confirmation_requirement ___________
+tests\xai_tests\security\test_attack_vectors.py:237: in test_transaction_confirmation_requirement
+    assert len(bc.pending_transactions) > 0
+E   assert 0 > 0
+E    +  where 0 = len([])
+E    +    where [] = <xai.core.blockchain.Blockchain object at 0x000001E8F1318670>.pending_transactions
+---------------------------- Captured stdout call -----------------------------
+Loaded 2508 blocks from disk.
+Block mined! Hash: 0000d84069e314a4d97a2452f7b293380139b857114d125c80acfa30b35aa972
+STREAK BONUS: +0.1200 AXN (1%)
+------------------------------ Captured log call ------------------------------
+INFO     XAI_Blockchain:structured_logger.py:190 UTXO set loaded.
+INFO     XAI_Blockchain:structured_logger.py:190 Processed outputs for transaction e6928807f3...
+WARNING  XAI_Blockchain:structured_logger.py:190 Transaction validation failed for 27b4fca152...: Non-coinbase transaction must have inputs.
+_______________ TestTimejackAttack.test_reject_future_timestamp _______________
+tests\xai_tests\security\test_attack_vectors.py:277: in test_reject_future_timestamp
+    from blockchain_security import TimeValidator
+E   ModuleNotFoundError: No module named 'blockchain_security'
+_____________ TestTimejackAttack.test_median_time_past_validation _____________
+tests\xai_tests\security\test_attack_vectors.py:293: in test_median_time_past_validation
+    from blockchain_security import TimeValidator
+E   ModuleNotFoundError: No module named 'blockchain_security'
+============================== warnings summary ===============================
+tests/xai_tests/integration/test_mining.py: 2 warnings
+tests/xai_tests/security/test_attack_vectors.py: 9 warnings
+  C:\Users\decri\GitClones\Crypto\src\xai\core\structured_logger.py:190: DeprecationWarning: The 'warn' method is deprecated, use 'warning' instead
+    log_func(message, extra=extra)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/xai_tests/integration/test_network.py::TestBlockPropagation::test_block_validation_on_receive - assert False
+ +  where False = validate_chain()
+ +    where validate_chain = <xai.core.blockchain.Blockchain object at 0x000001E8F230A510>.validate_chain
+FAILED tests/xai_tests/integration/test_network.py::TestChainConsensus::test_chain_replacement_validation - assert False
+ +  where False = validate_chain()
+ +    where validate_chain = <xai.core.blockchain.Blockchain object at 0x000001E8F230AC10>.validate_chain
+FAILED tests/xai_tests/integration/test_network.py::TestChainConsensus::test_reject_invalid_chain - assert not True
+ +  where True = validate_chain()
+ +    where validate_chain = <xai.core.blockchain.Blockchain object at 0x000001E8F1318C90>.validate_chain
+FAILED tests/xai_tests/integration/test_network.py::TestTransactionPropagation::test_transaction_broadcast - NameError: name 'bc' is not defined
+FAILED tests/xai_tests/integration/test_network.py::TestNetworkSynchronization::test_sync_with_transactions - NameError: name 'bc' is not defined
+FAILED tests/xai_tests/integration/test_network.py::TestNetworkResilience::test_block_validation_prevents_corruption - assert not True
+ +  where True = validate_chain()
+ +    where validate_chain = <xai.core.blockchain.Blockchain object at 0x000001E8F13190F0>.validate_chain
+FAILED tests/xai_tests/integration/test_network.py::TestNetworkMessaging::test_transaction_announcement - NameError: name 'bc' is not defined
+FAILED tests/xai_tests/security/test_attack_vectors.py::TestRaceAttack::test_transaction_confirmation_requirement - assert 0 > 0
+ +  where 0 = len([])
+ +    where [] = <xai.core.blockchain.Blockchain object at 0x000001E8F1318670>.pending_transactions
+FAILED tests/xai_tests/security/test_attack_vectors.py::TestTimejackAttack::test_reject_future_timestamp - ModuleNotFoundError: No module named 'blockchain_security'
+FAILED tests/xai_tests/security/test_attack_vectors.py::TestTimejackAttack::test_median_time_past_validation - ModuleNotFoundError: No module named 'blockchain_security'
+!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 10 failures !!!!!!!!!!!!!!!!!!!!!!!!!!
+==== 10 failed, 73 passed, 16 deselected, 11 warnings in 174.82s (0:02:54) ====

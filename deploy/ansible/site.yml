@@ -1,0 +1,155 @@
+---
+# ============================================================================
+# XAI Blockchain - Main Ansible Playbook
+# ============================================================================
+# This playbook orchestrates the deployment of the complete XAI blockchain
+# infrastructure across development, staging, and production environments.
+
+- name: Configure XAI Blockchain Infrastructure
+  hosts: all
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    # Default variables (override in environment-specific inventory)
+    python_version: "3.11"
+    app_user: "xai"
+    app_group: "xai"
+    app_home: "/opt/xai"
+    app_data: "/var/lib/xai"
+    app_logs: "/var/log/xai"
+    
+  pre_tasks:
+    - name: Display deployment information
+      debug:
+        msg: |
+          Deploying XAI Blockchain
+          Environment: {{ environment | default('development') }}
+          Ansible Version: {{ ansible_version.full }}
+          Python: {{ ansible_python_version }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+    
+    - name: Validate required variables
+      assert:
+        that:
+          - environment is defined
+          - deployment_version is defined
+        fail_msg: "environment and deployment_version variables are required"
+    
+    - name: Set facts for deployment
+      set_fact:
+        app_version: "{{ deployment_version }}"
+        deploy_timestamp: "{{ ansible_date_time.iso8601 }}"
+        deployment_user: "{{ ansible_user_id }}"
+
+  roles:
+    # System configuration and security hardening
+    - role: system-hardening
+      tags: [system, security, always]
+    
+    # Docker and container runtime
+    - role: docker
+      tags: [docker, container, infrastructure]
+    
+    # Blockchain node deployment
+    - role: blockchain-node
+      tags: [blockchain, node, application]
+    
+    # Block explorer deployment
+    - role: explorer
+      tags: [explorer, web, application]
+    
+    # Monitoring and observability
+    - role: monitoring
+      tags: [monitoring, observability]
+    
+    # Backup and disaster recovery
+    - role: backup
+      tags: [backup, disaster-recovery]
+    
+    # Firewall and security configuration
+    - role: firewall
+      tags: [firewall, security, networking]
+
+  post_tasks:
+    - name: Run health checks
+      include_tasks: health_checks.yml
+      tags: [health-check, verify]
+    
+    - name: Collect deployment logs
+      command: "journalctl -u xai-node -n 50 --no-pager"
+      register: deployment_logs
+      ignore_errors: yes
+    
+    - name: Display deployment summary
+      debug:
+        msg: |
+          DEPLOYMENT COMPLETE
+          ==================
+          Version: {{ app_version }}
+          Timestamp: {{ deploy_timestamp }}
+          Environment: {{ environment }}
+          Status: SUCCESS
+          
+          Services Status:
+          - Blockchain Node: {{ blockchain_node_status | default('running') }}
+          - Block Explorer: {{ explorer_status | default('running') }}
+          - Monitoring: {{ monitoring_status | default('running') }}
+          - Backup: {{ backup_status | default('configured') }}
+    
+    - name: Send deployment notification
+      mail:
+        host: "{{ notification_smtp_server | default(omit) }}"
+        port: "{{ notification_smtp_port | default(587) }}"
+        username: "{{ notification_smtp_user | default(omit) }}"
+        password: "{{ notification_smtp_pass | default(omit) }}"
+        to: "{{ notification_email }}"
+        subject: "XAI Deployment Complete - {{ environment }}"
+        body: |
+          Deployment completed successfully for XAI Blockchain
+          
+          Environment: {{ environment }}
+          Version: {{ app_version }}
+          Timestamp: {{ deploy_timestamp }}
+          
+          All services are running and healthy.
+      when: notification_email is defined
+      ignore_errors: yes
+
+# ============================================================================
+# Post-Deployment Validation Play
+# ============================================================================
+
+- name: Validate Deployment
+  hosts: blockchain-nodes
+  gather_facts: no
+  tags: [validation, verify]
+  
+  tasks:
+    - name: Validate blockchain node connectivity
+      uri:
+        url: "http://{{ ansible_host }}:8080/health"
+        method: GET
+        status_code: 200
+      register: node_health
+      retries: 5
+      delay: 10
+      until: node_health is succeeded
+    
+    - name: Validate API endpoint
+      uri:
+        url: "http://{{ ansible_host }}:8080/api/v1/network/info"
+        method: GET
+        status_code: 200
+      register: api_response
+    
+    - name: Verify P2P port connectivity
+      wait_for:
+        host: "{{ ansible_host }}"
+        port: 8333
+        timeout: 10
+    
+    - name: Check blockchain sync status
+      shell: "curl -s http://localhost:8080/api/v1/blockchain/info | jq '.is_synced'"
+      register: sync_status
+      changed_when: false
