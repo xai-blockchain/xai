@@ -24,6 +24,13 @@ __pycache__/
 /xai/data_test/backups/
 /.tmp.*
 
+# Terraform artifacts
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+
 # Virtual environments and installed packages
 venv/
 .venv/
