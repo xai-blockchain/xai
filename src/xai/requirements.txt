@@ -85,7 +85,7 @@ psycopg2-binary==2.9.11
     # via -r src/xai/requirements.in
 pycparser==2.23
     # via cffi
-pycryptodome==3.19.0
+pycryptodome==3.23.0
     # via -r src/xai/requirements.in
 pydantic==2.12.4
     # via
