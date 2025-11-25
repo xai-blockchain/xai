@@ -79,7 +79,7 @@ openai==2.7.2
     # via -r src/xai/requirements.in
 prometheus-client==0.23.1
     # via -r src/xai/requirements.in
-psutil==5.9.8
+psutil==7.1.3
     # via -r src/xai/requirements.in
 psycopg2-binary==2.9.11
     # via -r src/xai/requirements.in
