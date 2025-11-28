@@ -16,7 +16,7 @@ import os
 import json
 from typing import Dict, Any, List, Optional, Callable
 from collections import defaultdict, deque
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from xai.core.config import Config
 from xai.core.security_validation import SecurityEventRouter
@@ -197,7 +197,7 @@ class Alert:
         self.metric_name = metric_name
         self.threshold = threshold
         self.current_value = current_value
-        self.timestamp = datetime.utcnow()
+        self.timestamp = datetime.now(timezone.utc)
         self.active = True
 
     def to_dict(self) -> Dict[str, Any]:
@@ -773,7 +773,7 @@ class MetricsCollector:
             {
                 "event_type": event_type,
                 "severity": severity_normalized,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "details": payload or {},
             }
         )
@@ -901,7 +901,7 @@ class MetricsCollector:
         """
         status = {
             "status": "healthy",
-            "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             "uptime_seconds": time.time() - self.start_time,
             "checks": {},
         }

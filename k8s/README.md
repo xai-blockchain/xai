@@ -28,6 +28,10 @@ k8s/
 ├── hpa.yaml                  # Horizontal Pod Autoscaler
 ├── monitoring.yaml           # Prometheus monitoring setup
 ├── rbac.yaml                 # RBAC and security policies
+├── networkpolicy.yaml        # NetworkPolicy restricting ingress/egress (generic)
+├── networkpolicy.prod.yaml   # Production NetworkPolicy (restrict to validator CIDRs)
+├── networkpolicy.dev.yaml    # Development NetworkPolicy (allow namespace traffic)
+├── values-p2p-hardening.yaml # Helm values stub for P2P hardening
 └── docker/                   # Docker build artifacts (if needed)
     └── Dockerfile            # Container image definition
 ```
@@ -112,6 +116,11 @@ Review and update `configmap.yaml` with your network settings:
 # - WS_PORT: WebSocket port (default 8547)
 # - BLOCKCHAIN_DIFFICULTY: Mining difficulty
 # - MAX_PEERS: Maximum peer connections
+# - XAI_SECURITY_WEBHOOK_URL / XAI_SECURITY_WEBHOOK_TOKEN: SIEM webhook (optional)
+# - XAI_PEER_REQUIRE_CLIENT_CERT / XAI_PEER_NONCE_TTL_SECONDS: mTLS + replay window
+# - XAI_P2P_MAX_MESSAGE_RATE / XAI_P2P_MAX_BANDWIDTH_{IN,OUT}: P2P rate and bandwidth caps
+# - XAI_TRUSTED_PEER_PUBKEYS_FILE / XAI_TRUSTED_PEER_CERT_FPS_FILE: trust stores mounted at /etc/xai/trust
+# - NetworkPolicy CIDRs: edit `networkpolicy.yaml` to match your validator ingress ranges
 ```
 
 ### 3. Prepare Persistent Volumes

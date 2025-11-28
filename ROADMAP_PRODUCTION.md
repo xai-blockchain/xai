@@ -55,9 +55,22 @@ This roadmap targets production readiness with security-first posture, robust co
 - Backups/recovery: periodic chain/key snapshots, verified restore runbooks.
 
 ## Next Up
-- Add Prometheus/Alertmanager rules for `xai_p2p_nonce_replay_total`, `xai_p2p_rate_limited_total`, and `xai_p2p_invalid_signature_total`; forward `p2p.*` events to SIEM via `SecurityEventRouter` webhooks.
-- Propagate P2P hardening envs to deployment manifests/Helm (trust-store mounts, mTLS requirement, nonce TTL, rate/bandwidth caps).
-- Extend chaos harness to simulate partition/reconnect with signed transactions and assert UTXO digests remain stable across reorgs under load.
+- ✅ Add Prometheus/Alertmanager rules for `xai_p2p_nonce_replay_total`, `xai_p2p_rate_limited_total`, and `xai_p2p_invalid_signature_total`; forward `p2p.*` events to SIEM via `SecurityEventRouter` webhooks.
+- ✅ Propagate P2P hardening envs to deployment manifests/Helm (trust-store mounts, mTLS requirement, nonce TTL, rate/bandwidth caps).
+- ✅ Extend chaos harness to simulate partition/reconnect with signed transactions and assert UTXO digests remain stable across reorgs under load.
+- ✅ Add Grafana dashboard panels for the new P2P security metrics and verify Alertmanager routing uses the new rules/runbooks.
+- ✅ Author runbooks for P2P replay, rate-limit, and invalid-signature alerts to satisfy the linked Alertmanager runbook URLs.
+- ✅ Add deploy-time validation (deploy.sh/kubeval) to ensure trust-store ConfigMap/secret and mTLS env flags are present before rollout.
+- ✅ Publish P2P runbooks into the docs site navigation and verify the Alertmanager runbook links resolve in the built docs.
+- ✅ Add deploy-time checks to block rollout when trust-store placeholders are present or mTLS env keys are missing for production overlays.
+- ✅ Add synthetic P2P security probes (replay/invalid signature) to monitoring verification or chaos harness to continuously test the paths.
+- ✅ Add CI gating (pre-merge) to enforce the P2P hardening checks and ensure production overlays inherit the mTLS/trust-store settings (wire `scripts/ci/p2p_hardening_check.sh` into the pipeline).
+- ✅ Wire SIEM webhook smoke-test into deploy verify script and ensure webhook sink failures alert.
+- [ ] Consensus/state: deepen reorg/partition simulations with snapshot verification (state/UTXO digest) and bounded orphan pool enforcement tests.
+- [ ] Networking: add QUIC/WebSocket fallback path and versioned feature negotiation schema; document supported P2P versions per release.
+- [ ] Validation/testing: expand property/fuzz tests for tx/block validation and crypto vectors; add deterministic testnet fixtures for reproducible CI.
+- [ ] Ops/release: automate release/rollback checklist, backup/restore runbook, and integrate dependency audit artifacts into CI.
+- [ ] Security/API: strengthen API auth (scoped keys/JWT) and add SAST/DAST gating guidance/tests; governance/consensus invariants tests.
 
 ## 10) Documentation and Runbooks
 - Developer docs: protocol specs, validation rules, P2P handshake, API schemas, integration guides.

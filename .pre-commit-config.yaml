@@ -90,6 +90,16 @@ repos:
         pass_filenames: false
         stages: [commit]
 
+  - repo: local
+    hooks:
+      - id: p2p-hardening-check
+        name: P2P Hardening Check
+        entry: scripts/ci/p2p_hardening_check.sh
+        language: system
+        types: [file]
+        pass_filenames: false
+        stages: [commit]
+
   # Type checking with MyPy
     rev: v1.13.0
     hooks:

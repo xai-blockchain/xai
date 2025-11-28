@@ -214,6 +214,48 @@ spec:
             description: "Node failed to reach consensus"
 
 ---
+# PrometheusRule - P2P security
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: xai-blockchain-p2p-security
+  namespace: xai-blockchain
+  labels:
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: blockchain.p2p.security
+      interval: 30s
+      rules:
+        - alert: P2PNonceReplaySpike
+          expr: increase(xai_p2p_nonce_replay_total[5m]) > 3
+          for: 2m
+          labels:
+            severity: warning
+            service: network
+          annotations:
+            summary: "P2P Nonce Replay Attempts Rising"
+            description: "{{ $value }} replayed nonces observed in 5m; possible replay probing"
+        - alert: P2PRateLimitedPeers
+          expr: increase(xai_p2p_rate_limited_total[5m]) > 50
+          for: 2m
+          labels:
+            severity: warning
+            service: network
+          annotations:
+            summary: "Peers Hitting Rate Limits"
+            description: "{{ $value }} P2P messages throttled in 5m; check for abusive peers"
+        - alert: P2PInvalidSignatures
+          expr: increase(xai_p2p_invalid_signature_total[5m]) > 5
+          for: 2m
+          labels:
+            severity: warning
+            service: network
+          annotations:
+            summary: "Invalid P2P Signatures Detected"
+            description: "{{ $value }} invalid/stale P2P signatures in 5m; investigate peer auth"
+
+---
 # Alertmanager configuration
 apiVersion: v1
 kind: ConfigMap

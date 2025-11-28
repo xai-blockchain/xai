@@ -20,10 +20,12 @@ from threading import RLock
 from xai.core.crypto_utils import sign_message_hex, verify_signature_hex
 
 
+HEADER_VERSION = "X-Node-Version"
 HEADER_PUBKEY = "X-Node-Pub"
 HEADER_SIG = "X-Node-Signature"
 HEADER_TS = "X-Node-Timestamp"
 HEADER_NONCE = "X-Node-Nonce"
+HEADER_FEATURES = "X-Node-Features"
 
 
 class P2PSecurityConfig:
@@ -46,6 +48,9 @@ class P2PSecurityConfig:
     PENALTY_MINOR = 5.0
     PENALTY_MAJOR = 15.0
     PENALTY_CRITICAL = 30.0
+    PROTOCOL_VERSION = "1"
+    SUPPORTED_VERSIONS = {"1"}
+    SUPPORTED_FEATURES = {"quic", "ws"}
 
 
 def _digest(body_bytes: bytes, ts: str, nonce: str) -> bytes:
@@ -61,15 +66,34 @@ def sign_headers(
     *,
     timestamp: int | None = None,
     nonce: str | None = None,
+    version: str | None = None,
+    features: Set[str] | None = None,
 ) -> Dict[str, str]:
     ts = str(int(timestamp if timestamp is not None else time.time()))
     nn = nonce if nonce is not None else hashlib.sha256(f"{time.time()}".encode()).hexdigest()[:32]
     digest = _digest(body_bytes, ts, nn)
     sig = sign_message_hex(private_hex, digest)
-    return {HEADER_PUBKEY: public_hex, HEADER_TS: ts, HEADER_NONCE: nn, HEADER_SIG: sig}
+    ver = version or P2PSecurityConfig.PROTOCOL_VERSION
+    feat = ",".join(sorted((features or P2PSecurityConfig.SUPPORTED_FEATURES) & P2PSecurityConfig.SUPPORTED_FEATURES))
+    return {
+        HEADER_VERSION: ver,
+        HEADER_PUBKEY: public_hex,
+        HEADER_TS: ts,
+        HEADER_NONCE: nn,
+        HEADER_SIG: sig,
+        HEADER_FEATURES: feat,
+    }
 
 
 def verify_headers(headers: Dict[str, str], body_bytes: bytes, *, max_skew_seconds: int = 300) -> Tuple[bool, str]:
+    version = headers.get(HEADER_VERSION, "")
+    if version and version not in P2PSecurityConfig.SUPPORTED_VERSIONS:
+        return False, "unsupported_protocol_version"
+    if not version:
+        return False, "missing_protocol_version"
+    features = set(filter(None, headers.get(HEADER_FEATURES, "").split(",")))
+    if features and not features.issubset(P2PSecurityConfig.SUPPORTED_FEATURES):
+        return False, "unsupported_feature"
     pub = headers.get(HEADER_PUBKEY, "")
     sig = headers.get(HEADER_SIG, "")
     ts = headers.get(HEADER_TS, "")

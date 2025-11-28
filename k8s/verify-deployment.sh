@@ -195,6 +195,37 @@ verify_monitoring() {
     fi
 }
 
+verify_p2p_metrics() {
+    test_info "Verifying P2P security metrics exposure..."
+    local pod
+    pod=$(kubectl get pods -n $NAMESPACE -l app=xai-blockchain -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    if [ -z "$pod" ]; then
+        test_warn "No pods available to check metrics"
+        return
+    fi
+    if kubectl exec -n $NAMESPACE "$pod" -- sh -c "curl -s http://localhost:9090/metrics | grep xai_p2p_nonce_replay_total" >/dev/null 2>&1; then
+        test_pass "P2P metrics exposed on /metrics (nonce replay counter present)"
+    else
+        test_warn "P2P metrics not found on /metrics; check metrics configuration"
+    fi
+}
+
+verify_siem_webhook() {
+    test_info "Verifying SIEM webhook (if configured)..."
+    local url
+    url=$(kubectl get configmap xai-blockchain-config -n $NAMESPACE -o jsonpath='{.data.XAI_SECURITY_WEBHOOK_URL}' 2>/dev/null || echo "")
+    if [ -z "$url" ]; then
+        test_warn "XAI_SECURITY_WEBHOOK_URL not set in ConfigMap; skipping SIEM webhook probe"
+        return
+    fi
+
+    if kubectl exec -n $NAMESPACE "$(kubectl get pods -n $NAMESPACE -l app=xai-blockchain -o jsonpath='{.items[0].metadata.name}')" -- sh -c "curl -sf -m 5 -X POST -H 'Content-Type: application/json' -d '{\"event_type\":\"p2p.siem_probe\",\"severity\":\"WARNING\",\"details\":{\"probe\":\"verify-deployment\"}}' $url" >/dev/null 2>&1; then
+        test_pass "SIEM webhook probe delivered successfully"
+    else
+        test_warn "SIEM webhook probe failed (check webhook URL/secret)"
+    fi
+}
+
 verify_hpa() {
     test_info "Verifying Horizontal Pod Autoscaler..."
 

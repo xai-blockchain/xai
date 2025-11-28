@@ -180,6 +180,12 @@ iptables -A INPUT -j DROP
 4. Reputation scoring
 5. Ban list checking
 
+### Operational Runbooks
+
+- P2P Nonce Replay: `runbooks/p2p-replay.md`
+- P2P Rate Limiting: `runbooks/p2p-rate-limit.md`
+- P2P Invalid Signatures: `runbooks/p2p-auth.md`
+
 ## Transaction Security
 
 ### Signature Verification

@@ -25,20 +25,13 @@ Production nodes must enforce strict peer auth, replay protection, and bandwidth
 - Metrics:
   - `xai_p2p_nonce_replay_total`: rejected messages due to nonce replay.
   - `xai_p2p_rate_limited_total`: messages dropped due to rate limiting.
-- Prometheus rules (examples):
-  ```
-  - alert: XAIP2PReplaySpike
-    expr: increase(xai_p2p_nonce_replay_total[5m]) > 10
-    for: 2m
-    labels: {severity: warning}
-    annotations:
-      summary: "P2P nonce replay surge"
-
-  - alert: XAIP2PRateLimitSpike
-    expr: increase(xai_p2p_rate_limited_total[5m]) > 25
-    for: 2m
-    labels: {severity: warning}
-    annotations:
-      summary: "P2P rate limiting triggered frequently"
-  ```
-- Alerts flow via `SecurityEventRouter` (prefixed `p2p.*`) and can be forwarded through `XAI_SECURITY_WEBHOOK_URL`.
+  - `xai_p2p_invalid_signature_total`: messages rejected for invalid or stale signatures.
+- Prometheus rules (production defaults live in `monitoring/prometheus_alerts.yml`):
+  - Nonce replay: warning at >3/5m, critical at >15/5m.
+  - Rate limiting: warning at >50/5m, critical at >200/5m.
+  - Invalid signatures: warning at >5/5m, critical at >25/5m.
+- Alerts flow via `SecurityEventRouter` (prefixed `p2p.*`) and can be forwarded through `XAI_SECURITY_WEBHOOK_URL` to your SIEM or incident channel.
+- Runbooks:
+  - [P2P Nonce Replay](../../runbooks/p2p-replay.md)
+  - [P2P Rate Limiting](../../runbooks/p2p-rate-limit.md)
+  - [P2P Invalid Signatures](../../runbooks/p2p-auth.md)

@@ -86,6 +86,74 @@ groups:
           summary: "High Network Latency"
           description: "95th percentile latency: {{ $value | humanizeDuration }}"
 
+      # ==================== P2P SECURITY ====================
+
+      - alert: P2PNonceReplaySpike
+        expr: increase(xai_p2p_nonce_replay_total[5m]) > 3
+        for: 2m
+        labels:
+          severity: warning
+          service: network
+        annotations:
+          summary: "P2P Nonce Replay Attempts Rising"
+          description: "{{ $value }} replayed nonces observed in 5m; possible replay probing"
+          runbook: "https://docs.blockchain-project.io/runbooks/p2p-replay/"
+
+      - alert: P2PNonceReplayFlood
+        expr: increase(xai_p2p_nonce_replay_total[5m]) > 15
+        for: 1m
+        labels:
+          severity: critical
+          service: network
+        annotations:
+          summary: "P2P Nonce Replay Flood"
+          description: "{{ $value }} replayed nonces in 5m; likely coordinated replay attack"
+          runbook: "https://docs.blockchain-project.io/runbooks/p2p-replay/"
+
+      - alert: P2PRateLimitedPeers
+        expr: increase(xai_p2p_rate_limited_total[5m]) > 50
+        for: 2m
+        labels:
+          severity: warning
+          service: network
+        annotations:
+          summary: "Peers Hitting Rate Limits"
+          description: "{{ $value }} P2P messages throttled in 5m; check for abusive peers"
+          runbook: "https://docs.blockchain-project.io/runbooks/p2p-rate-limit/"
+
+      - alert: P2PRateLimitFlood
+        expr: increase(xai_p2p_rate_limited_total[5m]) > 200
+        for: 1m
+        labels:
+          severity: critical
+          service: network
+        annotations:
+          summary: "P2P Rate Limit Flood"
+          description: "{{ $value }} throttled P2P messages in 5m; likely DoS or misconfigured peer"
+          runbook: "https://docs.blockchain-project.io/runbooks/p2p-rate-limit/"
+
+      - alert: P2PInvalidSignatures
+        expr: increase(xai_p2p_invalid_signature_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: network
+        annotations:
+          summary: "Invalid P2P Signatures Detected"
+          description: "{{ $value }} invalid/stale P2P signatures in 5m; investigate peer auth"
+          runbook: "https://docs.blockchain-project.io/runbooks/p2p-auth/"
+
+      - alert: P2PInvalidSignatureFlood
+        expr: increase(xai_p2p_invalid_signature_total[5m]) > 25
+        for: 1m
+        labels:
+          severity: critical
+          service: network
+        annotations:
+          summary: "P2P Invalid Signature Flood"
+          description: "{{ $value }} invalid/stale P2P signatures in 5m; possible key misuse or attack"
+          runbook: "https://docs.blockchain-project.io/runbooks/p2p-auth/"
+
       # ==================== BLOCK PRODUCTION ====================
 
       - alert: LowBlockProductionRate

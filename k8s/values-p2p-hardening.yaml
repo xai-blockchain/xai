@@ -1,0 +1,22 @@
+p2p:
+  requireClientCert: true
+  nonceTtlSeconds: 120
+  maxMessageRate: 50
+  securityLogRate: 20
+  maxBandwidthIn: 524288
+  maxBandwidthOut: 524288
+  dnsSeeds: []
+  bootstrapNodes: []
+  caBundle: /etc/ssl/certs/ca-bundle.crt
+  trustedPeerPubkeysFile: /etc/xai/trust/trusted_peer_pubkeys.txt
+  trustedPeerCertFpsFile: /etc/xai/trust/trusted_peer_cert_fps.txt
+
+security:
+  webhookUrl: ""
+  webhookToken: ""
+
+trustStores:
+  pubkeys: |
+    # insert peer public keys here
+  certFingerprints: |
+    # insert certificate SHA-256 fingerprints here

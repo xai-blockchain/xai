@@ -35,8 +35,8 @@ XAI is a Python-based blockchain implementing a production-grade proof-of-work (
 ### Installation
 
 ```bash
-# From the project root, install dependencies
-pip install -r requirements.txt
+# From the project root, install dependencies (with constraints for reproducibility)
+pip install -c constraints.txt -e ".[dev]"
 
 # Verify installation
 python -m pytest --co -q
@@ -246,6 +246,15 @@ make all  # Linting + Security + Tests + Coverage
 
 # Run only security tests
 pytest -m security
+
+# P2P security-focused subset
+make test-p2p-security
+# Static P2P hardening check
+make p2p-hardening-check
+# CI-friendly aggregate (hardening + P2P tests)
+scripts/ci/run_p2p_checks.sh
+# Install with constraints (pin deps in CI)
+scripts/ci/install_with_constraints.sh
 
 # Test with coverage requirement
 pytest --cov=src/xai --cov-fail-under=80

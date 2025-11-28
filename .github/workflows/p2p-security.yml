@@ -1,0 +1,52 @@
+name: P2P Security Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * *"  # nightly
+
+jobs:
+  p2p-security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies with constraints
+        run: |
+          python -m pip install --upgrade pip
+          scripts/ci/install_with_constraints.sh
+
+      - name: Run P2P hardening + security subset
+        run: scripts/ci/run_p2p_checks.sh
+
+      - name: Run perf guardrails
+        run: python scripts/ci/perf_check.py
+
+      - name: Upload benchmark report
+        uses: actions/upload-artifact@v4
+        with:
+          name: crypto-benchmarks
+          path: benchmarks/crypto_report.json
+          if-no-files-found: ignore
+
+      - name: Dependency audit (pip-audit)
+        run: pip-audit -r requirements.txt -f json -o pip-audit.json
+
+      - name: Upload dependency audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit
+          path: pip-audit.json
+          if-no-files-found: ignore
+
+      - name: (Optional) SIEM webhook smoke-test
+        if: env.XAI_SECURITY_WEBHOOK_URL != ''
+        run: scripts/ci/smoke_siem_webhook.sh

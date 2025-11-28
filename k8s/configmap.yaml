@@ -52,6 +52,21 @@ data:
   ENABLE_SECURITY_VALIDATION: "true"
   ENABLE_RATE_LIMITING: "true"
   RATE_LIMIT_PER_SECOND: "100"
+  XAI_SECURITY_WEBHOOK_URL: ""
+  XAI_SECURITY_WEBHOOK_TOKEN: ""
+
+  # P2P Hardening
+  XAI_PEER_REQUIRE_CLIENT_CERT: "1"
+  XAI_PEER_NONCE_TTL_SECONDS: "120"
+  XAI_P2P_MAX_MESSAGE_RATE: "50"
+  XAI_P2P_SECURITY_LOG_RATE: "20"
+  XAI_P2P_MAX_BANDWIDTH_IN: "524288"
+  XAI_P2P_MAX_BANDWIDTH_OUT: "524288"
+  XAI_TRUSTED_PEER_PUBKEYS_FILE: "/etc/xai/trust/trusted_peer_pubkeys.txt"
+  XAI_TRUSTED_PEER_CERT_FPS_FILE: "/etc/xai/trust/trusted_peer_cert_fps.txt"
+  XAI_P2P_CA_BUNDLE: "/etc/ssl/certs/ca-bundle.crt"
+  XAI_P2P_DNS_SEEDS: ""
+  XAI_P2P_BOOTSTRAP_NODES: ""
 
   # Monitoring
   METRICS_ENABLED: "true"
@@ -132,3 +147,20 @@ data:
       --port "$NODE_PORT" \
       --miner-address "$MINER_ADDRESS" \
       --environment "$ENVIRONMENT"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: xai-blockchain-trust
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    component: trust
+data:
+  trusted_peer_pubkeys.txt: |
+    # Hex-encoded peer public keys (compressed) for mTLS peer allowlist
+    # 02abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+  trusted_peer_cert_fps.txt: |
+    # SHA-256 certificate fingerprints for pinned peer certificates
+    # a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00

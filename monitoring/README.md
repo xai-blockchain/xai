@@ -25,6 +25,7 @@ This directory contains:
 1. **prometheus_alerts.yml** - Alert rules for critical conditions
    - Node availability
    - Network health
+   - P2P security (replay/rate-limit/invalid-signature spikes)
    - Block production
    - Transaction processing
    - System resources

@@ -15,15 +15,16 @@ import os
 import threading
 from urllib.parse import urlparse
 import websockets
-from websockets.server import WebSocketServerProtocol
 from websockets.exceptions import ConnectionClosed
 import json
+import hashlib
 from typing import TYPE_CHECKING, Set, Optional, Dict, Any, Union
 
 import requests
 from xai.network.peer_manager import PeerManager
 from xai.core.block_header import BlockHeader
-from xai.core.p2p_security import MessageRateLimiter, BandwidthLimiter
+from xai.core.p2p_security import MessageRateLimiter, BandwidthLimiter, HEADER_VERSION, P2PSecurityConfig
+from xai.core.security_validation import SecurityEventRouter
 from xai.core.config import Config
 
 if TYPE_CHECKING:
@@ -68,8 +69,8 @@ class P2PNetworkManager:
         self.host = host
         self.port = port
         self.server: Optional[websockets.WebSocketServer] = None
-        self.connections: Dict[str, WebSocketServerProtocol] = {}
-        self.websocket_peer_ids: Dict[WebSocketServerProtocol, str] = {}
+        self.connections: Dict[str, Any] = {}
+        self.websocket_peer_ids: Dict[Any, str] = {}
         self.http_peers: Set[str] = set()
         self.peers = self.http_peers  # Alias used by legacy callers/tests
         self._peer_lock = threading.RLock()
@@ -158,7 +159,7 @@ class P2PNetworkManager:
         self.connections.clear()
         print("P2P server stopped.")
 
-    async def _handler(self, websocket: WebSocketServerProtocol, path: str) -> None:
+    async def _handler(self, websocket: Any, path: str) -> None:
         """Handles incoming WebSocket connections."""
         remote_ip = websocket.remote_address[0]
         if not self.peer_manager.can_connect(remote_ip):
@@ -245,20 +246,53 @@ class P2PNetworkManager:
                 self._log_security_event("self", f"trust_store_refresh_failed:{exc}")
             print(f"Health check: {self.get_peer_count()} peers connected.")
 
+    def _emit_security_event(
+        self,
+        event_type: str,
+        severity: str = "WARNING",
+        payload: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """
+        Forward P2P security events through the global router so metrics and webhooks
+        receive a consistent signal. Falls back to metrics directly when no sinks are
+        registered (e.g., unit tests without node initialization).
+        """
+        normalized_severity = (severity or "INFO").upper()
+        payload = dict(payload or {})
+        peer_id = payload.get("peer")
+        if peer_id:
+            # Redact peer identifiers to avoid leaking IPs/IDs into logs/webhooks.
+            payload["peer"] = f"peer#{hashlib.sha256(str(peer_id).encode('utf-8')).hexdigest()[:10]}"
+        sinks = getattr(SecurityEventRouter, "_sinks", [])
+        dispatched = False
+        try:
+            SecurityEventRouter.dispatch(event_type, payload, normalized_severity)
+            dispatched = bool(sinks)
+        except Exception:
+            # Avoid surfacing routing errors on hot paths
+            pass
+
+        if not dispatched:
+            try:
+                from xai.core.monitoring import MetricsCollector
+                MetricsCollector.instance().record_security_event(
+                    event_type=event_type,
+                    severity=normalized_severity,
+                    payload=payload,
+                )
+            except Exception:
+                pass
+
     def _log_security_event(self, peer_id: str, message: str) -> None:
         """Log security-related events with lightweight rate limiting to avoid log flooding."""
         if self.security_log_limiter.is_rate_limited(peer_id):
             return
         print(f"[SECURITY] {peer_id}: {message}")
-        try:
-            from xai.core.monitoring import MetricsCollector
-            MetricsCollector.instance().record_security_event(
-                event_type=f"p2p.{message}",
-                severity="WARNING",
-                payload={"peer": peer_id},
-            )
-        except Exception:
-            pass
+        self._emit_security_event(
+            event_type=f"p2p.{message}",
+            severity="WARNING",
+            payload={"peer": peer_id},
+        )
         
     async def _handle_message(self, websocket: WebSocketServerProtocol, message: Union[str, bytes]) -> None:
         """Handles incoming messages from peers."""
@@ -286,15 +320,11 @@ class P2PNetworkManager:
             verified_message = self.peer_manager.encryption.verify_signed_message(raw_bytes)
             if not verified_message:
                 self._log_security_event(peer_id, "invalid_or_stale_signature")
-                try:
-                    from xai.core.monitoring import MetricsCollector
-                    MetricsCollector.instance().record_security_event(
-                        event_type="p2p.invalid_signature",
-                        severity="WARNING",
-                        payload={"peer": peer_id},
-                    )
-                except Exception:
-                    pass
+                self._emit_security_event(
+                    event_type="p2p.invalid_signature",
+                    severity="WARNING",
+                    payload={"peer": peer_id},
+                )
                 self.peer_manager.reputation.record_invalid_transaction(peer_id) # Generic penalty
                 return
             
@@ -315,6 +345,21 @@ class P2PNetworkManager:
                 self.peer_manager.record_nonce(sender_id, nonce, timestamp)
 
             data = verified_message.get("payload")
+            msg_version = verified_message.get("version") or verified_message.get(HEADER_VERSION) or str(
+                getattr(P2PSecurityConfig, "PROTOCOL_VERSION", "1")
+            )
+            if msg_version not in getattr(P2PSecurityConfig, "SUPPORTED_VERSIONS", {"1"}):
+                self._log_security_event(peer_id, f"unsupported_protocol_version:{msg_version}")
+                self.peer_manager.reputation.record_invalid_transaction(peer_id)
+                return
+            features = set()
+            feat_raw = verified_message.get("features") or verified_message.get("headers", {}).get("X-Node-Features")
+            if feat_raw:
+                features = set(str(feat_raw).split(","))
+            if features and not features.issubset(getattr(P2PSecurityConfig, "SUPPORTED_FEATURES", set())):
+                self._log_security_event(peer_id, f"unsupported_features:{','.join(sorted(features))}")
+                self.peer_manager.reputation.record_invalid_transaction(peer_id)
+                return
 
             message_type = data.get("type")
             payload = data.get("payload")
@@ -364,7 +409,7 @@ class P2PNetworkManager:
 
     async def _send_signed_message(
         self,
-        websocket: WebSocketServerProtocol,
+        websocket: Any,
         peer_id: str,
         message: Dict[str, Any],
     ) -> None:

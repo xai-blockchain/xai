@@ -154,6 +154,56 @@ validate_configuration() {
         fi
     done
     log_success "All required manifest files found"
+
+    validate_p2p_hardening
+}
+
+validate_p2p_hardening() {
+    log_info "Validating P2P hardening settings..."
+    local cfg="$SCRIPT_DIR/configmap.yaml"
+
+    # Ensure critical env keys are present
+    local required_envs=(
+        "XAI_PEER_REQUIRE_CLIENT_CERT"
+        "XAI_PEER_NONCE_TTL_SECONDS"
+        "XAI_P2P_MAX_MESSAGE_RATE"
+        "XAI_P2P_MAX_BANDWIDTH_IN"
+        "XAI_P2P_MAX_BANDWIDTH_OUT"
+        "XAI_TRUSTED_PEER_PUBKEYS_FILE"
+        "XAI_TRUSTED_PEER_CERT_FPS_FILE"
+    )
+    for key in "${required_envs[@]}"; do
+        if ! grep -q "$key" "$cfg"; then
+            log_error "Missing required P2P hardening key in configmap.yaml: $key"
+            exit 1
+        fi
+    done
+
+    # Ensure trust-store ConfigMap exists
+    if ! grep -q "name: xai-blockchain-trust" "$cfg"; then
+        log_error "Trust-store ConfigMap (xai-blockchain-trust) not defined in configmap.yaml"
+        exit 1
+    fi
+
+    # Warn if trust stores contain placeholder fingerprints/keys
+    if grep -q "02abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789" "$cfg"; then
+        if [ "${ALLOW_PLACEHOLDER_TRUST_STORES:-0}" != "1" ]; then
+            log_error "Trusted peer pubkeys ConfigMap contains placeholder values. Set ALLOW_PLACEHOLDER_TRUST_STORES=1 to override (not recommended)."
+            exit 1
+        else
+            log_warning "Trusted peer pubkeys ConfigMap contains placeholder values (override enabled)."
+        fi
+    fi
+    if grep -q "a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00" "$cfg"; then
+        if [ "${ALLOW_PLACEHOLDER_TRUST_STORES:-0}" != "1" ]; then
+            log_error "Trusted peer certificate fingerprints ConfigMap contains placeholders. Set ALLOW_PLACEHOLDER_TRUST_STORES=1 to override (not recommended)."
+            exit 1
+        else
+            log_warning "Trusted peer certificate fingerprints ConfigMap contains placeholders (override enabled)."
+        fi
+    fi
+
+    log_success "P2P hardening configuration validated (env keys and trust-store present)"
 }
 
 create_namespace() {

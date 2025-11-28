@@ -1,0 +1,46 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: xai-blockchain-p2p-restrict
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+spec:
+  podSelector:
+    matchLabels:
+      app: xai-blockchain
+      component: node
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        # Allow intra-namespace communication
+        - podSelector: {}
+        # Allow trusted CIDRs (update for your validators)
+        - ipBlock:
+            cidr: 10.0.0.0/8
+            except:
+              - 10.0.0.0/24
+        # Example production CIDR (replace)
+        - ipBlock:
+            cidr: 192.0.2.0/24
+      ports:
+        - port: 8545
+          protocol: TCP
+        - port: 8546
+          protocol: TCP
+        - port: 8547
+          protocol: TCP
+        - port: 9090
+          protocol: TCP
+  egress:
+    - to:
+        - podSelector: {}
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 443
+          protocol: TCP
+        - port: 80
+          protocol: TCP

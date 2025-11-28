@@ -1,0 +1,7 @@
+{
+  "timestamp": 1764312650.3990593,
+  "benchmarks": {
+    "signature_verify_avg_ms": 0.25020105200383114,
+    "block_header_serialize_avg_ms": 0.00017006299458444118
+  }
+}

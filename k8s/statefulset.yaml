@@ -218,6 +218,75 @@ spec:
                   name: xai-blockchain-secrets
                   key: jwt-secret
 
+            # P2P Security & Hardening
+            - name: XAI_PEER_REQUIRE_CLIENT_CERT
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: XAI_PEER_REQUIRE_CLIENT_CERT
+            - name: XAI_PEER_NONCE_TTL_SECONDS
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: XAI_PEER_NONCE_TTL_SECONDS
+            - name: XAI_P2P_MAX_MESSAGE_RATE
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: XAI_P2P_MAX_MESSAGE_RATE
+            - name: XAI_P2P_SECURITY_LOG_RATE
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: XAI_P2P_SECURITY_LOG_RATE
+            - name: XAI_P2P_MAX_BANDWIDTH_IN
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: XAI_P2P_MAX_BANDWIDTH_IN
+            - name: XAI_P2P_MAX_BANDWIDTH_OUT
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: XAI_P2P_MAX_BANDWIDTH_OUT
+            - name: XAI_TRUSTED_PEER_PUBKEYS_FILE
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: XAI_TRUSTED_PEER_PUBKEYS_FILE
+            - name: XAI_TRUSTED_PEER_CERT_FPS_FILE
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: XAI_TRUSTED_PEER_CERT_FPS_FILE
+            - name: XAI_P2P_CA_BUNDLE
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: XAI_P2P_CA_BUNDLE
+            - name: XAI_P2P_DNS_SEEDS
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: XAI_P2P_DNS_SEEDS
+            - name: XAI_P2P_BOOTSTRAP_NODES
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: XAI_P2P_BOOTSTRAP_NODES
+            - name: XAI_SECURITY_WEBHOOK_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: XAI_SECURITY_WEBHOOK_URL
+                  optional: true
+            - name: XAI_SECURITY_WEBHOOK_TOKEN
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: XAI_SECURITY_WEBHOOK_TOKEN
+                  optional: true
+
             # Bootstrap Configuration
             - name: BOOTSTRAP_PEERS
               valueFrom:
@@ -267,6 +336,10 @@ spec:
             # Secrets
             - name: secrets
               mountPath: /run/secrets
+              readOnly: true
+            # P2P trust stores
+            - name: trust-store
+              mountPath: /etc/xai/trust
               readOnly: true
             # Temp directory
             - name: tmp
@@ -326,6 +399,10 @@ spec:
           secret:
             secretName: xai-blockchain-secrets
             defaultMode: 0400
+        - name: trust-store
+          configMap:
+            name: xai-blockchain-trust
+            defaultMode: 0644
         - name: tmp
           emptyDir:
             sizeLimit: 1Gi

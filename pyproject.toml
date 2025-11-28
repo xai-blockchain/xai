@@ -46,6 +46,8 @@ dependencies = [
     "websockets>=12.0", # For persistent P2P connections
     "dnspython>=2.6.0", # For DNS-based peer discovery
     "argon2-cffi>=21.3.0", # For key derivation in wallet
+    "base58>=2.1.0",
+    "mnemonic>=0.21",
 ]
 
 [project.optional-dependencies]
