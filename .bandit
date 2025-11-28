@@ -1,0 +1,20 @@
+# Bandit Security Configuration
+# https://bandit.readthedocs.io/
+
+exclude_dirs:
+  - /tests/
+  - /test/
+  - /.pytest_cache/
+  - /__pycache__/
+  - /venv/
+  - /env/
+  - /.venv/
+  - /node_modules/
+  - /data/
+  - /data_testnet/
+  - /temp_test_storage/
+  - /embedded_wallets/
+  - /.playwright-mcp/
+
+# Severity level to report (LOW, MEDIUM, HIGH)
+# Confidence level to report (LOW, MEDIUM, HIGH)

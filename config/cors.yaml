@@ -1,0 +1,16 @@
+# CORS Configuration
+#
+# This file contains the allowed origins for CORS requests.
+#
+# For development, you can allow localhost origins.
+# For production, you should restrict this to your application's domain.
+#
+# Example:
+# origins:
+#   - http://localhost:3000
+#   - http://localhost:8080
+#   - https://myapp.com
+
+origins:
+  - http://localhost:3000
+  - http://localhost:8080

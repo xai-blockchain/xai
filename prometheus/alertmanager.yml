@@ -1,0 +1,156 @@
+# Alertmanager Configuration
+# Handles alert routing and notifications
+
+global:
+  resolve_timeout: 5m
+  # SMTP configuration for email alerts
+  # smtp_smarthost: 'smtp.gmail.com:587'
+  # smtp_from: 'alertmanager@yourblockchain.network'
+  # smtp_auth_username: 'your-username'
+  # smtp_auth_password: 'your-password'
+
+# Templates for alert messages
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree for alert distribution
+route:
+  # Default receiver for all alerts
+  receiver: 'default'
+
+  # Group alerts by these labels
+  group_by: ['alertname', 'severity', 'component']
+
+  # Wait time before sending first notification
+  group_wait: 10s
+
+  # Wait time before sending notification about new alerts
+  # in the same group
+  group_interval: 10s
+
+  # Wait time before re-sending a notification
+  repeat_interval: 12h
+
+  # Child routes
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 0s
+      repeat_interval: 1h
+
+    # Blockchain-specific alerts
+    - match:
+        component: mining
+      receiver: 'mining-alerts'
+
+    - match:
+        component: network
+      receiver: 'network-alerts'
+
+    - match:
+        component: api
+      receiver: 'api-alerts'
+
+# Inhibition rules - prevent certain alerts when others are firing
+inhibit_rules:
+  # Inhibit low peer count alert if no peers connected
+  - source_match:
+      alertname: 'NoPeersConnected'
+    target_match:
+      alertname: 'LowPeerCount'
+    equal: ['instance']
+
+  # Inhibit warning alerts when critical alert is firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
+
+# Receivers - notification destinations
+receivers:
+  # Default receiver (console logging)
+  - name: 'default'
+    # webhook_configs:
+    #   - url: 'http://localhost:5001/alerts'
+
+  # Critical alerts - multiple channels
+  - name: 'critical-alerts'
+    # Email notification
+    # email_configs:
+    #   - to: 'critical-alerts@yourblockchain.network'
+    #     headers:
+    #       Subject: '[CRITICAL] XAI Blockchain Alert: {{ .GroupLabels.alertname }}'
+
+    # Slack notification
+    # slack_configs:
+    #   - api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
+    #     channel: '#blockchain-alerts'
+    #     title: 'Critical Alert: {{ .GroupLabels.alertname }}'
+    #     text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+    # PagerDuty notification
+    # pagerduty_configs:
+    #   - service_key: 'your-pagerduty-service-key'
+
+    # Discord webhook
+    # webhook_configs:
+    #   - url: 'https://discord.com/api/webhooks/YOUR/WEBHOOK'
+
+  # Mining alerts
+  - name: 'mining-alerts'
+    # email_configs:
+    #   - to: 'mining-team@yourblockchain.network'
+
+  # Network alerts
+  - name: 'network-alerts'
+    # email_configs:
+    #   - to: 'network-team@yourblockchain.network'
+
+  # API alerts
+  - name: 'api-alerts'
+    # email_configs:
+    #   - to: 'api-team@yourblockchain.network'
+
+# Example Slack configuration
+# - name: 'slack-notifications'
+#   slack_configs:
+#     - api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
+#       channel: '#blockchain-alerts'
+#       title: '{{ .GroupLabels.alertname }}'
+#       text: |-
+#         {{ range .Alerts }}
+#         *Alert:* {{ .Labels.alertname }}
+#         *Severity:* {{ .Labels.severity }}
+#         *Component:* {{ .Labels.component }}
+#         *Summary:* {{ .Annotations.summary }}
+#         *Description:* {{ .Annotations.description }}
+#         {{ end }}
+#       send_resolved: true
+
+# Example Discord configuration
+# - name: 'discord-notifications'
+#   webhook_configs:
+#     - url: 'https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN'
+#       send_resolved: true
+
+# Example Telegram configuration
+# - name: 'telegram-notifications'
+#   telegram_configs:
+#     - bot_token: 'YOUR_BOT_TOKEN'
+#       chat_id: YOUR_CHAT_ID
+#       parse_mode: 'HTML'
+#       message: |-
+#         {{ range .Alerts }}
+#         <b>{{ .Labels.alertname }}</b>
+#         Severity: {{ .Labels.severity }}
+#         {{ .Annotations.description }}
+#         {{ end }}
+
+# Example Microsoft Teams configuration
+# - name: 'teams-notifications'
+#   webhook_configs:
+#     - url: 'https://outlook.office.com/webhook/YOUR_WEBHOOK'
+#       send_resolved: true

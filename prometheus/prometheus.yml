@@ -1,0 +1,123 @@
+# Prometheus Configuration for XAI Blockchain
+# https://prometheus.io/docs/prometheus/latest/configuration/configuration/
+
+global:
+  scrape_interval: 15s      # Scrape targets every 15 seconds
+  evaluation_interval: 15s  # Evaluate rules every 15 seconds
+  scrape_timeout: 10s       # Timeout after 10 seconds
+
+  # Labels to add to all metrics
+  external_labels:
+    cluster: 'xai-blockchain'
+    environment: 'production'
+
+# Alertmanager configuration (optional - configure if using alerting)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - 'localhost:9093'  # Uncomment when Alertmanager is running
+
+# Load rules for alerting
+rule_files:
+  - 'alerts/*.yml'
+  - 'recording_rules/*.yml'
+
+# Scrape configurations
+scrape_configs:
+  # ==================== XAI BLOCKCHAIN NODE ====================
+  - job_name: 'xai-node'
+    static_configs:
+      - targets: ['localhost:8000']
+        labels:
+          node_type: 'full_node'
+          instance: 'xai-node-1'
+
+  # Multiple nodes (if running cluster)
+  # - job_name: 'xai-nodes'
+  #   static_configs:
+  #     - targets:
+  #       - 'node1.xai.network:8000'
+  #       - 'node2.xai.network:8000'
+  #       - 'node3.xai.network:8000'
+
+  # ==================== PROMETHEUS SELF-MONITORING ====================
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ==================== NODE EXPORTER (System Metrics) ====================
+  # Uncomment if using node_exporter for detailed system metrics
+  # - job_name: 'node-exporter'
+  #   static_configs:
+  #     - targets: ['localhost:9100']
+
+  # ==================== BLOCK EXPLORER API ====================
+  - job_name: 'xai-explorer'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['localhost:5001']
+        labels:
+          service: 'block_explorer'
+
+  # ==================== DATABASE (PostgreSQL) ====================
+  # Uncomment if using postgres_exporter
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['localhost:9187']
+
+  # ==================== AI SERVICES ====================
+  # Monitor AI task execution if exposed
+  - job_name: 'xai-ai-services'
+    metrics_path: '/metrics'
+    scrape_interval: 30s  # Less frequent for AI services
+    static_configs:
+      - targets: ['localhost:8001']
+        labels:
+          service: 'ai_executor'
+
+  # ==================== CUSTOM APPLICATION METRICS ====================
+  # Add additional services as needed
+  # - job_name: 'custom-service'
+  #   static_configs:
+  #     - targets: ['localhost:8002']
+
+# ==================== SERVICE DISCOVERY ====================
+# For dynamic environments (Kubernetes, Docker Swarm, Consul, etc.)
+
+# Kubernetes example:
+# - job_name: 'kubernetes-pods'
+#   kubernetes_sd_configs:
+#     - role: pod
+#   relabel_configs:
+#     - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+#       action: keep
+#       regex: true
+
+# Docker Swarm example:
+# - job_name: 'docker-swarm'
+#   dockerswarm_sd_configs:
+#     - host: unix:///var/run/docker.sock
+#       role: tasks
+
+# File-based service discovery:
+# - job_name: 'file-sd'
+#   file_sd_configs:
+#     - files:
+#       - 'targets/*.json'
+#       - 'targets/*.yml'
+#       refresh_interval: 5m
+
+# ==================== REMOTE STORAGE ====================
+# For long-term storage (optional)
+# remote_write:
+#   - url: "http://remote-storage:9009/api/v1/write"
+#     queue_config:
+#       capacity: 10000
+#       max_shards: 200
+#       min_shards: 1
+#       max_samples_per_send: 5000
+#       batch_send_deadline: 5s
+
+# remote_read:
+#   - url: "http://remote-storage:9009/api/v1/read"

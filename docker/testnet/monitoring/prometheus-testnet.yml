@@ -1,0 +1,52 @@
+# Prometheus Configuration for XAI Testnet
+
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+  external_labels:
+    cluster: 'xai-testnet'
+    environment: 'testnet'
+
+scrape_configs:
+  # Bootstrap Node
+  - job_name: 'testnet-bootstrap'
+    static_configs:
+      - targets: ['xai-testnet-bootstrap:9090']
+        labels:
+          node_type: 'bootstrap'
+          instance: 'bootstrap-node'
+
+  # Testnet Node 1
+  - job_name: 'testnet-node1'
+    static_configs:
+      - targets: ['xai-testnet-node1:9090']
+        labels:
+          node_type: 'peer'
+          instance: 'node-1'
+
+  # Testnet Node 2
+  - job_name: 'testnet-node2'
+    static_configs:
+      - targets: ['xai-testnet-node2:9090']
+        labels:
+          node_type: 'peer'
+          instance: 'node-2'
+
+  # PostgreSQL
+  - job_name: 'testnet-postgres'
+    static_configs:
+      - targets: ['testnet-postgres:9187']
+        labels:
+          instance: 'testnet-db'
+
+  # Redis
+  - job_name: 'testnet-redis'
+    static_configs:
+      - targets: ['testnet-redis:9121']
+        labels:
+          instance: 'testnet-cache'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

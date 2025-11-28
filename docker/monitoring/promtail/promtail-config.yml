@@ -1,0 +1,166 @@
+# Promtail Configuration for XAI Blockchain
+# Ships logs from containers and files to Loki
+
+server:
+  http_listen_port: 9080
+  log_level: info
+  log_format: json
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Docker container logs
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_image_name']
+        target_label: 'image'
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'service'
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
+        target_label: 'project'
+    pipeline_stages:
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            timestamp: time
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      - labels:
+          stream:
+          project:
+          service:
+          container:
+          image:
+
+  # XAI Blockchain logs
+  - job_name: xai-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: xai
+          __path__: /var/log/xai/*.json
+    pipeline_stages:
+      # Parse JSON logs
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: message
+            service: service
+            component: component
+      # Extract timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      # Create labels from JSON fields
+      - labels:
+          level:
+          service:
+          component:
+      # Add additional labels
+      - static_labels:
+          job: xai
+          environment: production
+      # Log matchers to filter/process
+      - match:
+          selector: '{level="error"}'
+          action: keep
+          pipeline_name: "errors"
+      - match:
+          selector: '{level="warning"}'
+          action: keep
+          pipeline_name: "warnings"
+
+  # System logs
+  - job_name: system-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: system
+          __path__: /var/log/syslog
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\w+ +\d+ \d+:\d+:\d+) (?P<hostname>[a-zA-Z0-9-]+) (?P<process>[a-zA-Z0-9\-\.]+)(?:\[(?P<pid>[0-9]+)\])?:? (?P<message>.*)$'
+      - timestamp:
+          source: timestamp
+          format: 'Jan 2 15:04:05'
+      - labels:
+          hostname:
+          process:
+
+  # Application access logs
+  - job_name: app-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: application
+          __path__: /var/log/app/*.log
+    pipeline_stages:
+      - json:
+          expressions:
+            method: method
+            path: path
+            status: status
+            duration: duration_ms
+      - labels:
+          method:
+          path:
+          status:
+
+  # Prometheus metrics logs
+  - job_name: prometheus-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: prometheus
+          __path__: /var/log/prometheus/*.log
+    pipeline_stages:
+      - regex:
+          expression: '^time="(?P<timestamp>[^"]+)" level=(?P<level>\w+) msg="(?P<message>[^"]*)"'
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+      - labels:
+          level:
+
+  # Withdrawal threshold history log
+  - job_name: withdrawal-threshold-history
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: withdrawal_threshold_history
+          __path__: /var/lib/xai/monitoring/withdrawal_threshold_history.jsonl
+    pipeline_stages:
+      - json:
+          expressions:
+            generated_at: generated_at
+            environment: environment
+            recommended_rate: recommended_rate
+            recommended_backlog: recommended_backlog
+            current_rate_threshold: current_rate_threshold
+            current_backlog_threshold: current_backlog_threshold
+            alert_required: alert_required
+      - timestamp:
+          source: generated_at
+          format: RFC3339Nano
+      - labels:
+          environment:
+          alert_required:
+      - template:
+          source: message
+          template: 'env={{ .environment }} recommended_rate={{ .recommended_rate }} current_rate={{ .current_rate_threshold }} recommended_backlog={{ .recommended_backlog }} current_backlog={{ .current_backlog_threshold }} alert={{ .alert_required }}'

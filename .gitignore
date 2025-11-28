@@ -1,0 +1,84 @@
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing
+.pytest_cache/
+.hypothesis/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment variables
+.env
+.env.local
+*.env
+
+# Logs
+*.log
+logs/
+
+# Data directories (keep structure, ignore contents)
+blockchain_data/
+mining_data/
+recovery_data/
+wallets_testnet/
+data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets - NEVER commit these
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*_secret*
+credentials.json
+*credentials*.json
+*secrets*.json
+secrets/
+
+# Keystore and wallets
+*.keystore
+keystore/
+wallets/
+!wallets/.gitkeep
+
+# Keep example files
+!.env.example
+!.env.template

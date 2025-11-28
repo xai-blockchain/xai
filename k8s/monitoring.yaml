@@ -1,0 +1,422 @@
+---
+# ServiceMonitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: xai-blockchain
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: xai-blockchain
+      component: metrics
+  endpoints:
+    - port: metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      path: /metrics
+
+---
+# Prometheus instance for XAI Blockchain
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: xai-blockchain
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+spec:
+  replicas: 2
+  retention: 15d
+  storageSpec:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: standard
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 50Gi
+  serviceMonitorSelector:
+    matchLabels:
+      prometheus: kube-prometheus
+  ruleSelector:
+    matchLabels:
+      prometheus: kube-prometheus
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 1000m
+      memory: 4Gi
+
+---
+# PrometheusRule - Node health and performance
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: xai-blockchain-node-health
+  namespace: xai-blockchain
+  labels:
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: blockchain.node.health
+      interval: 30s
+      rules:
+        # Node availability
+        - alert: NodeDown
+          expr: count(up{job="xai-blockchain"} == 1) < 3
+          for: 2m
+          labels:
+            severity: critical
+            service: xai-blockchain
+          annotations:
+            summary: "XAI blockchain nodes down"
+            description: "Only {{ $value }} nodes are up (expected 3)"
+
+        # Network connectivity
+        - alert: PeerCountLow
+          expr: blockchain_connected_peers < 2
+          for: 5m
+          labels:
+            severity: warning
+            service: xai-blockchain
+          annotations:
+            summary: "Low peer connectivity: {{ $labels.pod }}"
+            description: "Node has only {{ $value }} peers"
+
+        # Block production
+        - alert: NoBlocksProduced
+          expr: |
+            increase(blockchain_blocks_mined_total[10m]) == 0
+          labels:
+            severity: critical
+            service: xai-blockchain
+          annotations:
+            summary: "No blocks produced in last 10 minutes"
+            description: "Mining appears to be stalled"
+
+---
+# PrometheusRule - Resource usage
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: xai-blockchain-resources
+  namespace: xai-blockchain
+  labels:
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: blockchain.resources
+      interval: 30s
+      rules:
+        # Memory pressure
+        - alert: HighMemoryUsage
+          expr: |
+            (sum(container_memory_working_set_bytes{pod=~"xai-blockchain-node-.*"}) by (pod) /
+             sum(container_spec_memory_limit_bytes{pod=~"xai-blockchain-node-.*"}) by (pod)) > 0.9
+          for: 5m
+          labels:
+            severity: warning
+            service: xai-blockchain
+          annotations:
+            summary: "High memory usage: {{ $labels.pod }}"
+            description: "Memory at {{ $value | humanizePercentage }}"
+
+        # CPU pressure
+        - alert: HighCPUUsage
+          expr: |
+            (sum(rate(container_cpu_usage_seconds_total{pod=~"xai-blockchain-node-.*"}[5m])) by (pod)) > 1.8
+          for: 5m
+          labels:
+            severity: warning
+            service: xai-blockchain
+          annotations:
+            summary: "High CPU usage: {{ $labels.pod }}"
+            description: "CPU usage at {{ $value | humanizePercentage }}"
+
+        # Disk usage
+        - alert: DiskUsageHigh
+          expr: |
+            (kubelet_volume_stats_used_bytes{persistentvolumeclaim=~"blockchain-data-.*"} /
+             kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~"blockchain-data-.*"}) > 0.85
+          for: 5m
+          labels:
+            severity: warning
+            service: xai-blockchain
+          annotations:
+            summary: "High disk usage: {{ $labels.persistentvolumeclaim }}"
+            description: "Disk at {{ $value | humanizePercentage }}"
+
+---
+# PrometheusRule - Blockchain integrity
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: xai-blockchain-integrity
+  namespace: xai-blockchain
+  labels:
+    prometheus: kube-prometheus
+spec:
+  groups:
+    - name: blockchain.integrity
+      interval: 30s
+      rules:
+        # Chain fork detection
+        - alert: ChainFork
+          expr: |
+            count(count(blockchain_chain_height) by (pod)) > 1
+          for: 10m
+          labels:
+            severity: critical
+            service: xai-blockchain
+          annotations:
+            summary: "Possible blockchain fork detected"
+            description: "Nodes have different chain heights"
+
+        # Transaction validation errors
+        - alert: HighValidationErrors
+          expr: |
+            rate(blockchain_validation_errors_total[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+            service: xai-blockchain
+          annotations:
+            summary: "High transaction validation errors: {{ $labels.pod }}"
+            description: "Error rate: {{ $value | humanize }} per second"
+
+        # Block sync lag
+        - alert: BlockSyncLag
+          expr: blockchain_block_sync_lag > 50
+          for: 10m
+          labels:
+            severity: warning
+            service: xai-blockchain
+          annotations:
+            summary: "Block sync lag high: {{ $labels.pod }}"
+            description: "{{ $value }} blocks behind"
+
+        # Consensus failures
+        - alert: ConsensusFailures
+          expr: |
+            increase(blockchain_consensus_failures_total[5m]) > 0
+          labels:
+            severity: critical
+            service: xai-blockchain
+          annotations:
+            summary: "Consensus failure detected: {{ $labels.pod }}"
+            description: "Node failed to reach consensus"
+
+---
+# Alertmanager configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-xai-blockchain
+  namespace: xai-blockchain
+data:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+      slack_api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
+
+    route:
+      receiver: 'default'
+      group_by: ['service', 'severity']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 12h
+      routes:
+        - match:
+            severity: critical
+          receiver: 'critical'
+          repeat_interval: 5m
+        - match:
+            severity: warning
+          receiver: 'warning'
+          repeat_interval: 1h
+
+    receivers:
+      - name: 'default'
+        slack_configs:
+          - channel: '#blockchain-alerts'
+            title: 'Alert: {{ .GroupLabels.alertname }}'
+            text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+      - name: 'critical'
+        slack_configs:
+          - channel: '#blockchain-critical'
+            title: 'CRITICAL: {{ .GroupLabels.alertname }}'
+            text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        pagerduty_configs:
+          - service_key: 'YOUR_PAGERDUTY_KEY'
+
+      - name: 'warning'
+        slack_configs:
+          - channel: '#blockchain-warnings'
+            title: 'Warning: {{ .GroupLabels.alertname }}'
+            text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+---
+# Grafana Dashboard ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: xai-blockchain-dashboard
+  namespace: xai-blockchain
+data:
+  dashboard.json: |
+    {
+      "dashboard": {
+        "title": "XAI Blockchain Monitoring",
+        "panels": [
+          {
+            "title": "Node Status",
+            "targets": [
+              {
+                "expr": "up{job=\"xai-blockchain\"}"
+              }
+            ]
+          },
+          {
+            "title": "Block Height",
+            "targets": [
+              {
+                "expr": "blockchain_chain_height"
+              }
+            ]
+          },
+          {
+            "title": "Transaction Rate",
+            "targets": [
+              {
+                "expr": "rate(blockchain_tx_processed_total[5m])"
+              }
+            ]
+          },
+          {
+            "title": "Memory Usage",
+            "targets": [
+              {
+                "expr": "container_memory_usage_bytes{pod=~\"xai-blockchain-node-.*\"}"
+              }
+            ]
+          },
+          {
+            "title": "CPU Usage",
+            "targets": [
+              {
+                "expr": "rate(container_cpu_usage_seconds_total{pod=~\"xai-blockchain-node-.*\"}[5m])"
+              }
+            ]
+          },
+          {
+            "title": "Disk Usage",
+            "targets": [
+              {
+                "expr": "kubelet_volume_stats_used_bytes{persistentvolumeclaim=~\"blockchain-data-.*\"}"
+              }
+            ]
+          },
+          {
+            "title": "Connected Peers",
+            "targets": [
+              {
+                "expr": "blockchain_connected_peers"
+              }
+            ]
+          },
+          {
+            "title": "Block Sync Lag",
+            "targets": [
+              {
+                "expr": "blockchain_block_sync_lag"
+              }
+            ]
+          }
+        ]
+      }
+    }
+
+---
+# Loki Log Aggregation (optional)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: loki-xai-blockchain
+  namespace: xai-blockchain
+data:
+  loki-config.yaml: |
+    auth_enabled: false
+    ingester:
+      chunk_idle_period: 3m
+      max_chunk_age: 1h
+      max_streams_per_user: 10000
+    limits_config:
+      enforce_metric_name: false
+      reject_old_samples: true
+      reject_old_samples_max_age: 168h
+    schema_config:
+      configs:
+        - from: 2020-10-24
+          store: boltdb-shipper
+          object_store: filesystem
+          schema: v11
+          index:
+            prefix: index_
+            period: 24h
+    server:
+      http_listen_port: 3100
+    storage_config:
+      boltdb_shipper:
+        active_index_directory: /loki/boltdb-shipper-active
+        cache_location: /loki/boltdb-shipper-cache
+      filesystem:
+        directory: /loki/chunks
+
+---
+# RBAC for monitoring
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus-role
+  namespace: xai-blockchain
+rules:
+  - apiGroups: [""]
+    resources:
+      - services
+      - endpoints
+      - pods
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions"]
+    resources:
+      - ingresses
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-rolebinding
+  namespace: xai-blockchain
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-role
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: xai-blockchain
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: xai-blockchain

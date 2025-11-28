@@ -1,0 +1,213 @@
+---
+# Headless Service for StatefulSet discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: xai-blockchain-headless
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    component: node
+spec:
+  clusterIP: None  # Headless service
+  selector:
+    app: xai-blockchain
+    component: node
+  ports:
+    - name: p2p
+      port: 8545
+      targetPort: 8545
+      protocol: TCP
+    - name: rpc
+      port: 8546
+      targetPort: 8546
+      protocol: TCP
+    - name: ws
+      port: 8547
+      targetPort: 8547
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+  publishNotReadyAddresses: true
+  sessionAffinity: None
+
+---
+# LoadBalancer Service for P2P (public access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: xai-blockchain-p2p
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    component: p2p
+  annotations:
+    description: "P2P network access for blockchain node discovery"
+spec:
+  type: LoadBalancer
+  selector:
+    app: xai-blockchain
+    component: node
+  ports:
+    - name: p2p
+      port: 30303
+      targetPort: 8545
+      protocol: TCP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+
+---
+# ClusterIP Service for RPC (internal access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: xai-blockchain-rpc
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    component: rpc
+  annotations:
+    description: "JSON-RPC endpoint for blockchain interaction"
+spec:
+  type: ClusterIP
+  selector:
+    app: xai-blockchain
+    component: node
+  ports:
+    - name: rpc
+      port: 8546
+      targetPort: 8546
+      protocol: TCP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+
+---
+# LoadBalancer Service for RPC (public access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: xai-blockchain-rpc-public
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    component: rpc-public
+  annotations:
+    description: "Public JSON-RPC endpoint for external access"
+spec:
+  type: LoadBalancer
+  selector:
+    app: xai-blockchain
+    component: node
+  ports:
+    - name: rpc
+      port: 8546
+      targetPort: 8546
+      protocol: TCP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+
+---
+# ClusterIP Service for WebSocket (internal access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: xai-blockchain-ws
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    component: ws
+  annotations:
+    description: "WebSocket endpoint for real-time blockchain events"
+spec:
+  type: ClusterIP
+  selector:
+    app: xai-blockchain
+    component: node
+  ports:
+    - name: ws
+      port: 8547
+      targetPort: 8547
+      protocol: TCP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+
+---
+# LoadBalancer Service for WebSocket (public access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: xai-blockchain-ws-public
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    component: ws-public
+  annotations:
+    description: "Public WebSocket endpoint for external connections"
+spec:
+  type: LoadBalancer
+  selector:
+    app: xai-blockchain
+    component: node
+  ports:
+    - name: ws
+      port: 8547
+      targetPort: 8547
+      protocol: TCP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+
+---
+# ClusterIP Service for Metrics (internal monitoring)
+apiVersion: v1
+kind: Service
+metadata:
+  name: xai-blockchain-metrics
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    component: metrics
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  selector:
+    app: xai-blockchain
+    component: node
+  ports:
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+
+---
+# ExternalName Service for seed nodes/bootstrap peers
+apiVersion: v1
+kind: Service
+metadata:
+  name: xai-blockchain-bootstrap
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    component: bootstrap
+spec:
+  type: ExternalName
+  externalName: bootstrap.xai.network  # Replace with actual bootstrap server
+  ports:
+    - name: p2p
+      port: 30303
+      targetPort: 30303
+      protocol: TCP

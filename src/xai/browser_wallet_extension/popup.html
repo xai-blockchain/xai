@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>XAI Wallet Miner</title>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>XAI Wallet Miner</h1>
+      <p>Browser-based wallet, miner control, and trade portal.</p>
+    </header>
+
+    <section class="card">
+      <h2>Settings</h2>
+      <label>
+        API Host
+        <input id="apiHost" type="text" placeholder="http://localhost:8545" />
+      </label>
+      <label>
+        Wallet Address
+        <input id="walletAddress" type="text" placeholder="XAI..." />
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>Mining Controls</h2>
+      <div class="button-row">
+        <button id="startMining">Start Mining</button>
+        <button id="stopMining">Stop Mining</button>
+      </div>
+      <p id="miningStatus" class="status">Status: idle</p>
+      <p id="miningMeta" class="meta"></p>
+    </section>
+
+    <section class="card">
+      <h2>Trade Studio</h2>
+      <div class="button-row">
+        <button id="refreshOrders">Refresh Orders</button>
+        <button id="refreshMatches">Refresh Matches</button>
+      </div>
+
+      <div id="ordersList" class="list-section">
+        <h3>Orders</h3>
+        <div class="list-placeholder">No data yet.</div>
+      </div>
+
+      <div id="matchesList" class="list-section">
+        <h3>Matches</h3>
+        <div class="list-placeholder">No matches yet.</div>
+      </div>
+
+      <form id="orderForm" class="order-form">
+        <h3>Submit Order</h3>
+        <label>
+          Token Offered
+          <input name="tokenOffered" placeholder="XAI" required />
+        </label>
+        <label>
+          Amount Offered
+          <input name="amountOffered" type="number" step="0.000001" required />
+        </label>
+        <label>
+          Token Requested
+          <input name="tokenRequested" placeholder="BTC" required />
+        </label>
+        <label>
+          Amount Requested
+          <input name="amountRequested" type="number" step="0.000001" required />
+        </label>
+        <label>
+          Order Type
+          <select name="orderType">
+            <option value="sell">Sell</option>
+            <option value="buy">Buy</option>
+          </select>
+        </label>
+        <button type="submit">Create Order</button>
+      </form>
+
+      <p id="tradeMessage" class="status"></p>
+    </section>
+
+    <section class="card">
+      <h2>Trade History</h2>
+      <div id="tradeHistory" class="list-section">
+        <div class="list-placeholder">No recorded trades yet.</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Miner Dashboard</h2>
+      <div class="button-row">
+        <button id="forceStatus">Refresh Miner Status</button>
+      </div>
+      <p id="minerStats" class="meta"></p>
+      <p id="minerHistory" class="list-placeholder">Waiting for blocks...</p>
+    </section>
+
+    <section class="card">
+      <h2>Personal AI Assistant</h2>
+      <label>
+        Management Mode
+        <select id="aiKeyMode">
+          <option value="temporary">Temporary (deleted after each session)</option>
+          <option value="session">Session cache (cleared when you tap “Clear Key”)</option>
+          <option value="external">External key manager (provide key per call)</option>
+        </select>
+      </label>
+      <label>
+        AI Provider
+        <input id="aiProvider" type="text" placeholder="anthropic" />
+      </label>
+      <label>
+        AI Model
+        <input id="aiModel" type="text" placeholder="claude-opus-4" />
+      </label>
+      <label>
+        API Key
+        <input id="aiApiKey" type="password" placeholder="Your AI API key" />
+      </label>
+      <label>
+        Swap: From Coin
+        <input id="aiFromCoin" type="text" placeholder="XAI" />
+      </label>
+      <label>
+        Swap: To Coin
+        <input id="aiToCoin" type="text" placeholder="ADA" />
+      </label>
+      <label>
+        Amount
+        <input id="aiAmount" type="number" step="0.000001" placeholder="1" />
+      </label>
+      <label>
+        Recipient Address
+        <input id="aiRecipient" type="text" placeholder="XAI..." />
+      </label>
+      <div class="button-row">
+        <button id="runAiSwap">Run Personal AI Swap</button>
+        <button id="clearAiKey" class="secondary">Clear Key</button>
+      </div>
+      <p id="aiStatus" class="status"></p>
+      <p id="aiKeyDeleted" class="meta"></p>
+    </section>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,160 @@
+---
+# PersistentVolume for Node 0
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: xai-blockchain-pv-0
+  labels:
+    app: xai-blockchain
+    node: "0"
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: xai-blockchain-storage
+  # hostPath for local deployment (replace with cloud storage in production)
+  hostPath:
+    path: /data/xai-blockchain-0
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - node-0  # Specify the actual node name
+
+---
+# PersistentVolume for Node 1
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: xai-blockchain-pv-1
+  labels:
+    app: xai-blockchain
+    node: "1"
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: xai-blockchain-storage
+  hostPath:
+    path: /data/xai-blockchain-1
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - node-1  # Specify the actual node name
+
+---
+# PersistentVolume for Node 2
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: xai-blockchain-pv-2
+  labels:
+    app: xai-blockchain
+    node: "2"
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: xai-blockchain-storage
+  hostPath:
+    path: /data/xai-blockchain-2
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - node-2  # Specify the actual node name
+
+---
+# StorageClass for XAI Blockchain
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: xai-blockchain-storage
+  labels:
+    app: xai-blockchain
+provisioner: kubernetes.io/no-provisioner
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer
+reclaimPolicy: Retain
+parameters:
+  fstype: ext4
+
+---
+# PersistentVolumeClaim Template (referenced in StatefulSet)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: xai-blockchain-data-0
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    ordinal: "0"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: xai-blockchain-storage
+  selector:
+    matchLabels:
+      node: "0"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: xai-blockchain-data-1
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    ordinal: "1"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: xai-blockchain-storage
+  selector:
+    matchLabels:
+      node: "1"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: xai-blockchain-data-2
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    ordinal: "2"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: xai-blockchain-storage
+  selector:
+    matchLabels:
+      node: "2"

@@ -1,0 +1,128 @@
+# XAI Blockchain Recording Rules
+# Pre-compute frequently used or expensive queries
+
+groups:
+  - name: blockchain_aggregations
+    interval: 30s
+    rules:
+      # Block production rate (blocks per minute)
+      - record: xai:block_production_rate:1m
+        expr: rate(xai_blocks_total[1m]) * 60
+
+      # Block production rate (blocks per hour)
+      - record: xai:block_production_rate:1h
+        expr: rate(xai_blocks_total[1h]) * 3600
+
+      # Average block size
+      - record: xai:block_size_bytes:avg
+        expr: avg_over_time(xai_block_size_bytes_bucket[5m])
+
+      # Average mining time
+      - record: xai:block_mining_time:avg
+        expr: avg_over_time(xai_block_mining_time_seconds_bucket[5m])
+
+  - name: transaction_aggregations
+    interval: 30s
+    rules:
+      # Transaction throughput (tx/s)
+      - record: xai:transaction_throughput:1m
+        expr: rate(xai_transactions_total[1m])
+
+      # Transaction success rate
+      - record: xai:transaction_success_rate:5m
+        expr: |
+          rate(xai_transactions_total{status="confirmed"}[5m])
+          /
+          rate(xai_transactions_total[5m])
+
+      # Average transaction fee
+      - record: xai:transaction_fee:avg
+        expr: |
+          sum(rate(xai_transaction_fee_xai_sum[5m]))
+          /
+          sum(rate(xai_transaction_fee_xai_count[5m]))
+
+  - name: network_aggregations
+    interval: 30s
+    rules:
+      # Network bandwidth (bytes/s)
+      - record: xai:network_bandwidth_sent:rate1m
+        expr: rate(xai_network_bandwidth_sent_bytes_total[1m])
+
+      - record: xai:network_bandwidth_received:rate1m
+        expr: rate(xai_network_bandwidth_received_bytes_total[1m])
+
+      # Total network bandwidth
+      - record: xai:network_bandwidth_total:rate1m
+        expr: |
+          rate(xai_network_bandwidth_sent_bytes_total[1m])
+          +
+          rate(xai_network_bandwidth_received_bytes_total[1m])
+
+      # Median network latency
+      - record: xai:network_latency:p50
+        expr: histogram_quantile(0.50, rate(xai_network_latency_seconds_bucket[5m]))
+
+      # 95th percentile network latency
+      - record: xai:network_latency:p95
+        expr: histogram_quantile(0.95, rate(xai_network_latency_seconds_bucket[5m]))
+
+  - name: api_aggregations
+    interval: 30s
+    rules:
+      # API request rate
+      - record: xai:api_requests:rate1m
+        expr: rate(xai_api_requests_total[1m])
+
+      # API success rate
+      - record: xai:api_success_rate:5m
+        expr: |
+          rate(xai_api_requests_total{status=~"2.."}[5m])
+          /
+          rate(xai_api_requests_total[5m])
+
+      # API error rate
+      - record: xai:api_error_rate:5m
+        expr: |
+          rate(xai_api_requests_total{status=~"5.."}[5m])
+          /
+          rate(xai_api_requests_total[5m])
+
+      # API latency percentiles
+      - record: xai:api_latency:p50
+        expr: histogram_quantile(0.50, rate(xai_api_request_duration_seconds_bucket[5m]))
+
+      - record: xai:api_latency:p95
+        expr: histogram_quantile(0.95, rate(xai_api_request_duration_seconds_bucket[5m]))
+
+      - record: xai:api_latency:p99
+        expr: histogram_quantile(0.99, rate(xai_api_request_duration_seconds_bucket[5m]))
+
+  - name: mining_aggregations
+    interval: 30s
+    rules:
+      # Mining success rate
+      - record: xai:mining_success_rate:1h
+        expr: |
+          rate(xai_mining_success_total[1h])
+          /
+          rate(xai_mining_attempts_total[1h])
+
+      # Effective hashrate (hashes/s)
+      - record: xai:mining_effective_hashrate:1h
+        expr: avg_over_time(xai_mining_hashrate[1h])
+
+  - name: system_aggregations
+    interval: 30s
+    rules:
+      # Average CPU usage
+      - record: xai:system_cpu:avg5m
+        expr: avg_over_time(xai_system_cpu_usage_percent[5m])
+
+      # Average memory usage
+      - record: xai:system_memory:avg5m
+        expr: avg_over_time(xai_system_memory_percent[5m])
+
+      # Disk growth rate (bytes/hour)
+      - record: xai:system_disk_growth:1h
+        expr: rate(xai_system_disk_usage_bytes[1h]) * 3600

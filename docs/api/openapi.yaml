@@ -1,0 +1,1328 @@
+openapi: 3.0.3
+info:
+  title: XAI Blockchain API
+  description: |
+    Comprehensive REST API for the XAI blockchain platform.
+    
+    ## Features
+    - Wallet management and transaction handling
+    - Blockchain querying and synchronization
+    - Mining operations and rewards
+    - Governance and voting mechanisms
+    - Real-time updates via WebSocket
+    - Rate limiting and authentication
+    
+    ## Authentication
+    All endpoints require either:
+    1. API Key in `X-API-Key` header
+    2. JWT Bearer token in `Authorization` header
+    
+    ## Base URL
+    Production: `https://api.xai-blockchain.io`
+    Testnet: `https://testnet-api.xai-blockchain.io`
+    Local: `http://localhost:5000`
+    
+  version: "1.0.0"
+  contact:
+    name: XAI Support
+    url: https://xai-blockchain.io
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:5000
+    description: Local Development
+  - url: https://testnet-api.xai-blockchain.io
+    description: Testnet
+  - url: https://api.xai-blockchain.io
+    description: Production
+
+tags:
+  - name: Health & Info
+    description: Node health and information endpoints
+  - name: Wallet
+    description: Wallet creation, management, and balance operations
+  - name: Transactions
+    description: Transaction creation, broadcasting, and status
+  - name: Blockchain
+    description: Blockchain querying and synchronization
+  - name: Mining
+    description: Mining operations and reward management
+  - name: Governance
+    description: Voting and governance mechanisms
+  - name: Trading
+    description: Wallet trading and peer-to-peer operations
+  - name: WebSocket
+    description: Real-time event streams
+
+paths:
+  # ==================== HEALTH & INFO ====================
+  /:
+    get:
+      tags:
+        - Health & Info
+      summary: Get node information
+      description: Returns basic information about the blockchain node
+      operationId: getNodeInfo
+      responses:
+        '200':
+          description: Node information retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: online
+                  node:
+                    type: string
+                    example: XAI Full Node
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  network:
+                    type: string
+                    example: mainnet
+                  endpoints:
+                    type: array
+                    items:
+                      type: string
+
+  /health:
+    get:
+      tags:
+        - Health & Info
+      summary: Health check endpoint
+      description: Used for monitoring node health status
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Node is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  uptime_seconds:
+                    type: integer
+                  peers_connected:
+                    type: integer
+                  sync_status:
+                    type: string
+                    enum: [synced, syncing, out_of_sync]
+                  last_block:
+                    type: integer
+        '503':
+          description: Node is unhealthy
+
+  /stats:
+    get:
+      tags:
+        - Health & Info
+      summary: Get blockchain statistics
+      description: Returns current blockchain statistics and metrics
+      operationId: getStats
+      responses:
+        '200':
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockchainStats'
+
+  # ==================== WALLET ENDPOINTS ====================
+  /wallet/create:
+    post:
+      tags:
+        - Wallet
+      summary: Create a new wallet
+      description: Creates a new wallet with a unique address and keypair
+      operationId: createWallet
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Optional wallet name
+                wallet_type:
+                  type: string
+                  enum: [standard, embedded, hardware]
+                  default: standard
+      responses:
+        '201':
+          description: Wallet created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /wallet/{address}:
+    get:
+      tags:
+        - Wallet
+      summary: Get wallet information
+      description: Retrieves wallet details and balance information
+      operationId: getWallet
+      parameters:
+        - name: address
+          in: path
+          required: true
+          description: Wallet address
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Wallet information retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /wallet/{address}/balance:
+    get:
+      tags:
+        - Wallet
+      summary: Get wallet balance
+      description: Returns the current balance of a wallet
+      operationId: getBalance
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Balance retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  address:
+                    type: string
+                  balance:
+                    type: string
+                    description: Balance in smallest unit (wei)
+                  locked_balance:
+                    type: string
+                  available_balance:
+                    type: string
+                  nonce:
+                    type: integer
+
+  /wallet/{address}/transactions:
+    get:
+      tags:
+        - Wallet
+      summary: Get wallet transaction history
+      description: Returns transaction history for a wallet
+      operationId: getWalletTransactions
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Transactions retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+
+  /wallet/embedded/create:
+    post:
+      tags:
+        - Wallet
+      summary: Create an embedded wallet
+      description: Creates a wallet embedded within an application
+      operationId: createEmbeddedWallet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                app_id:
+                  type: string
+                user_id:
+                  type: string
+                metadata:
+                  type: object
+              required: [app_id, user_id]
+      responses:
+        '201':
+          description: Embedded wallet created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmbeddedWalletResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /wallet/embedded/login:
+    post:
+      tags:
+        - Wallet
+      summary: Login to embedded wallet
+      description: Authenticates and retrieves session for embedded wallet
+      operationId: loginEmbeddedWallet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                wallet_id:
+                  type: string
+                password:
+                  type: string
+              required: [wallet_id, password]
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_token:
+                    type: string
+                  wallet_id:
+                    type: string
+                  expires_in:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==================== TRANSACTION ENDPOINTS ====================
+  /transaction/send:
+    post:
+      tags:
+        - Transactions
+      summary: Send a transaction
+      description: Creates and broadcasts a transaction to the network
+      operationId: sendTransaction
+      security:
+        - api_key: []
+        - bearer_auth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionRequest'
+      responses:
+        '202':
+          description: Transaction accepted and queued for broadcasting
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /transaction/{hash}:
+    get:
+      tags:
+        - Transactions
+      summary: Get transaction details
+      description: Retrieves details of a specific transaction
+      operationId: getTransaction
+      parameters:
+        - name: hash
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Transaction details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /transaction/{hash}/status:
+    get:
+      tags:
+        - Transactions
+      summary: Get transaction status
+      description: Returns the current status of a transaction
+      operationId: getTransactionStatus
+      parameters:
+        - name: hash
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Transaction status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hash:
+                    type: string
+                  status:
+                    type: string
+                    enum: [pending, confirmed, failed]
+                  confirmations:
+                    type: integer
+                  block_number:
+                    type: integer
+
+  /transaction/estimate-fee:
+    post:
+      tags:
+        - Transactions
+      summary: Estimate transaction fee
+      description: Estimates the fee for a transaction
+      operationId: estimateFee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                from:
+                  type: string
+                to:
+                  type: string
+                amount:
+                  type: string
+                data:
+                  type: string
+      responses:
+        '200':
+          description: Fee estimate
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gas_limit:
+                    type: string
+                  gas_price:
+                    type: string
+                  estimated_fee:
+                    type: string
+
+  # ==================== BLOCKCHAIN ENDPOINTS ====================
+  /blockchain/blocks:
+    get:
+      tags:
+        - Blockchain
+      summary: List recent blocks
+      description: Returns a list of recent blocks
+      operationId: listBlocks
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Blocks retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  blocks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Block'
+                  total:
+                    type: integer
+
+  /blockchain/blocks/{block_number}:
+    get:
+      tags:
+        - Blockchain
+      summary: Get block details
+      description: Retrieves details of a specific block
+      operationId: getBlock
+      parameters:
+        - name: block_number
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Block details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /blockchain/blocks/{block_number}/transactions:
+    get:
+      tags:
+        - Blockchain
+      summary: Get block transactions
+      description: Returns all transactions in a block
+      operationId: getBlockTransactions
+      parameters:
+        - name: block_number
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Block transactions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  block_number:
+                    type: integer
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+
+  /blockchain/sync:
+    get:
+      tags:
+        - Blockchain
+      summary: Get sync status
+      description: Returns blockchain synchronization status
+      operationId: getSyncStatus
+      responses:
+        '200':
+          description: Sync status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  syncing:
+                    type: boolean
+                  current_block:
+                    type: integer
+                  highest_block:
+                    type: integer
+                  starting_block:
+                    type: integer
+
+  # ==================== MINING ENDPOINTS ====================
+  /mining/start:
+    post:
+      tags:
+        - Mining
+      summary: Start mining
+      description: Starts the mining process on this node
+      operationId: startMining
+      security:
+        - api_key: []
+        - bearer_auth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                threads:
+                  type: integer
+                  default: 1
+                  minimum: 1
+                  maximum: 16
+      responses:
+        '200':
+          description: Mining started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: mining_started
+                  threads:
+                    type: integer
+                  difficulty:
+                    type: string
+
+  /mining/stop:
+    post:
+      tags:
+        - Mining
+      summary: Stop mining
+      description: Stops the mining process
+      operationId: stopMining
+      security:
+        - api_key: []
+        - bearer_auth: []
+      responses:
+        '200':
+          description: Mining stopped
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: mining_stopped
+
+  /mining/status:
+    get:
+      tags:
+        - Mining
+      summary: Get mining status
+      description: Returns current mining status and statistics
+      operationId: getMiningStatus
+      responses:
+        '200':
+          description: Mining status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MiningStatus'
+
+  /mining/rewards:
+    get:
+      tags:
+        - Mining
+      summary: Get mining rewards
+      description: Returns earned mining rewards
+      operationId: getMiningRewards
+      parameters:
+        - name: address
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Mining rewards
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  address:
+                    type: string
+                  total_rewards:
+                    type: string
+                  pending_rewards:
+                    type: string
+                  claimed_rewards:
+                    type: string
+
+  # ==================== GOVERNANCE ENDPOINTS ====================
+  /governance/proposals:
+    get:
+      tags:
+        - Governance
+      summary: List governance proposals
+      description: Returns list of governance proposals
+      operationId: listProposals
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, passed, failed, pending]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Proposals retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  proposals:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Proposal'
+                  total:
+                    type: integer
+
+    post:
+      tags:
+        - Governance
+      summary: Create a proposal
+      description: Creates a new governance proposal
+      operationId: createProposal
+      security:
+        - api_key: []
+        - bearer_auth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProposalRequest'
+      responses:
+        '201':
+          description: Proposal created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Proposal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /governance/proposals/{proposal_id}:
+    get:
+      tags:
+        - Governance
+      summary: Get proposal details
+      description: Returns detailed information about a proposal
+      operationId: getProposal
+      parameters:
+        - name: proposal_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Proposal details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProposalDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /governance/proposals/{proposal_id}/vote:
+    post:
+      tags:
+        - Governance
+      summary: Vote on a proposal
+      description: Casts a vote on a governance proposal
+      operationId: voteOnProposal
+      security:
+        - api_key: []
+        - bearer_auth: []
+      parameters:
+        - name: proposal_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                voter:
+                  type: string
+                choice:
+                  type: string
+                  enum: [yes, no, abstain]
+              required: [voter, choice]
+      responses:
+        '200':
+          description: Vote recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  proposal_id:
+                    type: integer
+                  voter:
+                    type: string
+                  choice:
+                    type: string
+
+  # ==================== TRADING ENDPOINTS ====================
+  /wallet-trades/register:
+    post:
+      tags:
+        - Trading
+      summary: Register trade session
+      description: Creates a WalletConnect-style trade session
+      operationId: registerTradeSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                wallet_address:
+                  type: string
+                peer_id:
+                  type: string
+      responses:
+        '201':
+          description: Session registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: string
+                  wallet_address:
+                    type: string
+                  expires_at:
+                    type: string
+                    format: date-time
+
+  /wallet-trades/orders:
+    get:
+      tags:
+        - Trading
+      summary: List trade orders
+      description: Returns active trade orders
+      operationId: listTradeOrders
+      responses:
+        '200':
+          description: Trade orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TradeOrder'
+
+    post:
+      tags:
+        - Trading
+      summary: Create trade order
+      description: Creates a new trade order
+      operationId: createTradeOrder
+      security:
+        - api_key: []
+        - bearer_auth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TradeOrderRequest'
+      responses:
+        '201':
+          description: Trade order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TradeOrder'
+
+  # ==================== WEBSOCKET ====================
+  /ws:
+    get:
+      tags:
+        - WebSocket
+      summary: WebSocket connection endpoint
+      description: |
+        Establishes WebSocket connection for real-time events.
+        
+        ## Events
+        - `block`: New block mined
+        - `transaction`: New transaction
+        - `balance_change`: Wallet balance changed
+        - `proposal_update`: Governance proposal update
+        - `price_update`: Price data update
+        
+        ## Example Message
+        ```json
+        {
+          "type": "block",
+          "data": {
+            "number": 12345,
+            "hash": "0x...",
+            "timestamp": 1234567890
+          }
+        }
+        ```
+      operationId: connectWebSocket
+      responses:
+        '101':
+          description: WebSocket connection established
+        '400':
+          description: Invalid request
+
+components:
+  schemas:
+    # ==================== WALLET SCHEMAS ====================
+    WalletResponse:
+      type: object
+      properties:
+        address:
+          type: string
+          example: "0x1234567890abcdef"
+        private_key:
+          type: string
+          description: Only returned at wallet creation
+          example: "0xabcdef1234567890"
+        public_key:
+          type: string
+          example: "0x..."
+        created_at:
+          type: string
+          format: date-time
+        wallet_type:
+          type: string
+          enum: [standard, embedded, hardware]
+
+    WalletDetail:
+      type: object
+      properties:
+        address:
+          type: string
+        balance:
+          type: string
+        locked_balance:
+          type: string
+        available_balance:
+          type: string
+        nonce:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        last_activity:
+          type: string
+          format: date-time
+        transaction_count:
+          type: integer
+
+    EmbeddedWalletResponse:
+      type: object
+      properties:
+        wallet_id:
+          type: string
+        app_id:
+          type: string
+        user_id:
+          type: string
+        address:
+          type: string
+        session_token:
+          type: string
+        expires_in:
+          type: integer
+
+    # ==================== TRANSACTION SCHEMAS ====================
+    TransactionRequest:
+      type: object
+      required:
+        - from
+        - to
+        - amount
+      properties:
+        from:
+          type: string
+          description: Sender address
+        to:
+          type: string
+          description: Recipient address
+        amount:
+          type: string
+          description: Amount in smallest unit
+        data:
+          type: string
+          description: Optional transaction data
+        gas_limit:
+          type: string
+          description: Gas limit for transaction
+        gas_price:
+          type: string
+          description: Gas price per unit
+        nonce:
+          type: integer
+          description: Transaction nonce
+        signature:
+          type: string
+          description: Signed transaction data
+
+    TransactionResponse:
+      type: object
+      properties:
+        hash:
+          type: string
+          description: Transaction hash
+        status:
+          type: string
+          enum: [pending, confirmed, failed]
+        from:
+          type: string
+        to:
+          type: string
+        amount:
+          type: string
+        gas_used:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    TransactionDetail:
+      type: object
+      properties:
+        hash:
+          type: string
+        status:
+          type: string
+        from:
+          type: string
+        to:
+          type: string
+        amount:
+          type: string
+        fee:
+          type: string
+        data:
+          type: string
+        block_number:
+          type: integer
+        block_hash:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        confirmations:
+          type: integer
+
+    Transaction:
+      type: object
+      properties:
+        hash:
+          type: string
+        from:
+          type: string
+        to:
+          type: string
+        amount:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    # ==================== BLOCKCHAIN SCHEMAS ====================
+    Block:
+      type: object
+      properties:
+        number:
+          type: integer
+        hash:
+          type: string
+        parent_hash:
+          type: string
+        timestamp:
+          type: integer
+        transactions:
+          type: integer
+          description: Number of transactions in block
+        miner:
+          type: string
+
+    BlockDetail:
+      type: object
+      properties:
+        number:
+          type: integer
+        hash:
+          type: string
+        parent_hash:
+          type: string
+        timestamp:
+          type: integer
+        difficulty:
+          type: string
+        miner:
+          type: string
+        transactions:
+          type: array
+          items:
+            type: string
+        transaction_count:
+          type: integer
+        gas_used:
+          type: string
+        gas_limit:
+          type: string
+
+    BlockchainStats:
+      type: object
+      properties:
+        total_blocks:
+          type: integer
+        total_transactions:
+          type: integer
+        total_accounts:
+          type: integer
+        difficulty:
+          type: string
+        hashrate:
+          type: string
+        average_block_time:
+          type: number
+        total_supply:
+          type: string
+
+    # ==================== MINING SCHEMAS ====================
+    MiningStatus:
+      type: object
+      properties:
+        mining:
+          type: boolean
+        threads:
+          type: integer
+        hashrate:
+          type: string
+        blocks_found:
+          type: integer
+        current_difficulty:
+          type: string
+        uptime:
+          type: integer
+
+    # ==================== GOVERNANCE SCHEMAS ====================
+    Proposal:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [pending, active, passed, failed]
+        creator:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        voting_ends_at:
+          type: string
+          format: date-time
+        votes_for:
+          type: integer
+        votes_against:
+          type: integer
+
+    ProposalRequest:
+      type: object
+      required:
+        - title
+        - description
+        - proposer
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        proposer:
+          type: string
+        duration:
+          type: integer
+          description: Voting duration in seconds
+        metadata:
+          type: object
+
+    ProposalDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        creator:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        voting_starts_at:
+          type: string
+          format: date-time
+        voting_ends_at:
+          type: string
+          format: date-time
+        votes_for:
+          type: integer
+        votes_against:
+          type: integer
+        votes_abstain:
+          type: integer
+        votes:
+          type: array
+          items:
+            type: object
+            properties:
+              voter:
+                type: string
+              choice:
+                type: string
+              timestamp:
+                type: string
+
+    # ==================== TRADING SCHEMAS ====================
+    TradeOrder:
+      type: object
+      properties:
+        id:
+          type: string
+        from_address:
+          type: string
+        to_address:
+          type: string
+        from_amount:
+          type: string
+        to_amount:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    TradeOrderRequest:
+      type: object
+      required:
+        - from_address
+        - to_address
+        - from_amount
+        - to_amount
+      properties:
+        from_address:
+          type: string
+        to_address:
+          type: string
+        from_amount:
+          type: string
+        to_amount:
+          type: string
+        timeout:
+          type: integer
+
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    RateLimitExceeded:
+      description: Rate Limit Exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        error:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+  securitySchemes:
+    api_key:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+    bearer_auth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - api_key: []
+  - bearer_auth: []

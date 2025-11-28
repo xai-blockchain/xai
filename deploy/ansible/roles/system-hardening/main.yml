@@ -1,0 +1,197 @@
+---
+# ============================================================================
+# System Hardening Role
+# ============================================================================
+
+- name: Update system packages
+  block:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+    
+    - name: Upgrade packages
+      apt:
+        upgrade: safe
+    
+    - name: Install security updates
+      apt:
+        only_upgrade: yes
+        autoremove: yes
+        autoclean: yes
+
+- name: Create application user
+  block:
+    - name: Create XAI group
+      group:
+        name: "{{ app_group }}"
+        state: present
+        gid: 1000
+    
+    - name: Create XAI user
+      user:
+        name: "{{ app_user }}"
+        group: "{{ app_group }}"
+        uid: 1000
+        shell: /bin/bash
+        home: "{{ app_home }}"
+        createhome: yes
+        state: present
+
+- name: Configure system limits
+  block:
+    - name: Increase open file descriptors limit
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: "{{ app_user }} soft nofile 65536"
+        insertbefore: "^# End of file"
+        state: present
+    
+    - name: Increase open file descriptors hard limit
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: "{{ app_user }} hard nofile 65536"
+        insertbefore: "^# End of file"
+        state: present
+    
+    - name: Increase process limit
+      lineinfile:
+        path: /etc/security/limits.conf
+        line: "{{ app_user }} soft nproc 65536"
+        insertbefore: "^# End of file"
+        state: present
+
+- name: Harden SSH configuration
+  block:
+    - name: Disable SSH password authentication
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^#?PasswordAuthentication"
+        line: "PasswordAuthentication no"
+        state: present
+      notify: restart sshd
+    
+    - name: Disable SSH root login
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^#?PermitRootLogin"
+        line: "PermitRootLogin no"
+        state: present
+      notify: restart sshd
+    
+    - name: Disable SSH empty password
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^#?PermitEmptyPasswords"
+        line: "PermitEmptyPasswords no"
+        state: present
+      notify: restart sshd
+    
+    - name: Set SSH X11 forwarding to no
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "^#?X11Forwarding"
+        line: "X11Forwarding no"
+        state: present
+      notify: restart sshd
+
+- name: Configure kernel hardening
+  block:
+    - name: Enable IP forwarding (for network services)
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        sysctl_set: yes
+        state: present
+    
+    - name: Disable ICMP redirect acceptance
+      sysctl:
+        name: "{{ item }}"
+        value: "0"
+        sysctl_set: yes
+        state: present
+      loop:
+        - net.ipv4.conf.all.accept_redirects
+        - net.ipv4.conf.default.accept_redirects
+        - net.ipv6.conf.all.accept_redirects
+        - net.ipv6.conf.default.accept_redirects
+    
+    - name: Enable TCP SYN cookies
+      sysctl:
+        name: net.ipv4.tcp_syncookies
+        value: "1"
+        sysctl_set: yes
+        state: present
+    
+    - name: Disable broadcast ping
+      sysctl:
+        name: net.ipv4.icmp_echo_ignore_broadcasts
+        value: "1"
+        sysctl_set: yes
+        state: present
+
+- name: Install security tools
+  package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - aide
+    - auditd
+    - clamav
+    - chkrootkit
+    - lynis
+    - unattended-upgrades
+    - apt-listchanges
+
+- name: Configure automatic security updates
+  template:
+    src: 50unattended-upgrades.j2
+    dest: /etc/apt/apt.conf.d/50unattended-upgrades
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Enable auditd
+  systemd:
+    name: auditd
+    enabled: yes
+    state: started
+
+- name: Configure audit logging
+  template:
+    src: audit.rules.j2
+    dest: /etc/audit/rules.d/xai.rules
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart auditd
+
+- name: Install and configure AIDE
+  block:
+    - name: Initialize AIDE database
+      command: "aideinit"
+      args:
+        creates: /var/lib/aide/aide.db
+    
+    - name: Create daily AIDE check cron job
+      cron:
+        name: "Daily AIDE check"
+        hour: "3"
+        minute: "0"
+        job: "/usr/bin/aide --check | mail -s 'AIDE Daily Report' root"
+        user: root
+        state: present
+
+- name: Display hardening summary
+  debug:
+    msg: |
+      System Hardening Complete
+      - SSH password auth: Disabled
+      - SSH root login: Disabled
+      - TCP SYN cookies: Enabled
+      - IP forwarding: Enabled
+      - ICMP redirect: Disabled
+      - Security tools: Installed
+      - Automatic updates: Enabled
+      - AIDE file monitoring: Configured
+      - Audit logging: Enabled

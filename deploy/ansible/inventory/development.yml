@@ -1,0 +1,72 @@
+---
+# ============================================================================
+# XAI Blockchain - Development Inventory
+# ============================================================================
+
+all:
+  vars:
+    # Environment
+    environment: development
+    deployment_version: "dev"
+    
+    # Application settings
+    app_env: development
+    log_level: DEBUG
+    enable_mining: true
+    
+    # Database settings
+    postgres_host: "localhost"
+    postgres_port: 5432
+    postgres_db: "xai_dev"
+    postgres_backup_enabled: false
+    
+    # Redis settings
+    redis_host: "localhost"
+    redis_port: 6379
+    redis_cluster_enabled: false
+    redis_replication_enabled: false
+    
+    # Blockchain network
+    network_id: "0xBEEF"  # Devnet
+    network_name: "devnet"
+    min_peers: 1
+    max_peers: 10
+    
+    # Security
+    enable_tls: false
+    firewall_enabled: false
+    p2p_require_client_cert: false
+    p2p_trusted_cert_fps: []
+    p2p_trusted_peer_pubkeys: []
+    p2p_nonce_ttl_seconds: 300
+    p2p_ca_bundle: ""
+    p2p_allowed_ips:
+      - "127.0.0.1"
+    
+    # Monitoring
+    monitoring_enabled: true
+    prometheus_enabled: true
+    grafana_enabled: true
+    
+    # Backup
+    backup_enabled: false
+    
+    # Performance tuning
+    worker_threads: 2
+    max_connections: 10
+    cache_size: 256
+
+  children:
+    blockchain-nodes:
+      hosts:
+        localhost:
+          ansible_host: 127.0.0.1
+          ansible_connection: local
+          node_id: "dev-node-1"
+          mining_enabled: true
+      
+      vars:
+        blockchain_node_port: 28333
+        blockchain_api_port: 28080
+        blockchain_ws_port: 28081
+        blockchain_metrics_port: 29090

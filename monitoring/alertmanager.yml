@@ -1,0 +1,230 @@
+# Alertmanager Configuration for XAI Blockchain
+# Handles alert routing, grouping, and notifications
+#
+# This configuration:
+# - Routes alerts by severity and service
+# - Groups related alerts
+# - Manages notification integrations (Slack, PagerDuty, Email, etc.)
+# - Implements notification templates with context
+
+global:
+  # Default notification timeout
+  resolve_timeout: 5m
+  # Slack webhook (set via environment variable or update)
+  slack_api_url: "${SLACK_WEBHOOK_URL}"
+  # PagerDuty integration token
+  pagerduty_url: "https://events.pagerduty.com/v2/enqueue"
+
+# Global templates for notifications
+templates:
+  - "monitoring/alert_templates.tmpl"
+
+# Top-level routing rule
+route:
+  # Alert receiver (default destination)
+  receiver: "default"
+
+  # Group alerts by labels
+  group_by: ["alertname", "cluster", "service"]
+
+  # Wait before sending notification (to group related alerts)
+  group_wait: 10s
+
+  # Minimum interval between notifications for same group
+  group_interval: 30s
+
+  # Minimum interval between repeated notifications
+  repeat_interval: 4h
+
+  # Sub-routes for specific alert types
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: "critical-alerts"
+      group_wait: 5s
+      group_interval: 10s
+      repeat_interval: 1h
+
+    # Network alerts - immediate notification to on-call
+    - match:
+        service: network
+      receiver: "network-team"
+      group_wait: 10s
+      repeat_interval: 2h
+
+    # System alerts - delayed notification, grouping
+    - match:
+        service: system
+      receiver: "system-alerts"
+      group_wait: 30s
+      repeat_interval: 3h
+
+    # Blockchain alerts - dedicated receiver
+    - match:
+        service: blockchain
+      receiver: "blockchain-alerts"
+      group_wait: 10s
+      repeat_interval: 2h
+
+    # API alerts - operations team
+    - match:
+        service: api
+      receiver: "api-alerts"
+      group_wait: 30s
+      repeat_interval: 4h
+
+    # Info-level alerts - batched daily
+    - match:
+        severity: info
+      receiver: "info-alerts"
+      group_wait: 10m
+      repeat_interval: 1d
+
+# Receivers define notification destinations
+receivers:
+  # Default receiver - all alerts to main channel
+  - name: "default"
+    slack_configs:
+      - channel: "#blockchain-alerts"
+        title: "{{ .GroupLabels.alertname }}"
+        text: "{{ range .Alerts }}{{ .Annotations.summary }}\n{{ end }}"
+        send_resolved: true
+        color: "{{ if eq .Status \"firing\" }}danger{{ else }}good{{ end }}"
+
+  # Critical alerts - PagerDuty + Slack + Email
+  - name: "critical-alerts"
+    # Slack notifications
+    slack_configs:
+      - channel: "#critical-alerts"
+        title: "CRITICAL: {{ .GroupLabels.alertname }}"
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Labels.alertname }}
+          *Service:* {{ .Labels.service }}
+          *Severity:* {{ .Labels.severity }}
+          *Description:* {{ .Annotations.description }}
+          *Instance:* {{ .Labels.instance }}
+          {{ end }}
+        send_resolved: true
+        color: "{{ if eq .Status \"firing\" }}danger{{ else }}good{{ end }}"
+        api_url: "${SLACK_WEBHOOK_URL}"
+
+    # PagerDuty integration for on-call rotation
+    pagerduty_configs:
+      - service_key: "${PAGERDUTY_SERVICE_KEY}"
+        description: "{{ .GroupLabels.alertname }}"
+        details:
+          firing: "{{ range .Alerts.Firing }}{{ .Labels.instance }} {{ end }}"
+          resolved: "{{ range .Alerts.Resolved }}{{ .Labels.instance }} {{ end }}"
+
+    # Email notification
+    email_configs:
+      - to: "${ALERT_EMAIL_CRITICAL}"
+        from: "alertmanager@xai.network"
+        smarthost: "${EMAIL_SMTP_HOST}:${EMAIL_SMTP_PORT}"
+        auth_username: "${EMAIL_USERNAME}"
+        auth_password: "${EMAIL_PASSWORD}"
+        headers:
+          Subject: "CRITICAL ALERT: {{ .GroupLabels.alertname }}"
+        html: |
+          <h2>Critical Alert</h2>
+          {{ range .Alerts }}
+          <p><strong>Alert:</strong> {{ .Labels.alertname }}</p>
+          <p><strong>Severity:</strong> {{ .Labels.severity }}</p>
+          <p><strong>Description:</strong> {{ .Annotations.description }}</p>
+          <p><strong>Time:</strong> {{ .StartsAt }}</p>
+          {{ end }}
+
+  # Network team
+  - name: "network-team"
+    slack_configs:
+      - channel: "#network-alerts"
+        title: "Network Alert: {{ .GroupLabels.alertname }}"
+        text: "{{ range .Alerts }}{{ .Annotations.description }}\n{{ end }}"
+        send_resolved: true
+
+  # System alerts
+  - name: "system-alerts"
+    slack_configs:
+      - channel: "#system-alerts"
+        title: "System Alert: {{ .GroupLabels.alertname }}"
+        text: "{{ range .Alerts }}{{ .Annotations.description }}\n{{ end }}"
+        send_resolved: true
+
+  # Blockchain alerts
+  - name: "blockchain-alerts"
+    slack_configs:
+      - channel: "#blockchain-alerts"
+        title: "Blockchain Alert: {{ .GroupLabels.alertname }}"
+        text: "{{ range .Alerts }}{{ .Annotations.description }}\n{{ end }}"
+        send_resolved: true
+
+  # API alerts
+  - name: "api-alerts"
+    slack_configs:
+      - channel: "#api-alerts"
+        title: "API Alert: {{ .GroupLabels.alertname }}"
+        text: "{{ range .Alerts }}{{ .Annotations.description }}\n{{ end }}"
+        send_resolved: true
+
+  # Info alerts - batched, sent to general channel
+  - name: "info-alerts"
+    slack_configs:
+      - channel: "#info-alerts"
+        title: "Info: {{ .GroupLabels.alertname }}"
+        text: "{{ range .Alerts }}{{ .Annotations.description }}\n{{ end }}"
+        send_resolved: false
+
+# Inhibition rules - suppress alerts under certain conditions
+inhibit_rules:
+  # If node is down, suppress other node-related alerts
+  - source_match:
+      alertname: "NodeDown"
+      severity: critical
+    target_match_re:
+      severity: "warning|info"
+    equal: ["instance"]
+
+  # If no peers, suppress low peer count alert
+  - source_match:
+      alertname: "NoPeersConnected"
+      severity: critical
+    target_match:
+      alertname: "LowPeerCount"
+    equal: ["instance"]
+
+  # If chain not synced, suppress low block production
+  - source_match:
+      alertname: "ChainNotSynced"
+      severity: warning
+    target_match:
+      alertname: "LowBlockProductionRate"
+    equal: ["instance"]
+
+  # If critical CPU, suppress high CPU warning
+  - source_match:
+      alertname: "CriticalCPUUsage"
+      severity: critical
+    target_match:
+      alertname: "HighCPUUsage"
+      severity: warning
+    equal: ["instance"]
+
+  # If critical memory, suppress high memory warning
+  - source_match:
+      alertname: "CriticalMemoryUsage"
+      severity: critical
+    target_match:
+      alertname: "HighMemoryUsage"
+      severity: warning
+    equal: ["instance"]
+
+  # If critical disk, suppress disk warning
+  - source_match:
+      alertname: "CriticalDiskSpace"
+      severity: critical
+    target_match:
+      alertname: "DiskSpaceRunningOut"
+      severity: warning
+    equal: ["instance"]

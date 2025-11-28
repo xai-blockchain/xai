@@ -1,0 +1,134 @@
+---
+# ============================================================================
+# Monitoring and Observability Role
+# ============================================================================
+
+- name: Create monitoring directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /opt/prometheus
+    - /opt/grafana
+    - /var/lib/prometheus
+    - /var/lib/grafana
+
+- name: Deploy Prometheus configuration
+  template:
+    src: prometheus.yml.j2
+    dest: /opt/prometheus/prometheus.yml
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart prometheus
+
+- name: Deploy Prometheus systemd service
+  template:
+    src: prometheus.service.j2
+    dest: /etc/systemd/system/prometheus.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart prometheus
+
+- name: Deploy Grafana configuration
+  template:
+    src: grafana.ini.j2
+    dest: /etc/grafana/grafana.ini
+    owner: grafana
+    group: grafana
+    mode: "0644"
+  notify: restart grafana
+
+- name: Deploy Grafana datasources
+  template:
+    src: datasources.yml.j2
+    dest: /etc/grafana/provisioning/datasources/prometheus.yml
+    owner: grafana
+    group: grafana
+    mode: "0644"
+  notify: restart grafana
+
+- name: Deploy Grafana dashboards
+  copy:
+    src: dashboards/
+    dest: /etc/grafana/provisioning/dashboards/
+    owner: grafana
+    group: grafana
+    mode: "0644"
+  notify: restart grafana
+
+- name: Enable and start Prometheus
+  systemd:
+    name: prometheus
+    enabled: yes
+    state: started
+    daemon_reload: yes
+  when: prometheus_enabled | default(true)
+
+- name: Enable and start Grafana
+  systemd:
+    name: grafana-server
+    enabled: yes
+    state: started
+    daemon_reload: yes
+  when: grafana_enabled | default(true)
+
+- name: Wait for Prometheus to be ready
+  uri:
+    url: "http://localhost:9090/-/healthy"
+    method: GET
+    status_code: 200
+  register: prometheus_health
+  retries: 10
+  delay: 5
+  until: prometheus_health is succeeded
+  when: prometheus_enabled | default(true)
+
+- name: Wait for Grafana to be ready
+  uri:
+    url: "http://localhost:3000/api/health"
+    method: GET
+    status_code: 200
+  register: grafana_health
+  retries: 10
+  delay: 5
+  until: grafana_health is succeeded
+  when: grafana_enabled | default(true)
+
+- name: Configure Grafana admin password
+  grafana_datasource:
+    grafana_url: "http://localhost:3000"
+    grafana_api_key: "admin:admin"
+    state: present
+  ignore_errors: yes
+
+- name: Set up AlertManager
+  template:
+    src: alertmanager.yml.j2
+    dest: /opt/prometheus/alertmanager.yml
+    owner: root
+    group: root
+    mode: "0644"
+  when: alerting_enabled | default(true)
+
+- name: Deploy Prometheus alerting rules
+  copy:
+    src: alert-rules.yml
+    dest: /opt/prometheus/alert-rules.yml
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart prometheus
+
+- name: Display monitoring information
+  debug:
+    msg: |
+      Monitoring Stack Deployed
+      - Prometheus: http://{{ ansible_host }}:9090
+      - Grafana: http://{{ ansible_host }}:3000
+      - Default Grafana User: admin
+      - AlertManager: Configured

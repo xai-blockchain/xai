@@ -1,0 +1,374 @@
+---
+# ServiceAccount for XAI Blockchain
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: xai-blockchain-sa
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+
+---
+# Role for pod operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: xai-blockchain-role
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+rules:
+  # Pod information
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/log
+      - pods/status
+    verbs:
+      - get
+      - list
+      - watch
+
+  # ConfigMap and Secret access
+  - apiGroups: [""]
+    resources:
+      - configmaps
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+
+  # Service discovery
+  - apiGroups: [""]
+    resources:
+      - services
+      - endpoints
+    verbs:
+      - get
+      - list
+      - watch
+
+  # StatefulSet operations
+  - apiGroups: ["apps"]
+    resources:
+      - statefulsets
+      - statefulsets/status
+    verbs:
+      - get
+      - list
+      - watch
+
+  # PVC operations
+  - apiGroups: [""]
+    resources:
+      - persistentvolumeclaims
+    verbs:
+      - get
+      - list
+      - watch
+
+---
+# ClusterRole for cross-namespace access
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: xai-blockchain-cluster-role
+  labels:
+    app: xai-blockchain
+rules:
+  # Node information
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - nodes/proxy
+      - nodes/metrics
+    verbs:
+      - get
+      - list
+      - watch
+
+  # PersistentVolume information
+  - apiGroups: [""]
+    resources:
+      - persistentvolumes
+    verbs:
+      - get
+      - list
+      - watch
+
+  # Metrics access
+  - apiGroups: ["metrics.k8s.io"]
+    resources:
+      - pods
+      - nodes
+    verbs:
+      - get
+      - list
+
+  # Read cluster events
+  - apiGroups: [""]
+    resources:
+      - events
+    verbs:
+      - get
+      - list
+      - watch
+
+---
+# RoleBinding for namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: xai-blockchain-rolebinding
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: xai-blockchain-role
+subjects:
+  - kind: ServiceAccount
+    name: xai-blockchain-sa
+    namespace: xai-blockchain
+
+---
+# ClusterRoleBinding for cluster access
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: xai-blockchain-cluster-rolebinding
+  labels:
+    app: xai-blockchain
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: xai-blockchain-cluster-role
+subjects:
+  - kind: ServiceAccount
+    name: xai-blockchain-sa
+    namespace: xai-blockchain
+
+---
+# PodSecurityPolicy (Kubernetes < 1.25)
+# Note: PSP is deprecated in K8s 1.25+, use Pod Security Standards instead
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: xai-blockchain-psp
+  labels:
+    app: xai-blockchain
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'MustRunAs'
+    seLinuxOptions:
+      level: "s0:c123,c456"
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+  readOnlyRootFilesystem: false
+
+---
+# Pod Security Standards (Kubernetes >= 1.25)
+apiVersion: policy/v1alpha1
+kind: PodSecurityStandard
+metadata:
+  name: xai-blockchain-pss
+  namespace: xai-blockchain
+spec:
+  enforce: "baseline"
+  audit: "restricted"
+  warn: "restricted"
+  versions:
+    - "v1.26"
+
+---
+# Network Policy for ingress-nginx communication
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: xai-blockchain-allow-ingress
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+spec:
+  podSelector:
+    matchLabels:
+      app: xai-blockchain
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from ingress-nginx
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8546  # RPC
+        - protocol: TCP
+          port: 8547  # WebSocket
+
+---
+# Network Policy for inter-pod P2P communication
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: xai-blockchain-allow-p2p
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+spec:
+  podSelector:
+    matchLabels:
+      app: xai-blockchain
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from other blockchain pods
+    - from:
+        - podSelector:
+            matchLabels:
+              app: xai-blockchain
+      ports:
+        - protocol: TCP
+          port: 8545  # P2P
+
+---
+# Network Policy for egress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: xai-blockchain-allow-egress
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+spec:
+  podSelector:
+    matchLabels:
+      app: xai-blockchain
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow inter-pod communication
+    - to:
+        - podSelector:
+            matchLabels:
+              app: xai-blockchain
+      ports:
+        - protocol: TCP
+          port: 8545
+        - protocol: TCP
+          port: 8546
+        - protocol: TCP
+          port: 8547
+    # Allow external P2P
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 169.254.169.254/32  # AWS metadata
+      ports:
+        - protocol: TCP
+          port: 30303
+
+---
+# Resource Quota
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: xai-blockchain-quota
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+spec:
+  hard:
+    requests.cpu: "10"
+    requests.memory: "50Gi"
+    limits.cpu: "20"
+    limits.memory: "100Gi"
+    pods: "20"
+    persistentvolumeclaims: "10"
+  scopeSelector:
+    matchExpressions:
+      - operator: In
+        scopeName: PriorityClass
+        values:
+          - blockchain-priority
+
+---
+# LimitRange
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: xai-blockchain-limits
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+spec:
+  limits:
+    # Pod limits
+    - type: Pod
+      max:
+        cpu: "4"
+        memory: "8Gi"
+      min:
+        cpu: "100m"
+        memory: "128Mi"
+    # Container limits
+    - type: Container
+      max:
+        cpu: "2"
+        memory: "4Gi"
+      min:
+        cpu: "100m"
+        memory: "128Mi"
+      default:
+        cpu: "1000m"
+        memory: "2Gi"
+      defaultRequest:
+        cpu: "500m"
+        memory: "1Gi"
+    # PVC limits
+    - type: PersistentVolumeClaim
+      max:
+        storage: "500Gi"
+      min:
+        storage: "1Gi"
+
+---
+# PriorityClass for blockchain nodes
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: blockchain-priority
+  labels:
+    app: xai-blockchain
+value: 1000
+globalDefault: false
+description: "Priority class for critical XAI blockchain infrastructure"

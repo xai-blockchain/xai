@@ -1,0 +1,47 @@
+# XAI Blockchain Node - Systemd Service
+# INTERNAL USE ONLY - DELETE BEFORE PUBLIC RELEASE
+# Installation: sudo cp xai-node.service /etc/systemd/system/
+#              sudo systemctl daemon-reload
+#              sudo systemctl enable xai-node
+#              sudo systemctl start xai-node
+
+[Unit]
+Description=XAI Blockchain Node
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xai
+Group=xai
+WorkingDirectory=/home/xai/xai-blockchain
+Environment="PATH=/home/xai/xai-blockchain/venv/bin"
+EnvironmentFile=/home/xai/xai-blockchain/config.env
+
+ExecStart=/home/xai/xai-blockchain/venv/bin/python core/node.py
+
+# Restart policy
+Restart=always
+RestartSec=10s
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=2G
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/home/xai/xai-blockchain/data
+ReadWritePaths=/home/xai/xai-blockchain/logs
+ReadWritePaths=/home/xai/xai-blockchain/gamification_data
+ReadWritePaths=/home/xai/xai-blockchain/mining_data
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=xai-node
+
+[Install]
+WantedBy=multi-user.target

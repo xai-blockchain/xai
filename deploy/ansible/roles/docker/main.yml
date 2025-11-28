@@ -1,0 +1,119 @@
+---
+# ============================================================================
+# Docker Installation and Configuration Role
+# ============================================================================
+
+- name: Install Docker dependencies
+  package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - gnupg
+    - lsb-release
+    - software-properties-common
+
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+
+- name: Install Docker
+  package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - docker-ce
+    - docker-ce-cli
+    - containerd.io
+    - docker-compose-plugin
+
+- name: Add user to docker group
+  user:
+    name: "{{ app_user }}"
+    groups: docker
+    append: yes
+
+- name: Create Docker daemon configuration
+  template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart docker
+
+- name: Create Docker directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  loop:
+    - /etc/docker/certs.d
+    - /var/lib/docker
+    - /var/log/docker
+
+- name: Configure Docker logging
+  template:
+    src: docker-logrotate.j2
+    dest: /etc/logrotate.d/docker
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Enable and start Docker daemon
+  systemd:
+    name: docker
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+- name: Install docker-compose
+  get_url:
+    dest: /usr/local/bin/docker-compose
+    mode: "0755"
+
+- name: Install Docker Python module
+  pip:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - docker
+    - docker-compose
+
+- name: Pull Docker images
+  docker_image:
+    name: "{{ item }}"
+    source: pull
+    state: present
+  loop:
+    - "ubuntu:22.04"
+    - "postgres:15-alpine"
+    - "redis:7-alpine"
+    - "prometheus:latest"
+    - "grafana/grafana:latest"
+  retries: 3
+  delay: 10
+
+- name: Verify Docker installation
+  docker_info:
+  register: docker_info
+
+- name: Display Docker information
+  debug:
+    msg: |
+      Docker Installation Complete
+      - Docker Version: {{ docker_info.host_info.ServerVersion }}
+      - Container Runtime: {{ docker_info.host_info.ContainerdCommit.ID | default('N/A') }}
+      - Storage Driver: {{ docker_info.host_info.Driver }}
+      - Logged In User Groups: docker
+      - Docker Compose: Installed

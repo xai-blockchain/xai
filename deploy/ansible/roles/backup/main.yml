@@ -1,0 +1,127 @@
+---
+# ============================================================================
+# Backup and Disaster Recovery Role
+# ============================================================================
+
+- name: Create backup directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0755"
+  loop:
+    - /var/backups/xai
+    - /var/backups/xai/database
+    - /var/backups/xai/blockchain
+    - /var/backups/xai/logs
+
+- name: Install backup tools
+  package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - pg_dump
+    - mysqldump
+    - redis-tools
+    - tar
+    - gzip
+    - zstd
+    - awscli
+
+- name: Configure AWS credentials for backups
+  template:
+    src: aws-credentials.j2
+    dest: "/home/{{ app_user }}/.aws/credentials"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0600"
+  when: backup_s3_bucket is defined
+
+- name: Deploy backup script
+  template:
+    src: backup.sh.j2
+    dest: /usr/local/bin/xai-backup
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy database backup script
+  template:
+    src: backup-database.sh.j2
+    dest: /usr/local/bin/xai-backup-database
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy blockchain backup script
+  template:
+    src: backup-blockchain.sh.j2
+    dest: /usr/local/bin/xai-backup-blockchain
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy restore script
+  template:
+    src: restore.sh.j2
+    dest: /usr/local/bin/xai-restore
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create backup cron job
+  cron:
+    name: "XAI Daily Backup"
+    minute: "0"
+    hour: "2"
+    job: "/usr/local/bin/xai-backup >> /var/log/xai-backup.log 2>&1"
+    user: "{{ app_user }}"
+    state: present
+  when: backup_enabled | default(false)
+
+- name: Create backup cleanup cron job
+  cron:
+    name: "XAI Backup Cleanup"
+    minute: "30"
+    hour: "3"
+    job: "find /var/backups/xai -mtime +{{ backup_retention_days }} -delete"
+    user: root
+    state: present
+  when: backup_enabled | default(false)
+
+- name: Test backup script
+  command: "/usr/local/bin/xai-backup --test"
+  register: backup_test
+  ignore_errors: yes
+
+- name: Display backup configuration
+  debug:
+    msg: |
+      Backup Configuration
+      - Enabled: {{ backup_enabled | default(false) }}
+      - Schedule: {{ backup_schedule }}
+      - Retention: {{ backup_retention_days }} days
+      - S3 Bucket: {{ backup_s3_bucket | default('N/A') }}
+      - Backup Location: /var/backups/xai
+      - Test Result: {{ backup_test.stdout | default('Skipped') }}
+
+- name: Create disaster recovery documentation
+  template:
+    src: DISASTER_RECOVERY.md.j2
+    dest: /opt/xai/DISASTER_RECOVERY.md
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0644"
+
+- name: Set up backup monitoring
+  blockinfile:
+    path: /opt/prometheus/alert-rules.yml
+    marker: "# {mark} BACKUP ALERTS"
+    block: |
+      - alert: BackupFailed
+        expr: time() - timestamp(node_textfile_mtime{file="backup_success"}) > 86400
+        for: 1h
+        annotations:
+          summary: "Backup failed for {{ ansible_hostname }}"
+          description: "No successful backup in the last 24 hours"

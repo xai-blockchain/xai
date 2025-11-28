@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XAI Exchange - Connection Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6 text-blue-400">XAI Exchange - Connection Test</h1>
+
+        <div class="space-y-4">
+            <!-- API Test -->
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">API Connection Test</h2>
+                <button onclick="testAPI()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg">Test API</button>
+                <div id="apiResult" class="mt-4 p-4 bg-gray-700 rounded-lg hidden">
+                    <pre id="apiResponse" class="text-sm overflow-auto"></pre>
+                </div>
+            </div>
+
+            <!-- WebSocket Test -->
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">WebSocket Connection Test</h2>
+                <button onclick="testWebSocket()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg">Test WebSocket</button>
+                <button onclick="closeWebSocket()" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg ml-2">Close WebSocket</button>
+                <div id="wsResult" class="mt-4 p-4 bg-gray-700 rounded-lg hidden">
+                    <div id="wsStatus" class="text-sm mb-2"></div>
+                    <pre id="wsMessages" class="text-sm overflow-auto max-h-64"></pre>
+                </div>
+            </div>
+
+            <!-- Order Book Test -->
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Order Book Test</h2>
+                <button onclick="testOrderBook()" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg">Get Order Book</button>
+                <div id="orderBookResult" class="mt-4 p-4 bg-gray-700 rounded-lg hidden">
+                    <pre id="orderBookResponse" class="text-sm overflow-auto"></pre>
+                </div>
+            </div>
+
+            <!-- Recent Trades Test -->
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Recent Trades Test</h2>
+                <button onclick="testRecentTrades()" class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-lg">Get Recent Trades</button>
+                <div id="tradesResult" class="mt-4 p-4 bg-gray-700 rounded-lg hidden">
+                    <pre id="tradesResponse" class="text-sm overflow-auto"></pre>
+                </div>
+            </div>
+
+            <!-- Instructions -->
+            <div class="bg-blue-900/30 border border-blue-500 rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4 text-blue-400">Instructions</h2>
+                <ol class="list-decimal list-inside space-y-2 text-sm">
+                    <li>Ensure the backend server is running at <code class="bg-gray-800 px-2 py-1 rounded">http://localhost:5000</code></li>
+                    <li>Click "Test API" to verify API connectivity</li>
+                    <li>Click "Test WebSocket" to verify WebSocket connectivity</li>
+                    <li>Click "Get Order Book" to test order book endpoint</li>
+                    <li>Click "Get Recent Trades" to test trades endpoint</li>
+                    <li>If all tests pass, proceed to <a href="index.html" class="text-blue-400 underline">index.html</a></li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:5000/api';
+        const WS_URL = 'ws://localhost:5000';
+        let ws = null;
+        let wsMessages = [];
+
+        async function testAPI() {
+            const resultEl = document.getElementById('apiResult');
+            const responseEl = document.getElementById('apiResponse');
+
+            try {
+                resultEl.classList.remove('hidden');
+                responseEl.textContent = 'Testing API connection...';
+
+                const response = await fetch(`${API_BASE_URL}/health`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+
+                responseEl.textContent = JSON.stringify({
+                    status: response.status,
+                    statusText: response.statusText,
+                    data: data
+                }, null, 2);
+
+                if (response.ok) {
+                    responseEl.classList.add('text-green-400');
+                } else {
+                    responseEl.classList.add('text-red-400');
+                }
+            } catch (error) {
+                responseEl.textContent = `Error: ${error.message}\n\nMake sure the backend server is running at http://localhost:5000`;
+                responseEl.classList.add('text-red-400');
+            }
+        }
+
+        function testWebSocket() {
+            const resultEl = document.getElementById('wsResult');
+            const statusEl = document.getElementById('wsStatus');
+            const messagesEl = document.getElementById('wsMessages');
+
+            resultEl.classList.remove('hidden');
+            wsMessages = [];
+
+            try {
+                statusEl.textContent = 'Connecting to WebSocket...';
+                statusEl.className = 'text-sm mb-2 text-yellow-400';
+
+                ws = new WebSocket(WS_URL);
+
+                ws.onopen = () => {
+                    statusEl.textContent = 'WebSocket Connected!';
+                    statusEl.className = 'text-sm mb-2 text-green-400';
+
+                    wsMessages.push({ time: new Date().toLocaleTimeString(), event: 'Connected' });
+                    updateWSMessages(messagesEl);
+
+                    // Subscribe to channels
+                    ws.send(JSON.stringify({ type: 'subscribe', channel: 'price' }));
+                    ws.send(JSON.stringify({ type: 'subscribe', channel: 'orderbook' }));
+                };
+
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    wsMessages.push({ time: new Date().toLocaleTimeString(), data: data });
+                    updateWSMessages(messagesEl);
+                };
+
+                ws.onerror = (error) => {
+                    statusEl.textContent = 'WebSocket Error!';
+                    statusEl.className = 'text-sm mb-2 text-red-400';
+                    wsMessages.push({ time: new Date().toLocaleTimeString(), event: 'Error', error: error.message });
+                    updateWSMessages(messagesEl);
+                };
+
+                ws.onclose = () => {
+                    statusEl.textContent = 'WebSocket Disconnected';
+                    statusEl.className = 'text-sm mb-2 text-gray-400';
+                    wsMessages.push({ time: new Date().toLocaleTimeString(), event: 'Disconnected' });
+                    updateWSMessages(messagesEl);
+                };
+            } catch (error) {
+                statusEl.textContent = `Error: ${error.message}`;
+                statusEl.className = 'text-sm mb-2 text-red-400';
+                messagesEl.textContent = 'Make sure the WebSocket server is running at ws://localhost:5000';
+            }
+        }
+
+        function closeWebSocket() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function updateWSMessages(element) {
+            element.textContent = wsMessages.map(msg => {
+                if (msg.event) {
+                    return `[${msg.time}] ${msg.event}`;
+                }
+                return `[${msg.time}]\n${JSON.stringify(msg.data, null, 2)}`;
+            }).join('\n\n---\n\n');
+
+            // Auto-scroll to bottom
+            element.scrollTop = element.scrollHeight;
+        }
+
+        async function testOrderBook() {
+            const resultEl = document.getElementById('orderBookResult');
+            const responseEl = document.getElementById('orderBookResponse');
+
+            try {
+                resultEl.classList.remove('hidden');
+                responseEl.textContent = 'Fetching order book...';
+
+                const response = await fetch(`${API_BASE_URL}/orders/book`);
+                const data = await response.json();
+
+                responseEl.textContent = JSON.stringify({
+                    status: response.status,
+                    bids_count: data.bids ? data.bids.length : 0,
+                    asks_count: data.asks ? data.asks.length : 0,
+                    data: data
+                }, null, 2);
+
+                if (response.ok) {
+                    responseEl.classList.add('text-green-400');
+                } else {
+                    responseEl.classList.add('text-red-400');
+                }
+            } catch (error) {
+                responseEl.textContent = `Error: ${error.message}`;
+                responseEl.classList.add('text-red-400');
+            }
+        }
+
+        async function testRecentTrades() {
+            const resultEl = document.getElementById('tradesResult');
+            const responseEl = document.getElementById('tradesResponse');
+
+            try {
+                resultEl.classList.remove('hidden');
+                responseEl.textContent = 'Fetching recent trades...';
+
+                const response = await fetch(`${API_BASE_URL}/trades/recent?limit=10`);
+                const data = await response.json();
+
+                responseEl.textContent = JSON.stringify({
+                    status: response.status,
+                    trades_count: data.trades ? data.trades.length : 0,
+                    data: data
+                }, null, 2);
+
+                if (response.ok) {
+                    responseEl.classList.add('text-green-400');
+                } else {
+                    responseEl.classList.add('text-red-400');
+                }
+            } catch (error) {
+                responseEl.textContent = `Error: ${error.message}`;
+                responseEl.classList.add('text-red-400');
+            }
+        }
+
+        // Auto-test on load
+        window.addEventListener('load', () => {
+            console.log('XAI Exchange Connection Test Loaded');
+            console.log('API URL:', API_BASE_URL);
+            console.log('WebSocket URL:', WS_URL);
+        });
+    </script>
+</body>
+</html>

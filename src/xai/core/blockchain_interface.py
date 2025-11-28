@@ -1,0 +1,66 @@
+"""
+Interface for blockchain data needed by external modules (e.g., monitoring and gamification).
+
+This module helps to break cyclic dependencies by providing lightweight,
+abstract views of blockchain data without directly importing the full
+Blockchain implementation.
+"""
+
+from dataclasses import dataclass
+from typing import Dict, Any, List, Optional
+import time
+
+@dataclass
+class BlockchainDataProvider:
+    """
+    Provides essential blockchain statistics without a direct dependency
+    on the full Blockchain class.
+    """
+    chain_height: int
+    pending_transactions_count: int
+    orphan_blocks_count: int
+    orphan_transactions_count: int
+    total_circulating_supply: float
+    difficulty: int
+    mempool_size_bytes: int = 0
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Return a dictionary of the provided statistics."""
+        return {
+            "chain_height": self.chain_height,
+            "pending_transactions_count": self.pending_transactions_count,
+            "orphan_blocks_count": self.orphan_blocks_count,
+            "orphan_transactions_count": self.orphan_transactions_count,
+            "total_circulating_supply": self.total_circulating_supply,
+            "difficulty": self.difficulty,
+            "mempool_size_bytes": self.mempool_size_bytes,
+        }
+
+class GamificationBlockchainInterface:
+    """
+    Interface for blockchain methods needed by gamification managers.
+    This helps to break cyclic dependencies by abstracting the Blockchain class.
+    """
+    def get_balance(self, address: str) -> float:
+        """Get the balance of a given address."""
+        raise NotImplementedError
+
+    def get_chain_length(self) -> int:
+        """Get the current length of the blockchain."""
+        raise NotImplementedError
+
+    def get_block_by_index(self, index: int) -> Optional[Any]:
+        """Get a block by its index (returns a simplified view or header)."""
+        raise NotImplementedError
+
+    def get_latest_block_hash(self) -> str:
+        """Get the hash of the latest block."""
+        raise NotImplementedError
+
+    def get_pending_transactions(self) -> List[Any]:
+        """Get the list of pending transactions."""
+        raise NotImplementedError
+    
+    def add_transaction_to_mempool(self, transaction: Any) -> bool:
+        """Add a transaction to the mempool."""
+        raise NotImplementedError

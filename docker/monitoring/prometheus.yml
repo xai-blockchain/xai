@@ -1,0 +1,136 @@
+# Prometheus Configuration for XAI Blockchain
+
+global:
+  # Scrape interval for each job
+  scrape_interval: 15s
+  # Interval for evaluating alert rules
+  evaluation_interval: 15s
+  # External labels added to all time series
+  external_labels:
+    cluster: 'xai-production'
+    environment: 'production'
+    monitor: 'xai-blockchain'
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+      relabel_configs:
+        - source_labels: [__address__]
+          target_label: alertmanager
+
+# Rule files
+rule_files:
+  - "monitoring/prometheus_alerts.yml"
+  - "monitoring/prometheus_alerts_*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # XAI Node metrics - Main blockchain node
+  - job_name: 'xai-node'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    static_configs:
+      - targets: ['xai-node:9090']
+        labels:
+          instance: 'xai-node-1'
+          type: 'full-node'
+          network: 'production'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: node
+        regex: '([^:]+):.*'
+        replacement: '${1}'
+
+  # XAI Node metrics - Additional nodes (if scaling)
+  - job_name: 'xai-nodes'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    static_configs:
+      - targets: []
+        # Add more nodes like:
+        # - 'xai-node-2:9090'
+        # - 'xai-node-3:9090'
+        labels:
+          type: 'full-node'
+          network: 'production'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: node
+        regex: '([^:]+):.*'
+        replacement: '${1}'
+
+  # PostgreSQL metrics (if database exporter is configured)
+  - job_name: 'postgres'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['postgres:9187']
+        labels:
+          instance: 'postgres-main'
+          type: 'database'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: pg_instance
+        regex: '([^:]+):.*'
+        replacement: '${1}'
+
+  # Redis metrics (if cache exporter is configured)
+  - job_name: 'redis'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['redis:9121']
+        labels:
+          instance: 'redis-main'
+          type: 'cache'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          instance: 'prometheus'
+          type: 'monitoring'
+
+  # Node Exporter for system-level metrics
+  - job_name: 'node-exporter'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          instance: 'system-metrics'
+          type: 'system'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: node
+        regex: '([^:]+):.*'
+        replacement: '${1}'
+
+  # Docker Container metrics (if docker exporter is available)
+  - job_name: 'docker'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['docker-exporter:9323']
+        labels:
+          instance: 'docker-main'
+          type: 'containers'
+
+  # Custom blockchain validator metrics (optional)
+  - job_name: 'blockchain-validator'
+    scrape_interval: 15s
+    static_configs:
+      - targets: []
+        # Uncomment to add validator nodes:
+        # - 'validator-1:9090'
+        # - 'validator-2:9090'
+        labels:
+          type: 'validator'
+
+# Service discovery configurations (optional for dynamic environments)
+# - file_sd_configs:
+#   - files:
+#     - 'sd/nodes.json'
+#     - 'sd/targets/*.json'
+#   refresh_interval: 30s

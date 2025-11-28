@@ -1,0 +1,221 @@
+# XAI Blockchain - Complete Monitoring Stack
+# Includes: Prometheus, Grafana, AlertManager, Node Exporter, Loki
+#
+# Usage:
+#   docker-compose up -d              # Start all services
+#   docker-compose logs -f prometheus # View logs
+#   docker-compose down               # Stop all services
+
+version: '3.8'
+
+services:
+  # ==================== PROMETHEUS ====================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: xai-prometheus
+    hostname: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      # Mount configuration from project root
+      - ../../docker/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../../monitoring/prometheus_alerts.yml:/etc/prometheus/rules/alerts.yml:ro
+      # Persistent data volume
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-admin-api'
+    environment:
+      - TZ=UTC
+    networks:
+      - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==================== GRAFANA ====================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: xai-grafana
+    hostname: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      # Provisioning configurations
+      - ../../docker/monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ../../docker/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      # Custom configurations
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+      # Persistent data volume
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel,grafana-worldmap-panel
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_DATE_FORMAT=YYYY-MM-DD HH:mm:ss
+      - GF_TIMEZONE=UTC
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+    networks:
+      - monitoring
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==================== ALERTMANAGER ====================
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: xai-alertmanager
+    hostname: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      # Mount configuration from project root
+      - ../../monitoring/alertmanager.yml:/etc/alertmanager/config.yml:ro
+      - ../../monitoring/alert_templates.tmpl:/etc/alertmanager/templates.tmpl:ro
+      # Persistent data volume
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+      - '--log.level=info'
+    environment:
+      - TZ=UTC
+    networks:
+      - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==================== NODE EXPORTER ====================
+  # Exports system-level metrics (CPU, memory, disk, network, etc.)
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: xai-node-exporter
+    hostname: node-exporter
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--collector.netdev.device-exclude=^(veth.*|br.*|docker.*|virbr.*|lo)'
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # ==================== LOKI (Log Aggregation) ====================
+  # Optional: for centralized log storage and searching
+  loki:
+    image: grafana/loki:latest
+    container_name: xai-loki
+    hostname: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/local-config.yml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yml
+    networks:
+      - monitoring
+    restart: unless-stopped
+    profiles: [logs]  # Optional service, use --profile logs to enable
+
+  # ==================== PROMTAIL (Log Shipper) ====================
+  # Optional: ships logs to Loki
+  promtail:
+    image: grafana/promtail:latest
+    container_name: xai-promtail
+    hostname: promtail
+    ports:
+      - "9080:9080"
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - monitoring
+    depends_on:
+      - loki
+    restart: unless-stopped
+    profiles: [logs]  # Optional service
+
+  # ==================== CADVISOR (Container Metrics) ====================
+  # Optional: provides container-level metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: xai-cadvisor
+    hostname: cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    privileged: true
+    networks:
+      - monitoring
+    restart: unless-stopped
+    profiles: [containers]  # Optional service
+
+volumes:
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  alertmanager_data:
+    driver: local
+  loki_data:
+    driver: local
+
+networks:
+  monitoring:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16
+
+# ====================  SERVICE ENDPOINTS ====================
+# After running `docker-compose up -d`:
+#
+# Prometheus:     http://localhost:9090
+# Grafana:        http://localhost:3000 (admin/admin)
+# AlertManager:   http://localhost:9093
+# Node Exporter:  http://localhost:9100/metrics
+# Loki:           http://localhost:3100 (with --profile logs)
+# cAdvisor:       http://localhost:8080 (with --profile containers)
+#
+# To enable optional services:
+#   docker-compose --profile logs up -d
+#   docker-compose --profile containers up -d
+#   docker-compose --profile logs --profile containers up -d

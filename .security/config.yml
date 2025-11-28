@@ -1,0 +1,234 @@
+# XAI Blockchain Security Configuration
+# Defines scan schedules, severity thresholds, and alert settings
+
+# Scan targets
+scan_targets:
+  source: 'src/'
+  tests: 'tests/'
+  scripts: 'scripts/'
+  configs: 'config/'
+
+# Severity thresholds - triggers alerts if exceeded
+severity_thresholds:
+  critical: 0      # Zero tolerance for critical issues
+  high: 5          # Max 5 high-severity issues
+  medium: 20       # Max 20 medium-severity issues
+  low: 100         # Max 100 low-severity issues
+
+# Exclusion patterns
+exclusions:
+  paths:
+    - 'venv/'
+    - '.venv/'
+    - '.venv313/'
+    - '__pycache__/'
+    # Removed VCS-specific exclusions for portability
+    - 'node_modules/'
+    - '.pytest_cache/'
+    - '.mypy_cache/'
+    - 'htmlcov/'
+    - 'build/'
+    - 'dist/'
+    - '.eggs/'
+  files:
+    - '*.pyc'
+    - '*.pyo'
+    - '*.egg-info'
+
+# Security scanning tools configuration
+tools:
+  # Bandit - Python security scanner
+  bandit:
+    enabled: true
+    level: '-ll'  # Report low and medium severity issues
+    skip_tests:
+      - 'B101'   # assert_used
+      - 'B601'   # paramiko_calls
+    timeout: 300  # 5 minutes
+
+  # Safety - Dependency vulnerability scanner
+  safety:
+    enabled: true
+    check_installed: true
+    json_output: true
+    timeout: 300
+
+  # pip-audit - Python package auditor
+  pip_audit:
+    enabled: true
+    timeout: 300
+    strict: false
+
+  # Semgrep - Static analysis SAST tool
+  semgrep:
+    enabled: true
+    config: 'auto'  # Use default rules
+    timeout: 600    # 10 minutes
+    json_output: true
+
+  # Trivy - Vulnerability scanner (file system, container, etc.)
+  trivy:
+    enabled: false  # Can be expensive
+    severity:
+      - 'CRITICAL'
+      - 'HIGH'
+    timeout: 600
+
+  # OWASP Dependency-Check
+  owasp_check:
+    enabled: false
+    timeout: 900    # 15 minutes
+
+# Alert configuration
+alerts:
+  email:
+    enabled: false
+    smtp_server: 'smtp.gmail.com'
+    smtp_port: 587
+    from_address: null  # Set via ALERT_EMAIL_FROM env var
+    to_addresses: []    # Set via ALERT_EMAIL_TO env var
+    tls: true
+
+  slack:
+    enabled: false
+    webhook_url: null   # Set via SLACK_WEBHOOK_URL env var
+    channel: '#security'
+    username: 'Security Bot'
+    notify_for:
+      - 'critical'
+      - 'high'
+
+    enabled: false
+    create_issues: false
+    create_discussions: false
+    auto_label: false
+    labels: []
+    notify_for: []
+
+# Scheduling
+schedule:
+  # Cron-style scheduling for automated scans
+  daily:
+    enabled: true
+    time: '02:00'     # 2 AM UTC
+    mode: 'standard'
+
+  weekly:
+    enabled: true
+    day: 'sunday'
+    time: '03:00'     # 3 AM UTC
+    mode: 'comprehensive'
+
+  on_push:
+    enabled: true
+    branches:
+      - 'main'
+      - 'develop'
+    mode: 'quick'
+
+  on_pull_request:
+    enabled: true
+    mode: 'standard'
+
+# Reporting
+reporting:
+  output_directory: 'security_reports/'
+  formats:
+    - 'json'
+    - 'markdown'
+    - 'html'
+
+  retention_days: 90
+  max_reports: 100
+
+  # Trend analysis
+  track_trends: true
+  trend_window_days: 30
+
+  # Automatic dashboard updates
+  update_dashboard: true
+  dashboard_file: 'SECURITY-DASHBOARD.md'
+
+# Custom checks
+custom_checks:
+  # SQL injection detection
+  sql_injection:
+    enabled: true
+    patterns:
+      - 'execute\('
+      - 'query\('
+      - 'f".*{.*}.*"'
+
+  # XSS detection
+  xss_detection:
+    enabled: true
+    patterns:
+      - 'innerHTML'
+      - 'dangerouslySetInnerHTML'
+
+  # Hardcoded secrets
+  secret_detection:
+    enabled: true
+    patterns:
+      - 'password\s*='
+      - 'api[_-]?key\s*='
+      - 'secret\s*='
+      - 'token\s*='
+
+# Performance
+performance:
+  parallel_scans: true
+  max_workers: 4
+  cache_results: true
+  cache_ttl_hours: 24
+
+# Logging
+logging:
+  level: 'INFO'
+  file: 'security_monitor.log'
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  max_file_size_mb: 10
+  backup_count: 5
+
+# Integration
+integrations:
+  # SonarQube integration
+  sonarqube:
+    enabled: false
+    server_url: null
+    project_key: 'xai-blockchain'
+    token: null  # Set via SONARQUBE_TOKEN env var
+
+    enabled: false
+    repository: null
+    token: null
+
+  # Slack integration
+  slack:
+    enabled: false
+    token: null       # Set via SLACK_TOKEN env var
+    webhook_url: null # Set via SLACK_WEBHOOK_URL env var
+
+# False positives and exceptions
+exceptions:
+  # Rules to exclude from specific scans
+  bandit_exceptions:
+    - test_*.py       # Skip security checks in test files
+    - */conftest.py   # Skip in conftest
+
+  # Paths to exclude globally
+  global_excludes:
+    - 'archived_*'
+    - '*.bak'
+    - '*.tmp'
+
+# Remediation tracking
+remediation:
+  # Track remediation of issues
+  track_issues: true
+
+  # Auto-close issues when vulnerability is fixed
+  auto_close_fixed: true
+
+  # Require comments/evidence for closure
+  require_comments: true

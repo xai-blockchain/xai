@@ -1,0 +1,425 @@
+# XAI Blockchain - Prometheus Alert Rules
+# Critical conditions and monitoring thresholds for production deployment
+#
+# Alert severity levels:
+# - critical: Immediate action required, service impaired
+# - warning: Should be addressed soon, potential issues
+# - info: Informational alerts for tracking
+
+groups:
+  - name: blockchain_alerts
+    interval: 15s
+    rules:
+      # ==================== NODE AVAILABILITY ====================
+
+      - alert: NodeDown
+        expr: up{job="xai-node"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: blockchain
+        annotations:
+          summary: "XAI Node is Down"
+          description: "Node {{ $labels.instance }} has been unavailable for 2 minutes"
+          runbook: "https://docs.xai.network/runbooks/node-down"
+
+      - alert: NodeUnhealthy
+        expr: |
+          (
+            increase(xai_network_errors_total[5m]) > 10
+            OR
+            xai_api_active_connections < 1
+          )
+        for: 5m
+        labels:
+          severity: warning
+          service: blockchain
+        annotations:
+          summary: "XAI Node Health Degraded"
+          description: "Node {{ $labels.instance }} is showing signs of unhealthiness"
+
+      # ==================== NETWORK ISSUES ====================
+
+      - alert: LowPeerCount
+        expr: xai_peers_connected < 2
+        for: 5m
+        labels:
+          severity: warning
+          service: network
+        annotations:
+          summary: "Low Peer Count"
+          description: |
+            Node has only {{ $value }} connected peers.
+            Minimum recommended: 3-5 peers
+          runbook: "https://docs.xai.network/runbooks/low-peer-count"
+
+      - alert: NoPeersConnected
+        expr: xai_peers_connected == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: network
+        annotations:
+          summary: "No Peers Connected"
+          description: "Node {{ $labels.instance }} has no active peer connections"
+          runbook: "https://docs.xai.network/runbooks/no-peers"
+
+      - alert: HighNetworkErrorRate
+        expr: |
+          rate(xai_network_errors_total[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: network
+        annotations:
+          summary: "High Network Error Rate"
+          description: "Network error rate: {{ $value | humanize }} errors/sec"
+
+      - alert: HighNetworkLatency
+        expr: |
+          histogram_quantile(0.95, rate(xai_network_latency_seconds_bucket[5m])) > 2
+        for: 10m
+        labels:
+          severity: warning
+          service: network
+        annotations:
+          summary: "High Network Latency"
+          description: "95th percentile latency: {{ $value | humanizeDuration }}"
+
+      # ==================== BLOCK PRODUCTION ====================
+
+      - alert: LowBlockProductionRate
+        expr: |
+          increase(xai_blocks_total[10m]) < 1
+        for: 15m
+        labels:
+          severity: warning
+          service: blockchain
+        annotations:
+          summary: "Low Block Production Rate"
+          description: |
+            No blocks produced in last 10 minutes.
+            Current height: {{ $value }}
+          runbook: "https://docs.xai.network/runbooks/low-block-rate"
+
+      - alert: HighBlockValidationTime
+        expr: |
+          histogram_quantile(0.95, rate(xai_block_validation_time_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: blockchain
+        annotations:
+          summary: "High Block Validation Time"
+          description: "95th percentile block validation: {{ $value | humanizeDuration }}"
+
+      - alert: LongMiningTime
+        expr: |
+          histogram_quantile(0.95, rate(xai_block_mining_time_seconds_bucket[10m])) > 600
+        for: 10m
+        labels:
+          severity: warning
+          service: mining
+        annotations:
+          summary: "Unusually Long Mining Times"
+          description: "95th percentile mining time: {{ $value | humanizeDuration }}"
+
+      - alert: ChainNotSynced
+        expr: xai_chain_sync_status == 0
+        for: 10m
+        labels:
+          severity: warning
+          service: blockchain
+        annotations:
+          summary: "Chain Out of Sync"
+          description: |
+            Node is not synced with the network.
+            Sync progress: {{ $value }}%
+          runbook: "https://docs.xai.network/runbooks/chain-sync"
+
+      - alert: LowSyncProgress
+        expr: |
+          (
+            xai_chain_sync_percentage < 95
+            AND
+            increase(xai_blocks_total[5m]) == 0
+          )
+        for: 5m
+        labels:
+          severity: warning
+          service: blockchain
+        annotations:
+          summary: "Slow Chain Sync"
+          description: "Sync progress: {{ $value }}%"
+
+      - alert: ChainReorganization
+        expr: increase(xai_chain_reorgs_total[1h]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: blockchain
+        annotations:
+          summary: "Chain Reorganization Detected"
+          description: |
+            Chain reorg occurred with depth: {{ $value }}
+            This may indicate temporary fork resolution
+
+      # ==================== TRANSACTION POOL ====================
+
+      - alert: LargeMempool
+        expr: |
+          xai_transaction_pool_size > 10000
+        for: 10m
+        labels:
+          severity: warning
+          service: transactions
+        annotations:
+          summary: "Large Transaction Mempool"
+          description: |
+            Mempool size: {{ $value }} transactions
+            Network may be congested
+
+      - alert: HighTransactionFees
+        expr: |
+          histogram_quantile(0.75, rate(xai_transaction_fee_xai_bucket[5m])) > 10
+        for: 10m
+        labels:
+          severity: info
+          service: transactions
+        annotations:
+          summary: "High Transaction Fees"
+          description: "75th percentile fee: {{ $value }} XAI"
+
+      - alert: LowTransactionThroughput
+        expr: |
+          rate(xai_transactions_total[5m]) < 1
+        for: 15m
+        labels:
+          severity: info
+          service: transactions
+        annotations:
+          summary: "Low Transaction Throughput"
+          description: "TPS: {{ $value | humanize }}"
+
+      # ==================== SYSTEM RESOURCES ====================
+
+      - alert: HighCPUUsage
+        expr: xai_system_cpu_usage_percent > 80
+        for: 10m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High CPU Usage"
+          description: "CPU usage: {{ $value }}%"
+          runbook: "https://docs.xai.network/runbooks/high-cpu"
+
+      - alert: CriticalCPUUsage
+        expr: xai_system_cpu_usage_percent > 95
+        for: 2m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Critical CPU Usage"
+          description: "CPU usage: {{ $value }}%"
+
+      - alert: HighMemoryUsage
+        expr: xai_system_memory_percent > 85
+        for: 10m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High Memory Usage"
+          description: "Memory usage: {{ $value }}%"
+          runbook: "https://docs.xai.network/runbooks/high-memory"
+
+      - alert: CriticalMemoryUsage
+        expr: xai_system_memory_percent > 95
+        for: 2m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Critical Memory Usage"
+          description: "Memory usage: {{ $value }}%"
+
+      - alert: DiskSpaceRunningOut
+        expr: |
+          (
+            (1 - (xai_system_disk_usage_bytes / node_filesystem_size_bytes)) < 0.1
+          )
+        for: 30m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "Disk Space Running Out"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining"
+          runbook: "https://docs.xai.network/runbooks/disk-space"
+
+      - alert: CriticalDiskSpace
+        expr: |
+          (
+            (1 - (xai_system_disk_usage_bytes / node_filesystem_size_bytes)) < 0.05
+          )
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Critical Disk Space"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining"
+
+      - alert: HighThreadCount
+        expr: |
+          xai_process_num_threads > 1000
+        for: 10m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High Thread Count"
+          description: "Thread count: {{ $value }}"
+
+      # ==================== API HEALTH ====================
+
+      - alert: HighAPIErrorRate
+        expr: |
+          (
+            rate(xai_api_requests_total{status=~"5.."}[5m]) /
+            rate(xai_api_requests_total[5m])
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: api
+        annotations:
+          summary: "High API Error Rate"
+          description: "Error rate: {{ $value | humanizePercentage }}"
+
+      - alert: SlowAPIResponses
+        expr: |
+          histogram_quantile(0.95, rate(xai_api_request_duration_seconds_bucket[5m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+          service: api
+        annotations:
+          summary: "Slow API Responses"
+          description: "95th percentile response time: {{ $value | humanizeDuration }}"
+
+      - alert: NoAPIConnections
+        expr: |
+          xai_api_active_connections == 0
+        for: 5m
+        labels:
+          severity: warning
+          service: api
+        annotations:
+          summary: "No Active API Connections"
+          description: "No clients connected to API"
+
+      # ==================== MINING ====================
+
+      - alert: LowHashrate
+        expr: |
+          xai_mining_hashrate < 1000
+        for: 15m
+        labels:
+          severity: info
+          service: mining
+        annotations:
+          summary: "Low Mining Hashrate"
+          description: "Current hashrate: {{ $value | humanize }} H/s"
+
+      - alert: MiningFailureRate
+        expr: |
+          (
+            rate(xai_mining_attempts_total[5m]) -
+            rate(xai_mining_success_total[5m])
+          ) / rate(xai_mining_attempts_total[5m]) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          service: mining
+        annotations:
+          summary: "High Mining Failure Rate"
+          description: "Failure rate: {{ $value | humanizePercentage }}"
+
+      # ==================== VALIDATION ====================
+
+      - alert: HighValidationFailures
+        expr: |
+          rate(xai_validation_failures_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: validation
+        annotations:
+          summary: "High Validation Failure Rate"
+          description: "Failures/sec: {{ $value | humanize }}"
+
+      - alert: ValidationErrors
+        expr: |
+          increase(xai_validation_errors_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          service: validation
+        annotations:
+          summary: "Validation Errors Detected"
+          description: "Error count: {{ $value }}"
+
+      # ==================== SUPPLY ====================
+
+      - alert: UnusualSupplyChange
+        expr: |
+          rate(xai_total_supply_xai[10m]) > 1000
+        for: 5m
+        labels:
+          severity: critical
+          service: blockchain
+        annotations:
+          summary: "Unusual Supply Change Rate"
+          description: "Supply change rate: {{ $value }} XAI/min"
+
+      # ==================== SERVICE MONITORING ====================
+
+      - alert: HighOrphanedBlocks
+        expr: |
+          increase(xai_orphaned_blocks_total[1h]) > 5
+        for: 10m
+        labels:
+          severity: info
+          service: blockchain
+        annotations:
+          summary: "Multiple Orphaned Blocks"
+          description: "Orphaned blocks in last hour: {{ $value }}"
+
+  - name: system_alerts
+    interval: 30s
+    rules:
+      - alert: NodeProcessCrash
+        expr: |
+          increase(xai_process_uptime_seconds[1m]) < 0
+        for: 1m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Node Process May Have Crashed"
+          description: "Process uptime decreased - possible crash"
+
+      - alert: NodeUpgradeRequired
+        expr: |
+          up{job="xai-node"} == 1
+          AND
+          (time() - timestamp(xai_node_info)) > 86400
+        labels:
+          severity: info
+          service: system
+        annotations:
+          summary: "Node Version Check Recommended"
+          description: "Consider checking for new node versions"

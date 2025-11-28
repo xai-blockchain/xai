@@ -1,0 +1,133 @@
+---
+# ============================================================================
+# XAI Blockchain - Production Inventory
+# ============================================================================
+
+all:
+  vars:
+    # Environment
+    environment: production
+    deployment_version: "1.0.0"
+    
+    # Application settings
+    app_env: production
+    log_level: INFO
+    enable_mining: false
+    
+    # Database settings
+    postgres_host: "postgres.production.internal"
+    postgres_port: 5432
+    postgres_db: "xai_blockchain"
+    postgres_backup_enabled: true
+    postgres_backup_retention_days: 30
+    
+    # Redis settings
+    redis_host: "redis.production.internal"
+    redis_port: 6379
+    redis_cluster_enabled: true
+    redis_replication_enabled: true
+    
+    # Blockchain network
+    network_id: "0x5841"  # Mainnet
+    network_name: "mainnet"
+    min_peers: 10
+    max_peers: 500
+    
+    # Security
+    enable_tls: true
+    tls_cert_path: "/etc/ssl/certs/xai.crt"
+    tls_key_path: "/etc/ssl/private/xai.key"
+    firewall_enabled: true
+    p2p_require_client_cert: true
+    p2p_trusted_cert_fps:
+      - "abc123..."
+    p2p_trusted_peer_pubkeys:
+      - "02abcd..."
+    p2p_nonce_ttl_seconds: 90
+    p2p_ca_bundle: "/etc/ssl/certs/ca-bundle.crt"
+    p2p_allowed_ips:
+      - "10.0.0.0/8"
+    
+    # Monitoring
+    monitoring_enabled: true
+    prometheus_enabled: true
+    grafana_enabled: true
+    alert_email: "ops-team@company.internal"
+    
+    # Backup
+    backup_enabled: true
+    backup_schedule: "0 2 * * *"  # Daily at 2 AM
+    backup_retention_days: 30
+    backup_s3_bucket: "xai-backups-production"
+    
+    # Performance tuning
+    worker_threads: 16
+    max_connections: 200
+    cache_size: 2048
+
+  children:
+    blockchain-nodes:
+      hosts:
+        blockchain-node-1:
+          ansible_host: 10.0.1.10
+          ansible_user: ubuntu
+          node_id: "node-1"
+          mining_enabled: false
+          
+        blockchain-node-2:
+          ansible_host: 10.0.2.10
+          ansible_user: ubuntu
+          node_id: "node-2"
+          mining_enabled: false
+          
+        blockchain-node-3:
+          ansible_host: 10.0.3.10
+          ansible_user: ubuntu
+          node_id: "node-3"
+          mining_enabled: false
+      
+      vars:
+        blockchain_node_port: 8333
+        blockchain_api_port: 8080
+        blockchain_ws_port: 8081
+        blockchain_metrics_port: 9090
+
+    block-explorers:
+      hosts:
+        explorer-1:
+          ansible_host: 10.0.1.20
+          ansible_user: ubuntu
+          explorer_id: "explorer-1"
+          
+        explorer-2:
+          ansible_host: 10.0.2.20
+          ansible_user: ubuntu
+          explorer_id: "explorer-2"
+      
+      vars:
+        explorer_port: 8082
+        explorer_db_host: "postgres.production.internal"
+
+    monitoring-servers:
+      hosts:
+        prometheus-1:
+          ansible_host: 10.0.1.30
+          ansible_user: ubuntu
+          
+        grafana-1:
+          ansible_host: 10.0.1.31
+          ansible_user: ubuntu
+      
+      vars:
+        prometheus_retention_days: 30
+        grafana_admin_user: "admin"
+
+    backup-servers:
+      hosts:
+        backup-1:
+          ansible_host: 10.0.1.40
+          ansible_user: ubuntu
+      
+      vars:
+        backup_type: "full-incremental"
+        backup_compression: "zstd"

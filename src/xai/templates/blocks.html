@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}XAI Block Explorer - Blocks{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Blockchain Blocks</h2>
+    {% if blocks %}
+    <table>
+        <thead>
+            <tr>
+                <th>Block</th>
+                <th>Hash</th>
+                <th>Previous Hash</th>
+                <th>Transactions</th>
+                <th>Difficulty</th>
+                <th>Nonce</th>
+                <th>Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for block in blocks %}
+            <tr>
+                <td><a href="/block/{{ block.index }}">#{{ block.index }}</a></td>
+                <td class="hash truncate" title="{{ block.hash }}">{{ block.hash[:16] }}...</td>
+                <td class="hash truncate" title="{{ block.previous_hash }}">{{ block.previous_hash[:16] }}...</td>
+                <td>{{ block.transactions|length }}</td>
+                <td>{{ block.difficulty }}</td>
+                <td class="hash">{{ block.nonce }}</td>
+                <td>{{ format_timestamp(block.timestamp) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div style="margin-top: 20px; text-align: center;">
+        {% if offset > 0 %}
+        <a href="/blocks?limit={{ limit }}&offset={{ offset - limit }}" style="margin-right: 20px;">← Previous</a>
+        {% endif %}
+        <a href="/blocks?limit={{ limit }}&offset={{ offset + limit }}">Next →</a>
+    </div>
+    {% else %}
+    <p>No blocks found or unable to connect to node.</p>
+    {% endif %}
+</div>
+{% endblock %}

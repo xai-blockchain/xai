@@ -1,0 +1,33 @@
+# Core blockchain dependencies
+cryptography
+secp256k1
+pycryptodome
+base58
+requests
+flask
+flask-cors
+python-dotenv
+sqlalchemy
+psycopg2-binary
+prometheus-client
+psutil
+grafana-api
+openai
+anthropic
+python-dateutil
+python-json-logger
+
+# Production-grade cryptography libraries
+mnemonic
+bip-utils
+pyotp
+argon2-cffi
+pynacl
+py-ecc
+
+# Zero-Knowledge Proof libraries
+gmpy2
+sympy
+eth-hash
+cairo-lang
+pqcrypto>=0.3.4

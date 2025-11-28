@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: xai-blockchain
+  labels:
+    name: xai-blockchain
+    environment: production
+spec:
+  finalizers:
+    - kubernetes
