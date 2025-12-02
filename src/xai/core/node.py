@@ -218,7 +218,11 @@ class _SecurityWebhookForwarder:
             self._persist_queue()
         except Full:
             self.dropped_events += 1
-            print(f"[SECURITY] Dropping webhook event {payload.get('event_type')} (queue full)")
+            logger.warning(
+                "Dropping webhook event %s (queue full)",
+                payload.get("event_type"),
+                extra={"event": "security.webhook_queue_full"}
+            )
 
     def _worker(self) -> None:
         while True:
@@ -243,8 +247,12 @@ class _SecurityWebhookForwarder:
             except Exception as exc:
                 attempt += 1
                 if attempt >= self.max_retries:
-                    print(
-                        f"[SECURITY] Failed to deliver webhook event {payload.get('event_type')}: {exc}"
+                    logger.error(
+                        "Failed to deliver webhook event %s after %d attempts: %s",
+                        payload.get("event_type"),
+                        self.max_retries,
+                        type(exc).__name__,
+                        extra={"event": "security.webhook_delivery_failed"}
                     )
                     return
                 delay = min(self.backoff * attempt, self.max_backoff)
@@ -263,7 +271,11 @@ class _SecurityWebhookForwarder:
             with open(self.queue_path, "wb") as handle:
                 handle.write(data)
         except Exception as exc:
-            print(f"[SECURITY] Failed to persist webhook queue: {exc}")
+            logger.warning(
+                "Failed to persist webhook queue: %s",
+                type(exc).__name__,
+                extra={"event": "security.webhook_queue_persist_failed"}
+            )
 
     def _load_persisted_events(self) -> None:
         if not self.queue_path or not os.path.exists(self.queue_path):
@@ -275,7 +287,10 @@ class _SecurityWebhookForwarder:
                 try:
                     data = self._fernet.decrypt(data)
                 except InvalidToken as exc:
-                    print(f"[SECURITY] Failed to decrypt webhook queue: {exc}")
+                    logger.error(
+                        "Failed to decrypt webhook queue: invalid token",
+                        extra={"event": "security.webhook_queue_decrypt_failed"}
+                    )
                     return
             payloads = json.loads(data.decode("utf-8"))
             for item in payloads:
@@ -285,7 +300,11 @@ class _SecurityWebhookForwarder:
                     self.dropped_events += 1
                     break
         except Exception as exc:
-            print(f"[SECURITY] Failed to load webhook queue: {exc}")
+            logger.warning(
+                "Failed to load webhook queue: %s",
+                type(exc).__name__,
+                extra={"event": "security.webhook_queue_load_failed"}
+            )
 
     @staticmethod
     def _build_fernet(raw_key: Optional[str]) -> Optional[Fernet]:
@@ -299,7 +318,10 @@ class _SecurityWebhookForwarder:
                 hex_bytes = bytes.fromhex(raw_key.strip())
                 return Fernet(base64.urlsafe_b64encode(hex_bytes))
             except Exception as exc:
-                print(f"[SECURITY] Invalid webhook queue key: {exc}")
+                logger.error(
+                    "Invalid webhook queue encryption key",
+                    extra={"event": "security.webhook_queue_key_invalid"}
+                )
                 return None
 
 
@@ -357,7 +379,11 @@ class BlockchainNode:
             data_dir = getattr(self.blockchain.storage, "data_dir", os.path.join(os.getcwd(), "data"))
             self.identity = load_or_create_identity(data_dir)
         except Exception as exc:
-            print(f"[WARN] Failed to initialize node identity: {exc}")
+            logger.warning(
+                "Failed to initialize node identity: %s",
+                type(exc).__name__,
+                extra={"event": "node.identity_init_failed"}
+            )
             self.identity = {"private_key": "", "public_key": ""}
 
         # Setup CORS with production-grade policy manager (Task 67)
@@ -410,7 +436,7 @@ class BlockchainNode:
             config=security_config,
             enable_cors=True
         )
-        print("[INIT] Security middleware initialized")
+        logger.info("Security middleware initialized", extra={"event": "node.security_middleware_init"})
 
         # Initialize optional features (these may not exist in all setups)
         self._initialize_optional_features()
@@ -432,7 +458,7 @@ class BlockchainNode:
             )
             return response
 
-        print("[INIT] Blockchain node initialized")
+        logger.info("Blockchain node initialized", extra={"event": "node.init_complete"})
 
     def _register_security_sinks(self) -> None:
         SecurityEventRouter.register_sink(self._create_security_event_sink())
@@ -531,9 +557,9 @@ class BlockchainNode:
 
                 self.fee_optimizer = FeeOptimizer()
                 self.fraud_detector = FraudDetector()
-                print("[INIT] Algorithmic features enabled")
+                logger.info("Algorithmic features enabled", extra={"event": "node.algo_features_enabled"})
             except ImportError as exc:
-                print(f"[WARN] Algorithmic features unavailable: {exc}")
+                logger.debug("Algorithmic features unavailable: %s", type(exc).__name__)
 
         # Social recovery
         try:
@@ -541,7 +567,7 @@ class BlockchainNode:
 
             self.recovery_manager = SocialRecoveryManager()
         except (ImportError, AttributeError) as exc:
-            print(f"[WARN] Social recovery disabled: {exc}")
+            logger.debug("Social recovery disabled: %s", type(exc).__name__)
 
         # Mining bonuses
         try:
@@ -561,7 +587,7 @@ class BlockchainNode:
             )
         except (ImportError, AttributeError) as exc:
             self.exchange_wallet_manager = None
-            print(f"[WARN] Exchange wallet manager disabled: {exc}")
+            logger.debug("Exchange wallet manager disabled: %s", type(exc).__name__)
 
         if self.exchange_wallet_manager:
             try:
@@ -598,11 +624,11 @@ class BlockchainNode:
                 wallet_manager=self.wallet_manager,
                 storage_path=storage_dir,
             )
-            print("[INIT] Embedded wallet manager initialized")
+            logger.info("Embedded wallet manager initialized", extra={"event": "node.wallet_manager_init"})
         except Exception as exc:
             self.wallet_manager = None
             self.account_abstraction = None
-            print(f"[WARN] Embedded wallets disabled: {exc}")
+            logger.debug("Embedded wallets disabled: %s", type(exc).__name__)
 
     # ==================== FAUCET OPERATIONS ====================
 
@@ -637,24 +663,24 @@ class BlockchainNode:
     def start_mining(self) -> None:
         """Start automatic mining in background thread."""
         if self.is_mining:
-            print("[WARN] Mining already active")
+            logger.warning("Mining already active", extra={"event": "mining.already_active"})
             return
 
         self.is_mining = True
         self.mining_thread = threading.Thread(target=self._mine_continuously, daemon=True)
         self.mining_thread.start()
-        print("[MINING] Auto-mining started")
+        logger.info("Auto-mining started", extra={"event": "mining.started"})
 
     def stop_mining(self) -> None:
         """Stop automatic mining."""
         if not self.is_mining:
-            print("[WARN] Mining not active")
+            logger.warning("Mining not active", extra={"event": "mining.not_active"})
             return
 
         self.is_mining = False
         if self.mining_thread:
             self.mining_thread.join(timeout=5)
-        print("[MINING] Auto-mining stopped")
+        logger.info("Auto-mining stopped", extra={"event": "mining.stopped"})
 
     def _mine_continuously(self) -> None:
         """
@@ -666,18 +692,25 @@ class BlockchainNode:
         while self.is_mining:
             if self.blockchain.pending_transactions:
                 try:
-                    print(
-                        f"Mining block with {len(self.blockchain.pending_transactions)} transactions..."
+                    logger.debug(
+                        "Mining block with %d transactions",
+                        len(self.blockchain.pending_transactions),
+                        extra={"event": "mining.block_start"}
                     )
                     block = self.blockchain.mine_pending_transactions(self.miner_address, self.identity)
-                    print(f"[OK] Block {block.index} mined! Hash: {block.hash}")
+                    logger.info(
+                        "Block %d mined, hash=%s",
+                        block.index,
+                        block.hash[:16] + "..." if block.hash else "<none>",
+                        extra={"event": "mining.block_mined", "block_index": block.index}
+                    )
 
                     self.mined_blocks_counter += 1
                     time_since_last_block = time.time() - self.last_mining_time
                     if time_since_last_block > 0:
                         mining_rate = self.mined_blocks_counter / time_since_last_block
                         self.metrics_collector.get_metric("xai_mining_rate_blocks_per_second").set(mining_rate)
-                    
+
                     if self.mined_blocks_counter > 100:
                         self.mined_blocks_counter = 0
                         self.last_mining_time = time.time()
@@ -685,7 +718,11 @@ class BlockchainNode:
                     # Broadcast to peers
                     self.broadcast_block(block)
                 except Exception as e:
-                    print(f"[ERROR] Mining error: {e}")
+                    logger.error(
+                        "Mining error: %s",
+                        type(e).__name__,
+                        extra={"event": "mining.error"}
+                    )
 
             time.sleep(1)  # Small delay between mining attempts
 
@@ -803,7 +840,11 @@ class BlockchainNode:
                     )
 
                     if not trade_result["success"]:
-                        print(f"[ERROR] Trade execution failed: {trade_result.get('error')}")
+                        logger.error(
+                            "Trade execution failed: %s",
+                            trade_result.get("error", "unknown"),
+                            extra={"event": "exchange.trade_failed"}
+                        )
                         continue
 
                     # Unlock balances
@@ -869,7 +910,11 @@ class BlockchainNode:
             return len(matched_trades) > 0
 
         except Exception as e:
-            print(f"[ERROR] Error matching orders: {e}")
+            logger.error(
+                "Error matching orders: %s",
+                type(e).__name__,
+                extra={"event": "exchange.order_match_error"}
+            )
             return False
 
     # ==================== NODE CONTROL ====================
@@ -890,15 +935,17 @@ class BlockchainNode:
         """
         self.start_time = time.time()
 
-        print("=" * 60)
-        print("XAI BLOCKCHAIN NODE")
-        print("=" * 60)
-        print(f"Miner Address: {self.miner_address}")
-        print(f"Listening on: http://{self.host}:{self.port}")
-        print(f"P2P Listening on: ws://{self.p2p_manager.host}:{self.p2p_manager.port}")
-        print(f"Blockchain height: {len(self.blockchain.chain)}")
-        print(f"Network difficulty: {self.blockchain.difficulty}")
-        print("=" * 60)
+        logger.info(
+            "XAI Blockchain Node starting: miner=%s, api=%s:%d, p2p=%s:%d, height=%d, difficulty=%d",
+            self.miner_address[:16] + "..." if self.miner_address else "<none>",
+            self.host,
+            self.port,
+            self.p2p_manager.host,
+            self.p2p_manager.port,
+            len(self.blockchain.chain),
+            self.blockchain.difficulty,
+            extra={"event": "node.start"}
+        )
 
         # Start P2P manager
         await self.p2p_manager.start()
@@ -968,7 +1015,7 @@ def main() -> None:
     try:
         asyncio.run(main_async())
     except KeyboardInterrupt:
-        print("Shutting down node...")
+        logger.info("Shutting down node...", extra={"event": "node.shutdown"})
 
 # Backwards compatibility alias
 Node = BlockchainNode

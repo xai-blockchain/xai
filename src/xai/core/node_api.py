@@ -21,10 +21,13 @@ from typing import TYPE_CHECKING, Dict, Any, Tuple, List, Optional
 from flask import jsonify, request
 import time
 import json
+import logging
 import os
 import uuid
 import re
 import html
+
+logger = logging.getLogger(__name__)
 
 from pydantic import ValidationError as PydanticValidationError
 from xai.core.config import Config, NetworkType
@@ -151,6 +154,11 @@ class InputSanitizer:
     def validate_address(address: str) -> str:
         """Validate blockchain address format.
 
+        XAI addresses follow the format:
+        - Mainnet: XAI + 40 hex characters (e.g., XAI1234567890abcdef...)
+        - Testnet: TXAI + 40 hex characters (e.g., TXAI1234567890abcdef...)
+        - Special: COINBASE (mining rewards), fee addresses
+
         Args:
             address: Blockchain address to validate
 
@@ -160,9 +168,27 @@ class InputSanitizer:
         Raises:
             ValueError: If address format is invalid
         """
-        if not re.fullmatch(r'[A-Za-z0-9]{26,64}', address):
-            raise ValueError("Invalid address format")
-        return address
+        if not isinstance(address, str):
+            raise ValueError("Address must be a string")
+
+        address = address.strip()
+
+        # Special addresses
+        if address in ("COINBASE", "XAITRADEFEE", "TXAITRADEFEE"):
+            return address
+
+        # Standard XAI/TXAI addresses: prefix + 40 hex chars
+        if re.fullmatch(r'(XAI|TXAI)[A-Fa-f0-9]{40}', address):
+            return address
+
+        # Legacy format: just XAI/TXAI prefix + variable hex (26-64 total)
+        # Kept for backward compatibility but logged
+        if re.fullmatch(r'(XAI|TXAI)[A-Fa-f0-9]{22,60}', address):
+            return address
+
+        raise ValueError(
+            "Invalid address format: must be XAI/TXAI prefix followed by hex characters"
+        )
 
     @staticmethod
     def validate_hash(hash_value: str, expected_length: int = 64) -> str:
@@ -630,7 +656,8 @@ class NodeAPIRoutes:
             fallback_block = None
             try:
                 fallback_block = chain[idx_int]
-            except Exception:
+            except Exception as e:
+                logger.debug("Block %d not in chain cache: %s", idx_int, type(e).__name__)
                 fallback_block = None
 
             block_obj = None
@@ -639,7 +666,8 @@ class NodeAPIRoutes:
             ):
                 try:
                     block_obj = self.blockchain.get_block(idx_int)
-                except Exception:
+                except Exception as e:
+                    logger.debug("get_block(%d) failed: %s", idx_int, type(e).__name__)
                     block_obj = None
 
             if block_obj is None or (
@@ -717,8 +745,8 @@ class NodeAPIRoutes:
                 try:
                     from xai.core.monitoring import MetricsCollector
                     MetricsCollector.instance().record_p2p_message("received")
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("P2P metrics record failed: %s", type(e).__name__)
                 added = self.blockchain.add_block(block)
             except Exception as exc:
                 return self._handle_exception(exc, "receive_block")
@@ -757,7 +785,8 @@ class NodeAPIRoutes:
                 fallback_block = None
                 try:
                     fallback_block = chain[i]
-                except Exception:
+                except Exception as e:
+                    logger.debug("Block %d not in chain cache: %s", i, type(e).__name__)
                     fallback_block = None
 
                 block = None
@@ -766,7 +795,8 @@ class NodeAPIRoutes:
                 ):
                     try:
                         block = self.blockchain.get_block(i)
-                    except Exception:
+                    except Exception as e:
+                        logger.debug("get_block(%d) failed: %s", i, type(e).__name__)
                         block = None
                 if block is None and fallback_block is not None:
                     block = fallback_block
@@ -838,8 +868,8 @@ class NodeAPIRoutes:
                         status=429,
                         code="rate_limited",
                     )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Rate limiter check failed (non-fatal): %s", type(e).__name__)
                 
             model: Optional[NodeTransactionInput] = getattr(request, "validated_model", None)
             if model is None:
@@ -955,8 +985,8 @@ class NodeAPIRoutes:
                 try:
                     from xai.core.monitoring import MetricsCollector
                     MetricsCollector.instance().record_p2p_message("received")
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("P2P metrics record failed: %s", type(e).__name__)
                 accepted = self.blockchain.add_transaction(tx)
             except Exception as exc:
                 return self._handle_exception(exc, "receive_transaction")
@@ -1380,8 +1410,8 @@ class NodeAPIRoutes:
                         status=429,
                         code="rate_limited",
                     )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Rate limiter check failed (non-fatal): %s", type(e).__name__)
 
             if not self.blockchain.pending_transactions:
                 return jsonify({"error": "No pending transactions to mine"}), 400

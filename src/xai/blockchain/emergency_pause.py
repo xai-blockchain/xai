@@ -26,15 +26,16 @@ class EmergencyPauseManager:
 
     def __init__(
         self,
-        db_path: Path,
         authorized_pauser_address: str,
+        db_path: Optional[Path] = None,
         circuit_breaker: Optional[CircuitBreaker] = None,
         time_provider: Optional[Callable[[], int]] = None,
     ):
         if not authorized_pauser_address:
             raise ValueError("Authorized pauser address cannot be empty.")
 
-        self.storage = StorageManager(db_path)
+        storage_path = db_path or Path.home() / ".xai" / "emergency_pause.db"
+        self.storage = StorageManager(storage_path)
         self.authorized_pauser_address = authorized_pauser_address
         self.circuit_breaker = circuit_breaker  # Optional: for automatic pausing
         self._time_provider = time_provider or (lambda: int(datetime.now(timezone.utc).timestamp()))

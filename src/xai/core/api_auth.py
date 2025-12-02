@@ -8,8 +8,10 @@ import os
 import secrets
 import time
 from typing import Dict, Optional, Tuple, Any, List, Set
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import deque
+
+import logging
 
 from flask import Request
 
@@ -20,6 +22,8 @@ except ImportError:
 
 from xai.core.config import Config
 from xai.core.security_validation import log_security_event
+
+logger = logging.getLogger(__name__)
 
 
 class APIKeyStore:
@@ -79,6 +83,17 @@ class APIKeyStore:
             return True
         return False
 
+    def rotate_key(self, key_id: str, label: str = "", scope: str = "user") -> Tuple[str, str]:
+        """
+        Rotate a key by revoking the old key and issuing a new one with the same label/scope.
+        Returns plaintext and new key_id.
+        """
+        if key_id in self._keys:
+            self.revoke_key(key_id)
+        plaintext, new_id = self.issue_key(label=label, scope=scope)
+        self._log_event("rotate", new_id, {"replaced": key_id})
+        return plaintext, new_id
+
     def _log_event(self, action: str, key_id: str, extra: Optional[Dict[str, Any]] = None) -> None:
         event = {
             "timestamp": time.time(),
@@ -120,8 +135,13 @@ class APIKeyStore:
             }
             severity = "WARNING" if event.get("action") == "revoke" else "INFO"
             log_security_event("api_key_audit", payload, severity=severity)
-        except Exception:
-            # Never let logging issues break key management
+        except Exception as e:
+            # Never let logging issues break key management, but log for debugging
+            logger.debug(
+                "Security log emission failed: %s",
+                type(e).__name__,
+                extra={"event": "api_auth.emit_log_failed", "error": str(e)}
+            )
             return
 
 
@@ -229,6 +249,26 @@ class APIAuthManager:
         self.refresh_from_store()
         return removed
 
+    def rotate_key(self, key_id: str, label: str = "", scope: str = "user") -> Tuple[str, str]:
+        if not self._store:
+            raise ValueError("API key store not configured")
+        new_plain, new_id = self._store.rotate_key(key_id, label=label, scope=scope)
+        self.refresh_from_store()
+        try:
+            severity = "WARNING" if scope == "admin" else "INFO"
+            log_security_event(
+                "api_key_rotated",
+                {"old_key_id": key_id, "new_key_id": new_id, "scope": scope, "label": label},
+                severity=severity,
+            )
+        except Exception as e:
+            logger.debug(
+                "Failed to log key rotation event: %s",
+                type(e).__name__,
+                extra={"event": "api_auth.rotation_log_failed", "error": str(e)}
+            )
+        return new_plain, new_id
+
     def _extract_admin_token(self, request: Request) -> Optional[str]:
         token = request.headers.get("X-Admin-Token")
         if token:
@@ -279,7 +319,7 @@ class JWTAuthManager:
         Returns:
             Tuple of (access_token, refresh_token)
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # Access token (short-lived)
         access_payload = {
@@ -329,8 +369,8 @@ class JWTAuthManager:
             # Verify expiration (jwt.decode already checks this, but be explicit)
             exp = payload.get("exp")
             if exp:
-                exp_dt = datetime.fromtimestamp(exp)
-                if exp_dt < datetime.utcnow():
+                exp_dt = datetime.fromtimestamp(exp, tz=timezone.utc)
+                if exp_dt < datetime.now(timezone.utc):
                     return False, None, "Token expired"
 
             return True, payload, None
@@ -366,11 +406,15 @@ class JWTAuthManager:
             scope = payload.get("scope", "user")
             access_token, _ = self.generate_token(user_id, scope)
 
-            log_security_event("jwt_token_refreshed", {
-                "user_id": user_id,
-                "scope": scope,
-                "timestamp": datetime.utcnow().isoformat()
-            }, severity="INFO")
+            log_security_event(
+                "jwt_token_refreshed",
+                {
+                    "user_id": user_id,
+                    "scope": scope,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+                severity="INFO",
+            )
 
             return True, access_token, None
 
@@ -388,12 +432,21 @@ class JWTAuthManager:
         try:
             payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm], options={"verify_exp": False})
             user_id = payload.get("user_id", "unknown")
-            log_security_event("jwt_token_revoked", {
-                "user_id": user_id,
-                "timestamp": datetime.utcnow().isoformat()
-            }, severity="WARNING")
-        except Exception:
-            pass
+            log_security_event(
+                "jwt_token_revoked",
+                {
+                    "user_id": user_id,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+                severity="WARNING",
+            )
+        except Exception as e:
+            # Log decode failure but still proceed with revocation
+            logger.debug(
+                "Could not decode token for revocation logging: %s",
+                type(e).__name__,
+                extra={"event": "api_auth.jwt_revoke_decode_failed"}
+            )
 
     def cleanup_expired_tokens(self) -> int:
         """Remove expired tokens from blacklist.
@@ -414,17 +467,25 @@ class JWTAuthManager:
                 # Token is expired, can be removed
                 expired_tokens.add(token)
                 removed += 1
-            except Exception:
-                # Any other error, keep in blacklist to be safe
-                pass
+            except Exception as e:
+                # Any other error (invalid token, decode error), keep in blacklist to be safe
+                logger.debug(
+                    "Token cleanup check failed: %s - keeping in blacklist",
+                    type(e).__name__,
+                    extra={"event": "api_auth.jwt_cleanup_check_failed"}
+                )
 
         self.blacklist -= expired_tokens
 
         if removed > 0:
-            log_security_event("jwt_blacklist_cleanup", {
-                "removed_count": removed,
-                "timestamp": datetime.utcnow().isoformat()
-            }, severity="INFO")
+            log_security_event(
+                "jwt_blacklist_cleanup",
+                {
+                    "removed_count": removed,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                },
+                severity="INFO",
+            )
 
         return removed
 

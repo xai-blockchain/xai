@@ -348,7 +348,7 @@ class TestTransactionOrderingComprehensive:
         coinbase = Transaction("COINBASE", wallet.address, 12.0)
         coinbase.txid = coinbase.calculate_hash()
 
-        regular = Transaction(wallet.address, "other", 10.0, 0.5, public_key=wallet.public_key)
+        regular = Transaction(wallet.address, "XAI" + "a" * 40, 10.0, 0.5, public_key=wallet.public_key)
         regular.txid = regular.calculate_hash()
 
         # Add in reverse order
@@ -361,13 +361,13 @@ class TestTransactionOrderingComprehensive:
         """Test transactions ordered by fee (highest first)"""
         wallet = Wallet()
 
-        tx1 = Transaction(wallet.address, "addr1", 10.0, 0.1, public_key=wallet.public_key)
+        tx1 = Transaction(wallet.address, "XAI" + "1" * 40, 10.0, 0.1, public_key=wallet.public_key)
         tx1.txid = tx1.calculate_hash()
 
-        tx2 = Transaction(wallet.address, "addr2", 10.0, 0.5, public_key=wallet.public_key)
+        tx2 = Transaction(wallet.address, "XAI" + "2" * 40, 10.0, 0.5, public_key=wallet.public_key)
         tx2.txid = tx2.calculate_hash()
 
-        tx3 = Transaction(wallet.address, "addr3", 10.0, 0.3, public_key=wallet.public_key)
+        tx3 = Transaction(wallet.address, "XAI" + "3" * 40, 10.0, 0.3, public_key=wallet.public_key)
         tx3.txid = tx3.calculate_hash()
 
         ordered = TransactionOrdering.order_transactions([tx1, tx2, tx3])
@@ -381,13 +381,13 @@ class TestTransactionOrderingComprehensive:
         """Test transactions with same fee ordered by timestamp"""
         wallet = Wallet()
 
-        tx1 = Transaction(wallet.address, "addr1", 10.0, 0.1, public_key=wallet.public_key)
+        tx1 = Transaction(wallet.address, "XAI" + "1" * 40, 10.0, 0.1, public_key=wallet.public_key)
         tx1.timestamp = time.time()
         tx1.txid = tx1.calculate_hash()
 
         time.sleep(0.01)
 
-        tx2 = Transaction(wallet.address, "addr2", 10.0, 0.1, public_key=wallet.public_key)
+        tx2 = Transaction(wallet.address, "XAI" + "2" * 40, 10.0, 0.1, public_key=wallet.public_key)
         tx2.timestamp = time.time()
         tx2.txid = tx2.calculate_hash()
 
@@ -400,11 +400,11 @@ class TestTransactionOrderingComprehensive:
         """Test transactions with same fee and timestamp ordered by hash"""
         wallet = Wallet()
 
-        tx1 = Transaction(wallet.address, "addr1", 10.0, 0.1, public_key=wallet.public_key)
+        tx1 = Transaction(wallet.address, "XAI" + "1" * 40, 10.0, 0.1, public_key=wallet.public_key)
         tx1.timestamp = 1000.0
         tx1.txid = "aaa"
 
-        tx2 = Transaction(wallet.address, "addr2", 10.0, 0.1, public_key=wallet.public_key)
+        tx2 = Transaction(wallet.address, "XAI" + "2" * 40, 10.0, 0.1, public_key=wallet.public_key)
         tx2.timestamp = 1000.0
         tx2.txid = "zzz"
 
@@ -421,10 +421,10 @@ class TestTransactionOrderingComprehensive:
         coinbase = Transaction("COINBASE", wallet.address, 12.0)
         coinbase.txid = coinbase.calculate_hash()
 
-        tx1 = Transaction(wallet.address, "addr1", 10.0, 0.5, public_key=wallet.public_key)
+        tx1 = Transaction(wallet.address, "XAI" + "1" * 40, 10.0, 0.5, public_key=wallet.public_key)
         tx1.txid = tx1.calculate_hash()
 
-        tx2 = Transaction(wallet.address, "addr2", 10.0, 0.3, public_key=wallet.public_key)
+        tx2 = Transaction(wallet.address, "XAI" + "2" * 40, 10.0, 0.3, public_key=wallet.public_key)
         tx2.txid = tx2.calculate_hash()
 
         ordered = [coinbase, tx1, tx2]
@@ -439,7 +439,7 @@ class TestTransactionOrderingComprehensive:
         """Test validation fails if coinbase not first"""
         wallet = Wallet()
 
-        tx1 = Transaction(wallet.address, "addr1", 10.0, 0.5, public_key=wallet.public_key)
+        tx1 = Transaction(wallet.address, "XAI" + "1" * 40, 10.0, 0.5, public_key=wallet.public_key)
         tx1.txid = tx1.calculate_hash()
 
         coinbase = Transaction("COINBASE", wallet.address, 12.0)
@@ -457,10 +457,10 @@ class TestTransactionOrderingComprehensive:
         coinbase = Transaction("COINBASE", wallet.address, 12.0)
         coinbase.txid = coinbase.calculate_hash()
 
-        tx1 = Transaction(wallet.address, "addr1", 10.0, 0.1, public_key=wallet.public_key)
+        tx1 = Transaction(wallet.address, "XAI" + "1" * 40, 10.0, 0.1, public_key=wallet.public_key)
         tx1.txid = tx1.calculate_hash()
 
-        tx2 = Transaction(wallet.address, "addr2", 10.0, 0.5, public_key=wallet.public_key)
+        tx2 = Transaction(wallet.address, "XAI" + "2" * 40, 10.0, 0.5, public_key=wallet.public_key)
         tx2.txid = tx2.calculate_hash()
 
         # Wrong order (low fee before high fee)
@@ -475,11 +475,11 @@ class TestTransactionOrderingComprehensive:
         coinbase = Transaction("COINBASE", wallet.address, 12.0)
         coinbase.txid = coinbase.calculate_hash()
 
-        tx1 = Transaction(wallet.address, "addr1", 10.0, 0.1, public_key=wallet.public_key)
+        tx1 = Transaction(wallet.address, "XAI" + "1" * 40, 10.0, 0.1, public_key=wallet.public_key)
         tx1.timestamp = 2000.0
         tx1.txid = tx1.calculate_hash()
 
-        tx2 = Transaction(wallet.address, "addr2", 10.0, 0.1, public_key=wallet.public_key)
+        tx2 = Transaction(wallet.address, "XAI" + "2" * 40, 10.0, 0.1, public_key=wallet.public_key)
         tx2.timestamp = 1000.0
         tx2.txid = tx2.calculate_hash()
 
@@ -497,9 +497,9 @@ class TestTransactionOrderingRulesComprehensive:
         rules = TransactionOrderingRules()
         wallet = Wallet()
 
-        tx1 = Transaction(wallet.address, "addr1", 10.0, 0.1)
-        tx2 = Transaction(wallet.address, "addr2", 10.0, 0.5)
-        tx3 = Transaction(wallet.address, "addr3", 10.0, 0.3)
+        tx1 = Transaction(wallet.address, "XAI" + "1" * 40, 10.0, 0.1)
+        tx2 = Transaction(wallet.address, "XAI" + "2" * 40, 10.0, 0.5)
+        tx3 = Transaction(wallet.address, "XAI" + "3" * 40, 10.0, 0.3)
 
         ordered = rules.order_by_fee([tx1, tx2, tx3])
 
@@ -512,13 +512,13 @@ class TestTransactionOrderingRulesComprehensive:
         rules = TransactionOrderingRules()
         wallet = Wallet()
 
-        tx1 = Transaction(wallet.address, "addr1", 10.0, 0.1)
+        tx1 = Transaction(wallet.address, "XAI" + "1" * 40, 10.0, 0.1)
         tx1.timestamp = 3000.0
 
-        tx2 = Transaction(wallet.address, "addr2", 10.0, 0.1)
+        tx2 = Transaction(wallet.address, "XAI" + "2" * 40, 10.0, 0.1)
         tx2.timestamp = 1000.0
 
-        tx3 = Transaction(wallet.address, "addr3", 10.0, 0.1)
+        tx3 = Transaction(wallet.address, "XAI" + "3" * 40, 10.0, 0.1)
         tx3.timestamp = 2000.0
 
         ordered = rules.order_by_timestamp([tx1, tx2, tx3])
@@ -532,13 +532,13 @@ class TestTransactionOrderingRulesComprehensive:
         rules = TransactionOrderingRules()
         wallet = Wallet()
 
-        tx1 = Transaction(wallet.address, "addr1", 10.0, 0.1)
+        tx1 = Transaction(wallet.address, "XAI" + "1" * 40, 10.0, 0.1)
         tx1.timestamp = 1000.0
 
-        tx2 = Transaction(wallet.address, "addr2", 10.0, 0.5)
+        tx2 = Transaction(wallet.address, "XAI" + "2" * 40, 10.0, 0.5)
         tx2.timestamp = 3000.0
 
-        tx3 = Transaction(wallet.address, "addr3", 10.0, 0.1)
+        tx3 = Transaction(wallet.address, "XAI" + "3" * 40, 10.0, 0.1)
         tx3.timestamp = 2000.0
 
         ordered = rules.prioritize([tx1, tx2, tx3])
@@ -834,7 +834,7 @@ class TestAdvancedConsensusManagerComprehensive:
         wallet = Wallet()
 
         # Create block with wrong transaction order
-        tx1 = Transaction(wallet.address, "addr1", 10.0, 0.1, public_key=wallet.public_key)
+        tx1 = Transaction(wallet.address, "XAI" + "1" * 40, 10.0, 0.1, public_key=wallet.public_key)
         tx1.txid = tx1.calculate_hash()
 
         coinbase = Transaction("COINBASE", wallet.address, 12.0)
@@ -893,8 +893,8 @@ class TestAdvancedConsensusManagerComprehensive:
         # Add some pending transactions
         bc.mine_pending_transactions(wallet.address)
 
-        tx1 = bc.create_transaction(wallet.address, "addr1", 1.0, 0.1, wallet.private_key, wallet.public_key)
-        tx2 = bc.create_transaction(wallet.address, "addr2", 1.0, 0.5, wallet.private_key, wallet.public_key)
+        tx1 = bc.create_transaction(wallet.address, "XAI" + "1" * 40, 1.0, 0.1, wallet.private_key, wallet.public_key)
+        tx2 = bc.create_transaction(wallet.address, "XAI" + "2" * 40, 1.0, 0.5, wallet.private_key, wallet.public_key)
 
         if tx1:
             bc.add_transaction(tx1)

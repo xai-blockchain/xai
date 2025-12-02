@@ -23,12 +23,22 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           scripts/ci/install_with_constraints.sh
+          python -m pip install -e ".[network]"
 
       - name: Run P2P hardening + security subset
         run: scripts/ci/run_p2p_checks.sh
 
+      - name: Run QUIC optional tests
+        run: pytest tests/xai_tests/integration/test_p2p_quic_optional.py -q
+
+      - name: Run QUIC latency soak check
+        run: scripts/ci/quic_soak_check.sh
+
       - name: Run perf guardrails
         run: python scripts/ci/perf_check.py
+
+      - name: UTXO audit smoke test
+        run: scripts/ci/utxo_audit_smoke.sh
 
       - name: Upload benchmark report
         uses: actions/upload-artifact@v4
@@ -36,6 +46,11 @@ jobs:
           name: crypto-benchmarks
           path: benchmarks/crypto_report.json
           if-no-files-found: ignore
+
+      - name: Perf regression check (if baseline provided)
+        if: env.PERF_BASELINE_PATH != ''
+        run: |
+          python scripts/ci/perf_compare.py --baseline "$PERF_BASELINE_PATH" --current benchmarks/crypto_report.json --threshold ${PERF_REGRESSION_THRESHOLD:-0.5}
 
       - name: Dependency audit (pip-audit)
         run: pip-audit -r requirements.txt -f json -o pip-audit.json
@@ -45,6 +60,27 @@ jobs:
         with:
           name: pip-audit
           path: pip-audit.json
+          if-no-files-found: ignore
+
+      - name: (Optional) DAST stub (non-prod only)
+        if: env.DAST_TARGET_URL != ''
+        run: |
+          echo "[INFO] Running ZAP baseline against $DAST_TARGET_URL"
+          docker run --rm -t owasp/zap2docker-stable zap-baseline.py \
+            -t "$DAST_TARGET_URL" \
+            -m 5 -I \
+            -r zap-report.html -J zap-report.json || true
+          ls -l zap-report.*
+        continue-on-error: true
+
+      - name: Upload DAST report
+        if: env.DAST_TARGET_URL != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: dast-zap
+          path: |
+            zap-report.html
+            zap-report.json
           if-no-files-found: ignore
 
       - name: (Optional) SIEM webhook smoke-test

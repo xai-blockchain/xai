@@ -430,6 +430,8 @@ class MetricsCollector:
         self.register_counter("xai_p2p_nonce_replay_total", "Total P2P messages rejected due to nonce replay")
         self.register_counter("xai_p2p_rate_limited_total", "Total P2P messages dropped due to rate limits")
         self.register_counter("xai_p2p_invalid_signature_total", "Total P2P messages rejected for invalid or stale signatures")
+        self.register_counter("xai_p2p_quic_errors_total", "Total QUIC transport errors detected")
+        self.register_counter("xai_p2p_quic_timeouts_total", "Total QUIC dial/send timeouts detected")
 
         # Start time for uptime calculation
         self.start_time = time.time()

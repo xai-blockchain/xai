@@ -99,13 +99,17 @@ class HardwareSecurityModule:
         self.keys_file = self.storage_path / "encrypted_keys.dat"
         self.metadata_file = self.storage_path / "key_metadata.json"
         self.audit_log_file = self.storage_path / "audit_log.jsonl"
+        self.salt_file = self.storage_path / "hsm_salt.bin"
 
         self.auto_rotate_days = auto_rotate_days
         self.logger = logging.getLogger(__name__)
 
+        # Load or generate unique salt for this HSM instance
+        self._hsm_salt = self._load_or_generate_salt()
+
         # Derive encryption key from master password
         if master_password:
-            self.encryption_key = self._derive_encryption_key(master_password)
+            self.encryption_key = self._derive_encryption_key(master_password, self._hsm_salt)
         else:
             # For testing only - generate random key
             self.logger.warning("No master password provided - using random encryption key")
@@ -117,10 +121,59 @@ class HardwareSecurityModule:
         self.key_metadata: Dict[str, KeyMetadata] = self._load_metadata()
         self.encrypted_keys: Dict[str, bytes] = self._load_encrypted_keys()
 
+    def _load_or_generate_salt(self) -> bytes:
+        """
+        Load existing HSM salt or generate a new random one.
+
+        Each HSM instance has a unique 32-byte salt stored persistently.
+        This prevents rainbow table attacks and ensures different HSM
+        instances with the same password derive different encryption keys.
+
+        Returns:
+            32-byte salt unique to this HSM instance
+        """
+        if self.salt_file.exists():
+            salt = self.salt_file.read_bytes()
+            if len(salt) == 32:
+                self.logger.info("Loaded existing HSM salt")
+                return salt
+            else:
+                self.logger.warning(
+                    "Invalid salt file size, regenerating",
+                    extra={"event": "hsm.salt_regenerated", "old_size": len(salt)}
+                )
+
+        # Generate new cryptographically secure random salt
+        salt = secrets.token_bytes(32)
+
+        # Persist salt with restrictive permissions
+        self.salt_file.write_bytes(salt)
+        try:
+            self.salt_file.chmod(0o600)  # Owner read/write only
+        except (OSError, PermissionError):
+            self.logger.warning("Could not set restrictive permissions on salt file")
+
+        self.logger.info(
+            "Generated new HSM salt",
+            extra={"event": "hsm.salt_generated"}
+        )
+        return salt
+
     def _derive_encryption_key(self, password: str, salt: Optional[bytes] = None) -> bytes:
-        """Derive encryption key from master password using PBKDF2"""
+        """
+        Derive encryption key from master password using PBKDF2.
+
+        Uses the HSM instance's unique salt to prevent rainbow table attacks.
+
+        Args:
+            password: Master password for key derivation
+            salt: Optional salt override (uses instance salt if not provided)
+
+        Returns:
+            32-byte derived encryption key
+        """
         if salt is None:
-            salt = b"hsm_salt_v1_production"  # In production, store salt securely
+            salt = self._hsm_salt
 
         kdf = PBKDF2(
             algorithm=hashes.SHA256(),

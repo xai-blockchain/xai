@@ -4,6 +4,11 @@ XAI Blockchain - UTXO Manager
 Manages the Unspent Transaction Output (UTXO) set for the blockchain.
 Ensures that transactions spend only available UTXOs and prevents double-spending.
 Thread-safe implementation with RLock to prevent race conditions and double-spend attacks.
+
+Security Notes:
+- All UTXO amounts are validated before adding to the set
+- Negative, NaN, and Infinity amounts are rejected
+- Maximum amount is bounded by total supply cap
 """
 
 from typing import Dict, List, Any, Optional, TYPE_CHECKING
@@ -12,9 +17,19 @@ from threading import RLock
 from xai.core.structured_logger import StructuredLogger, get_structured_logger
 import hashlib
 import json
+import math
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Transaction
+
+# Validation constants
+MAX_UTXO_AMOUNT = 121_000_000.0  # Total supply cap
+MIN_UTXO_AMOUNT = 0.0
+
+
+class UTXOValidationError(ValueError):
+    """Raised when UTXO validation fails."""
+    pass
 
 
 class UTXOManager:
@@ -47,6 +62,47 @@ class UTXOManager:
             payload = "|".join(entries)
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
+    @staticmethod
+    def _validate_amount(amount: Any, context: str = "amount") -> float:
+        """Validate a UTXO amount.
+
+        Args:
+            amount: Value to validate
+            context: Context for error messages
+
+        Returns:
+            Validated float amount
+
+        Raises:
+            UTXOValidationError: If validation fails
+        """
+        if amount is None:
+            raise UTXOValidationError(f"UTXO {context} cannot be None")
+
+        try:
+            value = float(amount)
+        except (TypeError, ValueError) as e:
+            raise UTXOValidationError(
+                f"UTXO {context} must be a number, got {type(amount).__name__}: {e}"
+            )
+
+        if math.isnan(value) or math.isinf(value):
+            raise UTXOValidationError(
+                f"UTXO {context} must be finite, got {value}"
+            )
+
+        if value < MIN_UTXO_AMOUNT:
+            raise UTXOValidationError(
+                f"UTXO {context} cannot be negative: {value}"
+            )
+
+        if value > MAX_UTXO_AMOUNT:
+            raise UTXOValidationError(
+                f"UTXO {context} exceeds maximum ({MAX_UTXO_AMOUNT}): {value}"
+            )
+
+        return value
+
     def add_utxo(self, address: str, txid: str, vout: int, amount: float, script_pubkey: str):
         """
         Adds a new UTXO to the set.
@@ -55,26 +111,32 @@ class UTXOManager:
             address: The address to which the UTXO belongs.
             txid: The transaction ID that created this UTXO.
             vout: The output index within the transaction.
-            amount: The amount of the UTXO.
+            amount: The amount of the UTXO (must be >= 0 and <= MAX_UTXO_AMOUNT).
             script_pubkey: The script public key (or similar locking script).
+
+        Raises:
+            UTXOValidationError: If amount validation fails
         """
+        # Validate amount before adding
+        validated_amount = self._validate_amount(amount)
+
         with self._lock:
             utxo = {
                 "txid": txid,
                 "vout": vout,
-                "amount": amount,
+                "amount": validated_amount,
                 "script_pubkey": script_pubkey,
                 "spent": False,  # Track if this UTXO has been spent
             }
             self.utxo_set[address].append(utxo)
             self.total_utxos += 1
-            self.total_value += amount
+            self.total_value += validated_amount
             self.logger.debug(
-                f"Added UTXO: {txid}:{vout} for {address} with {amount} XAI",
+                f"Added UTXO: {txid}:{vout} for {address} with {validated_amount} XAI",
                 address=address,
                 txid=txid,
                 vout=vout,
-                amount=amount,
+                amount=validated_amount,
             )
 
     def mark_utxo_spent(self, address: str, txid: str, vout: int) -> bool:
@@ -95,6 +157,8 @@ class UTXOManager:
                     if utxo["txid"] == txid and utxo["vout"] == vout and not utxo["spent"]:
                         utxo["spent"] = True
                         self.total_value -= utxo["amount"]
+                        if self.total_utxos > 0:
+                            self.total_utxos -= 1
                         self.logger.debug(
                             f"Marked UTXO: {txid}:{vout} for {address} as spent",
                             address=address,
@@ -153,8 +217,9 @@ class UTXOManager:
                 output["amount"],
                 f"P2PKH {output['address']}",
             )
+        txid_display = transaction.txid[:10] if transaction.txid else "<unsigned>"
         self.logger.info(
-            f"Processed outputs for transaction {transaction.txid[:10]}...", txid=transaction.txid
+            f"Processed outputs for transaction {txid_display}...", txid=transaction.txid
         )
 
     def process_transaction_inputs(self, transaction: "Transaction") -> bool:
@@ -182,8 +247,9 @@ class UTXOManager:
                     sender=transaction.sender,
                 )
                 return False
+        txid_display = transaction.txid[:10] if transaction.txid else "<unsigned>"
         self.logger.info(
-            f"Processed inputs for transaction {transaction.txid[:10]}...", txid=transaction.txid
+            f"Processed inputs for transaction {txid_display}...", txid=transaction.txid
         )
         return True
 

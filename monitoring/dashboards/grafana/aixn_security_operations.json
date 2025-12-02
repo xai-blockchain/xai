@@ -14,11 +14,15 @@
       "from": "now-6h",
       "to": "now"
     },
-    "panels": [
-      {
-        "id": 1,
-        "title": "Security Events (5m rate)",
-        "type": "graph",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Security Events (5m rate)",
+      "type": "graph",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
         "gridPos": {
           "h": 8,
           "w": 12,
@@ -31,19 +35,53 @@
             "legendFormat": "all events"
           }
         ],
-        "yaxes": [
-          {
-            "format": "short",
-            "label": "events",
-            "logBase": 1
-          },
-          {
-            "format": "short"
-          }
-        ],
-        "lines": true,
-        "linewidth": 2
+      "yaxes": [
+        {
+          "format": "short",
+          "label": "events",
+          "logBase": 1
+        },
+        {
+          "format": "short"
+        }
+      ],
+      "lines": true,
+      "linewidth": 2
+    },
+    {
+      "id": 101,
+      "title": "Fast Mining Config Events (5m rate)",
+      "type": "graph",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
       },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "increase(xai_security_events_total{event=~\"config.fast_mining_.*\"}[5m])",
+          "legendFormat": "{{event}}"
+        }
+      ],
+      "yaxes": [
+        {
+          "format": "short",
+          "label": "events",
+          "logBase": 1
+        },
+        {
+          "format": "short"
+        }
+      ],
+      "lines": true,
+      "linewidth": 2,
+      "description": "Critical guardrail visibility: fast-mining enablement or mainnet rejection should never appear on staging/prod. Investigate any non-zero signal."
+    },
       {
         "id": 2,
         "title": "Warnings vs Critical",
@@ -337,6 +375,43 @@
           "orientation": "horizontal",
           "colorMode": "value"
         }
+      },
+      {
+        "id": 120,
+        "title": "QUIC Errors/Timeouts (5m rate)",
+        "type": "graph",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "gridPos": {
+          "h": 6,
+          "w": 24,
+          "x": 0,
+          "y": 42
+        },
+        "targets": [
+          {
+            "expr": "increase(xai_p2p_quic_errors_total[5m])",
+            "legendFormat": "errors"
+          },
+          {
+            "expr": "increase(xai_p2p_quic_timeouts_total[5m])",
+            "legendFormat": "timeouts"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "events / 5m",
+            "logBase": 1
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "lines": true,
+        "linewidth": 2
       }
     ]
   }

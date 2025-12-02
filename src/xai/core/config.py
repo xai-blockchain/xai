@@ -2,18 +2,71 @@
 XAI Blockchain Configuration
 
 Supports testnet and mainnet with separate configurations.
+
+SECURITY NOTICE:
+- All secrets MUST be provided via environment variables
+- Never commit secrets to version control
+- Use different secrets for testnet vs mainnet
+- Rotate secrets periodically
 """
 
 from __future__ import annotations
 
+import hashlib
+import logging
 import os
+import secrets as secrets_module
 from datetime import datetime, timezone
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 
 class NetworkType(Enum):
     TESTNET = "testnet"
     MAINNET = "mainnet"
+
+
+class ConfigurationError(Exception):
+    """Raised when required configuration is missing or invalid."""
+    pass
+
+
+def _get_required_secret(env_var: str, network: str) -> str:
+    """Get a required secret from environment, with mainnet enforcement.
+
+    On mainnet, missing secrets raise ConfigurationError.
+    On testnet, missing secrets generate a random value with a warning.
+    """
+    value = os.getenv(env_var, "").strip()
+    if value:
+        return value
+
+    if network.lower() == "mainnet":
+        raise ConfigurationError(
+            f"CRITICAL: {env_var} environment variable required for mainnet. "
+            f"Generate a secure secret: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
+
+    # Testnet: generate random secret and warn
+    generated = secrets_module.token_hex(32)
+    logger.warning(
+        "Security: %s not set, using generated value for testnet. "
+        "Set this environment variable for production.",
+        env_var,
+        extra={"event": "config.secret_generated", "env_var": env_var}
+    )
+    return generated
+
+
+def _get_secret_with_default(env_var: str, default_generator=None) -> str:
+    """Get a secret from environment, or generate one if not provided."""
+    value = os.getenv(env_var, "").strip()
+    if value:
+        return value
+    if default_generator:
+        return default_generator()
+    return secrets_module.token_hex(32)
 
 
 # Get network type from environment variable
@@ -25,8 +78,11 @@ FEATURE_FLAGS = {
 
 MAX_CONTRACT_GAS = int(os.getenv("XAI_MAX_CONTRACT_GAS", "20000000"))
 
-WALLET_TRADE_PEER_SECRET = os.getenv("XAI_WALLET_TRADE_PEER_SECRET", "xai-peer-secret")
-TIME_CAPSULE_MASTER_KEY = os.getenv("XAI_TIME_CAPSULE_MASTER_KEY", "xai-timecapsule-secret")
+# SECURITY: These secrets are required for production
+# On mainnet, missing values will raise ConfigurationError
+# On testnet, missing values will generate random secrets with warnings
+WALLET_TRADE_PEER_SECRET = _get_required_secret("XAI_WALLET_TRADE_PEER_SECRET", NETWORK)
+TIME_CAPSULE_MASTER_KEY = _get_required_secret("XAI_TIME_CAPSULE_MASTER_KEY", NETWORK)
 PERSONAL_AI_WEBHOOK_URL = os.getenv("XAI_PERSONAL_AI_WEBHOOK_URL", "")
 PERSONAL_AI_WEBHOOK_TIMEOUT = int(os.getenv("XAI_PERSONAL_AI_WEBHOOK_TIMEOUT", "5"))
 WALLET_PASSWORD = os.getenv("XAI_WALLET_PASSWORD", "")
@@ -52,7 +108,8 @@ if API_ADMIN_TOKEN:
 API_AUTH_REQUIRED = bool(int(os.getenv("XAI_API_AUTH_REQUIRED", "0")))
 API_AUTH_KEYS = [key.strip() for key in os.getenv("XAI_API_KEYS", "").split(",") if key.strip()]
 LEDGER_DERIVATION_PATH = os.getenv("XAI_LEDGER_PATH", "44'/0'/0'/0/0")
-EMBEDDED_WALLET_SALT = os.getenv("XAI_EMBEDDED_SALT", "embedded-salt")
+# SECURITY: Embedded wallet salt must be unique per deployment
+EMBEDDED_WALLET_SALT = _get_required_secret("XAI_EMBEDDED_SALT", NETWORK)
 EMBEDDED_WALLET_DIR = os.getenv("XAI_EMBEDDED_DIR", os.path.join(os.getcwd(), "embedded_wallets"))
 TRUSTED_PEER_PUBKEYS = [key.strip().lower() for key in os.getenv("XAI_TRUSTED_PEER_PUBKEYS", "").split(",") if key.strip()]
 TRUSTED_PEER_CERT_FINGERPRINTS = [
@@ -69,6 +126,8 @@ P2P_SECURITY_LOG_RATE = int(os.getenv("XAI_P2P_SECURITY_LOG_RATE", "20"))
 P2P_MAX_BANDWIDTH_IN = int(os.getenv("XAI_P2P_MAX_BANDWIDTH_IN", str(1024 * 1024)))
 P2P_MAX_BANDWIDTH_OUT = int(os.getenv("XAI_P2P_MAX_BANDWIDTH_OUT", str(1024 * 1024)))
 P2P_CA_BUNDLE = os.getenv("XAI_P2P_CA_BUNDLE", os.getenv("XAI_PEER_CA_BUNDLE", "")).strip()
+P2P_ENABLE_QUIC = bool(int(os.getenv("XAI_P2P_ENABLE_QUIC", "0")))
+P2P_QUIC_DIAL_TIMEOUT = float(os.getenv("XAI_P2P_QUIC_DIAL_TIMEOUT", "1.0"))
 
 SAFE_GENESIS_HASHES = {
     NetworkType.TESTNET: os.getenv(
@@ -127,7 +186,8 @@ class TestnetConfig:
     FIAT_UNLOCK_SUPPORT_PERCENT = FIAT_UNLOCK_SUPPORT_PERCENT
     TRADE_FEE_PERCENT = 0.002
     TRADE_ORDER_EXPIRY = 3600
-    LUCKY_BLOCK_SEED = os.getenv("XAI_LUCKY_BLOCK_SEED", "testnet-default-seed")
+    # SECURITY: Lucky block seed should be unpredictable
+    LUCKY_BLOCK_SEED = _get_required_secret("XAI_LUCKY_BLOCK_SEED", NETWORK)
     API_RATE_LIMIT = API_RATE_LIMIT
     API_RATE_WINDOW_SECONDS = API_RATE_WINDOW_SECONDS
     API_MAX_JSON_BYTES = API_MAX_JSON_BYTES
@@ -222,7 +282,9 @@ class MainnetConfig:
     FIAT_UNLOCK_SUPPORT_PERCENT = FIAT_UNLOCK_SUPPORT_PERCENT
     TRADE_FEE_PERCENT = 0.001
     TRADE_ORDER_EXPIRY = 3600
-    LUCKY_BLOCK_SEED = os.getenv("XAI_LUCKY_BLOCK_SEED", "mainnet-default-seed")
+    # SECURITY: Lucky block seed - uses network-aware function
+    # On mainnet, this will be enforced when Config is selected
+    LUCKY_BLOCK_SEED = os.getenv("XAI_LUCKY_BLOCK_SEED", "")
     API_RATE_LIMIT = API_RATE_LIMIT
     API_RATE_WINDOW_SECONDS = API_RATE_WINDOW_SECONDS
     API_MAX_JSON_BYTES = API_MAX_JSON_BYTES
@@ -263,6 +325,19 @@ class MainnetConfig:
 # Select config based on network
 if NETWORK.lower() == "mainnet":
     Config = MainnetConfig
+    # Enforce required secrets for mainnet
+    _required_mainnet_secrets = [
+        ("XAI_WALLET_TRADE_PEER_SECRET", WALLET_TRADE_PEER_SECRET),
+        ("XAI_TIME_CAPSULE_MASTER_KEY", TIME_CAPSULE_MASTER_KEY),
+        ("XAI_EMBEDDED_SALT", EMBEDDED_WALLET_SALT),
+        ("XAI_LUCKY_BLOCK_SEED", MainnetConfig.LUCKY_BLOCK_SEED),
+    ]
+    for env_var, value in _required_mainnet_secrets:
+        if not value or len(value) < 16:
+            raise ConfigurationError(
+                f"CRITICAL: {env_var} must be set to a secure value (min 16 chars) for mainnet. "
+                f"Generate: python -c \"import secrets; print(secrets.token_hex(32))\""
+            )
 else:
     Config = TestnetConfig
 
@@ -274,6 +349,7 @@ Config.MEMPOOL_INVALID_WINDOW_SECONDS = MEMPOOL_INVALID_WINDOW_SECONDS
 Config.MEMPOOL_ALERT_INVALID_DELTA = MEMPOOL_ALERT_INVALID_DELTA
 Config.MEMPOOL_ALERT_BAN_DELTA = MEMPOOL_ALERT_BAN_DELTA
 Config.MEMPOOL_ALERT_ACTIVE_BANS = MEMPOOL_ALERT_ACTIVE_BANS
+Config.P2P_QUIC_DIAL_TIMEOUT = P2P_QUIC_DIAL_TIMEOUT
 
 # Wallet trade peers
 

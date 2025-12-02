@@ -1,5 +1,5 @@
 import hashlib
-import random
+import secrets
 from typing import List, Dict, Any, Tuple, Optional
 
 # This is a highly simplified conceptual model of a Threshold Signature Scheme (TSS).
@@ -26,25 +26,35 @@ class ThresholdSignatureScheme:
         """
         Simulates the generation of a conceptual private key and its shares.
         In a real TSS, this would involve Distributed Key Generation (DKG) protocols.
+
+        SECURITY-CRITICAL: Uses secrets module for cryptographically secure random
+        number generation. The random module MUST NOT be used for cryptographic
+        key generation as it is predictable and completely breaks security.
         """
         # For simplicity, let's imagine a conceptual "master private key"
         # and distribute random shares that sum up to it (modulo some large prime).
         # This is NOT how real TSS works, but illustrates the sharing concept.
 
-        # Conceptual master private key (random for demo)
-        master_private_key = random.randint(1, 10**10)
+        # Conceptual master private key (cryptographically secure random)
+        # SECURITY: Using secrets.randbelow() for cryptographically secure RNG
+        master_private_key = secrets.randbelow(10**10 - 1) + 1  # Range [1, 10**10]
         self.public_key = master_private_key  # For conceptual linking
 
         shares = []
-        # Generate n-1 random shares
+        # Generate n-1 cryptographically secure random shares
+        # SECURITY: Using secrets.randbelow() instead of random.randint()
         for _ in range(self.n_participants - 1):
-            shares.append(random.randint(1, master_private_key))
+            shares.append(secrets.randbelow(master_private_key - 1) + 1)  # Range [1, master_private_key]
 
         # The last share makes the sum equal to the master private key
         shares.append(master_private_key - sum(shares))
 
-        # Assign shares to participants
-        random.shuffle(shares)  # Distribute randomly
+        # Assign shares to participants with cryptographically secure shuffle
+        # SECURITY: Fisher-Yates shuffle using secrets.randbelow() for unpredictable distribution
+        for i in range(len(shares) - 1, 0, -1):
+            j = secrets.randbelow(i + 1)
+            shares[i], shares[j] = shares[j], shares[i]
+
         for i in range(self.n_participants):
             self.private_key_shares[i + 1] = shares[i]  # Participant IDs start from 1
 

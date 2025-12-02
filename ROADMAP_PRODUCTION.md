@@ -1,90 +1,458 @@
 # Production-Grade Roadmap for XAI Blockchain
 
-This roadmap targets production readiness with security-first posture, robust consensus, and operational excellence. Items are grouped by domain; each should be treated as a deliverable with design, implementation, tests, and review.
+This roadmap targets production readiness with security-first posture, robust consensus, and operational excellence. All code must be robust, expert blockchain coding, using sophisticated logic, production-level, professional-level, high-end, cutting-edge blockchain development. Security must be airtight with no holes in logic, no weak or outdated patterns. Code must meet or EXCEED the expectations of the professional blockchain coding community.
 
-## 1) Consensus, Chain Safety, and State Integrity
-- Finalize consensus rules: deterministic validation, fork-choice (longest-chain + finality thresholds), header invariants (difficulty retarget windows, timestamp drift, versioning).
-- Reorg/partition resilience: simulate deep reorgs, delayed arrivals, competing forks; bound orphan pools and rollback safely.
-- UTXO/state integrity: checksum snapshots, periodic Merkle audits of UTXO sets, post-reorg integrity checks.
-- Fee/mempool policy: max mempool size, per-sender caps, age-based eviction, rejection/ban on repeated invalid txs. ✅ Enforced with min-fee admission, eviction, sender backoff/bans, and metrics/alerts.
+**AGENT INSTRUCTIONS:** All implementations must:
+- Pass Trail of Bits / OpenZeppelin audit standards
+- Use proper cryptographic primitives (no weak random, no MD5/SHA1 for security)
+- Include comprehensive error handling with specific error types
+- Emit structured logging for all security-relevant events
+- Include unit tests, integration tests, and security tests
+- Follow checks-effects-interactions pattern for all state changes
+- Use safe math for all arithmetic operations
+- Validate all inputs at system boundaries
 
-## 2) Networking and P2P Security
-- Mutual auth + pinning by default; trusted sets per network, with rotation and rollout guidance.
-- Replay/DoS controls: nonce TTL (in place), per-peer rate limits, circuit breakers on signature failures, reputation decay/auto-unban. ✅ Nonce TTL, P2P rate/bandwidth caps, invalid-signature/replay counters wired to metrics/alerts.
-- Message schema/versioning: version-tagged messages, feature negotiation, strict reject of unknown versions.
-- Transport hygiene: TLS everywhere with cert validation; consider QUIC/WebSocket fallback; heartbeat/health pings and graceful close.
+---
 
-## 3) Transaction and Validation Pipeline
-- Deterministic validation: explicit fields (nonce, inputs/outputs, public key) and precise decimal handling; enforce min-fee thresholds.
-- Domain-separated signatures: include chain/network IDs in hashes to prevent cross-context replay.
-- Mempool conflicts: explicit RBF/nonce replacement rules; conflict eviction on confirmed inputs.
-- Smart contracts: validate call/deploy metadata (gas, payload size, ABI), sandbox limits if VM enabled.
+## CRITICAL SECURITY FIXES (Priority 1 - Immediate)
 
-## 4) Cryptography and Key Management
-- Key storage: encrypted at rest, HSM/KMS hooks, deterministic node identity derivation, rotation plan.
-- Zeroization/side-channel hygiene: minimize key lifetime in memory; audit temp files/logs.
-- Strong randomness: audit entropy sources; prefer DRBG with health checks where required.
+### Cryptography & Random Number Generation
 
-## 5) API and Surface Security
-- Validation-first: enforce size/content-type/schema (already tightened); consistent error envelopes without sensitive data.
-- AuthN/AuthZ: API keys/admin tokens with scopes/roles and per-key rate limits; consider JWT with short TTL and rotation.
-- CORS/CSRF: strict origin allowlists; CSRF tokens where session flows exist.
-- Secrets/config: source from env/secret stores; no weak prod defaults.
+- [ ] **CRITICAL**: Replace weak `random` module with `secrets` in threshold signature scheme (`src/xai/security/threshold_signature.py` lines 35, 41, 47). Master key and share generation uses predictable RNG - complete cryptographic failure.
+- [ ] **CRITICAL**: Fix deterministic premine wallet selection using `random.seed(42)` in `mark_time_capsule_wallets.py` line 38. Use cryptographically secure selection or remove predictability.
+- [ ] **CRITICAL**: Replace weak randomness in gamification (`src/xai/core/gamification.py` lines 97, 124, 148, 157, 162) with `secrets` module for fair random selection.
 
-## 6) Observability, Telemetry, and Alerting
-- Metrics: consensus health, mempool pressure, P2P trust scores, invalid tx/block counts, VM execution stats.
-- Logging: structured, privacy-preserving, correlation IDs; redaction for keys/signatures; security event feed to SIEM.
-- Alerts: thresholds for orphan spikes, validation failures, replay attempts, TLS pinning failures; auto-mitigation hooks (ban/rate-limit).
+### DeFi Protocol Critical Fixes
 
-## 7) Performance, Scaling, and Resilience
-- Benchmarks: signature verification batching, Merkle/UTXO lookups, block serialization; add microbench harnesses.
-- Concurrency: audit thread safety (UTXO manager, mempool, P2P); prefer lock-free reads where possible.
-- Persistence: durability strategy (fsync), corruption detection, fast recovery with checkpoints/snapshots.
-- Resource controls: CPU/mem/disk quotas; backpressure under load; autoscaling guidance for API vs validator nodes.
+- [ ] **CRITICAL**: Fix flash loan repayment verification logic in `src/xai/core/defi/flash_loans.py` lines 206-214. Current logic only verifies fees paid, NOT that principal was returned. Attacker can steal all liquidity.
+- [ ] **CRITICAL**: Add access control to `add_liquidity()` in `flash_loans.py` line 318. Missing `_require_owner(caller)` check allows unauthorized liquidity manipulation.
+- [ ] **CRITICAL**: Implement staking delegator reward distribution in `src/xai/core/defi/staking.py` lines 510-519. Currently validators take all rewards, delegators receive NOTHING.
+- [ ] **CRITICAL**: Fix vesting curve precision loss in `src/xai/core/defi/vesting.py` lines 95-96. Float division causes precision loss on large vesting amounts. Convert to fixed-point (WAD/RAY) arithmetic.
+- [ ] **CRITICAL**: Add price bounds rejection in oracle (`src/xai/core/defi/oracle.py` lines 257-274). Currently extreme price moves are only LOGGED, not REJECTED. Enables oracle manipulation attacks.
 
-## 8) Testing and Verification
-- Full matrix: unit, integration, P2P simulators, fuzz/property tests for tx/block validation, chaos tests (partition, drops, clock skew). ✅ Mempool security tests, P2P nonce/cert pinning tests, reorg simulator chaos test with state snapshots.
-- Crypto vectors: signatures, hash correctness, deterministic serialization.
-- Deterministic testnet/CI: reproducible blocks with fixed seeds in non-prod where acceptable.
-- Coverage: governance, recovery, treasure, exchange flows with realistic signed payloads.
+### Account Abstraction & Transaction Security
 
-## 9) Deployment, Ops, and Tooling
-- Network profiles: hardened defaults per network (mainnet/testnet/dev) for trust stores, fees, rate limits, CORS.
-- Secure CI/CD: pinned deps, signed artifacts, SAST/DAST, dependency scanning, SBOM.
-- Rollout: blue/green or canary, backward-compatible migrations, auto-rollback on health regression.
-- Backups/recovery: periodic chain/key snapshots, verified restore runbooks.
+- [ ] **CRITICAL**: Fix placeholder transaction tracking in `src/xai/core/account_abstraction.py` line 124. `txid="pending"` never updated - breaks audit trail and reconciliation.
+- [ ] **CRITICAL**: Add bounds validation to lending pool borrow amounts in `src/xai/core/defi/lending.py` line 195+. No validation allows borrowing unrealistic amounts or causing overflow.
 
-## Next Up
-- ✅ Add Prometheus/Alertmanager rules for `xai_p2p_nonce_replay_total`, `xai_p2p_rate_limited_total`, and `xai_p2p_invalid_signature_total`; forward `p2p.*` events to SIEM via `SecurityEventRouter` webhooks.
-- ✅ Propagate P2P hardening envs to deployment manifests/Helm (trust-store mounts, mTLS requirement, nonce TTL, rate/bandwidth caps).
-- ✅ Extend chaos harness to simulate partition/reconnect with signed transactions and assert UTXO digests remain stable across reorgs under load.
-- ✅ Add Grafana dashboard panels for the new P2P security metrics and verify Alertmanager routing uses the new rules/runbooks.
-- ✅ Author runbooks for P2P replay, rate-limit, and invalid-signature alerts to satisfy the linked Alertmanager runbook URLs.
-- ✅ Add deploy-time validation (deploy.sh/kubeval) to ensure trust-store ConfigMap/secret and mTLS env flags are present before rollout.
-- ✅ Publish P2P runbooks into the docs site navigation and verify the Alertmanager runbook links resolve in the built docs.
-- ✅ Add deploy-time checks to block rollout when trust-store placeholders are present or mTLS env keys are missing for production overlays.
-- ✅ Add synthetic P2P security probes (replay/invalid signature) to monitoring verification or chaos harness to continuously test the paths.
-- ✅ Add CI gating (pre-merge) to enforce the P2P hardening checks and ensure production overlays inherit the mTLS/trust-store settings (wire `scripts/ci/p2p_hardening_check.sh` into the pipeline).
-- ✅ Wire SIEM webhook smoke-test into deploy verify script and ensure webhook sink failures alert.
-- [ ] Consensus/state: deepen reorg/partition simulations with snapshot verification (state/UTXO digest) and bounded orphan pool enforcement tests.
-- [ ] Networking: add QUIC/WebSocket fallback path and versioned feature negotiation schema; document supported P2P versions per release.
-- [ ] Validation/testing: expand property/fuzz tests for tx/block validation and crypto vectors; add deterministic testnet fixtures for reproducible CI.
-- [ ] Ops/release: automate release/rollback checklist, backup/restore runbook, and integrate dependency audit artifacts into CI.
-- [ ] Security/API: strengthen API auth (scoped keys/JWT) and add SAST/DAST gating guidance/tests; governance/consensus invariants tests.
+### Consensus Critical Fixes
 
-## 10) Documentation and Runbooks
-- Developer docs: protocol specs, validation rules, P2P handshake, API schemas, integration guides.
-- Operator runbooks: deployment, key rotation, incident handling (reorgs, DoS, cert failures), monitoring dashboards.
-- Security posture: threat model, hardening guide, control expectations (rate limits, bans, pinning, logging).
+- [ ] **CRITICAL**: Implement block reward validation. Currently ANY coinbase amount is accepted - allows unlimited coin inflation. Add reward schedule enforcement.
+- [ ] **CRITICAL**: Add future timestamp rejection in block validation (`node_consensus.py` line 88-90). Currently only checks past timestamps - blocks can have timestamps arbitrarily far in future.
+- [ ] **CRITICAL**: Implement transaction ordering rules. Currently undefined - enables MEV/front-running attacks. Add fee-based priority and nonce sequencing.
 
-## 11) Audit and Compliance
-- Third-party security audit (crypto, P2P, consensus, API auth).
-- Formal verification targets: tx validation rules, nonce handling, critical invariants.
-- Compliance checklist: logging retention, PII handling, data minimization.
+---
+
+## HIGH SECURITY FIXES (Priority 2)
+
+### Authentication & Authorization
+
+- [ ] Fix JWT token verification disabling expiration in `src/xai/core/api_auth.py` line 433. `verify_exp=False` allows expired tokens - extend attack window.
+- [ ] Add per-second rate limiting to gas sponsorship in `account_abstraction.py` lines 141-150. Current daily-only limit allows burst attacks.
+- [ ] Fix unprotected access control in DeFi contracts - address-string matching without signature verification in oracle.py, staking.py, vesting.py, circuit_breaker.py.
+- [ ] Register XAI with SLIP-0044 before mainnet (`src/xai/security/hd_wallet.py` line 56 - coin type 9999 unregistered).
+
+### Integer Math & Precision
+
+- [ ] Fix integer division precision loss in concentrated liquidity (`src/xai/core/defi/concentrated_liquidity.py` lines 210, 241, 529-535). Implement proper rounding (ROUND_UP) for user-affecting calculations.
+- [ ] Fix lending pool interest accrual dust loss (`src/xai/core/defi/lending.py` lines 836-839). Small principals accrue 0 interest due to integer division.
+- [ ] Add overflow protection to swap router multiplication (`src/xai/core/defi/swap_router.py` lines 1261, 1264). Check `a * b > MAX_AMOUNT` before multiplication.
+
+### P2P & Network Security
+
+- [ ] Require cryptography library - fail fast if unavailable instead of creating placeholder certificates (`src/xai/network/peer_manager.py` lines 256, 309-310).
+- [ ] Implement ASN/geolocation diversity checks for eclipse attack protection. Current IP-based limits insufficient.
+- [ ] Add proof-of-work for peer admission to prevent Sybil attacks. Currently unlimited peer identities can be created.
+- [ ] Implement message deduplication in P2P layer - can receive same tx/block multiple times causing network floods.
+
+### Validation & Error Handling
+
+- [ ] Replace bare `except Exception: pass` blocks with specific exception handling in: `node_p2p.py` (9 instances), `blockchain.py` (lines 367, 382, 2849), `monitoring.py` (lines 236, 504, 869).
+- [ ] Fix signature verification exception swallowing in `account_abstraction.py` lines 540, 582. Signature failures logged but execution continues.
+- [ ] Add bounds checking to mining bonus configuration to prevent minting more coins than supply cap.
+
+---
+
+## EVM & SMART CONTRACT FIXES (Priority 3)
+
+### Critical VM Execution Gaps
+
+- [ ] **CRITICAL**: Implement recursive CALL/DELEGATECALL execution in `src/xai/core/vm/evm/interpreter.py` lines 904-983. Currently returns hardcoded success without executing called contract. Breaks ALL cross-contract communication.
+- [ ] **CRITICAL**: Fix CREATE/CREATE2 deployment (`interpreter.py` lines 878-902, 985-1016). Nonce hardcoded to 0, init code never executed, storage never initialized. Contract deployment completely broken.
+- [ ] **CRITICAL**: Implement account nonce tracking. CREATE address derivation uses hardcoded nonce=0 - all CREATE calls generate same address.
+- [ ] Fix STATICCALL to actually enforce static mode in nested calls (`interpreter.py` lines 1018-1041).
+- [ ] Implement CALLCODE context switching - currently just delegates to broken CALL.
+
+### Gas Metering Fixes
+
+- [ ] Fix EXP opcode gas calculation formula (`interpreter.py` lines 365-375). Formula based on bit length, not exponent value length.
+- [ ] Implement 63/64 gas forwarding rule for CALL operations.
+- [ ] Add CREATE code storage gas costs.
+- [ ] Charge intrinsic gas for calldata encoding in calls.
+
+### Missing Precompiles
+
+- [ ] Implement ECADD precompile (0x06) - required for signature verification in contracts.
+- [ ] Implement ECMUL precompile (0x07).
+- [ ] Implement ECPAIRING precompile (0x08).
+- [ ] Implement BLAKE2F precompile (0x09).
+- [ ] Implement POINT_EVALUATION precompile (0x0a).
+
+### Contract Integration
+
+- [ ] Integrate ERC20/ERC721 contract libraries with EVM bytecode interpreter. Currently Python classes, not executable bytecode.
+- [ ] Implement ABI encoding/decoding for contract calls.
+- [ ] Store contract state in EVM storage, not Python dictionaries.
+- [ ] Implement proxy DELEGATECALL forwarding for upgradeable contracts.
+- [ ] Add receive() hooks for safe token transfers.
+
+---
+
+## WALLET & KEY MANAGEMENT FIXES (Priority 4)
+
+### Critical Wallet Security
+
+- [ ] **CRITICAL**: Remove private key from CLI command line (`src/xai/wallet/cli.py` lines 573-576). Key appears in shell history, process list, logs. Implement keyring/wallet file only.
+- [ ] **CRITICAL**: Encrypt browser extension storage (`src/xai/browser_wallet_extension/popup.js` lines 61-87). Session secrets and AI API keys stored in PLAINTEXT.
+- [ ] **CRITICAL**: Fix browser extension HMAC-SHA256 signatures (popup.js lines 48-59). Uses HMAC instead of ECDSA - signatures not verifiable by blockchain.
+
+### BIP Standards Implementation
+
+- [ ] Implement proper BIP-32/BIP-44 hierarchical deterministic derivation. Current "simplified BIP-32" is just HMAC-SHA512 - not actual HD wallets.
+- [ ] Add multi-account support (currently single account only).
+- [ ] Implement hardened derivation for account separation.
+- [ ] Add change address generation (separate change/payment branches).
+
+### Hardware Wallet
+
+- [ ] Implement real Ledger hardware wallet support. Current `MockHardwareWallet` stores private key in memory - defeats purpose.
+- [ ] Implement Trezor support.
+- [ ] Remove MockHardwareWallet from production code.
+
+### Wallet Features
+
+- [ ] Implement proper fee estimation API. Current hardcoded 0.05 XAI + multipliers insufficient.
+- [ ] Add offline transaction signing capability.
+- [ ] Fix multisig nonce handling - add nonce/sequence fields to prevent replay.
+- [ ] Add transaction signing verification UI (show what's being signed before confirmation).
+- [ ] Add seed phrase backup QR code generation.
+- [ ] Implement spending limits.
+- [ ] Add 2FA support (TOTP or FIDO2).
+
+### Desktop Wallet Security
+
+- [ ] Remove PowerShell execution policy bypass in Electron (`src/xai/electron/main.js` line 21). Could allow script injection.
+- [ ] Implement IPC-based private key isolation from dashboard process.
+- [ ] Add HTTPS encryption for localhost endpoints.
+- [ ] Implement process sandboxing with resource limits.
+
+---
+
+## API & EXPLORER FIXES (Priority 5)
+
+### Critical API Gaps
+
+- [ ] **CRITICAL**: Implement `/mempool` endpoint with full statistics (size, fee rates, transaction list). Currently only in explorer backend, not main API.
+- [ ] **CRITICAL**: Fix rate limiter non-fatal failures (`node_api.py` lines 860-872). Rate limiter exceptions caught and logged but requests proceed anyway.
+- [ ] **CRITICAL**: Add pagination limits to all list endpoints. `GET /history/<address>` and `GET /transactions` return unlimited results - OOM attack vector.
+
+### API Authentication
+
+- [ ] Fix WebSocket authentication - connections don't check API keys (`api_websocket.py` lines 217-220).
+- [ ] Implement API versioning (/v1/, /v2/) with deprecation headers.
+- [ ] Add CORS to main API (only explorer has CORS currently).
+- [ ] Implement request size limits (`MAX_CONTENT_LENGTH`).
+
+### Missing Endpoints
+
+- [ ] Add `GET /address/<addr>/nonce` - required for transaction construction.
+- [ ] Add `GET /block/<hash>` - block lookup by hash.
+- [ ] Add `GET /contracts/<addr>/abi` - contract ABI registry.
+- [ ] Add `GET /contracts/<addr>/events` - contract event logs.
+- [ ] Add `GET /mempool/stats` - fee statistics, pressure indicators.
+- [ ] Add `GET /peers?verbose=true` - peer details (version, latency, reputation).
+
+### Documentation
+
+- [ ] Complete OpenAPI documentation - only ~40% of 65+ endpoints documented.
+- [ ] Add WebSocket message format specification.
+- [ ] Document all error codes and response formats.
+- [ ] Add rate limiting documentation.
+
+---
+
+## CONSENSUS & P2P FIXES (Priority 6)
+
+### Consensus Rules
+
+- [ ] Implement difficulty adjustment enforcement. `DynamicDifficultyAdjustment` calculates but doesn't apply adjustments.
+- [ ] Add median-time-past (MTP) for timestamp validation. Current check only against previous block.
+- [ ] Implement block size limits to prevent DoS via huge blocks.
+- [ ] Add header version/format validation.
+- [ ] Implement chain work-based fork choice (cumulative difficulty). Current work calculation counts leading zeros only.
+- [ ] Add cryptographic finality with validator signatures.
+- [ ] Implement slashing for finality violations.
+- [ ] Persist finality state (currently in-memory only, lost on restart).
+
+### P2P Protocol
+
+- [ ] Implement inventory (inv) protocol for efficient broadcast. Currently always sends full transactions.
+- [ ] Add getdata/getblocks for selective block requests.
+- [ ] Implement partial/checkpoint sync. Current sync downloads full chain.
+- [ ] Add parallel sync from multiple peers.
+- [ ] Implement explicit peer version/capabilities handshake.
+- [ ] Add session key establishment for peer authentication.
+- [ ] Implement peer identity authentication (currently can spoof peer IDs).
+- [ ] Add connection idle timeouts.
+
+### Network Resilience
+
+- [ ] Add bandwidth-based rate limiting (currently only request count).
+- [ ] Implement UDP flood protection.
+- [ ] Add connection reset storm detection.
+- [ ] Implement reputation time decay (old misbehavior currently never forgotten).
+- [ ] Add exponential backoff for ban duration.
+- [ ] Implement /16 subnet diversity enforcement for eclipse protection.
+
+---
+
+## TRADING & EXCHANGE FIXES (Priority 7)
+
+### Exchange Core
+
+- [ ] **CRITICAL**: Implement real blockchain settlement verification. All exchange settlements use in-memory balance provider - no actual blockchain confirmation.
+- [ ] Add price validation to order placement - currently accepts negative, zero, or infinite prices.
+- [ ] Implement STOP-LIMIT order type (defined but not implemented).
+- [ ] Add slippage protection to market orders.
+- [ ] Implement fee collection and maker/taker distinction.
+
+### Atomic Swaps
+
+- [ ] **CRITICAL**: Implement real blockchain contract deployment for atomic swaps. Current `CrossChainVerifier` is completely mocked - returns true for unverified transactions.
+- [ ] Deploy actual Bitcoin HTLC scripts.
+- [ ] Deploy Ethereum HTLC smart contracts.
+- [ ] Implement real SPV verification with blockchain API calls.
+- [ ] Add fee calculation for atomic swap transactions.
+- [ ] Implement automatic recovery for failed claims.
+
+### Margin & Liquidation
+
+- [ ] Implement margin trading infrastructure (isolated and cross-margin).
+- [ ] Add leverage mechanisms.
+- [ ] Implement liquidation logic with health factor.
+- [ ] Add PnL tracking (realized and unrealized).
+- [ ] Implement position averaging and entry price tracking.
+
+### Trading Features
+
+- [ ] Add advanced order types: TWAP, VWAP, Iceberg, trailing stop.
+- [ ] Implement order rate limiting per user.
+- [ ] Fix division by zero in price calculation (`wallet_trade_manager_impl.py` line 64).
+- [ ] Add withdrawal processing (currently marked pending but never processed).
+- [ ] Implement deposit address generation with confirmation counting.
+
+---
+
+## AI & GAMIFICATION FIXES (Priority 8)
+
+### AI Safety Critical
+
+- [ ] **CRITICAL**: Replace regex-based output validation with semantic analysis (`src/xai/core/ai_safety_controls.py` lines 618-690). Current patterns easily bypassed with string manipulation.
+- [ ] Implement proper hallucination detection with knowledge base verification. Current word-counting approach is superficial.
+- [ ] Add persistent rate limit storage. Currently in-memory only - reset on restart.
+- [ ] Fix stub response success bug in `personal_ai_assistant.py` lines 476-477. Returns `success=True` with stub when provider unavailable.
+
+### AI Governance
+
+- [ ] Implement ProposalImpactAnalyzer metrics (`src/xai/core/ai_governance.py` lines 739-757). All values hardcoded placeholders - no actual analysis.
+- [ ] Add quality tracking for AI workload distribution. `quality_score` initialized to 1.0 but never updated.
+- [ ] Implement voting fraud/sybil detection.
+- [ ] Add execution tracking for approved proposals.
+
+### AI Trading Bot
+
+- [ ] Complete `_analyze_market()` implementation. Function called but logic incomplete.
+- [ ] Implement `_execute_trade()` with actual order placement.
+- [ ] Complete `_check_risk_limits()` implementation.
+- [ ] Implement `_update_market_data()`.
+
+### AI Pool Management
+
+- [ ] Complete `execute_ai_task_with_limits()` core logic (cut off at line 244+).
+- [ ] Implement `_find_suitable_keys()` multi-key pooling.
+- [ ] Add key rotation and cleanup for depleted keys.
+
+### Gamification
+
+- [ ] Implement achievement system.
+- [ ] Add level/XP progression.
+- [ ] Implement badges/trophies.
+- [ ] Add daily challenges.
+- [ ] Implement referral system with tracking and bonuses.
+- [ ] Add unified points leaderboard.
+- [ ] Implement anti-sybil measures for airdrops.
+
+### AI Safety Controls
+
+- [ ] Implement actual sandbox resource enforcement. Currently declared but not enforced.
+- [ ] Add provider-specific rate limits (expensive providers like Anthropic/OpenAI should have lower limits).
+- [ ] Implement streaming response support.
+- [ ] Add response caching for identical prompts.
+
+---
+
+## CODE QUALITY & REFACTORING (Priority 9)
+
+### God Class Refactoring
+
+- [ ] Split `Blockchain.__init__` (2,287 lines) into: `_init_storage()`, `_init_consensus()`, `_init_governance()`, `_init_mining()`.
+- [ ] Split `APIRoutes.__init__` (2,183 lines) - extract route definitions into separate modules by category.
+- [ ] Split `Wallet.__init__` (755 lines) into composition chain.
+
+### Exception Handling
+
+- [ ] Replace all 28+ bare `except Exception: pass` clauses with specific exception types.
+- [ ] Add structured logging to all exception handlers.
+- [ ] Propagate signature verification errors - never silently continue.
+
+### Logging Migration
+
+- [ ] Convert remaining ~1,650 print() statements to structured logging across 62 files.
+- [ ] Implement consistent log levels by module.
+- [ ] Add correlation IDs for request tracing.
+
+### Type Safety
+
+- [ ] Add return type hints to 69+ public API methods missing them.
+- [ ] Add docstrings to 45+ public APIs missing documentation.
+- [ ] Resolve 9 circular import dependencies using TYPE_CHECKING guards.
+
+### Code Cleanup
+
+- [ ] Extract 250+ magic numbers into named constants.
+- [ ] Remove empty `ExchangeWalletManager` class (dead code).
+- [ ] Replace NotImplementedError with ABC/abstractmethod pattern (13 instances).
+- [ ] Remove legacy weak encryption path from wallet.py `_encrypt()` method.
+
+---
+
+## TESTING GAPS (Priority 10)
+
+### Security Tests Missing
+
+- [ ] Add flash loan multi-step attack tests (reentrancy scenarios).
+- [ ] Add oracle manipulation tests (TWAP attacks, single-source bias).
+- [ ] Add sandwich attack tests for swap slippage.
+- [ ] Add MEV/front-running tests with realistic mempool ordering.
+- [ ] Add time lock manipulation boundary tests.
+- [ ] Add governance griefing tests (low-cost attacks).
+
+### Fuzz Testing
+
+- [ ] Add transaction parser fuzzing.
+- [ ] Add block header parsing fuzzing.
+- [ ] Add API request parsing fuzzing.
+- [ ] Add signature verification edge case fuzzing.
+- [ ] Add UTXO script validation fuzzing.
+
+### Invariant Tests
+
+- [ ] Add total supply preservation tests (including after reorg).
+- [ ] Add balance conservation tests (fees, burned coins).
+- [ ] Add state root correctness tests for light client verification.
+- [ ] Add transaction ordering invariant tests.
+
+### Edge Case Tests
+
+- [ ] Add malformed block header tests.
+- [ ] Add timestamp boundary condition tests.
+- [ ] Add nonce overflow/underflow tests.
+- [ ] Add extreme difficulty adjustment tests.
+- [ ] Add mempool eviction order tests under full mempool.
+- [ ] Add conflicting RBF replacement tests.
+- [ ] Add seed phrase corruption recovery tests.
+- [ ] Add concurrent transaction signing tests.
+- [ ] Add hardware wallet failure mode tests.
+
+### Performance Tests
+
+- [ ] Add mempool eviction under load stress tests.
+- [ ] Add storage compaction performance tests.
+- [ ] Add QUIC vs TCP latency comparison tests.
+- [ ] Add block propagation latency tests with realistic network conditions.
+
+### Skipped Tests
+
+- [ ] Fix QUIC latency/timeout tests (aioquic dependency).
+- [ ] Fix checkpoint protection tests (checkpoint manager availability).
+
+---
+
+## DOCUMENTATION FIXES (Priority 11)
+
+### Critical Missing Docs
+
+- [ ] Fix 13+ broken links in `docs/index.md` - references files that don't exist.
+- [ ] Create `docs/api/rest-api.md` - REST API reference.
+- [ ] Create `docs/api/websocket.md` - WebSocket specification.
+- [ ] Create `docs/deployment/testnet.md` - testnet deployment guide.
+- [ ] Create `docs/deployment/production.md` - production deployment guide.
+- [ ] Create `docs/deployment/configuration.md` - node configuration reference.
+- [ ] Create `docs/user-guides/staking.md` - staking guide.
+- [ ] Create `docs/user-guides/faq.md` - frequently asked questions.
+- [ ] Create `docs/user-guides/troubleshooting.md` - troubleshooting guide.
+
+### Architecture Documentation
+
+- [ ] Create consensus mechanism specification (formal rules, not just overview).
+- [ ] Create storage layer design documentation.
+- [ ] Create UTXO model lifecycle specification.
+- [ ] Create EVM interpreter documentation.
+- [ ] Create state management/commitment scheme docs.
+- [ ] Create transaction format serialization specification.
+- [ ] Create block format specification.
+- [ ] Create Merkle proof format documentation.
+- [ ] Create difficulty adjustment algorithm specification.
+- [ ] Create fork choice rule formal specification.
+
+### Security Documentation
+
+- [ ] Expand threat model (currently only 2.1KB).
+- [ ] Create wallet security guide.
+- [ ] Create smart contract security guide.
+- [ ] Create compliance guide.
+- [ ] Document audit findings.
+
+### File Permissions
+
+- [ ] Fix user guide file permissions (0600 → 0644) for mining.md, transactions.md, wallet-setup.md.
+
+---
+
+## DEPLOYMENT & OPS (Priority 12)
+
+### Blocked Task
+
+- [ ] [BLOCKED] Stage/prod rollout: After local testing passes, run on staging/production clusters.
+  - **Blocker:** No kubeconfig contexts present for staging/prod clusters
+  - **Needs:** Provide kubeconfig with staging/prod access
+  - **Template:** `k8s/kubeconfig.staging-prod.example`
+  - **Date:** 2025-11-30
+
+---
 
 ## Execution Phases
-- Phase A (Safety & Validation): lock down tx/mempool validation, P2P auth, observability; finalize API/Auth.
-- Phase B (Consensus & State): reorg/partition resilience, persistence hardening, checkpoints/snapshots.
-- Phase C (Performance & Scale): benchmarking, optimization, concurrency review.
-- Phase D (Docs & Runbooks): developer/operator docs, incident guides.
-- Phase E (Audit & Release): external audit, configs finalized, staged rollout to testnet then mainnet.
+
+- **Phase A (Safety & Validation):** Complete CRITICAL and HIGH priority security fixes.
+- **Phase B (Smart Contracts):** EVM/smart contract implementation completion.
+- **Phase C (Wallet & API):** Wallet security and API completeness.
+- **Phase D (Consensus & P2P):** Consensus rules and P2P protocol hardening.
+- **Phase E (Trading):** Exchange and trading infrastructure.
+- **Phase F (AI & Gamification):** AI safety and gamification features.
+- **Phase G (Quality):** Code refactoring and testing gaps.
+- **Phase H (Docs & Release):** Documentation and production deployment.
+
+---
+
+*Last comprehensive audit: 2025-12-01*
+*Audit coverage: Security, Code Quality, DeFi, Wallet/CLI, Consensus/P2P, Smart Contracts/VM, API/Explorer, Testing/Docs, AI/Gamification, Trading/Exchange*

@@ -24,6 +24,7 @@ k8s/
 ├── pv.yaml                   # PersistentVolume and StorageClass definitions
 ├── statefulset.yaml          # StatefulSet for blockchain nodes
 ├── service.yaml              # Services for P2P, RPC, WebSocket
+├── service.quic.yaml         # QUIC UDP service (staging/optional)
 ├── ingress.yaml              # Ingress with TLS and NetworkPolicy
 ├── hpa.yaml                  # Horizontal Pod Autoscaler
 ├── monitoring.yaml           # Prometheus monitoring setup
@@ -121,6 +122,7 @@ Review and update `configmap.yaml` with your network settings:
 # - XAI_P2P_MAX_MESSAGE_RATE / XAI_P2P_MAX_BANDWIDTH_{IN,OUT}: P2P rate and bandwidth caps
 # - XAI_TRUSTED_PEER_PUBKEYS_FILE / XAI_TRUSTED_PEER_CERT_FPS_FILE: trust stores mounted at /etc/xai/trust
 # - NetworkPolicy CIDRs: edit `networkpolicy.yaml` to match your validator ingress ranges
+# - XAI_P2P_ENABLE_QUIC: enable QUIC transport (requires aioquic) on p2p_port+1 (see service.quic.yaml)
 ```
 
 ### 3. Prepare Persistent Volumes
@@ -327,6 +329,14 @@ Critical alerts include:
 - High disk usage (>85%)
 - Network partition detection
 - Consensus failures
+
+### Staging/Prod monitoring rollout (fast-mining + P2P security)
+
+- Apply the hardened monitoring overlays (Alertmanager routes to SIEM, Prometheus rules, Grafana security dashboard) with `./k8s/apply-monitoring-overlays.sh <namespace>`; pass `monitoring` if your monitoring stack runs there.
+- The overlays publish `alertmanager-xai-blockchain`, `xai-prometheus-alerts`, and `xai-grafana-security-ops` ConfigMaps. Grafana picks the dashboard via `grafana_dashboard=1`.
+- Verify Alertmanager is serving the new routes by checking `/api/v2/alerts` after generating a `config.fast_mining_*` or `p2p.*` security event; confirm the SIEM receiver fires.
+- Ensure Grafana sees the security operations dashboard and that the datasource `uid=prometheus` exists before rollout.
+- Run `./k8s/verify-deployment.sh --namespace=<namespace>` to probe P2P metrics, SIEM webhook delivery, and dashboard/Alertmanager ConfigMaps.
 
 ## Security
 

@@ -62,10 +62,13 @@ class TestWalletManagerOperations:
             assert wallet is not None
             assert "test_wallet" in manager.wallets
 
-            # Verify file is encrypted
+            # Verify file is encrypted (new HMAC format)
             with open(os.path.join(tmpdir, "test_wallet.wallet"), "r") as f:
-                data = json.load(f)
-            assert data.get("encrypted") is True
+                file_data = json.load(f)
+            # New format has HMAC wrapper with data inside
+            assert "hmac_signature" in file_data
+            assert "data" in file_data
+            assert file_data["data"].get("encrypted") is True
 
     def test_load_wallet_unencrypted(self):
         """Test loading unencrypted wallet"""

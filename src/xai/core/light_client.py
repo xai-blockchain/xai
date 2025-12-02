@@ -221,9 +221,46 @@ class LightClient:
         return True
 
     def _validate_pow(self, header: BlockHeader) -> bool:
-        """Validate proof of work for header"""
-        target = "0" * header.difficulty
-        return header.hash.startswith(target)
+        """
+        Validate proof of work for header using proper target comparison.
+
+        The hash must be numerically less than the target value where:
+        target = 2^256 / difficulty
+
+        This is the correct Bitcoin-style PoW validation that compares
+        the hash as an integer against the target, not just leading zeros.
+
+        Args:
+            header: Block header to validate
+
+        Returns:
+            True if hash meets difficulty requirement
+
+        Security:
+            Using integer comparison instead of string prefix is critical.
+            String prefix only checks leading zeros but doesn't verify
+            the actual numeric value of the hash is below target.
+        """
+        if not header.hash:
+            return False
+
+        if header.difficulty <= 0:
+            return False
+
+        try:
+            # Convert hash to integer for comparison
+            hash_int = int(header.hash, 16)
+
+            # Calculate target: 2^256 / difficulty
+            # Lower difficulty = higher target = easier to mine
+            # Higher difficulty = lower target = harder to mine
+            target = (2**256) // header.difficulty
+
+            return hash_int < target
+
+        except (ValueError, ZeroDivisionError):
+            # Invalid hash format or zero difficulty
+            return False
 
     def verify_transaction(self, spv_proof: SPVProof) -> bool:
         """

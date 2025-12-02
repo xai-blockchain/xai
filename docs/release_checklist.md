@@ -5,7 +5,7 @@
 - Trust stores updated and rolled; placeholder values removed.
 - Run `k8s/verify-deployment.sh` in staging (P2P metrics + SIEM probe).
 - Confirm NetworkPolicy CIDRs for target environment.
-- Update versioned P2P supported versions (if changed) and document in `docs/api/p2p_handshake.md`.
+- Update P2P protocol support if changed: bump constants, refresh `config/p2p_versions.yaml`, and regenerate `docs/api/p2p_handshake.md` + `docs/api/p2p_versions.md`.
 - Dependency audit: `pip-audit`/`safety` clean; constraints updated if needed.
 - Bench artifact captured; check for perf regressions.
 - Run chaos/reorg tests and P2P security tests.

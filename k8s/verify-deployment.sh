@@ -112,6 +112,33 @@ verify_services() {
     done
 }
 
+verify_quic_transport() {
+    test_info "Verifying QUIC transport configuration..."
+    local quic_flag
+    quic_flag=$(kubectl get configmap xai-blockchain-config -n $NAMESPACE -o jsonpath='{.data.XAI_P2P_ENABLE_QUIC}' 2>/dev/null || echo "")
+
+    if [ -z "$quic_flag" ]; then
+        test_warn "XAI_P2P_ENABLE_QUIC not set in ConfigMap; assuming disabled"
+        return
+    fi
+
+    if [[ "$quic_flag" == "1" || "$quic_flag" == "true" ]]; then
+        if kubectl get svc xai-blockchain-quic -n $NAMESPACE &> /dev/null; then
+            test_pass "Service xai-blockchain-quic exists for QUIC transport"
+        else
+            test_fail "QUIC enabled but Service xai-blockchain-quic not found"
+        fi
+        local port=$(kubectl get svc xai-blockchain-quic -n $NAMESPACE -o jsonpath='{.spec.ports[0].port}' 2>/dev/null || echo "")
+        if [ -n "$port" ]; then
+            test_info "QUIC service port: $port/udp"
+        else
+            test_warn "Unable to determine QUIC service port"
+        fi
+    else
+        test_info "QUIC disabled by configuration; skipping QUIC service checks"
+    fi
+}
+
 verify_ingress() {
     test_info "Verifying Ingress..."
 
@@ -195,6 +222,32 @@ verify_monitoring() {
     fi
 }
 
+verify_prometheus_alerts_configmap() {
+    test_info "Verifying Prometheus alert rules ConfigMap..."
+    local cm="xai-prometheus-alerts"
+    if ! kubectl get configmap "$cm" -n $NAMESPACE &>/dev/null; then
+        test_warn "ConfigMap $cm not found in namespace $NAMESPACE"
+        return
+    fi
+    local rules
+    rules=$(kubectl get configmap "$cm" -n $NAMESPACE -o jsonpath='{.data.prometheus_alerts\.yml}' 2>/dev/null || echo "")
+    if echo "$rules" | grep -q "FastMiningConfigEnabled"; then
+        test_pass "Fast-mining guardrail alert present in $cm"
+    else
+        test_warn "FastMiningConfigEnabled alert missing from $cm"
+    fi
+    if echo "$rules" | grep -q "P2PQuicErrors"; then
+        test_pass "P2PQuicErrors alert present in $cm"
+    else
+        test_warn "P2PQuicErrors alert missing from $cm"
+    fi
+    if echo "$rules" | grep -q "P2PQuicDialTimeouts"; then
+        test_pass "P2PQuicDialTimeouts alert present in $cm"
+    else
+        test_warn "P2PQuicDialTimeouts alert missing from $cm"
+    fi
+}
+
 verify_p2p_metrics() {
     test_info "Verifying P2P security metrics exposure..."
     local pod
@@ -207,6 +260,38 @@ verify_p2p_metrics() {
         test_pass "P2P metrics exposed on /metrics (nonce replay counter present)"
     else
         test_warn "P2P metrics not found on /metrics; check metrics configuration"
+    fi
+
+    local quic_flag
+    quic_flag=$(kubectl get configmap xai-blockchain-config -n $NAMESPACE -o jsonpath='{.data.XAI_P2P_ENABLE_QUIC}' 2>/dev/null || echo "")
+    if [[ "$quic_flag" == "1" || "$quic_flag" == "true" ]]; then
+        if kubectl exec -n $NAMESPACE "$pod" -- sh -c "curl -s http://localhost:9090/metrics | grep xai_p2p_quic_errors_total" >/dev/null 2>&1; then
+            test_pass "QUIC error counter exported alongside P2P metrics"
+        else
+            test_warn "QUIC enabled but xai_p2p_quic_errors_total not observed in metrics output"
+        fi
+        if kubectl exec -n $NAMESPACE "$pod" -- sh -c "curl -s http://localhost:9090/metrics | grep xai_p2p_quic_timeouts_total" >/dev/null 2>&1; then
+            test_pass "QUIC timeout counter exported alongside P2P metrics"
+        else
+            test_warn "QUIC enabled but xai_p2p_quic_timeouts_total not observed in metrics output"
+        fi
+    fi
+}
+
+verify_alertmanager_siem_route() {
+    test_info "Verifying Alertmanager SIEM routing config..."
+    local cm="alertmanager-xai-blockchain"
+    if ! kubectl get configmap "$cm" -n $NAMESPACE &>/dev/null; then
+        test_warn "ConfigMap $cm not found in namespace $NAMESPACE"
+        return
+    fi
+
+    local config
+    config=$(kubectl get configmap "$cm" -n $NAMESPACE -o jsonpath='{.data.alertmanager\.yml}' 2>/dev/null || echo "")
+    if echo "$config" | grep -q "config\\.fast_mining_.*|p2p\\..*"; then
+        test_pass "Alertmanager config contains SIEM routing for fast-mining and P2P events"
+    else
+        test_warn "Alertmanager config missing SIEM routing for fast-mining/P2P events"
     fi
 }
 
@@ -223,6 +308,40 @@ verify_siem_webhook() {
         test_pass "SIEM webhook probe delivered successfully"
     else
         test_warn "SIEM webhook probe failed (check webhook URL/secret)"
+    fi
+}
+
+verify_grafana_security_dashboard() {
+    test_info "Verifying Grafana security operations dashboard config..."
+    local cm="xai-grafana-security-ops"
+    if ! kubectl get configmap "$cm" -n $NAMESPACE &>/dev/null; then
+        test_warn "ConfigMap $cm not found; Grafana dashboard may not be provisioned"
+        return
+    fi
+
+    local dashboard
+    dashboard=$(kubectl get configmap "$cm" -n $NAMESPACE -o jsonpath='{.data.aixn_security_operations\.json}' 2>/dev/null || echo "")
+    if echo "$dashboard" | grep -q "Fast Mining Config Events"; then
+        test_pass "Fast-mining panel present in Grafana security dashboard config"
+    else
+        test_warn "Fast-mining panel not detected in Grafana dashboard config"
+    fi
+
+    if echo "$dashboard" | grep -q '"uid":"prometheus"'; then
+        test_pass "Grafana dashboard references Prometheus datasource uid=prometheus"
+    else
+        test_warn "Grafana dashboard missing Prometheus datasource uid"
+    fi
+
+    if echo "$dashboard" | grep -q "xai_p2p_quic_errors_total"; then
+        test_pass "QUIC error metric panel present in Grafana dashboard config"
+    else
+        test_warn "QUIC error metric panel missing from Grafana dashboard config"
+    fi
+    if echo "$dashboard" | grep -q "xai_p2p_quic_timeouts_total"; then
+        test_pass "QUIC timeout metric series present in Grafana dashboard config"
+    else
+        test_warn "QUIC timeout metric series missing from Grafana dashboard config"
     fi
 }
 
@@ -387,6 +506,8 @@ main() {
     echo ""
     verify_services
     echo ""
+    verify_quic_transport
+    echo ""
     verify_ingress
     echo ""
     verify_storage
@@ -396,6 +517,16 @@ main() {
     verify_secrets
     echo ""
     verify_monitoring
+    echo ""
+    verify_prometheus_alerts_configmap
+    echo ""
+    verify_p2p_metrics
+    echo ""
+    verify_alertmanager_siem_route
+    echo ""
+    verify_siem_webhook
+    echo ""
+    verify_grafana_security_dashboard
     echo ""
     verify_hpa
     echo ""

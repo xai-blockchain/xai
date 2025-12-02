@@ -3,7 +3,8 @@
 import os
 
 import pytest
-import schemathesis
+schemathesis = pytest.importorskip("schemathesis")
+loaders = getattr(schemathesis, "loaders", None)
 
 API_BASE_URL = os.environ.get("API_BASE_URL")
 pytestmark = pytest.mark.skipif(
@@ -11,7 +12,12 @@ pytestmark = pytest.mark.skipif(
     reason="Set API_BASE_URL to point at a running node before enabling contract regression tests.",
 )
 
-schema = schemathesis.from_path("docs/api/openapi.yaml")
+if loaders and hasattr(loaders, "from_path"):
+    schema = loaders.from_path("docs/api/openapi.yaml")
+elif hasattr(schemathesis, "from_path"):
+    schema = schemathesis.from_path("docs/api/openapi.yaml")
+else:
+    pytest.skip("schemathesis loader not available", allow_module_level=True)
 
 
 @schema.parametrize()

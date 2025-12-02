@@ -1,0 +1,12 @@
+{
+  "description": "Deterministic snapshot generated with seeded timestamps and difficulty=1 for reproducible CI validation.",
+  "protocol_version": "1",
+  "node_version": "2.0.0",
+  "height": 3,
+  "utxo_digest": "a9335ab8bbdb6997f45d31d9323c31c541586daabdc4ccd472f0de14384ea27e",
+  "block_hashes": [
+    "0000a9027db198db8571e980d32d83516ae38810dd3882772e773bd617be0704",
+    "03fcef1d5d298c59c85e36c6ef76be3c5a770860c3697cec4201b3eedd7d44cb",
+    "0ef918cc5e7e8b5c9c2c4fead9ba161886858f59fee4425a7602aa80ab3d480b"
+  ]
+}

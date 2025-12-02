@@ -1,22 +1,269 @@
-
 """
 XAI Blockchain Core - Transaction
+
+Implements a UTXO-based transaction model with ECDSA signatures.
+All monetary values use Decimal for precision in production.
+
+Security Notes:
+- All inputs are validated before processing
+- Amounts must be non-negative finite numbers
+- Addresses must follow XAI format conventions
+- Signatures use domain separation to prevent cross-network replay
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import math
+import re
 import time
-from typing import List, Dict, Optional, Any
+from decimal import Decimal, InvalidOperation
+from typing import List, Dict, Optional, Any, Union
 import base58
 from xai.core.crypto_utils import sign_message_hex, verify_signature_hex, derive_public_key_hex
 
+logger = logging.getLogger(__name__)
+
+# Validation constants
+MAX_TRANSACTION_AMOUNT = 121_000_000.0  # Total supply cap
+MIN_TRANSACTION_AMOUNT = 0.0
+MAX_FEE = 1_000_000.0  # Reasonable fee cap
+MAX_METADATA_SIZE = 4096  # 4KB metadata limit
+MAX_INPUTS = 1000  # Maximum inputs per transaction
+MAX_OUTPUTS = 1000  # Maximum outputs per transaction
+ADDRESS_PATTERN = re.compile(r'^(XAI|TXAI|COINBASE)[A-Fa-f0-9]{0,64}$')
+
+
+class TransactionValidationError(ValueError):
+    """Raised when transaction validation fails."""
+    pass
+
 
 class Transaction:
-    """Real cryptocurrency transaction with ECDSA signatures, supporting UTXO model."""
+    """Real cryptocurrency transaction with ECDSA signatures, supporting UTXO model.
+
+    All parameters are validated on construction. Invalid transactions
+    raise TransactionValidationError with details about the failure.
+
+    Attributes:
+        sender: Source address (XAI... format) or "COINBASE" for mining rewards
+        recipient: Destination address
+        amount: Transfer amount (must be >= 0 and <= MAX_TRANSACTION_AMOUNT)
+        fee: Transaction fee (must be >= 0)
+        public_key: ECDSA public key (hex) for signature verification
+        tx_type: Transaction type (normal, coinbase, contract, etc.)
+        nonce: Replay protection nonce (sequential per address)
+        inputs: UTXO inputs being spent
+        outputs: UTXO outputs being created
+        metadata: Optional transaction metadata (size limited)
+    """
     # Domain separation context for TXID/signatures to prevent cross-network replay
     _CHAIN_CONTEXT: str = "mainnet"
+
+    @staticmethod
+    def _validate_amount(value: Any, field_name: str, allow_zero: bool = True) -> float:
+        """Validate a monetary amount.
+
+        Args:
+            value: Value to validate
+            field_name: Field name for error messages
+            allow_zero: Whether zero is a valid amount
+
+        Returns:
+            Validated float amount
+
+        Raises:
+            TransactionValidationError: If validation fails
+        """
+        if value is None:
+            raise TransactionValidationError(f"{field_name} cannot be None")
+
+        try:
+            amount = float(value)
+        except (TypeError, ValueError) as e:
+            raise TransactionValidationError(
+                f"{field_name} must be a number, got {type(value).__name__}: {e}"
+            )
+
+        if math.isnan(amount) or math.isinf(amount):
+            raise TransactionValidationError(
+                f"{field_name} must be a finite number, got {amount}"
+            )
+
+        if amount < MIN_TRANSACTION_AMOUNT:
+            raise TransactionValidationError(
+                f"{field_name} cannot be negative: {amount}"
+            )
+
+        if not allow_zero and amount == 0:
+            raise TransactionValidationError(
+                f"{field_name} cannot be zero"
+            )
+
+        if amount > MAX_TRANSACTION_AMOUNT:
+            raise TransactionValidationError(
+                f"{field_name} exceeds maximum ({MAX_TRANSACTION_AMOUNT}): {amount}"
+            )
+
+        return amount
+
+    @staticmethod
+    def _validate_address(address: Any, field_name: str, allow_empty: bool = False) -> str:
+        """Validate an address format.
+
+        Args:
+            address: Address to validate
+            field_name: Field name for error messages
+            allow_empty: Whether empty/None is allowed
+
+        Returns:
+            Validated address string
+
+        Raises:
+            TransactionValidationError: If validation fails
+        """
+        if address is None or address == "":
+            if allow_empty:
+                return ""
+            raise TransactionValidationError(f"{field_name} cannot be empty")
+
+        if not isinstance(address, str):
+            raise TransactionValidationError(
+                f"{field_name} must be a string, got {type(address).__name__}"
+            )
+
+        address = address.strip()
+
+        # Special cases
+        if address == "COINBASE":
+            return address
+
+        # Check address format
+        if not ADDRESS_PATTERN.match(address):
+            raise TransactionValidationError(
+                f"{field_name} has invalid format: must start with XAI/TXAI and contain hex chars"
+            )
+
+        return address
+
+    @staticmethod
+    def _validate_inputs(inputs: Any) -> List[Dict[str, Any]]:
+        """Validate transaction inputs.
+
+        Args:
+            inputs: List of input UTXOs
+
+        Returns:
+            Validated inputs list
+
+        Raises:
+            TransactionValidationError: If validation fails
+        """
+        if inputs is None:
+            return []
+
+        if not isinstance(inputs, list):
+            raise TransactionValidationError(
+                f"inputs must be a list, got {type(inputs).__name__}"
+            )
+
+        if len(inputs) > MAX_INPUTS:
+            raise TransactionValidationError(
+                f"Too many inputs: {len(inputs)} > {MAX_INPUTS}"
+            )
+
+        validated = []
+        for i, inp in enumerate(inputs):
+            if not isinstance(inp, dict):
+                raise TransactionValidationError(
+                    f"Input {i} must be a dict, got {type(inp).__name__}"
+                )
+            if "txid" not in inp:
+                raise TransactionValidationError(f"Input {i} missing 'txid'")
+            if "vout" not in inp:
+                raise TransactionValidationError(f"Input {i} missing 'vout'")
+            validated.append(inp)
+
+        return validated
+
+    @staticmethod
+    def _validate_outputs(outputs: Any) -> List[Dict[str, Any]]:
+        """Validate transaction outputs.
+
+        Args:
+            outputs: List of output destinations
+
+        Returns:
+            Validated outputs list
+
+        Raises:
+            TransactionValidationError: If validation fails
+        """
+        if outputs is None:
+            return []
+
+        if not isinstance(outputs, list):
+            raise TransactionValidationError(
+                f"outputs must be a list, got {type(outputs).__name__}"
+            )
+
+        if len(outputs) > MAX_OUTPUTS:
+            raise TransactionValidationError(
+                f"Too many outputs: {len(outputs)} > {MAX_OUTPUTS}"
+            )
+
+        validated = []
+        for i, out in enumerate(outputs):
+            if not isinstance(out, dict):
+                raise TransactionValidationError(
+                    f"Output {i} must be a dict, got {type(out).__name__}"
+                )
+            if "address" not in out:
+                raise TransactionValidationError(f"Output {i} missing 'address'")
+            if "amount" not in out:
+                raise TransactionValidationError(f"Output {i} missing 'amount'")
+
+            # Validate output amount
+            Transaction._validate_amount(out["amount"], f"Output {i} amount")
+            Transaction._validate_address(out["address"], f"Output {i} address", allow_empty=True)
+            validated.append(out)
+
+        return validated
+
+    @staticmethod
+    def _validate_metadata(metadata: Any) -> Dict[str, Any]:
+        """Validate transaction metadata.
+
+        Args:
+            metadata: Metadata dictionary
+
+        Returns:
+            Validated metadata
+
+        Raises:
+            TransactionValidationError: If validation fails
+        """
+        if metadata is None:
+            return {}
+
+        if not isinstance(metadata, dict):
+            raise TransactionValidationError(
+                f"metadata must be a dict, got {type(metadata).__name__}"
+            )
+
+        # Check serialized size
+        try:
+            serialized = json.dumps(metadata)
+            if len(serialized) > MAX_METADATA_SIZE:
+                raise TransactionValidationError(
+                    f"metadata too large: {len(serialized)} > {MAX_METADATA_SIZE} bytes"
+                )
+        except (TypeError, ValueError) as e:
+            raise TransactionValidationError(f"metadata not JSON serializable: {e}")
+
+        return metadata
 
     def __init__(
         self,
@@ -32,27 +279,87 @@ class Transaction:
         metadata: Optional[Dict[str, Any]] = None,
         rbf_enabled: bool = False,
         replaces_txid: Optional[str] = None,
+        gas_sponsor: Optional[str] = None,
     ) -> None:
-        self.sender = sender
-        self.recipient = recipient
-        self.amount = amount
-        self.fee = fee
+        """Initialize a new transaction with validated parameters.
+
+        Args:
+            sender: Source address or "COINBASE"
+            recipient: Destination address
+            amount: Transfer amount (must be >= 0)
+            fee: Transaction fee (must be >= 0)
+            public_key: ECDSA public key for verification
+            tx_type: Transaction type
+            nonce: Replay protection nonce
+            inputs: UTXO inputs
+            outputs: UTXO outputs
+            metadata: Optional metadata (size limited)
+            rbf_enabled: Replace-by-fee enabled
+            replaces_txid: TXID this transaction replaces (if RBF)
+            gas_sponsor: Address of gas sponsor for account abstraction (optional)
+
+        Raises:
+            TransactionValidationError: If any validation fails
+        """
+        # Validate all inputs
+        self.sender = self._validate_address(sender, "sender")
+        self.recipient = self._validate_address(recipient, "recipient", allow_empty=True)
+        self.amount = self._validate_amount(amount, "amount")
+        self.fee = self._validate_amount(fee, "fee")
+
+        # Validate fee is reasonable
+        if self.fee > MAX_FEE:
+            raise TransactionValidationError(
+                f"fee exceeds maximum ({MAX_FEE}): {self.fee}"
+            )
+
+        # Validate nonce if provided
+        if nonce is not None:
+            if not isinstance(nonce, int) or nonce < 0:
+                raise TransactionValidationError(
+                    f"nonce must be a non-negative integer, got {nonce}"
+                )
+        self.nonce = nonce
+
+        # Validate tx_type
+        valid_types = {"normal", "coinbase", "contract", "governance", "stake", "unstake"}
+        if tx_type not in valid_types:
+            logger.warning(
+                "Non-standard tx_type: %s (allowed but may not be processed)",
+                tx_type,
+                extra={"event": "tx.nonstandard_type", "tx_type": tx_type}
+            )
+        self.tx_type = tx_type
+
+        # Validate public key format if provided
+        if public_key is not None:
+            if not isinstance(public_key, str):
+                raise TransactionValidationError(
+                    f"public_key must be a string, got {type(public_key).__name__}"
+                )
+            # Should be hex-encoded (variable length for compressed/uncompressed)
+            if public_key and not re.match(r'^[A-Fa-f0-9]+$', public_key):
+                raise TransactionValidationError("public_key must be hex-encoded")
+        self.public_key = public_key
+
+        # Validate inputs/outputs
+        self.inputs = self._validate_inputs(inputs)
+        self.outputs = self._validate_outputs(outputs)
+        self.metadata = self._validate_metadata(metadata)
+
+        # Set remaining fields
         self.timestamp = time.time()
         self.signature = None
         self.txid = None
-        self.public_key = public_key
-        self.tx_type = tx_type
-        self.nonce = nonce
-        self.metadata: Dict[str, Any] = metadata or {}
-        self.rbf_enabled = rbf_enabled
+        self.rbf_enabled = bool(rbf_enabled)
         self.replaces_txid = replaces_txid
-        self.inputs = (
-            inputs if inputs is not None else []
-        )
-        self.outputs = (
-            outputs if outputs is not None else []
-        )
 
+        # Gas sponsorship for account abstraction (Task 178)
+        # When set, the sponsor pays the fee instead of the sender
+        self.gas_sponsor = gas_sponsor
+        self.gas_sponsor_signature = None  # Sponsor's authorization signature
+
+        # Create default output if needed
         if not self.outputs and self.recipient and self.amount > 0:
             self.outputs.append({"address": self.recipient, "amount": self.amount})
 
@@ -106,16 +413,27 @@ class Transaction:
             return False
 
         try:
-            pub_hash = hashlib.sha256(self.public_key.encode()).hexdigest()
+            # Convert public key hex to bytes before hashing (matches wallet.py)
+            pub_key_bytes = bytes.fromhex(self.public_key)
+            pub_hash = hashlib.sha256(pub_key_bytes).hexdigest()
             expected_address = f"XAI{pub_hash[:40]}"
             if expected_address != self.sender:
-                print(f"Address mismatch: expected {expected_address}, got {self.sender}")
+                logger.warning(
+                    "Address mismatch in signature verification: expected=%s, got=%s",
+                    expected_address[:16] + "...",
+                    self.sender[:16] + "..." if self.sender else "<none>",
+                    extra={"event": "tx.address_mismatch"}
+                )
                 return False
 
             message = self.calculate_hash().encode()
             return verify_signature_hex(self.public_key, message, self.signature)
         except Exception as e:
-            print(f"Signature verification error: {e}")
+            logger.warning(
+                "Signature verification error: %s",
+                type(e).__name__,
+                extra={"event": "tx.signature_verification_failed"}
+            )
             return False
 
     def get_size(self) -> int:
@@ -142,7 +460,7 @@ class Transaction:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
-        return {
+        result = {
             "txid": self.txid,
             "sender": self.sender,
             "recipient": self.recipient,
@@ -159,3 +477,8 @@ class Transaction:
             "rbf_enabled": self.rbf_enabled,
             "replaces_txid": self.replaces_txid,
         }
+        # Include gas sponsorship fields if present
+        if self.gas_sponsor:
+            result["gas_sponsor"] = self.gas_sponsor
+            result["gas_sponsor_signature"] = self.gas_sponsor_signature
+        return result

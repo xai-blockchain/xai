@@ -16,9 +16,24 @@ import threading
 from urllib.parse import urlparse
 import websockets
 from websockets.exceptions import ConnectionClosed
+try:
+    import aioquic  # type: ignore
+    from xai.core.p2p_quic import (  # type: ignore
+        QUICServer,
+        QuicDialTimeout,
+        QuicConfiguration,
+        quic_client_send_with_timeout,
+    )
+    QUIC_AVAILABLE = True
+except Exception:
+    QUIC_AVAILABLE = False
+    QuicDialTimeout = ConnectionError  # type: ignore[assignment]
 import json
 import hashlib
+import logging
 from typing import TYPE_CHECKING, Set, Optional, Dict, Any, Union
+
+logger = logging.getLogger(__name__)
 
 import requests
 from xai.network.peer_manager import PeerManager
@@ -68,6 +83,8 @@ class P2PNetworkManager:
         self.consensus_manager = consensus_manager
         self.host = host
         self.port = port
+        self.quic_enabled = bool(getattr(Config, "P2P_ENABLE_QUIC", False) and QUIC_AVAILABLE)
+        self.quic_dial_timeout = float(getattr(Config, "P2P_QUIC_DIAL_TIMEOUT", 1.0))
         self.server: Optional[websockets.WebSocketServer] = None
         self.connections: Dict[str, Any] = {}
         self.websocket_peer_ids: Dict[Any, str] = {}
@@ -84,6 +101,7 @@ class P2PNetworkManager:
         self.bandwidth_limiter_in = BandwidthLimiter(max_bandwidth_in, max_bandwidth_in // 10)
         self.bandwidth_limiter_out = BandwidthLimiter(max_bandwidth_out, max_bandwidth_out // 10)
         self.received_chains = []
+        self._quic_server: Optional[QUICServer] = None
 
     @staticmethod
     def _normalize_peer_uri(peer_uri: str) -> str:
@@ -91,6 +109,54 @@ class P2PNetworkManager:
         if not parsed.scheme or not parsed.netloc:
             raise ValueError(f"Invalid peer URI: {peer_uri}")
         return f"{parsed.scheme}://{parsed.netloc}"
+
+    def _record_quic_error(self, host: Optional[str] = None) -> None:
+        """Increment QUIC error counter and emit a security event if configured."""
+        try:
+            from xai.core.monitoring import MetricsCollector
+
+            metric = MetricsCollector.instance().get_metric("xai_p2p_quic_errors_total")
+            if metric:
+                metric.inc()
+            SecurityEventRouter.dispatch(
+                "p2p.quic_error",
+                {"peer": host} if host else {},
+                "WARNING",
+            )
+        except Exception as e:
+            # Metrics collection failed - log but don't break P2P flows
+            logger.debug(
+                "QUIC error metric collection failed for host=%s: %s",
+                host or "unknown",
+                str(e),
+                extra={"event": "p2p.quic_error_metric_failed", "peer": host}
+            )
+
+    def _record_quic_timeout(self, host: Optional[str] = None) -> None:
+        """Increment QUIC timeout counter, track it as an error, and emit a security event."""
+        try:
+            from xai.core.monitoring import MetricsCollector
+
+            collector = MetricsCollector.instance()
+            timeout_metric = collector.get_metric("xai_p2p_quic_timeouts_total")
+            if timeout_metric:
+                timeout_metric.inc()
+            error_metric = collector.get_metric("xai_p2p_quic_errors_total")
+            if error_metric:
+                error_metric.inc()
+            SecurityEventRouter.dispatch(
+                "p2p.quic_timeout",
+                {"peer": host, "timeout_seconds": self.quic_dial_timeout} if host else {"timeout_seconds": self.quic_dial_timeout},
+                "ERROR",
+            )
+        except Exception as e:
+            # Metrics collection failed - log but don't break P2P flows
+            logger.debug(
+                "QUIC timeout metric collection failed for host=%s: %s",
+                host or "unknown",
+                str(e),
+                extra={"event": "p2p.quic_timeout_metric_failed", "peer": host}
+            )
 
     def add_peer(self, peer_uri: str) -> bool:
         """Register a peer URI for HTTP/WebSocket communication."""
@@ -104,9 +170,19 @@ class P2PNetworkManager:
             try:
                 if self.peer_manager.can_connect(host):
                     self.peer_manager.connect_peer(host)
-            except Exception:
-                # Do not fail peer registration on connection policy errors; reputation will handle at runtime.
-                pass
+            except Exception as e:
+                # Log connection policy errors for debugging; reputation system will handle at runtime
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    "Failed to connect to peer during registration",
+                    extra={
+                        "event": "peer.connect_failed",
+                        "host": host,
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
+                )
         return True
 
     def remove_peer(self, peer_uri: str) -> None:
@@ -123,8 +199,18 @@ class P2PNetworkManager:
             for pid in peers_to_disconnect:
                 try:
                     self.peer_manager.disconnect_peer(pid)
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        "Failed to disconnect peer",
+                        extra={
+                            "event": "peer.disconnect_failed",
+                            "peer_id": pid,
+                            "error": str(e),
+                            "error_type": type(e).__name__
+                        }
+                    )
 
     def get_peer_count(self) -> int:
         """Return count of known peers (HTTP/WebSocket)."""
@@ -145,7 +231,38 @@ class P2PNetworkManager:
         self.server = await websockets.serve(
             self._handler, self.host, self.port, ssl=ssl_context
         )
-        print(f"P2P server started on {self.host}:{self.port}")
+        transport = "quic+ws" if self.quic_enabled else "ws"
+        logger.info(
+            "P2P server started on %s://%s:%d",
+            transport,
+            self.host,
+            self.port,
+            extra={"event": "p2p.server_started"}
+        )
+        if self.quic_enabled and QUIC_AVAILABLE:
+            try:
+                quic_config = QuicConfiguration(is_client=False, alpn_protocols=["xai-p2p"])
+                self._quic_server = QUICServer(
+                    self.host,
+                    self.port + 1,  # QUIC on adjacent port
+                    quic_config,
+                    handler=lambda data: self._handle_quic_payload(data),
+                )
+                asyncio.create_task(self._quic_server.start())
+                logger.info(
+                    "P2P QUIC server started on %s:%d",
+                    self.host,
+                    self.port + 1,
+                    extra={"event": "p2p.quic_server_started"}
+                )
+            except Exception as exc:
+                logger.warning(
+                    "QUIC disabled due to init failure: %s",
+                    type(exc).__name__,
+                    extra={"event": "p2p.quic_init_failed"}
+                )
+                self._record_quic_error(self.host)
+                self.quic_enabled = False
         asyncio.create_task(self._connect_to_peers())
         asyncio.create_task(self._health_check())
 
@@ -157,7 +274,9 @@ class P2PNetworkManager:
         for conn in self.connections.values():
             await conn.close()
         self.connections.clear()
-        print("P2P server stopped.")
+        if self._quic_server:
+            await self._quic_server.close()
+        logger.info("P2P server stopped", extra={"event": "p2p.server_stopped"})
 
     async def _handler(self, websocket: Any, path: str) -> None:
         """Handles incoming WebSocket connections."""
@@ -178,14 +297,22 @@ class P2PNetworkManager:
             return
 
         if len(self.connections) >= self.max_connections:
-            print("Max connections reached. Rejecting new connection.")
+            logger.warning(
+                "Max connections reached, rejecting new connection from %s",
+                remote_ip,
+                extra={"event": "p2p.connection_rejected_max"}
+            )
             await websocket.close()
             return
         
         peer_id = self.peer_manager.connect_peer(remote_ip)
         self.connections[peer_id] = websocket
         self.websocket_peer_ids[websocket] = peer_id
-        print(f"Peer connected: {websocket.remote_address}")
+        logger.info(
+            "Peer connected: %s",
+            remote_ip,
+            extra={"event": "p2p.peer_connected", "peer": peer_id}
+        )
 
         try:
             async for message in websocket:
@@ -198,7 +325,11 @@ class P2PNetworkManager:
                 if conn:
                     self.websocket_peer_ids.pop(conn, None)
                 self.peer_manager.disconnect_peer(peer_id)
-            print(f"Peer disconnected: {websocket.remote_address}")
+            logger.info(
+                "Peer disconnected: %s",
+                remote_ip,
+                extra={"event": "p2p.peer_disconnected", "peer": peer_id}
+            )
 
     async def _connect_to_peers(self) -> None:
         """Connects to the initial set of peers with backoff/retry."""
@@ -225,15 +356,30 @@ class P2PNetworkManager:
                 peer_id = self.peer_manager.connect_peer(websocket.remote_address[0])
                 self.connections[peer_id] = websocket
                 self.websocket_peer_ids[websocket] = peer_id
-                print(f"Connected to peer: {peer_uri}")
+                logger.info(
+                    "Connected to peer: %s",
+                    peer_uri,
+                    extra={"event": "p2p.outbound_connected", "peer": peer_uri}
+                )
                 return
             except Exception as e:
-                print(f"Failed to connect to peer {peer_uri} on attempt {attempt + 1}/{max_retries}: {e}")
+                logger.debug(
+                    "Failed to connect to peer %s on attempt %d/%d: %s",
+                    peer_uri,
+                    attempt + 1,
+                    max_retries,
+                    type(e).__name__
+                )
                 if attempt < max_retries - 1:
                     await asyncio.sleep(delay)
                     delay *= 2  # Exponential backoff
                 else:
-                    print(f"Giving up on peer {peer_uri} after {max_retries} failed attempts.")
+                    logger.warning(
+                        "Giving up on peer %s after %d failed attempts",
+                        peer_uri,
+                        max_retries,
+                        extra={"event": "p2p.outbound_failed", "peer": peer_uri}
+                    )
                     self.peer_manager.reputation.record_disconnect(peer_uri)
 
     async def _health_check(self) -> None:
@@ -244,7 +390,11 @@ class P2PNetworkManager:
                 self.peer_manager.refresh_trust_stores()
             except Exception as exc:
                 self._log_security_event("self", f"trust_store_refresh_failed:{exc}")
-            print(f"Health check: {self.get_peer_count()} peers connected.")
+            logger.debug(
+                "Health check: %d peers connected",
+                self.get_peer_count(),
+                extra={"event": "p2p.health_check"}
+            )
 
     def _emit_security_event(
         self,
@@ -287,7 +437,12 @@ class P2PNetworkManager:
         """Log security-related events with lightweight rate limiting to avoid log flooding."""
         if self.security_log_limiter.is_rate_limited(peer_id):
             return
-        print(f"[SECURITY] {peer_id}: {message}")
+        logger.warning(
+            "Security event from %s: %s",
+            peer_id[:16] if peer_id else "<unknown>",
+            message,
+            extra={"event": f"p2p.security.{message.split(':')[0]}", "peer": peer_id}
+        )
         self._emit_security_event(
             event_type=f"p2p.{message}",
             severity="WARNING",
@@ -301,7 +456,11 @@ class P2PNetworkManager:
         
         message_size = len(raw_bytes)
         if not self.bandwidth_limiter_in.consume(peer_id, message_size):
-            print(f"Peer {peer_id} is exceeding incoming bandwidth. Disconnecting.")
+            logger.warning(
+                "Peer %s exceeding incoming bandwidth, disconnecting",
+                peer_id[:16],
+                extra={"event": "p2p.bandwidth_exceeded_in", "peer": peer_id}
+            )
             await websocket.close()
             if peer_id in self.connections:
                 conn = self.connections.pop(peer_id, None)
@@ -311,7 +470,11 @@ class P2PNetworkManager:
             return
 
         if self.rate_limiter.is_rate_limited(peer_id):
-            print(f"Peer {peer_id} is rate-limited. Ignoring message.")
+            logger.debug(
+                "Peer %s is rate-limited, ignoring message",
+                peer_id[:16],
+                extra={"event": "p2p.rate_limited", "peer": peer_id}
+            )
             self._log_security_event(peer_id, "rate_limited")
             return
 
@@ -399,12 +562,25 @@ class P2PNetworkManager:
                 # Latency can be calculated here
                 pass
             else:
-                print(f"Unknown message type: {message_type}")
+                logger.debug(
+                    "Unknown message type: %s",
+                    message_type,
+                    extra={"event": "p2p.unknown_message_type", "peer": peer_id}
+                )
         except json.JSONDecodeError:
-            print("Invalid JSON received from peer.")
+            logger.warning(
+                "Invalid JSON received from peer %s",
+                peer_id[:16],
+                extra={"event": "p2p.invalid_json", "peer": peer_id}
+            )
             self.peer_manager.reputation.record_invalid_transaction(peer_id)
         except Exception as e:
-            print(f"Error handling message: {e}")
+            logger.error(
+                "Error handling message from peer %s: %s",
+                peer_id[:16],
+                type(e).__name__,
+                extra={"event": "p2p.message_handling_error", "peer": peer_id}
+            )
             self.peer_manager.reputation.record_invalid_transaction(peer_id)
 
     async def _send_signed_message(
@@ -417,12 +593,21 @@ class P2PNetworkManager:
         try:
             signed_message = self.peer_manager.encryption.create_signed_message(message)
         except Exception as exc:
-            print(f"Failed to sign message for {peer_id}: {exc}")
+            logger.error(
+                "Failed to sign message for peer %s: %s",
+                peer_id[:16],
+                type(exc).__name__,
+                extra={"event": "p2p.sign_failed", "peer": peer_id}
+            )
             return
 
         message_size = len(signed_message)
         if not self.bandwidth_limiter_out.consume(peer_id, message_size):
-            print(f"Peer {peer_id} is exceeding outgoing bandwidth. Disconnecting.")
+            logger.warning(
+                "Peer %s exceeding outgoing bandwidth, disconnecting",
+                peer_id[:16],
+                extra={"event": "p2p.bandwidth_exceeded_out", "peer": peer_id}
+            )
             await websocket.close()
             if peer_id in self.connections:
                 conn = self.connections.pop(peer_id, None)
@@ -434,7 +619,12 @@ class P2PNetworkManager:
         try:
             await websocket.send(signed_message.decode("utf-8"))
         except Exception as exc:
-            print(f"Error sending signed message to {peer_id}: {exc}")
+            logger.error(
+                "Error sending message to peer %s: %s",
+                peer_id[:16],
+                type(exc).__name__,
+                extra={"event": "p2p.send_failed", "peer": peer_id}
+            )
             if peer_id in self.connections:
                 conn = self.connections.pop(peer_id, None)
                 if conn:
@@ -449,7 +639,11 @@ class P2PNetworkManager:
         try:
             signed_message = self.peer_manager.encryption.create_signed_message(message)
         except Exception as exc:
-            print(f"Failed to sign broadcast message: {exc}")
+            logger.error(
+                "Failed to sign broadcast message: %s",
+                type(exc).__name__,
+                extra={"event": "p2p.broadcast_sign_failed"}
+            )
             return
 
         message_size = len(signed_message)
@@ -457,7 +651,11 @@ class P2PNetworkManager:
         
         for peer_id, conn in list(self.connections.items()):
             if not self.bandwidth_limiter_out.consume(peer_id, message_size):
-                print(f"Peer {peer_id} is exceeding outgoing bandwidth. Disconnecting.")
+                logger.warning(
+                    "Peer %s exceeding outgoing bandwidth during broadcast, disconnecting",
+                    peer_id[:16],
+                    extra={"event": "p2p.broadcast_bandwidth_exceeded", "peer": peer_id}
+                )
                 await conn.close()
                 del self.connections[peer_id]
                 self.websocket_peer_ids.pop(conn, None)
@@ -466,7 +664,12 @@ class P2PNetworkManager:
             try:
                 await conn.send(message_str)
             except Exception as exc:
-                print(f"Error broadcasting to {peer_id}: {exc}")
+                logger.error(
+                    "Error broadcasting to peer %s: %s",
+                    peer_id[:16],
+                    type(exc).__name__,
+                    extra={"event": "p2p.broadcast_failed", "peer": peer_id}
+                )
                 await conn.close()
                 del self.connections[peer_id]
                 self.websocket_peer_ids.pop(conn, None)
@@ -483,6 +686,25 @@ class P2PNetworkManager:
             loop.create_task(coro)
         except RuntimeError:
             asyncio.run(coro)
+
+    async def _handle_quic_payload(self, data: bytes) -> None:
+        """Handle incoming QUIC payloads by reusing the websocket message handler."""
+        try:
+            await self._handle_message(None, data)
+        except Exception:
+            pass
+
+    async def _quic_send_payload(self, host: str, payload: bytes) -> None:
+        """Send QUIC payload with bounded timeout and metrics on failure."""
+        try:
+            quic_config = QuicConfiguration(is_client=True, alpn_protocols=["xai-p2p"])
+            await quic_client_send_with_timeout(
+                host, self.port + 1, payload, quic_config, timeout=self.quic_dial_timeout
+            )
+        except QuicDialTimeout:
+            self._record_quic_timeout(host)
+        except Exception:
+            self._record_quic_error(host)
 
     def broadcast_transaction(self, transaction: "Transaction") -> None:
         """Broadcast a transaction to all connected peers."""
@@ -502,6 +724,13 @@ class P2PNetworkManager:
             except Exception:
                 self.peer_manager.reputation.record_invalid_transaction(peer_uri)
         self._dispatch_async(self.broadcast(message))
+        if self.quic_enabled and QUIC_AVAILABLE:
+            payload = json.dumps(message).encode("utf-8")
+            for peer_uri in self._http_peers_snapshot():
+                host = urlparse(peer_uri).hostname
+                if not host:
+                    continue
+                self._dispatch_async(self._quic_send_payload(host, payload))
 
     def broadcast_block(self, block: "Block") -> None:
         """Broadcast a newly mined block to all connected peers."""
@@ -516,6 +745,13 @@ class P2PNetworkManager:
             except Exception:
                 pass
         self._dispatch_async(self.broadcast(message))
+        if self.quic_enabled:
+            payload = json.dumps(message).encode("utf-8")
+            for peer_uri in self._http_peers_snapshot():
+                host = urlparse(peer_uri).hostname
+                if not host:
+                    continue
+                self._dispatch_async(self._quic_send_payload(host, payload))
 
     def _http_sync(self) -> bool:
         """HTTP-based synchronization for manually registered peers."""

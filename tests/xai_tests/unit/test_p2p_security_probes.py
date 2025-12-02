@@ -2,7 +2,9 @@ import contextlib
 
 import pytest
 
+from xai.core.blockchain import Blockchain
 from xai.core.monitoring import MetricsCollector
+from xai.core.node_p2p import P2PNetworkManager
 from xai.core.security_validation import SecurityEventRouter
 
 
@@ -47,3 +49,26 @@ def test_p2p_security_probes_increment_metrics(security_router_reset, metrics_re
     crit_metric = metrics.get_metric("xai_security_events_critical_total")
     assert warn_metric is not None and warn_metric.value >= 2  # replay + rate limited
     assert crit_metric is not None and crit_metric.value >= 1  # invalid signature
+
+
+def test_quic_error_counter(metrics_reset):
+    metrics = metrics_reset
+    mgr = P2PNetworkManager(Blockchain())
+
+    mgr._record_quic_error()
+
+    quic_metric = metrics.get_metric("xai_p2p_quic_errors_total")
+    assert quic_metric is not None
+    assert quic_metric.value >= 1
+
+
+def test_quic_timeout_counter(metrics_reset, security_router_reset):
+    metrics = metrics_reset
+    mgr = P2PNetworkManager(Blockchain())
+
+    mgr._record_quic_timeout()
+
+    timeout_metric = metrics.get_metric("xai_p2p_quic_timeouts_total")
+    error_metric = metrics.get_metric("xai_p2p_quic_errors_total")
+    assert timeout_metric is not None and timeout_metric.value >= 1
+    assert error_metric is not None and error_metric.value >= 1

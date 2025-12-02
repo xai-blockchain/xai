@@ -37,6 +37,8 @@ XAI is a Python-based blockchain implementing a production-grade proof-of-work (
 ```bash
 # From the project root, install dependencies (with constraints for reproducibility)
 pip install -c constraints.txt -e ".[dev]"
+# Optional: enable QUIC support
+pip install -e ".[network]"
 
 # Verify installation
 python -m pytest --co -q

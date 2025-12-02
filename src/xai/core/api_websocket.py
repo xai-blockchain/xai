@@ -235,8 +235,8 @@ class WebSocketAPIHandler:
             try:
                 ws.send(json.dumps({"error": error}))
                 ws.close()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to send rejection to {ip_address}: {type(e).__name__}")
             return
 
         # Register connection
@@ -340,8 +340,8 @@ class WebSocketAPIHandler:
                     if client["id"] == client_id:
                         try:
                             client["ws"].close()
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.debug(f"Failed to close stale client {client_id}: {type(e).__name__}")
 
                         ip = client.get("ip", "unknown")
                         self.limiter.unregister_connection(client_id, ip)

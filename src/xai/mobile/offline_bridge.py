@@ -467,8 +467,9 @@ class OfflineSigningValidator:
         if not OfflineSigningBridge.verify_signed_transaction(signed_tx):
             return False
 
-        # Verify address matches public key
-        pub_hash = hashlib.sha256(signed_tx.public_key.encode()).hexdigest()
+        # Verify address matches public key (hash bytes, not hex string)
+        pub_key_bytes = bytes.fromhex(signed_tx.public_key)
+        pub_hash = hashlib.sha256(pub_key_bytes).hexdigest()
         expected_address = f"XAI{pub_hash[:40]}"
         if expected_address != signed_tx.unsigned_tx.sender:
             return False

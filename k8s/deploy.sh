@@ -167,8 +167,10 @@ validate_p2p_hardening() {
         "XAI_PEER_REQUIRE_CLIENT_CERT"
         "XAI_PEER_NONCE_TTL_SECONDS"
         "XAI_P2P_MAX_MESSAGE_RATE"
+        "XAI_P2P_SECURITY_LOG_RATE"
         "XAI_P2P_MAX_BANDWIDTH_IN"
         "XAI_P2P_MAX_BANDWIDTH_OUT"
+        "XAI_P2P_QUIC_DIAL_TIMEOUT"
         "XAI_TRUSTED_PEER_PUBKEYS_FILE"
         "XAI_TRUSTED_PEER_CERT_FPS_FILE"
     )
@@ -204,6 +206,21 @@ validate_p2p_hardening() {
     fi
 
     log_success "P2P hardening configuration validated (env keys and trust-store present)"
+
+    # QUIC guardrail: disallow enabling in prod unless explicitly allowed and soak-tested
+    local quic_flag
+    quic_flag=$(grep "XAI_P2P_ENABLE_QUIC" -A1 "$cfg" | tail -n1 | awk '{print $2}' | tr -d '"')
+    local ns_lower=$(echo "$NAMESPACE" | tr '[:upper:]' '[:lower:]')
+    if [[ "$quic_flag" == "1" || "$quic_flag" == "true" ]]; then
+        if [[ "$ns_lower" == *"prod"* || "$ns_lower" == *"production"* ]]; then
+            if [[ "${ALLOW_PROD_QUIC:-0}" != "1" ]]; then
+                log_error "QUIC is enabled for a prod namespace but ALLOW_PROD_QUIC=1 not set. Disable QUIC or set ALLOW_PROD_QUIC=1 after staging soak/latency SLOs are met."
+                exit 1
+            else
+                log_warning "QUIC enabled in prod namespace with override; ensure staging soak tests passed and SLOs documented."
+            fi
+        fi
+    fi
 }
 
 create_namespace() {

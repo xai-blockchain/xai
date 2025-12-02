@@ -6,6 +6,7 @@ Includes gap limit scanning (TASK 99)
 
 import hashlib
 import hmac
+import logging
 from typing import List, Tuple, Optional, Dict, Any
 from bip_utils import (
     Bip39SeedGenerator,
@@ -19,6 +20,8 @@ from bip_utils import (
 )
 from mnemonic import Mnemonic
 
+logger = logging.getLogger(__name__)
+
 
 class HDWallet:
     """
@@ -31,7 +34,26 @@ class HDWallet:
     - Gap limit scanning for wallet recovery (TASK 99)
     """
 
-    # XAI coin type (using 9999 as placeholder - register with SLIP-0044 for production)
+    # XAI coin type for BIP-44 derivation path
+    #
+    # IMPORTANT: Production Deployment Requirement
+    # ============================================
+    # Before mainnet launch, XAI MUST be registered with SLIP-0044:
+    # https://github.com/satoshilabs/slips/blob/master/slip-0044.md
+    #
+    # Registration process:
+    # 1. Fork the SLIPS repository
+    # 2. Add XAI entry to slip-0044.md with next available coin type
+    # 3. Submit pull request with project details
+    # 4. Update this constant after approval
+    #
+    # Current value (9999) is a PLACEHOLDER for development/testnet only.
+    # Using unregistered coin types in production can cause:
+    # - Address collisions with other chains
+    # - Incompatibility with hardware wallets
+    # - User fund loss in multi-chain wallets
+    #
+    # TODO(mainnet): Replace 9999 with registered SLIP-0044 coin type
     XAI_COIN_TYPE = 9999
 
     # BIP-44 gap limit - stop scanning after N consecutive empty addresses
@@ -162,8 +184,10 @@ class HDWallet:
         private_key = address_key.PrivateKey().Raw().ToHex()
         public_key = address_key.PublicKey().RawCompressed().ToHex()
 
-        # Generate XAI address (using SHA256 like in main wallet)
-        pub_hash = hashlib.sha256(public_key.encode()).hexdigest()
+        # Generate XAI address (using SHA256 of public key bytes)
+        # Convert hex string to bytes before hashing for consistency with main wallet
+        pub_key_bytes = bytes.fromhex(public_key)
+        pub_hash = hashlib.sha256(pub_key_bytes).hexdigest()
         address = f"XAI{pub_hash[:40]}"
 
         derivation_path = f"m/44'/{self.XAI_COIN_TYPE}'/{account_index}'/{change}/{address_index}{hardened_marker}"
@@ -365,53 +389,56 @@ class HDWallet:
         return addresses
 
 
-# Example Usage
+# Example Usage (for development/testing only)
 if __name__ == "__main__":
-    print("=" * 70)
-    print("XAI HD WALLET - BIP-32/BIP-44 Implementation (TASK 27)")
-    print("=" * 70)
+    # Configure basic logging for demo
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+    logger.info("=" * 70)
+    logger.info("XAI HD WALLET - BIP-32/BIP-44 Implementation (TASK 27)")
+    logger.info("=" * 70)
 
     # Create new HD wallet
-    print("\n1. Creating new HD wallet...")
+    logger.info("1. Creating new HD wallet...")
     wallet = HDWallet()
-    print(f"Mnemonic: {wallet.get_mnemonic()}")
+    logger.info("Mnemonic: %s", wallet.get_mnemonic())
 
     # Derive account
-    print("\n2. Deriving account 0...")
+    logger.info("2. Deriving account 0...")
     account = wallet.derive_account(0)
-    print(f"Path: {account['path']}")
-    print(f"Master Public Key: {account['master_public_key'][:32]}...")
+    logger.info("Path: %s", account['path'])
+    logger.info("Master Public Key: %s...", account['master_public_key'][:32])
 
     # Derive receiving addresses
-    print("\n3. Deriving receiving addresses (m/44'/9999'/0'/0/x)...")
+    logger.info("3. Deriving receiving addresses (m/44'/9999'/0'/0/x)...")
     for i in range(3):
         addr = wallet.derive_receiving_address(account_index=0, index=i)
-        print(f"   [{i}] {addr['address']} - {addr['path']}")
+        logger.info("   [%d] %s - %s", i, addr['address'], addr['path'])
 
     # Derive change addresses
-    print("\n4. Deriving change addresses (m/44'/9999'/0'/1/x)...")
+    logger.info("4. Deriving change addresses (m/44'/9999'/0'/1/x)...")
     for i in range(2):
         addr = wallet.derive_change_address(account_index=0, index=i)
-        print(f"   [{i}] {addr['address']} - {addr['path']}")
+        logger.info("   [%d] %s - %s", i, addr['address'], addr['path'])
 
     # Demonstrate wallet recovery with gap scanning (TASK 99)
-    print("\n5. Demonstrating gap limit scanning (TASK 99)...")
-    print(f"Gap limit: {HDWallet.GAP_LIMIT} addresses")
+    logger.info("5. Demonstrating gap limit scanning (TASK 99)...")
+    logger.info("Gap limit: %d addresses", HDWallet.GAP_LIMIT)
 
     # Mock balance checker for demonstration
     def mock_balance_checker(address):
         # Simulate some addresses having balance
         return address[-1] in ['0', '2', '5']  # Mock: some addresses are "used"
 
-    print("\n6. Scanning for used addresses...")
+    logger.info("6. Scanning for used addresses...")
     used_addresses = wallet.scan_for_used_addresses(
         account_index=0,
         change=0,
         check_balance_func=mock_balance_checker,
         max_scan=50
     )
-    print(f"Found {len(used_addresses)} used addresses")
+    logger.info("Found %d used addresses", len(used_addresses))
 
-    print("\n" + "=" * 70)
-    print("HD Wallet implementation complete!")
-    print("=" * 70)
+    logger.info("=" * 70)
+    logger.info("HD Wallet implementation complete!")
+    logger.info("=" * 70)

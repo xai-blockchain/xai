@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
-from .executor import ExecutionMessage, ExecutionResult, BaseExecutor, DummyExecutor
+from .executor import ExecutionMessage, ExecutionResult, BaseExecutor, ProductionContractExecutor
 from .state import EVMState
 
 if TYPE_CHECKING:  # pragma: no cover - import heavy types only for hints
@@ -29,7 +29,8 @@ class ContractTransactionProcessor:
 
     def __init__(self, blockchain: "Blockchain", executor: Optional[BaseExecutor] = None) -> None:
         self.blockchain = blockchain
-        self.executor = executor or DummyExecutor()
+        # Use production executor by default with full security controls
+        self.executor = executor or ProductionContractExecutor(blockchain)
         self.config = ProcessorConfig()
 
     def process(

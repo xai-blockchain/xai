@@ -7,9 +7,12 @@ Prevents replay attacks by tracking sequential nonces per address.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from typing import Dict, Optional
 from threading import RLock
+
+logger = logging.getLogger(__name__)
 
 
 class NonceTracker:
@@ -47,7 +50,13 @@ class NonceTracker:
             try:
                 with open(self.nonce_file, "r") as f:
                     self.nonces = json.load(f)
-            except Exception:
+            except Exception as e:
+                logger.warning(
+                    "Failed to load nonces from %s: %s - starting fresh",
+                    self.nonce_file,
+                    type(e).__name__,
+                    extra={"event": "nonce.load_failed", "error": str(e)}
+                )
                 self.nonces = {}
 
     def _save_nonces(self) -> None:
@@ -56,7 +65,12 @@ class NonceTracker:
             with open(self.nonce_file, "w") as f:
                 json.dump(self.nonces, f, indent=2)
         except Exception as e:
-            print(f"Error saving nonces: {e}")
+            logger.error(
+                "Failed to save nonces to %s: %s",
+                self.nonce_file,
+                type(e).__name__,
+                extra={"event": "nonce.save_failed", "error": str(e)}
+            )
 
     def _get_confirmed_nonce(self, address: str) -> int:
         return self.nonces.get(address, -1)

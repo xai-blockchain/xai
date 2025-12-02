@@ -10,6 +10,7 @@ CONFIGMAP="$ROOT_DIR/k8s/configmap.yaml"
 STATEFULSET="$ROOT_DIR/k8s/statefulset.yaml"
 MKDOCS="$ROOT_DIR/mkdocs.yml"
 ALERTS="$ROOT_DIR/monitoring/prometheus_alerts.yml"
+P2P_VERSIONS="$ROOT_DIR/config/p2p_versions.yaml"
 
 error() {
     echo "[ERROR] $*" >&2
@@ -35,6 +36,7 @@ require_file "$CONFIGMAP"
 require_file "$STATEFULSET"
 require_file "$MKDOCS"
 require_file "$ALERTS"
+require_file "$P2P_VERSIONS"
 
 required_envs=(
     XAI_PEER_REQUIRE_CLIENT_CERT
@@ -87,7 +89,7 @@ if grep -q "$cert_placeholder" "$CONFIGMAP"; then
 fi
 
 info "Validating runbooks are wired into docs navigation..."
-for runbook in runbooks/p2p-replay.md runbooks/p2p-rate-limit.md runbooks/p2p-auth.md; do
+for runbook in runbooks/p2p-replay.md runbooks/p2p-rate-limit.md runbooks/p2p-auth.md runbooks/p2p-quic.md; do
     if ! grep -q "$runbook" "$MKDOCS"; then
         error "mkdocs.yml missing navigation entry for $runbook"
         exit 1
@@ -107,5 +109,42 @@ if ! grep -q "runbooks/p2p-auth" "$ALERTS"; then
     error "Alert runbook link missing for p2p-auth in prometheus_alerts.yml"
     exit 1
 fi
+if ! grep -q "runbooks/p2p-quic" "$ALERTS"; then
+    error "Alert runbook link missing for p2p-quic in prometheus_alerts.yml"
+    exit 1
+fi
+
+info "Validating P2P version manifest matches code constants..."
+python - <<'PY'
+import importlib.util
+import pathlib
+import sys
+import yaml
+
+root = pathlib.Path(__file__).resolve().parents[2]
+spec = importlib.util.spec_from_file_location("p2p_security", root / "src/xai/core/p2p_security.py")
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)  # type: ignore
+
+manifest_path = root / "config/p2p_versions.yaml"
+data = yaml.safe_load(manifest_path.read_text())
+current = str(data.get("current", "")).strip()
+releases = data.get("releases") or []
+
+protocol_version = str(getattr(mod.P2PSecurityConfig, "PROTOCOL_VERSION", "")).strip()
+supported_versions = {str(v).strip() for v in getattr(mod.P2PSecurityConfig, "SUPPORTED_VERSIONS", set())}
+
+if not current:
+    sys.exit("current version missing in manifest")
+if protocol_version != current:
+    sys.exit(f"protocol version mismatch: P2PSecurityConfig={protocol_version} vs manifest current={current}")
+if protocol_version not in supported_versions:
+    sys.exit("PROTOCOL_VERSION not present in SUPPORTED_VERSIONS")
+matches = [row for row in releases if str(row.get("protocol_version")) == protocol_version]
+if not matches:
+    sys.exit("current protocol version not documented in releases list")
+
+print(f"[INFO] P2P protocol version manifest aligned (version {protocol_version}).")
+PY
 
 info "P2P hardening checks passed."

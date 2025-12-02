@@ -166,27 +166,30 @@ class TestWalletFileOperations:
 
             assert os.path.exists(filename)
 
-            # Verify file contents
+            # Verify file contents (new HMAC format)
             with open(filename, "r") as f:
-                data = json.load(f)
+                file_data = json.load(f)
 
+            # New format has HMAC wrapper
+            assert "hmac_signature" in file_data
+            assert "data" in file_data
+            assert "version" in file_data
+
+            data = file_data["data"]
             assert data["private_key"] == wallet.private_key
             assert data["public_key"] == wallet.public_key
             assert data["address"] == wallet.address
 
     def test_load_wallet_from_file(self):
-        """Test loading wallet from saved file"""
+        """Test loading wallet from saved file using Wallet.load_from_file"""
         wallet1 = Wallet()
 
         with tempfile.TemporaryDirectory() as tmpdir:
             filename = os.path.join(tmpdir, "test_wallet.json")
             wallet1.save_to_file(filename)
 
-            # Load wallet from file
-            with open(filename, "r") as f:
-                data = json.load(f)
-
-            wallet2 = Wallet(private_key=data["private_key"])
+            # Load wallet using the proper static method (handles HMAC verification)
+            wallet2 = Wallet.load_from_file(filename)
 
             assert wallet2.private_key == wallet1.private_key
             assert wallet2.address == wallet1.address
@@ -202,10 +205,16 @@ class TestWalletFileOperations:
 
             assert os.path.exists(filename)
 
-            # Verify file contains encrypted payload
+            # Verify file contains encrypted payload (new HMAC format)
             with open(filename, "r", encoding="utf-8") as f:
-                data = json.load(f)
+                file_data = json.load(f)
 
+            # New format has HMAC wrapper
+            assert "hmac_signature" in file_data
+            assert "data" in file_data
+            assert "version" in file_data
+
+            data = file_data["data"]
             assert data.get("encrypted") is True
             payload = data.get("payload") or data.get("data")
             assert payload and isinstance(payload, dict)

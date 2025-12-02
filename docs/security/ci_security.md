@@ -12,3 +12,4 @@ Recommended additions:
 - Periodic dependency report artifact from `pip-audit` or `safety`.
 - Governance/consensus invariant tests (difficulty bounds, nonce progression) in CI.
 - Capture perf trend over time; alert on regression vs baseline.
+- Optional perf regression gating: compare `benchmarks/crypto_report.json` against a stored baseline and fail on >50% regression.

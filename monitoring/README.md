@@ -18,6 +18,14 @@ docker-compose up -d
 - **AlertManager**: http://localhost:9093
 - **Node Exporter**: http://localhost:9100/metrics
 
+## Kubernetes/Staging Rollout
+
+- Ensure `kubectl` is installed and pointed at the target staging/prod cluster/context before applying overlays.
+- Run `python3 scripts/ci/lint_monitoring_assets.py` to statically verify Alertmanager/Prometheus/Grafana assets include the required P2P + fast-mining signals and prometheus datasource uid wiring before applying.
+- Push the hardened monitoring assets (Alertmanager SIEM routing, Prometheus rules, Grafana security dashboard) into your cluster with `./k8s/apply-monitoring-overlays.sh <namespace>` (use `monitoring` if your stack runs there).
+- Restart Alertmanager/Prometheus/Grafana after applying so the ConfigMaps are reloaded; the Grafana dashboard is labeled `grafana_dashboard=1` for sidecar discovery and uses datasource uid `prometheus`.
+- Smoke-test the SIEM webhook path via `scripts/ci/smoke_siem_webhook.sh` or `./k8s/verify-monitoring-overlays.sh --namespace=<monitoring-ns> --alertmanager-service=<svc> --probe-siem`, and confirm `config.fast_mining_*` and `p2p.*` alerts appear in `/api/v2/alerts`.
+
 ### Configuration Files
 
 This directory contains:
@@ -39,6 +47,7 @@ This directory contains:
    - PagerDuty on-call integration
    - Email notifications
    - Alert inhibition rules
+   - SIEM webhook receiver (e.g., `siem-webhook`) for security events (`config.fast_mining_*`, `p2p.*`) — ensure these alerts are routed there in staging/prod.
 
 3. **alert_templates.tmpl** - Notification templates
    - Slack message formatting

@@ -279,18 +279,20 @@ class TestTransactionValidation:
         assert not bc.validate_transaction(tx)
 
     def test_reject_negative_amount(self, tmp_path):
-        """Test rejection of negative amount"""
+        """Test rejection of negative amount - should raise TransactionValidationError"""
+        from xai.core.transaction import TransactionValidationError
+
         bc = Blockchain(data_dir=str(tmp_path))
         wallet1 = Wallet()
         wallet2 = Wallet()
 
         bc.mine_pending_transactions(wallet1.address)
 
-        tx = bc.create_transaction(
-            wallet1.address, wallet2.address, -10.0, 0.24, wallet1.private_key, wallet1.public_key
-        )
-
-        assert not bc.validate_transaction(tx)
+        # Negative amounts should now raise TransactionValidationError at creation time
+        with pytest.raises(TransactionValidationError, match="cannot be negative"):
+            bc.create_transaction(
+                wallet1.address, wallet2.address, -10.0, 0.24, wallet1.private_key, wallet1.public_key
+            )
 
     def test_validate_coinbase_transaction(self, tmp_path):
         """Test coinbase transactions validate"""
@@ -353,21 +355,15 @@ class TestTransactionFees:
         assert tx.fee == 0.0
 
     def test_fee_validation(self, tmp_path):
-        """Test fee must be non-negative"""
+        """Test fee must be non-negative - should raise TransactionValidationError"""
+        from xai.core.transaction import TransactionValidationError
+
         wallet1 = Wallet()
         wallet2 = Wallet()
 
-        tx = Transaction(wallet1.address, wallet2.address, 10.0, -0.5)
-
-        # Negative fees should be rejected by validation
-        bc = Blockchain(data_dir=str(tmp_path))
-        bc.mine_pending_transactions(wallet1.address)  # Give balance
-
-        tx.public_key = wallet1.public_key
-        tx.sign_transaction(wallet1.private_key)
-
-        # Should fail validation
-        assert not bc.validate_transaction(tx)
+        # Negative fees should now raise TransactionValidationError at creation time
+        with pytest.raises(TransactionValidationError, match="cannot be negative"):
+            Transaction(wallet1.address, wallet2.address, 10.0, -0.5)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ p2p:
   caBundle: /etc/ssl/certs/ca-bundle.crt
   trustedPeerPubkeysFile: /etc/xai/trust/trusted_peer_pubkeys.txt
   trustedPeerCertFpsFile: /etc/xai/trust/trusted_peer_cert_fps.txt
+  enableQuic: false
 
 security:
   webhookUrl: ""

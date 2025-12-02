@@ -1,9 +1,13 @@
+import json
+import logging
+import time
+from typing import List, Dict, Optional
+
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key
-from typing import List, Dict, Optional
-import json
-import time
+
+logger = logging.getLogger(__name__)
 
 
 class MultiSigWallet:
@@ -62,7 +66,14 @@ class MultiSigWallet:
         """
         # TASK 26: Enhanced threshold validation
         if len(signatures) < self.threshold:
-            print(f"[MULTISIG] Insufficient signatures: {len(signatures)}/{self.threshold} required")
+            logger.debug(
+                "Insufficient signatures for multisig threshold",
+                extra={
+                    "event": "multisig.insufficient_signatures",
+                    "signatures_provided": len(signatures),
+                    "threshold_required": self.threshold
+                }
+            )
             return False
 
         message_hash = hashes.Hash(hashes.SHA256())
@@ -75,7 +86,13 @@ class MultiSigWallet:
         for pub_key_hex, signature_hex in signatures.items():
             # Verify public key is authorized
             if pub_key_hex not in self.public_keys_hex:
-                print(f"[MULTISIG] Unauthorized public key: {pub_key_hex[:16]}...")
+                logger.warning(
+                    "Unauthorized public key in multisig verification",
+                    extra={
+                        "event": "multisig.unauthorized_key",
+                        "key_prefix": pub_key_hex[:16]
+                    }
+                )
                 continue
 
             try:
@@ -83,20 +100,46 @@ class MultiSigWallet:
                 signature = bytes.fromhex(signature_hex)
                 public_key.verify(signature, digest, ec.ECDSA(hashes.SHA256()))
                 valid_signatures += 1
-                print(f"[MULTISIG] Valid signature from: {pub_key_hex[:16]}...")
+                logger.debug(
+                    "Valid multisig signature verified",
+                    extra={
+                        "event": "multisig.valid_signature",
+                        "key_prefix": pub_key_hex[:16]
+                    }
+                )
             except Exception as e:
                 invalid_signatures.append(pub_key_hex[:16])
-                print(f"[MULTISIG] Invalid signature from {pub_key_hex[:16]}...: {e}")
+                logger.debug(
+                    "Invalid multisig signature",
+                    extra={
+                        "event": "multisig.invalid_signature",
+                        "key_prefix": pub_key_hex[:16],
+                        "error_type": type(e).__name__
+                    }
+                )
                 continue
 
         # TASK 26: Detailed threshold validation
         if valid_signatures < self.threshold:
-            print(f"[MULTISIG] Threshold not met: {valid_signatures}/{self.threshold} valid signatures")
-            if invalid_signatures:
-                print(f"[MULTISIG] Invalid signatures from: {', '.join(invalid_signatures)}")
+            logger.info(
+                "Multisig threshold not met",
+                extra={
+                    "event": "multisig.threshold_not_met",
+                    "valid_signatures": valid_signatures,
+                    "threshold_required": self.threshold,
+                    "invalid_count": len(invalid_signatures)
+                }
+            )
             return False
 
-        print(f"[MULTISIG] Threshold met: {valid_signatures}/{self.threshold} signatures verified")
+        logger.info(
+            "Multisig threshold met - transaction authorized",
+            extra={
+                "event": "multisig.threshold_met",
+                "valid_signatures": valid_signatures,
+                "threshold_required": self.threshold
+            }
+        )
         return True
 
     # ===== PARTIAL SIGNATURE SUPPORT (TASK 210) =====
@@ -180,7 +223,15 @@ class MultiSigWallet:
         if tx["signers_collected"] >= tx["threshold"]:
             tx["status"] = "ready"
             tx["completed_at"] = time.time()
-            print(f"[MULTISIG] Transaction {tx_id} ready: {tx['signers_collected']}/{tx['threshold']} signatures")
+            logger.info(
+                "Multisig transaction ready for finalization",
+                extra={
+                    "event": "multisig.tx_ready",
+                    "tx_id": tx_id,
+                    "signatures_collected": tx["signers_collected"],
+                    "threshold": tx["threshold"]
+                }
+            )
 
         return {
             "tx_id": tx_id,

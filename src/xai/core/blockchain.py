@@ -40,20 +40,76 @@ from xai.core.blockchain_interface import BlockchainDataProvider, GamificationBl
 
 from xai.core.transaction import Transaction
 from xai.core.node_identity import load_or_create_identity
+from xai.core.security_validation import SecurityEventRouter
+from xai.core.account_abstraction import (
+    get_sponsored_transaction_processor,
+    SponsorshipResult,
+)
 
 class Block:
     """Blockchain block with real proof-of-work"""
 
     def __init__(
         self,
-        header: BlockHeader,
+        header: Union[BlockHeader, int],
         transactions: List[Transaction],
+        previous_hash: Optional[str] = None,
+        difficulty: Optional[int] = None,
+        timestamp: Optional[float] = None,
+        nonce: int = 0,
+        merkle_root: Optional[str] = None,
+        signature: Optional[str] = None,
+        miner_pubkey: Optional[str] = None,
     ) -> None:
-        self.header = header
+        """
+        Accept either a fully constructed BlockHeader or legacy positional fields
+        (index, transactions, previous_hash, difficulty, ...). The legacy path
+        keeps backward compatibility with tests/utilities that still instantiate
+        blocks directly from primitives.
+        """
+        if isinstance(header, BlockHeader):
+            block_header = header
+        else:
+            if previous_hash is None or difficulty is None:
+                raise ValueError("previous_hash and difficulty are required for legacy block construction")
+            block_header = BlockHeader(
+                index=int(header),
+                previous_hash=previous_hash,
+                merkle_root=merkle_root or self._calculate_merkle_root_static(transactions),
+                timestamp=timestamp or time.time(),
+                difficulty=int(difficulty),
+                nonce=nonce,
+                signature=signature,
+                miner_pubkey=miner_pubkey,
+            )
+
+        self.header = block_header
         self.transactions = transactions
         self._miner: Optional[str] = None
         # Optional ancestry window for fast reorg sync; never persisted
         self.lineage: Optional[List["Block"]] = None
+
+    @staticmethod
+    def _calculate_merkle_root_static(transactions: List[Transaction]) -> str:
+        """Calculate a merkle root from raw transactions without needing a Blockchain instance."""
+        if not transactions:
+            return hashlib.sha256(b"").hexdigest()
+
+        tx_hashes: List[str] = []
+        for tx in transactions:
+            if tx.txid is None:
+                tx.txid = tx.calculate_hash()
+            tx_hashes.append(tx.txid)
+
+        while len(tx_hashes) > 1:
+            if len(tx_hashes) % 2 != 0:
+                tx_hashes.append(tx_hashes[-1])
+            tx_hashes = [
+                hashlib.sha256((tx_hashes[i] + tx_hashes[i + 1]).encode()).hexdigest()
+                for i in range(0, len(tx_hashes), 2)
+            ]
+
+        return tx_hashes[0]
 
     @property
     def index(self) -> int:
@@ -83,14 +139,29 @@ class Block:
     @property
     def timestamp(self) -> float:
         return self.header.timestamp
+
+    @timestamp.setter
+    def timestamp(self, value: float) -> None:
+        self.header.timestamp = value
+        self.header.hash = self.header.calculate_hash()
     
     @property
     def difficulty(self) -> int:
         return self.header.difficulty
+
+    @difficulty.setter
+    def difficulty(self, value: int) -> None:
+        self.header.difficulty = int(value)
+        self.header.hash = self.header.calculate_hash()
     
     @property
     def nonce(self) -> int:
         return self.header.nonce
+
+    @nonce.setter
+    def nonce(self, value: int) -> None:
+        self.header.nonce = int(value)
+        self.header.hash = self.header.calculate_hash()
     
     @property
     def merkle_root(self) -> str:
@@ -281,6 +352,37 @@ class Blockchain:
         max_checkpoints: int = 10,
         compact_on_startup: bool = False,
     ) -> None:
+        is_pytest = bool(os.environ.get("PYTEST_CURRENT_TEST"))
+        self.network_type = os.getenv("XAI_NETWORK", "testnet").lower()
+        fast_mining_default = "1" if (is_pytest and self.network_type != "mainnet") else "0"
+        self.fast_mining_enabled = os.getenv("XAI_FAST_MINING", fast_mining_default) == "1"
+        self.max_test_mining_difficulty = int(os.getenv("XAI_MAX_TEST_MINING_DIFFICULTY", "4"))
+        if self.network_type == "mainnet" and self.fast_mining_enabled:
+            try:
+                SecurityEventRouter.dispatch(
+                    "config.fast_mining_rejected",
+                    {"network": self.network_type},
+                    "CRITICAL",
+                )
+            except Exception:
+                pass
+            raise ValueError("Fast mining is not allowed on mainnet; unset XAI_FAST_MINING or switch network.")
+
+        if self.fast_mining_enabled:
+            try:
+                SecurityEventRouter.dispatch(
+                    "config.fast_mining_enabled",
+                    {
+                        "network": self.network_type,
+                        "cap": self.max_test_mining_difficulty,
+                        "data_dir": data_dir,
+                    },
+                    "WARNING",
+                )
+            except Exception:
+                # Do not block initialization if telemetry sink is unavailable
+                pass
+
         if os.environ.get("PYTEST_CURRENT_TEST") and data_dir == "data":
             data_dir = tempfile.mkdtemp(prefix="xai_chain_test_")
         self.storage = BlockchainStorage(data_dir, compact_on_startup)
@@ -326,7 +428,10 @@ class Blockchain:
             self._mempool_invalid_threshold = int(MEMPOOL_INVALID_TX_THRESHOLD)
             self._mempool_invalid_ban_seconds = int(MEMPOOL_INVALID_BAN_SECONDS)
             self._mempool_invalid_window_seconds = int(MEMPOOL_INVALID_WINDOW_SECONDS)
-        except Exception:
+        except Exception as e:
+            self.logger.warn(
+                f"Failed to load mempool config from environment, using defaults: {type(e).__name__}: {e}"
+            )
             self._mempool_max_size = 10000
             self._mempool_max_per_sender = 100
             self._mempool_max_age_seconds = 86400  # 24 hours
@@ -417,7 +522,8 @@ class Blockchain:
                 return candidate  # already a full block
         try:
             return self.storage.load_block_from_disk(index)
-        except Exception:
+        except Exception as e:
+            self.logger.debug(f"Failed to load block {index} from disk: {type(e).__name__}: {e}")
             return None
 
     def get_circulating_supply(self) -> float:
@@ -447,7 +553,8 @@ class Blockchain:
             if not block_obj or not getattr(block_obj, "transactions", None):
                 try:
                     block_obj = self.storage.load_block_from_disk(idx)
-                except Exception:
+                except Exception as e:
+                    self.logger.debug(f"Skipping block {idx} in history scan: {type(e).__name__}")
                     continue
             if not block_obj or not getattr(block_obj, "transactions", None):
                 continue
@@ -622,6 +729,43 @@ class Blockchain:
             block = self.storage.load_block_from_disk(header.index)
             if block:
                 self._process_governance_block_transactions(block)
+
+    def _rebuild_nonce_tracker(self, chain: List) -> None:
+        """
+        Rebuild nonce tracker from chain state.
+
+        This is critical after a chain reorganization to ensure the nonce
+        tracker reflects the actual confirmed transaction nonces.
+
+        Args:
+            chain: The new canonical chain (list of blocks or headers)
+        """
+        # Reset the nonce tracker
+        self.nonce_tracker.reset()
+
+        # Replay all transactions from the chain to rebuild nonces
+        for header_or_block in chain:
+            # Load full block if we only have header
+            if hasattr(header_or_block, 'transactions'):
+                block = header_or_block
+            else:
+                block = self.storage.load_block_from_disk(header_or_block.index)
+
+            if block and hasattr(block, 'transactions'):
+                for tx in block.transactions:
+                    if tx.sender and tx.sender != "COINBASE" and tx.nonce is not None:
+                        # Update the nonce tracker with confirmed transactions
+                        current_nonce = self.nonce_tracker.get_nonce(tx.sender)
+                        if tx.nonce >= current_nonce:
+                            self.nonce_tracker.set_nonce(tx.sender, tx.nonce + 1)
+
+        self.logger.info(
+            "Nonce tracker rebuilt after chain reorganization",
+            extra={
+                "event": "nonce_tracker.rebuilt",
+                "chain_length": len(chain)
+            }
+        )
 
     def _transaction_to_governance_transaction(self, tx: "Transaction") -> Optional[GovernanceTransaction]:
         metadata = getattr(tx, "metadata", {}) or {}
@@ -934,6 +1078,102 @@ class Blockchain:
             reward = remaining_supply
 
         return reward
+
+    def validate_coinbase_reward(self, block: Block) -> Tuple[bool, Optional[str]]:
+        """
+        Validate that the coinbase transaction doesn't exceed the allowed block reward + fees.
+
+        This is a CRITICAL security check that prevents miners from creating unlimited coins
+        by validating that the coinbase reward matches the expected block reward plus
+        transaction fees collected in the block.
+
+        Security Properties:
+        - Enforces halving schedule (reward halves every 262,800 blocks)
+        - Validates reward doesn't exceed base reward + total fees
+        - Prevents inflation attacks where miners create arbitrary amounts
+        - Enforces maximum supply cap (121M XAI)
+
+        Args:
+            block: The block to validate
+
+        Returns:
+            Tuple of (is_valid, error_message)
+            - is_valid: True if coinbase reward is valid
+            - error_message: Description of validation failure, or None if valid
+
+        Example:
+            >>> is_valid, error = blockchain.validate_coinbase_reward(block)
+            >>> if not is_valid:
+            ...     print(f"Invalid coinbase: {error}")
+
+        Attack Mitigation:
+            Without this check, a malicious miner could set coinbase amount to any value,
+            creating unlimited coins and breaking the tokenomics. This validation ensures
+            the economic model is enforced at the consensus level.
+        """
+        # Find the coinbase transaction
+        coinbase_tx = None
+        for tx in block.transactions:
+            if tx.sender == "COINBASE" or tx.tx_type == "coinbase":
+                coinbase_tx = tx
+                break
+
+        if coinbase_tx is None:
+            return False, "Block missing coinbase transaction"
+
+        # Calculate expected base block reward for this height
+        expected_reward = self.get_block_reward(block.index)
+
+        # Calculate total transaction fees in the block (all non-coinbase transactions)
+        total_fees = 0.0
+        for tx in block.transactions:
+            if tx.sender not in ["COINBASE", "SYSTEM", "AIRDROP"] and tx.tx_type != "coinbase":
+                total_fees += tx.fee
+
+        # Maximum allowed coinbase amount = base reward + transaction fees
+        max_allowed = expected_reward + total_fees
+
+        # Get actual coinbase reward
+        actual_reward = coinbase_tx.amount
+
+        # Validate coinbase doesn't exceed maximum allowed
+        # Allow small floating point tolerance (0.00000001 XAI)
+        tolerance = 0.00000001
+        if actual_reward > max_allowed + tolerance:
+            error_msg = (
+                f"Coinbase reward {actual_reward:.8f} XAI exceeds maximum allowed {max_allowed:.8f} XAI "
+                f"(base reward: {expected_reward:.8f} XAI, fees: {total_fees:.8f} XAI) at block height {block.index}"
+            )
+            self.logger.warn(
+                "SECURITY: Invalid coinbase reward - potential inflation attack",
+                extra={
+                    "event": "consensus.invalid_coinbase",
+                    "block_height": block.index,
+                    "block_hash": block.hash,
+                    "expected_reward": expected_reward,
+                    "actual_reward": actual_reward,
+                    "total_fees": total_fees,
+                    "max_allowed": max_allowed,
+                    "excess": actual_reward - max_allowed,
+                }
+            )
+            return False, error_msg
+
+        # Log successful validation
+        self.logger.debug(
+            "Coinbase reward validated successfully",
+            extra={
+                "event": "consensus.coinbase_validated",
+                "block_height": block.index,
+                "block_hash": block.hash,
+                "expected_reward": expected_reward,
+                "actual_reward": actual_reward,
+                "total_fees": total_fees,
+                "max_allowed": max_allowed,
+            }
+        )
+
+        return True, None
 
     def calculate_next_difficulty(self) -> int:
         """
@@ -1249,7 +1489,8 @@ class Blockchain:
         if not getattr(transaction, "txid", None):
             try:
                 transaction.txid = transaction.calculate_hash()
-            except Exception:
+            except Exception as e:
+                self.logger.warn(f"Transaction rejected: failed to calculate txid: {type(e).__name__}")
                 return False
 
         # Drop duplicates early
@@ -1399,7 +1640,32 @@ class Blockchain:
             self._sender_pending_count[transaction.sender] = self._sender_pending_count.get(transaction.sender, 0) + 1
             self.nonce_tracker.reserve_nonce(transaction.sender, transaction.nonce)
         self._clear_sender_penalty(transaction.sender)
-        self.logger.info("Transaction added to mempool", txid=transaction.txid, sender=transaction.sender)
+
+        # Process gas sponsorship if applicable (Task 178: Account Abstraction)
+        if hasattr(transaction, 'gas_sponsor') and transaction.gas_sponsor:
+            sponsor_processor = get_sponsored_transaction_processor()
+            validation = sponsor_processor.validate_sponsored_transaction(transaction)
+            if validation.result == SponsorshipResult.APPROVED:
+                sponsor_processor.deduct_sponsor_fee(transaction)
+                self.logger.info(
+                    "Sponsored transaction added to mempool",
+                    txid=transaction.txid,
+                    sender=transaction.sender,
+                    sponsor=transaction.gas_sponsor,
+                    fee=transaction.fee
+                )
+            else:
+                # Sponsorship validation failed - log but don't reject
+                # The transaction can still be processed if sender has funds
+                self.logger.warn(
+                    f"Sponsorship validation failed: {validation.message}",
+                    txid=transaction.txid,
+                    sender=transaction.sender,
+                    sponsor=transaction.gas_sponsor
+                )
+        else:
+            self.logger.info("Transaction added to mempool", txid=transaction.txid, sender=transaction.sender)
+
         return True
 
     def _handle_rbf_replacement(self, replacement_tx: Transaction) -> bool:
@@ -1532,6 +1798,13 @@ class Blockchain:
 
         # Adjust difficulty based on recent block times
         self.difficulty = self.calculate_next_difficulty()
+        if self.fast_mining_enabled and self.difficulty > self.max_test_mining_difficulty:
+            self.logger.info(
+                "Capping mining difficulty for fast-mining mode",
+                requested_difficulty=self.difficulty,
+                cap=self.max_test_mining_difficulty,
+            )
+            self.difficulty = self.max_test_mining_difficulty
 
         # Reset pending nonce reservations so block assembly validates from confirmed state in-order
         if hasattr(self.nonce_tracker, "pending_nonces"):
@@ -1725,7 +1998,18 @@ class Blockchain:
     
     def mine_block(self, header: BlockHeader) -> str:
         """Mine block with proof-of-work"""
-        target = "0" * header.difficulty
+        effective_difficulty = header.difficulty
+        if self.fast_mining_enabled and effective_difficulty > self.max_test_mining_difficulty:
+            self.logger.info(
+                "Applying fast-mining difficulty cap",
+                requested_difficulty=effective_difficulty,
+                cap=self.max_test_mining_difficulty,
+                network=self.network_type,
+            )
+            effective_difficulty = self.max_test_mining_difficulty
+            header.difficulty = effective_difficulty
+
+        target = "0" * effective_difficulty
 
         while True:
             hash_attempt = header.calculate_hash()
@@ -1895,11 +2179,18 @@ class Blockchain:
         nonce progression, merkle root verification, and supply cap enforcement.
         """
         if chain is None:
-            chain_to_check = []
-            for height in range(len(self.chain)):
-                disk_block = self.storage._load_block_from_disk(height)
-                # Fall back to in-memory reference if disk is missing (e.g., fresh nodes)
-                chain_to_check.append(disk_block or self.chain[height])
+            # Prefer the in-memory cache so we can detect tampering before hitting disk
+            # (e.g., corruption in RAM or during recovery). Use only headers to avoid
+            # coupling validation to any potentially mutated in-memory transaction objects.
+            if self.chain:
+                chain_to_check = [
+                    copy.deepcopy(block.header) if isinstance(block, Block) else copy.deepcopy(block)
+                    for block in self.chain
+                ]
+            else:
+                chain_to_check = self.storage.load_chain_from_disk()
+            if not chain_to_check:
+                return False
         else:
             chain_to_check = chain
         if not chain_to_check:
@@ -2044,8 +2335,8 @@ class Blockchain:
             self.nonce_tracker.pending_nonces = nonce_snapshot[1]
             try:
                 self.nonce_tracker._save_nonces()
-            except Exception:
-                pass
+            except Exception as e:
+                self.logger.debug(f"Failed to save nonces after chain validation restore: {type(e).__name__}")
 
     def _calculate_chain_work(self, chain: List[BlockHeader]) -> int:
         """
@@ -2307,6 +2598,11 @@ class Blockchain:
             self._rebuild_governance_state_from_chain()
             self.sync_smart_contract_vm()
 
+            # CRITICAL: Rebuild nonce tracker from new chain
+            # After a reorg, transaction nonces may have changed
+            # Failing to rebuild would cause mempool validation to use stale nonces
+            self._rebuild_nonce_tracker(materialized_chain)
+
             # Save new chain to disk
             for block in materialized_chain:
                 self.storage._save_block_to_disk(block)
@@ -2519,8 +2815,10 @@ class Blockchain:
 
     def _check_orphan_chains_for_reorg(self) -> bool:
         """
-        Check if orphan blocks can form a longer valid chain than the current chain.
-        This handles the case where blocks from a competing fork arrive sequentially.
+        Check if orphan blocks can form a chain with more cumulative work than the current chain.
+
+        This implements the work-based fork choice rule (heaviest chain wins), which is
+        more secure than length-based selection as it accounts for actual mining difficulty.
 
         Returns:
             True if reorganization occurred, False otherwise
@@ -2529,7 +2827,7 @@ class Blockchain:
             return False
 
         best_candidate = None
-        best_length = 0
+        best_work = self._calculate_chain_work(self.chain)
 
         # Try to build chains starting from each possible fork point
         for fork_point_index in range(len(self.chain)):
@@ -2563,19 +2861,65 @@ class Blockchain:
                         break
                     current_index += 1
 
-                # Check if this candidate is the longest we've found and at least as long as current chain
-                if len(candidate_chain) >= len(self.chain) and len(candidate_chain) > best_length:
+                # Calculate cumulative work for candidate chain
+                candidate_work = self._calculate_chain_work(candidate_chain)
+
+                # Select candidate with most cumulative work (not just length)
+                if candidate_work > best_work:
                     # Validate the candidate chain
                     if self._validate_chain_structure(candidate_chain):
                         best_candidate = candidate_chain
-                        best_length = len(candidate_chain)
+                        best_work = candidate_work
 
-        # If we found a longer or equal valid chain, reorganize to it
-        # Equal-length reorganization allows accepting competing chains that arrive together
-        if best_candidate and len(best_candidate) >= len(self.chain):
+        # If we found a chain with more work, reorganize to it
+        if best_candidate:
+            self.logger.info(
+                "Reorganizing to chain with more cumulative work",
+                extra={
+                    "event": "chain.reorg",
+                    "current_length": len(self.chain),
+                    "new_length": len(best_candidate),
+                    "current_work": self._calculate_chain_work(self.chain),
+                    "new_work": best_work
+                }
+            )
             return self.replace_chain(best_candidate)
 
         return False
+
+    def _calculate_chain_work(self, chain: List) -> int:
+        """
+        Calculate cumulative work for a chain.
+
+        Cumulative work represents the total computational effort required to produce
+        the chain. It's calculated as the sum of 2^difficulty for each block.
+
+        This is more accurate than chain length for fork choice because:
+        - A chain with 10 blocks at difficulty 20 has more work than
+        - A chain with 15 blocks at difficulty 10
+
+        Args:
+            chain: List of blocks or block headers
+
+        Returns:
+            Total cumulative work (sum of 2^difficulty for each block)
+        """
+        total_work = 0
+        for block_or_header in chain:
+            # Handle both Block and BlockHeader objects
+            if hasattr(block_or_header, 'header'):
+                difficulty = block_or_header.header.difficulty
+            elif hasattr(block_or_header, 'difficulty'):
+                difficulty = block_or_header.difficulty
+            else:
+                continue
+
+            # Work = 2^difficulty (exponential, like Bitcoin)
+            # Cap difficulty to prevent overflow
+            capped_difficulty = min(difficulty, 256)
+            total_work += 2 ** capped_difficulty
+
+        return total_work
 
     def _record_state_snapshot(self, label: str) -> None:
         """Store a bounded history of state integrity snapshots for audit/debug."""

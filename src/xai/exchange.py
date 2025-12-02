@@ -1,15 +1,52 @@
 """
-AXN Exchange - Decentralized Order Book and Matching Engine
-Handles limit orders, market orders, and trade execution
+XAI Exchange - Decentralized Order Book and Matching Engine
+
+Handles limit orders, market orders, and trade execution with atomic settlement.
+
+Features:
+- Price-time priority order matching
+- Atomic fund settlement with rollback on failure
+- Trading fee calculation with XAI discount
+- Order book depth and spread tracking
+- Trade history and user order management
+
+Security:
+- All settlements are atomic (both sides execute or neither)
+- Balance verification before trade execution
+- Fee deduction from trade proceeds
+- Structured logging for audit trail
 """
 
+import logging
 import time
 import uuid
-from decimal import Decimal
-from typing import List, Dict, Optional, Tuple
+from decimal import Decimal, InvalidOperation
+from typing import List, Dict, Optional, Tuple, Callable, Any
 from dataclasses import dataclass, field
 from enum import Enum
 import json
+
+logger = logging.getLogger(__name__)
+
+
+class ExchangeError(Exception):
+    """Base exception for exchange errors."""
+    pass
+
+
+class InsufficientBalanceError(ExchangeError):
+    """Raised when user has insufficient balance for trade."""
+    pass
+
+
+class SettlementError(ExchangeError):
+    """Raised when trade settlement fails."""
+    pass
+
+
+class OrderValidationError(ExchangeError):
+    """Raised when order validation fails."""
+    pass
 
 
 class OrderType(Enum):
@@ -78,9 +115,22 @@ class Order:
         }
 
 
+class SettlementStatus(Enum):
+    """Settlement status for trades."""
+    PENDING = "pending"
+    SETTLED = "settled"
+    FAILED = "failed"
+    ROLLED_BACK = "rolled_back"
+
+
 @dataclass
 class Trade:
-    """Represents an executed trade"""
+    """
+    Represents an executed trade with settlement tracking.
+
+    A trade is only considered complete when settlement_status is SETTLED,
+    indicating that funds have been atomically transferred between parties.
+    """
 
     id: str
     pair: str
@@ -91,6 +141,21 @@ class Trade:
     price: Decimal
     amount: Decimal
     timestamp: float = field(default_factory=time.time)
+    settlement_status: SettlementStatus = SettlementStatus.PENDING
+    buyer_fee: Decimal = Decimal("0")
+    seller_fee: Decimal = Decimal("0")
+    settlement_txid: Optional[str] = None
+    settlement_error: Optional[str] = None
+
+    @property
+    def total_value(self) -> Decimal:
+        """Total value of the trade (price * amount)."""
+        return self.price * self.amount
+
+    @property
+    def is_settled(self) -> bool:
+        """Check if trade has been settled."""
+        return self.settlement_status == SettlementStatus.SETTLED
 
     def to_dict(self) -> dict:
         """Convert to dictionary"""
@@ -103,7 +168,11 @@ class Trade:
             "seller": self.seller_address,
             "price": float(self.price),
             "amount": float(self.amount),
-            "total": float(self.price * self.amount),
+            "total": float(self.total_value),
+            "buyer_fee": float(self.buyer_fee),
+            "seller_fee": float(self.seller_fee),
+            "settlement_status": self.settlement_status.value,
+            "settlement_txid": self.settlement_txid,
             "timestamp": self.timestamp,
         }
 
@@ -185,18 +254,164 @@ class OrderBook:
         }
 
 
+class BalanceProvider:
+    """
+    Interface for balance management.
+
+    Implementations must provide atomic balance operations for settlement.
+    """
+
+    def get_balance(self, address: str, asset: str) -> Decimal:
+        """Get balance for an address and asset."""
+        raise NotImplementedError
+
+    def reserve_balance(self, address: str, asset: str, amount: Decimal) -> bool:
+        """
+        Reserve balance for a pending trade.
+
+        Returns True if reservation succeeded, False if insufficient balance.
+        """
+        raise NotImplementedError
+
+    def release_reservation(self, address: str, asset: str, amount: Decimal) -> bool:
+        """Release a previous reservation (on trade cancellation/rollback)."""
+        raise NotImplementedError
+
+    def transfer(
+        self, from_address: str, to_address: str, asset: str, amount: Decimal
+    ) -> Optional[str]:
+        """
+        Execute atomic transfer between addresses.
+
+        Returns transaction ID if successful, None if failed.
+        """
+        raise NotImplementedError
+
+
+class InMemoryBalanceProvider(BalanceProvider):
+    """
+    In-memory balance provider for testing and development.
+
+    WARNING: This is NOT suitable for production. Use a proper
+    blockchain-backed implementation for mainnet.
+    """
+
+    def __init__(self):
+        self.balances: Dict[str, Dict[str, Decimal]] = {}  # address -> {asset -> balance}
+        self.reservations: Dict[str, Dict[str, Decimal]] = {}  # address -> {asset -> reserved}
+        self._tx_counter = 0
+
+    def set_balance(self, address: str, asset: str, amount: Decimal):
+        """Set balance for testing."""
+        if address not in self.balances:
+            self.balances[address] = {}
+        self.balances[address][asset] = amount
+
+    def get_balance(self, address: str, asset: str) -> Decimal:
+        """Get available balance (total - reserved)."""
+        total = self.balances.get(address, {}).get(asset, Decimal("0"))
+        reserved = self.reservations.get(address, {}).get(asset, Decimal("0"))
+        return total - reserved
+
+    def reserve_balance(self, address: str, asset: str, amount: Decimal) -> bool:
+        """Reserve balance for pending trade."""
+        available = self.get_balance(address, asset)
+        if available < amount:
+            return False
+
+        if address not in self.reservations:
+            self.reservations[address] = {}
+        current_reserved = self.reservations[address].get(asset, Decimal("0"))
+        self.reservations[address][asset] = current_reserved + amount
+        return True
+
+    def release_reservation(self, address: str, asset: str, amount: Decimal) -> bool:
+        """Release reserved balance."""
+        if address not in self.reservations:
+            return False
+        current_reserved = self.reservations[address].get(asset, Decimal("0"))
+        if current_reserved < amount:
+            return False
+        self.reservations[address][asset] = current_reserved - amount
+        return True
+
+    def transfer(
+        self, from_address: str, to_address: str, asset: str, amount: Decimal
+    ) -> Optional[str]:
+        """Execute atomic transfer."""
+        # Check balance
+        from_balance = self.balances.get(from_address, {}).get(asset, Decimal("0"))
+        if from_balance < amount:
+            return None
+
+        # Execute transfer
+        self.balances[from_address][asset] = from_balance - amount
+        if to_address not in self.balances:
+            self.balances[to_address] = {}
+        to_balance = self.balances[to_address].get(asset, Decimal("0"))
+        self.balances[to_address][asset] = to_balance + amount
+
+        # Generate transaction ID
+        self._tx_counter += 1
+        return f"TX{self._tx_counter:08d}"
+
+
 class MatchingEngine:
-    """Order matching engine"""
+    """
+    Order matching engine with atomic settlement.
+
+    Implements price-time priority matching with proper fund settlement.
+    All trades are settled atomically - either both sides execute or neither.
+
+    Security:
+    - Balance verification before order placement
+    - Atomic settlement with rollback on failure
+    - Fee deduction from trade proceeds
+    - Structured logging for audit trail
+    """
 
     def __init__(
-        self, fee_rate: Decimal = Decimal("0.001"), axn_fee_discount: Decimal = Decimal("0.5")
+        self,
+        fee_rate: Decimal = Decimal("0.001"),
+        xai_fee_discount: Decimal = Decimal("0.5"),
+        balance_provider: Optional[BalanceProvider] = None,
+        fee_collector_address: str = "XAI_FEE_COLLECTOR",
     ):
+        """
+        Initialize matching engine.
+
+        Args:
+            fee_rate: Trading fee rate (default 0.1%)
+            xai_fee_discount: Discount when paying fees with XAI (default 50%)
+            balance_provider: Provider for balance operations (uses in-memory for dev if None)
+            fee_collector_address: Address to receive trading fees
+        """
         self.order_books: Dict[str, OrderBook] = {}
-        self.active_orders: Dict[str, Order] = {}  # All active orders
+        self.active_orders: Dict[str, Order] = {}
         self.trade_history: List[Trade] = []
-        self.user_orders: Dict[str, List[str]] = {}  # user_address -> [order_ids]
-        self.fee_rate = fee_rate  # 0.1% default fee
-        self.axn_fee_discount = axn_fee_discount  # 50% discount when paying with AXN
+        self.user_orders: Dict[str, List[str]] = {}
+        self.fee_rate = fee_rate
+        self.xai_fee_discount = xai_fee_discount
+        self.fee_collector_address = fee_collector_address
+
+        # Use provided balance provider or create in-memory for development
+        if balance_provider is None:
+            logger.warning(
+                "Using in-memory balance provider - NOT SUITABLE FOR PRODUCTION",
+                extra={"event": "exchange.dev_mode"}
+            )
+            self.balance_provider = InMemoryBalanceProvider()
+        else:
+            self.balance_provider = balance_provider
+
+        logger.info(
+            "Matching engine initialized",
+            extra={
+                "event": "exchange.init",
+                "fee_rate": float(fee_rate),
+                "xai_discount": float(xai_fee_discount)
+            }
+        )
 
     def get_order_book(self, pair: str) -> OrderBook:
         """Get or create order book for pair"""
@@ -311,9 +526,49 @@ class MatchingEngine:
                 else:
                     break  # No more matches
 
-    def execute_trade(self, buy_order: Order, sell_order: Order, price: Decimal, amount: Decimal):
-        """Execute a trade between two orders"""
-        # Create trade record
+    def execute_trade(self, buy_order: Order, sell_order: Order, price: Decimal, amount: Decimal) -> Optional[Trade]:
+        """
+        Execute a trade between two orders with atomic settlement.
+
+        Settlement flow:
+        1. Calculate fees for both parties
+        2. Verify buyer has sufficient quote currency (price * amount + fees)
+        3. Verify seller has sufficient base currency (amount)
+        4. Execute atomic transfers:
+           - Buyer sends quote currency to seller
+           - Seller sends base currency to buyer
+           - Fees sent to fee collector
+        5. On any failure, rollback all transfers
+
+        Args:
+            buy_order: The buy order
+            sell_order: The sell order
+            price: Execution price
+            amount: Trade amount (in base currency)
+
+        Returns:
+            Trade object if successful, None if settlement failed
+        """
+        # Parse trading pair (e.g., "XAI/USD" -> base="XAI", quote="USD")
+        try:
+            base_asset, quote_asset = buy_order.pair.split("/")
+        except ValueError:
+            logger.error(
+                "Invalid trading pair format",
+                extra={"event": "exchange.invalid_pair", "pair": buy_order.pair}
+            )
+            return None
+
+        # Calculate trade value and fees
+        trade_value = price * amount  # Quote currency amount
+        buyer_fee = self.calculate_fee(trade_value, buy_order.pay_fee_with_axn)
+        seller_fee = self.calculate_fee(trade_value, sell_order.pay_fee_with_axn)
+
+        # Total buyer needs: trade_value + buyer_fee (in quote currency)
+        buyer_total = trade_value + buyer_fee
+        # Seller needs: amount (in base currency)
+
+        # Create trade record (pending settlement)
         trade = Trade(
             id=str(uuid.uuid4()),
             pair=buy_order.pair,
@@ -323,7 +578,125 @@ class MatchingEngine:
             seller_address=sell_order.user_address,
             price=price,
             amount=amount,
+            buyer_fee=buyer_fee,
+            seller_fee=seller_fee,
+            settlement_status=SettlementStatus.PENDING,
         )
+
+        logger.info(
+            "Executing trade settlement",
+            extra={
+                "event": "exchange.settlement_start",
+                "trade_id": trade.id,
+                "buyer": buy_order.user_address[:16] + "...",
+                "seller": sell_order.user_address[:16] + "...",
+                "price": float(price),
+                "amount": float(amount),
+                "buyer_fee": float(buyer_fee),
+                "seller_fee": float(seller_fee),
+            }
+        )
+
+        # Verify balances before settlement
+        buyer_balance = self.balance_provider.get_balance(buy_order.user_address, quote_asset)
+        seller_balance = self.balance_provider.get_balance(sell_order.user_address, base_asset)
+
+        if buyer_balance < buyer_total:
+            trade.settlement_status = SettlementStatus.FAILED
+            trade.settlement_error = f"Insufficient buyer balance: {buyer_balance} < {buyer_total}"
+            logger.warning(
+                "Trade settlement failed: insufficient buyer balance",
+                extra={
+                    "event": "exchange.settlement_failed",
+                    "trade_id": trade.id,
+                    "reason": "insufficient_buyer_balance",
+                    "available": float(buyer_balance),
+                    "required": float(buyer_total),
+                }
+            )
+            self.trade_history.append(trade)
+            return None
+
+        if seller_balance < amount:
+            trade.settlement_status = SettlementStatus.FAILED
+            trade.settlement_error = f"Insufficient seller balance: {seller_balance} < {amount}"
+            logger.warning(
+                "Trade settlement failed: insufficient seller balance",
+                extra={
+                    "event": "exchange.settlement_failed",
+                    "trade_id": trade.id,
+                    "reason": "insufficient_seller_balance",
+                    "available": float(seller_balance),
+                    "required": float(amount),
+                }
+            )
+            self.trade_history.append(trade)
+            return None
+
+        # Execute atomic settlement
+        # Track completed transfers for potential rollback
+        completed_transfers: List[Tuple[str, str, str, Decimal]] = []
+
+        try:
+            # Transfer 1: Buyer sends quote currency to seller (minus seller fee)
+            seller_receives = trade_value - seller_fee
+            tx1 = self.balance_provider.transfer(
+                buy_order.user_address, sell_order.user_address, quote_asset, seller_receives
+            )
+            if not tx1:
+                raise SettlementError("Failed to transfer quote currency to seller")
+            completed_transfers.append((buy_order.user_address, sell_order.user_address, quote_asset, seller_receives))
+
+            # Transfer 2: Seller sends base currency to buyer
+            tx2 = self.balance_provider.transfer(
+                sell_order.user_address, buy_order.user_address, base_asset, amount
+            )
+            if not tx2:
+                raise SettlementError("Failed to transfer base currency to buyer")
+            completed_transfers.append((sell_order.user_address, buy_order.user_address, base_asset, amount))
+
+            # Transfer 3: Buyer fee to fee collector
+            if buyer_fee > 0:
+                tx3 = self.balance_provider.transfer(
+                    buy_order.user_address, self.fee_collector_address, quote_asset, buyer_fee
+                )
+                if not tx3:
+                    raise SettlementError("Failed to transfer buyer fee")
+                completed_transfers.append((buy_order.user_address, self.fee_collector_address, quote_asset, buyer_fee))
+
+            # Transfer 4: Seller fee to fee collector (from buyer's payment)
+            if seller_fee > 0:
+                tx4 = self.balance_provider.transfer(
+                    buy_order.user_address, self.fee_collector_address, quote_asset, seller_fee
+                )
+                if not tx4:
+                    raise SettlementError("Failed to transfer seller fee")
+                completed_transfers.append((buy_order.user_address, self.fee_collector_address, quote_asset, seller_fee))
+
+            # Settlement successful
+            trade.settlement_status = SettlementStatus.SETTLED
+            trade.settlement_txid = tx1  # Use first transfer as primary TXID
+
+        except SettlementError as e:
+            # Rollback all completed transfers
+            logger.error(
+                "Trade settlement failed, rolling back",
+                extra={
+                    "event": "exchange.settlement_rollback",
+                    "trade_id": trade.id,
+                    "error": str(e),
+                    "transfers_to_rollback": len(completed_transfers),
+                }
+            )
+
+            for from_addr, to_addr, asset, amt in reversed(completed_transfers):
+                # Reverse the transfer
+                self.balance_provider.transfer(to_addr, from_addr, asset, amt)
+
+            trade.settlement_status = SettlementStatus.ROLLED_BACK
+            trade.settlement_error = str(e)
+            self.trade_history.append(trade)
+            return None
 
         # Update order filled amounts
         buy_order.filled += amount
@@ -332,7 +705,6 @@ class MatchingEngine:
         # Update order status
         if buy_order.is_filled():
             buy_order.status = OrderStatus.FILLED
-            # Remove from order book
             order_book = self.get_order_book(buy_order.pair)
             order_book.remove_order(buy_order.id)
         elif buy_order.filled > 0:
@@ -340,7 +712,6 @@ class MatchingEngine:
 
         if sell_order.is_filled():
             sell_order.status = OrderStatus.FILLED
-            # Remove from order book
             order_book = self.get_order_book(sell_order.pair)
             order_book.remove_order(sell_order.id)
         elif sell_order.filled > 0:
@@ -352,6 +723,19 @@ class MatchingEngine:
         # Keep only last 1000 trades
         if len(self.trade_history) > 1000:
             self.trade_history = self.trade_history[-1000:]
+
+        logger.info(
+            "Trade settlement completed",
+            extra={
+                "event": "exchange.settlement_complete",
+                "trade_id": trade.id,
+                "settlement_txid": trade.settlement_txid,
+                "buyer_fee": float(buyer_fee),
+                "seller_fee": float(seller_fee),
+            }
+        )
+
+        return trade
 
     def cancel_order(self, order_id: str, user_address: str) -> bool:
         """Cancel an order"""
@@ -397,12 +781,21 @@ class MatchingEngine:
         # Return most recent first
         return sorted(trades, key=lambda t: -t.timestamp)[:limit]
 
-    def calculate_fee(self, total: Decimal, pay_with_axn: bool = False) -> Decimal:
-        """Calculate trading fee"""
+    def calculate_fee(self, total: Decimal, pay_with_xai: bool = False) -> Decimal:
+        """
+        Calculate trading fee.
+
+        Args:
+            total: Trade value in quote currency
+            pay_with_xai: If True, apply XAI discount
+
+        Returns:
+            Fee amount in quote currency
+        """
         fee = total * self.fee_rate
 
-        if pay_with_axn:
-            fee = fee * self.axn_fee_discount
+        if pay_with_xai:
+            fee = fee * self.xai_fee_discount
 
         return fee
 

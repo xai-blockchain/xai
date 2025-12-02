@@ -1,0 +1,11 @@
+# Supported P2P protocol versions by node release.
+# This file is consumed by CI to ensure protocol constants and docs stay in sync.
+current: "1"
+releases:
+  - node_version: "2.0.0"
+    protocol_version: "1"
+    supported_features:
+      - ws
+      - quic
+    deprecated: false
+    notes: "Initial production hardening release with versioned handshake, SIEM hooks, and optional QUIC transport."

@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: xai-blockchain-config
+  namespace: xai-blockchain
+  labels:
+    app: xai-blockchain
+    component: config
+data:
+  NODE_HOST: "0.0.0.0"
+  NODE_PORT: "8545"
+  RPC_PORT: "8546"
+  P2P_PORT: "30303"
+  WS_PORT: "8547"
+  BLOCKCHAIN_DIFFICULTY: "4"
+  BLOCK_TIME_TARGET: "120"
+  MAX_PEERS: "50"
+  ENVIRONMENT: "staging"
+  METRICS_ENABLED: "true"
+  METRICS_PORT: "9090"
+  XAI_PEER_REQUIRE_CLIENT_CERT: "1"
+  XAI_PEER_NONCE_TTL_SECONDS: "120"
+  XAI_P2P_MAX_MESSAGE_RATE: "50"
+  XAI_P2P_SECURITY_LOG_RATE: "20"
+  XAI_P2P_MAX_BANDWIDTH_IN: "524288"
+  XAI_P2P_MAX_BANDWIDTH_OUT: "524288"
+  XAI_P2P_QUIC_DIAL_TIMEOUT: "1.0"
+  XAI_TRUSTED_PEER_PUBKEYS_FILE: "/etc/xai/trust/trusted_peer_pubkeys.txt"
+  XAI_TRUSTED_PEER_CERT_FPS_FILE: "/etc/xai/trust/trusted_peer_cert_fps.txt"
+  XAI_P2P_CA_BUNDLE: "/etc/ssl/certs/ca-bundle.crt"
+  XAI_P2P_DNS_SEEDS: ""
+  XAI_P2P_BOOTSTRAP_NODES: ""
+  XAI_P2P_ENABLE_QUIC: "1"  # enable QUIC in staging for validation
+  XAI_SECURITY_WEBHOOK_URL: ""
+  XAI_SECURITY_WEBHOOK_TOKEN: ""

@@ -152,11 +152,11 @@ class TestUserJourneyTrading:
 
         # Check final balance
         total_sent = sum(amounts)
-        total_fees = 0.1 * len(amounts)
-        expected_balance = initial_balance - total_sent - total_fees
+        total_fees = round(0.1 * len(amounts), 8)
+        expected_balance = round(initial_balance - total_sent - total_fees, 8)
 
         user1_final = blockchain.get_balance(user1.address)
-        assert user1_final == expected_balance
+        assert round(user1_final, 8) == expected_balance
 
     def test_user_trading_multiple_pairs(self, e2e_blockchain_dir):
         """User trades with multiple trading pairs"""
@@ -194,8 +194,10 @@ class TestUserJourneyTrading:
         # Mine all transactions
         blockchain.mine_pending_transactions(Wallet().address)
 
-        # Verify chain validity
+        # Verify chain validity and positive balances remain
         assert blockchain.validate_chain()
+        for user in users:
+            assert blockchain.get_balance(user.address) >= 0
 
     def test_user_trading_with_partial_amounts(self, e2e_blockchain_dir):
         """User trades with fractional amounts"""
@@ -270,25 +272,29 @@ class TestUserJourneyTrading:
         blockchain.mine_pending_transactions(wallets[0].address)
         balance = blockchain.get_balance(wallets[0].address)
 
-        # Chain transactions
-        send_amount = balance / 4
+        # Chain transactions with conservative per-hop amount to cover fees
+        fee_per_tx = 0.05
         current_wallet = wallets[0]
 
         for next_wallet in wallets[1:]:
+            available = blockchain.get_balance(current_wallet.address)
+            transferable = max((available - fee_per_tx) * 0.4, 0.01)
             tx = blockchain.create_transaction(
                 current_wallet.address,
                 next_wallet.address,
-                send_amount,
-                0.2,
+                transferable,
+                fee_per_tx,
                 current_wallet.private_key,
-                current_wallet.public_key
+                current_wallet.public_key,
             )
+            assert tx is not None
             blockchain.add_transaction(tx)
             blockchain.mine_pending_transactions(Wallet().address)
             current_wallet = next_wallet
 
-        # Final wallet should have received
-        assert blockchain.get_balance(wallets[-1].address) > 0
+        # Final wallet should have received (allowing for fee from prior hop)
+        final_balance = blockchain.get_balance(wallets[-1].address)
+        assert final_balance > 0
 
     def test_user_trading_bidirectional(self, e2e_blockchain_dir):
         """User engages in bidirectional trading"""

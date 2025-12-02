@@ -81,10 +81,13 @@ class TestWalletSigning:
     def test_signature_uniqueness(self, tmp_path):
         """Test that signatures are unique per transaction"""
         wallet = Wallet()
+        recipient = Wallet()  # Create a valid recipient wallet
 
-        tx1 = Transaction(wallet.address, "XAI...", 10.0, 0.24)
-        tx2 = Transaction(wallet.address, "XAI...", 10.0, 0.24)
+        tx1 = Transaction(wallet.address, recipient.address, 10.0, 0.24)
+        tx2 = Transaction(wallet.address, recipient.address, 10.0, 0.24)
 
+        tx1.public_key = wallet.public_key
+        tx2.public_key = wallet.public_key
         tx1.sign_transaction(wallet.private_key)
         tx2.sign_transaction(wallet.private_key)
 
@@ -142,13 +145,16 @@ class TestWalletSecurity:
         """Test that signatures cannot be forged"""
         wallet1 = Wallet()
         wallet2 = Wallet()
+        recipient = Wallet()  # Create a valid recipient
 
-        tx = Transaction(wallet1.address, "XAI...", 10.0, 0.24)
+        tx = Transaction(wallet1.address, recipient.address, 10.0, 0.24)
+        tx.public_key = wallet1.public_key  # Set the expected signer's public key
 
-        # Try to sign with wrong wallet
+        # Try to sign with wrong wallet (wallet2's private key)
         tx.sign_transaction(wallet2.private_key)
 
-        # Verification should fail
+        # Verification should fail because signature was made with wallet2's key
+        # but public_key is set to wallet1's key
         assert not tx.verify_signature(), "Forged signature should not verify"
 
     def test_cannot_modify_signed_transaction(self, tmp_path):

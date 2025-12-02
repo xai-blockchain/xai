@@ -166,23 +166,31 @@ nav:
   - API Reference:
       - OpenAPI Spec: api/openapi.yaml
       - P2P Handshake: api/p2p_handshake.md
+      - P2P Versions: api/p2p_versions.md
       - Contract Tests: api/contract_tests.md
   - Deployment:
       - Local Setup: deployment/local-setup.md
       - Release Checklist: release_checklist.md
   - Operations:
       - Backup & Restore: ops/backup_restore.md
+      - API Key Rotation: ops/api_key_rotation.md
+      - UTXO Audits: ops/utxo_audit.md
+      - Fast Mining Control: ops/fast_mining.md
   - Security:
       - Overview: security/overview.md
       - SIEM Webhook: security/siem-webhook.md
       - CI Security Gates: security/ci_security.md
       - DAST Guidance: security/dast_guidance.md
+      - DAST Stub: security/dast_stub.md
+      - Perf Trends: security/perf_trends.md
+      - Perf Alerts: security/perf_alerts.md
       - Threat Model: security/threat_model.md
   - Runbooks:
       - Runbooks Index: runbooks/index.md
       - P2P Nonce Replay: runbooks/p2p-replay.md
       - P2P Rate Limiting: runbooks/p2p-rate-limit.md
       - P2P Invalid Signatures: runbooks/p2p-auth.md
+      - P2P QUIC Errors: runbooks/p2p-quic.md
       - SIEM Webhook Failures: runbooks/siem-webhook-failure.md
   - User Guides:
       - Getting Started: user-guides/getting-started.md

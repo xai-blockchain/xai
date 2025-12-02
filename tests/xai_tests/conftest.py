@@ -3,16 +3,20 @@ import sys
 import shutil
 import tempfile
 from pathlib import Path
+
 import pytest
+
+# Ensure both the project root (for namespace-style imports like `src.xai`) and
+# the src directory (for `xai.*`) are on the Python path before collection runs.
+project_root = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(project_root))
+src_path = project_root / "src"
+sys.path.insert(0, str(src_path))
 
 # Add stubs directory to path for test stubs
 stubs = Path(__file__).parent / "stubs"
 if stubs.exists():
     sys.path.insert(0, str(stubs))
-
-# Add src directory to path so tests can import xai.core modules
-src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "src"))
-sys.path.insert(0, src_path)
 
 
 @pytest.fixture

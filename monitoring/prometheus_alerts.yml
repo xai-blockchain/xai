@@ -154,6 +154,52 @@ groups:
           description: "{{ $value }} invalid/stale P2P signatures in 5m; possible key misuse or attack"
           runbook: "https://docs.blockchain-project.io/runbooks/p2p-auth/"
 
+      # ==================== CONFIG / GUARDRAILS ====================
+
+      - alert: FastMiningConfigEnabled
+        expr: increase(xai_security_events_total{event=\"config.fast_mining_enabled\"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: blockchain
+        annotations:
+          summary: "Fast mining enabled (non-mainnet)"
+          description: "Fast mining flag observed on {{ $labels.instance }} (network={{ $labels.network | default \"unknown\" }} cap={{ $labels.cap | default \"\" }}). Treat any staging/prod occurrence as a release blocker."
+          runbook: "https://docs.blockchain-project.io/ops/fast_mining/"
+
+      - alert: FastMiningRejectedMainnet
+        expr: increase(xai_security_events_total{event=\"config.fast_mining_rejected\"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: blockchain
+        annotations:
+          summary: "Fast mining rejected on mainnet"
+          description: "Attempt to enable fast mining on mainnet detected for {{ $labels.instance }}. Investigate deployment config immediately."
+          runbook: "https://docs.blockchain-project.io/ops/fast_mining/"
+
+      - alert: P2PQuicErrors
+        expr: increase(xai_p2p_quic_errors_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: network
+        annotations:
+          summary: "QUIC transport errors"
+          description: "QUIC errors observed: {{ $value }} in 5m; check QUIC listener/connectivity."
+          runbook: "https://docs.blockchain-project.io/runbooks/p2p-quic/"
+
+      - alert: P2PQuicDialTimeouts
+        expr: increase(xai_p2p_quic_timeouts_total[5m]) > 3
+        for: 2m
+        labels:
+          severity: critical
+          service: network
+        annotations:
+          summary: "QUIC dial timeouts"
+          description: "{{ $value }} QUIC dial/send timeouts in 5m; verify UDP reachability, firewall policies, or disable QUIC until soak tests stabilize."
+          runbook: "https://docs.blockchain-project.io/runbooks/p2p-quic/"
+
       # ==================== BLOCK PRODUCTION ====================
 
       - alert: LowBlockProductionRate

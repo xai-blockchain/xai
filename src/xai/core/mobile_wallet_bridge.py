@@ -3,16 +3,24 @@ Mobile wallet bridge helpers.
 
 Allows constrained devices to request unsigned transactions, display them
 as QR/USB payloads, and later submit signed transactions for broadcasting.
+
+Security Note:
+    This bridge facilitates air-gapped signing workflows where the signing
+    device never directly connects to the network. Transaction drafts are
+    encoded as QR codes or transferred via USB for offline signing.
 """
 
 import base64
 import json
+import logging
 import time
 import uuid
 from decimal import Decimal
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from xai.core.blockchain import Transaction
+
+logger = logging.getLogger(__name__)
 
 
 class MobileWalletBridge:
@@ -148,12 +156,31 @@ class MobileWalletBridge:
         return tx
 
     def _get_fee_quote(self, priority: str) -> Dict[str, Any]:
+        """
+        Get fee quote for transaction.
+
+        Uses fee optimizer if available, falls back to basic calculation.
+
+        Args:
+            priority: Transaction priority (low, normal, high)
+
+        Returns:
+            Fee quote dictionary with recommended_fee and conditions
+        """
         pending = len(self.blockchain.pending_transactions)
         if self.fee_optimizer:
             try:
                 return self.fee_optimizer.predict_optimal_fee(pending, priority=priority)
-            except Exception:
-                pass
+            except Exception as e:
+                # Fee optimizer failed - log and fall back to basic calculation
+                logger.warning(
+                    "Fee optimizer failed, using fallback calculation",
+                    extra={
+                        "event": "mobile_bridge.fee_optimizer_error",
+                        "error_type": type(e).__name__,
+                        "priority": priority
+                    }
+                )
 
         base_fee = Decimal("0.05")
         if priority == "high":

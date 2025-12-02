@@ -6,13 +6,105 @@ All features use $0 cost - pure Python with JSON file storage
 
 import json
 import time
-import random
+import secrets
 import hashlib
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
 from pathlib import Path
 import os
 from xai.core.blockchain_interface import GamificationBlockchainInterface
+
+
+# Cryptographically secure random number generation helpers
+# Used for fairness-critical operations: airdrops, winner selection, treasure hunts
+
+def _secure_randint(a: int, b: int) -> int:
+    """
+    Cryptographically secure random integer in [a, b] inclusive.
+
+    Uses secrets.randbelow() which is backed by os.urandom() - suitable for
+    security/cryptographic use where unpredictability is critical.
+
+    Args:
+        a: Minimum value (inclusive)
+        b: Maximum value (inclusive)
+
+    Returns:
+        Random integer in range [a, b]
+    """
+    if a > b:
+        raise ValueError(f"Invalid range: {a} > {b}")
+    return secrets.randbelow(b - a + 1) + a
+
+
+def _secure_random_float(min_val: float = 0.0, max_val: float = 1.0, precision: int = 10000) -> float:
+    """
+    Cryptographically secure random float in [min_val, max_val].
+
+    Args:
+        min_val: Minimum value
+        max_val: Maximum value
+        precision: Number of discrete steps (higher = more precision)
+
+    Returns:
+        Random float in range [min_val, max_val]
+    """
+    if min_val > max_val:
+        raise ValueError(f"Invalid range: {min_val} > {max_val}")
+
+    # Generate secure random value in [0, 1] with given precision
+    random_fraction = secrets.randbelow(precision) / float(precision)
+
+    # Scale to desired range
+    return min_val + (random_fraction * (max_val - min_val))
+
+
+def _secure_sample(population: list, k: int) -> list:
+    """
+    Cryptographically secure random sample without replacement.
+
+    Implements Fisher-Yates shuffle algorithm with secure randomness.
+    This prevents predictable selection even if internal state is partially known.
+
+    Args:
+        population: List to sample from
+        k: Number of samples to draw
+
+    Returns:
+        List of k randomly selected items (no duplicates)
+    """
+    if k > len(population):
+        raise ValueError(f"Sample size {k} exceeds population size {len(population)}")
+
+    # Create a copy to avoid modifying original
+    pool = list(population)
+    result = []
+
+    # Fisher-Yates shuffle for first k elements
+    for i in range(k):
+        # Select random index from remaining items
+        j = _secure_randint(i, len(pool) - 1)
+        # Swap
+        pool[i], pool[j] = pool[j], pool[i]
+        result.append(pool[i])
+
+    return result
+
+
+def _secure_choice(population: list):
+    """
+    Cryptographically secure random choice from list.
+
+    Args:
+        population: List to choose from
+
+    Returns:
+        Single randomly selected item
+    """
+    if not population:
+        raise ValueError("Cannot choose from empty population")
+
+    return population[secrets.randbelow(len(population))]
 
 
 class AirdropManager:
@@ -88,13 +180,14 @@ class AirdropManager:
         TASK 61: Fair random selection with optional weighted distribution
         Uses block hash as seed for deterministic but unpredictable selection
         Supports weighted selection based on activity scores
+
+        SECURITY: Uses cryptographically secure randomness (secrets module)
+        If seed is provided (block hash), uses it to derive deterministic but
+        unpredictable selection via hashing - this ensures fairness and prevents
+        manipulation while maintaining reproducibility for same block hash.
         """
         if not active_addresses:
             return []
-
-        # Use seed for reproducible randomness (based on block hash)
-        if seed:
-            random.seed(seed)
 
         # Select up to 'count' winners
         winner_count = min(count, len(active_addresses))
@@ -111,17 +204,26 @@ class AirdropManager:
             else:
                 probabilities = [1 / len(active_addresses)] * len(active_addresses)
 
-            # Use weighted random selection (numpy-free implementation)
+            # Use weighted random selection (secure implementation)
             winners = []
             remaining_addresses = active_addresses.copy()
             remaining_probs = probabilities.copy()
 
-            for _ in range(winner_count):
+            for i in range(winner_count):
                 if not remaining_addresses:
                     break
 
-                # Cumulative probability selection
-                r = random.random()
+                # Cumulative probability selection with secure randomness
+                if seed:
+                    # Deterministic but unpredictable: hash seed with iteration
+                    hash_input = f"{seed}:{i}".encode()
+                    hash_digest = hashlib.sha256(hash_input).digest()
+                    # Use first 8 bytes as random value
+                    r = int.from_bytes(hash_digest[:8], 'big') / (2**64)
+                else:
+                    # Truly random using secrets module
+                    r = _secure_random_float(0.0, 1.0, precision=100000)
+
                 cumulative = 0
                 selected_idx = 0
 
@@ -145,22 +247,63 @@ class AirdropManager:
             return winners
         else:
             # Simple random selection without weighting
-            winners = random.sample(active_addresses, winner_count)
-            return winners
+            if seed:
+                # Deterministic selection using seed
+                # Sort addresses first for consistent ordering
+                sorted_addresses = sorted(active_addresses)
+
+                # Select winners deterministically based on hash
+                winners = []
+                for i in range(winner_count):
+                    hash_input = f"{seed}:{i}".encode()
+                    hash_digest = hashlib.sha256(hash_input).digest()
+                    # Use hash to select index
+                    idx = int.from_bytes(hash_digest[:4], 'big') % len(sorted_addresses)
+
+                    # Ensure no duplicates
+                    selected = sorted_addresses[idx]
+                    attempts = 0
+                    while selected in winners and attempts < len(sorted_addresses):
+                        hash_input = f"{seed}:{i}:{attempts}".encode()
+                        hash_digest = hashlib.sha256(hash_input).digest()
+                        idx = int.from_bytes(hash_digest[:4], 'big') % len(sorted_addresses)
+                        selected = sorted_addresses[idx]
+                        attempts += 1
+
+                    if selected not in winners:
+                        winners.append(selected)
+
+                return winners
+            else:
+                # Truly random selection using secure randomness
+                winners = _secure_sample(active_addresses, winner_count)
+                return winners
 
     def calculate_airdrop_amounts(self, winners: List[str], seed: str = None) -> Dict[str, float]:
         """
         Calculate random airdrop amount for each winner (1-10 AXN)
         Uses seed for deterministic amounts
-        """
-        if seed:
-            random.seed(seed)
 
+        SECURITY: Uses cryptographically secure randomness (secrets module)
+        If seed is provided, uses deterministic hash-based generation for
+        reproducibility while maintaining unpredictability.
+        """
         amounts = {}
-        for winner in winners:
-            # Random amount between 1 and 10 AXN
-            amount = round(random.uniform(1.0, 10.0), 2)
-            amounts[winner] = amount
+        for idx, winner in enumerate(winners):
+            if seed:
+                # Deterministic but unpredictable amount using hash
+                hash_input = f"{seed}:amount:{winner}:{idx}".encode()
+                hash_digest = hashlib.sha256(hash_input).digest()
+                # Use hash to generate value in [1.0, 10.0]
+                # First 4 bytes as integer, scale to range
+                random_int = int.from_bytes(hash_digest[:4], 'big')
+                # Map to [1.0, 10.0] range with 2 decimal precision
+                amount = 1.0 + ((random_int % 900) / 100.0)  # 900 cents = 9.00 range
+                amounts[winner] = round(amount, 2)
+            else:
+                # Truly random amount using secure randomness
+                amount = _secure_random_float(1.0, 10.0, precision=900)
+                amounts[winner] = round(amount, 2)
 
         return amounts
 

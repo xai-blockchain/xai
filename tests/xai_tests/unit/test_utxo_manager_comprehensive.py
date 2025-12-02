@@ -149,6 +149,22 @@ class TestUTXOSpending:
 
         assert result is False
 
+    def test_mark_utxo_spent_updates_totals(self):
+        """Marking a UTXO spent should decrement counters and stay consistent"""
+        manager = UTXOManager()
+
+        manager.add_utxo("XAI123", "txid1", 0, 10.0, "P2PKH XAI123")
+        assert manager.total_utxos == 1
+        assert manager.total_value == 10.0
+
+        manager.mark_utxo_spent("XAI123", "txid1", 0)
+
+        assert manager.total_utxos == 0
+        assert manager.total_value == 0.0
+        verification = manager.verify_utxo_consistency()
+        assert verification["is_consistent"]
+        assert verification["total_utxos_actual"] == 0
+
     def test_spent_flag_set_correctly(self):
         """Test that spent flag is set correctly"""
         manager = UTXOManager()
@@ -591,14 +607,26 @@ class TestUTXOEdgeCases:
     """Test edge cases and boundary conditions"""
 
     def test_very_large_amounts(self):
-        """Test handling very large UTXO amounts"""
+        """Test handling large UTXO amounts up to supply cap"""
         manager = UTXOManager()
 
-        large_amount = 1_000_000_000.0
+        # Use the maximum allowed amount (121M supply cap)
+        large_amount = 121_000_000.0
         manager.add_utxo("XAI123", "txid1", 0, large_amount, "P2PKH XAI123")
 
         assert manager.total_value == large_amount
         assert manager.get_balance("XAI123") == large_amount
+
+    def test_excessive_amount_rejected(self):
+        """Test that amounts exceeding supply cap are rejected"""
+        from xai.core.utxo_manager import UTXOValidationError
+
+        manager = UTXOManager()
+
+        # Amounts exceeding supply cap should be rejected
+        excessive_amount = 200_000_000.0
+        with pytest.raises(UTXOValidationError, match="exceeds maximum"):
+            manager.add_utxo("XAI123", "txid1", 0, excessive_amount, "P2PKH XAI123")
 
     def test_very_small_amounts(self):
         """Test handling very small UTXO amounts (dust)"""

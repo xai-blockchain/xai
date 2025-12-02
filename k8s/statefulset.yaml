@@ -105,6 +105,10 @@ spec:
             - name: p2p
               containerPort: 8545
               protocol: TCP
+            # QUIC Port (p2p_port + 1)
+            - name: p2p-quic
+              containerPort: 8546
+              protocol: UDP
             # RPC Port
             - name: rpc
               containerPort: 8546
@@ -274,6 +278,11 @@ spec:
                 configMapKeyRef:
                   name: xai-blockchain-config
                   key: XAI_P2P_BOOTSTRAP_NODES
+            - name: XAI_P2P_ENABLE_QUIC
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-blockchain-config
+                  key: XAI_P2P_ENABLE_QUIC
             - name: XAI_SECURITY_WEBHOOK_URL
               valueFrom:
                 configMapKeyRef:

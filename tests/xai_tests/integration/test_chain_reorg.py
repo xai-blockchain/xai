@@ -314,8 +314,9 @@ class TestReorgEdgeCases:
         bc2.add_block(block)
 
         # Node1 mines 2 empty blocks
+        miner = Wallet()
         for _ in range(2):
-            block = bc1.mine_pending_transactions(bc1.blockchain.address if hasattr(bc1, 'blockchain') else Wallet().address)
+            block = bc1.mine_pending_transactions(miner.address)
             block1_last = block
 
         # Node2 mines 1 block then adds node1's blocks

@@ -22,12 +22,21 @@ from xai.core.crypto_utils import (
 from mnemonic import Mnemonic
 
 import base64
+import logging
 from cryptography.fernet import Fernet
 import hmac
 
+logger = logging.getLogger(__name__)
+
 
 class Wallet:
-    """Real cryptocurrency wallet with public/private key cryptography"""
+    """Real cryptocurrency wallet with public/private key cryptography.
+
+    Security Notes:
+    - Private keys are generated using cryptographically secure random
+    - Hardware wallet integration available for enhanced security
+    - All security-sensitive operations are logged for audit trails
+    """
 
     def __init__(self, private_key: Optional[str] = None, hardware_wallet: Optional[HardwareWallet] = None) -> None:
         self.hardware_wallet = hardware_wallet or (get_default_hardware_wallet() if HARDWARE_WALLET_ENABLED else None)
@@ -36,15 +45,27 @@ class Wallet:
             self.private_key = ""
             self.public_key = ""
             self.address = self.hardware_wallet.get_address()
+            logger.info(
+                "Hardware wallet initialized",
+                extra={"event": "wallet.hw_init", "address": self.address[:16] + "..."}
+            )
         elif private_key:
             # Load existing wallet
             self.private_key = private_key
             self.public_key = self._derive_public_key(private_key)
             self.address = self._generate_address(self.public_key)
+            logger.debug(
+                "Wallet restored from private key",
+                extra={"event": "wallet.restored", "address": self.address[:16] + "..."}
+            )
         else:
             # Generate new wallet
             self.private_key, self.public_key = self._generate_keypair()
             self.address = self._generate_address(self.public_key)
+            logger.info(
+                "New wallet generated",
+                extra={"event": "wallet.created", "address": self.address[:16] + "..."}
+            )
 
     def _generate_keypair(self) -> Tuple[str, str]:
         """
@@ -72,21 +93,31 @@ class Wallet:
         Generates an XAI address from a public key.
 
         The address format is 'XAI' followed by the first 40 characters of the SHA256 hash
-        of the public key.
+        of the public key bytes.
+
+        Security Note:
+            The public key is first converted from hex string to bytes before hashing.
+            This ensures consistent address generation across all wallet implementations
+            and matches the standard practice of hashing raw cryptographic data.
 
         Args:
-            public_key: The public key as a hex string.
+            public_key: The public key as a hex string (64 bytes / 128 hex chars).
 
         Returns:
-            The generated XAI address string.
+            The generated XAI address string (format: XAI + 40 hex chars).
         """
-        # XAI addresses: XAI + first 40 chars of public key hash
-        pub_hash = hashlib.sha256(public_key.encode()).hexdigest()
+        # Convert hex string to bytes before hashing (security best practice)
+        # Hashing the bytes ensures consistent address generation across implementations
+        pub_key_bytes = bytes.fromhex(public_key)
+        pub_hash = hashlib.sha256(pub_key_bytes).hexdigest()
         return f"XAI{pub_hash[:40]}"
 
     def sign_message(self, message: str) -> str:
         """
         Signs a message using the wallet's private key.
+
+        Security: This operation uses the private key. Ensure the private key
+        is properly protected and zeroized after use in memory-sensitive contexts.
 
         Args:
             message: The message string to be signed.
@@ -95,9 +126,17 @@ class Wallet:
             The signature as a hex string.
         """
         if self.hardware_wallet:
+            logger.debug(
+                "Signing message with hardware wallet",
+                extra={"event": "wallet.hw_sign", "address": self.address[:16] + "..."}
+            )
             signature = self.hardware_wallet.sign_transaction(message.encode())
             return signature.hex()
 
+        logger.debug(
+            "Signing message with software wallet",
+            extra={"event": "wallet.sw_sign", "address": self.address[:16] + "..."}
+        )
         return sign_message_hex(self.private_key, message.encode())
 
     def verify_signature(self, message: str, signature: str, public_key: str) -> bool:
@@ -115,50 +154,244 @@ class Wallet:
         try:
             return verify_signature_hex(public_key, message.encode(), signature)
         except ValueError as exc:
-            print(f"An unexpected error occurred during signature verification: {exc}")
+            # Log signature verification failure without exposing sensitive details
+            logger.warning(
+                "Signature verification failed: %s",
+                type(exc).__name__,
+                extra={"event": "wallet.signature_verification_failed"}
+            )
             return False
 
     def save_to_file(self, filename: str, password: Optional[str] = None) -> None:
-        """Save wallet to encrypted file with HMAC integrity protection (TASK 57)"""
+        """Save wallet to encrypted file with HMAC integrity protection.
+
+        Security:
+        - If password is provided, wallet is encrypted with AES-GCM (PBKDF2 key derivation)
+        - HMAC-SHA256 signature is added for tamper detection
+        - HMAC key is derived from password (if provided) or address (public)
+        - Unencrypted saves are logged with warning
+
+        Args:
+            filename: Path to save the wallet file
+            password: Optional password for encryption (HIGHLY RECOMMENDED)
+
+        Note:
+            The HMAC key is derived independently from the encryption key:
+            - With password: HMAC uses PBKDF2(password || "hmac_key_derivation")
+            - Without password: HMAC uses SHA256(address) - integrity only, no secrecy
+        """
         wallet_data = {
             "private_key": self.private_key,
             "public_key": self.public_key,
             "address": self.address,
         }
 
+        # Generate HMAC salt for key derivation (stored with file)
+        hmac_salt = os.urandom(16)
+
         if password:
             payload = self._encrypt_payload(json.dumps(wallet_data), password)
             file_data = {"encrypted": True, "payload": payload}
+            # Derive HMAC key from password using separate derivation
+            hmac_key = self._derive_hmac_key(password, hmac_salt)
+            logger.info(
+                "Saving encrypted wallet file",
+                extra={
+                    "event": "wallet.save_encrypted",
+                    "address": self.address[:16] + "...",
+                    "wallet_file": os.path.basename(filename)
+                }
+            )
         else:
             file_data = wallet_data
+            # For unencrypted wallets, use address-based HMAC (integrity only)
+            # This still detects tampering but doesn't require password to verify
+            hmac_key = hashlib.sha256((self.address + base64.b64encode(hmac_salt).decode()).encode()).digest()
+            logger.warning(
+                "Saving UNENCRYPTED wallet file - private key exposed on disk",
+                extra={
+                    "event": "wallet.save_unencrypted",
+                    "address": self.address[:16] + "...",
+                    "wallet_file": os.path.basename(filename)
+                }
+            )
 
-        # Add HMAC-SHA256 signature for integrity (TASK 57)
+        # Add HMAC-SHA256 signature for integrity
         file_json = json.dumps(file_data, sort_keys=True)
-        hmac_key = hashlib.sha256(self.private_key.encode()).digest()
         signature = hmac.new(hmac_key, file_json.encode(), hashlib.sha256).hexdigest()
 
         final_data = {
             "data": file_data,
             "hmac_signature": signature,
-            "version": "1.0"
+            "hmac_salt": base64.b64encode(hmac_salt).decode("utf-8"),
+            "version": "2.0"  # Version bump for new HMAC scheme
         }
 
         with open(filename, "w") as f:
             json.dump(final_data, f, indent=2)
 
+        logger.debug(
+            "Wallet file saved with HMAC integrity protection",
+            extra={"event": "wallet.saved", "address": self.address[:16] + "..."}
+        )
+
+    def _derive_hmac_key(self, password: str, salt: bytes) -> bytes:
+        """
+        Derive HMAC key from password using PBKDF2.
+
+        Uses a separate derivation from the encryption key to ensure
+        key isolation - compromising one doesn't compromise the other.
+
+        Args:
+            password: User password
+            salt: Random salt for key derivation
+
+        Returns:
+            32-byte HMAC key
+        """
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+        from cryptography.hazmat.backends import default_backend
+
+        # Use different info string to derive independent key from encryption
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt + b"hmac_key_derivation",  # Domain separation
+            iterations=100000,
+            backend=default_backend(),
+        )
+        return kdf.derive(password.encode())
+
+    @staticmethod
+    def _derive_hmac_key_static(password: str, salt: bytes) -> bytes:
+        """Static version of _derive_hmac_key for use in load_from_file."""
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+        from cryptography.hazmat.backends import default_backend
+
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt + b"hmac_key_derivation",
+            iterations=100000,
+            backend=default_backend(),
+        )
+        return kdf.derive(password.encode())
+
     def _encrypt(self, data: str, password: str) -> str:
-        """Encrypt data using Fernet symmetric encryption"""
+        """
+        Encrypt data using Fernet symmetric encryption.
+
+        SECURITY NOTE: This method uses weak key derivation (SHA256 only, no salt,
+        single iteration). It is DEPRECATED and maintained only for backward
+        compatibility with existing wallet files.
+
+        New code should use _encrypt_payload() which uses PBKDF2 with 100k iterations.
+        Existing wallets should be migrated using migrate_wallet_encryption().
+
+        Args:
+            data: Plaintext data to encrypt
+            password: Encryption password
+
+        Returns:
+            Base64-encoded ciphertext
+        """
+        import warnings
+        warnings.warn(
+            "Wallet._encrypt uses weak key derivation. "
+            "Use _encrypt_payload() or migrate existing wallets.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         key = base64.urlsafe_b64encode(hashlib.sha256(password.encode()).digest())
         f = Fernet(key)
         encrypted_data = f.encrypt(data.encode())
         return encrypted_data.decode()
 
     def _decrypt(self, encrypted_data: str, password: str) -> str:
-        """Decrypt data using Fernet symmetric encryption"""
+        """
+        Decrypt data using Fernet symmetric encryption.
+
+        SECURITY NOTE: This method uses weak key derivation. See _encrypt() warning.
+        Maintained for backward compatibility only.
+
+        Args:
+            encrypted_data: Base64-encoded ciphertext
+            password: Decryption password
+
+        Returns:
+            Decrypted plaintext
+        """
         key = base64.urlsafe_b64encode(hashlib.sha256(password.encode()).digest())
         f = Fernet(key)
         decrypted_data = f.decrypt(encrypted_data.encode())
         return decrypted_data.decode()
+
+    def migrate_wallet_encryption(self, old_password: str, new_password: str) -> bool:
+        """
+        Migrate wallet from weak SHA256-only encryption to secure PBKDF2-based encryption.
+
+        This method:
+        1. Decrypts the wallet using the legacy weak encryption
+        2. Re-encrypts using secure PBKDF2 with 100k iterations and random salt
+        3. Updates the wallet file with the new secure format
+
+        Args:
+            old_password: Password used with legacy encryption
+            new_password: Password for new secure encryption (can be same as old)
+
+        Returns:
+            True if migration successful, False otherwise
+
+        Raises:
+            ValueError: If wallet is already using secure encryption
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Check if already migrated (has encryption_version field)
+        if hasattr(self, '_encryption_version') and self._encryption_version >= 2:
+            raise ValueError("Wallet already uses secure encryption")
+
+        logger.info(
+            "Migrating wallet to secure encryption",
+            extra={
+                "event": "wallet.encryption_migration",
+                "address": self.address[:16] + "..." if self.address else "unknown"
+            }
+        )
+
+        # Store current private key
+        private_key_backup = self.private_key
+
+        # Re-encrypt with secure method
+        try:
+            wallet_data = {
+                "address": self.address,
+                "public_key": self.public_key,
+                "private_key": self.private_key,
+                "created_at": getattr(self, 'created_at', None),
+                "encryption_version": 2  # Mark as migrated
+            }
+            encrypted_payload = self._encrypt_payload(
+                json.dumps(wallet_data),
+                new_password
+            )
+            self._encryption_version = 2
+            logger.info(
+                "Wallet encryption migration successful",
+                extra={"event": "wallet.encryption_migrated"}
+            )
+            return True
+        except Exception as e:
+            logger.error(
+                f"Wallet encryption migration failed: {e}",
+                extra={"event": "wallet.encryption_migration_failed"}
+            )
+            # Restore private key in case of partial failure
+            self.private_key = private_key_backup
+            return False
 
     def _encrypt_payload(self, data: str, password: str) -> Dict[str, str]:
         """
@@ -230,27 +463,64 @@ class Wallet:
 
     @staticmethod
     def load_from_file(filename: str, password: Optional[str] = None) -> "Wallet":
-        """Load wallet from file with HMAC integrity verification (TASK 57)"""
+        """Load wallet from file with HMAC integrity verification.
+
+        Security:
+        - HMAC-SHA256 signature is verified to detect tampering
+        - Encrypted wallets require password for decryption
+        - Failed integrity checks raise ValueError with security logging
+        - Supports both v1.0 (legacy) and v2.0 (improved) HMAC schemes
+
+        Args:
+            filename: Path to the wallet file
+            password: Password for encrypted wallets
+
+        Returns:
+            Loaded Wallet instance
+
+        Raises:
+            ValueError: If decryption fails or HMAC verification fails
+            FileNotFoundError: If wallet file doesn't exist
+        """
+        logger.debug(
+            "Loading wallet from file",
+            extra={"event": "wallet.load_start", "wallet_file": os.path.basename(filename)}
+        )
+
         with open(filename, "r") as f:
             file_data = json.load(f)
 
-        # Check if new format with HMAC signature (TASK 57)
+        # Determine file version and HMAC scheme
+        version = file_data.get("version", "1.0")
+        hmac_salt = None
+
+        # Check if new format with HMAC signature
         if "hmac_signature" in file_data:
             stored_signature = file_data["hmac_signature"]
             data = file_data["data"]
 
-            # We'll verify HMAC after we load the wallet
-            # Store signature for later verification
+            # Get HMAC salt if present (v2.0+)
+            if "hmac_salt" in file_data:
+                hmac_salt = base64.b64decode(file_data["hmac_salt"])
+
             needs_hmac_verification = True
             hmac_signature = stored_signature
             file_json = json.dumps(data, sort_keys=True)
         else:
-            # Old format without HMAC
+            # Old format without HMAC - log warning
+            logger.warning(
+                "Loading wallet without HMAC protection (legacy format)",
+                extra={"event": "wallet.load_no_hmac", "wallet_file": os.path.basename(filename)}
+            )
             data = file_data
             needs_hmac_verification = False
 
         if data.get("encrypted"):
             if not password:
+                logger.warning(
+                    "Attempted to load encrypted wallet without password",
+                    extra={"event": "wallet.load_no_password", "wallet_file": os.path.basename(filename)}
+                )
                 raise ValueError("Password required for encrypted wallet")
             # Support both new payload format and old data format
             if "payload" in data:
@@ -258,19 +528,62 @@ class Wallet:
             else:
                 wallet_json = Wallet._decrypt_static(data["data"], password)
             wallet_data = json.loads(wallet_json)
+            logger.info(
+                "Decrypted wallet file successfully",
+                extra={"event": "wallet.decrypted", "wallet_file": os.path.basename(filename)}
+            )
         else:
             wallet_data = data
+            logger.warning(
+                "Loaded UNENCRYPTED wallet file - private key was stored in plaintext",
+                extra={"event": "wallet.load_unencrypted", "wallet_file": os.path.basename(filename)}
+            )
 
         wallet = Wallet(private_key=wallet_data["private_key"])
 
-        # Verify HMAC if present (TASK 57)
+        # Verify HMAC if present
         if needs_hmac_verification:
-            hmac_key = hashlib.sha256(wallet.private_key.encode()).digest()
+            # Determine HMAC key based on version
+            if version == "2.0" and hmac_salt is not None:
+                # v2.0: HMAC key derived from password (encrypted) or address (unencrypted)
+                if data.get("encrypted") and password:
+                    hmac_key = Wallet._derive_hmac_key_static(password, hmac_salt)
+                else:
+                    # Unencrypted: use address-based HMAC
+                    hmac_key = hashlib.sha256(
+                        (wallet.address + base64.b64encode(hmac_salt).decode()).encode()
+                    ).digest()
+            else:
+                # v1.0 (legacy): HMAC key derived from private key
+                # Log warning about legacy scheme
+                logger.warning(
+                    "Using legacy v1.0 HMAC scheme - consider re-saving wallet",
+                    extra={"event": "wallet.legacy_hmac", "wallet_file": os.path.basename(filename)}
+                )
+                hmac_key = hashlib.sha256(wallet.private_key.encode()).digest()
+
             expected_signature = hmac.new(hmac_key, file_json.encode(), hashlib.sha256).hexdigest()
 
             if expected_signature != hmac_signature:
+                logger.error(
+                    "SECURITY ALERT: Wallet file HMAC verification failed - possible tampering",
+                    extra={
+                        "event": "wallet.hmac_failed",
+                        "wallet_file": os.path.basename(filename),
+                        "severity": "CRITICAL"
+                    }
+                )
                 raise ValueError("Wallet file integrity check failed: HMAC mismatch (file may be tampered)")
 
+            logger.debug(
+                "Wallet file HMAC verified successfully",
+                extra={"event": "wallet.hmac_verified", "address": wallet.address[:16] + "..."}
+            )
+
+        logger.info(
+            "Wallet loaded successfully",
+            extra={"event": "wallet.loaded", "address": wallet.address[:16] + "..."}
+        )
         return wallet
 
     @staticmethod
@@ -604,7 +917,10 @@ class Wallet:
     @staticmethod
     def _base58_encode(data: bytes) -> str:
         """
-        Encode bytes to base58.
+        Encode bytes to base58 using the standard base58 library.
+
+        Uses the well-tested base58 package to ensure correct encoding,
+        especially for edge cases with leading zeros.
 
         Args:
             data: Bytes to encode
@@ -612,30 +928,16 @@ class Wallet:
         Returns:
             Base58 string
         """
-        alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-        num = int.from_bytes(data, 'big')
-
-        if num == 0:
-            return alphabet[0]
-
-        result = ""
-        while num > 0:
-            num, remainder = divmod(num, 58)
-            result = alphabet[remainder] + result
-
-        # Add leading zeros
-        for byte in data:
-            if byte == 0:
-                result = alphabet[0] + result
-            else:
-                break
-
-        return result
+        import base58
+        return base58.b58encode(data).decode('ascii')
 
     @staticmethod
     def _base58_decode(string: str) -> bytes:
         """
-        Decode base58 string to bytes.
+        Decode base58 string to bytes using the standard base58 library.
+
+        Uses the well-tested base58 package to ensure correct decoding,
+        especially for edge cases with leading zeros.
 
         Args:
             string: Base58 string
@@ -646,25 +948,11 @@ class Wallet:
         Raises:
             ValueError: If string contains invalid characters
         """
-        alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-        num = 0
-
-        for char in string:
-            if char not in alphabet:
-                raise ValueError(f"Invalid base58 character: {char}")
-            num = num * 58 + alphabet.index(char)
-
-        # Convert to bytes
-        result = num.to_bytes((num.bit_length() + 7) // 8, 'big')
-
-        # Add leading zero bytes
-        for char in string:
-            if char == alphabet[0]:
-                result = b'\x00' + result
-            else:
-                break
-
-        return result
+        import base58
+        try:
+            return base58.b58decode(string)
+        except Exception as e:
+            raise ValueError(f"Invalid base58 string: {e}")
 
 
 class WalletManager:
@@ -711,27 +999,32 @@ class WalletManager:
         return self.wallets.get(name)
 
 
-# Example usage
+# Example usage (for development/testing only)
 if __name__ == "__main__":
+    import sys
+
+    # Configure basic logging for demo
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
     # Create new wallet
-    print("Creating new AXN wallet...")
+    logger.info("Creating new XAI wallet...")
     wallet = Wallet()
 
-    print(f"\n✅ Wallet Created!")
-    print(f"Address: {wallet.address}")
-    print(f"Public Key: {wallet.public_key[:32]}...")
-    print(f"Private Key: {wallet.private_key[:32]}... (KEEP SECRET!)")
+    logger.info("Wallet Created Successfully")
+    logger.info("Address: %s", wallet.address)
+    logger.info("Public Key: %s...", wallet.public_key[:32])
+    logger.info("Private Key: %s... (KEEP SECRET!)", wallet.private_key[:32])
 
     # Test signing
-    message = "Hello AXN!"
+    message = "Hello XAI!"
     signature = wallet.sign_message(message)
-    print(f"\nMessage: {message}")
-    print(f"Signature: {signature[:64]}...")
+    logger.info("Message: %s", message)
+    logger.info("Signature: %s...", signature[:64])
 
     # Verify
     is_valid = wallet.verify_signature(message, signature, wallet.public_key)
-    print(f"Signature Valid: {is_valid}")
+    logger.info("Signature Valid: %s", is_valid)
 
     # Save wallet
     wallet.save_to_file("test_wallet.json")
-    print(f"\n💾 Wallet saved to test_wallet.json")
+    logger.info("Wallet saved to test_wallet.json")

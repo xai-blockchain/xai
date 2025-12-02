@@ -716,8 +716,9 @@ class ChainValidator:
             if not public_key or not signature:
                 return False
 
-            # Verify address matches public key
-            pub_hash = hashlib.sha256(public_key.encode()).hexdigest()
+            # Verify address matches public key (hash bytes, not hex string)
+            pub_key_bytes = bytes.fromhex(public_key)
+            pub_hash = hashlib.sha256(pub_key_bytes).hexdigest()
             expected_address = f"XAI{pub_hash[:40]}"
 
             if expected_address != sender:

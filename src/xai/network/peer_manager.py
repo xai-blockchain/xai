@@ -1,6 +1,7 @@
 import asyncio
 import hashlib
 import json
+import logging
 import os
 import ssl
 import time
@@ -8,6 +9,8 @@ from collections import defaultdict, deque
 from typing import List, Dict, Any, Optional, Tuple, Iterable
 import threading
 import websockets
+
+logger = logging.getLogger(__name__)
 
 
 class PeerReputation:
@@ -408,16 +411,29 @@ class PeerEncryption:
 
             # Verify timestamp is recent (e.g., within the last 5 minutes)
             if time.time() - message["timestamp"] > 300:
-                print("Stale message received. Discarding.")
+                logger.warning(
+                    "Stale message received, discarding",
+                    extra={
+                        "event": "peer.stale_message",
+                        "message_age_seconds": time.time() - message["timestamp"],
+                        "sender": pubkey_hex[:16] + "..." if pubkey_hex else "unknown"
+                    }
+                )
                 return None
-            
+
             # Serialize the inner message for verification
             serialized_message = json.dumps(message, sort_keys=True).encode('utf-8')
             message_hash = hashlib.sha256(serialized_message).digest()
-            
+
             # Verify the signature
             if not pubkey.ecdsa_verify(message_hash, signature):
-                print("Invalid signature.")
+                logger.warning(
+                    "Invalid signature in peer message",
+                    extra={
+                        "event": "peer.invalid_signature",
+                        "sender": pubkey_hex[:16] + "..." if pubkey_hex else "unknown"
+                    }
+                )
                 return None
             
             return {
@@ -428,7 +444,14 @@ class PeerEncryption:
             }
             
         except (json.JSONDecodeError, KeyError, ValueError) as e:
-            print(f"Error verifying signed message: {e}")
+            logger.warning(
+                "Error verifying signed message",
+                extra={
+                    "event": "peer.message_verification_error",
+                    "error_type": type(e).__name__,
+                    "error_message": str(e)
+                }
+            )
             return None
 
     def is_nonce_replay(self, sender_id: str, nonce: str, timestamp: Optional[float] = None) -> bool:
@@ -512,10 +535,35 @@ class PeerEncryption:
                     lines = self._load_lines_from_file(self.trusted_peer_pubkeys_file)
                     updated_pubkeys = set(line.lower() for line in lines)
                     self._trust_file_mtimes[self.trusted_peer_pubkeys_file] = mtime
+                    logger.info(
+                        "Reloaded trusted peer pubkeys",
+                        extra={
+                            "event": "peer.trust_store_reload",
+                            "store_type": "pubkeys",
+                            "count": len(updated_pubkeys),
+                            "file": self.trusted_peer_pubkeys_file
+                        }
+                    )
         except FileNotFoundError:
-            pass
+            logger.debug(
+                "Trusted peer pubkeys file not found",
+                extra={
+                    "event": "peer.trust_store_missing",
+                    "store_type": "pubkeys",
+                    "file": self.trusted_peer_pubkeys_file
+                }
+            )
         except Exception as exc:
-            print(f"Failed to reload trusted pubkeys: {exc}")
+            logger.error(
+                "Failed to reload trusted pubkeys",
+                extra={
+                    "event": "peer.trust_store_error",
+                    "store_type": "pubkeys",
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                    "file": self.trusted_peer_pubkeys_file
+                }
+            )
 
         try:
             if self.trusted_cert_fps_file:
@@ -524,10 +572,35 @@ class PeerEncryption:
                     lines = self._load_lines_from_file(self.trusted_cert_fps_file)
                     updated_fps = set(line.lower() for line in lines)
                     self._trust_file_mtimes[self.trusted_cert_fps_file] = mtime
+                    logger.info(
+                        "Reloaded trusted cert fingerprints",
+                        extra={
+                            "event": "peer.trust_store_reload",
+                            "store_type": "cert_fps",
+                            "count": len(updated_fps),
+                            "file": self.trusted_cert_fps_file
+                        }
+                    )
         except FileNotFoundError:
-            pass
+            logger.debug(
+                "Trusted cert fingerprints file not found",
+                extra={
+                    "event": "peer.trust_store_missing",
+                    "store_type": "cert_fps",
+                    "file": self.trusted_cert_fps_file
+                }
+            )
         except Exception as exc:
-            print(f"Failed to reload trusted cert fingerprints: {exc}")
+            logger.error(
+                "Failed to reload trusted cert fingerprints",
+                extra={
+                    "event": "peer.trust_store_error",
+                    "store_type": "cert_fps",
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                    "file": self.trusted_cert_fps_file
+                }
+            )
 
         if updated_pubkeys is not None:
             self.trusted_peer_pubkeys = updated_pubkeys
@@ -837,10 +910,35 @@ class PeerManager:
                     lines = self._load_lines_from_file(self.trusted_peer_pubkeys_file)
                     updated_pubkeys = set(line.lower() for line in lines)
                     self._trust_file_mtimes[self.trusted_peer_pubkeys_file] = mtime
+                    logger.info(
+                        "Reloaded trusted peer pubkeys",
+                        extra={
+                            "event": "peer.trust_store_reload",
+                            "store_type": "pubkeys",
+                            "count": len(updated_pubkeys),
+                            "file": self.trusted_peer_pubkeys_file
+                        }
+                    )
         except FileNotFoundError:
-            pass
+            logger.debug(
+                "Trusted peer pubkeys file not found",
+                extra={
+                    "event": "peer.trust_store_missing",
+                    "store_type": "pubkeys",
+                    "file": self.trusted_peer_pubkeys_file
+                }
+            )
         except Exception as exc:
-            print(f"Failed to reload trusted pubkeys: {exc}")
+            logger.error(
+                "Failed to reload trusted pubkeys",
+                extra={
+                    "event": "peer.trust_store_error",
+                    "store_type": "pubkeys",
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                    "file": self.trusted_peer_pubkeys_file
+                }
+            )
 
         try:
             if self.trusted_cert_fps_file:
@@ -849,10 +947,35 @@ class PeerManager:
                     lines = self._load_lines_from_file(self.trusted_cert_fps_file)
                     updated_fps = set(line.lower() for line in lines)
                     self._trust_file_mtimes[self.trusted_cert_fps_file] = mtime
+                    logger.info(
+                        "Reloaded trusted cert fingerprints",
+                        extra={
+                            "event": "peer.trust_store_reload",
+                            "store_type": "cert_fps",
+                            "count": len(updated_fps),
+                            "file": self.trusted_cert_fps_file
+                        }
+                    )
         except FileNotFoundError:
-            pass
+            logger.debug(
+                "Trusted cert fingerprints file not found",
+                extra={
+                    "event": "peer.trust_store_missing",
+                    "store_type": "cert_fps",
+                    "file": self.trusted_cert_fps_file
+                }
+            )
         except Exception as exc:
-            print(f"Failed to reload trusted cert fingerprints: {exc}")
+            logger.error(
+                "Failed to reload trusted cert fingerprints",
+                extra={
+                    "event": "peer.trust_store_error",
+                    "store_type": "cert_fps",
+                    "error_type": type(exc).__name__,
+                    "error_message": str(exc),
+                    "file": self.trusted_cert_fps_file
+                }
+            )
 
         if updated_pubkeys is not None:
             self.trusted_peer_pubkeys = updated_pubkeys

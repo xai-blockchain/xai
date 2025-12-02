@@ -13,9 +13,25 @@ Tests all wallet trade manager operations including:
 
 import pytest
 import uuid
+import tempfile
+import shutil
 from unittest.mock import Mock, MagicMock
 from xai.core.wallet_trade_manager_impl import WalletTradeManager, AuditSigner
 from xai.core.trading import SwapOrderType, TradeMatchStatus
+
+
+@pytest.fixture
+def tmp_data_dir():
+    """Provide a clean temporary directory for each test to ensure isolation."""
+    tmp_dir = tempfile.mkdtemp(prefix="wtm_test_")
+    yield tmp_dir
+    shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+@pytest.fixture
+def fresh_manager(tmp_data_dir):
+    """Provide a WalletTradeManager with isolated state (no shared persistent data)."""
+    return WalletTradeManager(data_dir=tmp_data_dir)
 
 
 class TestAuditSigner:
@@ -41,31 +57,31 @@ class TestAuditSigner:
 class TestWalletTradeManagerCreation:
     """Test WalletTradeManager initialization"""
 
-    def test_wallet_trade_manager_init_default(self):
-        """Test default initialization"""
-        manager = WalletTradeManager()
+    def test_wallet_trade_manager_init_default(self, tmp_data_dir):
+        """Test default initialization with clean state"""
+        manager = WalletTradeManager(data_dir=tmp_data_dir)
 
         assert manager.audit_signer is not None
         assert isinstance(manager.audit_signer, AuditSigner)
         assert manager.orders == {}
         assert manager.matches == {}
 
-    def test_wallet_trade_manager_init_with_params(self):
+    def test_wallet_trade_manager_init_with_params(self, tmp_data_dir):
         """Test initialization with parameters"""
         mock_exchange = Mock()
         manager = WalletTradeManager(
             exchange_wallet_manager=mock_exchange,
-            data_dir="/tmp/test",
+            data_dir=tmp_data_dir,
             nonce_tracker=Mock()
         )
 
         assert manager.exchange_wallet_manager == mock_exchange
-        assert manager.data_dir == "/tmp/test"
+        assert manager.data_dir == tmp_data_dir
         assert manager.nonce_tracker is not None
 
-    def test_wallet_trade_manager_has_audit_signer(self):
+    def test_wallet_trade_manager_has_audit_signer(self, tmp_data_dir):
         """Test manager has audit signer"""
-        manager = WalletTradeManager()
+        manager = WalletTradeManager(data_dir=tmp_data_dir)
 
         assert hasattr(manager, 'audit_signer')
         pub_key = manager.audit_signer.public_key()
@@ -269,9 +285,9 @@ class TestSignedEventBatch:
         assert result is not None
         assert isinstance(result, list)
 
-    def test_signed_event_batch_returns_empty(self):
-        """Test signed_event_batch returns empty list"""
-        manager = WalletTradeManager()
+    def test_signed_event_batch_returns_empty(self, tmp_data_dir):
+        """Test signed_event_batch returns empty list with fresh state"""
+        manager = WalletTradeManager(data_dir=tmp_data_dir)
 
         result = manager.signed_event_batch(5)
 
@@ -471,22 +487,26 @@ class TestSettleMatch:
         # Settle the match
         if matches:
             match = matches[0]
-            settled_match = manager.settle_match(match.match_id, match.secret)
+            result = manager.settle_match(match.match_id, match.secret)
 
-            assert settled_match is not None
+            assert result is not None
+            assert result["success"] is True
+            # Verify the match status was updated
+            settled_match = manager.get_match(match.match_id)
             assert settled_match.status == TradeMatchStatus.SETTLED
 
-    def test_settle_match_not_found(self):
-        """Test settling non-existent match"""
-        manager = WalletTradeManager()
+    def test_settle_match_not_found(self, tmp_data_dir):
+        """Test settling non-existent match returns error"""
+        manager = WalletTradeManager(data_dir=tmp_data_dir)
 
-        with pytest.raises(ValueError, match="Match not found"):
-            manager.settle_match("nonexistent", "secret")
+        result = manager.settle_match("nonexistent", "secret")
+        assert result["success"] is False
+        assert result["error"] == "match_not_found"
 
-    def test_settle_match_invalid_secret(self):
-        """Test settling match with wrong secret"""
+    def test_settle_match_invalid_secret(self, tmp_data_dir):
+        """Test settling match with wrong secret returns error"""
         mock_exchange = Mock()
-        manager = WalletTradeManager(exchange_wallet_manager=mock_exchange)
+        manager = WalletTradeManager(exchange_wallet_manager=mock_exchange, data_dir=tmp_data_dir)
 
         # Create matching orders
         manager.place_order(
@@ -510,8 +530,9 @@ class TestSettleMatch:
         )
 
         if matches:
-            with pytest.raises(ValueError, match="Invalid secret"):
-                manager.settle_match(matches[0].match_id, "wrong_secret")
+            result = manager.settle_match(matches[0].match_id, "wrong_secret")
+            assert result["success"] is False
+            assert result["error"] == "invalid_secret"
 
     def test_settle_match_performs_exchange(self):
         """Test settlement performs token exchange"""
@@ -583,9 +604,9 @@ class TestEdgeCases:
 
         assert order.amount_offered == 0.0
 
-    def test_multiple_orders_same_user(self):
-        """Test placing multiple orders for same user"""
-        manager = WalletTradeManager()
+    def test_multiple_orders_same_user(self, tmp_data_dir):
+        """Test placing multiple orders for same user with fresh state"""
+        manager = WalletTradeManager(data_dir=tmp_data_dir)
 
         for i in range(5):
             order, _ = manager.place_order(
@@ -691,7 +712,10 @@ class TestIntegrationScenarios:
 
         # Settle the match
         if matches:
-            settled_match = manager.settle_match(matches[0].match_id, matches[0].secret)
+            result = manager.settle_match(matches[0].match_id, matches[0].secret)
+            assert result["success"] is True
+            # Verify the match status was updated
+            settled_match = manager.get_match(matches[0].match_id)
             assert settled_match.status == TradeMatchStatus.SETTLED
 
 

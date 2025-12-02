@@ -62,9 +62,11 @@ data:
   XAI_P2P_SECURITY_LOG_RATE: "20"
   XAI_P2P_MAX_BANDWIDTH_IN: "524288"
   XAI_P2P_MAX_BANDWIDTH_OUT: "524288"
+  XAI_P2P_QUIC_DIAL_TIMEOUT: "1.0"
   XAI_TRUSTED_PEER_PUBKEYS_FILE: "/etc/xai/trust/trusted_peer_pubkeys.txt"
   XAI_TRUSTED_PEER_CERT_FPS_FILE: "/etc/xai/trust/trusted_peer_cert_fps.txt"
   XAI_P2P_CA_BUNDLE: "/etc/ssl/certs/ca-bundle.crt"
+  XAI_P2P_ENABLE_QUIC: "0"
   XAI_P2P_DNS_SEEDS: ""
   XAI_P2P_BOOTSTRAP_NODES: ""
 
