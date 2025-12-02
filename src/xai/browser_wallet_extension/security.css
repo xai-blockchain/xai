@@ -1,0 +1,295 @@
+/**
+ * XAI Browser Wallet - Security UI Styles
+ *
+ * Styles for encryption status, lock/unlock modals, and security indicators.
+ */
+
+/* Security Status Bar */
+.security-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding: 10px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  gap: 10px;
+}
+
+.encryption-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 600;
+  background: #e0e0e0;
+  color: #666;
+}
+
+.encryption-badge.encryption-enabled {
+  background: #4caf50;
+  color: white;
+}
+
+.lock-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 600;
+  background: #e0e0e0;
+  color: #666;
+}
+
+.lock-badge.locked {
+  background: #f44336;
+  color: white;
+}
+
+.lock-badge.unlocked {
+  background: #4caf50;
+  color: white;
+}
+
+.lock-button {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 4px;
+  background: #ff9800;
+  color: white;
+  font-size: 0.9em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.lock-button:hover {
+  background: #f57c00;
+}
+
+.lock-button:active {
+  background: #e65100;
+}
+
+/* Modal Styles */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background-color: #ffffff;
+  margin: 10% auto;
+  padding: 30px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 450px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+
+.modal-content h2 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #333;
+  font-size: 1.5em;
+}
+
+.modal-content p {
+  color: #666;
+  margin-bottom: 15px;
+  line-height: 1.5;
+}
+
+.modal-content ul {
+  list-style: none;
+  padding: 0;
+  margin: 15px 0;
+}
+
+.modal-content ul li {
+  padding: 6px 0;
+  color: #444;
+  font-size: 0.95em;
+}
+
+.modal-content ul li::before {
+  content: '✓ ';
+  color: #4caf50;
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+.modal-content label {
+  display: block;
+  text-align: left;
+  margin: 15px 0;
+  color: #333;
+  font-weight: 600;
+  font-size: 0.95em;
+}
+
+.modal-content input[type="password"] {
+  width: 100%;
+  padding: 10px;
+  margin-top: 6px;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+  font-size: 1em;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.modal-content input[type="password"]:focus {
+  outline: none;
+  border-color: #2196f3;
+}
+
+.modal-content .button-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  justify-content: center;
+}
+
+.modal-content button {
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 4px;
+  font-size: 1em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal-content button.primary {
+  background: #2196f3;
+  color: white;
+}
+
+.modal-content button.primary:hover {
+  background: #1976d2;
+}
+
+.modal-content button.primary:active {
+  background: #1565c0;
+}
+
+.modal-content button.secondary {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.modal-content button.secondary:hover {
+  background: #bdbdbd;
+}
+
+.modal-content button.secondary:active {
+  background: #9e9e9e;
+}
+
+.error-message {
+  color: #f44336;
+  font-size: 0.9em;
+  margin: 10px 0;
+  min-height: 20px;
+  font-weight: 600;
+}
+
+/* Security Indicators */
+input[type="password"]::placeholder {
+  color: #999;
+  font-style: italic;
+}
+
+small {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.85em;
+  color: #666;
+  line-height: 1.4;
+}
+
+/* Responsive Design */
+@media (max-width: 500px) {
+  .modal-content {
+    width: 95%;
+    padding: 20px;
+    margin: 5% auto;
+  }
+
+  .security-status {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .modal-content .button-row {
+    flex-direction: column;
+  }
+
+  .modal-content button {
+    width: 100%;
+  }
+}
+
+/* Animation for modal appearance */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal-content {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Security Warning Banner */
+.security-warning {
+  background: #fff3cd;
+  border: 2px solid #ffc107;
+  border-radius: 4px;
+  padding: 15px;
+  margin: 15px 0;
+  color: #856404;
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+
+.security-warning strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 1.05em;
+}
+
+/* Success Banner */
+.security-success {
+  background: #d4edda;
+  border: 2px solid #28a745;
+  border-radius: 4px;
+  padding: 15px;
+  margin: 15px 0;
+  color: #155724;
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+
+.security-success strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 1.05em;
+}

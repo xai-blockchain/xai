@@ -71,6 +71,18 @@ class WalletAPIHandler:
             """Login to embedded wallet."""
             return self.login_embedded_wallet_handler()
 
+        # Transaction signing route
+        @self.app.route("/wallet/sign", methods=["POST"])
+        def sign_transaction() -> Tuple[Dict[str, Any], int]:
+            """Sign transaction with ECDSA."""
+            return self.sign_transaction_handler()
+
+        # Public key derivation route
+        @self.app.route("/wallet/derive-public-key", methods=["POST"])
+        def derive_public_key() -> Tuple[Dict[str, Any], int]:
+            """Derive public key from private key."""
+            return self.derive_public_key_handler()
+
         # WalletConnect routes
         @self.app.route("/wallet-trades/wc/handshake", methods=["POST"])
         def walletconnect_handshake() -> Tuple[Dict[str, Any], int]:
@@ -180,6 +192,165 @@ class WalletAPIHandler:
             ),
             200,
         )
+
+    def sign_transaction_handler(self) -> Tuple[Dict[str, Any], int]:
+        """
+        Handle transaction signing with ECDSA secp256k1.
+
+        Expects JSON payload:
+        {
+            "message_hash": "hex-encoded SHA-256 hash of message",
+            "private_key": "hex-encoded private key (64 chars)"
+        }
+
+        Returns:
+            Tuple of (response dict, HTTP status code)
+
+        Security Note:
+            This endpoint receives private keys and should only be used
+            over HTTPS. In production, consider requiring additional
+            authentication or moving signing to client-side with noble-secp256k1.
+        """
+        from xai.core.crypto_utils import sign_message_hex
+
+        try:
+            payload = request.get_json(silent=True) or {}
+            message_hash = payload.get("message_hash")
+            private_key = payload.get("private_key")
+
+            # Validate inputs
+            if not message_hash:
+                return jsonify({"success": False, "error": "message_hash required"}), 400
+
+            if not private_key:
+                return jsonify({"success": False, "error": "private_key required"}), 400
+
+            if len(private_key) != 64:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "Invalid private key: must be 64 hex characters",
+                        }
+                    ),
+                    400,
+                )
+
+            if len(message_hash) != 64:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "Invalid message_hash: must be 64 hex characters (SHA-256)",
+                        }
+                    ),
+                    400,
+                )
+
+            # Convert hex hash to bytes
+            try:
+                message_bytes = bytes.fromhex(message_hash)
+            except ValueError:
+                return (
+                    jsonify(
+                        {"success": False, "error": "message_hash must be valid hexadecimal"}
+                    ),
+                    400,
+                )
+
+            # Sign the message hash with ECDSA
+            signature = sign_message_hex(private_key, message_bytes)
+
+            logger.info(
+                "Transaction signed successfully",
+                extra={
+                    "event": "transaction.signed",
+                    "signature_length": len(signature),
+                },
+            )
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "signature": signature,
+                        "algorithm": "ECDSA-secp256k1",
+                        "hash_algorithm": "SHA-256",
+                    }
+                ),
+                200,
+            )
+
+        except ValueError as e:
+            logger.error(f"Signing failed with ValueError: {e}")
+            return jsonify({"success": False, "error": str(e)}), 400
+        except Exception as e:
+            logger.error(f"Unexpected error during signing: {e}", exc_info=True)
+            return (
+                jsonify({"success": False, "error": "Internal signing error"}),
+                500,
+            )
+
+    def derive_public_key_handler(self) -> Tuple[Dict[str, Any], int]:
+        """
+        Handle public key derivation from private key.
+
+        Expects JSON payload:
+        {
+            "private_key": "hex-encoded private key (64 chars)"
+        }
+
+        Returns:
+            Tuple of (response dict, HTTP status code)
+
+        Security Note:
+            This endpoint receives private keys and should only be used
+            over HTTPS in trusted environments.
+        """
+        from xai.core.crypto_utils import derive_public_key_hex
+
+        try:
+            payload = request.get_json(silent=True) or {}
+            private_key = payload.get("private_key")
+
+            # Validate input
+            if not private_key:
+                return jsonify({"success": False, "error": "private_key required"}), 400
+
+            if len(private_key) != 64:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "Invalid private key: must be 64 hex characters",
+                        }
+                    ),
+                    400,
+                )
+
+            # Derive public key
+            public_key = derive_public_key_hex(private_key)
+
+            return (
+                jsonify(
+                    {
+                        "success": True,
+                        "public_key": public_key,
+                        "curve": "secp256k1",
+                    }
+                ),
+                200,
+            )
+
+        except ValueError as e:
+            logger.error(f"Public key derivation failed with ValueError: {e}")
+            return jsonify({"success": False, "error": str(e)}), 400
+        except Exception as e:
+            logger.error(f"Unexpected error during public key derivation: {e}", exc_info=True)
+            return (
+                jsonify({"success": False, "error": "Internal derivation error"}),
+                500,
+            )
 
     def create_embedded_wallet_handler(self) -> Tuple[Dict[str, Any], int]:
         """

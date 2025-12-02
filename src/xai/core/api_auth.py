@@ -480,14 +480,22 @@ class JWTAuthManager:
     def revoke_token(self, token: str) -> None:
         """Add token to blacklist (logout).
 
+        Note: verify_exp=False is intentionally used here because we need to
+        decode and revoke even expired tokens to extract user info for audit logging.
+
         Args:
             token: JWT token to revoke
         """
         self.blacklist.add(token)
 
-        # Try to extract user info for logging
+        # Try to extract user info for logging (skip expiration check - intentional)
         try:
-            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm], options={"verify_exp": False})
+            payload = jwt.decode(
+                token,
+                self.secret_key,
+                algorithms=[self.algorithm],
+                options={"verify_exp": False}  # Intentional: allow revoking expired tokens
+            )
             user_id = payload.get("user_id", "unknown")
             log_security_event(
                 "jwt_token_revoked",
@@ -519,7 +527,13 @@ class JWTAuthManager:
 
         for token in self.blacklist:
             try:
-                jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+                # Explicitly verify expiration to identify expired tokens
+                jwt.decode(
+                    token,
+                    self.secret_key,
+                    algorithms=[self.algorithm],
+                    options={"verify_exp": True}  # Explicit: we want ExpiredSignatureError
+                )
             except jwt.ExpiredSignatureError:
                 # Token is expired, can be removed
                 expired_tokens.add(token)

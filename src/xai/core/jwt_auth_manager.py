@@ -162,7 +162,14 @@ class JWTAuthManager:
 
     def validate_token(self, token: str) -> Tuple[bool, Optional[Dict], Optional[str]]:
         """
-        Validate JWT token.
+        Validate JWT token with explicit expiration verification.
+
+        Security features:
+        - Explicit expiration verification (verify_exp=True)
+        - Clock skew tolerance (30 seconds)
+        - Required claims validation (exp, iat, jti)
+        - Signature verification
+        - Revocation list checking
 
         Args:
             token: JWT token to validate
@@ -171,25 +178,30 @@ class JWTAuthManager:
             Tuple[bool, Optional[Dict], Optional[str]]: (valid, claims, error_message)
         """
         try:
-            # Decode token
+            # Decode token with explicit security options
             claims = jwt.decode(
                 token,
                 self.secret_key,
                 algorithms=[self.algorithm],
+                options={
+                    "verify_signature": True,  # Verify signature
+                    "verify_exp": True,  # CRITICAL: Verify expiration
+                    "verify_iat": True,  # Verify issued-at time
+                    "require": ["exp", "iat", "jti"],  # Required claims
+                },
+                leeway=30  # 30 seconds clock skew tolerance
             )
 
             # Check if token is revoked
             jti = claims.get('jti')
             if jti in self.revoked_tokens:
+                security_logger.warning(f"Revoked token access attempt: {jti}")
                 return False, None, "Token has been revoked"
-
-            # Check if token has expired
-            if datetime.fromtimestamp(claims['exp'], tz=timezone.utc) < datetime.now(timezone.utc):
-                return False, None, "Token has expired"
 
             return True, claims, None
 
         except jwt.ExpiredSignatureError:
+            security_logger.warning("Expired token access attempt")
             return False, None, "Token has expired"
         except jwt.InvalidTokenError as e:
             security_logger.warning(f"Invalid token: {str(e)}")
@@ -225,6 +237,10 @@ class JWTAuthManager:
         """
         Revoke a token (add to revocation list).
 
+        Note: verify_exp=False is intentionally used here because we need to
+        decode and revoke even expired tokens to extract their JTI and expiration
+        for proper blacklist management.
+
         Args:
             token: JWT token to revoke
 
@@ -232,11 +248,12 @@ class JWTAuthManager:
             bool: Success status
         """
         try:
+            # Intentionally skip expiration check - we need to revoke expired tokens too
             claims = jwt.decode(
                 token,
                 self.secret_key,
                 algorithms=[self.algorithm],
-                options={"verify_exp": False},
+                options={"verify_exp": False},  # Intentional: allow revoking expired tokens
             )
 
             jti = claims.get('jti')

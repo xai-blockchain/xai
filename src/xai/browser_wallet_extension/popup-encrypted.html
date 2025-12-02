@@ -4,13 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="stylesheet" href="styles.css" />
-  <title>XAI Wallet Miner</title>
+  <link rel="stylesheet" href="security.css" />
+  <title>XAI Wallet Miner (Encrypted)</title>
 </head>
 <body>
   <div class="container">
     <header>
       <h1>XAI Wallet Miner</h1>
       <p>Browser-based wallet, miner control, and trade portal.</p>
+      <div class="security-status">
+        <span id="encryptionStatus" class="encryption-badge">Checking...</span>
+        <span id="lockStatus" class="lock-badge">🔒 Locked</span>
+        <button id="lockWallet" class="lock-button">Lock Now</button>
+      </div>
     </header>
 
     <section class="card">
@@ -27,7 +33,7 @@
         Private Key (for transaction signing)
         <input id="privateKey" type="password" placeholder="64 hex characters" autocomplete="off" />
         <small style="color: #666; font-size: 0.85em;">
-          ⚠️ Required for ECDSA transaction signatures. Never share your private key.
+          🔒 Encrypted at rest. Required for ECDSA transaction signatures. Never share your private key.
         </small>
       </label>
     </section>
@@ -112,7 +118,7 @@
         Management Mode
         <select id="aiKeyMode">
           <option value="temporary">Temporary (deleted after each session)</option>
-          <option value="session">Session cache (cleared when you tap “Clear Key”)</option>
+          <option value="session">Session cache (encrypted, cleared when you tap "Clear Key")</option>
           <option value="external">External key manager (provide key per call)</option>
         </select>
       </label>
@@ -126,7 +132,10 @@
       </label>
       <label>
         API Key
-        <input id="aiApiKey" type="password" placeholder="Your AI API key" />
+        <input id="aiApiKey" type="password" placeholder="Your AI API key" autocomplete="off" />
+        <small style="color: #666; font-size: 0.85em;">
+          🔒 Stored encrypted if session cache mode selected.
+        </small>
       </label>
       <label>
         Swap: From Coin
@@ -152,6 +161,54 @@
       <p id="aiKeyDeleted" class="meta"></p>
     </section>
   </div>
-  <script src="popup.js"></script>
+
+  <!-- Unlock Modal -->
+  <div id="unlockModal" class="modal">
+    <div class="modal-content">
+      <h2>🔒 Unlock Wallet</h2>
+      <p>Enter your password to unlock encrypted storage.</p>
+      <label>
+        Password
+        <input id="unlockPassword" type="password" placeholder="Enter password" autocomplete="off" />
+      </label>
+      <p id="unlockError" class="error-message"></p>
+      <div class="button-row">
+        <button id="unlockBtn" class="primary">Unlock</button>
+        <button id="unlockCancelBtn" class="secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Setup Encryption Modal -->
+  <div id="setupEncryptionModal" class="modal">
+    <div class="modal-content">
+      <h2>🔐 Enable Encryption</h2>
+      <p>Protect your wallet data with a password.</p>
+      <p><strong>This will encrypt:</strong></p>
+      <ul style="text-align: left; margin: 10px 0;">
+        <li>Session tokens and secrets</li>
+        <li>Private keys</li>
+        <li>AI API keys</li>
+        <li>Wallet addresses</li>
+      </ul>
+      <label>
+        Password (min 8 characters)
+        <input id="setupPassword" type="password" placeholder="Choose password" autocomplete="new-password" />
+      </label>
+      <label>
+        Confirm Password
+        <input id="setupPasswordConfirm" type="password" placeholder="Confirm password" autocomplete="new-password" />
+      </label>
+      <p id="setupError" class="error-message"></p>
+      <div class="button-row">
+        <button id="setupEncryptionBtn" class="primary">Enable Encryption</button>
+        <button id="skipEncryptionBtn" class="secondary">Skip (Not Recommended)</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Load secure storage first, then main script -->
+  <script src="secure-storage.js"></script>
+  <script src="popup-encrypted.js"></script>
 </body>
 </html>
