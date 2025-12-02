@@ -113,7 +113,7 @@ This roadmap targets production readiness with security-first posture, robust co
 ### Critical Wallet Security
 
 - [x] **CRITICAL**: ~~Remove private key from CLI command line~~ ✅ FIXED - Removed --private-key arg, added encrypted keystore support, getpass for secure input, ~1870 lines of security hardening
-- [ ] **CRITICAL**: Encrypt browser extension storage (`src/xai/browser_wallet_extension/popup.js` lines 61-87). Session secrets and AI API keys stored in PLAINTEXT.
+- [x] **CRITICAL**: ~~Encrypt browser extension storage~~ ✅ FIXED - Implemented AES-256-GCM encryption with PBKDF2 key derivation (600k iterations), auto-lock, secure migration, ~2300 lines including tests/docs
 - [ ] **CRITICAL**: Fix browser extension HMAC-SHA256 signatures (popup.js lines 48-59). Uses HMAC instead of ECDSA - signatures not verifiable by blockchain.
 
 ### BIP Standards Implementation
