@@ -14,32 +14,32 @@ This roadmap targets production readiness with security-first posture, robust co
 
 ---
 
-## CRITICAL SECURITY FIXES (Priority 1 - Immediate)
+## CRITICAL SECURITY FIXES (Priority 1 - Immediate) ✅ ALL COMPLETED
 
 ### Cryptography & Random Number Generation
 
-- [ ] **CRITICAL**: Replace weak `random` module with `secrets` in threshold signature scheme (`src/xai/security/threshold_signature.py` lines 35, 41, 47). Master key and share generation uses predictable RNG - complete cryptographic failure.
-- [ ] **CRITICAL**: Fix deterministic premine wallet selection using `random.seed(42)` in `mark_time_capsule_wallets.py` line 38. Use cryptographically secure selection or remove predictability.
-- [ ] **CRITICAL**: Replace weak randomness in gamification (`src/xai/core/gamification.py` lines 97, 124, 148, 157, 162) with `secrets` module for fair random selection.
+- [x] **CRITICAL**: ~~Replace weak `random` module with `secrets` in threshold signature scheme~~ ✅ FIXED - Uses `secrets.randbelow()` and secure Fisher-Yates shuffle
+- [x] **CRITICAL**: ~~Fix deterministic premine wallet selection~~ ✅ FIXED - Uses hash-based deterministic selection when seed provided
+- [x] **CRITICAL**: ~~Replace weak randomness in gamification~~ ✅ FIXED - Uses `secrets` module with secure helpers
 
 ### DeFi Protocol Critical Fixes
 
-- [ ] **CRITICAL**: Fix flash loan repayment verification logic in `src/xai/core/defi/flash_loans.py` lines 206-214. Current logic only verifies fees paid, NOT that principal was returned. Attacker can steal all liquidity.
-- [ ] **CRITICAL**: Add access control to `add_liquidity()` in `flash_loans.py` line 318. Missing `_require_owner(caller)` check allows unauthorized liquidity manipulation.
-- [ ] **CRITICAL**: Implement staking delegator reward distribution in `src/xai/core/defi/staking.py` lines 510-519. Currently validators take all rewards, delegators receive NOTHING.
-- [ ] **CRITICAL**: Fix vesting curve precision loss in `src/xai/core/defi/vesting.py` lines 95-96. Float division causes precision loss on large vesting amounts. Convert to fixed-point (WAD/RAY) arithmetic.
-- [ ] **CRITICAL**: Add price bounds rejection in oracle (`src/xai/core/defi/oracle.py` lines 257-274). Currently extreme price moves are only LOGGED, not REJECTED. Enables oracle manipulation attacks.
+- [x] **CRITICAL**: ~~Fix flash loan repayment verification~~ ✅ FIXED - Validates both principal AND fees returned
+- [x] **CRITICAL**: ~~Add access control to `add_liquidity()`~~ ✅ FIXED - Added `_require_owner(caller)` check
+- [x] **CRITICAL**: ~~Implement staking delegator reward distribution~~ ✅ FIXED - Proportional distribution with `claim_rewards()`
+- [x] **CRITICAL**: ~~Fix vesting curve precision loss~~ ✅ ALREADY USING DECIMAL - Proper precision maintained
+- [x] **CRITICAL**: ~~Add price bounds rejection in oracle~~ ✅ FIXED - Raises `VMExecutionError` on deviation
 
 ### Account Abstraction & Transaction Security
 
-- [ ] **CRITICAL**: Fix placeholder transaction tracking in `src/xai/core/account_abstraction.py` line 124. `txid="pending"` never updated - breaks audit trail and reconciliation.
-- [ ] **CRITICAL**: Add bounds validation to lending pool borrow amounts in `src/xai/core/defi/lending.py` line 195+. No validation allows borrowing unrealistic amounts or causing overflow.
+- [x] **CRITICAL**: ~~Fix placeholder transaction tracking~~ ✅ ALREADY FIXED - SHA256-based txid generation
+- [x] **CRITICAL**: ~~Add bounds validation to lending pool borrow amounts~~ ✅ FIXED - 8 comprehensive validations added
 
 ### Consensus Critical Fixes
 
-- [ ] **CRITICAL**: Implement block reward validation. Currently ANY coinbase amount is accepted - allows unlimited coin inflation. Add reward schedule enforcement.
-- [ ] **CRITICAL**: Add future timestamp rejection in block validation (`node_consensus.py` line 88-90). Currently only checks past timestamps - blocks can have timestamps arbitrarily far in future.
-- [ ] **CRITICAL**: Implement transaction ordering rules. Currently undefined - enables MEV/front-running attacks. Add fee-based priority and nonce sequencing.
+- [x] **CRITICAL**: ~~Implement block reward validation~~ ✅ FIXED - Integrated into `validate_coinbase_reward()` with halving schedule
+- [x] **CRITICAL**: ~~Add future timestamp rejection~~ ✅ ALREADY IMPLEMENTED - MAX_FUTURE_BLOCK_TIME = 7200s
+- [x] **CRITICAL**: ~~Implement transaction ordering rules~~ ✅ FIXED - MEV prevention with fee priority and nonce sequencing
 
 ---
 
@@ -77,9 +77,9 @@ This roadmap targets production readiness with security-first posture, robust co
 
 ### Critical VM Execution Gaps
 
-- [ ] **CRITICAL**: Implement recursive CALL/DELEGATECALL execution in `src/xai/core/vm/evm/interpreter.py` lines 904-983. Currently returns hardcoded success without executing called contract. Breaks ALL cross-contract communication.
-- [ ] **CRITICAL**: Fix CREATE/CREATE2 deployment (`interpreter.py` lines 878-902, 985-1016). Nonce hardcoded to 0, init code never executed, storage never initialized. Contract deployment completely broken.
-- [ ] **CRITICAL**: Implement account nonce tracking. CREATE address derivation uses hardcoded nonce=0 - all CREATE calls generate same address.
+- [x] **CRITICAL**: ~~Implement recursive CALL/DELEGATECALL execution~~ ✅ FIXED - Full recursive execution with EIP-150 gas forwarding, return data handling, call depth limits
+- [x] **CRITICAL**: ~~Fix CREATE/CREATE2 deployment~~ ✅ FIXED - Proper nonce tracking, init code execution, bytecode extraction, EIP-170 size limits
+- [x] **CRITICAL**: ~~Implement account nonce tracking~~ ✅ FIXED - get_nonce/increment_nonce in context, proper CREATE address derivation
 - [ ] Fix STATICCALL to actually enforce static mode in nested calls (`interpreter.py` lines 1018-1041).
 - [ ] Implement CALLCODE context switching - currently just delegates to broken CALL.
 
@@ -112,7 +112,7 @@ This roadmap targets production readiness with security-first posture, robust co
 
 ### Critical Wallet Security
 
-- [ ] **CRITICAL**: Remove private key from CLI command line (`src/xai/wallet/cli.py` lines 573-576). Key appears in shell history, process list, logs. Implement keyring/wallet file only.
+- [x] **CRITICAL**: ~~Remove private key from CLI command line~~ ✅ FIXED - Removed --private-key arg, added encrypted keystore support, getpass for secure input, ~1870 lines of security hardening
 - [ ] **CRITICAL**: Encrypt browser extension storage (`src/xai/browser_wallet_extension/popup.js` lines 61-87). Session secrets and AI API keys stored in PLAINTEXT.
 - [ ] **CRITICAL**: Fix browser extension HMAC-SHA256 signatures (popup.js lines 48-59). Uses HMAC instead of ECDSA - signatures not verifiable by blockchain.
 

@@ -290,7 +290,8 @@ class JWTAuthManager:
         secret_key: str,
         token_expiry_hours: int = 1,
         refresh_expiry_days: int = 30,
-        algorithm: str = "HS256"
+        algorithm: str = "HS256",
+        clock_skew_seconds: int = 30
     ):
         """Initialize JWT authentication manager.
 
@@ -299,6 +300,7 @@ class JWTAuthManager:
             token_expiry_hours: Access token expiry in hours (default: 1)
             refresh_expiry_days: Refresh token expiry in days (default: 30)
             algorithm: JWT signing algorithm (default: HS256)
+            clock_skew_seconds: Clock skew tolerance in seconds (default: 30)
         """
         if not jwt:
             raise ImportError("PyJWT library is required for JWT authentication")
@@ -307,6 +309,7 @@ class JWTAuthManager:
         self.token_expiry = timedelta(hours=token_expiry_hours)
         self.refresh_expiry = timedelta(days=refresh_expiry_days)
         self.algorithm = algorithm
+        self.clock_skew = timedelta(seconds=clock_skew_seconds)
         self.blacklist: Set[str] = set()
 
     def generate_token(self, user_id: str, scope: str = "user") -> Tuple[str, str]:
@@ -323,7 +326,8 @@ class JWTAuthManager:
 
         # Access token (short-lived)
         access_payload = {
-            "user_id": user_id,
+            "sub": user_id,  # Standard JWT "subject" claim
+            "user_id": user_id,  # For backward compatibility
             "scope": scope,
             "exp": now + self.token_expiry,
             "iat": now,
@@ -333,7 +337,8 @@ class JWTAuthManager:
 
         # Refresh token (long-lived)
         refresh_payload = {
-            "user_id": user_id,
+            "sub": user_id,  # Standard JWT "subject" claim
+            "user_id": user_id,  # For backward compatibility
             "scope": scope,
             "exp": now + self.refresh_expiry,
             "iat": now,
@@ -350,37 +355,89 @@ class JWTAuthManager:
 
         return access_token, refresh_token
 
-    def validate_token(self, token: str) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+    def validate_token(self, token: str, remote_addr: Optional[str] = None) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
         """Validate JWT token with expiration check.
+
+        Security features:
+        - Explicit expiration verification (verify_exp=True)
+        - Clock skew tolerance to handle minor time drift
+        - Required claims validation (exp, sub, iat)
+        - Signature verification
+        - Blacklist checking for revoked tokens
 
         Args:
             token: JWT token to validate
+            remote_addr: Remote IP address for security logging (optional)
 
         Returns:
             Tuple of (is_valid, payload, error_message)
         """
-        # Check blacklist
+        # Check blacklist first (fast path for revoked tokens)
         if token in self.blacklist:
+            log_security_event(
+                "jwt_revoked_token_attempt",
+                {
+                    "remote_addr": remote_addr or "unknown",
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                },
+                severity="WARNING"
+            )
             return False, None, "Token has been revoked"
 
         try:
-            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
-
-            # Verify expiration (jwt.decode already checks this, but be explicit)
-            exp = payload.get("exp")
-            if exp:
-                exp_dt = datetime.fromtimestamp(exp, tz=timezone.utc)
-                if exp_dt < datetime.now(timezone.utc):
-                    return False, None, "Token expired"
+            # Decode with explicit security options
+            payload = jwt.decode(
+                token,
+                self.secret_key,
+                algorithms=[self.algorithm],
+                options={
+                    "verify_signature": True,  # Verify HMAC signature
+                    "verify_exp": True,  # CRITICAL: Verify expiration
+                    "verify_iat": True,  # Verify issued-at time
+                    "require": ["exp", "sub", "iat"],  # Required claims
+                },
+                leeway=self.clock_skew  # Clock skew tolerance (default: 30 seconds)
+            )
 
             return True, payload, None
 
         except jwt.ExpiredSignatureError:
-            return False, None, "Token expired"
+            # Token has expired - log security event
+            log_security_event(
+                "jwt_expired_token_attempt",
+                {
+                    "remote_addr": remote_addr or "unknown",
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                },
+                severity="WARNING"
+            )
+            return False, None, "Token has expired"
+
         except jwt.InvalidTokenError as e:
+            # Invalid token (malformed, wrong signature, missing claims, etc.)
+            log_security_event(
+                "jwt_invalid_token_attempt",
+                {
+                    "remote_addr": remote_addr or "unknown",
+                    "error": str(e),
+                    "timestamp": datetime.now(timezone.utc).isoformat()
+                },
+                severity="WARNING"
+            )
             return False, None, f"Invalid token: {str(e)}"
+
         except Exception as e:
-            return False, None, f"Token validation error: {str(e)}"
+            # Unexpected error - log for investigation
+            logger.error(
+                "Unexpected JWT validation error: %s",
+                type(e).__name__,
+                extra={
+                    "event": "api_auth.jwt_validation_error",
+                    "error": str(e),
+                    "remote_addr": remote_addr or "unknown"
+                }
+            )
+            return False, None, "Token validation error"
 
     def refresh_access_token(self, refresh_token: str) -> Tuple[bool, Optional[str], Optional[str]]:
         """Exchange refresh token for new access token.
@@ -520,7 +577,10 @@ class JWTAuthManager:
         if not token:
             return False, None, "No JWT token provided"
 
-        valid, payload, error = self.validate_token(token)
+        # Extract remote address for security logging
+        remote_addr = request.remote_addr if hasattr(request, 'remote_addr') else None
+
+        valid, payload, error = self.validate_token(token, remote_addr=remote_addr)
 
         if not valid:
             return False, None, error
@@ -529,6 +589,16 @@ class JWTAuthManager:
         if required_scope and payload:
             token_scope = payload.get("scope")
             if token_scope != required_scope:
+                log_security_event(
+                    "jwt_insufficient_permissions",
+                    {
+                        "remote_addr": remote_addr or "unknown",
+                        "required_scope": required_scope,
+                        "token_scope": token_scope,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    },
+                    severity="WARNING"
+                )
                 return False, None, f"Insufficient permissions. Required: {required_scope}"
 
         return True, payload, None

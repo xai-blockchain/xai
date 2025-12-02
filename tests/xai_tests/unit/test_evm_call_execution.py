@@ -63,18 +63,18 @@ class TestCALLExecution:
         context.warm_address(target_address)
 
         # Create caller contract that calls target
-        # PUSH1 ret_size, PUSH1 ret_offset, PUSH1 args_size, PUSH1 args_offset,
-        # PUSH1 value, PUSH20 address, PUSH4 gas, CALL
+        # CALL stack layout (from EVM spec): gas, address, value, argsOffset, argsSize, retOffset, retSize
+        # Where 'gas' is on TOP of stack (popped first)
+        # So we must PUSH in REVERSE order: retSize, retOffset, argsSize, argsOffset, value, address, gas
         caller_code = bytes([
-            # Stack setup for CALL: gas, address, value, argsOffset, argsSize, retOffset, retSize
-            Opcode.PUSH4, 0x00, 0x01, 0x00, 0x00,  # gas = 65536
+            Opcode.PUSH1, 0x20,  # retSize = 32 (pushed first, at bottom)
+            Opcode.PUSH1, 0x00,  # retOffset = 0
+            Opcode.PUSH1, 0x00,  # argsSize = 0
+            Opcode.PUSH1, 0x00,  # argsOffset = 0
+            Opcode.PUSH1, 0x00,  # value = 0
             Opcode.PUSH20,  # address (20 bytes)
             *bytes.fromhex(target_address[2:]),
-            Opcode.PUSH1, 0x00,  # value = 0
-            Opcode.PUSH1, 0x00,  # argsOffset = 0
-            Opcode.PUSH1, 0x00,  # argsSize = 0
-            Opcode.PUSH1, 0x00,  # retOffset = 0
-            Opcode.PUSH1, 0x20,  # retSize = 32
+            Opcode.PUSH4, 0x00, 0x01, 0x00, 0x00,  # gas = 65536 (pushed last, on top)
             Opcode.CALL,
             # After CALL, success is on stack, return data is in memory
             Opcode.STOP,

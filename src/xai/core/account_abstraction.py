@@ -30,9 +30,10 @@ import hashlib
 import secrets
 import time
 from pathlib import Path
-from typing import Dict, Optional, List, Tuple, TYPE_CHECKING
+from typing import Dict, Optional, List, Tuple, TYPE_CHECKING, Deque
 from dataclasses import dataclass, field
 from enum import Enum
+from collections import deque
 
 from xai.core.wallet import WalletManager
 from xai.core.config import Config
@@ -53,6 +54,311 @@ class TransactionStatus(Enum):
 
 
 @dataclass
+class RateLimitConfig:
+    """
+    Configuration for multi-tier rate limiting.
+
+    Supports per-second, per-minute, per-hour, and per-day limits
+    to prevent burst attacks on gas sponsorship.
+    """
+    per_second: int = 10      # Max transactions per second
+    per_minute: int = 100     # Max transactions per minute
+    per_hour: int = 500       # Max transactions per hour
+    per_day: int = 1000       # Max transactions per day
+
+    # Gas amount limits
+    max_gas_per_second: float = 1.0    # Max total gas per second
+    max_gas_per_minute: float = 10.0   # Max total gas per minute
+    max_gas_per_hour: float = 50.0     # Max total gas per hour
+    max_gas_per_day: float = 100.0     # Max total gas per day
+
+    # Per-transaction limits
+    max_gas_per_transaction: float = 0.1  # Max gas per single transaction
+    max_cost_per_transaction: float = 1.0 # Max XAI cost per transaction
+
+
+class SlidingWindowRateLimiter:
+    """
+    Sliding window rate limiter for gas sponsorship.
+
+    Tracks requests in a time-ordered queue and enforces limits
+    across multiple time windows (second, minute, hour, day).
+
+    This prevents burst attacks where an attacker drains the entire
+    daily limit in seconds.
+
+    Security Features:
+    - Multi-tier rate limiting (per-second through per-day)
+    - Gas amount tracking (prevents high-value burst attacks)
+    - Sliding windows (more accurate than fixed-window counters)
+    - Per-address isolation (one user can't block others)
+    - Automatic cleanup of old entries
+
+    Example:
+        config = RateLimitConfig(per_second=10, per_minute=100)
+        limiter = SlidingWindowRateLimiter(config)
+
+        if limiter.is_allowed(gas_amount=0.01):
+            # Process transaction
+            pass
+        else:
+            retry_after = limiter.get_retry_after()
+            # Reject with retry-after header
+    """
+
+    def __init__(self, config: RateLimitConfig):
+        """
+        Initialize rate limiter.
+
+        Args:
+            config: Rate limit configuration
+        """
+        self.config = config
+        self.requests: Deque[Tuple[float, float]] = deque()  # (timestamp, gas_amount)
+
+    def is_allowed(self, gas_amount: float = 0.0) -> bool:
+        """
+        Check if a request is allowed under current rate limits.
+
+        Args:
+            gas_amount: Amount of gas for this request
+
+        Returns:
+            True if request is allowed, False if rate limited
+        """
+        now = time.time()
+
+        # Clean up old entries (older than 24 hours)
+        self._cleanup_old_entries(now)
+
+        # Check transaction count limits
+        second_count = self._count_in_window(now, 1)
+        minute_count = self._count_in_window(now, 60)
+        hour_count = self._count_in_window(now, 3600)
+        day_count = len(self.requests)
+
+        if second_count >= self.config.per_second:
+            logger.debug(
+                "Rate limit exceeded: per-second transaction count",
+                extra={
+                    "event": "rate_limit.exceeded",
+                    "window": "second",
+                    "count": second_count,
+                    "limit": self.config.per_second
+                }
+            )
+            return False
+
+        if minute_count >= self.config.per_minute:
+            logger.debug(
+                "Rate limit exceeded: per-minute transaction count",
+                extra={
+                    "event": "rate_limit.exceeded",
+                    "window": "minute",
+                    "count": minute_count,
+                    "limit": self.config.per_minute
+                }
+            )
+            return False
+
+        if hour_count >= self.config.per_hour:
+            logger.debug(
+                "Rate limit exceeded: per-hour transaction count",
+                extra={
+                    "event": "rate_limit.exceeded",
+                    "window": "hour",
+                    "count": hour_count,
+                    "limit": self.config.per_hour
+                }
+            )
+            return False
+
+        if day_count >= self.config.per_day:
+            logger.debug(
+                "Rate limit exceeded: per-day transaction count",
+                extra={
+                    "event": "rate_limit.exceeded",
+                    "window": "day",
+                    "count": day_count,
+                    "limit": self.config.per_day
+                }
+            )
+            return False
+
+        # Check gas amount limits
+        second_gas = self._sum_gas_in_window(now, 1)
+        minute_gas = self._sum_gas_in_window(now, 60)
+        hour_gas = self._sum_gas_in_window(now, 3600)
+        day_gas = sum(gas for _, gas in self.requests)
+
+        if second_gas + gas_amount > self.config.max_gas_per_second:
+            logger.debug(
+                "Rate limit exceeded: per-second gas amount",
+                extra={
+                    "event": "rate_limit.exceeded",
+                    "window": "second",
+                    "gas_used": second_gas,
+                    "gas_requested": gas_amount,
+                    "limit": self.config.max_gas_per_second
+                }
+            )
+            return False
+
+        if minute_gas + gas_amount > self.config.max_gas_per_minute:
+            logger.debug(
+                "Rate limit exceeded: per-minute gas amount",
+                extra={
+                    "event": "rate_limit.exceeded",
+                    "window": "minute",
+                    "gas_used": minute_gas,
+                    "gas_requested": gas_amount,
+                    "limit": self.config.max_gas_per_minute
+                }
+            )
+            return False
+
+        if hour_gas + gas_amount > self.config.max_gas_per_hour:
+            logger.debug(
+                "Rate limit exceeded: per-hour gas amount",
+                extra={
+                    "event": "rate_limit.exceeded",
+                    "window": "hour",
+                    "gas_used": hour_gas,
+                    "gas_requested": gas_amount,
+                    "limit": self.config.max_gas_per_hour
+                }
+            )
+            return False
+
+        if day_gas + gas_amount > self.config.max_gas_per_day:
+            logger.debug(
+                "Rate limit exceeded: per-day gas amount",
+                extra={
+                    "event": "rate_limit.exceeded",
+                    "window": "day",
+                    "gas_used": day_gas,
+                    "gas_requested": gas_amount,
+                    "limit": self.config.max_gas_per_day
+                }
+            )
+            return False
+
+        # Per-transaction limit
+        if gas_amount > self.config.max_gas_per_transaction:
+            logger.debug(
+                "Rate limit exceeded: per-transaction gas limit",
+                extra={
+                    "event": "rate_limit.exceeded",
+                    "gas_requested": gas_amount,
+                    "limit": self.config.max_gas_per_transaction
+                }
+            )
+            return False
+
+        # All checks passed - record the request
+        self.requests.append((now, gas_amount))
+        return True
+
+    def _cleanup_old_entries(self, now: float) -> None:
+        """Remove entries older than 24 hours"""
+        day_ago = now - 86400
+        while self.requests and self.requests[0][0] < day_ago:
+            self.requests.popleft()
+
+    def _count_in_window(self, now: float, window_seconds: int) -> int:
+        """Count requests in the last N seconds"""
+        cutoff = now - window_seconds
+        return sum(1 for ts, _ in self.requests if ts > cutoff)
+
+    def _sum_gas_in_window(self, now: float, window_seconds: int) -> float:
+        """Sum gas amounts in the last N seconds"""
+        cutoff = now - window_seconds
+        return sum(gas for ts, gas in self.requests if ts > cutoff)
+
+    def get_retry_after(self) -> float:
+        """
+        Get time until next request would be allowed (in seconds).
+
+        Returns:
+            Seconds until retry, or 0 if immediately available
+        """
+        if not self.requests:
+            return 0.0
+
+        now = time.time()
+
+        # Find the earliest window that's full
+        # Check per-second limit
+        if self._count_in_window(now, 1) >= self.config.per_second:
+            # Wait until oldest request in last second expires
+            oldest_in_window = now - 1
+            for ts, _ in self.requests:
+                if ts > oldest_in_window:
+                    return ts - oldest_in_window
+
+        # Check per-minute limit
+        if self._count_in_window(now, 60) >= self.config.per_minute:
+            oldest_in_window = now - 60
+            for ts, _ in self.requests:
+                if ts > oldest_in_window:
+                    return ts - oldest_in_window
+
+        # Check per-hour limit
+        if self._count_in_window(now, 3600) >= self.config.per_hour:
+            oldest_in_window = now - 3600
+            for ts, _ in self.requests:
+                if ts > oldest_in_window:
+                    return ts - oldest_in_window
+
+        # Check per-day limit
+        if len(self.requests) >= self.config.per_day:
+            # Wait until oldest request expires
+            oldest_ts = self.requests[0][0]
+            return (oldest_ts + 86400) - now
+
+        return 0.0
+
+    def get_current_usage(self) -> Dict[str, any]:
+        """
+        Get current usage statistics.
+
+        Returns:
+            Dictionary with usage counts and gas amounts for each window
+        """
+        now = time.time()
+
+        return {
+            "counts": {
+                "per_second": self._count_in_window(now, 1),
+                "per_minute": self._count_in_window(now, 60),
+                "per_hour": self._count_in_window(now, 3600),
+                "per_day": len(self.requests)
+            },
+            "gas_used": {
+                "per_second": self._sum_gas_in_window(now, 1),
+                "per_minute": self._sum_gas_in_window(now, 60),
+                "per_hour": self._sum_gas_in_window(now, 3600),
+                "per_day": sum(gas for _, gas in self.requests)
+            },
+            "limits": {
+                "counts": {
+                    "per_second": self.config.per_second,
+                    "per_minute": self.config.per_minute,
+                    "per_hour": self.config.per_hour,
+                    "per_day": self.config.per_day
+                },
+                "gas": {
+                    "per_second": self.config.max_gas_per_second,
+                    "per_minute": self.config.max_gas_per_minute,
+                    "per_hour": self.config.max_gas_per_hour,
+                    "per_day": self.config.max_gas_per_day,
+                    "per_transaction": self.config.max_gas_per_transaction
+                }
+            }
+        }
+
+
+@dataclass
 class SponsoredTransaction:
     """Record of a sponsored transaction"""
     user_address: str
@@ -70,29 +376,79 @@ class GasSponsor:
 
     Allows sponsors to pay transaction fees on behalf of users,
     enabling gasless transactions for better UX.
+
+    Security Features:
+    - Multi-tier rate limiting (per-second, minute, hour, day)
+    - Per-address rate limiting (prevents one user from consuming all capacity)
+    - Gas amount limiting (prevents high-value burst attacks)
+    - Global rate limiting (protects sponsor's total budget)
+    - Whitelist/blacklist support
     """
 
-    def __init__(self, sponsor_address: str, budget: float, rate_limit: int = 10):
+    def __init__(
+        self,
+        sponsor_address: str,
+        budget: float,
+        rate_limit: int = 10,
+        rate_limit_config: Optional[RateLimitConfig] = None
+    ):
         """
         Initialize gas sponsor
 
         Args:
             sponsor_address: Address of the sponsor
             budget: Total budget for sponsorship
-            rate_limit: Max transactions per user per day
+            rate_limit: DEPRECATED - use rate_limit_config instead (kept for backwards compatibility)
+            rate_limit_config: Multi-tier rate limit configuration
         """
         self.sponsor_address = sponsor_address
         self.total_budget = budget
         self.remaining_budget = budget
+
+        # Legacy rate limit (kept for backwards compatibility)
         self.rate_limit = rate_limit
+
+        # Multi-tier rate limiting
+        if rate_limit_config is None:
+            # Default configuration with reasonable limits
+            rate_limit_config = RateLimitConfig(
+                per_second=10,
+                per_minute=100,
+                per_hour=500,
+                per_day=max(rate_limit, 1000),  # Use legacy rate_limit or default
+                max_gas_per_second=1.0,
+                max_gas_per_minute=10.0,
+                max_gas_per_hour=50.0,
+                max_gas_per_day=100.0,
+                max_gas_per_transaction=0.1,
+                max_cost_per_transaction=1.0
+            )
+        self.rate_limit_config = rate_limit_config
+
+        # Global rate limiter (applies to all users combined)
+        self.global_rate_limiter = SlidingWindowRateLimiter(rate_limit_config)
+
+        # Per-address rate limiters (isolates users from each other)
+        self.user_rate_limiters: Dict[str, SlidingWindowRateLimiter] = {}
+
+        # Transaction tracking
         self.sponsored_transactions: List[SponsoredTransaction] = []
+        self._txid_map: Dict[str, SponsoredTransaction] = {}  # preliminary_txid -> transaction
+
+        # Legacy tracking (kept for backwards compatibility)
         self.user_daily_usage: Dict[str, List[float]] = {}  # user -> timestamps
+
+        # Access control
         self.whitelist: List[str] = []  # Whitelisted user addresses
         self.blacklist: List[str] = []  # Blacklisted user addresses
+
+        # Limits
         self.min_balance_required = 0.0  # Minimum balance user must have
-        self.max_gas_per_transaction = 0.1  # Maximum gas per transaction
+        self.max_gas_per_transaction = rate_limit_config.max_gas_per_transaction
+        self.max_cost_per_transaction = rate_limit_config.max_cost_per_transaction
+
+        # Control
         self.enabled = True
-        self._txid_map: Dict[str, SponsoredTransaction] = {}  # preliminary_txid -> transaction
 
     def _generate_preliminary_txid(self, user_address: str, gas_amount: float, timestamp: float) -> str:
         """
@@ -113,7 +469,13 @@ class GasSponsor:
 
     def sponsor_transaction(self, user_address: str, gas_amount: float) -> Optional[str]:
         """
-        Sponsor a transaction for a user
+        Sponsor a transaction for a user.
+
+        Performs multi-tier rate limiting:
+        1. Global rate limiting (all users combined)
+        2. Per-address rate limiting (isolates users)
+        3. Budget checks
+        4. Access control (whitelist/blacklist)
 
         Args:
             user_address: User address
@@ -166,33 +528,72 @@ class GasSponsor:
             )
             return None
 
-        # Check per-transaction limit
+        # Check per-transaction gas limit
         if gas_amount > self.max_gas_per_transaction:
             logger.warning(
-                "Sponsorship rejected: exceeds per-tx limit",
+                "Sponsorship rejected: exceeds per-tx gas limit",
                 extra={
                     "event": "gas_sponsor.rejected",
-                    "reason": "exceeds_limit",
+                    "reason": "exceeds_gas_limit",
                     "requested": gas_amount,
                     "limit": self.max_gas_per_transaction
                 }
             )
             return None
 
-        # Check rate limit
-        if not self._check_rate_limit(user_address):
+        # Check per-transaction cost limit
+        if gas_amount > self.max_cost_per_transaction:
             logger.warning(
-                "Sponsorship rejected: rate limit exceeded",
+                "Sponsorship rejected: exceeds per-tx cost limit",
                 extra={
                     "event": "gas_sponsor.rejected",
-                    "reason": "rate_limit",
-                    "user": user_address[:16] + "...",
-                    "limit": self.rate_limit
+                    "reason": "exceeds_cost_limit",
+                    "requested": gas_amount,
+                    "limit": self.max_cost_per_transaction
                 }
             )
             return None
 
-        # Approve sponsorship
+        # Check global rate limit (all users combined)
+        if not self.global_rate_limiter.is_allowed(gas_amount):
+            retry_after = self.global_rate_limiter.get_retry_after()
+            logger.warning(
+                "Sponsorship rejected: global rate limit exceeded",
+                extra={
+                    "event": "gas_sponsor.rejected",
+                    "reason": "global_rate_limit",
+                    "user": user_address[:16] + "...",
+                    "retry_after_seconds": retry_after,
+                    "gas_requested": gas_amount
+                }
+            )
+            return None
+
+        # Get or create per-address rate limiter
+        if user_address not in self.user_rate_limiters:
+            # Create per-user rate limiter with same config as global
+            # This isolates users from each other
+            self.user_rate_limiters[user_address] = SlidingWindowRateLimiter(
+                self.rate_limit_config
+            )
+
+        # Check per-address rate limit
+        user_limiter = self.user_rate_limiters[user_address]
+        if not user_limiter.is_allowed(gas_amount):
+            retry_after = user_limiter.get_retry_after()
+            logger.warning(
+                "Sponsorship rejected: user rate limit exceeded",
+                extra={
+                    "event": "gas_sponsor.rejected",
+                    "reason": "user_rate_limit",
+                    "user": user_address[:16] + "...",
+                    "retry_after_seconds": retry_after,
+                    "gas_requested": gas_amount
+                }
+            )
+            return None
+
+        # All checks passed - approve sponsorship
         self.remaining_budget -= gas_amount
 
         # Generate preliminary txid
@@ -212,7 +613,7 @@ class GasSponsor:
         self.sponsored_transactions.append(tx)
         self._txid_map[preliminary_txid] = tx
 
-        # Update user usage
+        # Update legacy user usage tracking (kept for backwards compatibility)
         if user_address not in self.user_daily_usage:
             self.user_daily_usage[user_address] = []
         self.user_daily_usage[user_address].append(timestamp)
@@ -387,8 +788,47 @@ class GasSponsor:
         self.max_gas_per_transaction = amount
 
     def set_rate_limit(self, limit: int) -> None:
-        """Set rate limit (transactions per user per day)"""
+        """
+        Set legacy rate limit (transactions per user per day).
+
+        DEPRECATED: Use update_rate_limit_config() instead for multi-tier limiting.
+        This method is kept for backwards compatibility.
+        """
         self.rate_limit = limit
+        # Update the config's per-day limit to match
+        self.rate_limit_config.per_day = limit
+
+    def update_rate_limit_config(self, config: RateLimitConfig) -> None:
+        """
+        Update the multi-tier rate limit configuration.
+
+        Args:
+            config: New rate limit configuration
+        """
+        self.rate_limit_config = config
+        self.max_gas_per_transaction = config.max_gas_per_transaction
+        self.max_cost_per_transaction = config.max_cost_per_transaction
+
+        # Update global rate limiter
+        self.global_rate_limiter = SlidingWindowRateLimiter(config)
+
+        # Update all existing user rate limiters
+        for user_address in self.user_rate_limiters:
+            self.user_rate_limiters[user_address] = SlidingWindowRateLimiter(config)
+
+        logger.info(
+            "Rate limit configuration updated",
+            extra={
+                "event": "gas_sponsor.config_updated",
+                "sponsor": self.sponsor_address[:16] + "...",
+                "config": {
+                    "per_second": config.per_second,
+                    "per_minute": config.per_minute,
+                    "per_hour": config.per_hour,
+                    "per_day": config.per_day
+                }
+            }
+        )
 
     def enable(self) -> None:
         """Enable sponsorship"""
@@ -399,9 +839,12 @@ class GasSponsor:
         self.enabled = False
 
     def get_stats(self) -> Dict[str, any]:
-        """Get sponsorship statistics"""
+        """Get comprehensive sponsorship statistics"""
         total_sponsored = sum(tx.gas_amount for tx in self.sponsored_transactions)
         unique_users = len(set(tx.user_address for tx in self.sponsored_transactions))
+
+        # Get global rate limit usage
+        global_usage = self.global_rate_limiter.get_current_usage()
 
         return {
             "sponsor_address": self.sponsor_address,
@@ -411,7 +854,21 @@ class GasSponsor:
             "transaction_count": len(self.sponsored_transactions),
             "unique_users": unique_users,
             "enabled": self.enabled,
-            "rate_limit": self.rate_limit
+            "rate_limit": self.rate_limit,  # Legacy
+            "rate_limit_config": {
+                "per_second": self.rate_limit_config.per_second,
+                "per_minute": self.rate_limit_config.per_minute,
+                "per_hour": self.rate_limit_config.per_hour,
+                "per_day": self.rate_limit_config.per_day,
+                "max_gas_per_second": self.rate_limit_config.max_gas_per_second,
+                "max_gas_per_minute": self.rate_limit_config.max_gas_per_minute,
+                "max_gas_per_hour": self.rate_limit_config.max_gas_per_hour,
+                "max_gas_per_day": self.rate_limit_config.max_gas_per_day,
+                "max_gas_per_transaction": self.rate_limit_config.max_gas_per_transaction,
+                "max_cost_per_transaction": self.rate_limit_config.max_cost_per_transaction
+            },
+            "global_usage": global_usage,
+            "active_users": len(self.user_rate_limiters)
         }
 
     def get_user_usage(self, user_address: str) -> Dict[str, any]:
@@ -423,7 +880,7 @@ class GasSponsor:
 
         total_gas = sum(tx.gas_amount for tx in user_txs)
 
-        # Count today's transactions
+        # Count today's transactions (legacy)
         current_time = time.time()
         day_ago = current_time - 86400
         today_count = len([
@@ -431,13 +888,40 @@ class GasSponsor:
             if ts > day_ago
         ])
 
+        # Get detailed rate limit usage if user has a limiter
+        user_usage = None
+        if user_address in self.user_rate_limiters:
+            user_usage = self.user_rate_limiters[user_address].get_current_usage()
+
         return {
             "user_address": user_address,
             "total_transactions": len(user_txs),
             "total_gas_sponsored": total_gas,
-            "transactions_today": today_count,
-            "rate_limit_remaining": max(0, self.rate_limit - today_count)
+            "transactions_today": today_count,  # Legacy
+            "rate_limit_remaining": max(0, self.rate_limit - today_count),  # Legacy
+            "rate_limit_usage": user_usage  # New multi-tier stats
         }
+
+    def get_retry_after(self, user_address: Optional[str] = None) -> float:
+        """
+        Get time until next request would be allowed (in seconds).
+
+        Args:
+            user_address: Optional user address to check. If None, checks global limit.
+
+        Returns:
+            Seconds until retry, or 0 if immediately available
+        """
+        # Check global limit
+        global_retry = self.global_rate_limiter.get_retry_after()
+
+        # If user specified, check their limit too
+        if user_address and user_address in self.user_rate_limiters:
+            user_retry = self.user_rate_limiters[user_address].get_retry_after()
+            # Return the maximum (most restrictive)
+            return max(global_retry, user_retry)
+
+        return global_retry
 
 
 class EmbeddedWalletRecord:
@@ -591,10 +1075,14 @@ class SponsorshipResult(Enum):
     SPONSOR_DISABLED = "sponsor_disabled"
     INSUFFICIENT_BUDGET = "insufficient_budget"
     RATE_LIMIT_EXCEEDED = "rate_limit_exceeded"
+    GLOBAL_RATE_LIMIT_EXCEEDED = "global_rate_limit_exceeded"
+    USER_RATE_LIMIT_EXCEEDED = "user_rate_limit_exceeded"
+    GAS_RATE_LIMIT_EXCEEDED = "gas_rate_limit_exceeded"
     USER_BLACKLISTED = "user_blacklisted"
     USER_NOT_WHITELISTED = "user_not_whitelisted"
     INVALID_SIGNATURE = "invalid_signature"
     FEE_TOO_HIGH = "fee_too_high"
+    COST_TOO_HIGH = "cost_too_high"
 
 
 @dataclass
@@ -604,6 +1092,7 @@ class SponsorshipValidation:
     sponsor_address: Optional[str] = None
     fee_amount: float = 0.0
     message: str = ""
+    retry_after: float = 0.0  # Seconds until retry allowed (for rate limiting)
 
 
 class SponsoredTransactionProcessor:
@@ -655,6 +1144,7 @@ class SponsoredTransactionProcessor:
         max_fee_per_tx: float = 0.1,
         whitelist: Optional[List[str]] = None,
         blacklist: Optional[List[str]] = None,
+        rate_limit_config: Optional[RateLimitConfig] = None,
     ) -> GasSponsor:
         """
         Register a new gas sponsor.
@@ -663,15 +1153,16 @@ class SponsoredTransactionProcessor:
             sponsor_address: Address of the sponsor
             sponsor_public_key: Public key for signature verification
             budget: Total budget for sponsorship (in XAI)
-            rate_limit: Maximum transactions per user per day
-            max_fee_per_tx: Maximum fee sponsor will pay per transaction
+            rate_limit: DEPRECATED - use rate_limit_config instead (kept for backwards compatibility)
+            max_fee_per_tx: Maximum fee sponsor will pay per transaction (DEPRECATED - use rate_limit_config)
             whitelist: Optional list of allowed user addresses
             blacklist: Optional list of blocked user addresses
+            rate_limit_config: Multi-tier rate limit configuration (recommended)
 
         Returns:
             GasSponsor instance
 
-        Example:
+        Example (legacy):
             sponsor = processor.register_sponsor(
                 sponsor_address="XAI1234...",
                 sponsor_public_key="04abc...",
@@ -679,9 +1170,42 @@ class SponsoredTransactionProcessor:
                 rate_limit=50,
                 max_fee_per_tx=0.01
             )
+
+        Example (recommended):
+            config = RateLimitConfig(
+                per_second=10,
+                per_minute=100,
+                per_hour=500,
+                per_day=1000,
+                max_gas_per_second=1.0,
+                max_gas_per_minute=10.0,
+                max_gas_per_hour=50.0,
+                max_gas_per_day=100.0,
+                max_gas_per_transaction=0.1
+            )
+            sponsor = processor.register_sponsor(
+                sponsor_address="XAI1234...",
+                sponsor_public_key="04abc...",
+                budget=100.0,
+                rate_limit_config=config
+            )
         """
-        sponsor = GasSponsor(sponsor_address, budget, rate_limit)
-        sponsor.max_gas_per_transaction = max_fee_per_tx
+        # If no config provided, create one from legacy parameters
+        if rate_limit_config is None:
+            rate_limit_config = RateLimitConfig(
+                per_second=10,
+                per_minute=100,
+                per_hour=500,
+                per_day=max(rate_limit, 1000),
+                max_gas_per_second=1.0,
+                max_gas_per_minute=10.0,
+                max_gas_per_hour=50.0,
+                max_gas_per_day=100.0,
+                max_gas_per_transaction=max_fee_per_tx,
+                max_cost_per_transaction=max_fee_per_tx
+            )
+
+        sponsor = GasSponsor(sponsor_address, budget, rate_limit, rate_limit_config)
 
         if whitelist:
             sponsor.set_whitelist(whitelist)
@@ -697,7 +1221,13 @@ class SponsoredTransactionProcessor:
                 "event": "gas_sponsor.registered",
                 "sponsor": sponsor_address[:16] + "...",
                 "budget": budget,
-                "rate_limit": rate_limit
+                "rate_limit": rate_limit,  # Legacy
+                "rate_limit_config": {
+                    "per_second": rate_limit_config.per_second,
+                    "per_minute": rate_limit_config.per_minute,
+                    "per_hour": rate_limit_config.per_hour,
+                    "per_day": rate_limit_config.per_day
+                }
             }
         )
 
@@ -878,12 +1408,15 @@ class SponsoredTransactionProcessor:
                 message=f"Insufficient budget: {sponsor.remaining_budget} < {transaction.fee}"
             )
 
-        # Check rate limit
-        if not sponsor._check_rate_limit(transaction.sender):
+        # Check rate limit (this is now handled by the new rate limiters in sponsor_transaction,
+        # but we keep this check for backwards compatibility and validation-only scenarios)
+        retry_after = sponsor.get_retry_after(transaction.sender)
+        if retry_after > 0:
             return SponsorshipValidation(
                 result=SponsorshipResult.RATE_LIMIT_EXCEEDED,
                 sponsor_address=transaction.gas_sponsor,
-                message=f"User exceeded rate limit of {sponsor.rate_limit}/day"
+                message=f"Rate limit exceeded. Retry after {retry_after:.1f} seconds",
+                retry_after=retry_after
             )
 
         # Verify sponsor signature

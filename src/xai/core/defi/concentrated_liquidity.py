@@ -46,6 +46,177 @@ Q128 = 2**128
 # Precision for liquidity calculations
 LIQUIDITY_PRECISION = 10**18
 
+# Fixed-point precision constants
+WAD = 10 ** 18  # 18 decimal precision for amounts
+RAY = 10 ** 27  # 27 decimal precision for rates/percentages
+
+# Maximum safe integer (uint256 equivalent)
+MAX_UINT256 = 2**256 - 1
+
+
+# ==================== Fixed-Point Arithmetic ====================
+
+def safe_mul(a: int, b: int) -> int:
+    """
+    Safely multiply two integers with overflow protection.
+
+    Raises:
+        OverflowError: If result exceeds MAX_UINT256
+    """
+    if a == 0 or b == 0:
+        return 0
+
+    result = a * b
+
+    # Check for overflow
+    if result > MAX_UINT256:
+        raise OverflowError(f"Multiplication overflow: {a} * {b}")
+
+    # Verify no truncation occurred
+    if result // a != b:
+        raise OverflowError(f"Multiplication overflow detected: {a} * {b}")
+
+    return result
+
+
+def wad_mul(a: int, b: int, round_up: bool = False) -> int:
+    """
+    Multiply two WAD (18 decimal) fixed-point values.
+
+    Args:
+        a: First value in WAD precision
+        b: Second value in WAD precision
+        round_up: If True, round up (for charging users)
+                  If False, round down (for paying users)
+
+    Returns:
+        Product in WAD precision
+    """
+    result = safe_mul(a, b)
+
+    if round_up:
+        return (result + WAD - 1) // WAD
+    return result // WAD
+
+
+def wad_div(a: int, b: int, round_up: bool = False) -> int:
+    """
+    Divide two WAD (18 decimal) fixed-point values.
+
+    Args:
+        a: Numerator in WAD precision
+        b: Denominator in WAD precision
+        round_up: If True, round up (for charging users)
+                  If False, round down (for paying users)
+
+    Returns:
+        Quotient in WAD precision
+
+    Raises:
+        ValueError: If b is zero
+    """
+    if b == 0:
+        raise ValueError("Division by zero")
+
+    result = safe_mul(a, WAD)
+
+    if round_up:
+        return (result + b - 1) // b
+    return result // b
+
+
+def ray_mul(a: int, b: int, round_up: bool = False) -> int:
+    """
+    Multiply two RAY (27 decimal) fixed-point values.
+
+    Args:
+        a: First value in RAY precision
+        b: Second value in RAY precision
+        round_up: If True, round up (for charging users)
+                  If False, round down (for paying users)
+
+    Returns:
+        Product in RAY precision
+    """
+    result = safe_mul(a, b)
+
+    if round_up:
+        return (result + RAY - 1) // RAY
+    return result // RAY
+
+
+def ray_div(a: int, b: int, round_up: bool = False) -> int:
+    """
+    Divide two RAY (27 decimal) fixed-point values.
+
+    Args:
+        a: Numerator in RAY precision
+        b: Denominator in RAY precision
+        round_up: If True, round up (for charging users)
+                  If False, round down (for paying users)
+
+    Returns:
+        Quotient in RAY precision
+
+    Raises:
+        ValueError: If b is zero
+    """
+    if b == 0:
+        raise ValueError("Division by zero")
+
+    result = safe_mul(a, RAY)
+
+    if round_up:
+        return (result + b - 1) // b
+    return result // b
+
+
+def mul_div(a: int, b: int, denominator: int, round_up: bool = False) -> int:
+    """
+    Calculate (a * b) / denominator with full precision and controlled rounding.
+
+    This is critical for preventing precision loss in financial calculations.
+
+    Args:
+        a: First multiplicand
+        b: Second multiplicand
+        denominator: Divisor
+        round_up: If True, round up (for charging users)
+                  If False, round down (for paying users)
+
+    Returns:
+        Result of (a * b) / denominator
+
+    Raises:
+        ValueError: If denominator is zero
+        OverflowError: If calculation overflows
+    """
+    if denominator == 0:
+        raise ValueError("Division by zero")
+
+    result = safe_mul(a, b)
+
+    if round_up:
+        return (result + denominator - 1) // denominator
+    return result // denominator
+
+
+def calculate_fee_amount(amount: int, fee_bps: int) -> int:
+    """
+    Calculate fee amount from basis points, always rounding UP.
+
+    This ensures the protocol never loses fees due to rounding.
+
+    Args:
+        amount: Input amount
+        fee_bps: Fee in basis points (e.g., 3000 = 0.30%)
+
+    Returns:
+        Fee amount (rounded up)
+    """
+    # fee = amount * fee_bps / 10000, rounded up
+    return mul_div(amount, fee_bps, 10000, round_up=True)
+
 
 class FeeTier(Enum):
     """Available fee tiers with corresponding tick spacing."""
@@ -207,6 +378,9 @@ class ConcentratedLiquidityPool:
             ratio = (ratio * 12847376061809297530290974190478138313) >> 128
 
         if tick > 0:
+            # Invert ratio for positive ticks
+            # This is a special case where we need exact Uniswap V3 behavior
+            # Using standard division here matches the reference implementation
             ratio = (2**256 - 1) // ratio
 
         return ratio
@@ -424,7 +598,11 @@ class ConcentratedLiquidityPool:
         return self._collect_fees(position)
 
     def _collect_fees(self, position: Position) -> Tuple[int, int]:
-        """Collect fees for a position."""
+        """
+        Collect fees for a position.
+
+        Fees are always rounded DOWN when paying users to prevent dust drain attacks.
+        """
         fee_growth_inside_0 = self._get_fee_growth_inside(
             position.tick_lower, position.tick_upper, 0
         )
@@ -432,14 +610,19 @@ class ConcentratedLiquidityPool:
             position.tick_lower, position.tick_upper, 1
         )
 
-        # Calculate owed fees
-        fees_owed_0 = (
-            (fee_growth_inside_0 - position.fee_growth_inside_0_last) *
-            position.liquidity // Q128
+        # Calculate owed fees - round DOWN when paying users
+        # This prevents users from draining dust through rounding
+        fees_owed_0 = mul_div(
+            (fee_growth_inside_0 - position.fee_growth_inside_0_last),
+            position.liquidity,
+            Q128,
+            round_up=False  # Round down when paying users
         )
-        fees_owed_1 = (
-            (fee_growth_inside_1 - position.fee_growth_inside_1_last) *
-            position.liquidity // Q128
+        fees_owed_1 = mul_div(
+            (fee_growth_inside_1 - position.fee_growth_inside_1_last),
+            position.liquidity,
+            Q128,
+            round_up=False  # Round down when paying users
         )
 
         # Add previously owed
@@ -547,9 +730,9 @@ class ConcentratedLiquidityPool:
                     amount_remaining -= amount_out
                     amount_calculated += amount_in + fee_amount
 
-                # Update fee growth
+                # Update fee growth - use full precision, no rounding for global accounting
                 if state_liquidity > 0:
-                    fee_growth_global += fee_amount * Q128 // state_liquidity
+                    fee_growth_global += mul_div(fee_amount, Q128, state_liquidity, round_up=False)
 
                 # Cross tick if reached
                 if state_sqrt_price == sqrt_price_next:
@@ -646,16 +829,20 @@ class ConcentratedLiquidityPool:
                 sqrt_price_current, sqrt_price_target, liquidity, False
             )
 
-        # Calculate fee
-        fee_max = amount_in_max * fee // 10000
+        # Calculate fee - round UP when charging users
+        fee_max = calculate_fee_amount(amount_in_max, fee)
 
         if exact_input:
             if amount_remaining >= amount_in_max + fee_max:
                 # Use full step
                 return sqrt_price_target, amount_in_max, amount_out_max, fee_max
             else:
-                # Partial step
-                amount_in = amount_remaining * 10000 // (10000 + fee)
+                # Partial step - calculate amount_in from total including fee
+                # amount_remaining = amount_in + fee_amount
+                # amount_remaining = amount_in + (amount_in * fee / 10000)
+                # amount_remaining = amount_in * (10000 + fee) / 10000
+                # amount_in = amount_remaining * 10000 / (10000 + fee)
+                amount_in = mul_div(amount_remaining, 10000, 10000 + fee, round_up=False)
                 fee_amount = amount_remaining - amount_in
 
                 # Calculate new sqrt price
@@ -696,7 +883,8 @@ class ConcentratedLiquidityPool:
                         sqrt_price_current, sqrt_price_next, liquidity, True
                     )
 
-                fee_amount = amount_in * fee // 10000
+                # Calculate fee - round UP when charging users
+                fee_amount = calculate_fee_amount(amount_in, fee)
                 return sqrt_price_next, amount_in, amount_remaining, fee_amount
 
     # ==================== Internal Math ====================
@@ -935,7 +1123,11 @@ class ConcentratedLiquidityPool:
         }
 
     def _collect_fees_preview(self, position: Position) -> Tuple[int, int]:
-        """Preview fees without modifying state."""
+        """
+        Preview fees without modifying state.
+
+        Fees are always rounded DOWN when paying users.
+        """
         fee_growth_inside_0 = self._get_fee_growth_inside(
             position.tick_lower, position.tick_upper, 0
         )
@@ -943,14 +1135,19 @@ class ConcentratedLiquidityPool:
             position.tick_lower, position.tick_upper, 1
         )
 
-        fees_0 = (
-            (fee_growth_inside_0 - position.fee_growth_inside_0_last) *
-            position.liquidity // Q128
+        # Round DOWN when paying users
+        fees_0 = mul_div(
+            (fee_growth_inside_0 - position.fee_growth_inside_0_last),
+            position.liquidity,
+            Q128,
+            round_up=False
         ) + position.tokens_owed_0
 
-        fees_1 = (
-            (fee_growth_inside_1 - position.fee_growth_inside_1_last) *
-            position.liquidity // Q128
+        fees_1 = mul_div(
+            (fee_growth_inside_1 - position.fee_growth_inside_1_last),
+            position.liquidity,
+            Q128,
+            round_up=False
         ) + position.tokens_owed_1
 
         return fees_0, fees_1
@@ -1013,13 +1210,24 @@ class ConcentratedLiquidityPool:
                     self.sqrt_price, new_sqrt_price, self.liquidity, False
                 )
 
-            # Apply fee
-            fee = amount_in * self.fee_tier.fee // 10000
-            amount_out = amount_out * (10000 - self.fee_tier.fee) // 10000
+            # Apply fee - round UP when charging users, round DOWN when paying
+            fee = calculate_fee_amount(amount_in, self.fee_tier.fee)
+            # Reduce output by fee percentage - round DOWN when paying users
+            amount_out = mul_div(
+                amount_out,
+                (10000 - self.fee_tier.fee),
+                10000,
+                round_up=False
+            )
 
-            # Calculate price impact
+            # Calculate price impact in basis points
             if self.sqrt_price > 0:
-                price_impact = abs(new_sqrt_price - self.sqrt_price) * 10000 // self.sqrt_price
+                price_impact = mul_div(
+                    abs(new_sqrt_price - self.sqrt_price),
+                    10000,
+                    self.sqrt_price,
+                    round_up=False
+                )
             else:
                 price_impact = 0
 
@@ -1080,7 +1288,8 @@ class ConcentratedLiquidityFactory:
         # Sort tokens
         if token0 > token1:
             token0, token1 = token1, token0
-            initial_sqrt_price = Q96 * Q96 // initial_sqrt_price
+            # Invert sqrt price with full precision
+            initial_sqrt_price = mul_div(Q96, Q96, initial_sqrt_price, round_up=False)
 
         pair_key = f"{token0}:{token1}"
 
