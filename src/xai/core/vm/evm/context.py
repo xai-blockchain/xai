@@ -352,6 +352,47 @@ class ExecutionContext:
             return 0xC5D2460186F7233C927E7DB2DCC703C0E500B653CA82273B7BFAD8045D85A470
         return int.from_bytes(hashlib.sha3_256(code).digest(), "big")
 
+    def set_code(self, address: str, code: bytes) -> None:
+        """
+        Set contract code.
+
+        Args:
+            address: Contract address
+            code: Bytecode to set
+        """
+        if self.blockchain:
+            normalized = address.upper()
+            if normalized not in self.blockchain.contracts:
+                self.blockchain.contracts[normalized] = {}
+            # Convert bytes to hex string for storage
+            self.blockchain.contracts[normalized]["code"] = code.hex() if code else ""
+            self.created_accounts.add(address)
+
+    def get_nonce(self, address: str) -> int:
+        """
+        Get account nonce.
+
+        Args:
+            address: Account address
+
+        Returns:
+            Current nonce
+        """
+        if self.blockchain:
+            return self.blockchain.nonce_tracker.get_nonce(address)
+        return 0
+
+    def increment_nonce(self, address: str) -> None:
+        """
+        Increment account nonce.
+
+        Args:
+            address: Account address
+        """
+        if self.blockchain:
+            current = self.blockchain.nonce_tracker.get_nonce(address)
+            self.blockchain.nonce_tracker.set_nonce(address, current + 1)
+
     def warm_address(self, address: str) -> int:
         """
         Warm an address (EIP-2929).

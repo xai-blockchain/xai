@@ -26,6 +26,7 @@ from .stack import EVMStack, to_signed, to_unsigned, sign_extend, UINT256_MAX
 from .memory import EVMMemory
 from .context import ExecutionContext, CallContext, CallType, Log
 from ..exceptions import VMExecutionError
+from . import interpreter_helpers
 
 if TYPE_CHECKING:
     from .storage import EVMStorage
@@ -890,16 +891,17 @@ class EVMInterpreter:
         # Get init code
         init_code = call.memory.load_range(offset, size)
 
-        # Create contract address (keccak256(rlp([sender, nonce]))[12:])
-        # Simplified: hash of sender + nonce
-        nonce = 0  # Would get from account state
-        addr_input = call.address.encode() + nonce.to_bytes(8, "big")
-        addr_hash = hashlib.sha3_256(addr_input).digest()
-        new_address = f"0x{addr_hash[-20:].hex()}"
+        # Execute CREATE with proper init code execution
+        result_address = interpreter_helpers.execute_create(
+            interpreter=self,
+            call=call,
+            value=value,
+            init_code=init_code,
+            salt=None,
+        )
 
-        # Execute init code and store result
-        # For now, push address or 0 on failure
-        call.stack.push(int(new_address[2:], 16))
+        # Push result address (0 on failure)
+        call.stack.push(result_address)
 
     def _op_call(self, call: CallContext) -> None:
         """CALL: Message-call into account."""
@@ -918,32 +920,151 @@ class EVMInterpreter:
 
         address = f"0x{addr_int:040x}"
 
+        # Check call depth limit
+        if call.depth >= self.context.max_call_depth:
+            call.stack.push(0)  # Failure
+            call.return_data = b""
+            return
+
         # Warm/cold address gas
         warm_gas = self.context.warm_address(address)
 
-        # Memory expansion
-        in_expansion = call.memory.expansion_cost(args_offset, args_size)
-        out_expansion = call.memory.expansion_cost(ret_offset, ret_size)
+        # Memory expansion (calculate for both input and output regions)
+        # Memory expansion is cumulative - we need the max of the two expansion costs
+        in_expansion = call.memory.expansion_cost(args_offset, args_size) if args_size > 0 else 0
+        out_expansion = call.memory.expansion_cost(ret_offset, ret_size) if ret_size > 0 else 0
+        expansion_cost = max(in_expansion, out_expansion)
 
-        total_gas = warm_gas + in_expansion + out_expansion
+        total_gas = warm_gas + expansion_cost
         if value != 0:
             total_gas += 9000  # Value transfer stipend
+            # Check if account exists for value transfer
+            if not self._account_exists(address):
+                total_gas += 25000  # New account creation cost
 
         if not call.use_gas(total_gas):
             raise VMExecutionError("Out of gas for CALL")
 
-        # Get calldata
+        # Get calldata from memory
         calldata = call.memory.load_range(args_offset, args_size)
 
-        # Execute call (simplified - would recurse into interpreter)
-        # For now, return success
-        call.return_data = b""
-        call.stack.push(1)  # Success
+        # Calculate gas to forward (EIP-150: 63/64 rule)
+        gas_to_forward = min(gas, (call.gas * 63) // 64)
+
+        # Value transfer (check balance)
+        if value != 0:
+            sender_balance = self.context.get_balance(call.address)
+            if sender_balance < value:
+                # Insufficient balance - call fails
+                call.stack.push(0)
+                call.return_data = b""
+                return
+
+            # Add gas stipend for value transfer (2300 gas)
+            gas_to_forward += 2300
+
+        # Execute the call
+        success, return_data = self._execute_subcall(
+            call_type=CallType.CALL,
+            caller=call.address,
+            address=address,
+            value=value,
+            calldata=calldata,
+            gas=gas_to_forward,
+            depth=call.depth + 1,
+            static=call.static,
+        )
+
+        # Copy return data to memory (bounded by ret_size)
+        if return_data:
+            copy_size = min(len(return_data), ret_size)
+            call.memory.store_range(ret_offset, return_data[:copy_size])
+
+        # Update return_data buffer for RETURNDATASIZE/RETURNDATACOPY
+        call.return_data = return_data
+
+        # Push success/failure
+        call.stack.push(1 if success else 0)
 
     def _op_callcode(self, call: CallContext) -> None:
-        """CALLCODE: Message-call with alternative code."""
-        # Similar to CALL but executes code in current context
-        self._op_call(call)  # Simplified
+        """
+        CALLCODE: Message-call with alternative code.
+
+        Like CALL but executes code in current address's storage context.
+        Deprecated in favor of DELEGATECALL but kept for compatibility.
+        """
+        gas, addr_int, value, args_offset, args_size, ret_offset, ret_size = (
+            call.stack.pop(),
+            call.stack.pop(),
+            call.stack.pop(),
+            call.stack.pop(),
+            call.stack.pop(),
+            call.stack.pop(),
+            call.stack.pop(),
+        )
+
+        if call.static and value != 0:
+            raise VMExecutionError("Value transfer not allowed in static context")
+
+        address = f"0x{addr_int:040x}"
+
+        # Check call depth limit
+        if call.depth >= self.context.max_call_depth:
+            call.stack.push(0)  # Failure
+            call.return_data = b""
+            return
+
+        # Warm/cold address gas
+        warm_gas = self.context.warm_address(address)
+
+        # Memory expansion
+        in_expansion = call.memory.expansion_cost(args_offset, args_size) if args_size > 0 else 0
+        out_expansion = call.memory.expansion_cost(ret_offset, ret_size) if ret_size > 0 else 0
+        expansion_cost = max(in_expansion, out_expansion)
+
+        total_gas = warm_gas + expansion_cost
+        if value != 0:
+            total_gas += 9000
+
+        if not call.use_gas(total_gas):
+            raise VMExecutionError("Out of gas for CALLCODE")
+
+        # Get calldata from memory
+        calldata = call.memory.load_range(args_offset, args_size)
+
+        # Calculate gas to forward (EIP-150: 63/64 rule)
+        gas_to_forward = min(gas, (call.gas * 63) // 64)
+
+        # Value transfer check
+        if value != 0:
+            sender_balance = self.context.get_balance(call.address)
+            if sender_balance < value:
+                call.stack.push(0)
+                call.return_data = b""
+                return
+            gas_to_forward += 2300  # Gas stipend
+
+        # CALLCODE: Execute target code in current storage context
+        # Like DELEGATECALL but caller is current contract, not preserved
+        success, return_data = self._execute_subcall(
+            call_type=CallType.CALLCODE,
+            caller=call.address,  # Caller is current contract
+            address=call.address,  # Execute in current address's storage
+            code_address=address,  # But use code from target address
+            value=value,
+            calldata=calldata,
+            gas=gas_to_forward,
+            depth=call.depth + 1,
+            static=call.static,
+        )
+
+        # Copy return data to memory
+        if return_data:
+            copy_size = min(len(return_data), ret_size)
+            call.memory.store_range(ret_offset, return_data[:copy_size])
+
+        call.return_data = return_data
+        call.stack.push(1 if success else 0)
 
     def _op_return(self, call: CallContext) -> None:
         """RETURN: Halt and return output data."""
@@ -970,17 +1091,53 @@ class EVMInterpreter:
 
         address = f"0x{addr_int:040x}"
 
+        # Check call depth limit
+        if call.depth >= self.context.max_call_depth:
+            call.stack.push(0)  # Failure
+            call.return_data = b""
+            return
+
         # Warm/cold address gas
         warm_gas = self.context.warm_address(address)
-        in_expansion = call.memory.expansion_cost(args_offset, args_size)
-        out_expansion = call.memory.expansion_cost(ret_offset, ret_size)
 
-        if not call.use_gas(warm_gas + in_expansion + out_expansion):
+        # Memory expansion
+        in_expansion = call.memory.expansion_cost(args_offset, args_size) if args_size > 0 else 0
+        out_expansion = call.memory.expansion_cost(ret_offset, ret_size) if ret_size > 0 else 0
+        expansion_cost = max(in_expansion, out_expansion)
+
+        if not call.use_gas(warm_gas + expansion_cost):
             raise VMExecutionError("Out of gas for DELEGATECALL")
 
-        # Execute with current msg.sender and msg.value
-        call.return_data = b""
-        call.stack.push(1)
+        # Get calldata from memory
+        calldata = call.memory.load_range(args_offset, args_size)
+
+        # Calculate gas to forward (EIP-150: 63/64 rule)
+        gas_to_forward = min(gas, (call.gas * 63) // 64)
+
+        # Execute with current msg.sender and msg.value (preserved context)
+        # DELEGATECALL executes target code in caller's storage context
+        success, return_data = self._execute_subcall(
+            call_type=CallType.DELEGATECALL,
+            caller=call.caller,  # Preserve original caller
+            address=call.address,  # Execute in current address's storage
+            code_address=address,  # But use code from target address
+            value=call.value,  # Preserve original value
+            calldata=calldata,
+            gas=gas_to_forward,
+            depth=call.depth + 1,
+            static=call.static,
+        )
+
+        # Copy return data to memory (bounded by ret_size)
+        if return_data:
+            copy_size = min(len(return_data), ret_size)
+            call.memory.store_range(ret_offset, return_data[:copy_size])
+
+        # Update return_data buffer
+        call.return_data = return_data
+
+        # Push success/failure
+        call.stack.push(1 if success else 0)
 
     def _op_create2(self, call: CallContext) -> None:
         """CREATE2: Create with deterministic address."""
@@ -1002,18 +1159,17 @@ class EVMInterpreter:
 
         init_code = call.memory.load_range(offset, size)
 
-        # CREATE2 address: keccak256(0xff ++ sender ++ salt ++ keccak256(init_code))[12:]
-        init_code_hash = hashlib.sha3_256(init_code).digest()
-        addr_input = (
-            b"\xff"
-            + bytes.fromhex(call.address[2:] if call.address.startswith("0x") else call.address)
-            + salt.to_bytes(32, "big")
-            + init_code_hash
+        # Execute CREATE2 with proper init code execution
+        result_address = interpreter_helpers.execute_create(
+            interpreter=self,
+            call=call,
+            value=value,
+            init_code=init_code,
+            salt=salt,
         )
-        addr_hash = hashlib.sha3_256(addr_input).digest()
-        new_address = f"0x{addr_hash[-20:].hex()}"
 
-        call.stack.push(int(new_address[2:], 16))
+        # Push result address (0 on failure)
+        call.stack.push(result_address)
 
     def _op_staticcall(self, call: CallContext) -> None:
         """STATICCALL: Static message-call (no state modification)."""
@@ -1028,17 +1184,51 @@ class EVMInterpreter:
 
         address = f"0x{addr_int:040x}"
 
+        # Check call depth limit
+        if call.depth >= self.context.max_call_depth:
+            call.stack.push(0)  # Failure
+            call.return_data = b""
+            return
+
         # Warm/cold address gas
         warm_gas = self.context.warm_address(address)
-        in_expansion = call.memory.expansion_cost(args_offset, args_size)
-        out_expansion = call.memory.expansion_cost(ret_offset, ret_size)
 
-        if not call.use_gas(warm_gas + in_expansion + out_expansion):
+        # Memory expansion
+        in_expansion = call.memory.expansion_cost(args_offset, args_size) if args_size > 0 else 0
+        out_expansion = call.memory.expansion_cost(ret_offset, ret_size) if ret_size > 0 else 0
+        expansion_cost = max(in_expansion, out_expansion)
+
+        if not call.use_gas(warm_gas + expansion_cost):
             raise VMExecutionError("Out of gas for STATICCALL")
 
-        # Execute in static mode (no state changes)
-        call.return_data = b""
-        call.stack.push(1)
+        # Get calldata from memory
+        calldata = call.memory.load_range(args_offset, args_size)
+
+        # Calculate gas to forward (EIP-150: 63/64 rule)
+        gas_to_forward = min(gas, (call.gas * 63) // 64)
+
+        # Execute in static mode (no state changes allowed)
+        success, return_data = self._execute_subcall(
+            call_type=CallType.STATICCALL,
+            caller=call.address,
+            address=address,
+            value=0,  # No value transfer in STATICCALL
+            calldata=calldata,
+            gas=gas_to_forward,
+            depth=call.depth + 1,
+            static=True,  # Force static mode
+        )
+
+        # Copy return data to memory (bounded by ret_size)
+        if return_data:
+            copy_size = min(len(return_data), ret_size)
+            call.memory.store_range(ret_offset, return_data[:copy_size])
+
+        # Update return_data buffer
+        call.return_data = return_data
+
+        # Push success/failure
+        call.stack.push(1 if success else 0)
 
     def _op_revert(self, call: CallContext) -> None:
         """REVERT: Halt and revert state changes."""
@@ -1082,3 +1272,142 @@ class EVMInterpreter:
         # Mark for destruction
         self.context.destroyed_accounts.add(call.address)
         call.halted = True
+
+    # ==================== Helper Methods ====================
+
+    def _execute_subcall(
+        self,
+        call_type: CallType,
+        caller: str,
+        address: str,
+        value: int,
+        calldata: bytes,
+        gas: int,
+        depth: int,
+        static: bool,
+        code_address: Optional[str] = None,
+    ) -> tuple[bool, bytes]:
+        """
+        Execute a subcall (CALL, DELEGATECALL, STATICCALL).
+
+        This creates a new call context and recursively executes the called
+        contract's bytecode, returning success status and return data.
+
+        Args:
+            call_type: Type of call (CALL, DELEGATECALL, STATICCALL)
+            caller: Address of the caller
+            address: Address where code executes (storage context)
+            value: Value to transfer
+            calldata: Input data for the call
+            gas: Gas available for the call
+            depth: Call depth
+            static: Whether this is a static call
+            code_address: Address to load code from (for DELEGATECALL)
+
+        Returns:
+            Tuple of (success, return_data)
+        """
+        # Determine which address to load code from
+        code_addr = code_address if code_address else address
+
+        # Get contract code
+        code = self.context.get_code(code_addr)
+
+        # Empty code = success with empty return
+        if not code:
+            # Still perform value transfer if applicable
+            if value > 0 and call_type == CallType.CALL:
+                if not self.context.transfer(caller, address, value):
+                    return False, b""
+            return True, b""
+
+        # Check for precompiles (addresses 0x01-0x0a)
+        from .executor import EVMPrecompiles
+        if EVMPrecompiles.is_precompile(code_addr):
+            try:
+                return_data, gas_used = EVMPrecompiles.execute_precompile(
+                    code_addr, calldata, gas
+                )
+                return True, return_data
+            except VMExecutionError:
+                return False, b""
+
+        # Perform value transfer (for CALL only, before execution)
+        if value > 0 and call_type == CallType.CALL:
+            if not self.context.transfer(caller, address, value):
+                return False, b""
+
+        # Take snapshot for potential revert
+        snapshot_id = self.context.take_snapshot()
+
+        # Create child call context
+        child_call = CallContext(
+            call_type=call_type,
+            depth=depth,
+            address=address,
+            caller=caller,
+            origin=self.context.tx_origin,
+            value=value,
+            gas=gas,
+            code=code,
+            calldata=calldata,
+            static=static,
+        )
+
+        # Push onto call stack
+        if not self.context.push_call(child_call):
+            # Max depth exceeded (should be caught earlier, but safety check)
+            return False, b""
+
+        # Execute the child call
+        try:
+            self.execute(child_call)
+        except VMExecutionError as e:
+            # Execution error - revert and return failure
+            self.context.revert_to_snapshot(snapshot_id)
+            self.context.pop_call()
+            return False, b""
+
+        # Pop from call stack
+        self.context.pop_call()
+
+        # Check if call reverted
+        if child_call.reverted:
+            # Revert state changes
+            self.context.revert_to_snapshot(snapshot_id)
+            return False, child_call.output
+
+        # Success - commit snapshot
+        # (snapshot will be committed when parent commits)
+        return True, child_call.output
+
+    def _account_exists(self, address: str) -> bool:
+        """
+        Check if account exists (has code, balance, or nonce > 0).
+
+        Args:
+            address: Account address
+
+        Returns:
+            True if account exists
+        """
+        # Check if has code
+        code = self.context.get_code(address)
+        if code:
+            return True
+
+        # Check if has balance
+        balance = self.context.get_balance(address)
+        if balance > 0:
+            return True
+
+        # Check if has nonce
+        nonce = self.context.get_nonce(address)
+        if nonce > 0:
+            return True
+
+        # Check if in created accounts
+        if address in self.context.created_accounts:
+            return True
+
+        return False
