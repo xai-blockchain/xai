@@ -79,24 +79,31 @@ class AssetConfig:
 
 @dataclass
 class UserPosition:
-    """User's position in a lending pool."""
+    """
+    User's position in a lending pool.
+
+    Uses accumulator pattern (like Compound/Aave) to prevent dust loss:
+    - supplied: aToken balances (scaled principal)
+    - borrowed: Debt principal amounts
+    - borrow_index: Index at time of borrow (for each asset)
+
+    Interest is calculated globally via indices, not per-user.
+    """
 
     user: str
 
-    # Supplied collateral by asset
+    # Supplied collateral by asset (aToken amounts - scaled principal)
     supplied: Dict[str, int] = field(default_factory=dict)
 
-    # Borrowed amounts by asset
+    # Borrowed principal amounts by asset (in underlying tokens)
     borrowed: Dict[str, int] = field(default_factory=dict)
 
     # Interest rate mode per borrowed asset
     interest_mode: Dict[str, InterestRateModel] = field(default_factory=dict)
 
-    # Timestamps for interest calculation
-    last_update: Dict[str, float] = field(default_factory=dict)
-
-    # Accumulated interest
-    accrued_interest: Dict[str, int] = field(default_factory=dict)
+    # Borrow index snapshot at time of borrow (for each asset)
+    # Used to calculate accrued interest: debt = principal * (current_index / borrow_index)
+    borrow_index: Dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -265,8 +272,10 @@ class LendingPool:
         # Update state
         state = self.pool_states[asset]
 
-        # Calculate aTokens to mint (scaled by supply index)
-        a_tokens = self._ray_div(amount * self.RAY, state.supply_index)
+        # Calculate aTokens to mint (normalized to current index)
+        # aTokens = amount / (index / RAY) = amount * RAY / index
+        # This ensures: underlying = aTokens * index / RAY
+        a_tokens = (amount * self.RAY) // state.supply_index
 
         # Update balances
         position.supplied[asset] = position.supplied.get(asset, 0) + a_tokens
@@ -306,11 +315,8 @@ class LendingPool:
         # Update interest indices
         self._update_indices(asset)
 
-        state = self.pool_states[asset]
-
-        # Calculate available balance
-        a_token_balance = position.supplied.get(asset, 0)
-        underlying_balance = self._ray_mul(a_token_balance, state.supply_index) // self.RAY
+        # Calculate available balance using accumulator pattern
+        underlying_balance = self._get_user_supply_balance(position, asset)
 
         # Handle max withdrawal
         if amount == 2**256 - 1:
@@ -322,8 +328,10 @@ class LendingPool:
             )
 
         # Check if withdrawal maintains health factor
+        state = self.pool_states[asset]
+        a_tokens_to_burn = (amount * self.RAY) // state.supply_index
+
         new_supplied = position.supplied.copy()
-        a_tokens_to_burn = self._ray_div(amount * self.RAY, state.supply_index)
         new_supplied[asset] = new_supplied.get(asset, 0) - a_tokens_to_burn
 
         health_factor = self._calculate_health_factor_with_changes(
@@ -336,6 +344,7 @@ class LendingPool:
             )
 
         # Update balances
+        a_token_balance = position.supplied.get(asset, 0)
         position.supplied[asset] = a_token_balance - a_tokens_to_burn
         state.total_supplied -= amount
 
@@ -565,10 +574,9 @@ class LendingPool:
             }
         )
 
-        # Update state
-        position.borrowed[asset] = position.borrowed.get(asset, 0) + amount
+        # Update state using accumulator pattern
+        self._normalize_borrow_principal(position, asset, amount)
         position.interest_mode[asset] = interest_mode
-        position.last_update[asset] = time.time()
 
         state.total_borrowed += amount
 
@@ -613,14 +621,11 @@ class LendingPool:
         if not position:
             raise VMExecutionError("No position found")
 
-        # Update indices and accrue interest
+        # Update indices to accrue interest globally
         self._update_indices(asset)
-        self._accrue_interest(position, asset)
 
-        # Get total debt (principal + interest)
-        principal = position.borrowed.get(asset, 0)
-        interest = position.accrued_interest.get(asset, 0)
-        total_debt = principal + interest
+        # Get total debt (principal + accrued interest via index)
+        total_debt = self._get_user_borrow_balance(position, asset)
 
         if total_debt == 0:
             raise VMExecutionError(f"No debt to repay for {asset}")
@@ -629,32 +634,24 @@ class LendingPool:
         if amount == 2**256 - 1:
             amount = total_debt
 
-        # Cap at total debt
-        amount = min(amount, total_debt)
-
-        # First repay interest, then principal
-        if amount <= interest:
-            position.accrued_interest[asset] = interest - amount
-        else:
-            position.accrued_interest[asset] = 0
-            principal_repaid = amount - interest
-            position.borrowed[asset] = principal - principal_repaid
+        # Use normalized repayment (caps at total debt)
+        actual_repaid = self._normalize_repay_principal(position, asset, amount)
 
         # Update pool state
         state = self.pool_states[asset]
-        state.total_borrowed = max(0, state.total_borrowed - amount)
+        state.total_borrowed = max(0, state.total_borrowed - actual_repaid)
 
         logger.info(
             "Debt repaid to lending pool",
             extra={
                 "event": "lending.repay",
                 "asset": asset,
-                "amount": amount,
+                "amount": actual_repaid,
                 "user": beneficiary[:10],
             }
         )
 
-        return amount
+        return actual_repaid
 
     # ==================== Liquidation ====================
 
@@ -697,15 +694,12 @@ class LendingPool:
                 f"Position is healthy (health factor: {health_factor / self.RAY:.4f})"
             )
 
-        # Update indices and accrue interest
+        # Update indices to accrue interest globally
         self._update_indices(debt_asset)
         self._update_indices(collateral_asset)
-        self._accrue_interest(position, debt_asset)
 
-        # Get debt
-        principal = position.borrowed.get(debt_asset, 0)
-        interest = position.accrued_interest.get(debt_asset, 0)
-        total_debt = principal + interest
+        # Get total debt (principal + accrued interest via index)
+        total_debt = self._get_user_borrow_balance(position, debt_asset)
 
         if total_debt == 0:
             raise VMExecutionError("No debt to liquidate")
@@ -740,15 +734,11 @@ class LendingPool:
             )
 
         # Execute liquidation
-        # 1. Reduce borrower's debt
-        if debt_to_cover <= interest:
-            position.accrued_interest[debt_asset] = interest - debt_to_cover
-        else:
-            position.accrued_interest[debt_asset] = 0
-            position.borrowed[debt_asset] = principal - (debt_to_cover - interest)
+        # 1. Reduce borrower's debt using normalized repayment
+        self._normalize_repay_principal(position, debt_asset, debt_to_cover)
 
         # 2. Transfer collateral to liquidator
-        a_tokens_seized = self._ray_div(collateral_to_seize * self.RAY, state.supply_index)
+        a_tokens_seized = (collateral_to_seize * self.RAY) // state.supply_index
         position.supplied[collateral_asset] = a_token_balance - a_tokens_seized
 
         # Give aTokens to liquidator
@@ -825,16 +815,22 @@ class LendingPool:
                 state = self.pool_states[asset]
                 config = self.assets[asset]
 
-                underlying = self._ray_mul(a_tokens, state.supply_index) // self.RAY
+                # Update indices first
+                self._update_indices(asset)
+
+                # Calculate underlying: aTokens * index / RAY
+                underlying = (a_tokens * state.supply_index) // self.RAY
                 value = underlying * self._get_price(asset)
                 total_collateral += value
                 weighted_ltv += value * config.ltv // self.BASIS_POINTS
 
-        for asset, principal in position.borrowed.items():
-            if principal > 0:
-                self._accrue_interest(position, asset)
-                interest = position.accrued_interest.get(asset, 0)
-                total_debt += (principal + interest) * self._get_price(asset)
+        for asset in position.borrowed.keys():
+            # Update indices to get current accrued interest
+            self._update_indices(asset)
+            # Get debt with accrued interest via accumulator pattern
+            debt = self._get_user_borrow_balance(position, asset)
+            if debt > 0:
+                total_debt += debt * self._get_price(asset)
 
         health_factor = self._calculate_health_factor(position)
         available_borrow = max(0, weighted_ltv - total_debt) if total_collateral > 0 else 0
@@ -962,32 +958,9 @@ class LendingPool:
 
         state.last_update = time.time()
 
-    def _accrue_interest(self, position: UserPosition, asset: str) -> None:
-        """Accrue interest for a user's borrowed position."""
-        principal = position.borrowed.get(asset, 0)
-        if principal == 0:
-            return
-
-        last_update = position.last_update.get(asset, time.time())
-        time_elapsed = time.time() - last_update
-
-        if time_elapsed <= 0:
-            return
-
-        # Get interest rate
-        utilization = self._calculate_utilization(asset)
-        rate = self._calculate_borrow_rate(asset, utilization)
-
-        # Calculate interest
-        interest = (
-            principal * rate * int(time_elapsed)
-            // (self.SECONDS_PER_YEAR * self.BASIS_POINTS)
-        )
-
-        position.accrued_interest[asset] = (
-            position.accrued_interest.get(asset, 0) + interest
-        )
-        position.last_update[asset] = time.time()
+    # NOTE: _accrue_interest removed - we now use the accumulator pattern
+    # Interest is calculated globally via indices, not per-user
+    # Use _get_user_borrow_balance() to get debt with accrued interest
 
     # ==================== Health Factor Calculation ====================
 
@@ -1013,7 +986,8 @@ class LendingPool:
                 config = self.assets[asset]
                 state = self.pool_states[asset]
 
-                underlying = self._ray_mul(a_tokens, state.supply_index) // self.RAY
+                # Calculate underlying: aTokens * index / RAY
+                underlying = (a_tokens * state.supply_index) // self.RAY
                 value = underlying * self._get_price(asset)
 
                 # Weight by liquidation threshold
@@ -1022,10 +996,17 @@ class LendingPool:
                 )
 
         # Calculate total debt value
+        # Note: borrowed dict contains the hypothetical borrowed amounts
+        # For existing borrows, we need to get accrued interest via index
         for asset, principal in borrowed.items():
             if principal > 0:
-                interest = position.accrued_interest.get(asset, 0)
-                total_debt += (principal + interest) * self._get_price(asset)
+                # If this is the user's actual borrowed amount, get debt via index
+                if asset in position.borrowed and position.borrowed[asset] == principal:
+                    debt = self._get_user_borrow_balance(position, asset)
+                else:
+                    # Hypothetical borrow - use principal directly
+                    debt = principal
+                total_debt += debt * self._get_price(asset)
 
         if total_debt == 0:
             return self.RAY * 10  # No debt = infinite health factor
@@ -1064,6 +1045,133 @@ class LendingPool:
         self._price_cache[asset] = (price, time.time())
         return True
 
+    # ==================== User Balance Calculation (Accumulator Pattern) ====================
+
+    def _get_user_supply_balance(self, position: UserPosition, asset: str) -> int:
+        """
+        Get user's supplied balance including accrued interest.
+
+        Uses the accumulator pattern to prevent dust loss:
+        balance = aTokens * current_supply_index / RAY
+
+        Args:
+            position: User position
+            asset: Asset symbol
+
+        Returns:
+            Underlying token balance (with accrued interest)
+        """
+        a_tokens = position.supplied.get(asset, 0)
+        if a_tokens == 0:
+            return 0
+
+        state = self.pool_states[asset]
+        # Calculate underlying: aTokens * index / RAY (round down favors protocol)
+        return (a_tokens * state.supply_index) // self.RAY
+
+    def _get_user_borrow_balance(self, position: UserPosition, asset: str) -> int:
+        """
+        Get user's borrowed balance including accrued interest.
+
+        Uses the accumulator pattern to prevent dust loss:
+        debt = principal * (current_borrow_index / user_borrow_index)
+
+        If user has no borrow_index snapshot, it means they borrowed before
+        the index system, so we treat their debt as already normalized to
+        the current index.
+
+        Args:
+            position: User position
+            asset: Asset symbol
+
+        Returns:
+            Total debt (principal + accrued interest)
+        """
+        principal = position.borrowed.get(asset, 0)
+        if principal == 0:
+            return 0
+
+        # Get user's index snapshot at time of borrow
+        user_index = position.borrow_index.get(asset)
+
+        # If no index snapshot, this is a legacy position or same-block borrow
+        # In this case, principal is already at current index
+        if user_index is None or user_index == 0:
+            return principal
+
+        state = self.pool_states[asset]
+        current_index = state.borrow_index
+
+        # Calculate debt with accrued interest
+        # debt = principal * (current_index / user_index)
+        # Round UP when calculating debt (favors protocol)
+        debt = (principal * current_index + user_index - 1) // user_index
+
+        return debt
+
+    def _normalize_borrow_principal(
+        self, position: UserPosition, asset: str, amount: int
+    ) -> None:
+        """
+        Normalize a new borrow amount to the current index.
+
+        When a user borrows, we store the principal and the current index.
+        Later, we can calculate accrued interest using:
+        debt = principal * (current_index / borrow_index)
+
+        Args:
+            position: User position
+            asset: Asset symbol
+            amount: New borrow amount to add
+        """
+        state = self.pool_states[asset]
+        current_index = state.borrow_index
+
+        # Get existing debt at current index
+        existing_debt = self._get_user_borrow_balance(position, asset)
+
+        # Add new borrow
+        new_total_debt = existing_debt + amount
+
+        # Store as principal normalized to current index
+        position.borrowed[asset] = new_total_debt
+        position.borrow_index[asset] = current_index
+
+    def _normalize_repay_principal(
+        self, position: UserPosition, asset: str, amount: int
+    ) -> int:
+        """
+        Normalize a repayment against the current debt.
+
+        Returns the actual amount repaid (capped at total debt).
+
+        Args:
+            position: User position
+            asset: Asset symbol
+            amount: Amount to repay
+
+        Returns:
+            Actual amount repaid
+        """
+        # Get current total debt
+        total_debt = self._get_user_borrow_balance(position, asset)
+
+        if total_debt == 0:
+            return 0
+
+        # Cap repayment at total debt
+        actual_repay = min(amount, total_debt)
+
+        # Calculate new debt
+        new_debt = total_debt - actual_repay
+
+        # Store new principal at current index
+        state = self.pool_states[asset]
+        position.borrowed[asset] = new_debt
+        position.borrow_index[asset] = state.borrow_index
+
+        return actual_repay
+
     # ==================== Helpers ====================
 
     def _normalize(self, address: str) -> str:
@@ -1091,12 +1199,34 @@ class LendingPool:
         return self.positions[user_norm]
 
     def _ray_mul(self, a: int, b: int) -> int:
-        """Multiply two RAY values."""
+        """
+        Multiply two RAY values with half-up rounding.
+
+        Formula: (a * b + RAY/2) / RAY
+
+        This is used for scaling operations where we want fair rounding.
+        """
         return (a * b + self.RAY // 2) // self.RAY
 
-    def _ray_div(self, a: int, b: int) -> int:
-        """Divide two RAY values."""
-        return (a * self.RAY + b // 2) // b
+    def _ray_div(self, a: int, b: int, round_up: bool = False) -> int:
+        """
+        Divide two RAY values with configurable rounding.
+
+        Args:
+            a: Numerator
+            b: Denominator
+            round_up: If True, round up (favors protocol). If False, round down (favors user).
+
+        Formula (round down): (a * RAY) / b
+        Formula (round up): (a * RAY + b - 1) / b
+
+        Rounding strategy:
+        - Round DOWN when calculating user balances (favors protocol)
+        - Round UP when calculating user debt (favors protocol)
+        """
+        if round_up:
+            return (a * self.RAY + b - 1) // b
+        return (a * self.RAY) // b
 
     # ==================== Serialization ====================
 
@@ -1116,8 +1246,7 @@ class LendingPool:
                     "interest_mode": {
                         k2: v2.value for k2, v2 in v.interest_mode.items()
                     },
-                    "last_update": dict(v.last_update),
-                    "accrued_interest": dict(v.accrued_interest),
+                    "borrow_index": dict(v.borrow_index),
                 }
                 for k, v in self.positions.items()
             },

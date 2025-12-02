@@ -26,6 +26,7 @@ from typing import Dict, List, Optional, Tuple, Callable, TYPE_CHECKING
 from enum import Enum
 
 from ..vm.exceptions import VMExecutionError
+from .access_control import AccessControl, SignedRequest, RoleBasedAccessControl, Role
 
 if TYPE_CHECKING:
     from ..blockchain import Blockchain
@@ -445,6 +446,10 @@ class CircuitBreakerRegistry:
     # Audit log
     audit_log: List[Dict] = field(default_factory=list)
 
+    # Access control with signature verification
+    access_control: AccessControl = field(default_factory=AccessControl)
+    rbac: Optional[RoleBasedAccessControl] = None
+
     def __post_init__(self) -> None:
         """Initialize registry."""
         if not self.address:
@@ -452,6 +457,13 @@ class CircuitBreakerRegistry:
                 f"breaker_registry:{time.time()}".encode()
             ).digest()
             self.address = f"0x{addr_hash[-20:].hex()}"
+
+        # Initialize RBAC with owner as admin
+        if self.owner and not self.rbac:
+            self.rbac = RoleBasedAccessControl(
+                access_control=self.access_control,
+                admin_address=self.owner,
+            )
 
     # ==================== Guardian Management ====================
 
@@ -731,6 +743,298 @@ class CircuitBreakerRegistry:
             ],
             "guardians_active": sum(1 for g in self.guardians.values() if g),
         }
+
+    # ==================== Secure Functions (Signature-Verified) ====================
+
+    def emergency_pause_secure(
+        self,
+        request: SignedRequest,
+        duration: int = 3600,
+    ) -> bool:
+        """
+        Emergency pause all operations with signature verification.
+
+        SECURE: Requires cryptographic proof of guardian role.
+
+        Args:
+            request: Signed request from guardian
+            duration: Pause duration in seconds
+
+        Returns:
+            True if paused
+
+        Raises:
+            VMExecutionError: If signature verification fails or not guardian
+        """
+        # Verify caller has guardian role with valid signature
+        if self.rbac:
+            self.rbac.verify_role_simple(request, Role.GUARDIAN.value)
+        else:
+            # Fall back to manual guardian check
+            if not self.guardians.get(request.address.lower(), False):
+                raise VMExecutionError("Caller is not guardian")
+            self.access_control.verify_caller_simple(request, request.address)
+
+        self.global_pause = True
+        self.global_pause_until = time.time() + duration
+
+        # Execute pause callbacks
+        for name, callback in self.pause_callbacks.items():
+            try:
+                callback(True)
+            except Exception as e:
+                logger.error(f"Pause callback {name} failed: {e}")
+
+        self._log_action(request.address, "emergency_pause_secure", {"duration": duration})
+
+        logger.warning(
+            "Emergency pause activated (secure)",
+            extra={
+                "event": "registry.emergency_pause_secure",
+                "duration": duration,
+                "guardian": request.address[:10],
+            }
+        )
+
+        return True
+
+    def unpause_secure(self, request: SignedRequest) -> bool:
+        """
+        Unpause operations with signature verification.
+
+        SECURE: Requires cryptographic proof of guardian or owner role.
+
+        Args:
+            request: Signed request from guardian or owner
+
+        Returns:
+            True if unpaused
+
+        Raises:
+            VMExecutionError: If signature verification fails
+        """
+        # Verify caller is guardian or owner with valid signature
+        is_guardian = self.guardians.get(request.address.lower(), False)
+        is_owner = request.address.lower() == self.owner.lower()
+
+        if not is_guardian and not is_owner:
+            raise VMExecutionError("Caller is not guardian or owner")
+
+        if is_owner:
+            self.access_control.verify_caller_simple(request, self.owner)
+        else:
+            if self.rbac:
+                self.rbac.verify_role_simple(request, Role.GUARDIAN.value)
+            else:
+                self.access_control.verify_caller_simple(request, request.address)
+
+        self.global_pause = False
+        self.global_pause_until = 0
+
+        # Execute unpause callbacks
+        for name, callback in self.pause_callbacks.items():
+            try:
+                callback(False)
+            except Exception as e:
+                logger.error(f"Unpause callback {name} failed: {e}")
+
+        self._log_action(request.address, "unpause_secure", {})
+
+        logger.info(
+            "Operations unpaused (secure)",
+            extra={
+                "event": "registry.unpaused_secure",
+                "actor": request.address[:10],
+            }
+        )
+
+        return True
+
+    def manual_trigger_secure(
+        self,
+        request: SignedRequest,
+        breaker_id: str,
+        reason: str,
+    ) -> bool:
+        """
+        Manually trigger a circuit breaker with signature verification.
+
+        SECURE: Requires cryptographic proof of guardian role.
+
+        Args:
+            request: Signed request from guardian
+            breaker_id: Breaker to trigger
+            reason: Reason for manual trigger
+
+        Returns:
+            True if triggered
+
+        Raises:
+            VMExecutionError: If signature verification fails or not guardian
+        """
+        # Verify caller has guardian role with valid signature
+        if self.rbac:
+            self.rbac.verify_role_simple(request, Role.GUARDIAN.value)
+        else:
+            if not self.guardians.get(request.address.lower(), False):
+                raise VMExecutionError("Caller is not guardian")
+            self.access_control.verify_caller_simple(request, request.address)
+
+        breaker = self.breakers.get(breaker_id)
+        if not breaker:
+            raise VMExecutionError(f"Breaker {breaker_id} not found")
+
+        breaker.trigger(request.address, {"reason": reason, "manual": True})
+
+        self._log_action(request.address, "manual_trigger_secure", {
+            "breaker_id": breaker_id,
+            "reason": reason,
+        })
+
+        logger.warning(
+            "Circuit breaker manually triggered (secure)",
+            extra={
+                "event": "registry.manual_trigger_secure",
+                "breaker_id": breaker_id[:10],
+                "reason": reason,
+                "guardian": request.address[:10],
+            }
+        )
+
+        return True
+
+    def update_thresholds_secure(
+        self,
+        request: SignedRequest,
+        breaker_id: str,
+        warning_threshold: Optional[int] = None,
+        trigger_threshold: Optional[int] = None,
+    ) -> bool:
+        """
+        Update circuit breaker thresholds with signature verification.
+
+        SECURE: Requires cryptographic proof of owner's private key.
+
+        Args:
+            request: Signed request from owner
+            breaker_id: Breaker to update
+            warning_threshold: New warning threshold (optional)
+            trigger_threshold: New trigger threshold (optional)
+
+        Returns:
+            True if updated
+
+        Raises:
+            VMExecutionError: If signature verification fails
+        """
+        self.access_control.verify_caller_simple(request, self.owner)
+
+        breaker = self.breakers.get(breaker_id)
+        if not breaker:
+            raise VMExecutionError(f"Breaker {breaker_id} not found")
+
+        if warning_threshold is not None:
+            breaker.warning_threshold = warning_threshold
+
+        if trigger_threshold is not None:
+            breaker.trigger_threshold = trigger_threshold
+
+        self._log_action(request.address, "update_thresholds_secure", {
+            "breaker_id": breaker_id,
+            "warning": warning_threshold,
+            "trigger": trigger_threshold,
+        })
+
+        logger.info(
+            "Breaker thresholds updated (secure)",
+            extra={
+                "event": "registry.thresholds_updated_secure",
+                "breaker_id": breaker_id[:10],
+                "admin": request.address[:10],
+            }
+        )
+
+        return True
+
+    def add_guardian_secure(
+        self,
+        request: SignedRequest,
+        guardian: str,
+    ) -> bool:
+        """
+        Add a guardian address with signature verification.
+
+        SECURE: Requires cryptographic proof of owner's private key.
+
+        Args:
+            request: Signed request from owner
+            guardian: Guardian address to add
+
+        Returns:
+            True if added
+
+        Raises:
+            VMExecutionError: If signature verification fails
+        """
+        self.access_control.verify_caller_simple(request, self.owner)
+        self.guardians[guardian.lower()] = True
+
+        # Also grant guardian role in RBAC if available
+        if self.rbac:
+            self.rbac.roles[Role.GUARDIAN.value].add(guardian.lower())
+
+        self._log_action(request.address, "add_guardian_secure", {"guardian": guardian})
+
+        logger.info(
+            "Guardian added (secure)",
+            extra={
+                "event": "registry.guardian_added_secure",
+                "guardian": guardian[:10],
+                "admin": request.address[:10],
+            }
+        )
+
+        return True
+
+    def remove_guardian_secure(
+        self,
+        request: SignedRequest,
+        guardian: str,
+    ) -> bool:
+        """
+        Remove a guardian address with signature verification.
+
+        SECURE: Requires cryptographic proof of owner's private key.
+
+        Args:
+            request: Signed request from owner
+            guardian: Guardian address to remove
+
+        Returns:
+            True if removed
+
+        Raises:
+            VMExecutionError: If signature verification fails
+        """
+        self.access_control.verify_caller_simple(request, self.owner)
+        self.guardians[guardian.lower()] = False
+
+        # Also revoke guardian role in RBAC if available
+        if self.rbac:
+            self.rbac.roles[Role.GUARDIAN.value].discard(guardian.lower())
+
+        self._log_action(request.address, "remove_guardian_secure", {"guardian": guardian})
+
+        logger.info(
+            "Guardian removed (secure)",
+            extra={
+                "event": "registry.guardian_removed_secure",
+                "guardian": guardian[:10],
+                "admin": request.address[:10],
+            }
+        )
+
+        return True
 
     # ==================== Callbacks ====================
 

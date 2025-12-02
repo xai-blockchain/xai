@@ -233,9 +233,9 @@ class _LazyBlockchainProvider:
                 provider = self._source.get_blockchain_data_provider()
                 if provider:
                     return provider.get_stats()
-            except Exception:
+            except (AttributeError, TypeError) as e:
                 # Fall back to direct get_stats if provider snapshot fails
-                pass
+                logger.debug(f"Blockchain data provider snapshot unavailable: {e}")
 
         if hasattr(self._source, "get_stats") and callable(self._source.get_stats):
             return self._source.get_stats()
@@ -501,8 +501,9 @@ class MetricsCollector:
             else:
                 metric.value = value
                 metric.timestamp = time.time()
-        except Exception:
-            pass
+        except (TypeError, ValueError, AttributeError) as e:
+            # Metric update failed - log but don't break monitoring
+            logger.debug(f"Failed to set metric {name}: {e}")
 
     def _process_mempool_alert_state(self, stats: Dict[str, Any]) -> None:
         """
@@ -866,9 +867,9 @@ class MetricsCollector:
                 {"message": message, "level": level.value},
                 level.value.upper(),
             )
-        except Exception:
+        except (AttributeError, RuntimeError, TypeError) as e:
             # Avoid alert-path failures breaking monitoring
-            pass
+            logger.debug(f"Failed to dispatch alert event: {e}")
 
     def get_active_alerts(self) -> List[Dict[str, Any]]:
         """Get active alerts"""

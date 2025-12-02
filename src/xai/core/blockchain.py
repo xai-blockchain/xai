@@ -364,8 +364,9 @@ class Blockchain:
                     {"network": self.network_type},
                     "CRITICAL",
                 )
-            except Exception:
-                pass
+            except (AttributeError, RuntimeError, TypeError) as e:
+                # Security event dispatch failed - log but don't block initialization
+                logger.warning(f"Failed to dispatch fast mining security event: {e}")
             raise ValueError("Fast mining is not allowed on mainnet; unset XAI_FAST_MINING or switch network.")
 
         if self.fast_mining_enabled:
@@ -379,9 +380,9 @@ class Blockchain:
                     },
                     "WARNING",
                 )
-            except Exception:
+            except (AttributeError, RuntimeError, TypeError) as e:
                 # Do not block initialization if telemetry sink is unavailable
-                pass
+                logger.debug(f"Security event dispatch unavailable during initialization: {e}")
 
         if os.environ.get("PYTEST_CURRENT_TEST") and data_dir == "data":
             data_dir = tempfile.mkdtemp(prefix="xai_chain_test_")
@@ -2942,7 +2943,9 @@ class Blockchain:
         utxo_digest = ""
         try:
             utxo_digest = self.utxo_manager.snapshot_digest()
-        except Exception:
+        except (AttributeError, RuntimeError, ValueError) as e:
+            # UTXO snapshot unavailable - log and mark as unavailable
+            logger.debug(f"UTXO snapshot digest unavailable: {e}")
             utxo_digest = "unavailable"
 
         return {

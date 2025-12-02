@@ -28,6 +28,7 @@ from enum import Enum
 from decimal import Decimal, getcontext
 
 from ..vm.exceptions import VMExecutionError
+from .access_control import AccessControl, SignedRequest
 
 if TYPE_CHECKING:
     from ..blockchain import Blockchain
@@ -386,6 +387,9 @@ class VestingVault:
 
     # Early unlock penalties collected
     penalties_collected: int = 0
+
+    # Access control with signature verification
+    access_control: AccessControl = field(default_factory=AccessControl)
 
     def __post_init__(self) -> None:
         """Initialize vault."""
@@ -811,6 +815,142 @@ class VestingVault:
         )
 
         return unvested
+
+    def revoke_secure(
+        self,
+        request: SignedRequest,
+        schedule_id: str,
+    ) -> int:
+        """
+        Revoke a vesting schedule with signature verification.
+
+        SECURE: Requires cryptographic proof of owner's private key.
+
+        Args:
+            request: Signed request from owner
+            schedule_id: Schedule to revoke
+
+        Returns:
+            Amount of unvested tokens returned
+
+        Raises:
+            VMExecutionError: If signature verification fails or not owner
+        """
+        self.access_control.verify_caller_simple(request, self.owner)
+
+        schedule = self._get_schedule(schedule_id)
+
+        if not schedule.revocable:
+            raise VMExecutionError("Schedule is not revocable")
+
+        if schedule.status != VestingStatus.ACTIVE:
+            raise VMExecutionError("Schedule not active")
+
+        # Calculate unvested at revocation time
+        vested = schedule.get_vested_amount()
+        unvested = schedule.total_amount - vested
+
+        schedule.status = VestingStatus.REVOKED
+        schedule.revoked_at = time.time()
+        schedule.revoked_amount = unvested
+
+        self.total_revoked += unvested
+        self.total_locked -= unvested
+
+        logger.info(
+            "Schedule revoked (secure)",
+            extra={
+                "event": "vesting.revoked_secure",
+                "schedule_id": schedule_id[:10],
+                "beneficiary": schedule.beneficiary[:10],
+                "unvested_returned": unvested,
+                "admin": request.address[:10],
+            }
+        )
+
+        return unvested
+
+    def create_schedule_secure(
+        self,
+        request: SignedRequest,
+        beneficiary: str,
+        amount: int,
+        cliff_duration: int,
+        vesting_duration: int,
+        curve_type: VestingCurveType = VestingCurveType.LINEAR,
+        curve_factor: float = 3.0,
+        allow_early_unlock: bool = False,
+        early_unlock_penalty: int = 5000,
+        revocable: bool = False,
+        start_time: Optional[float] = None,
+    ) -> str:
+        """
+        Create a new vesting schedule with signature verification.
+
+        SECURE: Requires cryptographic proof of owner's private key.
+
+        Args:
+            request: Signed request from owner
+            beneficiary: Token recipient
+            amount: Total tokens to vest
+            cliff_duration: Cliff period in seconds
+            vesting_duration: Vesting period after cliff
+            curve_type: Type of vesting curve
+            curve_factor: Curve steepness parameter
+            allow_early_unlock: Whether to allow early unlock
+            early_unlock_penalty: Penalty in basis points
+            revocable: Whether schedule can be revoked
+            start_time: Optional custom start time
+
+        Returns:
+            Schedule ID
+
+        Raises:
+            VMExecutionError: If signature verification fails
+        """
+        self.access_control.verify_caller_simple(request, self.owner)
+
+        if amount <= 0:
+            raise VMExecutionError("Amount must be positive")
+
+        curve = VestingCurve(
+            curve_type=curve_type,
+            curve_factor=curve_factor,
+        )
+
+        schedule = VestingSchedule(
+            beneficiary=beneficiary,
+            total_amount=amount,
+            start_time=start_time or time.time(),
+            cliff_duration=cliff_duration,
+            vesting_duration=vesting_duration,
+            curve=curve,
+            allow_early_unlock=allow_early_unlock,
+            early_unlock_penalty=early_unlock_penalty,
+            revocable=revocable,
+        )
+
+        self.schedules[schedule.id] = schedule
+
+        if beneficiary not in self.beneficiary_schedules:
+            self.beneficiary_schedules[beneficiary] = []
+        self.beneficiary_schedules[beneficiary].append(schedule.id)
+
+        self.total_locked += amount
+
+        logger.info(
+            "Vesting schedule created (secure)",
+            extra={
+                "event": "vesting.schedule_created_secure",
+                "schedule_id": schedule.id[:10],
+                "beneficiary": beneficiary[:10],
+                "amount": amount,
+                "curve": curve_type.value,
+                "admin": request.address[:10],
+            }
+        )
+
+        return schedule.id
 
     # ==================== Delegation ====================
 

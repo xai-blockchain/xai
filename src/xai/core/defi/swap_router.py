@@ -128,8 +128,28 @@ class PoolInfo:
     reserve1: int = 0
     fee: int = 30  # Basis points (0.3%)
 
+    # Maximum values for overflow protection
+    MAX_AMOUNT: int = 2**128 - 1
+
     def get_output(self, token_in: str, amount_in: int) -> int:
-        """Calculate output amount for a swap."""
+        """
+        Calculate output amount for a swap using constant product formula.
+
+        Args:
+            token_in: Token being swapped in
+            amount_in: Amount of token_in
+
+        Returns:
+            Amount of token_out to receive
+
+        Raises:
+            VMExecutionError: If overflow would occur or invalid token
+
+        Security:
+            - Uses safe math to prevent integer overflow
+            - Validates reserves are non-zero
+            - Validates amount bounds
+        """
         if token_in == self.token0:
             reserve_in, reserve_out = self.reserve0, self.reserve1
         elif token_in == self.token1:
@@ -137,10 +157,36 @@ class PoolInfo:
         else:
             raise VMExecutionError(f"Token {token_in} not in pool")
 
-        # Constant product with fee
-        amount_in_with_fee = amount_in * (10000 - self.fee)
+        # Validate inputs
+        if amount_in <= 0:
+            raise VMExecutionError("Amount must be positive")
+        if amount_in > self.MAX_AMOUNT:
+            raise VMExecutionError(f"Amount exceeds maximum: {self.MAX_AMOUNT}")
+        if reserve_in <= 0 or reserve_out <= 0:
+            raise VMExecutionError("Pool has zero reserves")
+
+        # Constant product with fee: (amount_in * (10000 - fee) * reserve_out) / (reserve_in * 10000 + amount_in * (10000 - fee))
+        fee_multiplier = 10000 - self.fee
+
+        # Safe multiplication: amount_in * (10000 - fee)
+        if amount_in > self.MAX_AMOUNT // fee_multiplier:
+            raise VMExecutionError("Overflow in fee calculation")
+        amount_in_with_fee = amount_in * fee_multiplier
+
+        # Safe multiplication: amount_in_with_fee * reserve_out
+        if amount_in_with_fee > 0 and reserve_out > self.MAX_AMOUNT // amount_in_with_fee:
+            raise VMExecutionError("Overflow in output calculation")
         numerator = amount_in_with_fee * reserve_out
-        denominator = reserve_in * 10000 + amount_in_with_fee
+
+        # Safe multiplication: reserve_in * 10000
+        if reserve_in > self.MAX_AMOUNT // 10000:
+            raise VMExecutionError("Overflow in reserve calculation")
+        denominator_base = reserve_in * 10000
+
+        # Safe addition: denominator_base + amount_in_with_fee
+        if denominator_base > self.MAX_AMOUNT - amount_in_with_fee:
+            raise VMExecutionError("Overflow in denominator calculation")
+        denominator = denominator_base + amount_in_with_fee
 
         return numerator // denominator if denominator > 0 else 0
 
@@ -403,7 +449,21 @@ class SwapRouter:
         amount_in: int,
         token_in: str,
     ) -> int:
-        """Calculate price impact in basis points."""
+        """
+        Calculate price impact in basis points.
+
+        Args:
+            pool: Liquidity pool
+            amount_in: Input amount
+            token_in: Input token
+
+        Returns:
+            Price impact in basis points (0-10000)
+
+        Security:
+            - Uses safe math to prevent overflow
+            - Validates reserve is non-zero
+        """
         if token_in == pool.token0:
             reserve = pool.reserve0
         else:
@@ -413,6 +473,11 @@ class SwapRouter:
             return 10000  # 100% impact
 
         # Price impact = amount_in / reserve * 10000 (simplified)
+        # Use safe multiplication to prevent overflow
+        if amount_in > self.MAX_AMOUNT // 10000:
+            # If amount_in is very large, just return max impact
+            return 10000
+
         return min(10000, (amount_in * 10000) // reserve)
 
     # ==================== Swap Execution ====================
@@ -1264,6 +1329,24 @@ class SwapRouter:
         if a == 0 or b == 0:
             return 0
 
+        # Validate inputs are within bounds
+        if a < 0 or b < 0:
+            raise VMExecutionError("Negative values not allowed in mul_div")
+
+        if a > self.MAX_AMOUNT or b > self.MAX_AMOUNT:
+            raise VMExecutionError(
+                f"Input values exceed maximum: a={a}, b={b}, max={self.MAX_AMOUNT}"
+            )
+
+        # Check if intermediate product would overflow MAX_AMOUNT * c
+        # This protects against intermediate overflow even in Python's arbitrary precision
+        # because extremely large values can cause memory issues or DoS
+        MAX_PRODUCT = self.MAX_AMOUNT * c
+        if a > 0 and b > MAX_PRODUCT // a:
+            raise VMExecutionError(
+                f"Intermediate overflow in mul_div: {a} * {b} would exceed safe limits"
+            )
+
         # Python handles arbitrary precision integers, so we can safely do this
         # In languages with fixed-width integers, we'd need mulDiv512
         product = a * b
@@ -1271,7 +1354,7 @@ class SwapRouter:
 
         if result > self.MAX_AMOUNT:
             raise VMExecutionError(
-                f"Integer overflow in mul_div: ({a} * {b}) / {c} exceeds {self.MAX_AMOUNT}"
+                f"Integer overflow in mul_div: ({a} * {b}) / {c} = {result} exceeds {self.MAX_AMOUNT}"
             )
 
         return result

@@ -34,6 +34,10 @@ from .account_abstraction import (
     Paymaster,
     EntryPoint,
     AccountFactory,
+    SignatureError,
+    MalformedSignatureError,
+    InvalidSignatureError,
+    MissingPublicKeyError,
 )
 
 __all__ = [
@@ -63,4 +67,9 @@ __all__ = [
     "Paymaster",
     "EntryPoint",
     "AccountFactory",
+    # Signature Exceptions
+    "SignatureError",
+    "MalformedSignatureError",
+    "InvalidSignatureError",
+    "MissingPublicKeyError",
 ]

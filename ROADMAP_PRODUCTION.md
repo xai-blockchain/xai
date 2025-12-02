@@ -47,20 +47,20 @@ This roadmap targets production readiness with security-first posture, robust co
 
 ### Authentication & Authorization
 
-- [ ] Fix JWT token verification disabling expiration in `src/xai/core/api_auth.py` line 433. `verify_exp=False` allows expired tokens - extend attack window.
-- [ ] Add per-second rate limiting to gas sponsorship in `account_abstraction.py` lines 141-150. Current daily-only limit allows burst attacks.
-- [ ] Fix unprotected access control in DeFi contracts - address-string matching without signature verification in oracle.py, staking.py, vesting.py, circuit_breaker.py.
+- [x] ~~Fix JWT token verification disabling expiration~~ ✅ FIXED - Explicit `verify_exp=True`, 30s clock skew tolerance, required claims validation
+- [x] ~~Add per-second rate limiting to gas sponsorship~~ ✅ FIXED - Multi-tier limiting (per-second/minute/hour/day), per-user isolation, gas amount limits
+- [x] ~~Fix unprotected access control in DeFi contracts~~ ✅ FIXED - Added SignedRequest with ECDSA verification, RoleBasedAccessControl, nonce replay protection, 5-min timestamp expiration. Updated oracle.py, staking.py, vesting.py, circuit_breaker.py
 - [ ] Register XAI with SLIP-0044 before mainnet (`src/xai/security/hd_wallet.py` line 56 - coin type 9999 unregistered).
 
 ### Integer Math & Precision
 
-- [ ] Fix integer division precision loss in concentrated liquidity (`src/xai/core/defi/concentrated_liquidity.py` lines 210, 241, 529-535). Implement proper rounding (ROUND_UP) for user-affecting calculations.
-- [ ] Fix lending pool interest accrual dust loss (`src/xai/core/defi/lending.py` lines 836-839). Small principals accrue 0 interest due to integer division.
-- [ ] Add overflow protection to swap router multiplication (`src/xai/core/defi/swap_router.py` lines 1261, 1264). Check `a * b > MAX_AMOUNT` before multiplication.
+- [x] ~~Fix integer division precision loss in concentrated liquidity~~ ✅ FIXED - WAD/RAY arithmetic, proper rounding (ROUND_UP for fees, ROUND_DOWN for payouts), mul_div helper, 37 tests passing
+- [x] ~~Fix lending pool interest accrual dust loss~~ ✅ FIXED - Implemented Compound/Aave-style accumulator pattern, global index tracking, RAY precision, proper rounding, 52 tests passing
+- [x] ~~Add overflow protection to swap router multiplication~~ ✅ FIXED - Input validation (MAX_AMOUNT), pre-multiplication checks, enhanced _safe_mul_div, 51 tests passing
 
 ### P2P & Network Security
 
-- [ ] Require cryptography library - fail fast if unavailable instead of creating placeholder certificates (`src/xai/network/peer_manager.py` lines 256, 309-310).
+- [x] ~~Require cryptography library - fail fast if unavailable instead of creating placeholder certificates~~ ✅ FIXED - Module-level import check, fail-fast in PeerEncryption.__init__, removed all placeholder fallbacks, added validate_peer_certificate with key size and expiry checks, 8 comprehensive tests
 - [ ] Implement ASN/geolocation diversity checks for eclipse attack protection. Current IP-based limits insufficient.
 - [ ] Add proof-of-work for peer admission to prevent Sybil attacks. Currently unlimited peer identities can be created.
 - [ ] Implement message deduplication in P2P layer - can receive same tx/block multiple times causing network floods.
@@ -114,7 +114,7 @@ This roadmap targets production readiness with security-first posture, robust co
 
 - [x] **CRITICAL**: ~~Remove private key from CLI command line~~ ✅ FIXED - Removed --private-key arg, added encrypted keystore support, getpass for secure input, ~1870 lines of security hardening
 - [x] **CRITICAL**: ~~Encrypt browser extension storage~~ ✅ FIXED - Implemented AES-256-GCM encryption with PBKDF2 key derivation (600k iterations), auto-lock, secure migration, ~2300 lines including tests/docs
-- [ ] **CRITICAL**: Fix browser extension HMAC-SHA256 signatures (popup.js lines 48-59). Uses HMAC instead of ECDSA - signatures not verifiable by blockchain.
+- [x] **CRITICAL**: ~~Fix browser extension HMAC-SHA256 signatures~~ ✅ FIXED - Replaced HMAC with proper ECDSA secp256k1 signatures, backend signing endpoint, deterministic serialization, signature verification in blockchain.py
 
 ### BIP Standards Implementation
 

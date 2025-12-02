@@ -24,6 +24,7 @@ from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 from enum import Enum
 
 from ..vm.exceptions import VMExecutionError
+from .access_control import AccessControl, SignedRequest, RoleBasedAccessControl, Role
 
 if TYPE_CHECKING:
     from ..blockchain import Blockchain
@@ -148,12 +149,23 @@ class StakingPool:
     BASIS_POINTS: int = 10000
     PRECISION: int = 10**18
 
+    # Access control with signature verification
+    access_control: AccessControl = field(default_factory=AccessControl)
+    rbac: Optional[RoleBasedAccessControl] = None
+
     def __post_init__(self) -> None:
         """Initialize pool."""
         if not self.address:
             import hashlib
             addr_hash = hashlib.sha3_256(f"{self.name}{time.time()}".encode()).digest()
             self.address = f"0x{addr_hash[-20:].hex()}"
+
+        # Initialize RBAC with owner as admin
+        if self.owner and not self.rbac:
+            self.rbac = RoleBasedAccessControl(
+                access_control=self.access_control,
+                admin_address=self.owner,
+            )
 
     # ==================== Validator Management ====================
 
@@ -836,6 +848,236 @@ class StakingPool:
 
         val.status = ValidatorStatus.ACTIVE
         val.jailed_until = 0
+
+        return True
+
+    # ==================== Secure Functions (Signature-Verified) ====================
+
+    def slash_validator_secure(
+        self,
+        request: SignedRequest,
+        validator: str,
+        reason: str,
+        fraction: int,
+    ) -> int:
+        """
+        Slash a validator for misbehavior with signature verification.
+
+        SECURE: Requires cryptographic proof of slasher role.
+
+        Args:
+            request: Signed request from authorized slasher
+            validator: Validator to slash
+            reason: Reason for slashing
+            fraction: Slash fraction (basis points)
+
+        Returns:
+            Amount slashed
+
+        Raises:
+            VMExecutionError: If signature verification fails or not authorized
+        """
+        # Verify caller has slasher role or is owner
+        if not (self.rbac and self.rbac.has_role(Role.SLASHER.value, request.address)):
+            # Fall back to owner check
+            self.access_control.verify_caller_simple(request, self.owner)
+        else:
+            # Verify slasher signature
+            self.rbac.verify_role_simple(request, Role.SLASHER.value)
+
+        validator_norm = self._normalize(validator)
+        self._require_validator(validator_norm)
+
+        val = self.validators[validator_norm]
+
+        # Calculate slash amount
+        slash_amount = (val.total_stake * fraction) // self.BASIS_POINTS
+
+        # Apply to self-stake first
+        if val.self_stake >= slash_amount:
+            val.self_stake -= slash_amount
+        else:
+            # Slash delegators proportionally
+            remaining = slash_amount - val.self_stake
+            val.self_stake = 0
+
+            if val.delegated_stake > 0:
+                for delegator, del_map in self.delegations.items():
+                    if validator_norm in del_map:
+                        delegation = del_map[validator_norm]
+                        del_slash = (
+                            remaining * delegation.amount
+                        ) // val.delegated_stake
+                        delegation.amount -= del_slash
+
+                val.delegated_stake -= remaining
+
+        self.total_staked -= slash_amount
+        val.slashing_events += 1
+
+        logger.warning(
+            "Validator slashed (secure)",
+            extra={
+                "event": "staking.slashed_secure",
+                "validator": validator_norm[:10],
+                "reason": reason,
+                "amount": slash_amount,
+                "slasher": request.address[:10],
+            }
+        )
+
+        return slash_amount
+
+    def jail_validator_secure(
+        self,
+        request: SignedRequest,
+        validator: str,
+        duration: int,
+    ) -> bool:
+        """
+        Jail a validator with signature verification.
+
+        SECURE: Requires cryptographic proof of owner's private key.
+
+        Args:
+            request: Signed request from owner
+            validator: Validator to jail
+            duration: Jail duration in seconds
+
+        Returns:
+            True if successful
+
+        Raises:
+            VMExecutionError: If signature verification fails
+        """
+        self.access_control.verify_caller_simple(request, self.owner)
+
+        validator_norm = self._normalize(validator)
+        self._require_validator(validator_norm)
+
+        val = self.validators[validator_norm]
+        val.status = ValidatorStatus.JAILED
+        val.jailed_until = time.time() + duration
+
+        logger.warning(
+            "Validator jailed (secure)",
+            extra={
+                "event": "staking.jailed_secure",
+                "validator": validator_norm[:10],
+                "until": val.jailed_until,
+                "admin": request.address[:10],
+            }
+        )
+
+        return True
+
+    def update_commission_secure(
+        self,
+        request: SignedRequest,
+        new_commission: int,
+    ) -> bool:
+        """
+        Update validator commission rate with signature verification.
+
+        SECURE: Requires cryptographic proof that caller is the validator.
+
+        Args:
+            request: Signed request from validator
+            new_commission: New commission rate (basis points)
+
+        Returns:
+            True if successful
+
+        Raises:
+            VMExecutionError: If signature verification fails or not validator
+        """
+        caller_norm = self._normalize(request.address)
+        self._require_validator(caller_norm)
+
+        # Verify signature proves ownership of validator address
+        self.access_control.verify_caller_simple(request, request.address)
+
+        if new_commission > self.BASIS_POINTS:
+            raise VMExecutionError("Commission cannot exceed 100%")
+
+        self.validators[caller_norm].commission = new_commission
+
+        logger.info(
+            "Commission updated (secure)",
+            extra={
+                "event": "staking.commission_updated_secure",
+                "validator": caller_norm[:10],
+                "new_commission_bps": new_commission,
+            }
+        )
+
+        return True
+
+    def distribute_rewards_secure(
+        self,
+        request: SignedRequest,
+        amount: int,
+    ) -> bool:
+        """
+        Distribute rewards to all stakers with signature verification.
+
+        SECURE: Requires cryptographic proof of owner's private key.
+
+        Args:
+            request: Signed request from owner/reward distributor
+            amount: Total rewards to distribute
+
+        Returns:
+            True if successful
+
+        Raises:
+            VMExecutionError: If signature verification fails
+        """
+        self.access_control.verify_caller_simple(request, self.owner)
+
+        if self.total_staked == 0:
+            return True
+
+        total_delegator_rewards = 0
+        total_commission = 0
+
+        # Distribute proportionally to validators
+        for val_addr, validator in self.validators.items():
+            if validator.total_stake == 0:
+                continue
+
+            # Validator's share of rewards
+            val_share = (amount * validator.total_stake) // self.total_staked
+
+            # Validator takes commission
+            commission = (val_share * validator.commission) // self.BASIS_POINTS
+            validator.accumulated_rewards += commission
+            total_commission += commission
+
+            # Remaining goes to delegators
+            delegator_rewards = val_share - commission
+
+            # Distribute to delegators for this validator
+            if delegator_rewards > 0 and validator.delegated_stake > 0:
+                distributed = self._distribute_delegator_rewards(
+                    val_addr,
+                    validator,
+                    delegator_rewards
+                )
+                total_delegator_rewards += distributed
+
+        self.total_rewards_distributed += amount
+
+        logger.info(
+            "Rewards distributed (secure)",
+            extra={
+                "event": "staking.rewards_distributed_secure",
+                "total_amount": amount,
+                "total_commission": total_commission,
+                "total_delegator_rewards": total_delegator_rewards,
+                "distributor": request.address[:10],
+            }
+        )
 
         return True
 

@@ -16,6 +16,14 @@ import threading
 from urllib.parse import urlparse
 import websockets
 from websockets.exceptions import ConnectionClosed
+from websockets.server import WebSocketServerProtocol
+import json
+import hashlib
+import logging
+from typing import TYPE_CHECKING, Set, Optional, Dict, Any, Union
+
+logger = logging.getLogger(__name__)
+
 try:
     import aioquic  # type: ignore
     from xai.core.p2p_quic import (  # type: ignore
@@ -25,15 +33,11 @@ try:
         quic_client_send_with_timeout,
     )
     QUIC_AVAILABLE = True
-except Exception:
+except (ImportError, ModuleNotFoundError) as e:
+    # QUIC dependencies not installed - disable QUIC support
     QUIC_AVAILABLE = False
     QuicDialTimeout = ConnectionError  # type: ignore[assignment]
-import json
-import hashlib
-import logging
-from typing import TYPE_CHECKING, Set, Optional, Dict, Any, Union
-
-logger = logging.getLogger(__name__)
+    logger.debug(f"QUIC support disabled: {e}")
 
 import requests
 from xai.network.peer_manager import PeerManager
@@ -418,9 +422,9 @@ class P2PNetworkManager:
         try:
             SecurityEventRouter.dispatch(event_type, payload, normalized_severity)
             dispatched = bool(sinks)
-        except Exception:
+        except (AttributeError, RuntimeError, TypeError) as e:
             # Avoid surfacing routing errors on hot paths
-            pass
+            logger.debug(f"Security event dispatch failed for {event_type}: {e}")
 
         if not dispatched:
             try:
@@ -430,8 +434,9 @@ class P2PNetworkManager:
                     severity=normalized_severity,
                     payload=payload,
                 )
-            except Exception:
-                pass
+            except (ImportError, AttributeError, RuntimeError) as e:
+                # Metrics collection unavailable - log but continue
+                logger.debug(f"Failed to record security event in metrics: {e}")
 
     def _log_security_event(self, peer_id: str, message: str) -> None:
         """Log security-related events with lightweight rate limiting to avoid log flooding."""
@@ -691,8 +696,12 @@ class P2PNetworkManager:
         """Handle incoming QUIC payloads by reusing the websocket message handler."""
         try:
             await self._handle_message(None, data)
-        except Exception:
-            pass
+        except (json.JSONDecodeError, TypeError, ValueError) as e:
+            # Invalid QUIC payload - log and continue
+            logger.warning(f"Failed to handle QUIC payload: {e}")
+        except Exception as e:
+            # Unexpected error handling QUIC message - log with full context
+            logger.error(f"Unexpected error handling QUIC payload: {e}", exc_info=True)
 
     async def _quic_send_payload(self, host: str, payload: bytes) -> None:
         """Send QUIC payload with bounded timeout and metrics on failure."""
@@ -703,7 +712,13 @@ class P2PNetworkManager:
             )
         except QuicDialTimeout:
             self._record_quic_timeout(host)
-        except Exception:
+        except (ConnectionError, OSError, RuntimeError) as e:
+            # QUIC connection error - record and continue
+            logger.debug(f"QUIC send failed to {host}: {e}")
+            self._record_quic_error(host)
+        except Exception as e:
+            # Unexpected QUIC error - log with full context
+            logger.error(f"Unexpected QUIC error sending to {host}: {e}", exc_info=True)
             self._record_quic_error(host)
 
     def broadcast_transaction(self, transaction: "Transaction") -> None:
@@ -721,7 +736,9 @@ class P2PNetworkManager:
                     self.peer_manager.reputation.record_invalid_transaction(peer_uri)
                 else:
                     self.peer_manager.reputation.record_valid_transaction(peer_uri)
-            except Exception:
+            except (requests.RequestException, ConnectionError, TimeoutError) as e:
+                # Network error broadcasting transaction - record reputation penalty
+                logger.debug(f"Failed to broadcast transaction to {peer_uri}: {e}")
                 self.peer_manager.reputation.record_invalid_transaction(peer_uri)
         self._dispatch_async(self.broadcast(message))
         if self.quic_enabled and QUIC_AVAILABLE:
@@ -742,8 +759,9 @@ class P2PNetworkManager:
             endpoint = f"{peer_uri.rstrip('/')}/block/receive"
             try:
                 requests.post(endpoint, json=message["payload"], timeout=5)
-            except Exception:
-                pass
+            except (requests.RequestException, ConnectionError, TimeoutError) as e:
+                # Network error broadcasting block - peer may be down, continue to others
+                logger.debug(f"Failed to broadcast block to {peer_uri}: {e}")
         self._dispatch_async(self.broadcast(message))
         if self.quic_enabled:
             payload = json.dumps(message).encode("utf-8")
@@ -805,12 +823,20 @@ class P2PNetworkManager:
                             if "hash" in header_dict:
                                 header.hash = header_dict["hash"]
                             new_chain_headers.append(header)
-                        except Exception:
+                        except (KeyError, TypeError, ValueError) as e:
+                            # Invalid block header format - reject this chain
+                            logger.debug(f"Invalid block header in chain from {peer_uri}: {e}")
                             valid_chain = False
                             break
                     if valid_chain and self.blockchain.replace_chain(new_chain_headers):
                         return True
-            except Exception:
+            except (requests.RequestException, ConnectionError, TimeoutError) as e:
+                # Network error syncing with peer - try next peer
+                logger.debug(f"Failed to sync with peer {peer_uri}: {e}")
+                continue
+            except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+                # Invalid response format from peer - try next peer
+                logger.warning(f"Invalid chain data from peer {peer_uri}: {e}")
                 continue
         return False
 

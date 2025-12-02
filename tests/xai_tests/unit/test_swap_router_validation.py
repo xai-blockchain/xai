@@ -420,6 +420,37 @@ class TestSafeMath:
         result = router._safe_mul_div(amount, price, scale)
         assert result == 2_000_000_000_000
 
+    def test_safe_mul_div_rejects_negative_a(self, router):
+        """Test safe mul_div rejects negative first operand."""
+        with pytest.raises(VMExecutionError, match="Negative values not allowed"):
+            router._safe_mul_div(-100, 200, 50)
+
+    def test_safe_mul_div_rejects_negative_b(self, router):
+        """Test safe mul_div rejects negative second operand."""
+        with pytest.raises(VMExecutionError, match="Negative values not allowed"):
+            router._safe_mul_div(100, -200, 50)
+
+    def test_safe_mul_div_rejects_excessive_inputs(self, router):
+        """Test safe mul_div rejects inputs exceeding MAX_AMOUNT."""
+        with pytest.raises(VMExecutionError, match="exceed maximum"):
+            router._safe_mul_div(2**200, 100, 50)
+
+    def test_safe_mul_div_intermediate_overflow(self, router):
+        """Test safe mul_div detects intermediate overflow."""
+        # Use values that would cause intermediate overflow
+        max_amount = router.MAX_AMOUNT
+        # a * b would be huge even though result / c might fit
+        with pytest.raises(VMExecutionError, match="Intermediate overflow"):
+            router._safe_mul_div(max_amount // 2, max_amount // 2, 1)
+
+    def test_safe_mul_div_result_overflow(self, router):
+        """Test safe mul_div detects result overflow."""
+        # Use values where (a * b) / c > MAX_AMOUNT
+        max_amount = router.MAX_AMOUNT
+        # This will be caught by intermediate overflow check
+        with pytest.raises(VMExecutionError, match="overflow"):
+            router._safe_mul_div(max_amount, 100, 10)
+
 
 class TestLimitOrderSafeMath:
     """Tests for safe math in limit order filling."""
@@ -493,6 +524,112 @@ class TestLimitOrderSafeMath:
         # (1.5 * 7) / 3 = 3.5 tokens
         expected_output = 35 * 10**17
         assert amount_out == expected_output
+
+
+class TestPoolInfoOverflowProtection:
+    """Tests for overflow protection in PoolInfo.get_output()."""
+
+    @pytest.fixture
+    def pool(self):
+        """Create a test pool."""
+        return PoolInfo(
+            address="pool1",
+            token0="ETH",
+            token1="USDC",
+            reserve0=1_000_000_000,
+            reserve1=2_000_000_000_000,
+            fee=30,
+        )
+
+    def test_pool_get_output_normal_case(self, pool):
+        """Test normal swap calculation."""
+        output = pool.get_output("ETH", 1000)
+        assert output > 0
+
+    def test_pool_get_output_rejects_zero_amount(self, pool):
+        """Test that zero amount is rejected."""
+        with pytest.raises(VMExecutionError, match="must be positive"):
+            pool.get_output("ETH", 0)
+
+    def test_pool_get_output_rejects_negative_amount(self, pool):
+        """Test that negative amount is rejected."""
+        with pytest.raises(VMExecutionError, match="must be positive"):
+            pool.get_output("ETH", -1000)
+
+    def test_pool_get_output_rejects_excessive_amount(self, pool):
+        """Test that amount exceeding max is rejected."""
+        with pytest.raises(VMExecutionError, match="exceeds maximum"):
+            pool.get_output("ETH", 2**200)
+
+    def test_pool_get_output_rejects_zero_reserves(self):
+        """Test that pool with zero reserves is rejected."""
+        pool = PoolInfo(
+            address="pool_zero",
+            token0="ETH",
+            token1="USDC",
+            reserve0=0,
+            reserve1=1_000_000,
+            fee=30,
+        )
+        with pytest.raises(VMExecutionError, match="zero reserves"):
+            pool.get_output("ETH", 1000)
+
+    def test_pool_get_output_overflow_in_fee_calculation(self, pool):
+        """Test overflow detection in fee calculation."""
+        # Create amount that would overflow when multiplied by 10000
+        max_amount = pool.MAX_AMOUNT
+        overflow_amount = max_amount // 9000  # Will overflow when * 9970
+
+        with pytest.raises(VMExecutionError, match="Overflow in fee calculation"):
+            pool.get_output("ETH", overflow_amount)
+
+    def test_pool_get_output_overflow_in_numerator(self):
+        """Test overflow detection in numerator calculation."""
+        # Create pool with large reserves
+        pool = PoolInfo(
+            address="large_pool",
+            token0="ETH",
+            token1="USDC",
+            reserve0=10**20,
+            reserve1=10**38,  # Very large reserve
+            fee=30,
+        )
+
+        # Amount that would cause overflow when multiplied with reserve
+        large_amount = 10**30
+
+        with pytest.raises(VMExecutionError, match="Overflow in output calculation"):
+            pool.get_output("ETH", large_amount)
+
+    def test_pool_get_output_overflow_in_reserve_calculation(self):
+        """Test overflow detection in reserve * 10000 calculation."""
+        # Create pool with reserve that overflows when multiplied by 10000
+        max_amount = PoolInfo.MAX_AMOUNT
+        large_reserve = max_amount // 5000  # Will overflow when * 10000
+
+        pool = PoolInfo(
+            address="overflow_pool",
+            token0="ETH",
+            token1="USDC",
+            reserve0=large_reserve,
+            reserve1=1_000_000,
+            fee=30,
+        )
+
+        with pytest.raises(VMExecutionError, match="Overflow in reserve calculation"):
+            pool.get_output("ETH", 1000)
+
+    def test_pool_get_output_invalid_token(self, pool):
+        """Test that invalid token is rejected."""
+        with pytest.raises(VMExecutionError, match="not in pool"):
+            pool.get_output("INVALID", 1000)
+
+    def test_pool_get_output_large_valid_amounts(self, pool):
+        """Test with large but valid amounts."""
+        # Use amount that's large but won't overflow
+        large_amount = 10**15  # 1000 ETH in wei
+        output = pool.get_output("ETH", large_amount)
+        assert output > 0
 
 
 class TestSuccessfulSwap:

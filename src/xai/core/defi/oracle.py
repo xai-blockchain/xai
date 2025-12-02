@@ -25,6 +25,7 @@ from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 from enum import Enum
 
 from ..vm.exceptions import VMExecutionError
+from .access_control import AccessControl, SignedRequest, RoleBasedAccessControl, Role
 
 if TYPE_CHECKING:
     from ..blockchain import Blockchain
@@ -123,12 +124,23 @@ class PriceOracle:
     # Statistics
     total_updates: int = 0
 
+    # Access control with signature verification
+    access_control: AccessControl = field(default_factory=AccessControl)
+    rbac: Optional[RoleBasedAccessControl] = None
+
     def __post_init__(self) -> None:
         """Initialize oracle."""
         if not self.address:
             import hashlib
             addr_hash = hashlib.sha3_256(f"{self.name}{time.time()}".encode()).digest()
             self.address = f"0x{addr_hash[-20:].hex()}"
+
+        # Initialize RBAC with owner as admin
+        if self.owner and not self.rbac:
+            self.rbac = RoleBasedAccessControl(
+                access_control=self.access_control,
+                admin_address=self.owner,
+            )
 
     # ==================== Price Feed Management ====================
 
@@ -146,6 +158,9 @@ class PriceOracle:
         """
         Add a new price feed.
 
+        DEPRECATED: Use add_feed_secure() with signature verification.
+        This function is vulnerable to address spoofing.
+
         Args:
             caller: Must be owner
             pair: Price pair (e.g., "XAI/USD")
@@ -159,6 +174,14 @@ class PriceOracle:
         Returns:
             True if successful
         """
+        logger.warning(
+            "DEPRECATED: add_feed() called without signature verification",
+            extra={
+                "event": "oracle.deprecated_function",
+                "function": "add_feed",
+                "caller": caller[:10],
+            }
+        )
         self._require_owner(caller)
 
         if pair in self.feeds:
@@ -180,6 +203,66 @@ class PriceOracle:
                 "event": "oracle.feed_added",
                 "pair": pair,
                 "decimals": decimals,
+            }
+        )
+
+        return True
+
+    def add_feed_secure(
+        self,
+        request: SignedRequest,
+        pair: str,
+        base_asset: str,
+        quote_asset: str,
+        decimals: int = 8,
+        heartbeat: int = 3600,
+        deviation_threshold: int = 100,
+        min_sources: int = 1,
+    ) -> bool:
+        """
+        Add a new price feed with signature verification.
+
+        SECURE: Requires cryptographic proof of owner's private key.
+
+        Args:
+            request: Signed request from owner
+            pair: Price pair (e.g., "XAI/USD")
+            base_asset: Base asset symbol
+            quote_asset: Quote asset symbol
+            decimals: Price decimals
+            heartbeat: Max age before stale (seconds)
+            deviation_threshold: Max deviation (basis points)
+            min_sources: Minimum sources required
+
+        Returns:
+            True if successful
+
+        Raises:
+            VMExecutionError: If signature verification fails or not owner
+        """
+        # Verify signature proves ownership of admin address
+        self.access_control.verify_caller_simple(request, self.owner)
+
+        if pair in self.feeds:
+            raise VMExecutionError(f"Feed {pair} already exists")
+
+        self.feeds[pair] = PriceFeed(
+            pair=pair,
+            base_asset=base_asset,
+            quote_asset=quote_asset,
+            decimals=decimals,
+            heartbeat=heartbeat,
+            deviation_threshold=deviation_threshold,
+            min_sources=min_sources,
+        )
+
+        logger.info(
+            "Price feed added (secure)",
+            extra={
+                "event": "oracle.feed_added_secure",
+                "pair": pair,
+                "decimals": decimals,
+                "admin": request.address[:10],
             }
         )
 
@@ -524,6 +607,324 @@ class PriceOracle:
         """Reset circuit breaker."""
         self._require_owner(caller)
         self.circuit_breaker_active = False
+        return True
+
+    # ==================== Secure Admin Functions (Signature-Verified) ====================
+
+    def authorize_provider_secure(
+        self,
+        request: SignedRequest,
+        provider: str,
+    ) -> bool:
+        """
+        Authorize a data provider with signature verification.
+
+        SECURE: Requires cryptographic proof of owner's private key.
+
+        Args:
+            request: Signed request from owner
+            provider: Provider address to authorize
+
+        Returns:
+            True if authorized
+
+        Raises:
+            VMExecutionError: If signature verification fails
+        """
+        self.access_control.verify_caller_simple(request, self.owner)
+        self.authorized_providers[self._normalize(provider)] = True
+
+        logger.info(
+            "Provider authorized (secure)",
+            extra={
+                "event": "oracle.provider_authorized_secure",
+                "provider": provider[:10],
+                "admin": request.address[:10],
+            }
+        )
+
+        return True
+
+    def revoke_provider_secure(
+        self,
+        request: SignedRequest,
+        provider: str,
+    ) -> bool:
+        """
+        Revoke a data provider with signature verification.
+
+        SECURE: Requires cryptographic proof of owner's private key.
+
+        Args:
+            request: Signed request from owner
+            provider: Provider address to revoke
+
+        Returns:
+            True if revoked
+
+        Raises:
+            VMExecutionError: If signature verification fails
+        """
+        self.access_control.verify_caller_simple(request, self.owner)
+        self.authorized_providers[self._normalize(provider)] = False
+
+        logger.info(
+            "Provider revoked (secure)",
+            extra={
+                "event": "oracle.provider_revoked_secure",
+                "provider": provider[:10],
+                "admin": request.address[:10],
+            }
+        )
+
+        return True
+
+    def update_price_secure(
+        self,
+        request: SignedRequest,
+        pair: str,
+        price: int,
+        timestamp: Optional[float] = None,
+    ) -> bool:
+        """
+        Update price for a feed with signature verification.
+
+        SECURE: Requires cryptographic proof that caller is authorized price feeder.
+
+        Args:
+            request: Signed request from authorized provider
+            pair: Price pair
+            price: New price (in feed's decimal precision)
+            timestamp: Price timestamp (defaults to now)
+
+        Returns:
+            True if successful
+
+        Raises:
+            VMExecutionError: If signature verification fails or not authorized
+        """
+        # Verify caller is authorized provider with valid signature
+        if not self.authorized_providers.get(self._normalize(request.address), False):
+            raise VMExecutionError(f"Address {request.address} is not authorized provider")
+
+        self.access_control.verify_caller_simple(request, request.address)
+
+        self._require_feed(pair)
+        self._require_not_paused()
+
+        feed = self.feeds[pair]
+        timestamp = timestamp or time.time()
+
+        # Validate price bounds
+        if pair in self.price_bounds:
+            min_price, max_price = self.price_bounds[pair]
+            if price < min_price or price > max_price:
+                logger.warning(
+                    "Price outside bounds",
+                    extra={
+                        "event": "oracle.price_rejected",
+                        "pair": pair,
+                        "price": price,
+                        "bounds": (min_price, max_price),
+                    }
+                )
+                raise VMExecutionError(
+                    f"Price {price} outside bounds [{min_price}, {max_price}]"
+                )
+
+        # Check deviation from last price
+        deviation = 0
+        if feed.latest_price > 0:
+            deviation = abs(price - feed.latest_price) * 10000 // feed.latest_price
+            if deviation > feed.deviation_threshold:
+                logger.error(
+                    "Price update rejected - deviation exceeds threshold",
+                    extra={
+                        "event": "oracle.price_rejected",
+                        "pair": pair,
+                        "current_price": feed.latest_price,
+                        "proposed_price": price,
+                        "deviation_bps": deviation,
+                        "threshold_bps": feed.deviation_threshold,
+                        "reporter": request.address,
+                    }
+                )
+                raise VMExecutionError(
+                    f"Price deviation {deviation} bps exceeds threshold {feed.deviation_threshold} bps for {pair}. "
+                    f"Current: {feed.latest_price}, Proposed: {price}"
+                )
+
+        # Update feed
+        feed.round_id += 1
+        feed.latest_price = price
+        feed.latest_timestamp = timestamp
+        feed.status = OracleStatus.ACTIVE
+
+        # Add to history
+        price_data = PriceData(
+            price=price,
+            timestamp=timestamp,
+            round_id=feed.round_id,
+            source=request.address,
+        )
+        feed.price_history.append(price_data)
+
+        # Trim history
+        if len(feed.price_history) > feed.history_size:
+            feed.price_history = feed.price_history[-feed.history_size:]
+
+        self.total_updates += 1
+
+        logger.info(
+            "Price updated (secure)",
+            extra={
+                "event": "oracle.price_updated_secure",
+                "pair": pair,
+                "price": price,
+                "round": feed.round_id,
+                "deviation_bps": deviation,
+                "reporter": request.address[:10],
+            }
+        )
+
+        return True
+
+    def set_deviation_threshold_secure(
+        self,
+        request: SignedRequest,
+        pair: str,
+        threshold: int,
+    ) -> bool:
+        """
+        Set deviation threshold for a feed with signature verification.
+
+        SECURE: Requires cryptographic proof of owner's private key.
+
+        Args:
+            request: Signed request from owner
+            pair: Price pair
+            threshold: New deviation threshold (basis points)
+
+        Returns:
+            True if successful
+
+        Raises:
+            VMExecutionError: If signature verification fails
+        """
+        self.access_control.verify_caller_simple(request, self.owner)
+        self._require_feed(pair)
+        self.feeds[pair].deviation_threshold = threshold
+
+        logger.info(
+            "Deviation threshold updated (secure)",
+            extra={
+                "event": "oracle.deviation_threshold_updated_secure",
+                "pair": pair,
+                "threshold_bps": threshold,
+                "admin": request.address[:10],
+            }
+        )
+
+        return True
+
+    def set_price_bounds_secure(
+        self,
+        request: SignedRequest,
+        pair: str,
+        min_price: int,
+        max_price: int,
+    ) -> bool:
+        """
+        Set price bounds for a pair with signature verification.
+
+        SECURE: Requires cryptographic proof of owner's private key.
+
+        Args:
+            request: Signed request from owner
+            pair: Price pair
+            min_price: Minimum valid price
+            max_price: Maximum valid price
+
+        Returns:
+            True if successful
+
+        Raises:
+            VMExecutionError: If signature verification fails
+        """
+        self.access_control.verify_caller_simple(request, self.owner)
+
+        if min_price >= max_price:
+            raise VMExecutionError("Min must be less than max")
+
+        self.price_bounds[pair] = (min_price, max_price)
+
+        logger.info(
+            "Price bounds updated (secure)",
+            extra={
+                "event": "oracle.price_bounds_updated_secure",
+                "pair": pair,
+                "min": min_price,
+                "max": max_price,
+                "admin": request.address[:10],
+            }
+        )
+
+        return True
+
+    def trigger_circuit_breaker_secure(self, request: SignedRequest) -> bool:
+        """
+        Trigger circuit breaker with signature verification.
+
+        SECURE: Requires cryptographic proof of owner's private key.
+
+        Args:
+            request: Signed request from owner
+
+        Returns:
+            True if triggered
+
+        Raises:
+            VMExecutionError: If signature verification fails
+        """
+        self.access_control.verify_caller_simple(request, self.owner)
+        self.circuit_breaker_active = True
+
+        logger.warning(
+            "Circuit breaker triggered (secure)",
+            extra={
+                "event": "oracle.circuit_breaker_secure",
+                "admin": request.address[:10],
+            }
+        )
+
+        return True
+
+    def reset_circuit_breaker_secure(self, request: SignedRequest) -> bool:
+        """
+        Reset circuit breaker with signature verification.
+
+        SECURE: Requires cryptographic proof of owner's private key.
+
+        Args:
+            request: Signed request from owner
+
+        Returns:
+            True if reset
+
+        Raises:
+            VMExecutionError: If signature verification fails
+        """
+        self.access_control.verify_caller_simple(request, self.owner)
+        self.circuit_breaker_active = False
+
+        logger.info(
+            "Circuit breaker reset (secure)",
+            extra={
+                "event": "oracle.circuit_breaker_reset_secure",
+                "admin": request.address[:10],
+            }
+        )
+
         return True
 
     # ==================== Helpers ====================

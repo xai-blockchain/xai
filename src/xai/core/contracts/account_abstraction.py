@@ -42,6 +42,45 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# ==================== Signature Verification Exceptions ====================
+
+class SignatureError(VMExecutionError):
+    """Base exception for signature verification failures."""
+    pass
+
+
+class MalformedSignatureError(SignatureError):
+    """
+    Raised when signature format is invalid.
+
+    This indicates the signature data itself is malformed (wrong length,
+    invalid encoding, missing data, etc.). This should NEVER be silently
+    ignored as it may indicate an attack or data corruption.
+    """
+    pass
+
+
+class InvalidSignatureError(SignatureError):
+    """
+    Raised when signature does not match the claimed signer.
+
+    This indicates the signature was properly formed but cryptographic
+    verification failed - i.e., the signature was not created by the
+    claimed signer's private key.
+    """
+    pass
+
+
+class MissingPublicKeyError(SignatureError):
+    """
+    Raised when public key required for verification is not registered.
+
+    Account abstraction requires public keys to be explicitly registered
+    for signature verification. This error indicates the key is missing.
+    """
+    pass
+
+
 # ERC-4337 Constants
 VALIDATION_SUCCESS = 0
 VALIDATION_FAILED = 1
@@ -194,10 +233,18 @@ class SmartAccount:
 
         Returns:
             Packed validation data (see ERC-4337)
+
+        Note:
+            Signature validation now raises exceptions on failures.
+            The caller must catch SignatureError and handle appropriately.
         """
-        # Verify signature
-        if not self._validate_signature(user_op_hash, user_op.signature):
-            return SIG_VALIDATION_FAILED
+        # Verify signature - will raise exception on failure
+        try:
+            self._validate_signature(user_op_hash, user_op.signature)
+        except SignatureError:
+            # Signature verification failed - re-raise to caller
+            # This ensures signature failures are never silently ignored
+            raise
 
         # Pay prefund if needed
         if missing_account_funds > 0:
@@ -303,16 +350,22 @@ class SmartAccount:
             signature: The ECDSA signature (64 bytes: r || s)
 
         Returns:
-            True if signature is valid, False otherwise
+            True if signature is valid
+
+        Raises:
+            MissingPublicKeyError: If owner_public_key is not registered
+            MalformedSignatureError: If signature format is invalid
+            InvalidSignatureError: If signature verification fails
+            SignatureError: If cryptographic error occurs during verification
 
         Security:
             - Requires owner_public_key to be set for verification
             - Uses cryptographic ECDSA verification, not length checks
-            - Fails closed (returns False on any error)
+            - Fails fast with explicit exceptions (never silently ignores errors)
         """
-        # Fail closed: require public key to be registered
+        # Require public key to be registered
         if not self.owner_public_key:
-            logger.warning(
+            logger.error(
                 "Signature validation failed: no public key registered",
                 extra={
                     "event": "account.signature_validation_failed",
@@ -320,20 +373,36 @@ class SmartAccount:
                     "reason": "no_public_key",
                 }
             )
-            return False
+            raise MissingPublicKeyError(
+                f"Account {self.address[:16] if self.address else 'unknown'} has no public key registered"
+            )
 
-        # Validate signature format
-        if not signature or len(signature) != 64:
-            logger.warning(
-                "Signature validation failed: invalid signature format",
+        # Validate signature format - CRITICAL: must be exactly 64 bytes
+        if not signature:
+            logger.error(
+                "Signature validation failed: missing signature",
                 extra={
                     "event": "account.signature_validation_failed",
                     "account": self.address[:16] if self.address else "unknown",
-                    "reason": "invalid_signature_format",
-                    "signature_length": len(signature) if signature else 0,
+                    "reason": "missing_signature",
                 }
             )
-            return False
+            raise MalformedSignatureError("Missing signature")
+
+        if len(signature) != 64:
+            logger.error(
+                "Signature validation failed: invalid signature length",
+                extra={
+                    "event": "account.signature_validation_failed",
+                    "account": self.address[:16] if self.address else "unknown",
+                    "reason": "invalid_signature_length",
+                    "expected": 64,
+                    "actual": len(signature),
+                }
+            )
+            raise MalformedSignatureError(
+                f"Signature must be 64 bytes, got {len(signature)} bytes"
+            )
 
         try:
             # Convert signature bytes to hex for verification
@@ -355,20 +424,48 @@ class SmartAccount:
                         "reason": "ecdsa_verification_failed",
                     }
                 )
+                raise InvalidSignatureError(
+                    f"Signature does not match owner of account {self.address[:16] if self.address else 'unknown'}"
+                )
 
-            return is_valid
+            # Signature is valid
+            logger.debug(
+                "Signature validation succeeded",
+                extra={
+                    "event": "account.signature_validation_success",
+                    "account": self.address[:16] if self.address else "unknown",
+                }
+            )
+            return True
 
-        except Exception as e:
-            # Fail closed on any cryptographic error
+        except (MalformedSignatureError, InvalidSignatureError, MissingPublicKeyError):
+            # Re-raise our specific errors
+            raise
+
+        except ValueError as e:
+            # Invalid hex encoding or cryptographic parameter
             logger.error(
-                "Signature validation error",
+                "Signature validation error: invalid format",
                 extra={
                     "event": "account.signature_validation_error",
                     "account": self.address[:16] if self.address else "unknown",
                     "error": str(e),
                 }
             )
-            return False
+            raise MalformedSignatureError(f"Invalid signature format: {e}")
+
+        except Exception as e:
+            # Unexpected cryptographic error - fail fast, don't continue
+            logger.error(
+                "Signature validation error: cryptographic failure",
+                extra={
+                    "event": "account.signature_validation_error",
+                    "account": self.address[:16] if self.address else "unknown",
+                    "error": str(e),
+                },
+                exc_info=True
+            )
+            raise SignatureError(f"Signature verification failed: {e}")
 
     def _pay_prefund(self, amount: int) -> None:
         """Pay prefund to EntryPoint."""
@@ -511,15 +608,21 @@ class MultiSigAccount(SmartAccount):
         Returns:
             True if at least `threshold` valid signatures from distinct owners
 
+        Raises:
+            MissingPublicKeyError: If insufficient public keys registered
+            MalformedSignatureError: If signature format is invalid
+            InvalidSignatureError: If signature verification fails
+            SignatureError: If cryptographic error occurs
+
         Security:
             - Verifies each signature cryptographically using ECDSA
             - Tracks which owners have signed to prevent duplicate signatures
-            - Fails closed on any error
+            - Fails fast with explicit exceptions (never silently ignores errors)
         """
         # Check we have enough registered public keys
         registered_count = len(self.owner_public_keys)
         if registered_count < self.threshold:
-            logger.warning(
+            logger.error(
                 "MultiSig validation failed: insufficient registered public keys",
                 extra={
                     "event": "multisig.validation_failed",
@@ -529,25 +632,43 @@ class MultiSigAccount(SmartAccount):
                     "threshold": self.threshold,
                 }
             )
-            return False
+            raise MissingPublicKeyError(
+                f"MultiSig account {self.address[:16] if self.address else 'unknown'} "
+                f"has only {registered_count} public keys registered but needs {self.threshold}"
+            )
 
-        # Check signature length
+        # Check signature length - CRITICAL: must be exact multiple of 64
         expected_length = self.threshold * 64
-        if not signature or len(signature) < expected_length:
-            logger.warning(
+        if not signature:
+            logger.error(
+                "MultiSig validation failed: missing signature",
+                extra={
+                    "event": "multisig.validation_failed",
+                    "account": self.address[:16] if self.address else "unknown",
+                    "reason": "missing_signature",
+                }
+            )
+            raise MalformedSignatureError("Missing multisig signature")
+
+        if len(signature) < expected_length:
+            logger.error(
                 "MultiSig validation failed: signature too short",
                 extra={
                     "event": "multisig.validation_failed",
                     "account": self.address[:16] if self.address else "unknown",
                     "reason": "signature_too_short",
                     "expected": expected_length,
-                    "actual": len(signature) if signature else 0,
+                    "actual": len(signature),
                 }
             )
-            return False
+            raise MalformedSignatureError(
+                f"Multisig signature must be at least {expected_length} bytes "
+                f"({self.threshold} signatures * 64 bytes), got {len(signature)} bytes"
+            )
 
         # Extract and verify each signature
         valid_signers: set = set()
+        signature_errors: list = []  # Track errors for debugging
 
         for i in range(self.threshold):
             sig_start = i * 64
@@ -557,6 +678,8 @@ class MultiSigAccount(SmartAccount):
 
             # Try to verify against each owner's public key
             sig_valid = False
+            last_error: Optional[Exception] = None
+
             for owner in self.owners:
                 owner_lower = owner.lower()
 
@@ -572,38 +695,79 @@ class MultiSigAccount(SmartAccount):
                     if verify_signature_hex(public_key, hash_, single_sig_hex):
                         valid_signers.add(owner_lower)
                         sig_valid = True
+                        logger.debug(
+                            "MultiSig signature verified",
+                            extra={
+                                "event": "multisig.signature_verified",
+                                "account": self.address[:16] if self.address else "unknown",
+                                "signature_index": i,
+                                "signer": owner[:16],
+                            }
+                        )
                         break
-                except Exception:
-                    # Signature verification failed, try next owner
+                except ValueError as e:
+                    # Malformed signature or cryptographic parameter
+                    last_error = e
+                    logger.debug(
+                        f"Signature {i} verification failed for owner {owner[:16]}: {e}"
+                    )
+                    continue
+                except Exception as e:
+                    # Unexpected error - track but continue trying other owners
+                    last_error = e
+                    logger.warning(
+                        f"Unexpected error verifying signature {i} for owner {owner[:16]}: {e}"
+                    )
                     continue
 
             if not sig_valid:
-                logger.warning(
+                # None of the owners could verify this signature
+                error_msg = f"Signature {i} could not be verified against any owner"
+                if last_error:
+                    error_msg += f" (last error: {last_error})"
+                signature_errors.append(error_msg)
+
+                logger.error(
                     "MultiSig validation failed: invalid signature",
                     extra={
                         "event": "multisig.validation_failed",
                         "account": self.address[:16] if self.address else "unknown",
                         "reason": "invalid_signature",
                         "signature_index": i,
+                        "error": str(last_error) if last_error else "no matching owner",
                     }
                 )
-                return False
+
+                # If last error was a malformed signature, raise that
+                if isinstance(last_error, ValueError):
+                    raise MalformedSignatureError(
+                        f"Malformed signature at index {i}: {last_error}"
+                    )
+
+                # Otherwise, signature was well-formed but didn't match any owner
+                raise InvalidSignatureError(
+                    f"Signature {i} does not match any owner. "
+                    f"Valid signers so far: {len(valid_signers)}/{self.threshold}. "
+                    f"Errors: {'; '.join(signature_errors)}"
+                )
 
         # Check we have enough valid signers
         if len(valid_signers) >= self.threshold:
-            logger.debug(
+            logger.info(
                 "MultiSig validation succeeded",
                 extra={
                     "event": "multisig.validation_success",
                     "account": self.address[:16] if self.address else "unknown",
                     "valid_signers": len(valid_signers),
                     "threshold": self.threshold,
+                    "signers": [owner[:16] for owner in valid_signers],
                 }
             )
             return True
 
-        logger.warning(
-            "MultiSig validation failed: insufficient valid signers",
+        # This should never happen if we correctly validated threshold signatures above
+        logger.error(
+            "MultiSig validation failed: insufficient valid signers (unexpected state)",
             extra={
                 "event": "multisig.validation_failed",
                 "account": self.address[:16] if self.address else "unknown",
@@ -612,7 +776,9 @@ class MultiSigAccount(SmartAccount):
                 "threshold": self.threshold,
             }
         )
-        return False
+        raise InvalidSignatureError(
+            f"Insufficient valid signatures: got {len(valid_signers)}, need {self.threshold}"
+        )
 
     def _require_is_owner(self, caller: str) -> None:
         if caller.lower() not in [o.lower() for o in self.owners]:
@@ -1223,14 +1389,37 @@ class EntryPoint:
         op: UserOperation,
         op_hash: bytes,
     ) -> ValidationResult:
-        """Validate UserOp with account."""
+        """
+        Validate UserOp with account.
+
+        This method now properly handles signature verification exceptions
+        and logs detailed security events for audit purposes.
+        """
         account = self.accounts.get(op.sender)
         if not account:
+            logger.warning(
+                "UserOp validation failed: account not found",
+                extra={
+                    "event": "entrypoint.validation_failed",
+                    "sender": op.sender[:16],
+                    "reason": "account_not_found",
+                }
+            )
             return ValidationResult(valid=False)
 
         # Check nonce
         expected_nonce = account.nonce
         if op.nonce != expected_nonce:
+            logger.warning(
+                "UserOp validation failed: nonce mismatch",
+                extra={
+                    "event": "entrypoint.validation_failed",
+                    "sender": op.sender[:16],
+                    "reason": "nonce_mismatch",
+                    "expected": expected_nonce,
+                    "got": op.nonce,
+                }
+            )
             return ValidationResult(valid=False)
 
         # Calculate missing funds
@@ -1243,13 +1432,72 @@ class EntryPoint:
         current_deposit = account.balance
         missing_funds = max(0, max_cost - current_deposit)
 
-        # Validate with account
-        result = account.validate_user_op(op, op_hash, missing_funds)
+        # Validate with account - this will raise SignatureError on failures
+        try:
+            result = account.validate_user_op(op, op_hash, missing_funds)
 
-        return ValidationResult(
-            valid=(result == SIG_VALIDATION_SUCCESS),
-            prefund=max_cost,
-        )
+            logger.info(
+                "UserOp signature validation succeeded",
+                extra={
+                    "event": "entrypoint.signature_validated",
+                    "sender": op.sender[:16],
+                    "nonce": op.nonce,
+                }
+            )
+
+            return ValidationResult(
+                valid=(result == SIG_VALIDATION_SUCCESS),
+                prefund=max_cost,
+            )
+
+        except MissingPublicKeyError as e:
+            logger.error(
+                "UserOp validation failed: missing public key",
+                extra={
+                    "event": "entrypoint.validation_failed",
+                    "sender": op.sender[:16],
+                    "reason": "missing_public_key",
+                    "error": str(e),
+                }
+            )
+            return ValidationResult(valid=False, sig_failed=True)
+
+        except MalformedSignatureError as e:
+            logger.error(
+                "UserOp validation failed: malformed signature",
+                extra={
+                    "event": "entrypoint.validation_failed",
+                    "sender": op.sender[:16],
+                    "reason": "malformed_signature",
+                    "error": str(e),
+                }
+            )
+            return ValidationResult(valid=False, sig_failed=True)
+
+        except InvalidSignatureError as e:
+            logger.warning(
+                "UserOp validation failed: invalid signature",
+                extra={
+                    "event": "entrypoint.validation_failed",
+                    "sender": op.sender[:16],
+                    "reason": "invalid_signature",
+                    "error": str(e),
+                }
+            )
+            return ValidationResult(valid=False, sig_failed=True)
+
+        except SignatureError as e:
+            logger.error(
+                "UserOp validation failed: signature verification error",
+                extra={
+                    "event": "entrypoint.validation_failed",
+                    "sender": op.sender[:16],
+                    "reason": "signature_error",
+                    "error": str(e),
+                },
+                exc_info=True
+            )
+            return ValidationResult(valid=False, sig_failed=True)
 
     def _validate_paymaster(
         self,
