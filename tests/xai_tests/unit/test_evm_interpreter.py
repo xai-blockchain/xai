@@ -166,6 +166,66 @@ class TestEVMMemory:
             mem.store(2000, 42)
 
 
+class TestExpOpcode:
+    """Ensure EXP gas metering follows exponent byte length rules."""
+
+    def _make_call(self, gas: int = 5000) -> tuple[EVMInterpreter, CallContext]:
+        block = BlockContext(
+            number=1,
+            timestamp=1000,
+            gas_limit=1_000_000,
+            coinbase="0x" + "0" * 40,
+            prevrandao=0,
+            base_fee=0,
+            chain_id=1,
+        )
+        context = ExecutionContext(
+            block=block,
+            tx_origin="0x" + "1" * 40,
+            tx_gas_price=1,
+            tx_gas_limit=1_000_000,
+            tx_value=0,
+        )
+        call = CallContext(
+            call_type=CallType.CALL,
+            depth=0,
+            address="0x" + "2" * 40,
+            caller="0x" + "1" * 40,
+            origin="0x" + "1" * 40,
+            value=0,
+            gas=gas,
+            code=b"",
+            calldata=b"",
+        )
+        interpreter = EVMInterpreter(context)
+        context.push_call(call)
+        return interpreter, call
+
+    def _run_exp(self, exponent: int, expected_dynamic_gas: int) -> None:
+        interpreter, call = self._make_call()
+        # Push exponent first, base second (LIFO stack)
+        call.stack.push(exponent)
+        call.stack.push(2)
+        starting_gas = call.gas
+
+        interpreter._op_exp(call)
+
+        assert starting_gas - call.gas == expected_dynamic_gas
+
+    def test_exp_zero_exponent_costs_zero_dynamic_gas(self):
+        self._run_exp(0, expected_dynamic_gas=0)
+
+    def test_exp_single_byte_exponent_costs_50(self):
+        self._run_exp(0x7F, expected_dynamic_gas=50)
+
+    def test_exp_two_byte_exponent_costs_100(self):
+        self._run_exp(0x0100, expected_dynamic_gas=100)
+
+    def test_exp_full_word_exponent_costs_1600(self):
+        full_word = int.from_bytes(b"\x01" + b"\x00" * 31, "big")
+        self._run_exp(full_word, expected_dynamic_gas=32 * 50)
+
+
 class TestEVMStorage:
     """Tests for EVMStorage implementation."""
 

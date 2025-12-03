@@ -367,10 +367,13 @@ class EVMInterpreter:
         """EXP: Exponential operation."""
         base, exp = call.stack.pop(), call.stack.pop()
 
-        # Calculate dynamic gas cost (50 gas per byte of exponent)
-        exp_bytes = (exp.bit_length() + 7) // 8
+        if exp == 0:
+            exp_bytes = 0
+        else:
+            encoded = exp.to_bytes(32, "big", signed=False)
+            exp_bytes = len(encoded.lstrip(b"\x00"))
         dynamic_gas = 50 * exp_bytes
-        if not call.use_gas(dynamic_gas):
+        if dynamic_gas and not call.use_gas(dynamic_gas):
             raise VMExecutionError(f"Out of gas for EXP: need {dynamic_gas} more")
 
         call.stack.push(pow(base, exp, UINT256_CEILING))
