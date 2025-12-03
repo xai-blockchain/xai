@@ -10,6 +10,7 @@ import json
 import time
 import os
 import copy
+import statistics
 import tempfile
 from typing import List, Dict, Optional, Tuple, Any, Union
 from datetime import datetime
@@ -404,7 +405,7 @@ class Blockchain:
         self.logger = get_structured_logger()
         try:
             self.node_identity = load_or_create_identity(data_dir)
-        except Exception as exc:
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
             self.logger.warn(f"Failed to initialize node identity: {exc}")
             self.node_identity = {"private_key": "", "public_key": ""}
         # Mempool management
@@ -526,6 +527,34 @@ class Blockchain:
         except Exception as e:
             self.logger.debug(f"Failed to load block {index} from disk: {type(e).__name__}: {e}")
             return None
+
+    def get_block_by_hash(self, block_hash: str) -> Optional[Block]:
+        """
+        Return a block matching the provided hash.
+
+        Args:
+            block_hash: Hex-encoded hash with or without 0x prefix.
+        """
+
+        def _normalize(value: Optional[str]) -> Optional[str]:
+            if not value:
+                return None
+            lowered = value.lower()
+            if lowered.startswith("0x"):
+                lowered = lowered[2:]
+            return lowered if lowered else None
+
+        normalized = _normalize(block_hash)
+        if not normalized:
+            return None
+
+        for candidate in self.chain:
+            current_hash = getattr(candidate, "hash", None)
+            if not current_hash and isinstance(candidate, dict):
+                current_hash = candidate.get("hash") or candidate.get("block_hash")
+            if _normalize(current_hash) == normalized:
+                return candidate
+        return None
 
     def get_circulating_supply(self) -> float:
         """Circulating supply derived from total unspent value."""
@@ -1618,7 +1647,8 @@ class Blockchain:
             if self.pending_transactions:
                 lowest = min(self.pending_transactions, key=lambda t: t.get_fee_rate())
                 if transaction.get_fee_rate() > lowest.get_fee_rate():
-                    # Evict the lowest
+                    # Evict the lowest fee transaction to make room for the higher fee rate
+                    eviction_performed = False
                     try:
                         self.pending_transactions.remove(lowest)
                         self.seen_txids.discard(lowest.txid)
@@ -1627,9 +1657,21 @@ class Blockchain:
                                 0, self._sender_pending_count[lowest.sender] - 1
                             )
                         self._mempool_evicted_low_fee_total += 1
+                        eviction_performed = True
                         self.logger.info(f"Evicted transaction {lowest.txid[:10]}... from mempool (low fee rate)")
-                    except ValueError:
-                        pass
+                    except ValueError as exc:
+                        self.logger.error(
+                            "Failed to evict low-fee transaction due to inconsistent mempool state",
+                            txid=lowest.txid,
+                            error=str(exc),
+                            extra={"event": "mempool.eviction_failed"},
+                        )
+                    if not eviction_performed:
+                        self.logger.warn(
+                            f"Transaction {transaction.txid[:10]}... rejected (mempool full, eviction failed)"
+                        )
+                        self._mempool_rejected_low_fee_total += 1
+                        return False
                 else:
                     self.logger.warn(f"Transaction {transaction.txid[:10]}... rejected (mempool full, low fee rate)")
                     self._mempool_rejected_low_fee_total += 1
@@ -2983,6 +3025,89 @@ class Blockchain:
             "mempool_expired_total": self._mempool_expired_total,
             "mempool_active_bans": self._count_active_bans(now),
         }
+
+    def get_mempool_overview(self, limit: int = 100) -> Dict[str, Any]:
+        """
+        Return detailed mempool statistics and representative transactions.
+        """
+        limit = max(0, min(int(limit), 1000))
+        pending = list(self.pending_transactions) if self.pending_transactions else []
+        now = time.time()
+        size_bytes = sum(tx.get_size() for tx in pending) if pending else 0
+        total_amount = sum(float(getattr(tx, "amount", 0.0)) for tx in pending)
+        fees = [float(getattr(tx, "fee", 0.0)) for tx in pending]
+        fee_rates = [float(tx.get_fee_rate()) for tx in pending]
+        timestamps = [
+            float(tx.timestamp)
+            for tx in pending
+            if isinstance(getattr(tx, "timestamp", None), (int, float))
+        ]
+        sponsor_count = sum(1 for tx in pending if getattr(tx, "gas_sponsor", None))
+
+        def _avg(values: List[float]) -> float:
+            return sum(values) / len(values) if values else 0.0
+
+        limits = {
+            "max_transactions": getattr(self, "_mempool_max_size", len(pending)),
+            "max_per_sender": getattr(self, "_mempool_max_per_sender", 100),
+            "min_fee_rate": getattr(self, "_mempool_min_fee_rate", 0.0),
+            "max_age_seconds": getattr(self, "_mempool_max_age_seconds", 86400),
+        }
+
+        overview: Dict[str, Any] = {
+            "pending_count": len(pending),
+            "size_bytes": size_bytes,
+            "size_kb": size_bytes / 1024.0,
+            "total_amount": total_amount,
+            "total_fees": sum(fees) if fees else 0.0,
+            "avg_fee": _avg(fees),
+            "median_fee": float(statistics.median(fees)) if fees else 0.0,
+            "avg_fee_rate": _avg(fee_rates),
+            "median_fee_rate": float(statistics.median(fee_rates)) if fee_rates else 0.0,
+            "min_fee_rate": min(fee_rates) if fee_rates else 0.0,
+            "max_fee_rate": max(fee_rates) if fee_rates else 0.0,
+            "sponsored_transactions": sponsor_count,
+            "oldest_transaction_age_seconds": now - min(timestamps) if timestamps else 0.0,
+            "newest_transaction_age_seconds": now - max(timestamps) if timestamps else 0.0,
+            "limits": limits,
+            "rejections": {
+                "invalid_total": self._mempool_rejected_invalid_total,
+                "banned_total": self._mempool_rejected_banned_total,
+                "low_fee_total": self._mempool_rejected_low_fee_total,
+                "sender_cap_total": self._mempool_rejected_sender_cap_total,
+                "evicted_low_fee_total": self._mempool_evicted_low_fee_total,
+                "expired_total": self._mempool_expired_total,
+                "active_bans": self._count_active_bans(now),
+            },
+            "timestamp": now,
+        }
+
+        if limit > 0 and pending:
+            tx_summaries: List[Dict[str, Any]] = []
+            for tx in pending[:limit]:
+                tx_size = tx.get_size()
+                summary = {
+                    "txid": tx.txid,
+                    "sender": tx.sender,
+                    "recipient": tx.recipient,
+                    "amount": tx.amount,
+                    "fee": tx.fee,
+                    "fee_rate": tx.get_fee_rate(),
+                    "size_bytes": tx_size,
+                    "timestamp": getattr(tx, "timestamp", None),
+                    "age_seconds": now - tx.timestamp if getattr(tx, "timestamp", None) else None,
+                    "nonce": tx.nonce,
+                    "type": tx.tx_type,
+                    "rbf_enabled": bool(getattr(tx, "rbf_enabled", False)),
+                    "gas_sponsor": getattr(tx, "gas_sponsor", None),
+                }
+                tx_summaries.append(summary)
+            overview["transactions"] = tx_summaries
+        else:
+            overview["transactions"] = []
+
+        overview["transactions_returned"] = len(overview["transactions"])
+        return overview
 
     # ==================== TRADE MANAGEMENT ====================
 

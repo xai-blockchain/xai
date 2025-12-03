@@ -200,9 +200,10 @@ class TestNodeAPIBlockchainRoutes:
         for i in range(5):
             block = Mock()
             block.index = i
+            block.hash = f"0x{(100 + i):064x}"
             block.to_dict = Mock(return_value={
                 "index": i,
-                "hash": f"hash_{i}",
+                "hash": block.hash,
                 "transactions": []
             })
             blocks.append(block)
@@ -210,6 +211,9 @@ class TestNodeAPIBlockchainRoutes:
         node.blockchain = Mock()
         node.blockchain.chain = blocks
         node.blockchain.pending_transactions = []
+        node.blockchain.get_block_by_hash = Mock(side_effect=lambda h: next(
+            (b for b in blocks if getattr(b, "hash", "").lower().lstrip("0x") == h.lower().lstrip("0x")), None
+        ))
         return node
 
     @pytest.fixture
@@ -253,6 +257,28 @@ class TestNodeAPIBlockchainRoutes:
         assert response.status_code == 200
         data = response.get_json()
         assert data['index'] == 2
+
+    def test_get_block_by_hash_success(self, client, mock_node_with_blocks):
+        """Test GET /block/<hash> - valid hash returns payload."""
+        target_block = mock_node_with_blocks.blockchain.chain[2]
+        response = client.get(f"/block/{target_block.hash}")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['index'] == 2
+        assert data['hash'] == target_block.hash
+
+    def test_get_block_by_hash_not_found(self, client, mock_node_with_blocks):
+        """Test GET /block/<hash> - unknown hash returns 404."""
+        mock_node_with_blocks.blockchain.get_block_by_hash.return_value = None
+        response = client.get("/block/0x" + "f" * 64)
+        assert response.status_code == 404
+        data = response.get_json()
+        assert 'error' in data
+
+    def test_get_block_by_hash_invalid(self, client):
+        """Test GET /block/<hash> - invalid hash rejected."""
+        response = client.get("/block/not-a-hash")
+        assert response.status_code == 400
 
     def test_get_block_invalid_index_negative(self, client, mock_node_with_blocks):
         """Test GET /blocks/<index> - negative index (boundary condition)."""

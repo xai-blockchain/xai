@@ -746,6 +746,61 @@ class NodeAPIRoutes:
                 return jsonify({"error": "Block not available"}), 404
             return jsonify(payload), 200
 
+        @self.app.route("/block/<block_hash>", methods=["GET"])
+        def get_block_by_hash(block_hash: str) -> Tuple[Dict[str, Any], int]:
+            """Get a block by its hash."""
+            if not block_hash:
+                return jsonify({"error": "Invalid block hash"}), 400
+            normalized = block_hash.lower()
+            if normalized.startswith("0x"):
+                normalized = normalized[2:]
+            if not normalized or not re.fullmatch(r"[0-9a-f]{64}", normalized):
+                return jsonify({"error": "Invalid block hash"}), 400
+
+            block_obj = None
+            lookup = getattr(self.blockchain, "get_block_by_hash", None)
+            if callable(lookup):
+                try:
+                    block_obj = lookup(block_hash)
+                except Exception as exc:
+                    logger.debug("get_block_by_hash failed: %s", type(exc).__name__)
+                    block_obj = None
+
+            if block_obj is None:
+                chain = getattr(self.blockchain, "chain", [])
+                target = f"0x{normalized}"
+                for candidate in chain:
+                    candidate_hash = getattr(candidate, "hash", None)
+                    if not candidate_hash and isinstance(candidate, dict):
+                        candidate_hash = candidate.get("hash") or candidate.get("block_hash")
+                    if not candidate_hash:
+                        continue
+                    cand_norm = candidate_hash.lower()
+                    if cand_norm.startswith("0x"):
+                        cand_norm = cand_norm[2:]
+                    if cand_norm == normalized:
+                        block_obj = candidate
+                        break
+
+            if block_obj is None:
+                return jsonify({"error": "Block not found"}), 404
+
+            payload_source = block_obj
+            if hasattr(payload_source, "to_dict") and callable(getattr(payload_source, "to_dict", None)):
+                payload = payload_source.to_dict()
+            elif isinstance(payload_source, dict):
+                payload = payload_source
+            else:
+                payload = None
+
+            if not isinstance(payload, dict):
+                return jsonify({"error": "Block not available"}), 404
+
+            if "hash" not in payload:
+                payload["hash"] = getattr(block_obj, "hash", None)
+
+            return jsonify(payload), 200
+
         @self.app.route("/block/receive", methods=["POST"])
         def receive_block() -> Tuple[Dict[str, Any], int]:
             """Receive a block from a peer node."""
