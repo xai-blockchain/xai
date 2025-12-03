@@ -68,7 +68,7 @@ This roadmap targets production readiness with security-first posture, robust co
 ### Validation & Error Handling
 
 - [ ] Replace bare `except Exception: pass` blocks with specific exception handling in: `node_p2p.py` (9 instances), `blockchain.py` (lines 367, 382, 2849), `monitoring.py` (lines 236, 504, 869).
-- [ ] Fix signature verification exception swallowing in `account_abstraction.py` lines 540, 582. Signature failures logged but execution continues.
+- [x] ~~Fix signature verification exception swallowing in `account_abstraction.py` lines 540, 582. Signature failures logged but execution continues.~~ ✅ MultiSig verification now raises `SignatureError` on unexpected crypto failures and regression tests ensure the execution path halts immediately.
 - [ ] Add bounds checking to mining bonus configuration to prevent minting more coins than supply cap.
 
 ---
