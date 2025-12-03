@@ -305,6 +305,10 @@ class InputSanitizer:
         return sanitized
 
 
+class PaginationError(ValueError):
+    """Raised when pagination query parameters are invalid."""
+
+
 class NodeAPIRoutes:
     """
     Manages all API routes for the blockchain node.
@@ -455,6 +459,25 @@ class NodeAPIRoutes:
             code="admin_unauthorized",
             event_type="api_admin_auth_failure",
         )
+
+    def _get_pagination_params(
+        self,
+        default_limit: int = 50,
+        max_limit: int = 500,
+        default_offset: int = 0,
+    ) -> Tuple[int, int]:
+        """Normalize pagination query params and enforce sane limits."""
+        limit = request.args.get("limit", default=default_limit, type=int)
+        offset = request.args.get("offset", default=default_offset, type=int)
+        if limit is None or offset is None:
+            raise PaginationError("limit and offset must be integers")
+        if limit <= 0:
+            raise PaginationError("limit must be greater than zero")
+        if limit > max_limit:
+            raise PaginationError(f"limit cannot exceed {max_limit}")
+        if offset < 0:
+            raise PaginationError("offset cannot be negative")
+        return limit, offset
 
     # ==================== CORE ROUTES ====================
 
@@ -616,6 +639,25 @@ class NodeAPIRoutes:
             stats["node_uptime"] = time.time() - self.node.start_time
             return jsonify(stats)
 
+        @self.app.route("/mempool", methods=["GET"])
+        def get_mempool_overview() -> Tuple[Dict[str, Any], int]:
+            """Get mempool statistics and a snapshot of pending transactions."""
+            limit_param = request.args.get("limit", default=100, type=int)
+            limit = 100 if limit_param is None else limit_param
+            if limit < 0:
+                limit = 0
+            limit = min(limit, 1000)
+            try:
+                overview = self.blockchain.get_mempool_overview(limit)
+                return jsonify({"success": True, "limit": limit, "mempool": overview}), 200
+            except AttributeError:
+                return (
+                    jsonify({"success": False, "error": "Blockchain unavailable"}),
+                    503,
+                )
+            except Exception as exc:
+                return self._handle_exception(exc, "mempool_overview")
+
     # ==================== BLOCKCHAIN ROUTES ====================
 
     def _setup_blockchain_routes(self) -> None:
@@ -624,8 +666,15 @@ class NodeAPIRoutes:
         @self.app.route("/blocks", methods=["GET"])
         def get_blocks() -> Dict[str, Any]:
             """Get all blocks with pagination."""
-            limit = request.args.get("limit", default=10, type=int)
-            offset = request.args.get("offset", default=0, type=int)
+            try:
+                limit, offset = self._get_pagination_params(default_limit=10, max_limit=200)
+            except PaginationError as exc:
+                return self._error_response(
+                    str(exc),
+                    status=400,
+                    code="invalid_pagination",
+                    event_type="api.invalid_paging",
+                )
 
             blocks = [block.to_dict() for block in self.blockchain.chain]
             blocks.reverse()  # Most recent first
@@ -767,10 +816,26 @@ class NodeAPIRoutes:
         @self.app.route("/transactions", methods=["GET"])
         def get_pending_transactions() -> Dict[str, Any]:
             """Get pending transactions."""
+            try:
+                limit, offset = self._get_pagination_params(default_limit=50, max_limit=500)
+            except PaginationError as exc:
+                return self._error_response(
+                    str(exc),
+                    status=400,
+                    code="invalid_pagination",
+                    event_type="api.invalid_paging",
+                )
+
+            pending = list(getattr(self.blockchain, "pending_transactions", []) or [])
+            total = len(pending)
+            window = pending[offset : offset + limit]
+
             return jsonify(
                 {
-                    "count": len(self.blockchain.pending_transactions),
-                    "transactions": [tx.to_dict() for tx in self.blockchain.pending_transactions],
+                    "count": total,
+                    "limit": limit,
+                    "offset": offset,
+                    "transactions": [tx.to_dict() for tx in window],
                 }
             )
 
@@ -856,20 +921,34 @@ class NodeAPIRoutes:
             if auth_error:
                 return auth_error
             
-            # Rate limit send endpoint
+            # Rate limit send endpoint - fail closed when limiter unavailable
             try:
-                from xai.core.advanced_rate_limiter import get_rate_limiter
-                limiter = get_rate_limiter()
-                identifier = request.headers.get('X-Forwarded-For') or request.remote_addr or 'unknown'
-                allowed, error = limiter.check_rate_limit(identifier, "/send")
+                from xai.core.advanced_rate_limiter import get_rate_limiter as get_advanced_rate_limiter
+
+                limiter = get_advanced_rate_limiter()
+                allowed, error = limiter.check_rate_limit("/send")
                 if not allowed:
                     return self._error_response(
                         error or "Rate limit exceeded",
                         status=429,
                         code="rate_limited",
                     )
-            except Exception as e:
-                logger.debug("Rate limiter check failed (non-fatal): %s", type(e).__name__)
+            except Exception as exc:
+                logger.error(
+                    "Rate limiter unavailable for /send: %s",
+                    type(exc).__name__,
+                    extra={
+                        "event": "api.rate_limiter_error",
+                        "endpoint": "/send",
+                        "client": request.remote_addr or "unknown",
+                    },
+                    exc_info=True,
+                )
+                return self._error_response(
+                    "Rate limiting unavailable. Please retry later.",
+                    status=503,
+                    code="rate_limiter_unavailable",
+                )
                 
             model: Optional[NodeTransactionInput] = getattr(request, "validated_model", None)
             if model is None:
@@ -1276,12 +1355,60 @@ class NodeAPIRoutes:
             balance = self.blockchain.get_balance(address)
             return jsonify({"address": address, "balance": balance})
 
+        @self.app.route("/address/<address>/nonce", methods=["GET"])
+        def get_address_nonce(address: str) -> Tuple[Dict[str, Any], int]:
+            """Return confirmed and next nonce for an address."""
+            tracker = getattr(self.blockchain, "nonce_tracker", None)
+            if tracker is None:
+                return self._error_response(
+                    "Nonce tracker unavailable",
+                    status=503,
+                    code="nonce_tracker_unavailable",
+                )
+
+            try:
+                confirmed = tracker.get_nonce(address)
+                next_nonce = tracker.get_next_nonce(address)
+            except Exception as exc:
+                return self._handle_exception(exc, "nonce_lookup")
+
+            pending_nonce = next_nonce - 1 if next_nonce - 1 > confirmed else None
+            return (
+                jsonify(
+                    {
+                        "address": address,
+                        "confirmed_nonce": max(confirmed, -1),
+                        "next_nonce": next_nonce,
+                        "pending_nonce": pending_nonce,
+                    }
+                ),
+                200,
+            )
+
         @self.app.route("/history/<address>", methods=["GET"])
         def get_history(address: str) -> Dict[str, Any]:
             """Get transaction history for address."""
-            history = self.blockchain.get_transaction_history(address)
+            try:
+                limit, offset = self._get_pagination_params(default_limit=50, max_limit=500)
+            except PaginationError as exc:
+                return self._error_response(
+                    str(exc),
+                    status=400,
+                    code="invalid_pagination",
+                    event_type="api.invalid_paging",
+                )
+
+            history = self.blockchain.get_transaction_history(address) or []
+            total = len(history)
+            window = history[offset : offset + limit]
             return jsonify(
-                {"address": address, "transaction_count": len(history), "transactions": history}
+                {
+                    "address": address,
+                    "transaction_count": total,
+                    "limit": limit,
+                    "offset": offset,
+                    "transactions": window,
+                }
             )
 
     # ==================== FAUCET ROUTES ====================
@@ -1398,20 +1525,34 @@ class NodeAPIRoutes:
             if auth_error:
                 return auth_error
 
-            # Rate limit mining endpoint
+            # Rate limit mining endpoint - fail closed when limiter unavailable
             try:
-                from xai.core.advanced_rate_limiter import get_rate_limiter
-                limiter = get_rate_limiter()
-                identifier = request.headers.get('X-Forwarded-For') or request.remote_addr or 'unknown'
-                allowed, error = limiter.check_rate_limit(identifier, "/mine")
+                from xai.core.advanced_rate_limiter import get_rate_limiter as get_advanced_rate_limiter
+
+                limiter = get_advanced_rate_limiter()
+                allowed, error = limiter.check_rate_limit("/mine")
                 if not allowed:
                     return self._error_response(
                         error or "Rate limit exceeded",
                         status=429,
                         code="rate_limited",
                     )
-            except Exception as e:
-                logger.debug("Rate limiter check failed (non-fatal): %s", type(e).__name__)
+            except Exception as exc:
+                logger.error(
+                    "Rate limiter unavailable for /mine: %s",
+                    type(exc).__name__,
+                    extra={
+                        "event": "api.rate_limiter_error",
+                        "endpoint": "/mine",
+                        "client": request.remote_addr or "unknown",
+                    },
+                    exc_info=True,
+                )
+                return self._error_response(
+                    "Rate limiting unavailable. Please retry later.",
+                    status=503,
+                    code="rate_limiter_unavailable",
+                )
 
             if not self.blockchain.pending_transactions:
                 return jsonify({"error": "No pending transactions to mine"}), 400

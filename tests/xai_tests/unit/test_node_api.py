@@ -52,6 +52,7 @@ class TestNodeAPICoreRoutes:
             "difficulty": 4,
             "total_supply": 100.0
         })
+        node.blockchain.get_mempool_overview = Mock(return_value={"pending_count": 0, "transactions": []})
         node.miner_address = "test_miner"
         node.peers = set(["http://peer1:5000", "http://peer2:5000"])
         node.is_mining = False
@@ -117,6 +118,62 @@ class TestNodeAPICoreRoutes:
         response = client.get('/metrics')
         assert response.status_code == 500
         assert b'Error generating metrics' in response.data
+
+    def test_mempool_endpoint_default(self, client, mock_node):
+        """Test GET /mempool default behaviour."""
+        response = client.get('/mempool')
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["success"] is True
+        assert data["limit"] == 100
+        mock_node.blockchain.get_mempool_overview.assert_called_with(100)
+
+    def test_mempool_endpoint_limit_clamped(self, client, mock_node):
+        """Test GET /mempool respects limit bounds."""
+        mock_node.blockchain.get_mempool_overview.reset_mock()
+        response = client.get('/mempool?limit=5000')
+        assert response.status_code == 200
+        mock_node.blockchain.get_mempool_overview.assert_called_with(1000)
+
+        mock_node.blockchain.get_mempool_overview.reset_mock()
+        response = client.get('/mempool?limit=-5')
+        assert response.status_code == 200
+        mock_node.blockchain.get_mempool_overview.assert_called_with(0)
+
+    def test_address_nonce_endpoint_success(self, client, mock_node):
+        """GET /address/<addr>/nonce returns confirmed and next nonce."""
+        tracker = Mock()
+        tracker.get_nonce.return_value = 4
+        tracker.get_next_nonce.return_value = 6
+        mock_node.blockchain.nonce_tracker = tracker
+
+        response = client.get(f"/address/{VALID_SENDER}/nonce")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["address"] == VALID_SENDER
+        assert data["confirmed_nonce"] == 4
+        assert data["next_nonce"] == 6
+        assert data["pending_nonce"] == 5
+
+    def test_address_nonce_endpoint_unavailable(self, client, mock_node):
+        """GET /address/<addr>/nonce returns 503 when tracker missing."""
+        mock_node.blockchain.nonce_tracker = None
+
+        response = client.get(f"/address/{VALID_SENDER}/nonce")
+        assert response.status_code == 503
+        data = response.get_json()
+        assert data["code"] == "nonce_tracker_unavailable"
+
+    def test_address_nonce_endpoint_handles_errors(self, client, mock_node):
+        """GET /address/<addr>/nonce propagates tracker errors."""
+        tracker = Mock()
+        tracker.get_nonce.side_effect = Exception("db down")
+        mock_node.blockchain.nonce_tracker = tracker
+
+        response = client.get(f"/address/{VALID_SENDER}/nonce")
+        assert response.status_code == 500
+        data = response.get_json()
+        assert data["success"] is False
 
     def test_stats_endpoint(self, client, mock_node):
         """Test GET /stats - blockchain statistics."""
@@ -267,6 +324,34 @@ class TestNodeAPITransactionRoutes:
         data = response.get_json()
         assert data['count'] == 1
         assert len(data['transactions']) == 1
+        assert data['limit'] == 50
+        assert data['offset'] == 0
+
+    def test_get_pending_transactions_pagination(self, client, mock_node_with_tx):
+        """Test GET /transactions respects limit/offset pagination."""
+        extra_tx1 = Mock()
+        extra_tx1.txid = "pending_tx_2"
+        extra_tx1.to_dict = Mock(return_value={"txid": "pending_tx_2"})
+        extra_tx2 = Mock()
+        extra_tx2.txid = "pending_tx_3"
+        extra_tx2.to_dict = Mock(return_value={"txid": "pending_tx_3"})
+        mock_node_with_tx.blockchain.pending_transactions.extend([extra_tx1, extra_tx2])
+
+        response = client.get('/transactions?limit=1&offset=1')
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['count'] == 3
+        assert data['limit'] == 1
+        assert data['offset'] == 1
+        assert len(data['transactions']) == 1
+        assert data['transactions'][0]['txid'] == 'pending_tx_2'
+
+    def test_get_pending_transactions_invalid_limit(self, client):
+        """Test GET /transactions returns 400 for invalid pagination."""
+        response = client.get('/transactions?limit=0')
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data['code'] == 'invalid_pagination'
 
     def test_get_transaction_confirmed(self, client):
         """Test GET /transaction/<txid> - confirmed transaction."""
@@ -322,6 +407,42 @@ class TestNodeAPITransactionRoutes:
         assert data['success'] == True
         assert data['txid'] == 'new_tx_id'
         assert 'message' in data
+
+    @patch('xai.core.blockchain.Transaction')
+    def test_send_transaction_rate_limiter_failure(
+        self,
+        mock_tx_class,
+        client,
+        mock_node_with_tx,
+        monkeypatch,
+    ):
+        """Ensure /send fails closed when rate limiter is unavailable."""
+
+        class FailingLimiter:
+            def check_rate_limit(self, endpoint):
+                raise RuntimeError("limiter down")
+
+        monkeypatch.setattr(
+            'xai.core.advanced_rate_limiter.get_rate_limiter',
+            lambda: FailingLimiter(),
+            raising=False,
+        )
+
+        tx_data = {
+            "sender": VALID_SENDER,
+            "recipient": VALID_RECIPIENT,
+            "amount": 1.0,
+            "fee": 0.01,
+            "public_key": VALID_PUBLIC_KEY,
+            "nonce": 1,
+            "signature": VALID_SIGNATURE,
+        }
+
+        response = client.post('/send', data=json.dumps(tx_data), content_type='application/json')
+        assert response.status_code == 503
+        data = response.get_json()
+        assert data['code'] == 'rate_limiter_unavailable'
+        assert "Rate limiting unavailable" in data['error']
 
     def test_send_transaction_missing_fields(self, client):
         """Test POST /send - missing required fields."""
@@ -486,6 +607,31 @@ class TestNodeAPIWalletRoutes:
         assert data['address'] == 'test_address'
         assert data['transaction_count'] == 2
         assert len(data['transactions']) == 2
+        assert data['limit'] == 50
+        assert data['offset'] == 0
+
+    def test_get_history_with_pagination(self, client, mock_node):
+        """Test GET /history/<address> with limit and offset."""
+        mock_node.blockchain.get_transaction_history.return_value = [
+            {"txid": "tx1", "amount": 10.0},
+            {"txid": "tx2", "amount": 20.0},
+            {"txid": "tx3", "amount": 30.0},
+        ]
+        response = client.get('/history/test_address?limit=1&offset=1')
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['transaction_count'] == 3
+        assert data['limit'] == 1
+        assert data['offset'] == 1
+        assert len(data['transactions']) == 1
+        assert data['transactions'][0]['txid'] == 'tx2'
+
+    def test_get_history_invalid_offset(self, client):
+        """Test GET /history/<address> rejects invalid pagination parameters."""
+        response = client.get('/history/test_address?offset=-1')
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data['code'] == 'invalid_pagination'
 
 
 class TestNodeAPIMiningRoutes:
@@ -557,6 +703,25 @@ class TestNodeAPIMiningRoutes:
         assert response.status_code == 500
         data = response.get_json()
         assert 'error' in data
+
+    def test_mine_block_rate_limiter_failure(self, client, monkeypatch):
+        """Ensure /mine rejects requests when rate limiter fails."""
+
+        class FailingLimiter:
+            def check_rate_limit(self, endpoint):
+                raise RuntimeError("limiter offline")
+
+        monkeypatch.setattr(
+            'xai.core.advanced_rate_limiter.get_rate_limiter',
+            lambda: FailingLimiter(),
+            raising=False,
+        )
+
+        response = client.post('/mine')
+        assert response.status_code == 503
+        data = response.get_json()
+        assert data['code'] == 'rate_limiter_unavailable'
+        assert "Rate limiting unavailable" in data['error']
 
     def test_start_auto_mining(self, client, mock_node):
         """Test POST /auto-mine/start - start auto-mining."""
