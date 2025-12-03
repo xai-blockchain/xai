@@ -952,7 +952,7 @@ class EVMInterpreter:
         calldata = call.memory.load_range(args_offset, args_size)
 
         # Calculate gas to forward (EIP-150: 63/64 rule)
-        gas_to_forward = min(gas, (call.gas * 63) // 64)
+        gas_to_forward = self._calculate_call_gas_to_forward(call, gas)
 
         # Value transfer (check balance)
         if value != 0:
@@ -963,8 +963,9 @@ class EVMInterpreter:
                 call.return_data = b""
                 return
 
-            # Add gas stipend for value transfer (2300 gas)
-            gas_to_forward += 2300
+            # Add gas stipend for value transfer (2300 gas) without exceeding available gas
+            stipend = 2300
+            gas_to_forward = min(gas_to_forward + stipend, call.gas)
 
         # Execute the call
         success, return_data = self._execute_subcall(
@@ -1036,7 +1037,7 @@ class EVMInterpreter:
         calldata = call.memory.load_range(args_offset, args_size)
 
         # Calculate gas to forward (EIP-150: 63/64 rule)
-        gas_to_forward = min(gas, (call.gas * 63) // 64)
+        gas_to_forward = self._calculate_call_gas_to_forward(call, gas)
 
         # Value transfer check
         if value != 0:
@@ -1045,7 +1046,8 @@ class EVMInterpreter:
                 call.stack.push(0)
                 call.return_data = b""
                 return
-            gas_to_forward += 2300  # Gas stipend
+            stipend = 2300
+            gas_to_forward = min(gas_to_forward + stipend, call.gas)
 
         # CALLCODE: Execute target code in current storage context
         # Like DELEGATECALL but caller is current contract, not preserved
@@ -1115,7 +1117,7 @@ class EVMInterpreter:
         calldata = call.memory.load_range(args_offset, args_size)
 
         # Calculate gas to forward (EIP-150: 63/64 rule)
-        gas_to_forward = min(gas, (call.gas * 63) // 64)
+        gas_to_forward = self._calculate_call_gas_to_forward(call, gas)
 
         # Execute with current msg.sender and msg.value (preserved context)
         # DELEGATECALL executes target code in caller's storage context
@@ -1208,7 +1210,7 @@ class EVMInterpreter:
         calldata = call.memory.load_range(args_offset, args_size)
 
         # Calculate gas to forward (EIP-150: 63/64 rule)
-        gas_to_forward = min(gas, (call.gas * 63) // 64)
+        gas_to_forward = self._calculate_call_gas_to_forward(call, gas)
 
         # Execute in static mode (no state changes allowed)
         success, return_data = self._execute_subcall(
@@ -1277,6 +1279,25 @@ class EVMInterpreter:
         call.halted = True
 
     # ==================== Helper Methods ====================
+
+    def _calculate_call_gas_to_forward(self, call: CallContext, requested_gas: int) -> int:
+        """
+        Calculate gas to forward to a subcall using the 63/64 rule (EIP-150).
+
+        Args:
+            call: Current call context
+            requested_gas: Gas requested by opcode input
+
+        Returns:
+            Gas amount permitted to forward
+        """
+        if requested_gas <= 0 or call.gas <= 0:
+            return 0
+
+        max_forwardable = call.gas - (call.gas // 64)
+        if max_forwardable <= 0:
+            return 0
+        return min(requested_gas, max_forwardable)
 
     def _execute_subcall(
         self,
