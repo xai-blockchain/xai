@@ -938,7 +938,9 @@ class EVMInterpreter:
         out_expansion = call.memory.expansion_cost(ret_offset, ret_size) if ret_size > 0 else 0
         expansion_cost = max(in_expansion, out_expansion)
 
-        total_gas = warm_gas + expansion_cost
+        input_copy_cost = self._calldata_copy_cost(args_size)
+        output_copy_cost = self._calldata_copy_cost(ret_size)
+        total_gas = warm_gas + expansion_cost + input_copy_cost + output_copy_cost
         if value != 0:
             total_gas += 9000  # Value transfer stipend
             # Check if account exists for value transfer
@@ -1026,7 +1028,9 @@ class EVMInterpreter:
         out_expansion = call.memory.expansion_cost(ret_offset, ret_size) if ret_size > 0 else 0
         expansion_cost = max(in_expansion, out_expansion)
 
-        total_gas = warm_gas + expansion_cost
+        input_copy_cost = self._calldata_copy_cost(args_size)
+        output_copy_cost = self._calldata_copy_cost(ret_size)
+        total_gas = warm_gas + expansion_cost + input_copy_cost + output_copy_cost
         if value != 0:
             total_gas += 9000
 
@@ -1110,7 +1114,8 @@ class EVMInterpreter:
         out_expansion = call.memory.expansion_cost(ret_offset, ret_size) if ret_size > 0 else 0
         expansion_cost = max(in_expansion, out_expansion)
 
-        if not call.use_gas(warm_gas + expansion_cost):
+        copy_cost = self._calldata_copy_cost(args_size) + self._calldata_copy_cost(ret_size)
+        if not call.use_gas(warm_gas + expansion_cost + copy_cost):
             raise VMExecutionError("Out of gas for DELEGATECALL")
 
         # Get calldata from memory
@@ -1203,7 +1208,8 @@ class EVMInterpreter:
         out_expansion = call.memory.expansion_cost(ret_offset, ret_size) if ret_size > 0 else 0
         expansion_cost = max(in_expansion, out_expansion)
 
-        if not call.use_gas(warm_gas + expansion_cost):
+        copy_cost = self._calldata_copy_cost(args_size) + self._calldata_copy_cost(ret_size)
+        if not call.use_gas(warm_gas + expansion_cost + copy_cost):
             raise VMExecutionError("Out of gas for STATICCALL")
 
         # Get calldata from memory
@@ -1298,6 +1304,13 @@ class EVMInterpreter:
         if max_forwardable <= 0:
             return 0
         return min(requested_gas, max_forwardable)
+
+    @staticmethod
+    def _calldata_copy_cost(size: int) -> int:
+        """Gas cost for copying calldata or returndata (3 gas per 32-byte word)."""
+        if size <= 0:
+            return 0
+        return 3 * ((size + 31) // 32)
 
     def _execute_subcall(
         self,

@@ -6,6 +6,7 @@ their bytecode, including proper context handling and return data.
 """
 
 import pytest
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from xai.core.vm.evm.interpreter import EVMInterpreter
@@ -138,13 +139,13 @@ class TestCALLExecution:
         # Caller sends 1000 wei
         value = 1000
         caller_code = bytes([
-            Opcode.PUSH4, 0x00, 0x01, 0x00, 0x00,  # gas
-            Opcode.PUSH20, *bytes.fromhex(target_address[2:]),  # address
-            Opcode.PUSH2, *value.to_bytes(2, 'big'),  # value = 1000
-            Opcode.PUSH1, 0x00,  # argsOffset
-            Opcode.PUSH1, 0x00,  # argsSize
-            Opcode.PUSH1, 0x00,  # retOffset
             Opcode.PUSH1, 0x00,  # retSize
+            Opcode.PUSH1, 0x00,  # retOffset
+            Opcode.PUSH1, 0x00,  # argsSize
+            Opcode.PUSH1, 0x00,  # argsOffset
+            Opcode.PUSH2, *value.to_bytes(2, "big"),  # value = 1000
+            Opcode.PUSH20, *bytes.fromhex(target_address[2:]),  # address
+            Opcode.PUSH4, 0x00, 0x01, 0x00, 0x00,  # gas
             Opcode.CALL,
             Opcode.STOP,
         ])
@@ -171,13 +172,13 @@ class TestCALLExecution:
 
         # CALL to self with all gas
         recursive_code = bytes([
-            Opcode.PUSH4, 0xFF, 0xFF, 0xFF, 0xFF,  # gas = max
-            Opcode.PUSH20, *bytes.fromhex(self_address[2:]),  # self address
-            Opcode.PUSH1, 0x00,  # value
-            Opcode.PUSH1, 0x00,  # argsOffset
-            Opcode.PUSH1, 0x00,  # argsSize
-            Opcode.PUSH1, 0x00,  # retOffset
             Opcode.PUSH1, 0x00,  # retSize
+            Opcode.PUSH1, 0x00,  # retOffset
+            Opcode.PUSH1, 0x00,  # argsSize
+            Opcode.PUSH1, 0x00,  # argsOffset
+            Opcode.PUSH1, 0x00,  # value
+            Opcode.PUSH20, *bytes.fromhex(self_address[2:]),  # self address
+            Opcode.PUSH4, 0xFF, 0xFF, 0xFF, 0xFF,  # gas = max
             Opcode.CALL,
             Opcode.STOP,
         ])
@@ -259,12 +260,12 @@ class TestDELEGATECALL:
 
         # Caller uses DELEGATECALL
         caller_code = bytes([
-            Opcode.PUSH4, 0x00, 0x01, 0x00, 0x00,  # gas
-            Opcode.PUSH20, *bytes.fromhex(target_address[2:]),  # target address
-            Opcode.PUSH1, 0x00,  # argsOffset
-            Opcode.PUSH1, 0x00,  # argsSize
-            Opcode.PUSH1, 0x00,  # retOffset
             Opcode.PUSH1, 0x00,  # retSize
+            Opcode.PUSH1, 0x00,  # retOffset
+            Opcode.PUSH1, 0x00,  # argsSize
+            Opcode.PUSH1, 0x00,  # argsOffset
+            Opcode.PUSH20, *bytes.fromhex(target_address[2:]),  # target
+            Opcode.PUSH4, 0x00, 0x01, 0x00, 0x00,  # gas
             Opcode.DELEGATECALL,
             Opcode.STOP,
         ])
@@ -326,12 +327,12 @@ class TestSTATICCALL:
 
         # Caller uses STATICCALL
         caller_code = bytes([
-            Opcode.PUSH4, 0x00, 0x01, 0x00, 0x00,  # gas
-            Opcode.PUSH20, *bytes.fromhex(target_address[2:]),
-            Opcode.PUSH1, 0x00,  # argsOffset
-            Opcode.PUSH1, 0x00,  # argsSize
-            Opcode.PUSH1, 0x00,  # retOffset
             Opcode.PUSH1, 0x00,  # retSize
+            Opcode.PUSH1, 0x00,  # retOffset
+            Opcode.PUSH1, 0x00,  # argsSize
+            Opcode.PUSH1, 0x00,  # argsOffset
+            Opcode.PUSH20, *bytes.fromhex(target_address[2:]),
+            Opcode.PUSH4, 0x00, 0x01, 0x00, 0x00,  # gas
             Opcode.STATICCALL,
             # Result (0 = failure) should be on stack
             Opcode.STOP,
@@ -390,12 +391,12 @@ class TestSTATICCALL:
         )
 
         caller_code = bytes([
-            Opcode.PUSH4, 0x00, 0x01, 0x00, 0x00,  # gas
-            Opcode.PUSH20, *bytes.fromhex(target_address[2:]),
-            Opcode.PUSH1, 0x00,
-            Opcode.PUSH1, 0x00,
-            Opcode.PUSH1, 0x00,  # retOffset = 0
             Opcode.PUSH1, 0x20,  # retSize = 32
+            Opcode.PUSH1, 0x00,  # retOffset = 0
+            Opcode.PUSH1, 0x00,
+            Opcode.PUSH1, 0x00,
+            Opcode.PUSH20, *bytes.fromhex(target_address[2:]),
+            Opcode.PUSH4, 0x00, 0x01, 0x00, 0x00,  # gas
             Opcode.STATICCALL,
             Opcode.STOP,
         ])
@@ -503,13 +504,13 @@ class TestReturnDataHandling:
 
         # Caller does CALL then RETURNDATASIZE
         caller_code = bytes([
-            Opcode.PUSH4, 0x00, 0x01, 0x00, 0x00,
+            Opcode.PUSH1, 0x00,  # retSize
+            Opcode.PUSH1, 0x00,  # retOffset
+            Opcode.PUSH1, 0x00,
+            Opcode.PUSH1, 0x00,
+            Opcode.PUSH1, 0x00,  # value
             Opcode.PUSH20, *bytes.fromhex(target_address[2:]),
-            Opcode.PUSH1, 0x00,
-            Opcode.PUSH1, 0x00,
-            Opcode.PUSH1, 0x00,
-            Opcode.PUSH1, 0x00,
-            Opcode.PUSH1, 0x00,
+            Opcode.PUSH4, 0x00, 0x01, 0x00, 0x00,
             Opcode.CALL,
             Opcode.RETURNDATASIZE,  # Should push 64
             Opcode.STOP,
@@ -529,6 +530,147 @@ class TestReturnDataHandling:
         # RETURNDATASIZE should be 64
         size = call.stack.pop()
         assert size == 64
+
+
+class TestCallGasForwarding:
+    """Validate CALL-family gas forwarding semantics."""
+
+    CALLER = "0x" + "b" * 40
+    ORIGIN = "0x" + "a" * 40
+    TARGET = "0x9999999999999999999999999999999999999999"
+
+    def _build_context(self, initial_gas: int = 64000, static: bool = False):
+        """Create interpreter and call context with deterministic balances."""
+        blockchain = SimpleNamespace(
+            contracts={self.TARGET.upper(): {"code": ""}},
+            get_balance=lambda addr: 0,
+            nonce_tracker=SimpleNamespace(
+                get_nonce=lambda addr: 0,
+                set_nonce=lambda addr, value: None,
+            ),
+        )
+        block = BlockContext(
+            number=1,
+            timestamp=1000,
+            gas_limit=10_000_000,
+            coinbase="0x" + "0" * 40,
+            prevrandao=0,
+            base_fee=0,
+            chain_id=1,
+        )
+        context = ExecutionContext(
+            block=block,
+            tx_origin=self.ORIGIN,
+            tx_gas_price=1,
+            tx_gas_limit=1_000_000,
+            tx_value=0,
+            blockchain=blockchain,
+        )
+        call = CallContext(
+            call_type=CallType.CALL,
+            depth=0,
+            address=self.CALLER,
+            caller=self.ORIGIN,
+            origin=self.ORIGIN,
+            value=0,
+            gas=initial_gas,
+            code=b"",
+            calldata=b"",
+            static=static,
+        )
+        interpreter = EVMInterpreter(context)
+        context.push_call(call)
+        context.accessed_addresses.add(self.TARGET)
+        context.set_balance(self.CALLER, 10**9)
+        context.set_balance(self.TARGET, 1)
+        return interpreter, context, call
+
+    def _push_call_operands(self, call: CallContext, gas: int, value: int = 0, args_size: int = 0, ret_size: int = 0) -> None:
+        addr_int = int(self.TARGET, 16)
+        # PUSH order (bottom -> top): ret_size, ret_offset, args_size, args_offset, value, address, gas
+        for item in (ret_size, 0, args_size, 0, value, addr_int, gas):
+            call.stack.push(item)
+
+    def _push_staticcall_operands(self, call: CallContext, gas: int) -> None:
+        addr_int = int(self.TARGET, 16)
+        # PUSH order (bottom -> top): ret_size, ret_offset, args_size, args_offset, address, gas
+        for item in (0, 0, 0, 0, addr_int, gas):
+            call.stack.push(item)
+
+    def test_call_gas_forwarding_apply_min_with_63_64_rule(self):
+        interpreter, _, call = self._build_context(initial_gas=64000)
+        self._push_call_operands(call, gas=50_000)
+        mock_execute = MagicMock(return_value=(True, b""))
+        interpreter._execute_subcall = mock_execute
+
+        interpreter._op_call(call)
+
+        forwarded = mock_execute.call_args.kwargs["gas"]
+        assert forwarded == 50_000  # Requested less than cap so unchanged
+
+    def test_call_gas_forwarding_caps_to_63_64_limit(self):
+        interpreter, _, call = self._build_context(initial_gas=64_000)
+        # Request more gas than allowed (63/64 rule should cap to 63,000)
+        self._push_call_operands(call, gas=80_000)
+        mock_execute = MagicMock(return_value=(True, b""))
+        interpreter._execute_subcall = mock_execute
+
+        interpreter._op_call(call)
+
+        forwarded = mock_execute.call_args.kwargs["gas"]
+        assert forwarded == 63_000
+
+    def test_call_value_transfer_adds_stipend_without_exceeding_available(self):
+        interpreter, context, call = self._build_context(initial_gas=25_000)
+        value = 1_000
+        context.set_balance(self.CALLER, 10_000)
+        context.set_balance(self.TARGET, 1)
+        self._push_call_operands(call, gas=20_000, value=value)
+        mock_execute = MagicMock(return_value=(True, b""))
+        interpreter._execute_subcall = mock_execute
+
+        interpreter._op_call(call)
+
+        forwarded = mock_execute.call_args.kwargs["gas"]
+        remaining = 25_000 - 9_000  # value transfer base cost (address pre-warmed)
+        max_forwardable = remaining - (remaining // 64)
+        expected = min(20_000, max_forwardable)
+        expected = min(expected + 2_300, remaining)
+        assert forwarded == expected
+
+    def test_staticcall_uses_same_gas_limit_rule(self):
+        interpreter, _, call = self._build_context(initial_gas=90_000)
+        self._push_staticcall_operands(call, gas=200_000)
+        mock_execute = MagicMock(return_value=(True, b""))
+        interpreter._execute_subcall = mock_execute
+
+        interpreter._op_staticcall(call)
+
+        forwarded = mock_execute.call_args.kwargs["gas"]
+        assert forwarded == 90_000 - (90_000 // 64)
+
+    def test_call_charges_input_copy_gas(self):
+        interpreter, _, call = self._build_context(initial_gas=10_000)
+        call.memory.expansion_cost = MagicMock(return_value=0)
+        call.use_gas = MagicMock(wraps=call.use_gas)
+        self._push_call_operands(call, gas=10_000, args_size=64)
+
+        interpreter._op_call(call)
+
+        expected_copy = 3 * ((64 + 31) // 32)
+        call.use_gas.assert_called_once_with(expected_copy)
+
+    def test_call_charges_output_copy_gas(self):
+        interpreter, _, call = self._build_context(initial_gas=10_000)
+        call.memory.expansion_cost = MagicMock(return_value=0)
+        call.use_gas = MagicMock(wraps=call.use_gas)
+        self._push_call_operands(call, gas=10_000, ret_size=64)
+        interpreter._execute_subcall = MagicMock(return_value=(True, b""))
+
+        interpreter._op_call(call)
+
+        expected_copy = 3 * ((64 + 31) // 32)
+        call.use_gas.assert_called_once_with(expected_copy)
 
 
 if __name__ == "__main__":
