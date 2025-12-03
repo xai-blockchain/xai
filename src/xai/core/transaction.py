@@ -367,13 +367,19 @@ class Transaction:
         """Calculate transaction hash (TXID)"""
         try:
             from xai.core.config import Config
-            context = getattr(Config, "CHAIN_ID", None) or getattr(Config, "NETWORK_TYPE", Transaction._CHAIN_CONTEXT)
+            context = getattr(Config, "CHAIN_ID", None) or getattr(
+                Config, "NETWORK_TYPE", Transaction._CHAIN_CONTEXT
+            )
             # Normalize enum/other types to string
             if hasattr(context, "value"):
                 context = context.value
             Transaction._CHAIN_CONTEXT = str(context)
-        except Exception:
-            pass
+        except (ImportError, AttributeError) as exc:
+            logger.debug(
+                "Using default transaction chain context due to config load issue: %s",
+                exc,
+                extra={"event": "tx.chain_context_fallback"},
+            )
 
         tx_data = {
             "chain_context": Transaction._CHAIN_CONTEXT,

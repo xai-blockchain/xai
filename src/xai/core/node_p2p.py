@@ -13,14 +13,16 @@ from __future__ import annotations
 import asyncio
 import os
 import threading
+import time
 from urllib.parse import urlparse
 import websockets
-from websockets.exceptions import ConnectionClosed
+from websockets.exceptions import ConnectionClosed, WebSocketException
 from websockets.server import WebSocketServerProtocol
 import json
 import hashlib
 import logging
-from typing import TYPE_CHECKING, Set, Optional, Dict, Any, Union
+from collections import deque
+from typing import TYPE_CHECKING, Set, Optional, Dict, Any, Union, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +70,9 @@ class P2PNetworkManager:
         max_bandwidth_out: int = 1024 * 1024, # 1 MB/s
     ) -> None:
         self.blockchain = blockchain
-        data_dir = getattr(getattr(self.blockchain, "storage", None), "data_dir", "data")
+        storage_ref = getattr(self.blockchain, "storage", None)
+        data_dir_candidate = getattr(storage_ref, "data_dir", "data")
+        data_dir = data_dir_candidate if isinstance(data_dir_candidate, str) else "data"
         if peer_manager is None:
             peer_manager = PeerManager(
                 max_connections_per_ip=max_connections,
@@ -106,6 +110,12 @@ class P2PNetworkManager:
         self.bandwidth_limiter_out = BandwidthLimiter(max_bandwidth_out, max_bandwidth_out // 10)
         self.received_chains = []
         self._quic_server: Optional[QUICServer] = None
+        self._dedup_max_items = max(100, int(getattr(Config, "P2P_DEDUP_MAX_ITEMS", 5000)))
+        self._dedup_ttl = max(1.0, float(getattr(Config, "P2P_DEDUP_TTL_SECONDS", 900.0)))
+        self._tx_seen_ids: Set[str] = set()
+        self._tx_seen_queue: deque[Tuple[str, float]] = deque()
+        self._block_seen_ids: Set[str] = set()
+        self._block_seen_queue: deque[Tuple[str, float]] = deque()
 
     @staticmethod
     def _normalize_peer_uri(peer_uri: str) -> str:
@@ -127,7 +137,7 @@ class P2PNetworkManager:
                 {"peer": host} if host else {},
                 "WARNING",
             )
-        except Exception as e:
+        except (ImportError, AttributeError, RuntimeError) as e:
             # Metrics collection failed - log but don't break P2P flows
             logger.debug(
                 "QUIC error metric collection failed for host=%s: %s",
@@ -153,7 +163,7 @@ class P2PNetworkManager:
                 {"peer": host, "timeout_seconds": self.quic_dial_timeout} if host else {"timeout_seconds": self.quic_dial_timeout},
                 "ERROR",
             )
-        except Exception as e:
+        except (ImportError, AttributeError, RuntimeError) as e:
             # Metrics collection failed - log but don't break P2P flows
             logger.debug(
                 "QUIC timeout metric collection failed for host=%s: %s",
@@ -174,7 +184,7 @@ class P2PNetworkManager:
             try:
                 if self.peer_manager.can_connect(host):
                     self.peer_manager.connect_peer(host)
-            except Exception as e:
+            except (ValueError, RuntimeError) as e:
                 # Log connection policy errors for debugging; reputation system will handle at runtime
                 import logging
                 logger = logging.getLogger(__name__)
@@ -203,7 +213,7 @@ class P2PNetworkManager:
             for pid in peers_to_disconnect:
                 try:
                     self.peer_manager.disconnect_peer(pid)
-                except Exception as e:
+                except (ValueError, RuntimeError) as e:
                     import logging
                     logger = logging.getLogger(__name__)
                     logger.warning(
@@ -259,7 +269,7 @@ class P2PNetworkManager:
                     self.port + 1,
                     extra={"event": "p2p.quic_server_started"}
                 )
-            except Exception as exc:
+            except (OSError, RuntimeError, ValueError) as exc:
                 logger.warning(
                     "QUIC disabled due to init failure: %s",
                     type(exc).__name__,
@@ -321,8 +331,13 @@ class P2PNetworkManager:
         try:
             async for message in websocket:
                 await self._handle_message(websocket, message)
-        except ConnectionClosed:
-            pass
+        except ConnectionClosed as exc:
+            logger.debug(
+                "Connection to peer %s closed: %s",
+                remote_ip,
+                type(exc).__name__,
+                extra={"event": "p2p.peer_connection_closed", "peer": peer_id},
+            )
         finally:
             if peer_id in self.connections:
                 conn = self.connections.pop(peer_id, None)
@@ -366,7 +381,7 @@ class P2PNetworkManager:
                     extra={"event": "p2p.outbound_connected", "peer": peer_uri}
                 )
                 return
-            except Exception as e:
+            except (WebSocketException, OSError, ConnectionError, asyncio.TimeoutError, ValueError) as e:
                 logger.debug(
                     "Failed to connect to peer %s on attempt %d/%d: %s",
                     peer_uri,
@@ -392,7 +407,7 @@ class P2PNetworkManager:
             await asyncio.sleep(60)
             try:
                 self.peer_manager.refresh_trust_stores()
-            except Exception as exc:
+            except (OSError, ValueError, RuntimeError) as exc:
                 self._log_security_event("self", f"trust_store_refresh_failed:{exc}")
             logger.debug(
                 "Health check: %d peers connected",
@@ -454,9 +469,11 @@ class P2PNetworkManager:
             payload={"peer": peer_id},
         )
         
-    async def _handle_message(self, websocket: WebSocketServerProtocol, message: Union[str, bytes]) -> None:
+    async def _handle_message(self, websocket: Optional[WebSocketServerProtocol], message: Union[str, bytes]) -> None:
         """Handles incoming messages from peers."""
-        peer_id = self.websocket_peer_ids.get(websocket, str(websocket.remote_address))
+        remote_addr = getattr(websocket, "remote_address", ("<quic>", 0))
+        fallback_peer = remote_addr[0] if isinstance(remote_addr, (tuple, list)) and remote_addr else str(remote_addr)
+        peer_id = self.websocket_peer_ids.get(websocket, fallback_peer)
         raw_bytes = message if isinstance(message, (bytes, bytearray)) else message.encode("utf-8")
         
         message_size = len(raw_bytes)
@@ -533,12 +550,37 @@ class P2PNetworkManager:
             payload = data.get("payload")
 
             if message_type == "transaction":
+                dedup_id = self._derive_payload_fingerprint(payload, ("txid", "hash", "id"))
+                if self._is_duplicate_message("transaction", dedup_id):
+                    logger.debug(
+                        "Duplicate transaction %s dropped from peer %s",
+                        dedup_id,
+                        peer_id[:16],
+                        extra={"event": "p2p.duplicate_transaction", "peer": peer_id, "txid": dedup_id},
+                    )
+                    self._log_security_event(peer_id, "duplicate_transaction")
+                    self.peer_manager.reputation.record_invalid_transaction(peer_id)
+                    return
                 tx = self.blockchain._transaction_from_dict(payload)
                 if self.blockchain.add_transaction(tx):
                     self.peer_manager.reputation.record_valid_transaction(peer_id)
                 else:
                     self.peer_manager.reputation.record_invalid_transaction(peer_id)
             elif message_type == "block":
+                dedup_id = self._derive_payload_fingerprint(
+                    payload.get("header") if isinstance(payload, dict) else payload,
+                    ("hash", "block_hash"),
+                )
+                if self._is_duplicate_message("block", dedup_id):
+                    logger.debug(
+                        "Duplicate block %s dropped from peer %s",
+                        dedup_id,
+                        peer_id[:16],
+                        extra={"event": "p2p.duplicate_block", "peer": peer_id, "block_hash": dedup_id},
+                    )
+                    self._log_security_event(peer_id, "duplicate_block")
+                    self.peer_manager.reputation.record_invalid_block(peer_id)
+                    return
                 block = self.blockchain.deserialize_block(payload)
                 if self.blockchain.add_block(block):
                     self.peer_manager.reputation.record_valid_block(peer_id)
@@ -579,7 +621,7 @@ class P2PNetworkManager:
                 extra={"event": "p2p.invalid_json", "peer": peer_id}
             )
             self.peer_manager.reputation.record_invalid_transaction(peer_id)
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError, RuntimeError, KeyError) as e:
             logger.error(
                 "Error handling message from peer %s: %s",
                 peer_id[:16],
@@ -597,7 +639,7 @@ class P2PNetworkManager:
         """Sign and send a message to a single peer with bandwidth enforcement."""
         try:
             signed_message = self.peer_manager.encryption.create_signed_message(message)
-        except Exception as exc:
+        except (ValueError, RuntimeError) as exc:
             logger.error(
                 "Failed to sign message for peer %s: %s",
                 peer_id[:16],
@@ -623,7 +665,7 @@ class P2PNetworkManager:
 
         try:
             await websocket.send(signed_message.decode("utf-8"))
-        except Exception as exc:
+        except (ConnectionClosed, WebSocketException, OSError, RuntimeError) as exc:
             logger.error(
                 "Error sending message to peer %s: %s",
                 peer_id[:16],
@@ -643,7 +685,7 @@ class P2PNetworkManager:
 
         try:
             signed_message = self.peer_manager.encryption.create_signed_message(message)
-        except Exception as exc:
+        except (ValueError, RuntimeError) as exc:
             logger.error(
                 "Failed to sign broadcast message: %s",
                 type(exc).__name__,
@@ -668,7 +710,7 @@ class P2PNetworkManager:
                 continue
             try:
                 await conn.send(message_str)
-            except Exception as exc:
+            except (ConnectionClosed, WebSocketException, OSError, RuntimeError) as exc:
                 logger.error(
                     "Error broadcasting to peer %s: %s",
                     peer_id[:16],
@@ -692,16 +734,71 @@ class P2PNetworkManager:
         except RuntimeError:
             asyncio.run(coro)
 
+    def _derive_payload_fingerprint(self, payload: Any, candidate_fields: Tuple[str, ...]) -> Optional[str]:
+        """Return a stable fingerprint for deduplication."""
+        if payload is None:
+            return None
+        if isinstance(payload, dict):
+            for field in candidate_fields:
+                value = payload.get(field)
+                if value:
+                    return str(value)
+        try:
+            serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+        except (TypeError, ValueError):
+            serialized = str(payload)
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+    def _is_duplicate_message(
+        self,
+        category: str,
+        message_id: Optional[str],
+        now: Optional[float] = None,
+    ) -> bool:
+        """Track recently seen messages and detect duplicates."""
+        if not message_id:
+            return False
+        cache_set, cache_queue = self._select_dedup_cache(category)
+        if cache_set is None or cache_queue is None:
+            return False
+        current_time = now or time.time()
+        self._purge_dedup_cache(cache_queue, cache_set, current_time)
+        if message_id in cache_set:
+            return True
+        cache_set.add(message_id)
+        cache_queue.append((message_id, current_time + self._dedup_ttl))
+        self._purge_dedup_cache(cache_queue, cache_set, current_time)
+        return False
+
+    def _purge_dedup_cache(
+        self,
+        cache_queue: deque[Tuple[str, float]],
+        cache_set: Set[str],
+        now: float,
+    ) -> None:
+        """Remove expired or excess entries from the dedup cache."""
+        while cache_queue and (cache_queue[0][1] <= now or len(cache_set) > self._dedup_max_items):
+            message_id, _ = cache_queue.popleft()
+            cache_set.discard(message_id)
+
+    def _select_dedup_cache(
+        self,
+        category: str,
+    ) -> Tuple[Optional[Set[str]], Optional[deque]]:
+        if category == "transaction":
+            return self._tx_seen_ids, self._tx_seen_queue
+        if category == "block":
+            return self._block_seen_ids, self._block_seen_queue
+        return None, None
+
     async def _handle_quic_payload(self, data: bytes) -> None:
         """Handle incoming QUIC payloads by reusing the websocket message handler."""
         try:
             await self._handle_message(None, data)
         except (json.JSONDecodeError, TypeError, ValueError) as e:
-            # Invalid QUIC payload - log and continue
             logger.warning(f"Failed to handle QUIC payload: {e}")
-        except Exception as e:
-            # Unexpected error handling QUIC message - log with full context
-            logger.error(f"Unexpected error handling QUIC payload: {e}", exc_info=True)
+        except RuntimeError as e:
+            logger.error(f"Runtime error handling QUIC payload: {e}", exc_info=True)
 
     async def _quic_send_payload(self, host: str, payload: bytes) -> None:
         """Send QUIC payload with bounded timeout and metrics on failure."""
@@ -712,13 +809,9 @@ class P2PNetworkManager:
             )
         except QuicDialTimeout:
             self._record_quic_timeout(host)
-        except (ConnectionError, OSError, RuntimeError) as e:
+        except (ConnectionError, OSError, RuntimeError, ValueError) as e:
             # QUIC connection error - record and continue
             logger.debug(f"QUIC send failed to {host}: {e}")
-            self._record_quic_error(host)
-        except Exception as e:
-            # Unexpected QUIC error - log with full context
-            logger.error(f"Unexpected QUIC error sending to {host}: {e}", exc_info=True)
             self._record_quic_error(host)
 
     def broadcast_transaction(self, transaction: "Transaction") -> None:

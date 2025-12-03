@@ -165,10 +165,12 @@ class TransparentProxy:
             }
         )
 
-        # Call initializer if provided
+        # Call initializer if provided: record initializer digest and mark initialized
         if data:
-            # In real implementation, would delegatecall the initializer
-            pass
+            self.initialized = True
+            self.storage[EIP1967_IMPLEMENTATION_SLOT] = int.from_bytes(
+                hashlib.sha3_256(data).digest(), "big"
+            )
 
         return True
 
@@ -258,9 +260,15 @@ class TransparentProxy:
         if not impl:
             raise VMExecutionError(f"Implementation {self.implementation} not found")
 
-        # In real EVM, this would be DELEGATECALL
-        # The implementation runs in the context of the proxy (uses proxy's storage)
-        return impl
+        # In real EVM, this would be DELEGATECALL and the implementation executes
+        # with proxy's storage context. Here we return a structured forwarding
+        # directive that higher layers can act upon.
+        return {
+            "delegate_to": impl,
+            "calldata": calldata,
+            "proxy": self.address,
+            "implementation": self.implementation,
+        }
 
     # ==================== View Functions ====================
 

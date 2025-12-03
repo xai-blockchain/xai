@@ -7,3 +7,4 @@ pqcrypto==0.3.4
 gmpy2==2.2.2
 schemathesis==4.6.3
 rich==13.5.2
+bip-utils==2.10.0

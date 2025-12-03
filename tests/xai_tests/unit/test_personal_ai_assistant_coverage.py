@@ -14,6 +14,7 @@ This test suite achieves 80%+ coverage by testing:
 - Edge cases and boundary conditions
 """
 
+import builtins
 import json
 import os
 import pytest
@@ -722,6 +723,28 @@ class TestAIProviderCalls:
 
         assert result["success"] is False
         assert "not supported" in result["error"]
+
+    def test_call_ai_provider_missing_module_returns_failure(self, personal_ai):
+        """Provider import failures should return structured failure, not success stubs."""
+        original_import = builtins.__import__
+
+        def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+            if name == "anthropic":
+                raise ModuleNotFoundError("anthropic")
+            return original_import(name, globals, locals, fromlist, level)
+
+        with patch("builtins.__import__", side_effect=fake_import):
+            result = personal_ai._call_ai_provider(
+                ai_provider="anthropic",
+                ai_model="claude-3",
+                user_api_key="fake-key",
+                prompt="Hello",
+            )
+
+        assert result["success"] is False
+        assert result["code"] == "provider_module_missing"
+        assert "anthropic" in result["error"].lower()
+        assert "stub_text" in result
 
     def test_call_additional_provider_success(self, personal_ai):
         """Test calling additional provider successfully."""

@@ -10,9 +10,12 @@ This test file achieves 98%+ coverage of node_p2p.py by testing:
 - All edge cases
 """
 
+import time
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 import requests
+
+from xai.core.p2p_security import P2PSecurityConfig
 
 
 class TestPeerManagement:
@@ -587,3 +590,94 @@ class TestEdgeCases:
 
             p2p_manager.remove_peer(peer)
             assert peer not in p2p_manager.peers
+
+
+class TestMessageDeduplication:
+    """Ensure duplicate transactions/blocks are dropped to prevent floods."""
+
+    @pytest.fixture
+    def blockchain(self):
+        blockchain = Mock()
+        blockchain.storage = Mock()
+        blockchain.storage.data_dir = "data"
+        tx_obj = Mock()
+        tx_obj.txid = "tx-123"
+        blockchain._transaction_from_dict = Mock(return_value=tx_obj)
+        blockchain.add_transaction = Mock(return_value=True)
+        blockchain.deserialize_block = Mock(return_value=Mock())
+        blockchain.add_block = Mock(return_value=True)
+        blockchain.to_dict = Mock(return_value={"height": 1})
+        return blockchain
+
+    @pytest.fixture
+    def p2p_manager(self, blockchain):
+        from xai.core.node_p2p import P2PNetworkManager
+
+        manager = P2PNetworkManager(blockchain)
+        # Relax rate/bandwidth guards for deterministic tests
+        manager.rate_limiter.is_rate_limited = MagicMock(return_value=False)
+        manager.bandwidth_limiter_in.consume = MagicMock(return_value=True)
+        manager.peer_manager.reputation = MagicMock()
+        manager.peer_manager.reputation.record_valid_transaction = MagicMock()
+        manager.peer_manager.reputation.record_invalid_transaction = MagicMock()
+        manager.peer_manager.reputation.record_valid_block = MagicMock()
+        manager.peer_manager.reputation.record_invalid_block = MagicMock()
+        manager.peer_manager.encryption.verify_signed_message = MagicMock()
+        manager.peer_manager.is_sender_allowed = MagicMock(return_value=True)
+        manager.peer_manager.is_nonce_replay = MagicMock(return_value=False)
+        manager.peer_manager.record_nonce = MagicMock()
+        manager._dedup_ttl = 0.05
+        manager._dedup_max_items = 2
+        return manager
+
+    @pytest.mark.asyncio
+    async def test_duplicate_transactions_are_dropped(self, p2p_manager):
+        verified_message = {
+            "sender": "peer_pubkey",
+            "payload": {"type": "transaction", "payload": {"txid": "tx-dupe", "sender": "a"}},
+            "version": getattr(P2PSecurityConfig, "PROTOCOL_VERSION", "1"),
+        }
+        p2p_manager.peer_manager.encryption.verify_signed_message = MagicMock(return_value=verified_message)
+        websocket = MagicMock()
+        websocket.remote_address = ("127.0.0.1", 9000)
+        p2p_manager.websocket_peer_ids[websocket] = "peer-1"
+
+        await p2p_manager._handle_message(websocket, "{}")
+        await p2p_manager._handle_message(websocket, "{}")
+
+        assert p2p_manager.blockchain.add_transaction.call_count == 1
+        p2p_manager.peer_manager.reputation.record_invalid_transaction.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_duplicate_blocks_are_dropped(self, p2p_manager):
+        verified_message = {
+            "sender": "peer_pubkey",
+            "payload": {"type": "block", "payload": {"header": {"hash": "block-123"}}},
+            "version": getattr(P2PSecurityConfig, "PROTOCOL_VERSION", "1"),
+        }
+        p2p_manager.peer_manager.encryption.verify_signed_message = MagicMock(return_value=verified_message)
+        websocket = MagicMock()
+        websocket.remote_address = ("127.0.0.1", 9001)
+        p2p_manager.websocket_peer_ids[websocket] = "peer-2"
+
+        await p2p_manager._handle_message(websocket, "{}")
+        await p2p_manager._handle_message(websocket, "{}")
+
+        assert p2p_manager.blockchain.add_block.call_count == 1
+        p2p_manager.peer_manager.reputation.record_invalid_block.assert_called_once()
+
+    def test_dedup_cache_expires_entries(self, p2p_manager):
+        p2p_manager._dedup_ttl = 0.01
+        now = time.time()
+        assert p2p_manager._is_duplicate_message("transaction", "cache-test", now) is False
+        later = now + 0.02
+        assert p2p_manager._is_duplicate_message("transaction", "cache-test", later) is False
+
+    def test_dedup_cache_rotates_when_full(self, p2p_manager):
+        p2p_manager._dedup_max_items = 1
+        now = time.time()
+        assert p2p_manager._is_duplicate_message("transaction", "tx-a", now) is False
+        assert p2p_manager._is_duplicate_message("transaction", "tx-a", now + 0.001) is True
+        assert p2p_manager._is_duplicate_message("transaction", "tx-b", now + 0.002) is False
+        # tx-a should be evicted once cache hit max size (1 entry)
+        assert p2p_manager._is_duplicate_message("transaction", "tx-a", now + 0.003) is False

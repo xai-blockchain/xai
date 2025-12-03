@@ -20,6 +20,7 @@ from xai.core.vm.evm.opcodes import Opcode, OPCODE_INFO, get_push_size, is_push
 from xai.core.vm.evm.context import ExecutionContext, CallContext, CallType, BlockContext, Log
 from xai.core.vm.evm.interpreter import EVMInterpreter
 from xai.core.vm.evm.executor import EVMBytecodeExecutor
+from xai.core.vm.evm.abi import encode_call
 from xai.core.vm.exceptions import VMExecutionError
 
 
@@ -648,6 +649,42 @@ class TestEVMExecutor:
 
         gas = executor.estimate_gas(message)
         assert gas > 21000  # At least base transaction cost
+
+    def test_abi_call_encoding_to_external_code(self):
+        """Demonstrate using ABI encoding to call into an external contract stub."""
+        class MockChain:
+            def __init__(self):
+                self.contracts = {}
+                self.chain = []
+                from xai.core.nonce_tracker import NonceTracker
+                self.nonce_tracker = NonceTracker(data_dir=os.path.join(os.getcwd(), "data", "nonces_test"))
+
+            def get_balance(self, addr):
+                return 0
+
+        import os
+        mock_chain = MockChain()
+        # Echo contract: returns first 32 bytes of calldata
+        echo_code = bytes([0x60, 0x20, 0x60, 0x00, 0xF3])
+        addr = "0x" + "1" * 40
+        mock_chain.contracts[addr.upper()] = {"code": echo_code.hex(), "storage": {}}
+
+        executor = EVMBytecodeExecutor(mock_chain)
+        signature = "f(uint256)"
+        calldata = encode_call(signature, [123])
+
+        from xai.core.vm.executor import ExecutionMessage
+        msg = ExecutionMessage(
+            sender="0x" + "a" * 40,
+            to=addr,
+            value=0,
+            gas_limit=200000,
+            data=calldata,
+            nonce=0,
+        )
+        res = executor.call_static(msg)
+        assert res.success is True
+        assert res.return_data[:4] == calldata[:4]
 
 
 class TestKeccak256:

@@ -48,6 +48,7 @@ dependencies = [
     "argon2-cffi>=21.3.0", # For key derivation in wallet
     "base58>=2.1.0",
     "mnemonic>=0.21",
+    "bip-utils>=2.8.0",
     "PyJWT>=2.9.0",
     "flask-sock>=0.7.0",
     "py-ecc>=8.0.0",
@@ -91,7 +92,7 @@ dev = [
     # Performance Testing
     "locust>=2.20.0",
     "schemathesis>=4.6.3",
-    "rich==13.5.2",
+    "rich>=13.9.4,<14.0.0",
 ]
 network = [
     "aioquic>=1.1.0",

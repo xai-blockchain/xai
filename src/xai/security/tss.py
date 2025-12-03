@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 import hashlib
 import json
+import logging
+from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -12,6 +14,9 @@ from cryptography.hazmat.primitives.serialization import (
 )
 from cryptography.hazmat.backends import default_backend
 from typing import List, Tuple, Dict
+
+
+logger = logging.getLogger(__name__)
 
 
 class TSSInterface(ABC):
@@ -113,8 +118,14 @@ class MockTSS(TSSInterface):
                         bytes.fromhex(sig_hex), message_hash, ec.ECDSA(hashes.SHA256())
                     )
                     valid_signatures.append(sig_hex)
-                except Exception:
-                    pass  # Invalid signature
+                except (ValueError, InvalidSignature) as exc:
+                    logger.warning(
+                        "MockTSS rejected invalid participant signature",
+                        extra={
+                            "event": "tss.invalid_signature",
+                            "participant": signer_pub_hex[:16] + "...",
+                        },
+                    )
 
         if len(valid_signatures) >= threshold:
             # In a real TSS, partial signatures are combined cryptographically.

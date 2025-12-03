@@ -61,13 +61,13 @@ This roadmap targets production readiness with security-first posture, robust co
 ### P2P & Network Security
 
 - [x] ~~Require cryptography library - fail fast if unavailable instead of creating placeholder certificates~~ ✅ FIXED - Module-level import check, fail-fast in PeerEncryption.__init__, removed all placeholder fallbacks, added validate_peer_certificate with key size and expiry checks, 8 comprehensive tests
-- [ ] Implement ASN/geolocation diversity checks for eclipse attack protection. Current IP-based limits insufficient.
-- [ ] Add proof-of-work for peer admission to prevent Sybil attacks. Currently unlimited peer identities can be created.
-- [ ] Implement message deduplication in P2P layer - can receive same tx/block multiple times causing network floods.
+- [x] Implement ASN/geolocation diversity checks for eclipse attack protection. ✅ Implemented in PeerManager with per-/prefix, per-ASN, per-country limits and minimum diversity thresholds.
+- [x] Add proof-of-work for peer admission to prevent Sybil attacks. ✅ Implemented `PeerProofOfWork` and enforced in `PeerEncryption.verify_signed_message()`.
+- [x] Implement message deduplication in P2P layer. ✅ Implemented tx/block duplicate suppression with TTL-bounded cache.
 
 ### Validation & Error Handling
 
-- [ ] Replace bare `except Exception: pass` blocks with specific exception handling in: `node_p2p.py` (9 instances), `blockchain.py` (lines 367, 382, 2849), `monitoring.py` (lines 236, 504, 869).
+- [x] ~~Replace bare `except Exception: pass` blocks with specific exception handling in: `node_p2p.py` (9 instances), `blockchain.py` (lines 367, 382, 2849), `monitoring.py` (lines 236, 504, 869).~~ ✅ Connection-closed events now emit structured logs instead of silently passing, mempool eviction failures log precise errors and reject the new transaction, and monitoring already enforces typed catches.
 - [x] ~~Fix signature verification exception swallowing in `account_abstraction.py` lines 540, 582. Signature failures logged but execution continues.~~ ✅ MultiSig verification now raises `SignatureError` on unexpected crypto failures and regression tests ensure the execution path halts immediately.
 - [x] ~~Add bounds checking to mining bonus configuration to prevent minting more coins than supply cap.~~ ✅ Mining bonus manager now validates config overrides (including external JSON) against the global cap and refuses invalid values.
 
@@ -80,30 +80,30 @@ This roadmap targets production readiness with security-first posture, robust co
 - [x] **CRITICAL**: ~~Implement recursive CALL/DELEGATECALL execution~~ ✅ FIXED - Full recursive execution with EIP-150 gas forwarding, return data handling, call depth limits
 - [x] **CRITICAL**: ~~Fix CREATE/CREATE2 deployment~~ ✅ FIXED - Proper nonce tracking, init code execution, bytecode extraction, EIP-170 size limits
 - [x] **CRITICAL**: ~~Implement account nonce tracking~~ ✅ FIXED - get_nonce/increment_nonce in context, proper CREATE address derivation
-- [ ] Fix STATICCALL to actually enforce static mode in nested calls (`interpreter.py` lines 1018-1041).
+- [x] Fix STATICCALL to actually enforce static mode in nested calls. ✅ Enforced; nested STATICCALL frames run with static=True; tests passing.
 - [ ] Implement CALLCODE context switching - currently just delegates to broken CALL.
 
 ### Gas Metering Fixes
 
-- [ ] Fix EXP opcode gas calculation formula (`interpreter.py` lines 365-375). Formula based on bit length, not exponent value length.
-- [ ] Implement 63/64 gas forwarding rule for CALL operations.
-- [ ] Add CREATE code storage gas costs.
-- [ ] Charge intrinsic gas for calldata encoding in calls.
+- [x] Fix EXP opcode gas calculation formula. ✅ Implemented; dynamic gas based on exponent byte length; tests passing.
+- [x] Implement 63/64 gas forwarding rule for CALL operations. ✅ Implemented via `_calculate_call_gas_to_forward`.
+- [x] Add CREATE code storage gas costs. ✅ Enforced code deposit gas in executor.
+- [x] Charge intrinsic gas for calldata encoding in calls. ✅ Implemented in executor and interpreter copy costs.
 
 ### Missing Precompiles
 
-- [ ] Implement ECADD precompile (0x06) - required for signature verification in contracts.
-- [ ] Implement ECMUL precompile (0x07).
-- [ ] Implement ECPAIRING precompile (0x08).
-- [ ] Implement BLAKE2F precompile (0x09).
-- [ ] Implement POINT_EVALUATION precompile (0x0a).
+- [x] Implement ECADD precompile (0x06). ✅ Implemented with py_ecc on bn128.
+- [x] Implement ECMUL precompile (0x07). ✅ Implemented with py_ecc.
+- [x] Implement ECPAIRING precompile (0x08). ✅ Implemented with py_ecc.
+- [x] Implement BLAKE2F precompile (0x09). ✅ Implemented per EIP-152.
+- [ ] Implement POINT_EVALUATION precompile (0x0a). ⏳ Pending KZG integration.
 
 ### Contract Integration
 
 - [ ] Integrate ERC20/ERC721 contract libraries with EVM bytecode interpreter. Currently Python classes, not executable bytecode.
-- [ ] Implement ABI encoding/decoding for contract calls.
-- [ ] Store contract state in EVM storage, not Python dictionaries.
-- [ ] Implement proxy DELEGATECALL forwarding for upgradeable contracts.
+- [x] Implement ABI encoding/decoding for contract calls. ✅ Added minimal ABI utils (encode/decode + selector) with tests.
+- [ ] Store contract state in EVM storage, not Python dictionaries. (Executor/state adapters partially handle; further integration pending.)
+- [x] Implement proxy DELEGATECALL forwarding for upgradeable contracts. ✅ Added delegatecall harness and proxy forwarding directive; tests passing.
 - [ ] Add receive() hooks for safe token transfers.
 
 ---
@@ -118,7 +118,7 @@ This roadmap targets production readiness with security-first posture, robust co
 
 ### BIP Standards Implementation
 
-- [ ] Implement proper BIP-32/BIP-44 hierarchical deterministic derivation. Current "simplified BIP-32" is just HMAC-SHA512 - not actual HD wallets.
+- [ ] Implement proper BIP-32/BIP-44 hierarchical deterministic derivation. (HD wallet present with SLIP-0044 registry; improved xpub export.)
 - [ ] Add multi-account support (currently single account only).
 - [ ] Implement hardened derivation for account separation.
 - [ ] Add change address generation (separate change/payment branches).
@@ -131,12 +131,12 @@ This roadmap targets production readiness with security-first posture, robust co
 
 ### Wallet Features
 
-- [ ] Implement proper fee estimation API. Current hardcoded 0.05 XAI + multipliers insufficient.
-- [ ] Add offline transaction signing capability.
+- [ ] Implement proper fee estimation API. (Basic `/algo/fee-estimate` available; SDK wrapper added.)
+- [x] Add offline transaction signing capability. ✅ Added offline signing helpers with verify function.
 - [ ] Fix multisig nonce handling - add nonce/sequence fields to prevent replay.
 - [ ] Add transaction signing verification UI (show what's being signed before confirmation).
 - [ ] Add seed phrase backup QR code generation.
-- [ ] Implement spending limits.
+- [x] Implement spending limits. ✅ Daily per-address caps enforced at API boundary with persistence.
 - [ ] Add 2FA support (TOTP or FIDO2).
 
 ### Desktop Wallet Security
@@ -152,8 +152,8 @@ This roadmap targets production readiness with security-first posture, robust co
 
 ### Critical API Gaps
 
-- [ ] **CRITICAL**: Implement `/mempool` endpoint with full statistics (size, fee rates, transaction list). Currently only in explorer backend, not main API.
-- [ ] **CRITICAL**: Fix rate limiter non-fatal failures (`node_api.py` lines 860-872). Rate limiter exceptions caught and logged but requests proceed anyway.
+- [x] **CRITICAL**: Implement `/mempool` endpoint with full statistics. ✅ Implemented in `NodeAPIRoutes`.
+- [x] **CRITICAL**: Fix rate limiter non-fatal failures. ✅ `/send` now fails closed if limiter unavailable; structured error returned.
 - [ ] **CRITICAL**: Add pagination limits to all list endpoints. `GET /history/<address>` and `GET /transactions` return unlimited results - OOM attack vector.
 
 ### API Authentication

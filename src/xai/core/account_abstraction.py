@@ -39,6 +39,18 @@ from xai.core.wallet import WalletManager
 from xai.core.config import Config
 from xai.core.crypto_utils import sign_message_hex, verify_signature_hex
 
+
+class SponsorSignatureError(RuntimeError):
+    """Raised when sponsor signature generation fails."""
+
+    def __init__(self, message: str, *, sponsor: Optional[str] = None):
+        super().__init__(message)
+        self.sponsor = sponsor
+
+
+class SponsorSignatureVerificationError(SponsorSignatureError):
+    """Raised when sponsor signature verification fails due to malformed data."""
+
 if TYPE_CHECKING:
     from xai.core.transaction import Transaction
     from xai.core.blockchain import Blockchain
@@ -410,12 +422,14 @@ class GasSponsor:
 
         # Multi-tier rate limiting
         if rate_limit_config is None:
-            # Default configuration with reasonable limits
+            # Default configuration with reasonable limits; legacy rate_limit enforced separately
+            legacy_limit = max(1, int(rate_limit))
+            base_limit = max(legacy_limit, 10)
             rate_limit_config = RateLimitConfig(
-                per_second=10,
-                per_minute=100,
-                per_hour=500,
-                per_day=max(rate_limit, 1000),  # Use legacy rate_limit or default
+                per_second=base_limit,
+                per_minute=max(base_limit * 10, 100),
+                per_hour=max(base_limit * 60, 500),
+                per_day=max(legacy_limit, 1000),  # Use legacy rate_limit or default
                 max_gas_per_second=1.0,
                 max_gas_per_minute=10.0,
                 max_gas_per_hour=50.0,
@@ -425,8 +439,20 @@ class GasSponsor:
             )
         self.rate_limit_config = rate_limit_config
 
-        # Global rate limiter (applies to all users combined)
-        self.global_rate_limiter = SlidingWindowRateLimiter(rate_limit_config)
+        # Global rate limiter (applies to all users combined) - more lenient to avoid penalizing legitimate multi-user bursts
+        global_limit_config = RateLimitConfig(
+            per_second=max(rate_limit_config.per_second * 5, rate_limit_config.per_second + 1),
+            per_minute=max(rate_limit_config.per_minute * 5, rate_limit_config.per_minute + 10),
+            per_hour=max(rate_limit_config.per_hour * 5, rate_limit_config.per_hour + 60),
+            per_day=max(rate_limit_config.per_day * 2, rate_limit_config.per_day + 1000),
+            max_gas_per_second=rate_limit_config.max_gas_per_second * 5,
+            max_gas_per_minute=rate_limit_config.max_gas_per_minute * 5,
+            max_gas_per_hour=rate_limit_config.max_gas_per_hour * 5,
+            max_gas_per_day=rate_limit_config.max_gas_per_day * 2,
+            max_gas_per_transaction=rate_limit_config.max_gas_per_transaction,
+            max_cost_per_transaction=rate_limit_config.max_cost_per_transaction,
+        )
+        self.global_rate_limiter = SlidingWindowRateLimiter(global_limit_config)
 
         # Per-address rate limiters (isolates users from each other)
         self.user_rate_limiters: Dict[str, SlidingWindowRateLimiter] = {}
@@ -511,6 +537,19 @@ class GasSponsor:
                     "event": "gas_sponsor.rejected",
                     "reason": "not_whitelisted",
                     "user": user_address[:16] + "..."
+                }
+            )
+            return None
+
+        # Legacy per-user rate limit (transactions per day)
+        if not self._check_rate_limit(user_address):
+            logger.warning(
+                "Sponsorship rejected: legacy rate limit exceeded",
+                extra={
+                    "event": "gas_sponsor.rejected",
+                    "reason": "legacy_rate_limit",
+                    "user": user_address[:16] + "...",
+                    "limit": self.rate_limit,
                 }
             )
             return None
@@ -1269,24 +1308,46 @@ class SponsoredTransactionProcessor:
 
         try:
             signature = sign_message_hex(sponsor_private_key, auth_hash.encode())
-            transaction.gas_sponsor_signature = signature
-
-            logger.debug(
-                "Transaction authorized by sponsor",
-                extra={
-                    "event": "gas_sponsor.authorized",
-                    "sponsor": transaction.gas_sponsor[:16] + "...",
-                    "txid": transaction.txid[:16] + "..." if transaction.txid else "pending"
-                }
-            )
-            return True
-
-        except Exception as e:
+        except (ValueError, TypeError) as exc:
             logger.error(
-                f"Failed to authorize transaction: {e}",
-                extra={"event": "gas_sponsor.auth_failed"}
+                "Failed to authorize transaction due to invalid signing key: %s",
+                type(exc).__name__,
+                extra={
+                    "event": "gas_sponsor.auth_failed",
+                    "sponsor": transaction.gas_sponsor[:16] + "...",
+                },
+                exc_info=True,
             )
-            return False
+            raise SponsorSignatureError(
+                "Failed to authorize transaction: invalid sponsor key material",
+                sponsor=transaction.gas_sponsor,
+            ) from exc
+        except Exception as exc:  # pragma: no cover - unexpected crypto failures
+            logger.error(
+                "Unexpected error during sponsor authorization: %s",
+                type(exc).__name__,
+                extra={
+                    "event": "gas_sponsor.auth_failed",
+                    "sponsor": transaction.gas_sponsor[:16] + "...",
+                },
+                exc_info=True,
+            )
+            raise SponsorSignatureError(
+                "Failed to authorize transaction due to unexpected signing error",
+                sponsor=transaction.gas_sponsor,
+            ) from exc
+
+        transaction.gas_sponsor_signature = signature
+
+        logger.debug(
+            "Transaction authorized by sponsor",
+            extra={
+                "event": "gas_sponsor.authorized",
+                "sponsor": transaction.gas_sponsor[:16] + "...",
+                "txid": transaction.txid[:16] + "..." if transaction.txid else "pending"
+            }
+        )
+        return True
 
     def verify_sponsor_signature(self, transaction: "Transaction") -> bool:
         """
@@ -1323,12 +1384,30 @@ class SponsoredTransactionProcessor:
                 auth_hash.encode(),
                 transaction.gas_sponsor_signature
             )
-        except Exception as e:
-            logger.warning(
-                f"Sponsor signature verification failed: {e}",
-                extra={"event": "gas_sponsor.sig_verify_failed"}
+        except ValueError as exc:
+            logger.error(
+                "Sponsor signature malformed for %s: %s",
+                transaction.gas_sponsor[:16] + "...",
+                str(exc),
+                extra={"event": "gas_sponsor.sig_verify_failed"},
+                exc_info=True,
             )
-            return False
+            raise SponsorSignatureVerificationError(
+                "Malformed sponsor signature payload",
+                sponsor=transaction.gas_sponsor,
+            ) from exc
+        except Exception as exc:  # pragma: no cover - unexpected crypto failures
+            logger.error(
+                "Unexpected error verifying sponsor signature for %s: %s",
+                transaction.gas_sponsor[:16] + "...",
+                type(exc).__name__,
+                extra={"event": "gas_sponsor.sig_verify_failed"},
+                exc_info=True,
+            )
+            raise SponsorSignatureVerificationError(
+                "Unexpected error verifying sponsor signature",
+                sponsor=transaction.gas_sponsor,
+            ) from exc
 
     def validate_sponsored_transaction(
         self,
@@ -1420,7 +1499,16 @@ class SponsoredTransactionProcessor:
             )
 
         # Verify sponsor signature
-        if not self.verify_sponsor_signature(transaction):
+        try:
+            signature_valid = self.verify_sponsor_signature(transaction)
+        except SponsorSignatureVerificationError as exc:
+            return SponsorshipValidation(
+                result=SponsorshipResult.INVALID_SIGNATURE,
+                sponsor_address=transaction.gas_sponsor,
+                message=f"Sponsor signature verification error: {exc}"
+            )
+
+        if not signature_valid:
             return SponsorshipValidation(
                 result=SponsorshipResult.INVALID_SIGNATURE,
                 sponsor_address=transaction.gas_sponsor,

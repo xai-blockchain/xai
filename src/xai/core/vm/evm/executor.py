@@ -155,6 +155,92 @@ class EVMBytecodeExecutor(BaseExecutor):
             # Return max if execution fails
             return self.DEFAULT_GAS_LIMIT
 
+    def delegatecall(
+        self,
+        *,
+        sender: str,
+        proxy_address: str,
+        implementation_address: str,
+        calldata: bytes,
+        gas_limit: int = DEFAULT_GAS_LIMIT,
+    ) -> ExecutionResult:
+        """
+        Execute a high-level DELEGATECALL-like operation.
+
+        Runs code from implementation_address in the storage context of proxy_address,
+        preserving msg.sender and msg.value semantics (value=0 for DELEGATECALL).
+        This provides a convenient harness for proxy patterns implemented at the
+        Python layer without crafting raw opcodes.
+        """
+        # Prepare execution context and call
+        context = self._create_context(
+            ExecutionMessage(
+                sender=sender,
+                to=proxy_address,
+                value=0,
+                gas_limit=gas_limit,
+                data=calldata,
+                nonce=0,
+            )
+        )
+
+        # Load implementation code
+        code = self._get_contract_code(implementation_address)
+        if not code:
+            return ExecutionResult(
+                success=False,
+                gas_used=gas_limit,
+                return_data=b"",
+                logs=[{"event": "DelegateCallFailed", "error": "empty_code"}],
+            )
+
+        # Construct call context as DELEGATECALL frame
+        call = CallContext(
+            call_type=CallType.DELEGATECALL,
+            depth=0,
+            address=self._normalize_address(proxy_address),  # storage/context
+            caller=sender,
+            origin=sender,
+            value=0,
+            gas=gas_limit,
+            code=code,  # execute implementation code
+            calldata=calldata or b"",
+            static=False,
+        )
+
+        interpreter = EVMInterpreter(context)
+        context.push_call(call)
+        try:
+            interpreter.execute(call)
+        except VMExecutionError as e:
+            return ExecutionResult(
+                success=False,
+                gas_used=gas_limit,
+                return_data=b"",
+                logs=[{"event": "DelegateCallError", "error": str(e)}],
+            )
+
+        gas_used = gas_limit - call.gas
+        if call.reverted:
+            context.revert_to_snapshot(0) if context.snapshots else None
+            return ExecutionResult(
+                success=False,
+                gas_used=gas_used,
+                return_data=call.output,
+                logs=[{"event": "DelegateCallReverted", "reason": call.revert_reason}],
+            )
+
+        # Commit storage changes to proxy context
+        context.commit()
+        self._persist_storage(self._normalize_address(proxy_address), context.get_storage(self._normalize_address(proxy_address)))
+
+        return ExecutionResult(
+            success=True,
+            gas_used=gas_used,
+            return_data=call.output,
+            logs=[self._log_to_dict(l) for l in context.logs],
+        )
+
     def _deploy_contract(self, message: ExecutionMessage) -> ExecutionResult:
         """
         Deploy a new contract.
@@ -599,6 +685,16 @@ class EVMPrecompiles:
             return cls._identity(input_data, gas)
         elif addr_int == 5:
             return cls._modexp(input_data, gas)
+        elif addr_int == 6:
+            return cls._ecadd(input_data, gas)
+        elif addr_int == 7:
+            return cls._ecmul(input_data, gas)
+        elif addr_int == 8:
+            return cls._ecpairing(input_data, gas)
+        elif addr_int == 9:
+            return cls._blake2f(input_data, gas)
+        elif addr_int == 10:
+            return cls._point_evaluation(input_data, gas)
         else:
             raise VMExecutionError(f"Precompile {addr_int} not implemented")
 
@@ -677,3 +773,272 @@ class EVMPrecompiles:
             result = pow(base, exp, mod)
 
         return result.to_bytes(mod_len, "big"), gas_cost
+
+    # ---- Elliptic curve precompiles: alt_bn128 (EIP-196/197) ----
+
+    @classmethod
+    def _ecadd(cls, data: bytes, gas: int) -> tuple[bytes, int]:
+        """ECADD precompile (0x06) on alt_bn128 (bn254)."""
+        # Gas per EIP-196
+        gas_cost = 150
+        if gas < gas_cost:
+            raise VMExecutionError("Out of gas for ECADD")
+
+        # Input: 128 bytes -> (x1,y1,x2,y2), each 32-byte big-endian
+        if len(data) < 128:
+            data = data + b"\x00" * (128 - len(data))
+
+        x1 = int.from_bytes(data[0:32], "big")
+        y1 = int.from_bytes(data[32:64], "big")
+        x2 = int.from_bytes(data[64:96], "big")
+        y2 = int.from_bytes(data[96:128], "big")
+
+        try:
+            from py_ecc.optimized_bn128 import add, is_on_curve, FQ, curve_order, b
+        except Exception as exc:
+            raise VMExecutionError(f"ECADD dependency error: {exc}")
+
+        # Infinity handling: (0,0) represents point at infinity per spec
+        p1 = None if (x1 == 0 and y1 == 0) else (FQ(x1), FQ(y1), FQ(1))
+        p2 = None if (x2 == 0 and y2 == 0) else (FQ(x2), FQ(y2), FQ(1))
+
+        # Validate points (ignore infinity None)
+        if p1 is not None and not is_on_curve(p1, b):
+            return (b"\x00" * 64, gas_cost)
+        if p2 is not None and not is_on_curve(p2, b):
+            return (b"\x00" * 64, gas_cost)
+
+        if p1 is None:
+            result = p2
+        elif p2 is None:
+            result = p1
+        else:
+            result = add(p1, p2)
+
+        if result is None:
+            return (b"\x00" * 64, gas_cost)
+
+        x = int(result[0])
+        y = int(result[1])
+        return x.to_bytes(32, "big") + y.to_bytes(32, "big"), gas_cost
+
+    @classmethod
+    def _ecmul(cls, data: bytes, gas: int) -> tuple[bytes, int]:
+        """ECMUL precompile (0x07) on alt_bn128 (bn254)."""
+        # Gas per EIP-196
+        gas_cost = 6000
+        if gas < gas_cost:
+            raise VMExecutionError("Out of gas for ECMUL")
+
+        # Input: 96 bytes -> (x,y,scalar)
+        if len(data) < 96:
+            data = data + b"\x00" * (96 - len(data))
+
+        x = int.from_bytes(data[0:32], "big")
+        y = int.from_bytes(data[32:64], "big")
+        s = int.from_bytes(data[64:96], "big")
+
+        try:
+            from py_ecc.optimized_bn128 import multiply, is_on_curve, FQ, curve_order, b
+        except Exception as exc:
+            raise VMExecutionError(f"ECMUL dependency error: {exc}")
+
+        # Point at infinity
+        p = None if (x == 0 and y == 0) else (FQ(x), FQ(y), FQ(1))
+        if p is not None and not is_on_curve(p, b):
+            return (b"\x00" * 64, gas_cost)
+
+        # Reduce scalar mod curve order
+        s = s % curve_order
+        if p is None or s == 0:
+            return (b"\x00" * 64, gas_cost)
+
+        result = multiply(p, s)
+        if result is None:
+            return (b"\x00" * 64, gas_cost)
+
+        rx = int(result[0])
+        ry = int(result[1])
+        return rx.to_bytes(32, "big") + ry.to_bytes(32, "big"), gas_cost
+
+    @classmethod
+    def _ecpairing(cls, data: bytes, gas: int) -> tuple[bytes, int]:
+        """ECPAIRING precompile (0x08) on alt_bn128 (bn254)."""
+        # Each pair is 192 bytes: (G1: 64) + (G2: 128)
+        if len(data) % 192 != 0:
+            # Per spec, non-multiple input treated as padded with zeros to next multiple
+            padded_len = ((len(data) + 191) // 192) * 192
+            data = data + b"\x00" * (padded_len - len(data))
+
+        pairs = len(data) // 192
+        # Gas per EIP-197: 80_000 per pair
+        gas_cost = 80_000 * max(1, pairs)
+        if gas < gas_cost:
+            raise VMExecutionError("Out of gas for ECPAIRING")
+
+        try:
+            from py_ecc.optimized_bn128 import pairing, normalize, is_on_curve, FQ, FQ2, b2
+        except Exception as exc:
+            raise VMExecutionError(f"ECPAIRING dependency error: {exc}")
+
+        # Compute product of pairings; equal to identity -> success (1), else 0
+        # The py_ecc pairing(a,b) returns a value in FQ12; product equals 1 for true.
+        # We'll accumulate by multiplying pairings and check if result is one.
+        from py_ecc.optimized_bn128.optimized_curve import is_inf
+        from py_ecc.fields.field_properties import field_properties as fq12_props
+        from py_ecc.optimized_bn128 import FQ12
+
+        acc = FQ12.one()
+
+        for i in range(pairs):
+            off = i * 192
+            # G1 point
+            x1 = int.from_bytes(data[off : off + 32], "big")
+            y1 = int.from_bytes(data[off + 32 : off + 64], "big")
+            g1 = None if (x1 == 0 and y1 == 0) else (FQ(x1), FQ(y1), FQ(1))
+
+            # G2 point (x_im, x_re, y_im, y_re) 32-bytes each, big-endian
+            x2_im = int.from_bytes(data[off + 64 : off + 96], "big")
+            x2_re = int.from_bytes(data[off + 96 : off + 128], "big")
+            y2_im = int.from_bytes(data[off + 128 : off + 160], "big")
+            y2_re = int.from_bytes(data[off + 160 : off + 192], "big")
+            x2 = FQ2([x2_im, x2_re])
+            y2 = FQ2([y2_im, y2_re])
+            # Handle infinity (all zeros) for G2
+            g2 = None if (x2_im == 0 and x2_re == 0 and y2_im == 0 and y2_re == 0) else (x2, y2, FQ2.one())
+
+            # Validate on-curve
+            if g1 is not None and not is_on_curve(g1, b=None):
+                return (b"\x00" * 32, gas_cost)
+            if g2 is not None and not is_on_curve(g2, b2):
+                return (b"\x00" * 32, gas_cost)
+
+            if g1 is None or g2 is None:
+                # Pairing with infinity contributes neutral element (skip)
+                continue
+
+            acc *= pairing(g2, g1)
+
+        # Success if accumulator equals one in FQ12
+        out = (1).to_bytes(32, "big") if acc == FQ12.one() else (0).to_bytes(32, "big")
+        return out, gas_cost
+
+    # ---- Blake2f (EIP-152) and Point Evaluation (EIP-4844) placeholders ----
+
+    @classmethod
+    def _blake2f(cls, data: bytes, gas: int) -> tuple[bytes, int]:
+        """
+        BLAKE2f compression (0x09) per EIP-152.
+
+        Input (213 bytes):
+        - rounds: 4 bytes little-endian uint32
+        - h: 8 x uint64 little-endian (64 bytes)
+        - m: 16 x uint64 little-endian (128 bytes)
+        - t: 2 x uint64 little-endian (16 bytes) [t0, t1]
+        - f: 1 byte (0 or 1)
+
+        Output: 64 bytes little-endian (new h state)
+        """
+        if len(data) != 213:
+            raise VMExecutionError("BLAKE2f input must be 213 bytes")
+
+        def le_u32(b: bytes) -> int:
+            return int.from_bytes(b, "little")
+
+        def le_u64(b: bytes) -> int:
+            return int.from_bytes(b, "little")
+
+        rounds = le_u32(data[0:4])
+        if rounds <= 0 or rounds > 0xFFFFFFFF:
+            raise VMExecutionError("Invalid BLAKE2f rounds")
+
+        # Gas approximation: base + 12 ops per round
+        gas_cost = 10 + 12 * rounds
+        if gas < gas_cost:
+            raise VMExecutionError("Out of gas for BLAKE2F")
+
+        # Parse state
+        h = [le_u64(data[4 + i * 8 : 12 + i * 8]) for i in range(8)]
+        m = [le_u64(data[68 + i * 8 : 76 + i * 8]) for i in range(16)]
+        t0 = le_u64(data[196:204])
+        t1 = le_u64(data[204:212])
+        f = data[212]
+
+        # Constants
+        IV = [
+            0x6a09e667f3bcc908,
+            0xbb67ae8584caa73b,
+            0x3c6ef372fe94f82b,
+            0xa54ff53a5f1d36f1,
+            0x510e527fade682d1,
+            0x9b05688c2b3e6c1f,
+            0x1f83d9abfb41bd6b,
+            0x5be0cd19137e2179,
+        ]
+
+        SIGMA = [
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+            [14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3],
+            [11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4],
+            [7, 9, 3, 1, 13, 12, 11, 14, 2, 6, 5, 10, 4, 0, 15, 8],
+            [9, 0, 5, 7, 2, 4, 10, 15, 14, 1, 11, 12, 6, 8, 3, 13],
+            [2, 12, 6, 10, 0, 11, 8, 3, 4, 13, 7, 5, 15, 14, 1, 9],
+            [12, 5, 1, 15, 14, 13, 4, 10, 0, 7, 6, 3, 9, 2, 8, 11],
+            [13, 11, 7, 14, 12, 1, 3, 9, 5, 0, 15, 4, 8, 6, 2, 10],
+            [6, 15, 14, 9, 11, 3, 0, 8, 12, 2, 13, 7, 1, 4, 10, 5],
+            [10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0],
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+            [14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3],
+        ]
+
+        def rotr64(x: int, n: int) -> int:
+            return ((x >> n) | ((x & 0xFFFFFFFFFFFFFFFF) << (64 - n))) & 0xFFFFFFFFFFFFFFFF
+
+        # Initialize v
+        v = [0] * 16
+        v[0:8] = h[0:8]
+        v[8:16] = IV[0:8]
+        # t and f
+        v[12] ^= t0 & 0xFFFFFFFFFFFFFFFF
+        v[13] ^= t1 & 0xFFFFFFFFFFFFFFFF
+        if f != 0:
+            v[14] ^= 0xFFFFFFFFFFFFFFFF
+
+        def G(a: int, b: int, c: int, d: int, x: int, y: int) -> None:
+            v[a] = (v[a] + v[b] + x) & 0xFFFFFFFFFFFFFFFF
+            v[d] = rotr64(v[d] ^ v[a], 32)
+            v[c] = (v[c] + v[d]) & 0xFFFFFFFFFFFFFFFF
+            v[b] = rotr64(v[b] ^ v[c], 24)
+            v[a] = (v[a] + v[b] + y) & 0xFFFFFFFFFFFFFFFF
+            v[d] = rotr64(v[d] ^ v[a], 16)
+            v[c] = (v[c] + v[d]) & 0xFFFFFFFFFFFFFFFF
+            v[b] = rotr64(v[b] ^ v[c], 63)
+
+        for r in range(rounds):
+            s = SIGMA[r % 12]
+            # column rounds
+            G(0, 4, 8, 12, m[s[0]], m[s[1]])
+            G(1, 5, 9, 13, m[s[2]], m[s[3]])
+            G(2, 6, 10, 14, m[s[4]], m[s[5]])
+            G(3, 7, 11, 15, m[s[6]], m[s[7]])
+            # diagonal rounds
+            G(0, 5, 10, 15, m[s[8]], m[s[9]])
+            G(1, 6, 11, 12, m[s[10]], m[s[11]])
+            G(2, 7, 8, 13, m[s[12]], m[s[13]])
+            G(3, 4, 9, 14, m[s[14]], m[s[15]])
+
+        # Finalize h
+        out_h = [(h[i] ^ v[i] ^ v[i + 8]) & 0xFFFFFFFFFFFFFFFF for i in range(8)]
+        out = b"".join(x.to_bytes(8, "little") for x in out_h)
+        return out, gas_cost
+
+    @classmethod
+    def _point_evaluation(cls, data: bytes, gas: int) -> tuple[bytes, int]:
+        """
+        POINT_EVALUATION (0x0a) per EIP-4844.
+        Placeholder that returns a clear error until KZG integration lands.
+        """
+        gas_cost = 50_000
+        if gas < gas_cost:
+            raise VMExecutionError("Out of gas for POINT_EVALUATION")
+        raise VMExecutionError("POINT_EVALUATION precompile not yet implemented")

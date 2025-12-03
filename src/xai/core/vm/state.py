@@ -56,6 +56,26 @@ class EVMState:
         return AccountState(address=address, balance=int(balance), nonce=nonce)
 
     def _persist_account(self, account: AccountState) -> None:
-        # Persistence is deferred to the blockchain layer.  Implementations should
-        # update UTXO/account databases in tandem to keep both ledgers consistent.
-        pass
+        """
+        Persist account state back to the blockchain layer.
+
+        Notes:
+        - XAI uses a UTXO-based balance model as the source of truth. We do not
+          mutate balances here to avoid divergence between ledgers.
+        - We persist the latest observed nonce into the blockchain nonce tracker
+          so that subsequent transactions from this account respect sequencing.
+        """
+        # Best-effort nonce persistence: only increase tracked nonce.
+        try:
+            tracker = getattr(self.blockchain, "nonce_tracker", None)
+            if tracker is None:
+                return
+
+            current = int(tracker.get_nonce(account.address))
+            if account.nonce > current:
+                # Advance to the observed nonce. We do not decrease nonces.
+                tracker.set_nonce(account.address, int(account.nonce))
+        except Exception:
+            # Nonce persistence is a best-effort optimization; never break execution
+            # if the backing tracker is unavailable.
+            return

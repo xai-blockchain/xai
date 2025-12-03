@@ -21,6 +21,8 @@ from xai.core.account_abstraction import (
     SponsoredTransactionProcessor,
     SponsorshipResult,
     SponsorshipValidation,
+    SponsorSignatureError,
+    SponsorSignatureVerificationError,
     get_sponsored_transaction_processor,
     process_sponsored_transaction,
     AccountAbstractionManager,
@@ -286,6 +288,50 @@ class TestSponsoredTransactionProcessor:
 
         # Signature verification should fail
         assert processor.verify_sponsor_signature(tx) is False
+
+    def test_authorize_transaction_invalid_key_raises(self, processor, sponsor_keys, user_keys):
+        """Signer errors should raise SponsorSignatureError instead of continuing."""
+        sponsor_private, sponsor_public = sponsor_keys
+        _, user_public = user_keys
+        sponsor_address = "XAI" + sponsor_public[:40]
+        processor.register_sponsor(
+            sponsor_address=sponsor_address,
+            sponsor_public_key=sponsor_public,
+            budget=1.0,
+        )
+        tx = Transaction(
+            sender="XAI1111",
+            recipient="XAI2222",
+            amount=1.0,
+            fee=0.1,
+            public_key=user_public,
+            gas_sponsor=sponsor_address,
+        )
+        with pytest.raises(SponsorSignatureError):
+            processor.authorize_transaction(tx, "not-a-hex-key")
+
+    def test_verify_signature_malformed_payload_raises(self, processor, sponsor_keys, user_keys):
+        """Malformed signatures must raise and stop execution."""
+        sponsor_private, sponsor_public = sponsor_keys
+        _, user_public = user_keys
+        sponsor_address = "XAI" + sponsor_public[:40]
+        processor.register_sponsor(
+            sponsor_address=sponsor_address,
+            sponsor_public_key=sponsor_public,
+            budget=10.0,
+        )
+        tx = Transaction(
+            sender="XAI1111",
+            recipient="XAI2222",
+            amount=1.0,
+            fee=0.1,
+            public_key=user_public,
+            gas_sponsor=sponsor_address,
+        )
+        processor.authorize_transaction(tx, sponsor_private)
+        tx.gas_sponsor_signature = "zzzz"  # invalid hex to force parsing failure
+        with pytest.raises(SponsorSignatureVerificationError):
+            processor.verify_sponsor_signature(tx)
 
     def test_validate_sponsored_transaction_approved(self, processor, sponsor_keys, user_keys):
         """Test validation approves valid sponsored transaction."""

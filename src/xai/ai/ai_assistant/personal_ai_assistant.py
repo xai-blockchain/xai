@@ -1,5 +1,6 @@
 """Personal AI assistant implementation for the XAI blockchain."""
 
+import logging
 import math
 import os
 import secrets
@@ -17,6 +18,8 @@ except ImportError:
     RequestException = Exception
 
 from xai.core.config import Config
+
+logger = logging.getLogger(__name__)
 
 try:
     from xai.core.additional_ai_providers import (
@@ -473,8 +476,23 @@ class PersonalAIAssistant:
                     "error": f"Provider {provider} is not supported yet.",
                 }
         except ModuleNotFoundError as exc:  # pragma: no cover - best-effort provider call
-            stub_text = f"AI provider stub response ({provider} not installed: {exc.name})."
-            return {"success": True, "text": stub_text}
+            missing = exc.name or provider
+            stub_text = f"AI provider stub response ({provider} not installed: {missing})."
+            logger.warning(
+                "AI provider module missing; returning stub response",
+                extra={
+                    "event": "personal_ai.provider_missing",
+                    "provider": provider,
+                    "missing_module": missing,
+                },
+            )
+            return {
+                "success": False,
+                "error": f"Provider '{provider}' is unavailable because module '{missing}' is not installed.",
+                "stub_text": stub_text,
+                "provider": provider,
+                "code": "provider_module_missing",
+            }
         except Exception as exc:  # pragma: no cover - best-effort provider call
             return {"success": False, "error": str(exc)}
 

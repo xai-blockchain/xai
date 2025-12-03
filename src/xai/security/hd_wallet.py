@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import logging
 from typing import List, Tuple, Optional, Dict, Any
+import base58
 from bip_utils import (
     Bip39SeedGenerator,
     Bip39MnemonicGenerator,
@@ -19,6 +20,8 @@ from bip_utils import (
     Bip32KeyIndex,
 )
 from mnemonic import Mnemonic
+
+from xai.security.slip44_registry import Slip44Registry
 
 logger = logging.getLogger(__name__)
 
@@ -34,27 +37,11 @@ class HDWallet:
     - Gap limit scanning for wallet recovery (TASK 99)
     """
 
-    # XAI coin type for BIP-44 derivation path
-    #
-    # IMPORTANT: Production Deployment Requirement
-    # ============================================
-    # Before mainnet launch, XAI MUST be registered with SLIP-0044:
-    # https://github.com/satoshilabs/slips/blob/master/slip-0044.md
-    #
-    # Registration process:
-    # 1. Fork the SLIPS repository
-    # 2. Add XAI entry to slip-0044.md with next available coin type
-    # 3. Submit pull request with project details
-    # 4. Update this constant after approval
-    #
-    # Current value (9999) is a PLACEHOLDER for development/testnet only.
-    # Using unregistered coin types in production can cause:
-    # - Address collisions with other chains
-    # - Incompatibility with hardware wallets
-    # - User fund loss in multi-chain wallets
-    #
-    # TODO(mainnet): Replace 9999 with registered SLIP-0044 coin type
-    XAI_COIN_TYPE = 9999
+    # XAI coin type for BIP-44 derivation path. The Slip44Registry enforces
+    # that the project uses the officially reserved identifier so the wallet
+    # remains compatible with hardware vendors and multi-chain clients.
+    _SLIP44_REGISTRY = Slip44Registry()
+    XAI_COIN_TYPE = _SLIP44_REGISTRY.get_coin_type("XAI")
 
     # BIP-44 gap limit - stop scanning after N consecutive empty addresses
     GAP_LIMIT = 20
@@ -342,21 +329,55 @@ class HDWallet:
 
     def export_extended_public_key(self, account_index: int = 0) -> str:
         """
-        Export extended public key (xpub) for watch-only wallet.
+        Export standard BIP32 extended public key (xpub) for watch-only wallets.
+
+        This serializes the account-level public node using mainnet version bytes
+        0x0488B21E and Base58Check encoding.
 
         Args:
-            account_index: Account index
+            account_index: Account index (0-based)
 
         Returns:
-            Extended public key string
+            xpub string
         """
-        # Derive account
+        if account_index < 0:
+            raise ValueError("Account index must be non-negative")
+
+        # Derive nodes along m/44'/coin'/account'
         purpose = self.master_key.ChildKey(Bip32KeyIndex.HardenIndex(44))
         coin_type = purpose.ChildKey(Bip32KeyIndex.HardenIndex(self.XAI_COIN_TYPE))
         account = coin_type.ChildKey(Bip32KeyIndex.HardenIndex(account_index))
 
-        # Get extended public key
-        return account.PublicKey().RawCompressed().ToHex()
+        # Compute parent fingerprint from coin_type node compressed pubkey
+        parent_pub_hex = coin_type.PublicKey().RawCompressed().ToHex()
+        parent_pub = bytes.fromhex(parent_pub_hex)
+        parent_fingerprint = hashlib.new(
+            "ripemd160", hashlib.sha256(parent_pub).digest()
+        ).digest()[:4]
+
+        # Child number is hardened account index
+        child_number = (0x80000000 | account_index).to_bytes(4, "big")
+
+        # Depth of account node: purpose (1), coin (2), account (3)
+        depth = bytes([3])
+
+        # Chain code and key data
+        chain_code_hex = account.ChainCode().ToHex()
+        chain_code = bytes.fromhex(chain_code_hex)
+        pubkey_hex = account.PublicKey().RawCompressed().ToHex()
+        pubkey = bytes.fromhex(pubkey_hex)
+
+        if len(chain_code) != 32 or len(pubkey) != 33:
+            raise ValueError("Invalid BIP32 node serialization components")
+
+        # Version bytes for xpub
+        version = bytes.fromhex("0488B21E")
+
+        payload = (
+            version + depth + parent_fingerprint + child_number + chain_code + pubkey
+        )
+        checksum = hashlib.sha256(hashlib.sha256(payload).digest()).digest()[:4]
+        return base58.b58encode(payload + checksum).decode("ascii")
 
     def derive_multiple_addresses(
         self,

@@ -18,6 +18,8 @@ import time
 import json
 import hashlib
 from typing import Dict, List, Optional, Tuple
+import os
+from collections import deque
 from enum import Enum
 from dataclasses import dataclass
 import anthropic
@@ -150,6 +152,23 @@ class StrictAIPoolManager:
         self.emergency_stop = False
         self.max_tokens_per_call = 100000  # Safety limit per API call
 
+        # Provider-specific rate limits: (max_requests, window_seconds)
+        self.provider_rate_limits: Dict[AIProvider, Tuple[int, int]] = {
+            AIProvider.ANTHROPIC: (30, 60),
+            AIProvider.OPENAI: (30, 60),
+            AIProvider.GOOGLE: (60, 60),
+        }
+        self._provider_calls: Dict[AIProvider, deque] = {
+            AIProvider.ANTHROPIC: deque(),
+            AIProvider.OPENAI: deque(),
+            AIProvider.GOOGLE: deque(),
+        }
+
+        # Persistence path under ~/.xai to avoid storing in repo
+        self._state_path = os.path.expanduser("~/.xai/ai_pool_usage.json")
+        os.makedirs(os.path.dirname(self._state_path), exist_ok=True)
+        self._load_state()
+
     def submit_api_key_donation(
         self,
         donor_address: str,
@@ -229,7 +248,7 @@ class StrictAIPoolManager:
         if donated_minutes:
             self.total_minutes_donated += donated_minutes
 
-        return {
+        receipt = {
             "success": True,
             "key_id": key_id,
             "donor_address": donor_address,
@@ -240,6 +259,8 @@ class StrictAIPoolManager:
             "message": f"API key secured with STRICT limit of {donated_tokens:,} tokens",
             "validation_status": "pending",
         }
+        self._save_state()
+        return receipt
 
     def execute_ai_task_with_limits(
         self,
@@ -269,6 +290,14 @@ class StrictAIPoolManager:
                 "success": False,
                 "error": "REQUEST_TOO_LARGE",
                 "message": f"Request exceeds safety limit of {self.max_tokens_per_call} tokens",
+            }
+
+        # Enforce provider request rate limits
+        if not self._allow_provider_call(provider):
+            return {
+                "success": False,
+                "error": "PROVIDER_RATE_LIMIT",
+                "message": f"Rate limit reached for provider {provider.value}",
             }
 
         # Find suitable API key(s) with enough balance
@@ -428,6 +457,7 @@ class StrictAIPoolManager:
 
         # Update global usage
         self.total_tokens_used += actual_tokens_used
+        self._save_state()
 
         elapsed_minutes = (time.time() - start_time) / 60.0
 
@@ -541,6 +571,8 @@ class StrictAIPoolManager:
 
                 if is_depleted:
                     self._handle_depleted_key(key)
+        # Persist usage after deduction
+        self._save_state()
 
                 break
             else:
@@ -575,6 +607,96 @@ class StrictAIPoolManager:
             for key in self.donated_keys.values()
             if key.provider == provider and key.is_active and not key.is_depleted
         )
+
+    # ===== Persistence and Rate Limiting =====
+
+    def _allow_provider_call(self, provider: AIProvider) -> bool:
+        max_req, window = self.provider_rate_limits.get(provider, (60, 60))
+        now = time.time()
+        dq = self._provider_calls[provider]
+        # purge old
+        while dq and now - dq[0] > window:
+            dq.popleft()
+        if len(dq) >= max_req:
+            return False
+        dq.append(now)
+        return True
+
+    def _save_state(self) -> None:
+        try:
+            state = {
+                "totals": {
+                    "tokens_donated": self.total_tokens_donated,
+                    "tokens_used": self.total_tokens_used,
+                    "minutes_donated": self.total_minutes_donated,
+                    "minutes_used": self.total_minutes_used,
+                },
+                "keys": [
+                    {
+                        "key_id": k.key_id,
+                        "donor_address": k.donor_address,
+                        "provider": k.provider.value,
+                        "encrypted_key": k.encrypted_key,
+                        "donated_tokens": k.donated_tokens,
+                        "donated_minutes": k.donated_minutes,
+                        "used_tokens": k.used_tokens,
+                        "used_minutes": k.used_minutes,
+                        "is_active": k.is_active,
+                        "is_depleted": k.is_depleted,
+                        "submitted_at": k.submitted_at,
+                        "first_used_at": k.first_used_at,
+                        "last_used_at": k.last_used_at,
+                        "depleted_at": k.depleted_at,
+                        "api_calls_made": k.api_calls_made,
+                        "tasks_completed": k.tasks_completed,
+                    }
+                    for k in self.donated_keys.values()
+                ],
+            }
+            with open(self._state_path, "w", encoding="utf-8") as f:
+                json.dump(state, f)
+        except Exception:
+            # Persistence failures must not break runtime
+            pass
+
+    def _load_state(self) -> None:
+        try:
+            if not os.path.exists(self._state_path):
+                return
+            with open(self._state_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            totals = data.get("totals", {})
+            self.total_tokens_donated = totals.get("tokens_donated", 0)
+            self.total_tokens_used = totals.get("tokens_used", 0)
+            self.total_minutes_donated = totals.get("minutes_donated", 0.0)
+            self.total_minutes_used = totals.get("minutes_used", 0.0)
+            self.donated_keys.clear()
+            for item in data.get("keys", []):
+                try:
+                    dk = DonatedAPIKey(
+                        key_id=item["key_id"],
+                        donor_address=item["donor_address"],
+                        provider=AIProvider(item["provider"]),
+                        encrypted_key=item["encrypted_key"],
+                        donated_tokens=int(item["donated_tokens"]),
+                        donated_minutes=item.get("donated_minutes"),
+                        used_tokens=int(item.get("used_tokens", 0)),
+                        used_minutes=float(item.get("used_minutes", 0.0)),
+                        is_active=bool(item.get("is_active", True)),
+                        is_depleted=bool(item.get("is_depleted", False)),
+                        submitted_at=item.get("submitted_at"),
+                        first_used_at=item.get("first_used_at"),
+                        last_used_at=item.get("last_used_at"),
+                        depleted_at=item.get("depleted_at"),
+                        api_calls_made=int(item.get("api_calls_made", 0)),
+                        tasks_completed=int(item.get("tasks_completed", 0)),
+                    )
+                    self.donated_keys[dk.key_id] = dk
+                except Exception:
+                    continue
+        except Exception:
+            # Ignore load errors and start fresh
+            self.donated_keys = self.donated_keys or {}
 
     def get_pool_status(self) -> Dict:
         """Get detailed pool status with strict limit tracking"""

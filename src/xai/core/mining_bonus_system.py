@@ -18,12 +18,14 @@ class MiningBonusSystem:
 
     def get_bonus_stats(self) -> Dict[str, Any]:
         miners = len(self.manager.miners)
-        total_bonus = sum(b["amount"] for b in self.manager.bonuses.values())
+        total_bonus = self.manager.get_total_awarded_amount()
         return {
             "success": True,
             "miners": miners,
             "total_bonuses": total_bonus,
             "early_tiers": self.manager.early_adopter_tiers,
+            "bonus_cap": self.manager.max_bonus_supply,
+            "bonus_remaining": self.manager.get_bonus_supply_remaining(),
         }
 
 

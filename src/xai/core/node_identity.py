@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import stat
+import logging
 from typing import Dict, Tuple
 
 from xai.core.crypto_utils import (
@@ -53,8 +54,13 @@ def load_or_create_identity(data_dir: str) -> Dict[str, str]:
     # Restrict file permissions (owner read/write)
     try:
         os.chmod(path, stat.S_IRUSR | stat.S_IWUSR)
-    except Exception:
-        pass
+    except OSError as exc:
+        logger.warning(
+            "Failed to set restrictive permissions on %s: %s",
+            path,
+            exc,
+            extra={"event": "node_identity.chmod_failed", "path": path},
+        )
 
     return identity
 
@@ -66,4 +72,5 @@ def _atomic_write_json(path: str, payload: Dict) -> None:
         f.flush()
         os.fsync(f.fileno())
     os.replace(tmp, path)
+logger = logging.getLogger(__name__)
 

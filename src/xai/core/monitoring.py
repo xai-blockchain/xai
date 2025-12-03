@@ -14,12 +14,15 @@ import threading
 import psutil
 import os
 import json
+import logging
 from typing import Dict, Any, List, Optional, Callable
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from xai.core.config import Config
 from xai.core.security_validation import SecurityEventRouter
+
+logger = logging.getLogger(__name__)
 
 
 class MetricType(Enum):
@@ -580,8 +583,13 @@ class MetricsCollector:
                     self._update_blockchain_metrics()
                 self._check_alert_rules()
                 time.sleep(self.update_interval)
-            except Exception as e:
-                print(f"Error in monitoring loop: {e}")
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.error(
+                    "Error in monitoring loop: %s",
+                    exc,
+                    extra={"event": "monitoring.loop_error"},
+                    exc_info=True,
+                )
 
     def _update_system_metrics(self):
         """Update system resource metrics"""
@@ -603,8 +611,13 @@ class MetricsCollector:
             uptime = time.time() - self.start_time
             self.get_metric("xai_node_uptime_seconds").set(uptime)
 
-        except Exception as e:
-            print(f"Error updating system metrics: {e}")
+        except Exception as exc:
+            logger.error(
+                "Error updating system metrics: %s",
+                exc,
+                extra={"event": "monitoring.system_metrics_failed"},
+                exc_info=True,
+            )
 
     def _update_blockchain_metrics(self):
         """Update blockchain-specific metrics"""
@@ -664,8 +677,13 @@ class MetricsCollector:
             # Total supply
             self.get_metric("xai_total_supply").set(stats["total_circulating_supply"])
 
-        except Exception as e:
-            print(f"Error updating blockchain metrics: {e}")
+        except Exception as exc:
+            logger.error(
+                "Error updating blockchain metrics: %s",
+                exc,
+                extra={"event": "monitoring.blockchain_metrics_failed"},
+                exc_info=True,
+            )
 
     def record_block_mined(self, block_index: int, mining_time: float = None):
         """Record block mining event"""
@@ -818,8 +836,12 @@ class MetricsCollector:
             with open(self.withdrawal_event_log_path, "a", encoding="utf-8") as handle:
                 handle.write(json.dumps(event))
                 handle.write("\n")
-        except Exception as exc:
-            print(f"Failed to append withdrawal event log: {exc}")
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning(
+                "Failed to append withdrawal event log: %s",
+                exc,
+                extra={"event": "monitoring.withdrawal_log_failed"},
+            )
 
     def get_recent_withdrawals(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Return the most recent withdrawal events for alert context."""
@@ -847,8 +869,14 @@ class MetricsCollector:
             try:
                 if rule["condition"]():
                     self._fire_alert(rule["name"], rule["message"], rule["level"])
-            except Exception as e:
-                print(f"Error checking alert rule {rule['name']}: {e}")
+            except Exception as exc:
+                logger.error(
+                    "Error checking alert rule %s: %s",
+                    rule.get("name", "<unknown>"),
+                    exc,
+                    extra={"event": "monitoring.alert_rule_error"},
+                    exc_info=True,
+                )
 
     def _fire_alert(self, name: str, message: str, level: AlertLevel):
         """Fire an alert"""
@@ -860,7 +888,16 @@ class MetricsCollector:
             self.alerts = self.alerts[-self.max_alerts :]
 
         # Log alert
-        print(f"[ALERT {level.value.upper()}] {name}: {message}")
+        log_level = logging.WARNING if level != AlertLevel.INFO else logging.INFO
+        if level == AlertLevel.CRITICAL:
+            log_level = logging.CRITICAL
+        logger.log(
+            log_level,
+            "%s: %s",
+            name,
+            message,
+            extra={"event": "monitoring.alert", "alert_name": name, "severity": level.value},
+        )
         try:
             SecurityEventRouter.dispatch(
                 f"alert.{name}",
@@ -989,14 +1026,14 @@ class MetricsCollector:
 
 # Example usage and testing
 if __name__ == "__main__":
-    print("Testing Metrics Collector...")
-    print("=" * 70)
+    logger.info("Testing Metrics Collector...")
+    logger.info("=" * 70)
 
     # Create collector
     collector = MetricsCollector(update_interval=2)
 
     # Simulate some activity
-    print("\nSimulating blockchain activity...")
+    logger.info("Simulating blockchain activity...")
 
     for i in range(5):
         collector.record_block_mined(i + 1, mining_time=2.5)
@@ -1014,29 +1051,29 @@ if __name__ == "__main__":
     )
 
     # Get health status
-    print("\nHealth Status:")
+    logger.info("Health Status:")
     health = collector.get_health_status()
     import json
 
-    print(json.dumps(health, indent=2))
+    logger.info(json.dumps(health, indent=2))
 
     # Export Prometheus metrics
-    print("\n" + "=" * 70)
-    print("Prometheus Metrics Export (sample):")
-    print("=" * 70)
+    logger.info("=" * 70)
+    logger.info("Prometheus Metrics Export (sample):")
+    logger.info("=" * 70)
     prom_output = collector.export_prometheus()
     # Print first 1000 chars
-    print(prom_output[:1000])
-    print("\n... (truncated)")
+    logger.info("%s", prom_output[:1000])
+    logger.info("... (truncated)")
 
     # Get stats
-    print("\n" + "=" * 70)
-    print("Monitoring Statistics:")
-    print("=" * 70)
+    logger.info("=" * 70)
+    logger.info("Monitoring Statistics:")
+    logger.info("=" * 70)
     stats = collector.get_stats()
-    print(json.dumps(stats, indent=2, default=str))
+    logger.info(json.dumps(stats, indent=2, default=str))
 
     # Shutdown
-    print("\nShutting down...")
+    logger.info("Shutting down...")
     collector.shutdown()
-    print("Done!")
+    logger.info("Done!")

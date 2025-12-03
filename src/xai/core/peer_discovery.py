@@ -15,11 +15,14 @@ import time
 import json
 import random
 import threading
+import logging
 import requests
 from flask import request
 from typing import List, Dict, Set, Optional, Tuple
 from collections import defaultdict
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 class PeerInfo:
@@ -38,6 +41,7 @@ class PeerInfo:
         self.transactions_shared = 0
         self.is_bootstrap = False
         self.version = None
+        self.asn = None
         self.chain_height = 0
 
     def _extract_ip(self, url: str) -> str:
@@ -173,8 +177,13 @@ class PeerDiscoveryProtocol:
                 data = response.json()
                 return data.get("peers", [])
 
-        except Exception as e:
-            print(f"[PeerDiscovery] Failed to get peers from {peer_url}: {e}")
+        except requests.RequestException as e:
+            logger.warning(
+                "Failed to get peers from %s: %s",
+                peer_url,
+                e,
+                extra={"event": "peer_discovery.get_peers_failed", "peer": peer_url},
+            )
 
         return None
 
@@ -198,8 +207,13 @@ class PeerDiscoveryProtocol:
 
             return response.status_code == 200
 
-        except Exception as e:
-            print(f"[PeerDiscovery] Failed to announce to {peer_url}: {e}")
+        except requests.RequestException as e:
+            logger.warning(
+                "Failed to announce peer to %s: %s",
+                peer_url,
+                e,
+                extra={"event": "peer_discovery.announce_failed", "peer": peer_url},
+            )
 
         return False
 
@@ -222,7 +236,13 @@ class PeerDiscoveryProtocol:
 
             return response.status_code == 200, response_time
 
-        except Exception:
+        except requests.RequestException as exc:
+            logger.debug(
+                "Peer ping failed for %s: %s",
+                peer_url,
+                exc,
+                extra={"event": "peer_discovery.ping_failed", "peer": peer_url},
+            )
             return False, 0.0
 
     @staticmethod
@@ -243,8 +263,13 @@ class PeerDiscoveryProtocol:
             if response.status_code == 200:
                 return response.json()
 
-        except Exception:
-            pass
+        except requests.RequestException as exc:
+            logger.debug(
+                "Failed to fetch peer info from %s: %s",
+                peer_url,
+                exc,
+                extra={"event": "peer_discovery.info_failed", "peer": peer_url},
+            )
 
         return None
 
@@ -389,6 +414,13 @@ class PeerDiscoveryManager:
         # Peer storage
         self.known_peers: Dict[str, PeerInfo] = {}  # url -> PeerInfo
         self.connected_peers: Set[str] = set()
+        self.prefix_counts: Dict[str, int] = defaultdict(int)
+        self.asn_counts: Dict[str, int] = defaultdict(int)
+        self.max_per_prefix = getattr(Config, "P2P_MAX_PEERS_PER_PREFIX", 8)
+        self.max_per_asn = getattr(Config, "P2P_MAX_PEERS_PER_ASN", 16)
+        self.min_unique_prefixes = getattr(Config, "P2P_MIN_UNIQUE_PREFIXES", 5)
+        self.min_unique_asns = getattr(Config, "P2P_MIN_UNIQUE_ASNS", 5)
+        self.diversity_prefix_length = getattr(Config, "P2P_DIVERSITY_PREFIX_LENGTH", 16)
 
         # Discovery state
         self.is_running = False
@@ -400,7 +432,11 @@ class PeerDiscoveryManager:
         self.total_connections = 0
         self.total_failed_connections = 0
 
-        print(f"[PeerDiscovery] Initialized for {network_type} network")
+        logger.info(
+            "Peer discovery initialized for %s network",
+            network_type,
+            extra={"event": "peer_discovery.init", "network": network_type},
+        )
 
     def bootstrap_network(self) -> int:
         """
@@ -409,7 +445,10 @@ class PeerDiscoveryManager:
         Returns:
             Number of peers discovered
         """
-        print("[PeerDiscovery] Starting network bootstrap...")
+        logger.info(
+            "Starting network bootstrap",
+            extra={"event": "peer_discovery.bootstrap_start", "network": self.network_type},
+        )
 
         seeds = BootstrapNodes.get_seeds(self.network_type)
         discovered = 0
@@ -419,7 +458,11 @@ class PeerDiscoveryManager:
             if seed_url == self.my_url:
                 continue
 
-            print(f"[PeerDiscovery] Connecting to seed: {seed_url}")
+            logger.info(
+                "Connecting to bootstrap seed %s",
+                seed_url,
+                extra={"event": "peer_discovery.seed_connect", "peer": seed_url},
+            )
 
             # Ping seed node
             is_alive, response_time = PeerDiscoveryProtocol.ping_peer(seed_url)
@@ -445,11 +488,21 @@ class PeerDiscoveryManager:
                 if self.my_url:
                     PeerDiscoveryProtocol.send_peers_announcement(seed_url, self.my_url)
 
-                print(f"[PeerDiscovery] ✓ Connected to seed: {seed_url}")
+                logger.info(
+                    "Connected to bootstrap seed",
+                    extra={"event": "peer_discovery.seed_connected", "peer": seed_url},
+                )
             else:
-                print(f"[PeerDiscovery] ✗ Failed to connect to seed: {seed_url}")
+                logger.warning(
+                    "Failed to connect to bootstrap seed",
+                    extra={"event": "peer_discovery.seed_failed", "peer": seed_url},
+                )
 
-        print(f"[PeerDiscovery] Bootstrap complete. Discovered {discovered} peers.")
+        logger.info(
+            "Bootstrap complete with %d peers discovered",
+            discovered,
+            extra={"event": "peer_discovery.bootstrap_complete", "count": discovered},
+        )
         return discovered
 
     def discover_peers(self) -> int:
@@ -482,7 +535,11 @@ class PeerDiscoveryManager:
                         new_peers += 1
 
         if new_peers > 0:
-            print(f"[PeerDiscovery] Discovered {new_peers} new peers")
+            logger.info(
+                "Discovered %d new peers",
+                new_peers,
+                extra={"event": "peer_discovery.discovered", "count": new_peers},
+            )
 
         self.total_discoveries += new_peers
         return new_peers
@@ -527,7 +584,10 @@ class PeerDiscoveryManager:
                 self.connected_peers.add(peer.url)
                 connected.append(peer.url)
                 self.total_connections += 1
-                print(f"[PeerDiscovery] Connected to peer: {peer.url}")
+                logger.info(
+                    "Connected to peer",
+                    extra={"event": "peer_discovery.peer_connected", "peer": peer.url},
+                )
             else:
                 peer.update_failure()
                 self.total_failed_connections += 1
@@ -553,7 +613,10 @@ class PeerDiscoveryManager:
 
             # Remove from known peers
             del self.known_peers[url]
-            print(f"[PeerDiscovery] Removed dead peer: {url}")
+            logger.info(
+                "Removed dead peer",
+                extra={"event": "peer_discovery.peer_removed", "peer": url},
+            )
 
         return len(dead_peers)
 
@@ -577,7 +640,14 @@ class PeerDiscoveryManager:
                 # Disconnect if quality too low
                 if peer.quality_score < 10 and peer_url in self.connected_peers:
                     self.connected_peers.remove(peer_url)
-                    print(f"[PeerDiscovery] Disconnected low-quality peer: {peer_url}")
+                    logger.warning(
+                        "Disconnected low-quality peer",
+                        extra={
+                            "event": "peer_discovery.peer_disconnected_low_quality",
+                            "peer": peer_url,
+                            "score": peer.quality_score,
+                        },
+                    )
 
     def get_peer_list(self) -> List[str]:
         """
@@ -610,7 +680,10 @@ class PeerDiscoveryManager:
 
                 # Run discovery if interval elapsed
                 if current_time - self.last_discovery >= self.discovery_interval:
-                    print("[PeerDiscovery] Running periodic peer discovery...")
+                    logger.info(
+                        "Running periodic peer discovery round",
+                        extra={"event": "peer_discovery.loop"},
+                    )
 
                     # Discover new peers
                     self.discover_peers()
@@ -627,8 +700,13 @@ class PeerDiscoveryManager:
                 # Sleep for a bit
                 time.sleep(10)
 
-            except Exception as e:
-                print(f"[PeerDiscovery] Error in discovery loop: {e}")
+            except Exception as exc:
+                logger.error(
+                    "Peer discovery loop error: %s",
+                    exc,
+                    extra={"event": "peer_discovery.loop_error"},
+                    exc_info=True,
+                )
                 time.sleep(10)
 
     def start(self):
@@ -636,7 +714,7 @@ class PeerDiscoveryManager:
         if self.is_running:
             return
 
-        print("[PeerDiscovery] Starting peer discovery service...")
+        logger.info("Starting peer discovery service", extra={"event": "peer_discovery.start"})
 
         # Bootstrap network
         self.bootstrap_network()
@@ -649,20 +727,26 @@ class PeerDiscoveryManager:
         self.discovery_thread = threading.Thread(target=self._discovery_loop, daemon=True)
         self.discovery_thread.start()
 
-        print("[PeerDiscovery] Peer discovery service started")
+        logger.info(
+            "Peer discovery service started",
+            extra={"event": "peer_discovery.started"},
+        )
 
     def stop(self):
         """Stop peer discovery manager"""
         if not self.is_running:
             return
 
-        print("[PeerDiscovery] Stopping peer discovery service...")
+        logger.info("Stopping peer discovery service", extra={"event": "peer_discovery.stop"})
         self.is_running = False
 
         if self.discovery_thread:
             self.discovery_thread.join(timeout=5)
 
-        print("[PeerDiscovery] Peer discovery service stopped")
+        logger.info(
+            "Peer discovery service stopped",
+            extra={"event": "peer_discovery.stopped"},
+        )
 
     def get_stats(self) -> dict:
         """Get peer discovery statistics"""
@@ -750,12 +834,12 @@ def setup_peer_discovery_api(app, node):
         else:
             return {"error": "Peer discovery not enabled"}, 503
 
-    print("[PeerDiscovery] API endpoints registered")
+    logger.info("Peer discovery API endpoints registered", extra={"event": "peer_discovery.api_ready"})
 
 
 if __name__ == "__main__":
     # Test peer discovery
-    print("=== XAI Peer Discovery Test ===\n")
+    logger.info("=== XAI Peer Discovery Test ===")
 
     # Create discovery manager
     manager = PeerDiscoveryManager(
@@ -770,18 +854,21 @@ if __name__ == "__main__":
 
     # Show stats
     stats = manager.get_stats()
-    print("\n=== Discovery Statistics ===")
+    logger.info("=== Discovery Statistics ===")
     for key, value in stats.items():
-        print(f"{key}: {value}")
+        logger.info("%s: %s", key, value)
 
     # Show peer details
     details = manager.get_peer_details()
-    print(f"\n=== Known Peers ({len(details)}) ===")
+    logger.info("=== Known Peers (%d) ===", len(details))
     for peer in details[:5]:  # Show first 5
-        print(f"\nPeer: {peer['url']}")
-        print(f"  Quality: {peer['quality_score']}")
-        print(f"  Reliability: {peer['reliability']:.1f}%")
-        print(f"  Avg Response: {peer['avg_response_time']:.3f}s")
+        logger.info(
+            "Peer %s | quality=%s reliability=%.1f avg_latency=%.3fs",
+            peer["url"],
+            peer["quality_score"],
+            peer["reliability"],
+            peer["avg_response_time"],
+        )
 
     # Stop
     manager.stop()

@@ -133,3 +133,72 @@ def test_mempool_metrics_surface_to_monitoring(monkeypatch):
         assert "mempool.active_bans" in alert_names
     finally:
         collector.shutdown()
+
+
+def test_high_fee_transaction_rejected_when_eviction_fails(tmp_path):
+    """Ensure the mempool never exceeds capacity when eviction fails."""
+    chain = Blockchain(data_dir=str(tmp_path))
+    chain.transaction_validator.validate_transaction = Mock(return_value=True)
+    chain._mempool_max_size = 1
+    chain._mempool_max_per_sender = 10
+    chain.utxo_manager.get_unspent_output = lambda *_args, **_kwargs: {
+        "amount": 5.0,
+        "script_pubkey": "P2PKH",
+    }
+
+    sender = Wallet()
+    recipient = Wallet()
+
+    def _build_tx(nonce: int, fee: float, suffix: str) -> Transaction:
+        tx = Transaction(
+            sender.address,
+            recipient.address,
+            1.0,
+            fee,
+            public_key=sender.public_key,
+            nonce=nonce,
+            inputs=[{"txid": ("a" * 63) + suffix, "vout": 0}],
+            outputs=[{"address": recipient.address, "amount": 1.0}],
+        )
+        tx.signature = "stub-signature"
+        tx.txid = tx.calculate_hash()
+        return tx
+
+    low_fee_tx = _build_tx(nonce=1, fee=0.0001, suffix="0")
+    assert chain.add_transaction(low_fee_tx) is True
+    chain._prune_expired_mempool = lambda *args, **kwargs: 0
+    chain._prune_orphan_pool = lambda *args, **kwargs: 0
+
+    class FailingMempool:
+        def __init__(self, initial):
+            self._items = list(initial)
+
+        def __iter__(self):
+            return iter(self._items)
+
+        def __len__(self):
+            return len(self._items)
+
+        def __getitem__(self, idx):
+            return self._items[idx]
+
+        def __contains__(self, item):
+            return item in self._items
+
+        def append(self, value):
+            self._items.append(value)
+
+        def remove(self, value):
+            raise ValueError("simulated remove failure")
+
+        def __getattr__(self, attr):
+            return getattr(self._items, attr)
+
+    chain.pending_transactions = FailingMempool(chain.pending_transactions)
+    assert isinstance(chain.pending_transactions, FailingMempool)
+    previous_rejections = chain._mempool_rejected_low_fee_total
+
+    high_fee_tx = _build_tx(nonce=2, fee=10.0, suffix="1")
+    assert chain.add_transaction(high_fee_tx) is False
+    assert chain._mempool_rejected_low_fee_total == previous_rejections + 1
+    assert len(chain.pending_transactions) == 1

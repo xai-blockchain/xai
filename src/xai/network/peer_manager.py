@@ -5,10 +5,14 @@ import logging
 import os
 import ssl
 import time
+import secrets
+import ipaddress
 from collections import defaultdict, deque
 from typing import List, Dict, Any, Optional, Tuple, Iterable
 import threading
 import websockets
+from xai.core.config import Config
+from xai.network.geoip_resolver import GeoIPResolver, GeoIPMetadata
 
 # Fail fast: cryptography library is REQUIRED for P2P networking security
 # The node cannot operate without TLS encryption
@@ -218,6 +222,69 @@ class PeerDiscovery:
             return list(self.discovered_peers)
 
 
+class PeerProofOfWork:
+    """Perform and validate proof-of-work for peer admission."""
+
+    def __init__(
+        self,
+        enabled: bool = True,
+        difficulty_bits: int = 18,
+        max_iterations: int = 250000,
+        reuse_window_seconds: int = 600,
+    ):
+        self.enabled = enabled
+        self.difficulty_bits = max(1, int(difficulty_bits))
+        self.target = 1 << (256 - self.difficulty_bits)
+        self.max_iterations = max(1, int(max_iterations))
+        self.reuse_window_seconds = max(1, int(reuse_window_seconds))
+        self._solutions: Dict[str, float] = {}
+        self._lock = threading.RLock()
+
+    def solve(self, pubkey_hex: str, timestamp: int, message_nonce: str, payload_hash: str) -> Optional[Dict[str, Any]]:
+        if not self.enabled:
+            return None
+        base = f"{pubkey_hex}:{timestamp}:{message_nonce}:{payload_hash}"
+        for _ in range(self.max_iterations):
+            nonce = secrets.token_hex(16)
+            digest = hashlib.sha256(f"{base}:{nonce}".encode("utf-8")).digest()
+            if int.from_bytes(digest, "big") < self.target:
+                return {"nonce": nonce, "difficulty": self.difficulty_bits}
+        raise RuntimeError("Peer PoW solver exceeded iteration budget without finding a solution")
+
+    def verify(
+        self,
+        pubkey_hex: str,
+        timestamp: int,
+        message_nonce: str,
+        payload_hash: str,
+        proof: Optional[Dict[str, Any]],
+    ) -> bool:
+        if not self.enabled:
+            return True
+        if not proof or "nonce" not in proof or not message_nonce:
+            return False
+        nonce = str(proof["nonce"])
+        base = f"{pubkey_hex}:{timestamp}:{message_nonce}:{payload_hash}:{nonce}"
+        digest_value = int.from_bytes(hashlib.sha256(base.encode("utf-8")).digest(), "big")
+        if digest_value >= self.target:
+            return False
+
+        key = f"{pubkey_hex}:{message_nonce}"
+        now = time.time()
+        with self._lock:
+            self._purge_locked(now)
+            if key in self._solutions:
+                return False
+            self._solutions[key] = now
+        return True
+
+    def _purge_locked(self, now: float) -> None:
+        cutoff = now - self.reuse_window_seconds
+        stale = [key for key, ts in self._solutions.items() if ts < cutoff]
+        for key in stale:
+            self._solutions.pop(key, None)
+
+
 import hmac
 import secp256k1
 from datetime import datetime, timedelta
@@ -226,7 +293,12 @@ from datetime import datetime, timedelta
 class PeerEncryption:
     """Handle peer-to-peer encryption using TLS/SSL and message signing."""
 
-    def __init__(self, cert_dir: str = "data/certs", key_dir: str = "data/keys"):
+    def __init__(
+        self,
+        cert_dir: str = "data/certs",
+        key_dir: str = "data/keys",
+        pow_manager: Optional["PeerProofOfWork"] = None,
+    ):
         # Fail fast if cryptography library is not available
         if not CRYPTOGRAPHY_AVAILABLE:
             raise ImportError(
@@ -236,6 +308,7 @@ class PeerEncryption:
 
         self.cert_dir = cert_dir
         self.key_dir = key_dir
+        self.pow_manager = pow_manager
         os.makedirs(self.cert_dir, exist_ok=True)
         os.makedirs(self.key_dir, exist_ok=True)
 
@@ -252,6 +325,10 @@ class PeerEncryption:
 
         # Generate signing key if it doesn't exist
         self._generate_signing_key()
+
+    @staticmethod
+    def _canonical_json(data: Any) -> str:
+        return json.dumps(data, sort_keys=True, separators=(",", ":"), default=str)
 
     def _generate_signing_key(self) -> None:
         """Generate or load a secp256k1 private key for signing messages."""
@@ -514,14 +591,25 @@ class PeerEncryption:
         if not self.signing_key:
             raise ValueError("Signing key not available.")
 
+        pubkey_serialized = self.signing_key.pubkey.serialize()
+        if isinstance(pubkey_serialized, str):
+            pubkey_serialized = bytes.fromhex(pubkey_serialized)
+        pubkey_hex = pubkey_serialized.hex()
+
         message = {
             "payload": payload,
-            "timestamp": time.time(),
+            "timestamp": int(time.time()),
             "nonce": os.urandom(16).hex(),
         }
+
+        payload_hash = hashlib.sha256(self._canonical_json(payload).encode("utf-8")).hexdigest()
+        if self.pow_manager:
+            proof = self.pow_manager.solve(pubkey_hex, message["timestamp"], message["nonce"], payload_hash)
+            if proof:
+                message["pow"] = proof
         
         # Serialize the message for signing
-        serialized_message = json.dumps(message, sort_keys=True).encode('utf-8')
+        serialized_message = json.dumps(message, sort_keys=True, separators=(",", ":"), default=str).encode('utf-8')
         
         # Create a digest of the message
         message_hash = hashlib.sha256(serialized_message).digest()
@@ -532,10 +620,6 @@ class PeerEncryption:
         if isinstance(sig_bytes, str):
             sig_bytes = bytes.fromhex(sig_bytes)
         sig_hex = sig_bytes.hex()
-        pubkey_serialized = self.signing_key.pubkey.serialize()
-        if isinstance(pubkey_serialized, str):
-            pubkey_serialized = bytes.fromhex(pubkey_serialized)
-        pubkey_hex = pubkey_serialized.hex()
         
         # Final message structure including the signature
         signed_message = {
@@ -588,7 +672,7 @@ class PeerEncryption:
                 return None
 
             # Serialize the inner message for verification
-            serialized_message = json.dumps(message, sort_keys=True).encode('utf-8')
+            serialized_message = json.dumps(message, sort_keys=True, separators=(",", ":"), default=str).encode('utf-8')
             message_hash = hashlib.sha256(serialized_message).digest()
 
             # Verify the signature
@@ -598,6 +682,23 @@ class PeerEncryption:
                     extra={
                         "event": "peer.invalid_signature",
                         "sender": pubkey_hex[:16] + "..." if pubkey_hex else "unknown"
+                    }
+                )
+                return None
+
+            payload_hash = hashlib.sha256(self._canonical_json(message["payload"]).encode("utf-8")).hexdigest()
+            if self.pow_manager and not self.pow_manager.verify(
+                pubkey_hex,
+                int(message.get("timestamp", 0)),
+                message.get("nonce"),
+                payload_hash,
+                message.get("pow"),
+            ):
+                logger.warning(
+                    "Peer message failed proof-of-work validation",
+                    extra={
+                        "event": "peer.pow_invalid",
+                        "sender": pubkey_hex[:16] + "..." if pubkey_hex else "unknown",
                     }
                 )
                 return None
@@ -825,7 +926,13 @@ class PeerManager:
             dns_seeds=list(dns_seeds) if dns_seeds else None,
             bootstrap_nodes=list(bootstrap_nodes) if bootstrap_nodes else None,
         )
-        self.encryption = PeerEncryption(cert_dir=cert_dir, key_dir=key_dir)
+        self.pow_manager = PeerProofOfWork(
+            enabled=bool(getattr(Config, "P2P_POW_ENABLED", True)),
+            difficulty_bits=int(getattr(Config, "P2P_POW_DIFFICULTY_BITS", 18)),
+            max_iterations=int(getattr(Config, "P2P_POW_MAX_ITERATIONS", 250000)),
+            reuse_window_seconds=int(getattr(Config, "P2P_POW_REUSE_WINDOW_SECONDS", 600)),
+        )
+        self.encryption = PeerEncryption(cert_dir=cert_dir, key_dir=key_dir, pow_manager=self.pow_manager)
 
         print(f"PeerManager initialized. Max connections per IP: {self.max_connections_per_ip}.")
 
@@ -1051,7 +1158,32 @@ class PeerManager:
             dns_seeds=list(dns_seeds) if dns_seeds else None,
             bootstrap_nodes=list(bootstrap_nodes) if bootstrap_nodes else None,
         )
-        self.encryption = PeerEncryption(cert_dir=cert_dir, key_dir=key_dir)
+        self.pow_manager = PeerProofOfWork(
+            enabled=bool(getattr(Config, "P2P_POW_ENABLED", True)),
+            difficulty_bits=int(getattr(Config, "P2P_POW_DIFFICULTY_BITS", 18)),
+            max_iterations=int(getattr(Config, "P2P_POW_MAX_ITERATIONS", 250000)),
+            reuse_window_seconds=int(getattr(Config, "P2P_POW_REUSE_WINDOW_SECONDS", 600)),
+        )
+        self.encryption = PeerEncryption(cert_dir=cert_dir, key_dir=key_dir, pow_manager=self.pow_manager)
+
+        self.max_per_prefix = max(0, int(getattr(Config, "P2P_MAX_PEERS_PER_PREFIX", 8)))
+        self.max_per_asn = max(0, int(getattr(Config, "P2P_MAX_PEERS_PER_ASN", 16)))
+        self.max_per_country = max(0, int(getattr(Config, "P2P_MAX_PEERS_PER_COUNTRY", 48)))
+        self.min_unique_prefixes = max(0, int(getattr(Config, "P2P_MIN_UNIQUE_PREFIXES", 5)))
+        self.min_unique_asns = max(0, int(getattr(Config, "P2P_MIN_UNIQUE_ASNS", 5)))
+        self.min_unique_countries = max(0, int(getattr(Config, "P2P_MIN_UNIQUE_COUNTRIES", 5)))
+        self.max_unknown_geo = max(0, int(getattr(Config, "P2P_MAX_UNKNOWN_GEO", 32)))
+        self.diversity_prefix_length = max(4, int(getattr(Config, "P2P_DIVERSITY_PREFIX_LENGTH", 16)))
+        self.geoip_resolver = GeoIPResolver(
+            http_endpoint=getattr(Config, "P2P_GEOIP_ENDPOINT", "https://ipinfo.io/{ip}/json"),
+            timeout=float(getattr(Config, "P2P_GEOIP_TIMEOUT", 2.5)),
+            cache_ttl=int(getattr(Config, "P2P_GEOIP_CACHE_TTL", 3600)),
+        )
+        self.prefix_counts: Dict[str, int] = defaultdict(int)
+        self.asn_counts: Dict[str, int] = defaultdict(int)
+        self.country_counts: Dict[str, int] = defaultdict(int)
+        self.unknown_geo_peers = 0
+        self._diversity_lock = threading.RLock()
 
         print(f"PeerManager initialized. Max connections per IP: {self.max_connections_per_ip}.")
         self.refresh_trust_stores(force=True)
@@ -1221,6 +1353,10 @@ class PeerManager:
                 f"Connection from {ip_address} rejected: Exceeds max connections per IP ({self.max_connections_per_ip})."
             )
             return False
+        allowed, metadata, _, _, reason = self._evaluate_diversity_policy(ip_address, mutate=False)
+        if not allowed:
+            self._log_diversity_rejection(ip_address, reason or "diversity_limit", metadata)
+            return False
         return True
 
     def connect_peer(self, ip_address: str) -> str:
@@ -1228,12 +1364,25 @@ class PeerManager:
             raise ValueError(
                 f"Cannot connect to peer from {ip_address} due to policy restrictions."
             )
+        allowed, metadata, prefix, is_unknown, reason = self._evaluate_diversity_policy(ip_address, mutate=True)
+        if not allowed:
+            self._log_diversity_rejection(ip_address, reason or "diversity_limit", metadata)
+            raise ValueError(
+                f"Cannot connect to peer from {ip_address} due to diversity restrictions ({reason})."
+            )
         self._peer_id_counter += 1
         peer_id = f"peer_{self._peer_id_counter}"
         self.connected_peers[peer_id] = {
             "ip_address": ip_address,
             "connected_at": time.time(),
             "last_seen": time.time(),
+            "geo": {
+                "prefix": prefix,
+                "asn": metadata.normalized_asn if metadata else "AS-UNKNOWN",
+                "country": metadata.normalized_country if metadata else "UNKNOWN",
+                "source": getattr(metadata, "source", "unknown"),
+                "is_unknown": is_unknown,
+            },
         }
         self.connections_by_ip[ip_address] += 1
         return peer_id
@@ -1241,6 +1390,7 @@ class PeerManager:
     def disconnect_peer(self, peer_id: str):
         peer = self.connected_peers.pop(peer_id, None)
         if peer:
+            self._decrement_geo_counters(peer)
             ip_address = peer["ip_address"]
             self.connections_by_ip[ip_address] -= 1
             if self.connections_by_ip[ip_address] == 0:
@@ -1248,3 +1398,205 @@ class PeerManager:
             if peer_id in self.seen_nonces:
                 del self.seen_nonces[peer_id]
             self.reputation.record_disconnect(peer_id)
+        else:
+            print(f"Peer {peer_id} not found.")
+
+    def _evaluate_diversity_policy(
+        self,
+        ip_address: str,
+        mutate: bool = False,
+    ) -> Tuple[bool, GeoIPMetadata, Optional[str], bool, Optional[str]]:
+        metadata = self._resolve_geo_metadata(ip_address)
+        prefix = self._get_ip_prefix(ip_address)
+        normalized_asn = metadata.normalized_asn
+        normalized_country = metadata.normalized_country
+        is_unknown = normalized_asn == "AS-UNKNOWN" or normalized_country == "UNKNOWN"
+
+        with self._diversity_lock:
+            total_connected = len(self.connected_peers)
+            total_after_accept = total_connected + 1
+            prefix_is_new = bool(prefix) and prefix not in self.prefix_counts
+            asn_is_new = not is_unknown and normalized_asn not in self.asn_counts
+            country_is_new = not is_unknown and normalized_country not in self.country_counts
+
+            if self.max_per_prefix > 0 and prefix:
+                if self.prefix_counts[prefix] >= self.max_per_prefix:
+                    return False, metadata, prefix, is_unknown, "prefix_limit"
+            if (
+                self.max_per_asn > 0
+                and not is_unknown
+                and self.asn_counts[normalized_asn] >= self.max_per_asn
+            ):
+                return False, metadata, prefix, is_unknown, "asn_limit"
+            if (
+                self.max_per_country > 0
+                and not is_unknown
+                and self.country_counts[normalized_country] >= self.max_per_country
+            ):
+                return False, metadata, prefix, is_unknown, "country_limit"
+            if is_unknown and self.max_unknown_geo >= 0 and self.unknown_geo_peers >= self.max_unknown_geo:
+                return False, metadata, prefix, is_unknown, "unknown_geo_limit"
+
+            # Enforce diversity requirements by rejecting peers that do not add
+            # new prefixes/ASNs/countries when we're below the mandated minimums.
+            if (
+                self.min_unique_prefixes
+                and prefix
+                and total_after_accept >= self.min_unique_prefixes
+                and len(self.prefix_counts) + (1 if prefix_is_new else 0) < self.min_unique_prefixes
+                and not prefix_is_new
+            ):
+                return False, metadata, prefix, is_unknown, "prefix_diversity"
+
+            if (
+                self.min_unique_asns
+                and not is_unknown
+                and total_after_accept >= self.min_unique_asns
+                and len(self.asn_counts) + (1 if asn_is_new else 0) < self.min_unique_asns
+                and not asn_is_new
+            ):
+                return False, metadata, prefix, is_unknown, "asn_diversity"
+
+            if (
+                self.min_unique_countries
+                and not is_unknown
+                and total_after_accept >= self.min_unique_countries
+                and len(self.country_counts) + (1 if country_is_new else 0) < self.min_unique_countries
+                and not country_is_new
+            ):
+                return False, metadata, prefix, is_unknown, "country_diversity"
+
+            if mutate:
+                if prefix:
+                    self.prefix_counts[prefix] += 1
+                if is_unknown:
+                    self.unknown_geo_peers += 1
+                else:
+                    self.asn_counts[normalized_asn] += 1
+                    self.country_counts[normalized_country] += 1
+                self._check_diversity_thresholds()
+
+        return True, metadata, prefix, is_unknown, None
+
+    def _decrement_geo_counters(self, peer_info: Dict[str, Any]) -> None:
+        geo_info = peer_info.get("geo") or {}
+        prefix = geo_info.get("prefix")
+        normalized_asn = geo_info.get("asn")
+        normalized_country = geo_info.get("country")
+        is_unknown = geo_info.get("is_unknown", False)
+
+        with self._diversity_lock:
+            if prefix and prefix in self.prefix_counts:
+                self.prefix_counts[prefix] -= 1
+                if self.prefix_counts[prefix] <= 0:
+                    del self.prefix_counts[prefix]
+            if is_unknown:
+                self.unknown_geo_peers = max(0, self.unknown_geo_peers - 1)
+            else:
+                if normalized_asn and normalized_asn in self.asn_counts:
+                    self.asn_counts[normalized_asn] -= 1
+                    if self.asn_counts[normalized_asn] <= 0:
+                        del self.asn_counts[normalized_asn]
+                if normalized_country and normalized_country in self.country_counts:
+                    self.country_counts[normalized_country] -= 1
+                    if self.country_counts[normalized_country] <= 0:
+                        del self.country_counts[normalized_country]
+
+    def _check_diversity_thresholds(self) -> None:
+        total_peers = len(self.connected_peers) + 1  # include pending peer
+        unique_asns = len(self.asn_counts)
+        unique_countries = len(self.country_counts)
+        unique_prefixes = len(self.prefix_counts)
+
+        if self.min_unique_asns and unique_asns < self.min_unique_asns and total_peers >= self.min_unique_asns:
+            logger.warning(
+                "Peer ASN diversity below threshold (%s/%s)",
+                unique_asns,
+                self.min_unique_asns,
+                extra={
+                    "event": "peer.diversity.asn_below_threshold",
+                    "unique_asns": unique_asns,
+                    "threshold": self.min_unique_asns,
+                },
+            )
+        if (
+            self.min_unique_countries
+            and unique_countries < self.min_unique_countries
+            and total_peers >= self.min_unique_countries
+        ):
+            logger.warning(
+                "Peer country diversity below threshold (%s/%s)",
+                unique_countries,
+                self.min_unique_countries,
+                extra={
+                    "event": "peer.diversity.country_below_threshold",
+                    "unique_countries": unique_countries,
+                    "threshold": self.min_unique_countries,
+                },
+            )
+        if (
+            self.min_unique_prefixes
+            and unique_prefixes < self.min_unique_prefixes
+            and total_peers >= self.min_unique_prefixes
+        ):
+            logger.warning(
+                "Peer prefix diversity below threshold (%s/%s)",
+                unique_prefixes,
+                self.min_unique_prefixes,
+                extra={
+                    "event": "peer.diversity.prefix_below_threshold",
+                    "unique_prefixes": unique_prefixes,
+                    "threshold": self.min_unique_prefixes,
+                },
+            )
+
+    def _log_diversity_rejection(
+        self,
+        ip_address: str,
+        reason: str,
+        metadata: Optional[GeoIPMetadata],
+    ) -> None:
+        logger.warning(
+            "Peer connection rejected for diversity policy (%s)",
+            reason,
+            extra={
+                "event": "peer.diversity.rejected",
+                "ip": ip_address,
+                "reason": reason,
+                "asn": metadata.normalized_asn if metadata else "AS-UNKNOWN",
+                "country": metadata.normalized_country if metadata else "UNKNOWN",
+                "prefix": self._get_ip_prefix(ip_address),
+            },
+        )
+
+    def _resolve_geo_metadata(self, ip_address: str) -> GeoIPMetadata:
+        try:
+            return self.geoip_resolver.lookup(ip_address)
+        except Exception as exc:
+            logger.error(
+                "GeoIP lookup failed for %s: %s",
+                ip_address,
+                type(exc).__name__,
+                extra={"event": "peer.geoip.lookup_failed", "ip": ip_address},
+            )
+            return GeoIPMetadata(
+                ip=ip_address,
+                country="UNKNOWN",
+                country_name="Unknown",
+                asn="AS-UNKNOWN",
+                as_name="Unknown",
+                source="error",
+            )
+
+    def _get_ip_prefix(self, ip_address: str) -> Optional[str]:
+        try:
+            ip_obj = ipaddress.ip_address(ip_address)
+        except ValueError:
+            return None
+
+        if ip_obj.version == 4:
+            prefix_length = min(max(self.diversity_prefix_length, 8), 32)
+        else:
+            prefix_length = min(max(self.diversity_prefix_length, 32), 64)
+        network = ipaddress.ip_network(f"{ip_address}/{prefix_length}", strict=False)
+        return f"{network.network_address}/{prefix_length}"

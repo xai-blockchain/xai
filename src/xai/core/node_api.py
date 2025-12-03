@@ -73,6 +73,7 @@ from xai.core.monitoring import MetricsCollector
 from xai.core.api_auth import APIAuthManager, APIKeyStore
 from xai.core.governance_execution import ProposalType
 from xai.network.peer_manager import PeerManager
+from xai.wallet.spending_limits import SpendingLimitManager
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Transaction
@@ -342,6 +343,7 @@ class NodeAPIRoutes:
         self.error_registry = ErrorHandlerRegistry()
         self.security_validator = getattr(node, "validator", SecurityValidator())
         self.api_auth = APIAuthManager.from_config(store=self.api_key_store)
+        self.spending_limits = SpendingLimitManager()
 
     def _verify_signed_peer_message(self) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
         """
@@ -657,6 +659,98 @@ class NodeAPIRoutes:
                 )
             except Exception as exc:
                 return self._handle_exception(exc, "mempool_overview")
+
+        @self.app.route("/mempool/stats", methods=["GET"])
+        def get_mempool_stats() -> Tuple[Dict[str, Any], int]:
+            """Aggregate mempool fee statistics and congestion indicators."""
+            limit_param = request.args.get("limit", default=0, type=int)
+            limit = 0 if limit_param is None else limit_param
+            if limit < 0:
+                limit = 0
+            limit = min(limit, 1000)
+
+            try:
+                overview = self.blockchain.get_mempool_overview(limit)
+            except AttributeError:
+                return (
+                    jsonify({"success": False, "error": "Blockchain unavailable"}),
+                    503,
+                )
+            except Exception as exc:
+                return self._handle_exception(exc, "mempool_stats")
+
+            limits = overview.get("limits", {}) or {}
+            pending_count = int(overview.get("pending_count", 0) or 0)
+            size_bytes = int(overview.get("size_bytes", 0) or 0)
+            max_transactions = int(limits.get("max_transactions") or 0)
+            max_transactions = max(max_transactions, 1)
+            capacity_ratio = min(max(pending_count / float(max_transactions), 0.0), 1.0)
+
+            max_age_seconds = float(limits.get("max_age_seconds") or 0.0)
+            max_age_seconds = max(max_age_seconds, 1.0)
+            oldest_age = float(overview.get("oldest_transaction_age_seconds") or 0.0)
+            age_pressure = min(max(oldest_age / max_age_seconds, 0.0), 1.0)
+
+            if capacity_ratio >= 0.9 or age_pressure >= 0.9:
+                pressure_state = "critical"
+            elif capacity_ratio >= 0.7 or age_pressure >= 0.75:
+                pressure_state = "elevated"
+            elif capacity_ratio >= 0.5 or age_pressure >= 0.5:
+                pressure_state = "moderate"
+            else:
+                pressure_state = "normal"
+
+            avg_fee_rate = float(overview.get("avg_fee_rate") or 0.0)
+            median_fee_rate = float(overview.get("median_fee_rate") or 0.0)
+            min_fee_rate = float(overview.get("min_fee_rate") or 0.0)
+            max_fee_rate = float(overview.get("max_fee_rate") or 0.0)
+
+            def _recommended(multiplier: float) -> float:
+                baseline = median_fee_rate if median_fee_rate > 0 else avg_fee_rate
+                candidate = baseline * multiplier
+                if multiplier < 1.0:
+                    candidate = max(candidate, min_fee_rate)
+                else:
+                    candidate = max(candidate, min_fee_rate)
+                return float(candidate)
+
+            fee_stats = {
+                "average_fee": float(overview.get("avg_fee") or 0.0),
+                "median_fee": float(overview.get("median_fee") or 0.0),
+                "average_fee_rate": avg_fee_rate,
+                "median_fee_rate": median_fee_rate,
+                "min_fee_rate": min_fee_rate,
+                "max_fee_rate": max_fee_rate,
+                "recommended_fee_rates": {
+                    "slow": _recommended(0.75),
+                    "standard": _recommended(1.0),
+                    "priority": _recommended(1.25),
+                },
+            }
+
+            pressure = {
+                "status": pressure_state,
+                "capacity_ratio": capacity_ratio,
+                "pending_transactions": pending_count,
+                "max_transactions": max_transactions,
+                "age_pressure": age_pressure,
+                "oldest_transaction_age_seconds": oldest_age,
+                "size_bytes": size_bytes,
+                "size_kb": overview.get("size_kb", size_bytes / 1024.0 if size_bytes else 0.0),
+            }
+
+            response_body: Dict[str, Any] = {
+                "success": True,
+                "limit": limit,
+                "timestamp": overview.get("timestamp"),
+                "fees": fee_stats,
+                "pressure": pressure,
+                "sponsored_transactions": overview.get("sponsored_transactions", 0),
+                "rejections": overview.get("rejections", {}),
+                "transactions": overview.get("transactions", []),
+                "transactions_returned": overview.get("transactions_returned", 0),
+            }
+            return jsonify(response_body), 200
 
     # ==================== BLOCKCHAIN ROUTES ====================
 
@@ -1030,6 +1124,21 @@ class NodeAPIRoutes:
                 if model.metadata:
                     tx.metadata = model.metadata
 
+                # Enforce daily spending limits for non-AA wallets at API boundary
+                allowed, used, limit = self.spending_limits.can_spend(model.sender, float(model.amount))
+                if not allowed:
+                    return self._error_response(
+                        "Daily spending limit exceeded",
+                        status=403,
+                        code="spend_limit_exceeded",
+                        context={
+                            "sender": model.sender,
+                            "used_today": used,
+                            "limit": limit,
+                            "requested": float(model.amount),
+                        },
+                    )
+
                 if not tx.verify_signature():
                     return self._error_response(
                         "Invalid signature",
@@ -1039,6 +1148,11 @@ class NodeAPIRoutes:
                     )
 
                 if self.blockchain.add_transaction(tx):
+                    # Record spend on acceptance
+                    try:
+                        self.spending_limits.record_spend(model.sender, float(model.amount))
+                    except Exception:
+                        pass
                     self.node.broadcast_transaction(tx)
                     return self._success_response(
                         {
