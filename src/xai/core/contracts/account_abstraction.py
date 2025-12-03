@@ -713,12 +713,22 @@ class MultiSigAccount(SmartAccount):
                     )
                     continue
                 except Exception as e:
-                    # Unexpected error - track but continue trying other owners
-                    last_error = e
-                    logger.warning(
-                        f"Unexpected error verifying signature {i} for owner {owner[:16]}: {e}"
+                    logger.error(
+                        "Unexpected error verifying signature %s for owner %s: %s",
+                        i,
+                        owner[:16],
+                        type(e).__name__,
+                        extra={
+                            "event": "multisig.signature_validation_error",
+                            "account": self.address[:16] if self.address else "unknown",
+                            "signature_index": i,
+                            "owner": owner[:16],
+                        },
+                        exc_info=True,
                     )
-                    continue
+                    raise SignatureError(
+                        f"Unexpected signature verification failure at index {i} for owner {owner[:16]}: {e}"
+                    ) from e
 
             if not sig_valid:
                 # None of the owners could verify this signature

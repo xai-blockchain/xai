@@ -268,6 +268,23 @@ class TestMultiSigAccountSignatureValidation:
 
         assert "signature 1 does not match any owner" in str(exc_info.value).lower()
 
+    def test_multisig_unexpected_crypto_error_raises_signature_error(self, multisig_account):
+        """
+        SECURITY TEST: Unexpected crypto errors must raise SignatureError (fail fast).
+        """
+        account, _ = multisig_account
+        message_hash = hashlib.sha256(b"panic").digest()
+        signature = b"x" * (account.threshold * 64)
+
+        with patch("xai.core.contracts.account_abstraction.verify_signature_hex") as mock_verify:
+            mock_verify.side_effect = RuntimeError("crypto backend failure")
+
+            with pytest.raises(SignatureError) as exc_info:
+                account._validate_signature(message_hash, signature)
+
+            assert "unexpected signature verification failure" in str(exc_info.value).lower()
+            assert mock_verify.call_count == 1
+
     def test_valid_multisig_succeeds(self, multisig_account):
         """Test that valid multisig signatures are accepted."""
         account, owners = multisig_account
