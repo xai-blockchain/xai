@@ -6,7 +6,7 @@ nonce management, and address computation.
 """
 
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from xai.core.vm.evm.interpreter import EVMInterpreter
 from xai.core.vm.evm.context import (
@@ -55,6 +55,36 @@ class TestCreateOpcodes:
         # Set initial balance for deployer
         self.deployer_address = "0x1234567890123456789012345678901234567890"
         self.context.set_balance(self.deployer_address, 10**18)  # 1 ETH
+
+    def _single_byte_return_init_code(self) -> bytes:
+        """Init code that returns a single byte 0x2a."""
+        return bytes([
+            Opcode.PUSH1, 0x2A,  # value
+            Opcode.PUSH1, 0x00,  # offset
+            Opcode.MSTORE8,
+            Opcode.PUSH1, 0x01,  # size
+            Opcode.PUSH1, 0x00,  # offset
+            Opcode.RETURN,
+        ])
+
+    def _prepare_create_call(self, gas: int, init_code: bytes) -> CallContext:
+        """Build a call context preloaded with init code for CREATE."""
+        call = CallContext(
+            call_type=CallType.CALL,
+            depth=0,
+            address=self.deployer_address,
+            caller=self.context.tx_origin,
+            origin=self.context.tx_origin,
+            value=0,
+            gas=gas,
+            code=b"",
+            calldata=b"",
+        )
+        call.memory.store_range(0, init_code)
+        call.stack.push(len(init_code))
+        call.stack.push(0)  # offset
+        call.stack.push(0)  # value
+        return call
 
     def test_create_simple_deployment(self):
         """Test CREATE with simple contract deployment."""
@@ -326,6 +356,49 @@ class TestCreateOpcodes:
         # Should return 0 (failure due to code size limit)
         result_addr_int = call.stack.pop()
         assert result_addr_int == 0
+
+    def test_create_charges_code_deposit_gas(self):
+        """CREATE should charge 200 gas per byte of deployed code."""
+        init_code = self._single_byte_return_init_code()
+
+        call = self._prepare_create_call(200_000, init_code)
+        call.use_gas(32_000)
+        interpreter = EVMInterpreter(self.context)
+        deposit_cost = interpreter_helpers.CODE_DEPOSIT_GAS * 1
+
+        with patch.object(call, "use_gas", wraps=call.use_gas) as mocked_use_gas:
+            interpreter._op_create(call)
+
+        result_addr_int = call.stack.pop()
+        assert result_addr_int != 0
+        deployed_address = f"0x{result_addr_int:040x}"
+        assert self.context.get_code(deployed_address) == b"\x2a"
+
+        assert any(call_args.args and call_args.args[0] == deposit_cost for call_args in mocked_use_gas.call_args_list)
+
+    def test_create_code_deposit_oom_reverts(self):
+        """CREATE fails if caller lacks gas for code deposit."""
+        init_code = self._single_byte_return_init_code()
+
+        call = self._prepare_create_call(200_000, init_code)
+        call.use_gas(32_000)
+        interpreter = EVMInterpreter(self.context)
+        deposit_cost = interpreter_helpers.CODE_DEPOSIT_GAS * 1
+
+        original_use_gas = call.use_gas
+
+        def reject_deposit(amount: int) -> bool:
+            if amount == deposit_cost:
+                return False
+            return original_use_gas(amount)
+
+        call.use_gas = MagicMock(side_effect=reject_deposit)
+        interpreter._op_create(call)
+
+        result_addr_int = call.stack.pop()
+        assert result_addr_int == 0
+        expected_address = interpreter_helpers.compute_create_address(self.deployer_address, 0)
+        assert self.context.get_code(expected_address) == b""
 
     def test_create2_deterministic_address(self):
         """Test CREATE2 produces deterministic addresses."""

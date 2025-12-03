@@ -19,6 +19,9 @@ if TYPE_CHECKING:
     from .interpreter import EVMInterpreter
 
 
+CODE_DEPOSIT_GAS = 200  # Gas per byte to store deployed contract code
+
+
 def rlp_encode_address_nonce(address: str, nonce: int) -> bytes:
     """
     RLP encode [address, nonce] for CREATE address calculation.
@@ -221,6 +224,12 @@ def execute_create(
         # Check deployed code size (EIP-170: max 24KB)
         MAX_CODE_SIZE = 24576
         if len(deployed_code) > MAX_CODE_SIZE:
+            interpreter.context.revert_to_snapshot(snapshot_id)
+            return 0
+
+        # Charge code deposit gas (200 gas per byte stored)
+        code_deposit_cost = len(deployed_code) * CODE_DEPOSIT_GAS
+        if code_deposit_cost and not call.use_gas(code_deposit_cost):
             interpreter.context.revert_to_snapshot(snapshot_id)
             return 0
 
