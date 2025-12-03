@@ -3112,3 +3112,26 @@ class NodeAPIRoutes:
                 severity="INFO",
             )
             return self._success_response(payload)
+
+        @self.app.route("/admin/spend-limit", methods=["POST"])
+        def set_spend_limit() -> Tuple[Dict[str, Any], int]:
+            """Set per-address daily spending limit (admin only)."""
+            auth_error = self._require_admin_auth()
+            if auth_error:
+                return auth_error
+
+            payload = request.get_json(silent=True) or {}
+            address = str(payload.get("address", "")).strip()
+            try:
+                limit = float(payload.get("limit"))
+            except Exception:
+                return self._error_response("Invalid limit", status=400, code="invalid_payload")
+
+            if not address or limit <= 0:
+                return self._error_response("Invalid address or limit", status=400, code="invalid_payload")
+
+            try:
+                self.spending_limits.set_limit(address, limit)
+                return self._success_response({"address": address, "limit": limit}, status=201)
+            except Exception as exc:
+                return self._error_response(str(exc), status=500, code="admin_error")
