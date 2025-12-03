@@ -4,6 +4,7 @@ Unit tests for Mining Bonuses module
 Tests early adopter bonuses, achievements, referrals, and social bonuses
 """
 
+import json
 import pytest
 import tempfile
 import shutil
@@ -238,6 +239,71 @@ class TestMiningBonusManager:
 
         assert stats["total_registered_miners"] == 2
         assert "early_adopter_tiers" in stats
+
+    def test_bonus_cap_blocks_excess_awards(self, temp_dir):
+        """Ensure supply cap prevents inflationary bonuses."""
+        manager = MiningBonusManager(data_dir=temp_dir)
+        manager.max_bonus_supply = 50
+
+        result = manager.register_miner("XAI_CAP_LIMIT")
+
+        assert result["success"] is True
+        assert result["early_adopter_bonus"] == 0
+        assert "bonus_error" in result
+
+    def test_bonus_claim_fails_when_cap_reached(self, temp_dir):
+        """Ensure claiming bonuses fails once cap is exhausted."""
+        manager = MiningBonusManager(data_dir=temp_dir)
+        manager.max_bonus_supply = 105
+        manager.register_miner("XAI_CAP_USER")
+        tweet_result = manager.claim_bonus("XAI_CAP_USER", "tweet_verification")
+        assert tweet_result["success"] is True
+
+        second_claim = manager.claim_bonus("XAI_CAP_USER", "discord_join")
+
+        assert second_claim["success"] is False
+        assert "error" in second_claim
+
+    def test_bonus_configuration_bounds_enforced(self, tmp_path):
+        """Configuration exceeding cap should fail immediately."""
+        low_cap_dir = tmp_path / "low_cap_bonus"
+        low_cap_dir.mkdir()
+        with pytest.raises(ValueError):
+            MiningBonusManager(data_dir=str(low_cap_dir), max_bonus_supply=1000)
+
+    def test_bonus_config_overrides_applied(self, tmp_path):
+        """Custom configuration from bonus_config.json should be respected."""
+        config_dir = tmp_path / "override_bonus"
+        config_dir.mkdir()
+        config_path = config_dir / "bonus_config.json"
+        config = {
+            "early_adopter_tiers": {"50": 25, "500": 5},
+            "achievement_bonuses": {"first_block": 2},
+            "referral_bonuses": {"refer_friend": 4},
+            "social_bonuses": {"tweet_verification": 1.5},
+        }
+        config_path.write_text(json.dumps(config), encoding="utf-8")
+
+        manager = MiningBonusManager(data_dir=str(config_dir), max_bonus_supply=250000)
+
+        assert manager.early_adopter_tiers[50] == 25
+        assert manager.early_adopter_tiers[500] == 5
+        assert manager.achievement_bonuses["first_block"] == 2
+        assert manager.referral_bonuses["refer_friend"] == 4
+        assert manager.social_bonuses["tweet_verification"] == 1.5
+
+    def test_bonus_config_invalid_values_raise(self, tmp_path):
+        """Invalid configuration values should fail validation."""
+        config_dir = tmp_path / "invalid_bonus"
+        config_dir.mkdir()
+        config_path = config_dir / "bonus_config.json"
+        config_path.write_text(
+            json.dumps({"early_adopter_tiers": {"100": -5}}),
+            encoding="utf-8",
+        )
+
+        with pytest.raises(ValueError):
+            MiningBonusManager(data_dir=str(config_dir), max_bonus_supply=10000)
 
     def test_update_miner_stats(self, manager):
         """Test updating miner statistics"""

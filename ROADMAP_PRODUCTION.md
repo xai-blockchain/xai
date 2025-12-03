@@ -69,7 +69,7 @@ This roadmap targets production readiness with security-first posture, robust co
 
 - [ ] Replace bare `except Exception: pass` blocks with specific exception handling in: `node_p2p.py` (9 instances), `blockchain.py` (lines 367, 382, 2849), `monitoring.py` (lines 236, 504, 869).
 - [x] ~~Fix signature verification exception swallowing in `account_abstraction.py` lines 540, 582. Signature failures logged but execution continues.~~ ✅ MultiSig verification now raises `SignatureError` on unexpected crypto failures and regression tests ensure the execution path halts immediately.
-- [ ] Add bounds checking to mining bonus configuration to prevent minting more coins than supply cap.
+- [x] ~~Add bounds checking to mining bonus configuration to prevent minting more coins than supply cap.~~ ✅ Mining bonus manager now validates config overrides (including external JSON) against the global cap and refuses invalid values.
 
 ---
 
