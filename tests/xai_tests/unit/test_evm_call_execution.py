@@ -419,6 +419,58 @@ class TestSTATICCALL:
         returned = call.memory.load(0)
         assert returned == 99
 
+    def test_staticcall_context_flag_enforced(self):
+        """Ensure CallContext always enforces static mode for STATICCALL frames."""
+        # Contract attempts to write storage in a STATICCALL context.
+        target_address = "0x7777777777777777777777777777777777777777"
+        code = bytes([
+            Opcode.PUSH1, 0x01,
+            Opcode.PUSH1, 0x00,
+            Opcode.SSTORE,
+            Opcode.STOP,
+        ])
+
+        blockchain = MagicMock()
+        blockchain.contracts = {target_address.upper(): {"code": code.hex(), "storage": {}}}
+        blockchain.get_balance = MagicMock(return_value=0)
+
+        block = BlockContext(
+            number=1,
+            timestamp=1000,
+            gas_limit=10000000,
+            coinbase="0x" + "0" * 40,
+            prevrandao=0,
+            base_fee=0,
+            chain_id=1,
+        )
+        context = ExecutionContext(
+            block=block,
+            tx_origin="0x" + "a" * 40,
+            tx_gas_price=1,
+            tx_gas_limit=1000000,
+            tx_value=0,
+            blockchain=blockchain,
+        )
+
+        # Intentionally omit static=True to simulate callers forgetting to set it.
+        call = CallContext(
+            call_type=CallType.STATICCALL,
+            depth=0,
+            address=target_address,
+            caller="0x" + "b" * 40,
+            origin="0x" + "b" * 40,
+            value=0,
+            gas=100000,
+            code=code,
+            calldata=b"",
+            static=False,
+        )
+
+        interpreter = EVMInterpreter(context)
+        context.push_call(call)
+        with pytest.raises(VMExecutionError, match="static"):
+            interpreter.execute(call)
+
 
 class TestReturnDataHandling:
     """Tests for return data handling across calls."""

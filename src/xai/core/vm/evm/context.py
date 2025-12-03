@@ -85,6 +85,14 @@ class CallContext:
     reverted: bool = False
     revert_reason: str = ""
 
+    def __post_init__(self) -> None:
+        """
+        Ensure static mode is enforced for STATICCALL frames even if callers
+        forget to explicitly set the flag.
+        """
+        if self.call_type == CallType.STATICCALL and not self.static:
+            self.static = True
+
     def use_gas(self, amount: int) -> bool:
         """
         Consume gas from available gas.
