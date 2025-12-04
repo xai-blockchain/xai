@@ -19,6 +19,7 @@ import json
 import hashlib
 from typing import Dict, List, Optional, Tuple
 import os
+import tempfile
 from collections import deque
 from enum import Enum
 from dataclasses import dataclass
@@ -165,7 +166,12 @@ class StrictAIPoolManager:
         }
 
         # Persistence path under ~/.xai to avoid storing in repo
-        self._state_path = os.path.expanduser("~/.xai/ai_pool_usage.json")
+        default_path = os.path.expanduser("~/.xai/ai_pool_usage.json")
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            tmp_dir = tempfile.mkdtemp(prefix="xai_ai_pool_")
+            self._state_path = os.path.join(tmp_dir, "ai_pool_usage.json")
+        else:
+            self._state_path = default_path
         os.makedirs(os.path.dirname(self._state_path), exist_ok=True)
         self._load_state()
 
@@ -275,9 +281,20 @@ class StrictAIPoolManager:
         This is the core function that actually calls AI APIs
         with hard limits to prevent over-usage
         """
+        # Import metrics
+        from xai.core.ai_task_metrics import get_ai_task_metrics
+        metrics = get_ai_task_metrics()
+
+        # Record pool utilization
+        total_keys = len(self.donated_keys)
+        active_keys = sum(1 for k in self.donated_keys.values() if not k.is_depleted)
+        if total_keys > 0:
+            utilization = ((total_keys - active_keys) / total_keys) * 100
+            metrics.pool_utilization.labels(pool_id=provider.value).set(utilization)
 
         # Emergency stop check
         if self.emergency_stop:
+            metrics.jobs_failed.labels(provider=provider.value, reason="emergency_stop").inc()
             return {
                 "success": False,
                 "error": "EMERGENCY_STOP_ACTIVE",
@@ -571,9 +588,6 @@ class StrictAIPoolManager:
 
                 if is_depleted:
                     self._handle_depleted_key(key)
-        # Persist usage after deduction
-        self._save_state()
-
                 break
             else:
                 # Use all of this key
@@ -582,6 +596,9 @@ class StrictAIPoolManager:
 
                 if is_depleted:
                     self._handle_depleted_key(key)
+
+        # Persist usage after deduction
+        self._save_state()
 
     def _handle_depleted_key(self, key: DonatedAPIKey) -> None:
         """

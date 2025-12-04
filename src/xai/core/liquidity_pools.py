@@ -66,6 +66,9 @@ class LiquidityPool:
 
         Returns LP tokens representing share of pool
         """
+        # Import metrics
+        from xai.core.dex_metrics import get_dex_metrics
+        metrics = get_dex_metrics()
 
         if xai_amount <= 0 or other_amount <= 0:
             return {"success": False, "error": "Invalid amounts"}
@@ -133,6 +136,14 @@ class LiquidityPool:
             },
         )
 
+        # Record metrics
+        pool_id = str(self.pair.value)
+        metrics.liquidity_added.labels(pool=pool_id, denom="XAI").inc(xai_amount)
+        metrics.liquidity_added.labels(pool=pool_id, denom=self.pair.value.split("/")[1]).inc(other_amount)
+        metrics.pool_reserves.labels(pool=pool_id, denom="XAI").set(self.xai_reserve)
+        metrics.pool_reserves.labels(pool=pool_id, denom=self.pair.value.split("/")[1]).set(self.other_reserve)
+        metrics.lp_token_supply.labels(pool=pool_id).set(self.total_liquidity_tokens)
+
         return {
             "success": True,
             "lp_tokens": lp_tokens,
@@ -197,6 +208,11 @@ class LiquidityPool:
 
         Uses constant product formula: x * y = k
         """
+        # Import metrics
+        from xai.core.dex_metrics import get_dex_metrics
+        import time
+        metrics = get_dex_metrics()
+        start_time = time.time()
 
         if xai_amount <= 0:
             return {"success": False, "error": "Invalid amount"}
@@ -253,6 +269,17 @@ class LiquidityPool:
                 "price_impact": price_impact,
             },
         )
+
+        # Record metrics
+        pool_id = str(self.pair.value)
+        metrics.swaps_total.labels(pool=pool_id, token_in="XAI", token_out=self.pair.value.split("/")[1], status="success").inc()
+        metrics.swap_volume.labels(pool=pool_id, denom="XAI").inc(xai_amount)
+        metrics.swap_latency.observe(time.time() - start_time)
+        metrics.swap_slippage.observe(price_impact)
+        metrics.swap_fees_collected.labels(pool=pool_id, denom="XAI").inc(fee_amount)
+        metrics.pool_reserves.labels(pool=pool_id, denom="XAI").set(self.xai_reserve)
+        metrics.pool_reserves.labels(pool=pool_id, denom=self.pair.value.split("/")[1]).set(self.other_reserve)
+
         return {
             "success": True,
             "input_xai": xai_amount,

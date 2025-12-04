@@ -326,6 +326,9 @@ class AITradingBot:
         Returns:
             AI analysis with recommended action
         """
+        # Import metrics
+        from xai.core.ai_task_metrics import get_ai_task_metrics
+        metrics = get_ai_task_metrics()
 
         # Get current balance
         balance = self.blockchain.get_balance(self.user_address)
@@ -361,6 +364,12 @@ class AITradingBot:
                 if action_str in ["BUY", "SELL", "HOLD"]
                 else TradeAction.HOLD
             )
+
+            # Record trading decision metric
+            metrics.trading_decisions.labels(
+                decision_type=action.value,
+                model=self.ai_model
+            ).inc()
 
             return {
                 "action": action,

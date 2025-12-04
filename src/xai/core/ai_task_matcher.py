@@ -457,6 +457,12 @@ class AITaskMatcher:
                 'estimated_cost': 1.50
             }
         """
+        # Import metrics
+        from xai.core.ai_task_metrics import get_ai_task_metrics
+        metrics = get_ai_task_metrics()
+
+        # Record job submission
+        metrics.jobs_submitted.labels(job_type=task_type.value).inc()
 
         # Get task requirements
         requirements = self.task_requirements.get(task_type, {})
@@ -507,6 +513,9 @@ class AITaskMatcher:
         reasoning = self._generate_selection_reasoning(
             primary=primary, task_type=task_type, complexity=complexity, score=scores[primary]
         )
+
+        # Record model selection metric
+        metrics.model_selections.labels(model=primary, provider=model.provider).inc()
 
         return {
             "success": True,
