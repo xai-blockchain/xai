@@ -29,9 +29,12 @@ import time
 import json
 import threading
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Callable
 from dataclasses import dataclass, field
 from enum import Enum
+import hashlib
+from decimal import Decimal, InvalidOperation
+import secrets
 import anthropic
 import openai
 
@@ -104,6 +107,7 @@ class TradingPair:
     to_coin: str  # e.g., "ADA"
     current_rate: float = 0.0
     last_updated: float = 0.0
+    price_history: List[float] = field(default_factory=list)
 
 
 @dataclass
@@ -151,6 +155,7 @@ class AITradingBot:
         config: Dict,
         blockchain,
         personal_ai,
+        market_data_provider: Optional[Callable[[str], Optional[float]]] = None,
     ):
         """
         Initialize AI trading bot
@@ -179,6 +184,7 @@ class AITradingBot:
         self.config = config
         self.blockchain = blockchain
         self.personal_ai = personal_ai
+        self._market_data_provider = market_data_provider
 
         # Trading state
         self.is_active = False
@@ -200,6 +206,8 @@ class AITradingBot:
         # Last analysis
         self.last_analysis_time = 0
         self.analysis_interval = config.get("analysis_interval", 300)  # 5 minutes
+        self._price_noise_seed = secrets.token_bytes(16)
+        self._market_lock = threading.RLock()
 
         print(f"\n🤖 AI Trading Bot Initialized")
         print(f"   User: {user_address}")
@@ -216,6 +224,43 @@ class AITradingBot:
             from_coin, to_coin = pair_str.split("/")
             trading_pairs.append(TradingPair(from_coin=from_coin, to_coin=to_coin))
         return trading_pairs
+
+    def _bounded_jitter(self, pair_key: str, volatility_bps: int) -> float:
+        """
+        Generate a deterministic jitter in the range [-volatility, volatility].
+        Uses a keyed blake2b hash to avoid weak randomness while remaining bounded.
+        """
+        now_ms = int(time.time() * 1000)
+        digest = hashlib.blake2b(
+            f"{pair_key}:{now_ms}".encode("utf-8"),
+            key=self._price_noise_seed,
+            digest_size=8,
+        ).digest()
+        value = int.from_bytes(digest, "big") / (2**64 - 1)
+        amplitude = max(0, volatility_bps) / 10000.0
+        return (value * 2 - 1) * amplitude
+
+    def _normalize_trade_amount(self, raw_amount: float, balance: float) -> float:
+        """Clamp trade size to exposure, balance, and configured max_trade_amount."""
+        try:
+            amount_dec = Decimal(str(raw_amount))
+        except (InvalidOperation, ValueError):
+            return 0.0
+        if amount_dec <= 0:
+            return 0.0
+
+        try:
+            balance_dec = Decimal(str(balance))
+        except (InvalidOperation, ValueError):
+            balance_dec = Decimal("0")
+
+        max_exposure_percent = Decimal(str(self.config.get("max_exposure_percent", 100)))
+        if max_exposure_percent <= 0:
+            max_exposure_percent = Decimal("100")
+        exposure_cap = (balance_dec * max_exposure_percent) / Decimal("100")
+        hard_cap = Decimal(str(self.max_trade_amount))
+        normalized = min(amount_dec, exposure_cap, hard_cap)
+        return float(max(normalized, Decimal("0")))
 
     def start(self):
         """Start the trading bot"""
@@ -300,21 +345,35 @@ class AITradingBot:
         print(f"🛑 Trading loop stopped")
 
     def _update_market_data(self):
-        """Update market rates for all pairs"""
-        # In production, this would fetch real market data
-        # For demo, simulate fluctuating rates
+        """
+        Update market rates for all pairs.
 
-        import random
+        Production-hardening: prefer an injected market data provider (e.g., oracle/DEX)
+        and fall back to deterministic, bounded jitter to avoid weak randomness. Rates are
+        clamped to stay positive and recorded in a short history for trend analysis.
+        """
+        with self._market_lock:
+            for pair in self.trading_pairs:
+                pair_key = f"{pair.from_coin}/{pair.to_coin}"
+                rate = None
 
-        for pair in self.trading_pairs:
-            if pair.from_coin == "XAI" and pair.to_coin == "ADA":
-                # Simulate XAI/ADA rate fluctuating around 4.5
-                base_rate = 4.5
-                volatility = 0.05  # 5% volatility
-                pair.current_rate = base_rate * (1 + random.uniform(-volatility, volatility))
+                if self._market_data_provider:
+                    try:
+                        rate = self._market_data_provider(pair_key)
+                    except Exception as exc:  # pragma: no cover - defensive
+                        logging.warning("Market data provider failed", extra={"pair": pair_key, "error": str(exc)})
+
+                if rate is None:
+                    base_rate = float(self.config.get("base_rates", {}).get(pair_key, 4.5))
+                    volatility_bps = int(self.config.get("volatility_bps", 500))  # default 5%
+                    jitter = self._bounded_jitter(pair_key, volatility_bps)
+                    rate = max(0.0001, base_rate * (1 + jitter))
+
+                pair.current_rate = rate
                 pair.last_updated = time.time()
-
-            # Add more pairs as needed
+                pair.price_history.append(rate)
+                if len(pair.price_history) > 50:
+                    pair.price_history.pop(0)
 
     def _analyze_market(self, pair: TradingPair) -> Dict:
         """
@@ -331,7 +390,15 @@ class AITradingBot:
         metrics = get_ai_task_metrics()
 
         # Get current balance
-        balance = self.blockchain.get_balance(self.user_address)
+        balance_raw = self.blockchain.get_balance(self.user_address)
+        try:
+            balance = float(balance_raw)
+        except (TypeError, ValueError):
+            return {
+                "action": TradeAction.HOLD,
+                "reasoning": "Unable to determine balance",
+                "confidence": 0.0,
+            }
 
         # Get recent trade history for this pair
         recent_trades = [
@@ -371,12 +438,17 @@ class AITradingBot:
                 model=self.ai_model
             ).inc()
 
+            amount = self._normalize_trade_amount(analysis.get("recommended_amount", self.max_trade_amount), balance)
+            confidence = float(analysis.get("confidence", 0.0))
+            confidence = max(0.0, min(1.0, confidence))
+
             return {
                 "action": action,
                 "reasoning": analysis.get("reasoning", ""),
-                "confidence": analysis.get("confidence", 0.0),
-                "amount": analysis.get("recommended_amount", self.max_trade_amount),
+                "confidence": confidence,
+                "amount": amount,
                 "expected_profit": analysis.get("expected_profit", 0.0),
+                "reference_rate": pair.current_rate,
             }
 
         except (json.JSONDecodeError, KeyError) as e:
@@ -474,7 +546,14 @@ Return JSON:
         """
 
         action = analysis["action"]
-        amount = min(analysis["amount"], self.max_trade_amount)
+        amount = self._normalize_trade_amount(analysis.get("amount", 0), self.blockchain.get_balance(self.user_address))
+        if amount <= 0:
+            self.performance.failed_trades += 1
+            return
+
+        if pair.current_rate <= 0:
+            self.performance.failed_trades += 1
+            return
 
         print(f"\n🔄 Executing {action.value.upper()} trade:")
         print(f"   Pair: {pair.from_coin}/{pair.to_coin}")
@@ -555,9 +634,17 @@ Return JSON:
             print(f"⚠️  Daily trade limit reached ({self.max_daily_trades})")
             return False
 
+        # Price freshness guard: refuse to trade on stale quotes
+        staleness_cutoff = self.config.get("price_staleness_seconds", 900)
+        for pair in self.trading_pairs:
+            if pair.last_updated and (time.time() - pair.last_updated) > staleness_cutoff:
+                print(f"⚠️  Market data stale for {pair.from_coin}/{pair.to_coin}")
+                return False
+
         # Check stop-loss
         if self.performance.net_profit < 0:
-            loss_percent = abs(self.performance.net_profit) / self.max_trade_amount * 100
+            divisor = self.max_trade_amount if self.max_trade_amount > 0 else 1
+            loss_percent = abs(self.performance.net_profit) / divisor * 100
             if loss_percent >= self.stop_loss_percent:
                 print(f"🛑 STOP LOSS triggered! Loss: {loss_percent:.1f}%")
                 self.stop()

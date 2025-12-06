@@ -10,6 +10,7 @@ import tempfile
 import shutil
 import time
 from pathlib import Path
+from datetime import datetime, timedelta
 
 from xai.core.mining_bonuses import MiningBonusManager
 
@@ -28,6 +29,23 @@ class TestMiningBonusManager:
     def manager(self, temp_dir):
         """Create MiningBonusManager with temp storage"""
         return MiningBonusManager(data_dir=temp_dir)
+
+    def _make_clocked_manager(self, temp_dir):
+        """Create a manager with deterministic time control."""
+
+        class _Clock:
+            def __init__(self):
+                self.current = datetime(2024, 1, 1, 12, 0, 0)
+
+            def now(self):
+                return self.current
+
+            def advance(self, days: int = 0):
+                self.current += timedelta(days=days)
+
+        clock = _Clock()
+        manager = MiningBonusManager(data_dir=temp_dir, time_provider=clock.now)
+        return manager, clock
 
     def test_init(self, manager):
         """Test initialization"""
@@ -218,7 +236,29 @@ class TestMiningBonusManager:
 
         assert result["success"] is True
         assert "miner_stats" in result
-        assert "social_bonuses" in result
+        assert "progression" in result
+        assert result["progression"]["level"] >= 1
+        assert "achievement_xp_earned" in result["summary"]
+
+    def test_progression_awards_xp_on_actions(self, manager):
+        """XP and level progression should update as miners interact."""
+        manager.register_miner("XAI_MINER")
+        summary = manager.get_progression_summary("XAI_MINER")
+        base_xp = summary["total_xp"]
+        assert base_xp >= manager.progression_rewards["registration"]
+
+        manager.claim_bonus("XAI_MINER", "discord_join")
+        updated = manager.get_progression_summary("XAI_MINER")
+        assert updated["total_xp"] > base_xp
+        assert updated["recent_events"], "recent progression events should be tracked"
+
+    def test_get_stats_includes_progression_section(self, manager):
+        """Progression metrics should appear in system stats."""
+        manager.register_miner("XAI_MINER")
+        stats = manager.get_stats()
+        assert "progression" in stats
+        assert stats["progression"]["tracked_players"] >= 1
+        assert "social_bonuses" in stats
 
     def test_get_leaderboard(self, manager):
         """Test getting bonus leaderboard"""
@@ -239,6 +279,36 @@ class TestMiningBonusManager:
 
         assert stats["total_registered_miners"] == 2
         assert "early_adopter_tiers" in stats
+        assert "badges" in stats
+
+    def test_check_achievements_referral_based(self, manager):
+        """Referral-based achievements should trigger when requirement met."""
+        manager.register_miner("XAI_MINER")
+        manager.referrals["XAI_MINER"] = {
+            "referral_code": "ABCD1234",
+            "referred_miners": [{"address": f"friend{i}"} for i in range(5)],
+            "total_referral_bonus": 0,
+        }
+
+        result = manager.check_achievements("XAI_MINER", blocks_mined=0, streak_days=0)
+
+        assert result["success"] is True
+        assert any(a["type"] == "referral_champion" for a in result["new_achievements"])
+
+    def test_check_achievements_xp_based(self, manager):
+        """XP-only achievements unlock based on progression totals."""
+        manager.register_miner("XAI_MINER")
+        manager._award_xp("XAI_MINER", 3000, reason="integration_test")
+
+        result = manager.check_achievements("XAI_MINER", blocks_mined=0, streak_days=0)
+
+        assert any(a["type"] == "veteran_miner" for a in result["new_achievements"])
+
+    def test_get_achievement_catalog(self, manager):
+        """Catalog of achievements should be exposed for clients."""
+        catalog = manager.get_achievement_catalog()
+        assert isinstance(catalog, list)
+        assert any(entry["id"] == "first_block" for entry in catalog)
 
     def test_bonus_cap_blocks_excess_awards(self, temp_dir):
         """Ensure supply cap prevents inflationary bonuses."""
@@ -318,3 +388,60 @@ class TestMiningBonusManager:
 
         assert manager.miners["XAI_MINER"]["blocks_mined"] == 50
         assert manager.miners["XAI_MINER"]["current_streak"] == 5
+
+
+    def test_badge_awarded_from_achievement(self, temp_dir):
+        """Achievements should award the configured badge."""
+        manager, _ = self._make_clocked_manager(temp_dir)
+        manager.register_miner("XAI_BADGE")
+        manager.check_achievements("XAI_BADGE", blocks_mined=1, streak_days=0)
+
+        badges = manager.get_badges_summary("XAI_BADGE")
+        assert any(entry["name"] == "bronze_pickaxe" for entry in badges["badges"])
+
+    def test_daily_challenge_completion(self, temp_dir):
+        """Daily challenge completions should award xp/tokens once."""
+        manager, _ = self._make_clocked_manager(temp_dir)
+        manager.register_miner("XAI_DAILY")
+        today = manager._current_date_str()
+        manager.daily_challenges_state = {
+            "rotation_date": today,
+            "challenges": [
+                {
+                    "id": "daily_blocks_test",
+                    "condition": {"type": "blocks_mined", "threshold": 1},
+                    "bonus": 1.0,
+                    "xp": 20.0,
+                }
+            ],
+            "completions": {},
+        }
+
+        result = manager.check_achievements("XAI_DAILY", blocks_mined=5, streak_days=0)
+        assert result["daily_challenges"]["completed_today"]
+        status = manager.daily_challenges_state["completions"]["XAI_DAILY"][today]
+        assert status["daily_blocks_test"]["completed"] is True
+
+    def test_referral_identity_guard_blocks_duplicates(self, temp_dir):
+        """Same identity hash cannot be reused for multiple addresses."""
+        manager, _ = self._make_clocked_manager(temp_dir)
+        manager.register_miner("XAI_REFERRER")
+        code = manager.create_referral_code("XAI_REFERRER")["referral_code"]
+        metadata = {"identity_hash": "b" * 64}
+        assert manager.use_referral_code("XAI_NEW", code, metadata=metadata)["success"]
+
+        duplicate = manager.use_referral_code("XAI_DUP", code, metadata=metadata)
+        assert duplicate["success"] is False
+        assert "Identity already registered" in duplicate["error"]
+
+    def test_unified_leaderboard_metric(self, temp_dir):
+        """Unified leaderboard should expose metrics sorted by requested field."""
+        manager, _ = self._make_clocked_manager(temp_dir)
+        manager.register_miner("ADDR1")
+        manager.register_miner("ADDR2")
+        manager.claim_bonus("ADDR1", "tweet_verification")
+        code = manager.create_referral_code("ADDR2")["referral_code"]
+        manager.use_referral_code("ADDR3", code, metadata={"identity_hash": "c" * 64})
+
+        leaderboard = manager.get_unified_leaderboard(metric="referrals", limit=2)
+        assert leaderboard[0]["address"] == "ADDR2"

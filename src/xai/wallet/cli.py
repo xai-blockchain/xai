@@ -21,6 +21,10 @@ from pathlib import Path
 from typing import Any, Dict, Tuple, Optional
 
 import requests
+try:
+    import qrcode
+except ImportError:  # pragma: no cover
+    qrcode = None
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf import pbkdf2
@@ -28,9 +32,16 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 
 from xai.core.wallet import Wallet
+from xai.wallet.mnemonic_qr_backup import (
+    MnemonicQRBackupGenerator,
+    QRCodeUnavailableError,
+)
+from xai.wallet.two_factor_profile import TwoFactorProfile, TwoFactorProfileStore
+from xai.security.two_factor_auth import TwoFactorAuthManager, TwoFactorSetup
 
 DEFAULT_API_URL = os.getenv("XAI_API_URL", "http://localhost:18545")
 DEFAULT_KEYSTORE_DIR = Path.home() / ".xai" / "keystores"
+TWO_FACTOR_STORE = TwoFactorProfileStore()
 
 # Encryption constants
 PBKDF2_ITERATIONS = 600000  # NIST recommended minimum for 2023+
@@ -529,6 +540,13 @@ def _send_transaction(args: argparse.Namespace) -> int:
     Security: Private key is obtained securely via keystore or interactive input.
     NEVER passed as CLI argument.
     """
+    if args.two_fa_profile:
+        try:
+            _require_two_factor(args.two_fa_profile, args.otp)
+        except Exception as exc:
+            print(f"2FA verification failed: {exc}", file=sys.stderr)
+            return 1
+
     try:
         # Securely obtain private key
         private_key = get_private_key_secure(
@@ -623,6 +641,13 @@ def _export_wallet(args: argparse.Namespace) -> int:
 
     Security: Private key obtained securely, never via CLI argument.
     """
+    if args.two_fa_profile:
+        try:
+            _require_two_factor(args.two_fa_profile, args.otp)
+        except Exception as exc:
+            print(f"2FA verification failed: {exc}", file=sys.stderr)
+            return 1
+
     try:
         # Securely obtain private key
         private_key = get_private_key_secure(
@@ -811,6 +836,206 @@ def _import_wallet(args: argparse.Namespace) -> int:
         return 1
 
 
+def _read_mnemonic_from_args(args: argparse.Namespace) -> str:
+    """Securely obtain mnemonic from CLI args or interactive prompt."""
+    if args.mnemonic and args.mnemonic_file:
+        raise ValueError("Provide either --mnemonic or --mnemonic-file, not both.")
+
+    if args.mnemonic_file:
+        with open(args.mnemonic_file, "r", encoding="utf-8") as handle:
+            return handle.read().strip()
+
+    if args.mnemonic:
+        return args.mnemonic.strip()
+
+    print(
+        "Enter BIP-39 mnemonic (input hidden; words separated by spaces):",
+        file=sys.stderr,
+    )
+    phrase = getpass.getpass("")
+    if not phrase:
+        raise ValueError("Mnemonic input is empty")
+    if not args.skip_confirmation:
+        confirm = getpass.getpass("Re-enter mnemonic to confirm: ")
+        if phrase.strip() != confirm.strip():
+            raise ValueError("Mnemonic phrases did not match")
+    return phrase.strip()
+
+
+def _mnemonic_qr_backup(args: argparse.Namespace) -> int:
+    """Generate QR code backups for a mnemonic phrase."""
+    try:
+        mnemonic_phrase = _read_mnemonic_from_args(args)
+    except Exception as exc:
+        print(f"Mnemonic input error: {exc}", file=sys.stderr)
+        return 1
+
+    bip39_passphrase = args.bip39_passphrase or ""
+
+    try:
+        generator = MnemonicQRBackupGenerator()
+    except QRCodeUnavailableError as exc:  # pragma: no cover - dependency guard
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    metadata: Dict[str, Any] = {}
+    if args.metadata_address:
+        metadata["address"] = args.metadata_address
+    if args.note:
+        metadata["note"] = args.note
+
+    try:
+        bundle = generator.generate_bundle(
+            mnemonic_phrase,
+            passphrase=bip39_passphrase,
+            include_passphrase=args.include_passphrase,
+            metadata=metadata or None,
+        )
+    except Exception as exc:
+        print(f"Failed to build QR backup: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        # Best-effort scrubbing of sensitive strings
+        mnemonic_phrase = ""  # type: ignore
+
+    if args.output:
+        png_bytes = base64.b64decode(bundle.image_base64.encode("ascii"))
+        with open(args.output, "wb") as handle:
+            handle.write(png_bytes)
+        os.chmod(args.output, 0o600)
+        print(f"QR backup image written to: {args.output}")
+
+    if args.payload_output:
+        with open(args.payload_output, "w", encoding="utf-8") as handle:
+            json.dump(bundle.payload, handle, indent=2, sort_keys=True)
+        os.chmod(args.payload_output, 0o600)
+        print(f"Structured payload saved to: {args.payload_output}")
+
+    if args.show_base64 or not args.output:
+        print("\n--- BEGIN QR PNG (Base64) ---")
+        print(bundle.image_base64)
+        print("--- END QR PNG (Base64) ---\n")
+
+    if args.ascii:
+        print("ASCII QR Preview:\n")
+        print(bundle.ascii_art)
+
+    checksum = bundle.payload.get("checksum", "unknown")
+    created_at = bundle.payload.get("created_at")
+    word_count = bundle.payload.get("word_count")
+    print("Mnemonic QR backup generated successfully.")
+    print(f"  Word count: {word_count}")
+    if bip39_passphrase:
+        print(
+            f"  Passphrase hint: {bundle.payload.get('passphrase_hint', 'n/a')} "
+            f"{'(passphrase embedded)' if args.include_passphrase else ''}"
+        )
+    print(f"  Payload checksum: {checksum[:16]}…")
+    if created_at:
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(created_at))
+        print(f"  Created at: {timestamp}")
+    print("Store the PNG/ASCII output offline. Anyone scanning it gains full access to your funds!")
+    return 0
+
+
+def _setup_two_factor(args: argparse.Namespace) -> int:
+    """Provision a TOTP secret for the provided profile label."""
+    label = args.label.strip()
+    if not label:
+        print("Label is required for 2FA setup.", file=sys.stderr)
+        return 1
+
+    if TWO_FACTOR_STORE.exists(label) and not args.force:
+        print(f"2FA profile '{label}' already exists. Use --force to overwrite.", file=sys.stderr)
+        return 1
+
+    manager = TwoFactorAuthManager()
+    setup = manager.setup_2fa(label, user_email=args.user_email)
+    hashed_codes = manager.hash_backup_codes(setup.backup_codes)
+
+    profile = TwoFactorProfile(
+        label=label,
+        secret=setup.secret,
+        backup_codes=hashed_codes,
+        issuer=manager.issuer_name,
+        metadata={"user_email": args.user_email} if args.user_email else {},
+    )
+
+    TWO_FACTOR_STORE.save(profile)
+
+    print("\n2FA Enabled Successfully")
+    print(f"Profile Label: {label}")
+    print(f"Secret (store securely): {setup.secret}")
+    print(f"Provisioning URI: {setup.provisioning_uri}")
+    print("\nBackup Codes (store offline, each usable once):")
+    for idx, code in enumerate(setup.backup_codes, 1):
+        print(f"  {idx:02d}: {code}")
+
+    if args.qr_output:
+        if qrcode is None:
+            print("QR generation unavailable (missing qrcode dependency).", file=sys.stderr)
+        else:
+            qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_Q, box_size=8, border=4)
+            qr.add_data(setup.provisioning_uri)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            img.save(args.qr_output)
+            os.chmod(args.qr_output, 0o600)
+            print(f"\nQR code (PNG) saved to {args.qr_output}")
+
+    return 0
+
+
+def _two_factor_status(args: argparse.Namespace) -> int:
+    """Show metadata about a 2FA profile."""
+    label = args.label.strip()
+    try:
+        profile = TWO_FACTOR_STORE.load(label)
+    except FileNotFoundError:
+        print(f"2FA profile '{label}' not found.", file=sys.stderr)
+        return 1
+
+    created_ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(profile.created_at))
+    print(f"Profile: {label}")
+    print(f"Issuer: {profile.issuer}")
+    print(f"Created: {created_ts}")
+    print(f"Remaining backup codes: {len(profile.backup_codes)}")
+    if profile.metadata.get("user_email"):
+        print(f"User email: {profile.metadata['user_email']}")
+    return 0
+
+
+def _two_factor_disable(args: argparse.Namespace) -> int:
+    """Delete a 2FA profile."""
+    label = args.label.strip()
+    if not TWO_FACTOR_STORE.exists(label):
+        print(f"2FA profile '{label}' not found.", file=sys.stderr)
+        return 1
+
+    confirm = input(f"Type 'DISABLE {label}' to remove this 2FA profile: ")
+    if confirm != f"DISABLE {label}":
+        print("Operation cancelled.")
+        return 1
+
+    TWO_FACTOR_STORE.delete(label)
+    print(f"2FA profile '{label}' removed.")
+    return 0
+
+
+def _require_two_factor(profile_label: str, otp: Optional[str] = None) -> None:
+    """Prompt for and verify a 2FA code."""
+    manager = TwoFactorAuthManager()
+    code = otp or getpass.getpass("Enter 2FA code (or backup code): ").strip()
+    if not code:
+        raise ValueError("2FA code required")
+
+    success, message = TWO_FACTOR_STORE.verify_code(profile_label, code, manager=manager)
+    if not success:
+        raise ValueError("Invalid 2FA or backup code provided.")
+
+    print(f"2FA verification successful ({message}).")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI argument parser."""
     parser = argparse.ArgumentParser(description="XAI wallet utilities")
@@ -974,6 +1199,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Emit raw JSON response",
     )
+    send.add_argument(
+        "--2fa-profile",
+        help="Require TOTP verification with the specified 2FA profile label",
+    )
+    send.add_argument(
+        "--otp",
+        help="Provide 2FA code via argument (use with caution). If omitted, prompts securely.",
+    )
     send.set_defaults(func=_send_transaction)
 
     # Wallet history
@@ -1071,6 +1304,14 @@ def build_parser() -> argparse.ArgumentParser:
         default="pbkdf2",
         help="Key derivation function (default: pbkdf2)",
     )
+    export.add_argument(
+        "--2fa-profile",
+        help="Require TOTP verification with the specified 2FA profile label",
+    )
+    export.add_argument(
+        "--otp",
+        help="Provide 2FA code via argument (use with caution). If omitted, prompts securely.",
+    )
     export.set_defaults(func=_export_wallet)
 
     # Import wallet
@@ -1094,6 +1335,99 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit raw JSON output",
     )
     import_cmd.set_defaults(func=_import_wallet)
+
+    # Mnemonic QR backup
+    mnemonic_qr = subparsers.add_parser(
+        "mnemonic-qr",
+        help="Generate a QR code backup for a BIP-39 mnemonic",
+        description=(
+            "Create an offline QR code backup for a seed phrase. "
+            "WARNING: The QR payload contains your entire mnemonic; treat it like the seed itself."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    mnemonic_qr.add_argument(
+        "--mnemonic",
+        help="Mnemonic phrase (use quotes). Leaving empty prompts for secure input.",
+    )
+    mnemonic_qr.add_argument(
+        "--mnemonic-file",
+        help="Path to file containing mnemonic phrase (one line, words separated by spaces).",
+    )
+    mnemonic_qr.add_argument(
+        "--bip39-passphrase",
+        default="",
+        help="Optional BIP-39 passphrase tied to the mnemonic.",
+    )
+    mnemonic_qr.add_argument(
+        "--include-passphrase",
+        action="store_true",
+        help="Embed the plaintext passphrase in the QR payload (NOT recommended).",
+    )
+    mnemonic_qr.add_argument(
+        "--metadata-address",
+        help="Optional wallet address metadata stored in the QR payload.",
+    )
+    mnemonic_qr.add_argument(
+        "--note",
+        help="Optional note stored in the payload (e.g., device/location).",
+    )
+    mnemonic_qr.add_argument(
+        "--output",
+        help="Write PNG image to this path (default: print base64 representation).",
+    )
+    mnemonic_qr.add_argument(
+        "--payload-output",
+        help="Write structured payload JSON to this path (sensitive!).",
+    )
+    mnemonic_qr.add_argument(
+        "--ascii",
+        action="store_true",
+        help="Render ASCII-art QR to stdout for immediate scanning.",
+    )
+    mnemonic_qr.add_argument(
+        "--show-base64",
+        action="store_true",
+        help="Print base64 PNG data even if --output is specified.",
+    )
+    mnemonic_qr.add_argument(
+        "--skip-confirmation",
+        action="store_true",
+        help="Skip mnemonic double-entry confirmation when prompted interactively.",
+    )
+    mnemonic_qr.set_defaults(func=_mnemonic_qr_backup)
+
+    # 2FA subcommands
+    twofa_setup = subparsers.add_parser(
+        "2fa-setup",
+        help="Enable TOTP-based 2FA for wallet commands",
+    )
+    twofa_setup.add_argument("--label", required=True, help="Profile label (e.g., wallet name)")
+    twofa_setup.add_argument("--user-email", help="Optional email/account identifier for authenticator")
+    twofa_setup.add_argument(
+        "--qr-output",
+        help="Optional path to save provisioning QR as PNG",
+    )
+    twofa_setup.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing profile if it already exists",
+    )
+    twofa_setup.set_defaults(func=_setup_two_factor)
+
+    twofa_status = subparsers.add_parser(
+        "2fa-status",
+        help="Show metadata for a 2FA profile",
+    )
+    twofa_status.add_argument("--label", required=True, help="Profile label")
+    twofa_status.set_defaults(func=_two_factor_status)
+
+    twofa_disable = subparsers.add_parser(
+        "2fa-disable",
+        help="Delete a 2FA profile",
+    )
+    twofa_disable.add_argument("--label", required=True, help="Profile label to delete")
+    twofa_disable.set_defaults(func=_two_factor_disable)
 
     return parser
 

@@ -219,6 +219,146 @@ class TestCALLExecution:
         # The recursive call should eventually return 0 due to depth limit
         assert True  # Made it without infinite recursion
 
+    def test_callcode_executes_in_caller_context(self):
+        """CALLCODE should execute target bytecode using caller's storage context."""
+        target_code = bytes([
+            Opcode.PUSH1, 0xAB,
+            Opcode.PUSH1, 0x00,
+            Opcode.SSTORE,
+            Opcode.STOP,
+        ])
+
+        blockchain = MagicMock()
+        target_address = "0x2222222222222222222222222222222222222222"
+        caller_address = "0x" + "b" * 40
+        blockchain.contracts = {
+            target_address.upper(): {"code": target_code.hex()},
+        }
+        blockchain.get_balance = MagicMock(return_value=0)
+
+        block = BlockContext(
+            number=1,
+            timestamp=1000,
+            gas_limit=10_000_000,
+            coinbase="0x" + "0" * 40,
+            prevrandao=0,
+            base_fee=0,
+            chain_id=1,
+        )
+        context = ExecutionContext(
+            block=block,
+            tx_origin="0x" + "a" * 40,
+            tx_gas_price=1,
+            tx_gas_limit=1_000_000,
+            tx_value=0,
+            blockchain=blockchain,
+        )
+        context.warm_address(target_address)
+
+        caller_code = bytes([
+            Opcode.PUSH1, 0x00,
+            Opcode.PUSH1, 0x00,
+            Opcode.PUSH1, 0x00,
+            Opcode.PUSH1, 0x00,
+            Opcode.PUSH1, 0x00,
+            Opcode.PUSH20, *bytes.fromhex(target_address[2:]),
+            Opcode.PUSH4, 0x00, 0x01, 0x00, 0x00,
+            Opcode.CALLCODE,
+            Opcode.STOP,
+        ])
+
+        call = CallContext(
+            call_type=CallType.CALLCODE,
+            depth=0,
+            address=caller_address,
+            caller="0x" + "a" * 40,
+            origin="0x" + "a" * 40,
+            value=0,
+            gas=10_000_000,
+            code=caller_code,
+            calldata=b"",
+            static=False,
+        )
+
+        interpreter = EVMInterpreter(context)
+        context.push_call(call)
+        interpreter.execute(call)
+
+        assert call.stack.pop() == 1
+        caller_storage = context.get_storage(caller_address)
+        stored, _ = caller_storage.load(0)
+        assert stored == 0xAB
+        target_storage = context.get_storage(target_address)
+        target_value, _ = target_storage.load(0)
+        assert target_value == 0
+
+    def test_callcode_value_transfer_requires_balance(self):
+        """CALLCODE should fail if the contract lacks sufficient balance."""
+        target_code = bytes([Opcode.STOP])
+
+        blockchain = MagicMock()
+        target_address = "0x3333333333333333333333333333333333333333"
+        caller_address = "0x" + "c" * 40
+        balances = {
+            caller_address: 500,
+            target_address: 0,
+        }
+        blockchain.contracts = {
+            target_address.upper(): {"code": target_code.hex()},
+        }
+        blockchain.get_balance = lambda addr: balances.get(addr, 0)
+
+        block = BlockContext(
+            number=1,
+            timestamp=1000,
+            gas_limit=10_000_000,
+            coinbase="0x" + "0" * 40,
+            prevrandao=0,
+            base_fee=0,
+            chain_id=1,
+        )
+        context = ExecutionContext(
+            block=block,
+            tx_origin="0x" + "a" * 40,
+            tx_gas_price=1,
+            tx_gas_limit=1_000_000,
+            tx_value=0,
+            blockchain=blockchain,
+        )
+
+        value = 1000
+        caller_code = bytes([
+            Opcode.PUSH1, 0x00,
+            Opcode.PUSH1, 0x00,
+            Opcode.PUSH1, 0x00,
+            Opcode.PUSH1, 0x00,
+            Opcode.PUSH2, *value.to_bytes(2, "big"),
+            Opcode.PUSH20, *bytes.fromhex(target_address[2:]),
+            Opcode.PUSH4, 0x00, 0x01, 0x00, 0x00,
+            Opcode.CALLCODE,
+            Opcode.STOP,
+        ])
+
+        call = CallContext(
+            call_type=CallType.CALLCODE,
+            depth=0,
+            address=caller_address,
+            caller="0x" + "a" * 40,
+            origin="0x" + "a" * 40,
+            value=0,
+            gas=10_000_000,
+            code=caller_code,
+            calldata=b"",
+            static=False,
+        )
+
+        interpreter = EVMInterpreter(context)
+        context.push_call(call)
+        interpreter.execute(call)
+
+        assert call.stack.pop() == 0
+        assert context.get_balance(caller_address) == 500
+
 
 class TestDELEGATECALL:
     """Tests for DELEGATECALL opcode execution."""

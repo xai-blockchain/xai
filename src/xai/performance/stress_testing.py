@@ -8,7 +8,7 @@ Comprehensive stress testing framework for blockchain performance testing.
 from __future__ import annotations
 
 import time
-import random
+import random  # OK for test data generation in performance simulation
 import threading
 from typing import List, Dict, Any, Callable, Optional
 from dataclasses import dataclass, field

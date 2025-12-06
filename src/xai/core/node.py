@@ -37,6 +37,11 @@ from xai.core.security_validation import SecurityValidator, SecurityEventRouter
 from xai.core.wallet import WalletManager
 from xai.core.account_abstraction import AccountAbstractionManager
 from xai.core.config import Config
+from xai.core.withdrawal_processor import WithdrawalProcessor
+from xai.core.crypto_deposit_monitor import (
+    CryptoDepositMonitor,
+    create_deposit_source,
+)
 
 # Import refactored modules
 from xai.core.node_utils import (
@@ -79,8 +84,10 @@ class CORSPolicyManager:
         Returns:
             List of allowed origin URLs
         """
-        # Default: same-origin only in production
-        default_origins: List[str] = []
+        # Config-driven origins have highest precedence
+        config_origins = getattr(Config, "API_ALLOWED_ORIGINS", None)
+        if config_origins:
+            return list(config_origins)
 
         # Load from environment variable
         env_origins = os.getenv("XAI_ALLOWED_ORIGINS", "")
@@ -97,7 +104,7 @@ class CORSPolicyManager:
             return ["*"]  # Allow all in development
 
         # Production: only specific domains
-        return default_origins
+        return []
 
     def setup_cors(self) -> None:
         """Setup CORS with strict policies."""
@@ -369,6 +376,13 @@ class BlockchainNode:
         self.mining_thread: Optional[threading.Thread] = None
         self.mined_blocks_counter = 0
         self.last_mining_time = time.time()
+        self.withdrawal_processor: Optional[WithdrawalProcessor] = None
+        self._withdrawal_worker_thread: Optional[threading.Thread] = None
+        self._withdrawal_worker_stop: Optional[threading.Event] = None
+        self._withdrawal_worker_interval: int = 30
+        self._withdrawal_stats_lock = threading.Lock()
+        self._last_withdrawal_stats: Optional[Dict[str, Any]] = None
+        self.crypto_deposit_monitor: Optional[CryptoDepositMonitor] = None
 
         # Flask app setup
         self.app = Flask(__name__)
@@ -546,7 +560,9 @@ class BlockchainNode:
         self.fraud_detector = None
         self.recovery_manager = None
         self.exchange_wallet_manager = None
+        self.withdrawal_processor = None
         self.crypto_deposit_manager = None
+        self.crypto_deposit_monitor = None
         self.payment_processor = None
 
         # Algorithmic features
@@ -582,9 +598,31 @@ class BlockchainNode:
             from xai.core.exchange_wallet_manager import ExchangeWalletManager
 
             self.exchange_wallet_manager = ExchangeWalletManager()
-            self.blockchain.trade_manager.attach_exchange_manager(
-                self.exchange_wallet_manager
-            )
+            self.blockchain.trade_manager.attach_exchange_manager(self.exchange_wallet_manager)
+
+            processor_cfg = getattr(Config, "WITHDRAWAL_PROCESSOR", {}) or {}
+            try:
+                self.withdrawal_processor = WithdrawalProcessor(
+                    self.exchange_wallet_manager,
+                    data_dir=processor_cfg.get(
+                        "DATA_DIR", os.path.join(get_base_dir(), "withdrawals")
+                    ),
+                    lock_amount_threshold=processor_cfg.get("LOCK_AMOUNT_THRESHOLD", 5_000.0),
+                    lock_duration_seconds=processor_cfg.get("LOCK_DURATION_SECONDS", 3600),
+                    max_withdrawal_per_tx=processor_cfg.get("MAX_PER_TX", 250_000.0),
+                    max_daily_volume=processor_cfg.get("MAX_DAILY_VOLUME", 1_000_000.0),
+                    manual_review_threshold=processor_cfg.get("MANUAL_REVIEW_THRESHOLD", 0.65),
+                    blocked_destinations=set(processor_cfg.get("BLOCKED_DESTINATIONS", [])),
+                )
+                interval = int(processor_cfg.get("INTERVAL_SECONDS", 45) or 45)
+                self._start_withdrawal_worker(interval)
+            except Exception as exc:
+                self.withdrawal_processor = None
+                logger.error(
+                    "Failed to initialize withdrawal processor: %s",
+                    type(exc).__name__,
+                    extra={"event": "withdrawal.processor_init_failed"},
+                )
         except (ImportError, AttributeError) as exc:
             self.exchange_wallet_manager = None
             logger.debug("Exchange wallet manager disabled: %s", type(exc).__name__)
@@ -598,6 +636,8 @@ class BlockchainNode:
                 )
             except (ImportError, AttributeError):
                 self.crypto_deposit_manager = None
+
+            self._configure_crypto_deposit_monitor(getattr(Config, "CRYPTO_DEPOSIT_MONITOR", {}))
 
             try:
                 from xai.core.payment_processor import PaymentProcessor
@@ -629,6 +669,138 @@ class BlockchainNode:
             self.wallet_manager = None
             self.account_abstraction = None
             logger.debug("Embedded wallets disabled: %s", type(exc).__name__)
+
+    def _configure_crypto_deposit_monitor(self, monitor_cfg: Dict[str, Any]) -> None:
+        """Initialize crypto deposit monitoring if enabled."""
+        if not monitor_cfg or not monitor_cfg.get("ENABLED"):
+            return
+        if not self.crypto_deposit_manager:
+            logger.warning(
+                "Crypto deposit monitor requested but deposit manager unavailable",
+                extra={"event": "deposit.monitor_disabled_no_manager"},
+            )
+            return
+
+        monitor = CryptoDepositMonitor(
+            self.crypto_deposit_manager,
+            poll_interval=int(monitor_cfg.get("POLL_INTERVAL", 30) or 30),
+            jitter_seconds=int(monitor_cfg.get("JITTER_SECONDS", 5) or 5),
+            metrics_collector=self.metrics_collector,
+        )
+
+        sources_cfg = monitor_cfg.get("SOURCES") or {}
+        for currency, cfg in sources_cfg.items():
+            try:
+                source = create_deposit_source(currency, cfg, self.crypto_deposit_manager)
+            except ValueError as exc:
+                logger.warning(
+                    "Skipping crypto deposit source for %s: %s",
+                    currency,
+                    exc,
+                    extra={"event": "deposit.monitor_source_skipped", "currency": currency},
+                )
+                continue
+            monitor.register_source(currency, source)
+
+        if monitor.sources:
+            monitor.start()
+            self.crypto_deposit_monitor = monitor
+        else:
+            logger.warning(
+                "Crypto deposit monitor enabled but no valid sources configured",
+                extra={"event": "deposit.monitor_no_valid_sources"},
+            )
+
+    def _start_withdrawal_worker(self, interval_seconds: int) -> None:
+        """Start automated withdrawal queue processing."""
+        if not self.withdrawal_processor:
+            return
+        if self._withdrawal_worker_thread and self._withdrawal_worker_thread.is_alive():
+            return
+
+        self._withdrawal_worker_interval = max(10, int(interval_seconds))
+        self._withdrawal_worker_stop = threading.Event()
+        self._withdrawal_worker_thread = threading.Thread(
+            target=self._withdrawal_worker_loop,
+            name="withdrawal-processor",
+            daemon=True,
+        )
+        self._withdrawal_worker_thread.start()
+        logger.info(
+            "Withdrawal processor thread started (interval=%ss)",
+            self._withdrawal_worker_interval,
+            extra={"event": "withdrawal.processor_started"},
+        )
+
+    def _withdrawal_worker_loop(self) -> None:
+        """Loop that periodically processes pending exchange withdrawals."""
+        while self.withdrawal_processor and self._withdrawal_worker_stop:
+            if self._withdrawal_worker_stop.is_set():
+                break
+            try:
+                stats = self.withdrawal_processor.process_queue()
+                queue_depth = (
+                    self.exchange_wallet_manager.get_pending_count()
+                    if self.exchange_wallet_manager
+                    else 0
+                )
+                snapshot = dict(stats)
+                snapshot["queue_depth"] = queue_depth
+                snapshot["timestamp"] = time.time()
+                with self._withdrawal_stats_lock:
+                    self._last_withdrawal_stats = snapshot
+                self._record_withdrawal_processor_metrics(stats, queue_depth)
+                if any(stats.get(key, 0) for key in ("completed", "flagged", "failed")):
+                    logger.info(
+                        "Withdrawal processor run summary "
+                        "(checked=%d, completed=%d, flagged=%d, failed=%d, deferred=%d)",
+                        stats.get("checked", 0),
+                        stats.get("completed", 0),
+                        stats.get("flagged", 0),
+                        stats.get("failed", 0),
+                        stats.get("deferred", 0),
+                        extra={
+                            "event": "withdrawal.processor_cycle",
+                            "details": {**stats, "queue_depth": queue_depth},
+                        },
+                    )
+            except Exception as exc:
+                logger.error(
+                    "Withdrawal processor cycle failed: %s",
+                    type(exc).__name__,
+                    extra={"event": "withdrawal.processor_error"},
+                )
+            finally:
+                if self._withdrawal_worker_stop.wait(self._withdrawal_worker_interval):
+                    break
+
+    def _stop_withdrawal_worker(self) -> None:
+        """Stop withdrawal worker thread gracefully."""
+        if not self._withdrawal_worker_thread or not self._withdrawal_worker_stop:
+            return
+        self._withdrawal_worker_stop.set()
+        self._withdrawal_worker_thread.join(timeout=5)
+        logger.info("Withdrawal processor stopped", extra={"event": "withdrawal.processor_stopped"})
+        self._withdrawal_worker_thread = None
+        self._withdrawal_worker_stop = None
+
+    def _stop_crypto_deposit_monitor(self) -> None:
+        monitor = getattr(self, "crypto_deposit_monitor", None)
+        if monitor:
+            monitor.stop()
+            self.crypto_deposit_monitor = None
+
+    def _record_withdrawal_processor_metrics(self, stats: Dict[str, Any], queue_depth: int) -> None:
+        collector = getattr(self, "metrics_collector", None)
+        if collector:
+            collector.record_withdrawal_processor_stats(stats, queue_depth)
+
+    def get_withdrawal_processor_stats(self) -> Optional[Dict[str, Any]]:
+        """Return the latest withdrawal processor snapshot if available."""
+        with self._withdrawal_stats_lock:
+            if not self._last_withdrawal_stats:
+                return None
+            return dict(self._last_withdrawal_stats)
 
     # ==================== FAUCET OPERATIONS ====================
 
@@ -947,6 +1119,11 @@ class BlockchainNode:
             extra={"event": "node.start"}
         )
 
+        # Start Prometheus metrics server
+        from xai.core.node_metrics_server import start_metrics_server_if_enabled
+        metrics_port = int(os.getenv("XAI_METRICS_PORT", "8000"))
+        start_metrics_server_if_enabled(port=metrics_port, enabled=True)
+
         # Start P2P manager
         await self.p2p_manager.start()
 
@@ -974,6 +1151,8 @@ class BlockchainNode:
         Stop all node services.
         """
         self.stop_mining()
+        self._stop_withdrawal_worker()
+        self._stop_crypto_deposit_monitor()
         await self.p2p_manager.stop()
 
 

@@ -7,7 +7,7 @@ Simulates fee market dynamics to test fee estimation and pricing.
 
 from __future__ import annotations
 
-import random
+import random  # OK for simulation and test data generation
 import time
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass

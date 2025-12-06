@@ -66,6 +66,7 @@ class TestBlockValidation:
         block.previous_hash = "prevhash"
         block.timestamp = time.time()
         block.calculate_hash = Mock(return_value="0000abcd1234")
+        block.version = 1
         return block
 
     def test_validate_block_valid(self, consensus_manager, valid_block):
@@ -85,6 +86,14 @@ class TestBlockValidation:
         is_valid, error = consensus_manager.validate_block(block)
         assert is_valid == False
         assert "Invalid block hash" in error
+
+    def test_validate_block_invalid_version(self, consensus_manager, valid_block):
+        """Blocks with unsupported header versions are rejected."""
+        consensus_manager._allowed_header_versions = {1}
+        valid_block.version = 99
+        is_valid, error = consensus_manager.validate_block(valid_block)
+        assert is_valid is False
+        assert "Unsupported block header version" in error
 
     def test_validate_block_invalid_pow(self, consensus_manager):
         """Test block with invalid proof-of-work."""
@@ -151,6 +160,38 @@ class TestBlockValidation:
         is_valid, error = consensus_manager.validate_block(block, prev_block)
         assert is_valid == False
         assert "timestamp is before previous block" in error
+
+    def test_validate_block_timestamp_not_above_median(self, consensus_manager):
+        """Blocks must be newer than the median time past window."""
+        blockchain = consensus_manager.blockchain
+        base_time = time.time()
+        span = consensus_manager._median_time_span
+
+        blockchain.chain = []
+        previous_block = None
+        for i in range(span):
+            header = Mock()
+            header.index = i
+            header.hash = f"0000prev{i}"
+            # Make the majority of historical timestamps far in the future while previous block stays low
+            if i == span - 1:
+                header.timestamp = base_time  # previous block has low timestamp
+            else:
+                header.timestamp = base_time + 10_000 + i * 10
+            blockchain.chain.append(header)
+            previous_block = header
+
+        block = Mock()
+        block.index = previous_block.index + 1
+        block.hash = "0000median"
+        block.previous_hash = previous_block.hash
+        block.calculate_hash = Mock(return_value="0000median")
+        # Slightly above previous block but far below the historical median
+        block.timestamp = previous_block.timestamp + 1
+
+        is_valid, error = consensus_manager.validate_block(block, previous_block)
+        assert is_valid is False
+        assert "median time past" in error
 
     def test_validate_block_index_mismatch_with_chain(self, consensus_manager, blockchain):
         """Test block index mismatch with chain position."""

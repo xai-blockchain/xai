@@ -14,10 +14,14 @@ import json
 import time
 import logging
 from typing import Dict, Any, Tuple, Optional
+
+import requests
 from flask import Flask, jsonify, request, Response
 from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
+
 from xai.core.config import Config
 from xai.core.security_validation import ValidationError
+from xai.core.wallet import Wallet
 
 logger = logging.getLogger(__name__)
 
@@ -171,26 +175,125 @@ class WalletAPIHandler:
 
     def create_wallet_handler(self) -> Tuple[Dict[str, Any], int]:
         """
-        Handle wallet creation.
+        Handle wallet creation - returns encrypted keystore.
+
+        SECURITY: This endpoint NEVER returns raw private keys in HTTP responses.
+        Instead, it returns an encrypted keystore that the client must decrypt
+        locally with their password.
+
+        Expects JSON payload:
+        {
+            "encryption_password": "strong password (minimum 12 characters)"
+        }
 
         Returns:
             Tuple of (response dict, HTTP status code)
-        """
-        from xai.core.wallet import Wallet
 
+        Response format:
+        {
+            "success": true,
+            "address": "XAI...",
+            "public_key": "hex-encoded public key",
+            "encrypted_keystore": {
+                "ciphertext": "base64-encoded AES-GCM ciphertext",
+                "nonce": "base64-encoded nonce",
+                "salt": "base64-encoded PBKDF2 salt"
+            },
+            "instructions": "Decrypt this keystore locally. Never share your password or decrypted keys."
+        }
+
+        Security Notes:
+            - Uses AES-256-GCM encryption with PBKDF2 key derivation (100k iterations)
+            - Password must be minimum 12 characters
+            - Client must decrypt locally - server never stores or transmits raw private keys
+            - Over HTTPS, encrypted keystore provides defense-in-depth
+        """
+        payload = request.get_json(silent=True) or {}
+        password = payload.get("encryption_password")
+
+        # Enforce strong password requirement
+        if not password:
+            logger.warning(
+                "Wallet creation rejected: no encryption password provided",
+                extra={"event": "wallet.create_no_password"}
+            )
+            return (
+                jsonify({
+                    "success": False,
+                    "error": "encryption_password required",
+                    "details": "Strong encryption password required (minimum 12 characters)",
+                    "documentation": "https://xai.network/docs/wallet-security"
+                }),
+                400,
+            )
+
+        if len(password) < 12:
+            logger.warning(
+                "Wallet creation rejected: password too weak",
+                extra={"event": "wallet.create_weak_password", "password_length": len(password)}
+            )
+            return (
+                jsonify({
+                    "success": False,
+                    "error": "weak_password",
+                    "details": "Password must be at least 12 characters for security",
+                    "documentation": "https://xai.network/docs/wallet-security"
+                }),
+                400,
+            )
+
+        # Generate new wallet
         wallet = Wallet()
 
+        # Prepare wallet data for encryption
+        wallet_data = {
+            "private_key": wallet.private_key,
+            "public_key": wallet.public_key,
+            "address": wallet.address,
+            "created_at": time.time(),
+            "version": "1.0"
+        }
+
+        # Encrypt the keystore with user's password
+        try:
+            encrypted_keystore = wallet._encrypt_payload(json.dumps(wallet_data), password)
+        except Exception as e:
+            logger.error(
+                f"Wallet encryption failed: {e}",
+                extra={"event": "wallet.encryption_failed"},
+                exc_info=True
+            )
+            return (
+                jsonify({
+                    "success": False,
+                    "error": "encryption_failed",
+                    "details": "Failed to encrypt wallet keystore"
+                }),
+                500,
+            )
+
+        public_key = wallet.public_key.decode("utf-8") if isinstance(wallet.public_key, (bytes, bytearray)) else wallet.public_key
+
+        logger.info(
+            "Wallet created with encrypted keystore",
+            extra={
+                "event": "wallet.created_encrypted",
+                "address": wallet.address[:16] + "...",
+                "keystore_size": len(json.dumps(encrypted_keystore))
+            }
+        )
+
         return (
-            jsonify(
-                {
-                    "success": True,
-                    "address": wallet.address,
-                    "public_key": wallet.public_key,
-                    "private_key": wallet.private_key,
-                    "warning": "Save private key securely. Cannot be recovered.",
-                }
-            ),
-            200,
+            jsonify({
+                "success": True,
+                "address": wallet.address,
+                "public_key": public_key,
+                "encrypted_keystore": encrypted_keystore,
+                "instructions": "Decrypt this keystore locally with your password. Store it securely. Password cannot be recovered.",
+                "warning": "NEVER share your password or decrypted private key. XAI support will NEVER ask for them.",
+                "client_decryption_guide": "https://xai.network/docs/wallet-decryption"
+            }),
+            201,
         )
 
     def sign_transaction_handler(self) -> Tuple[Dict[str, Any], int]:
@@ -200,7 +303,8 @@ class WalletAPIHandler:
         Expects JSON payload:
         {
             "message_hash": "hex-encoded SHA-256 hash of message",
-            "private_key": "hex-encoded private key (64 chars)"
+            "private_key": "hex-encoded private key (64 chars)",
+            "ack_hash_prefix": "first N chars of message_hash acknowledged by signer"
         }
 
         Returns:
@@ -208,8 +312,8 @@ class WalletAPIHandler:
 
         Security Note:
             This endpoint receives private keys and should only be used
-            over HTTPS. In production, consider requiring additional
-            authentication or moving signing to client-side with noble-secp256k1.
+            over HTTPS. A hash-prefix acknowledgement is required to
+            prevent blind signing. Prefer client-side signing for production.
         """
         from xai.core.crypto_utils import sign_message_hex
 
@@ -217,6 +321,7 @@ class WalletAPIHandler:
             payload = request.get_json(silent=True) or {}
             message_hash = payload.get("message_hash")
             private_key = payload.get("private_key")
+            ack_prefix = (payload.get("ack_hash_prefix") or "").strip()
 
             # Validate inputs
             if not message_hash:
@@ -224,6 +329,18 @@ class WalletAPIHandler:
 
             if not private_key:
                 return jsonify({"success": False, "error": "private_key required"}), 400
+
+            min_ack_len = max(8, int(getattr(Config, "SIGNING_ACK_PREFIX_MIN_LEN", 8)))
+            if len(ack_prefix) < min_ack_len:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": f"ack_hash_prefix must be at least {min_ack_len} characters to confirm signer intent",
+                        }
+                    ),
+                    400,
+                )
 
             if len(private_key) != 64:
                 return (
@@ -254,6 +371,15 @@ class WalletAPIHandler:
                 return (
                     jsonify(
                         {"success": False, "error": "message_hash must be valid hexadecimal"}
+                    ),
+                    400,
+                )
+
+            # Require explicit acknowledgement of the signing hash (case-insensitive prefix match)
+            if not message_hash.lower().startswith(ack_prefix.lower()):
+                return (
+                    jsonify(
+                        {"success": False, "error": "ack_hash_prefix does not match message_hash"}
                     ),
                     400,
                 )

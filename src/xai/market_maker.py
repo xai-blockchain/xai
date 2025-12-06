@@ -4,7 +4,7 @@ Maintains buy and sell orders to ensure trading is always possible
 """
 
 import time
-import random
+import random  # OK for simulating market making order size variation (non-security context)
 from decimal import Decimal
 from typing import List, Dict, Optional
 import requests

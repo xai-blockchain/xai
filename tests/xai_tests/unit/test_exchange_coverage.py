@@ -45,6 +45,9 @@ class TestOrder:
         assert order.amount == Decimal("10")
         assert order.filled == Decimal("0")
         assert order.status == OrderStatus.PENDING
+        assert order.stop_price is None
+        assert order.triggered is False
+        assert order.triggered_at is None
 
     def test_order_remaining(self):
         """Test remaining amount calculation"""
@@ -116,6 +119,31 @@ class TestOrder:
         assert data["status"] == "partial"
         assert data["timestamp"] == 1234567890
         assert data["pay_fee_with_axn"] is True
+        assert data["stop_price"] is None
+        assert data["triggered"] is False
+        assert data["triggered_at"] is None
+        assert data["slippage_bps"] is None
+        assert data["reference_price"] is None
+
+    def test_order_stop_fields_serialization(self):
+        """Ensure stop order metadata is serialized"""
+        order = Order(
+            id="order2",
+            user_address="user2",
+            pair="AXN/USD",
+            side=OrderSide.SELL,
+            order_type=OrderType.STOP_LIMIT,
+            price=Decimal("120"),
+            amount=Decimal("5"),
+            stop_price=Decimal("110"),
+        )
+        order.triggered = True
+        order.triggered_at = 123.45
+        data = order.to_dict()
+
+        assert data["stop_price"] == 110.0
+        assert data["triggered"] is True
+        assert data["triggered_at"] == pytest.approx(123.45)
 
     def test_order_with_market_type(self):
         """Test market order creation"""
@@ -199,6 +227,12 @@ class TestTrade:
         assert data["amount"] == 5.0
         assert data["total"] == 500.0
         assert data["timestamp"] == 1234567890
+        assert data["maker_address"] is None
+        assert data["taker_address"] is None
+        assert data["maker_order_id"] is None
+        assert data["taker_order_id"] is None
+        assert data["maker_fee"] == 0.0
+        assert data["taker_fee"] == 0.0
 
     def test_trade_total_calculation(self):
         """Test trade total calculation"""
@@ -640,6 +674,8 @@ class TestMatchingEngine:
         assert len(engine.user_orders) == 0
         assert engine.fee_rate == Decimal("0.001")
         assert engine.axn_fee_discount == Decimal("0.5")
+        assert engine.stop_orders == {}
+        assert engine.last_trade_price == {}
 
     def test_engine_custom_fees(self):
         """Test matching engine with custom fees"""
@@ -725,6 +761,78 @@ class TestMatchingEngine:
         )
 
         assert order.pay_fee_with_axn is True
+
+    def test_stop_limit_order_queued_until_triggered(self):
+        """Stop-limit orders should remain pending until stop price is hit."""
+        engine = MatchingEngine()
+        order = engine.place_order(
+            user_address="breakout_trader",
+            pair="AXN/USD",
+            side="buy",
+            order_type=OrderType.STOP_LIMIT.value,
+            price=100.0,
+            amount=5.0,
+            stop_price=110.0,
+        )
+        assert order.triggered is False
+        assert order.order_type == OrderType.STOP_LIMIT
+        assert "AXN/USD" in engine.stop_orders
+        assert order in engine.stop_orders["AXN/USD"]
+
+    def test_stop_limit_order_triggers_and_executes_after_spike(self):
+        """Stop-limit order should activate after price spike and fill when liquidity arrives."""
+        engine = MatchingEngine()
+        provider = engine.balance_provider
+        provider.set_balance("stop_buyer", "USD", Decimal("2000"))
+        provider.set_balance("spike_seller", "AXN", Decimal("5"))
+        provider.set_balance("spike_buyer", "USD", Decimal("2000"))
+        provider.set_balance("liquidity_seller", "AXN", Decimal("5"))
+
+        stop_order = engine.place_order(
+            user_address="stop_buyer",
+            pair="AXN/USD",
+            side="buy",
+            order_type=OrderType.STOP_LIMIT.value,
+            price=106.0,
+            amount=2.0,
+            stop_price=110.0,
+        )
+
+        # Price spike trade at 111 triggers the stop order
+        engine.place_order(
+            user_address="spike_seller",
+            pair="AXN/USD",
+            side="sell",
+            order_type="limit",
+            price=111.0,
+            amount=1.0,
+        )
+        engine.place_order(
+            user_address="spike_buyer",
+            pair="AXN/USD",
+            side="buy",
+            order_type="limit",
+            price=111.0,
+            amount=1.0,
+        )
+
+        assert stop_order.triggered is True
+        assert stop_order.order_type == OrderType.LIMIT
+        assert "AXN/USD" not in engine.stop_orders or stop_order not in engine.stop_orders.get("AXN/USD", [])
+
+        # Provide liquidity below the limit price so the triggered order fills
+        engine.place_order(
+            user_address="liquidity_seller",
+            pair="AXN/USD",
+            side="sell",
+            order_type="limit",
+            price=105.0,
+            amount=2.0,
+        )
+
+        assert stop_order.status == OrderStatus.FILLED
+        assert stop_order.is_filled()
+        assert stop_order.triggered_at is not None
 
     def test_match_limit_orders_exact(self):
         """Test matching limit orders with exact amounts"""
@@ -963,6 +1071,41 @@ class TestMatchingEngine:
         assert sell_order.filled == Decimal("8")
         assert sell_order.status == OrderStatus.FILLED
 
+    def test_market_order_halts_when_slippage_exceeded(self):
+        """Slippage guardrails should stop further fills"""
+        engine = MatchingEngine()
+
+        # Provide deep liquidity but with wide second level
+        engine.place_order(
+            user_address="seller1",
+            pair="AXN/USD",
+            side="sell",
+            order_type="limit",
+            price=100.0,
+            amount=5.0,
+        )
+        engine.place_order(
+            user_address="seller2",
+            pair="AXN/USD",
+            side="sell",
+            order_type="limit",
+            price=120.0,
+            amount=5.0,
+        )
+
+        buy_order = engine.place_order(
+            user_address="buyer",
+            pair="AXN/USD",
+            side="buy",
+            order_type="market",
+            price=0,
+            amount=8.0,
+            max_slippage_bps=500,  # 5% max
+        )
+
+        assert buy_order.filled == Decimal("5")
+        assert len(engine.trade_history) == 1
+
     def test_market_order_cancelled_if_no_match(self):
         """Test market order cancelled if no matching orders"""
         engine = MatchingEngine()
@@ -1038,7 +1181,13 @@ class TestMatchingEngine:
         book.add_order(sell_order)
 
         # Execute trade
-        engine.execute_trade(buy_order, sell_order, Decimal("100"), Decimal("10"))
+        engine.execute_trade(
+            buy_order,
+            sell_order,
+            Decimal("100"),
+            Decimal("10"),
+            taker_is_buy=True,
+        )
 
         # Check orders updated
         assert buy_order.filled == Decimal("10")
@@ -1086,7 +1235,13 @@ class TestMatchingEngine:
         book.add_order(sell_order)
 
         # Execute partial trade
-        engine.execute_trade(buy_order, sell_order, Decimal("100"), Decimal("10"))
+        engine.execute_trade(
+            buy_order,
+            sell_order,
+            Decimal("100"),
+            Decimal("10"),
+            taker_is_buy=True,
+        )
 
         # Buy order should be partial
         assert buy_order.filled == Decimal("10")
@@ -1509,6 +1664,47 @@ class TestMatchingEngine:
         fee = engine.calculate_fee(Decimal("1000"), pay_with_axn=True)
         assert fee == Decimal("0.5")
 
+    def test_maker_taker_fee_application(self):
+        """Maker/taker fee rates should be applied correctly."""
+        engine = MatchingEngine(
+            maker_fee_rate=Decimal("0.0005"), taker_fee_rate=Decimal("0.002")
+        )
+        provider = engine.balance_provider
+        provider.set_balance("buyer", "USD", Decimal("5000"))
+        provider.set_balance("seller", "AXN", Decimal("50"))
+
+        buy_order = Order(
+            id="buy-maker-taker",
+            user_address="buyer",
+            pair="AXN/USD",
+            side=OrderSide.BUY,
+            order_type=OrderType.LIMIT,
+            price=Decimal("100"),
+            amount=Decimal("5"),
+        )
+        sell_order = Order(
+            id="sell-maker-taker",
+            user_address="seller",
+            pair="AXN/USD",
+            side=OrderSide.SELL,
+            order_type=OrderType.LIMIT,
+            price=Decimal("100"),
+            amount=Decimal("5"),
+        )
+
+        trade = engine.execute_trade(
+            buy_order,
+            sell_order,
+            Decimal("100"),
+            Decimal("5"),
+            taker_is_buy=True,
+        )
+        assert trade is not None
+        assert trade.maker_address == "seller"
+        assert trade.taker_address == "buyer"
+        assert trade.maker_fee == trade.seller_fee == Decimal("0.25")  # 0.0005 * 500
+        assert trade.taker_fee == trade.buyer_fee == Decimal("1.0")  # 0.002 * 500
+
     def test_get_stats(self):
         """Test getting exchange statistics"""
         engine = MatchingEngine()
@@ -1549,6 +1745,7 @@ class TestMatchingEngine:
         assert stats["unique_traders"] == 3
         assert "AXN/USD" in stats["pairs"]
         assert "BTC/USD" in stats["pairs"]
+        assert stats["pending_stop_orders"] == 0
 
     def test_get_stats_empty(self):
         """Test getting stats for empty exchange"""
@@ -1560,6 +1757,7 @@ class TestMatchingEngine:
         assert stats["total_trades"] == 0
         assert stats["unique_traders"] == 0
         assert len(stats["pairs"]) == 0
+        assert stats["pending_stop_orders"] == 0
 
     def test_concurrent_orders_same_pair(self):
         """Test handling concurrent orders on same pair"""

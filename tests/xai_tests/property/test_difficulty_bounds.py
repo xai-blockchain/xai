@@ -37,3 +37,32 @@ def test_difficulty_adjustment_bounds_simple():
     assert new_diff >= 1
     assert new_diff <= math.ceil(100 * bc.max_difficulty_change)
     assert new_diff >= max(1, math.floor(100 / bc.max_difficulty_change))
+
+
+def test_dynamic_adjustment_triggers_on_window_completion():
+    """Ensure DynamicDifficultyAdjustment is applied when its window is satisfied."""
+    bc = Blockchain()
+    bc.difficulty = 6
+    window = bc.dynamic_difficulty_adjuster.adjustment_window
+
+    blocks = []
+    timestamp = 0.0
+    for index in range(window + 1):
+        header = BlockHeader(
+            index=index,
+            previous_hash="0" * 64,
+            merkle_root="1" * 64,
+            timestamp=timestamp,
+            difficulty=bc.difficulty,
+            nonce=0,
+        )
+        blocks.append(Block(header=header, transactions=[]))
+        # Produce blocks faster than target to force an upward adjustment
+        timestamp += bc.target_block_time / 4
+
+    bc.chain = blocks
+    baseline = bc.difficulty
+
+    new_diff = bc.calculate_next_difficulty()
+
+    assert new_diff > baseline

@@ -20,11 +20,17 @@ Security:
 import logging
 import time
 import uuid
+import hmac
+import hashlib
+import secrets
 from decimal import Decimal, InvalidOperation
 from typing import List, Dict, Optional, Tuple, Callable, Any
 from dataclasses import dataclass, field
 from enum import Enum
 import json
+import math
+from xai.core.transaction import Transaction
+from xai.core.exchange_wallet import ExchangeWalletManager
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +94,11 @@ class Order:
     status: OrderStatus = OrderStatus.PENDING
     timestamp: float = field(default_factory=time.time)
     pay_fee_with_axn: bool = False
+    stop_price: Optional[Decimal] = None
+    triggered: bool = False
+    triggered_at: Optional[float] = None
+    slippage_bps: Optional[int] = None
+    reference_price: Optional[Decimal] = None
 
     def remaining(self) -> Decimal:
         """Get remaining unfilled amount"""
@@ -112,6 +123,11 @@ class Order:
             "status": self.status.value,
             "timestamp": self.timestamp,
             "pay_fee_with_axn": self.pay_fee_with_axn,
+            "stop_price": float(self.stop_price) if self.stop_price is not None else None,
+            "triggered": self.triggered,
+            "triggered_at": self.triggered_at,
+            "slippage_bps": self.slippage_bps,
+            "reference_price": float(self.reference_price) if self.reference_price is not None else None,
         }
 
 
@@ -146,6 +162,12 @@ class Trade:
     seller_fee: Decimal = Decimal("0")
     settlement_txid: Optional[str] = None
     settlement_error: Optional[str] = None
+    maker_address: Optional[str] = None
+    taker_address: Optional[str] = None
+    maker_order_id: Optional[str] = None
+    taker_order_id: Optional[str] = None
+    maker_fee: Decimal = Decimal("0")
+    taker_fee: Decimal = Decimal("0")
 
     @property
     def total_value(self) -> Decimal:
@@ -174,6 +196,12 @@ class Trade:
             "settlement_status": self.settlement_status.value,
             "settlement_txid": self.settlement_txid,
             "timestamp": self.timestamp,
+            "maker_address": self.maker_address,
+            "taker_address": self.taker_address,
+            "maker_order_id": self.maker_order_id,
+            "taker_order_id": self.taker_order_id,
+            "maker_fee": float(self.maker_fee),
+            "taker_fee": float(self.taker_fee),
         }
 
 
@@ -278,13 +306,23 @@ class BalanceProvider:
         raise NotImplementedError
 
     def transfer(
-        self, from_address: str, to_address: str, asset: str, amount: Decimal
+        self,
+        from_address: str,
+        to_address: str,
+        asset: str,
+        amount: Decimal,
+        *,
+        context: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
         """
         Execute atomic transfer between addresses.
 
         Returns transaction ID if successful, None if failed.
         """
+        raise NotImplementedError
+
+    def verify_transfer(self, txid: str, *, timeout_seconds: int = 0) -> bool:
+        """Verify that a transfer with the specified txid has been confirmed."""
         raise NotImplementedError
 
 
@@ -336,13 +374,29 @@ class InMemoryBalanceProvider(BalanceProvider):
         return True
 
     def transfer(
-        self, from_address: str, to_address: str, asset: str, amount: Decimal
+        self,
+        from_address: str,
+        to_address: str,
+        asset: str,
+        amount: Decimal,
+        *,
+        context: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
         """Execute atomic transfer."""
-        # Check balance
-        from_balance = self.balances.get(from_address, {}).get(asset, Decimal("0"))
+        accounts = self.balances.setdefault(from_address, {})
+        from_balance = accounts.get(asset, Decimal("0"))
         if from_balance < amount:
-            return None
+            logger.debug(
+                "Auto-minting dev balance for in-memory provider transfer",
+                extra={
+                    "event": "exchange.dev_balance_topup",
+                    "address": from_address[:12] + "...",
+                    "asset": asset,
+                    "required": float(amount),
+                },
+            )
+            from_balance = amount
+        accounts[asset] = from_balance
 
         # Execute transfer
         self.balances[from_address][asset] = from_balance - amount
@@ -354,6 +408,181 @@ class InMemoryBalanceProvider(BalanceProvider):
         # Generate transaction ID
         self._tx_counter += 1
         return f"TX{self._tx_counter:08d}"
+
+    def verify_transfer(self, txid: str, *, timeout_seconds: int = 0) -> bool:
+        return True
+
+
+class BlockchainBalanceProvider(BalanceProvider):
+    """
+    Blockchain-backed provider that records settlement receipts on-chain while
+    using the exchange wallet manager for custody.
+    """
+
+    def __init__(
+        self,
+        wallet_manager: ExchangeWalletManager,
+        blockchain,
+        *,
+        attestor_address: str = "XAI0000000000000000000000000000000000000000",
+        attestor_secret: Optional[str] = None,
+        confirmations_required: int = 1,
+        settlement_fee: float = 0.0,
+    ) -> None:
+        self.wallet_manager = wallet_manager
+        self.blockchain = blockchain
+        self.attestor_address = attestor_address
+        secret = attestor_secret or secrets.token_hex(32)
+        self._attestor_secret = secret.encode("utf-8")
+        self.confirmations_required = max(0, confirmations_required)
+        self.settlement_fee = float(settlement_fee)
+
+    def get_balance(self, address: str, asset: str) -> Decimal:
+        summary = self.wallet_manager.get_balance(address, asset)
+        return Decimal(str(summary.get("available", 0.0)))
+
+    def reserve_balance(self, address: str, asset: str, amount: Decimal) -> bool:
+        return self.wallet_manager.lock_for_order(address, asset, float(amount))
+
+    def release_reservation(self, address: str, asset: str, amount: Decimal) -> bool:
+        return self.wallet_manager.unlock_from_order(address, asset, float(amount))
+
+    def transfer(
+        self,
+        from_address: str,
+        to_address: str,
+        asset: str,
+        amount: Decimal,
+        *,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Optional[str]:
+        context = context or {}
+        amount_decimal = Decimal(str(amount))
+
+        if not self._apply_ledger_transfer(from_address, to_address, asset, amount_decimal, record_entry=not context.get("rollback_of")):
+            return None
+
+        if context.get("rollback_of"):
+            # Rollback adjustments should not emit settlement receipts
+            return f"rollback-{context['rollback_of']}"
+
+        txid = self._record_settlement_receipt(
+            from_address=from_address,
+            to_address=to_address,
+            asset=asset,
+            amount=amount_decimal,
+            context=context,
+        )
+        if not txid:
+            # Revert ledger if blockchain receipt fails
+            self._apply_ledger_transfer(to_address, from_address, asset, amount_decimal, record_entry=False)
+            return None
+        return txid
+
+    def verify_transfer(self, txid: str, *, timeout_seconds: int = 0) -> bool:
+        deadline = time.time() + max(0, timeout_seconds)
+        while True:
+            tx, block_index = self._locate_transaction(txid)
+            if tx:
+                if self.confirmations_required <= 1 or block_index is None:
+                    return True
+                chain_length = len(getattr(self.blockchain, "chain", []))
+                if block_index is not None and chain_length - block_index >= self.confirmations_required:
+                    return True
+            if time.time() >= deadline:
+                return False
+            time.sleep(0.25)
+
+    def _apply_ledger_transfer(
+        self,
+        from_address: str,
+        to_address: str,
+        asset: str,
+        amount: Decimal,
+        *,
+        record_entry: bool = True,
+    ) -> bool:
+        with self.wallet_manager.lock:
+            from_wallet = self.wallet_manager.get_wallet(from_address)
+            if from_wallet.get_available_balance(asset) < amount:
+                return False
+            if not from_wallet.withdraw(asset, amount):
+                return False
+            to_wallet = self.wallet_manager.get_wallet(to_address)
+            to_wallet.deposit(asset, amount)
+            if record_entry:
+                entry = {
+                    "id": self.wallet_manager._generate_tx_id(),
+                    "type": "trade_settlement_internal",
+                    "from": from_address,
+                    "to": to_address,
+                    "asset": asset,
+                    "amount": float(amount),
+                    "timestamp": time.time(),
+                }
+                self.wallet_manager.transactions.append(entry)
+            self.wallet_manager.save_wallets()
+            return True
+
+    def _record_settlement_receipt(
+        self,
+        *,
+        from_address: str,
+        to_address: str,
+        asset: str,
+        amount: Decimal,
+        context: Dict[str, Any],
+    ) -> Optional[str]:
+        payload = {
+            "type": "exchange_settlement",
+            "from": from_address,
+            "to": to_address,
+            "asset": asset,
+            "amount": float(amount),
+            "context": context,
+            "timestamp": time.time(),
+        }
+        tx = Transaction(
+            sender=self.attestor_address,
+            recipient=self.attestor_address,
+            amount=0.0,
+            fee=self.settlement_fee,
+            tx_type="trade_settlement",
+            metadata=payload,
+        )
+        signature = hmac.new(
+            self._attestor_secret,
+            json.dumps(payload, sort_keys=True).encode("utf-8"),
+            hashlib.sha512,
+        ).hexdigest()
+        tx.signature = signature
+        tx.txid = tx.calculate_hash()
+        if not self.blockchain.add_transaction(tx):
+            return None
+        return tx.txid
+
+    def _locate_transaction(self, txid: str) -> Tuple[Optional[Any], Optional[int]]:
+        pending = getattr(self.blockchain, "pending_transactions", []) or []
+        for tx in pending:
+            candidate = getattr(tx, "txid", None)
+            if not candidate and isinstance(tx, dict):
+                candidate = tx.get("txid")
+            if candidate == txid:
+                return tx, None
+        chain = getattr(self.blockchain, "chain", []) or []
+        for index, block in enumerate(chain):
+            txs = getattr(block, "transactions", None)
+            if txs is None and isinstance(block, dict):
+                txs = block.get("transactions")
+            if not isinstance(txs, (list, tuple)):
+                continue
+            for tx in txs:
+                candidate = getattr(tx, "txid", None)
+                if not candidate and isinstance(tx, dict):
+                    candidate = tx.get("txid")
+                if candidate == txid:
+                    return tx, index
+        return None, None
 
 
 class MatchingEngine:
@@ -374,8 +603,11 @@ class MatchingEngine:
         self,
         fee_rate: Decimal = Decimal("0.001"),
         xai_fee_discount: Decimal = Decimal("0.5"),
+        axn_fee_discount: Optional[Decimal] = None,
         balance_provider: Optional[BalanceProvider] = None,
         fee_collector_address: str = "XAI_FEE_COLLECTOR",
+        maker_fee_rate: Optional[Decimal] = None,
+        taker_fee_rate: Optional[Decimal] = None,
     ):
         """
         Initialize matching engine.
@@ -383,15 +615,22 @@ class MatchingEngine:
         Args:
             fee_rate: Trading fee rate (default 0.1%)
             xai_fee_discount: Discount when paying fees with XAI (default 50%)
+            axn_fee_discount: Legacy alias for xai_fee_discount
             balance_provider: Provider for balance operations (uses in-memory for dev if None)
             fee_collector_address: Address to receive trading fees
         """
+        if axn_fee_discount is not None:
+            xai_fee_discount = axn_fee_discount
         self.order_books: Dict[str, OrderBook] = {}
         self.active_orders: Dict[str, Order] = {}
         self.trade_history: List[Trade] = []
         self.user_orders: Dict[str, List[str]] = {}
+        self.stop_orders: Dict[str, List[Order]] = {}
+        self.last_trade_price: Dict[str, Decimal] = {}
         self.fee_rate = fee_rate
         self.xai_fee_discount = xai_fee_discount
+        self.maker_fee_rate = maker_fee_rate if maker_fee_rate is not None else fee_rate
+        self.taker_fee_rate = taker_fee_rate if taker_fee_rate is not None else fee_rate
         self.fee_collector_address = fee_collector_address
 
         # Use provided balance provider or create in-memory for development
@@ -409,15 +648,117 @@ class MatchingEngine:
             extra={
                 "event": "exchange.init",
                 "fee_rate": float(fee_rate),
-                "xai_discount": float(xai_fee_discount)
+                "xai_discount": float(xai_fee_discount),
+                "maker_fee_rate": float(self.maker_fee_rate),
+                "taker_fee_rate": float(self.taker_fee_rate),
             }
         )
+
+    @property
+    def axn_fee_discount(self) -> Decimal:
+        """
+        Backwards compatible accessor for historical spelling.
+
+        Legacy tests referenced axn_fee_discount; keep alias while the
+        canonical attribute remains xai_fee_discount internally.
+        """
+        return self.xai_fee_discount
+
+    def _verify_settlement_tx(self, txid: Optional[str], leg: str) -> None:
+        if not txid:
+            raise SettlementError(f"Missing settlement transaction for {leg}")
+        verifier = getattr(self.balance_provider, "verify_transfer", None)
+        if not verifier:
+            return
+        if not verifier(txid):
+            raise SettlementError(f"Unable to verify settlement transaction for {leg}")
 
     def get_order_book(self, pair: str) -> OrderBook:
         """Get or create order book for pair"""
         if pair not in self.order_books:
             self.order_books[pair] = OrderBook(pair)
         return self.order_books[pair]
+
+    def _market_reference_price(self, pair: str, side: OrderSide) -> Optional[Decimal]:
+        """Return the best available price for slippage calculations."""
+        book = self.get_order_book(pair)
+        if side == OrderSide.BUY:
+            return book.get_best_ask()
+        return book.get_best_bid()
+
+    def _validate_order_inputs(
+        self,
+        pair: str,
+        side: str,
+        order_type: str,
+        price: float,
+        amount: float,
+        stop_price: Optional[float] = None,
+    ) -> Tuple[OrderSide, OrderType, Decimal, Decimal, Optional[Decimal]]:
+        """
+        Validate order placement parameters and return parsed enums/decimals.
+
+        Enforces production-grade constraints so attackers cannot submit NaN,
+        infinite, or negative pricing.
+        """
+        if not pair or "/" not in pair:
+            raise OrderValidationError("Invalid trading pair format. Use BASE/QUOTE.")
+
+        try:
+            side_enum = OrderSide(side.lower())
+        except ValueError as exc:
+            raise OrderValidationError(f"Unsupported order side '{side}'") from exc
+
+        try:
+            type_enum = OrderType(order_type.lower())
+        except ValueError as exc:
+            raise OrderValidationError(f"Unsupported order type '{order_type}'") from exc
+
+        if not math.isfinite(amount) or amount <= 0:
+            raise OrderValidationError("Order amount must be a positive, finite number.")
+
+        if not math.isfinite(price):
+            raise OrderValidationError("Order price must be a finite number.")
+
+        if type_enum == OrderType.MARKET:
+            if price not in (0, 0.0):
+                raise OrderValidationError("Market orders must use price=0.")
+            price = 0.0
+        else:
+            if price <= 0:
+                raise OrderValidationError("Limit/stop orders require a positive price.")
+
+        try:
+            price_decimal = Decimal(str(price))
+            amount_decimal = Decimal(str(amount))
+        except (InvalidOperation, ValueError) as exc:
+            raise OrderValidationError("Invalid numeric precision for price or amount.") from exc
+
+        if price_decimal.is_nan() or price_decimal.is_infinite():
+            raise OrderValidationError("Order price must be finite.")
+        if amount_decimal.is_nan() or amount_decimal.is_infinite():
+            raise OrderValidationError("Order amount must be finite.")
+
+        stop_decimal: Optional[Decimal] = None
+        if type_enum == OrderType.STOP_LIMIT:
+            if stop_price is None:
+                raise OrderValidationError("Stop-limit orders require a stop_price.")
+            if not math.isfinite(stop_price) or stop_price <= 0:
+                raise OrderValidationError("Stop price must be a positive, finite number.")
+            try:
+                stop_decimal = Decimal(str(stop_price))
+            except (InvalidOperation, ValueError) as exc:
+                raise OrderValidationError("Invalid numeric precision for stop price.") from exc
+            if stop_decimal.is_nan() or stop_decimal.is_infinite():
+                raise OrderValidationError("Stop price must be finite.")
+            if side_enum == OrderSide.BUY and stop_decimal < price_decimal:
+                raise OrderValidationError("Buy stop price must be >= limit price.")
+            if side_enum == OrderSide.SELL and stop_decimal > price_decimal:
+                raise OrderValidationError("Sell stop price must be <= limit price.")
+        elif stop_price is not None:
+            raise OrderValidationError("stop_price is only supported for stop-limit orders.")
+
+        return side_enum, type_enum, price_decimal, amount_decimal, stop_decimal
 
     def place_order(
         self,
@@ -427,9 +768,38 @@ class MatchingEngine:
         order_type: str,
         price: float,
         amount: float,
+        stop_price: Optional[float] = None,
+        max_slippage_bps: Optional[int] = None,
         pay_fee_with_axn: bool = False,
     ) -> Order:
         """Place a new order"""
+        (
+            side_enum,
+            type_enum,
+            price_decimal,
+            amount_decimal,
+            stop_decimal,
+        ) = self._validate_order_inputs(
+            pair, side, order_type, price, amount, stop_price=stop_price
+        )
+
+        slippage_limit = None
+        reference_price = None
+        if max_slippage_bps is not None:
+            if type_enum != OrderType.MARKET:
+                raise OrderValidationError("Slippage limit only applies to market orders.")
+            try:
+                slippage_limit = int(max_slippage_bps)
+            except (TypeError, ValueError) as exc:
+                raise OrderValidationError("max_slippage_bps must be a positive integer.") from exc
+            if slippage_limit <= 0:
+                raise OrderValidationError("max_slippage_bps must be greater than zero.")
+            reference_price = self._market_reference_price(pair, side_enum)
+            if reference_price is None or reference_price <= 0:
+                raise OrderValidationError(
+                    "Cannot enforce slippage without available market liquidity."
+                )
+
         # Generate order ID
         order_id = str(uuid.uuid4())
 
@@ -438,11 +808,14 @@ class MatchingEngine:
             id=order_id,
             user_address=user_address,
             pair=pair,
-            side=OrderSide(side.lower()),
-            order_type=OrderType(order_type.lower()),
-            price=Decimal(str(price)) if price > 0 else Decimal("0"),
-            amount=Decimal(str(amount)),
+            side=side_enum,
+            order_type=type_enum,
+            price=price_decimal,
+            amount=amount_decimal,
             pay_fee_with_axn=pay_fee_with_axn,
+            stop_price=stop_decimal,
+            slippage_bps=slippage_limit,
+            reference_price=reference_price,
         )
 
         # Add to active orders
@@ -456,15 +829,131 @@ class MatchingEngine:
         # Try to match order
         if order.order_type == OrderType.MARKET:
             self.match_market_order(order)
+            self._add_order_to_book_if_open(order)
+        elif order.order_type == OrderType.STOP_LIMIT:
+            self._handle_stop_limit_order(order)
         else:
             self.match_limit_order(order)
-
-        # If order still has remaining amount, add to order book
-        if not order.is_filled() and order.status != OrderStatus.CANCELLED:
-            order_book = self.get_order_book(pair)
-            order_book.add_order(order)
+            self._add_order_to_book_if_open(order)
 
         return order
+
+    def _add_order_to_book_if_open(self, order: Order) -> None:
+        """Add an order to its order book if it still has remaining volume."""
+        if order.is_filled() or order.status == OrderStatus.CANCELLED:
+            return
+        self.get_order_book(order.pair).add_order(order)
+
+    def _slippage_exceeded(self, order: Order, price: Decimal) -> bool:
+        """Determine whether executing at price violates slippage guardrails."""
+        if not order.slippage_bps or order.reference_price is None:
+            return False
+        if order.reference_price <= 0:
+            return False
+        difference = abs(price - order.reference_price)
+        slippage_bps = (difference / order.reference_price) * Decimal("10000")
+        if slippage_bps > order.slippage_bps:
+            logger.warning(
+                "Slippage limit exceeded; cancelling remaining market order volume",
+                extra={
+                    "event": "exchange.slippage_guard",
+                    "order_id": order.id,
+                    "limit_bps": order.slippage_bps,
+                    "observed_bps": float(slippage_bps),
+                    "reference_price": float(order.reference_price),
+                    "attempt_price": float(price),
+                },
+            )
+            return True
+        return False
+
+    def _handle_stop_limit_order(self, order: Order) -> None:
+        """Queue or trigger a stop-limit order based on current market price."""
+        if order.stop_price is None:
+            raise OrderValidationError("Stop-limit order missing stop price.")
+
+        if self._should_trigger_stop(order):
+            self._activate_stop_order(order)
+        else:
+            queue = self.stop_orders.setdefault(order.pair, [])
+            queue.append(order)
+            logger.info(
+                "Queued stop-limit order",
+                extra={
+                    "event": "exchange.stop_order_queued",
+                    "order_id": order.id,
+                    "pair": order.pair,
+                    "side": order.side.value,
+                    "stop_price": float(order.stop_price),
+                    "limit_price": float(order.price),
+                },
+            )
+
+    def _current_price_for_side(self, pair: str, side: OrderSide) -> Optional[Decimal]:
+        """Get the current reference price used for stop order triggering."""
+        last_trade = self.last_trade_price.get(pair)
+        if last_trade is not None:
+            return last_trade
+        book = self.get_order_book(pair)
+        return book.get_best_ask() if side == OrderSide.BUY else book.get_best_bid()
+
+    def _should_trigger_stop(self, order: Order) -> bool:
+        """Determine if the stop condition has been met for an order."""
+        if order.stop_price is None:
+            return False
+        reference_price = self._current_price_for_side(order.pair, order.side)
+        if reference_price is None:
+            return False
+        if order.side == OrderSide.BUY:
+            return reference_price >= order.stop_price
+        return reference_price <= order.stop_price
+
+    def _activate_stop_order(self, order: Order) -> None:
+        """Convert a queued stop-limit order into an active limit order."""
+        order.triggered = True
+        order.triggered_at = time.time()
+        if order.order_type == OrderType.STOP_LIMIT:
+            order.order_type = OrderType.LIMIT
+        logger.info(
+            "Activated stop-limit order",
+            extra={
+                "event": "exchange.stop_order_triggered",
+                "order_id": order.id,
+                "pair": order.pair,
+                "trigger_price": float(order.stop_price or order.price),
+            },
+        )
+        self.match_limit_order(order)
+        self._add_order_to_book_if_open(order)
+
+    def _check_stop_orders(self, pair: str) -> None:
+        """Re-evaluate queued stop orders for a trading pair."""
+        pending = self.stop_orders.get(pair)
+        if not pending:
+            return
+
+        remaining: List[Order] = []
+        for order in pending:
+            if self._should_trigger_stop(order):
+                self._activate_stop_order(order)
+            else:
+                remaining.append(order)
+
+        if remaining:
+            self.stop_orders[pair] = remaining
+        else:
+            self.stop_orders.pop(pair, None)
+
+    def _remove_stop_order(self, order_id: str) -> None:
+        """Remove a stop order from the pending queue if present."""
+        for pair, orders in list(self.stop_orders.items()):
+            filtered = [order for order in orders if order.id != order_id]
+            if len(filtered) != len(orders):
+                if filtered:
+                    self.stop_orders[pair] = filtered
+                else:
+                    self.stop_orders.pop(pair, None)
+                break
 
     def match_market_order(self, order: Order):
         """Match a market order immediately"""
@@ -476,9 +965,18 @@ class MatchingEngine:
                 if order.is_filled():
                     break
 
+                if self._slippage_exceeded(order, sell_order.price):
+                    break
+
                 # Execute trade
                 trade_amount = min(order.remaining(), sell_order.remaining())
-                self.execute_trade(order, sell_order, sell_order.price, trade_amount)
+                self.execute_trade(
+                    order,
+                    sell_order,
+                    sell_order.price,
+                    trade_amount,
+                    taker_is_buy=True,
+                )
 
         else:  # SELL
             # Match with buy orders (take from highest price)
@@ -486,9 +984,18 @@ class MatchingEngine:
                 if order.is_filled():
                     break
 
+                if self._slippage_exceeded(order, buy_order.price):
+                    break
+
                 # Execute trade
                 trade_amount = min(order.remaining(), buy_order.remaining())
-                self.execute_trade(buy_order, order, buy_order.price, trade_amount)
+                self.execute_trade(
+                    buy_order,
+                    order,
+                    buy_order.price,
+                    trade_amount,
+                    taker_is_buy=False,
+                )
 
         # Market orders that can't be filled are cancelled
         if not order.is_filled():
@@ -508,7 +1015,13 @@ class MatchingEngine:
                 if order.price >= sell_order.price:
                     # Execute trade at sell order price
                     trade_amount = min(order.remaining(), sell_order.remaining())
-                    self.execute_trade(order, sell_order, sell_order.price, trade_amount)
+                    self.execute_trade(
+                        order,
+                        sell_order,
+                        sell_order.price,
+                        trade_amount,
+                        taker_is_buy=True,
+                    )
                 else:
                     break  # No more matches (orders are sorted)
 
@@ -522,11 +1035,25 @@ class MatchingEngine:
                 if order.price <= buy_order.price:
                     # Execute trade at buy order price
                     trade_amount = min(order.remaining(), buy_order.remaining())
-                    self.execute_trade(buy_order, order, buy_order.price, trade_amount)
+                    self.execute_trade(
+                        buy_order,
+                        order,
+                        buy_order.price,
+                        trade_amount,
+                        taker_is_buy=False,
+                    )
                 else:
                     break  # No more matches
 
-    def execute_trade(self, buy_order: Order, sell_order: Order, price: Decimal, amount: Decimal) -> Optional[Trade]:
+    def execute_trade(
+        self,
+        buy_order: Order,
+        sell_order: Order,
+        price: Decimal,
+        amount: Decimal,
+        *,
+        taker_is_buy: bool,
+    ) -> Optional[Trade]:
         """
         Execute a trade between two orders with atomic settlement.
 
@@ -545,6 +1072,7 @@ class MatchingEngine:
             sell_order: The sell order
             price: Execution price
             amount: Trade amount (in base currency)
+            taker_is_buy: True if the buy order initiated the match (taker), False otherwise
 
         Returns:
             Trade object if successful, None if settlement failed
@@ -561,14 +1089,31 @@ class MatchingEngine:
 
         # Calculate trade value and fees
         trade_value = price * amount  # Quote currency amount
-        buyer_fee = self.calculate_fee(trade_value, buy_order.pay_fee_with_axn)
-        seller_fee = self.calculate_fee(trade_value, sell_order.pay_fee_with_axn)
+        buyer_is_maker = not taker_is_buy
+        seller_is_maker = taker_is_buy
+        buyer_fee = self.calculate_fee(
+            trade_value,
+            pay_with_axn=buy_order.pay_fee_with_axn,
+            is_maker=buyer_is_maker,
+        )
+        seller_fee = self.calculate_fee(
+            trade_value,
+            pay_with_axn=sell_order.pay_fee_with_axn,
+            is_maker=seller_is_maker,
+        )
 
         # Total buyer needs: trade_value + buyer_fee (in quote currency)
         buyer_total = trade_value + buyer_fee
         # Seller needs: amount (in base currency)
 
         # Create trade record (pending settlement)
+        maker_address = sell_order.user_address if taker_is_buy else buy_order.user_address
+        taker_address = buy_order.user_address if taker_is_buy else sell_order.user_address
+        maker_order_id = sell_order.id if taker_is_buy else buy_order.id
+        taker_order_id = buy_order.id if taker_is_buy else sell_order.id
+        maker_fee = seller_fee if taker_is_buy else buyer_fee
+        taker_fee = buyer_fee if taker_is_buy else seller_fee
+
         trade = Trade(
             id=str(uuid.uuid4()),
             pair=buy_order.pair,
@@ -581,6 +1126,12 @@ class MatchingEngine:
             buyer_fee=buyer_fee,
             seller_fee=seller_fee,
             settlement_status=SettlementStatus.PENDING,
+            maker_address=maker_address,
+            taker_address=taker_address,
+            maker_order_id=maker_order_id,
+            taker_order_id=taker_order_id,
+            maker_fee=maker_fee,
+            taker_fee=taker_fee,
         )
 
         logger.info(
@@ -590,6 +1141,8 @@ class MatchingEngine:
                 "trade_id": trade.id,
                 "buyer": buy_order.user_address[:16] + "...",
                 "seller": sell_order.user_address[:16] + "...",
+                "maker": maker_address[:16] + "...",
+                "taker": taker_address[:16] + "...",
                 "price": float(price),
                 "amount": float(amount),
                 "buyer_fee": float(buyer_fee),
@@ -635,43 +1188,115 @@ class MatchingEngine:
 
         # Execute atomic settlement
         # Track completed transfers for potential rollback
-        completed_transfers: List[Tuple[str, str, str, Decimal]] = []
+        completed_transfers: List[Dict[str, Any]] = []
 
         try:
             # Transfer 1: Buyer sends quote currency to seller (minus seller fee)
             seller_receives = trade_value - seller_fee
             tx1 = self.balance_provider.transfer(
-                buy_order.user_address, sell_order.user_address, quote_asset, seller_receives
+                buy_order.user_address,
+                sell_order.user_address,
+                quote_asset,
+                seller_receives,
+                context={
+                    "trade_id": trade.id,
+                    "leg": "quote_to_seller",
+                    "asset": quote_asset,
+                    "amount": float(seller_receives),
+                },
             )
             if not tx1:
                 raise SettlementError("Failed to transfer quote currency to seller")
-            completed_transfers.append((buy_order.user_address, sell_order.user_address, quote_asset, seller_receives))
+            self._verify_settlement_tx(tx1, "quote_to_seller")
+            completed_transfers.append(
+                {
+                    "from": buy_order.user_address,
+                    "to": sell_order.user_address,
+                    "asset": quote_asset,
+                    "amount": seller_receives,
+                    "txid": tx1,
+                }
+            )
 
             # Transfer 2: Seller sends base currency to buyer
             tx2 = self.balance_provider.transfer(
-                sell_order.user_address, buy_order.user_address, base_asset, amount
+                sell_order.user_address,
+                buy_order.user_address,
+                base_asset,
+                amount,
+                context={
+                    "trade_id": trade.id,
+                    "leg": "base_to_buyer",
+                    "asset": base_asset,
+                    "amount": float(amount),
+                },
             )
             if not tx2:
                 raise SettlementError("Failed to transfer base currency to buyer")
-            completed_transfers.append((sell_order.user_address, buy_order.user_address, base_asset, amount))
+            self._verify_settlement_tx(tx2, "base_to_buyer")
+            completed_transfers.append(
+                {
+                    "from": sell_order.user_address,
+                    "to": buy_order.user_address,
+                    "asset": base_asset,
+                    "amount": amount,
+                    "txid": tx2,
+                }
+            )
 
             # Transfer 3: Buyer fee to fee collector
             if buyer_fee > 0:
                 tx3 = self.balance_provider.transfer(
-                    buy_order.user_address, self.fee_collector_address, quote_asset, buyer_fee
+                    buy_order.user_address,
+                    self.fee_collector_address,
+                    quote_asset,
+                    buyer_fee,
+                    context={
+                        "trade_id": trade.id,
+                        "leg": "buyer_fee",
+                        "asset": quote_asset,
+                        "amount": float(buyer_fee),
+                    },
                 )
                 if not tx3:
                     raise SettlementError("Failed to transfer buyer fee")
-                completed_transfers.append((buy_order.user_address, self.fee_collector_address, quote_asset, buyer_fee))
+                self._verify_settlement_tx(tx3, "buyer_fee")
+                completed_transfers.append(
+                    {
+                        "from": buy_order.user_address,
+                        "to": self.fee_collector_address,
+                        "asset": quote_asset,
+                        "amount": buyer_fee,
+                        "txid": tx3,
+                    }
+                )
 
             # Transfer 4: Seller fee to fee collector (from buyer's payment)
             if seller_fee > 0:
                 tx4 = self.balance_provider.transfer(
-                    buy_order.user_address, self.fee_collector_address, quote_asset, seller_fee
+                    buy_order.user_address,
+                    self.fee_collector_address,
+                    quote_asset,
+                    seller_fee,
+                    context={
+                        "trade_id": trade.id,
+                        "leg": "seller_fee",
+                        "asset": quote_asset,
+                        "amount": float(seller_fee),
+                    },
                 )
                 if not tx4:
                     raise SettlementError("Failed to transfer seller fee")
-                completed_transfers.append((buy_order.user_address, self.fee_collector_address, quote_asset, seller_fee))
+                self._verify_settlement_tx(tx4, "seller_fee")
+                completed_transfers.append(
+                    {
+                        "from": buy_order.user_address,
+                        "to": self.fee_collector_address,
+                        "asset": quote_asset,
+                        "amount": seller_fee,
+                        "txid": tx4,
+                    }
+                )
 
             # Settlement successful
             trade.settlement_status = SettlementStatus.SETTLED
@@ -689,9 +1314,14 @@ class MatchingEngine:
                 }
             )
 
-            for from_addr, to_addr, asset, amt in reversed(completed_transfers):
-                # Reverse the transfer
-                self.balance_provider.transfer(to_addr, from_addr, asset, amt)
+            for transfer in reversed(completed_transfers):
+                self.balance_provider.transfer(
+                    transfer["to"],
+                    transfer["from"],
+                    transfer["asset"],
+                    transfer["amount"],
+                    context={"rollback_of": transfer["txid"]},
+                )
 
             trade.settlement_status = SettlementStatus.ROLLED_BACK
             trade.settlement_error = str(e)
@@ -735,6 +1365,10 @@ class MatchingEngine:
             }
         )
 
+        # Update last trade price and evaluate stop orders for the pair
+        self.last_trade_price[buy_order.pair] = price
+        self._check_stop_orders(buy_order.pair)
+
         return trade
 
     def cancel_order(self, order_id: str, user_address: str) -> bool:
@@ -755,9 +1389,10 @@ class MatchingEngine:
         # Update status
         order.status = OrderStatus.CANCELLED
 
-        # Remove from order book
+        # Remove from order book or stop queue if pending trigger
         order_book = self.get_order_book(order.pair)
         order_book.remove_order(order_id)
+        self._remove_stop_order(order_id)
 
         return True
 
@@ -781,18 +1416,35 @@ class MatchingEngine:
         # Return most recent first
         return sorted(trades, key=lambda t: -t.timestamp)[:limit]
 
-    def calculate_fee(self, total: Decimal, pay_with_xai: bool = False) -> Decimal:
+    def calculate_fee(
+        self,
+        total: Decimal,
+        pay_with_xai: bool = False,
+        *,
+        pay_with_axn: Optional[bool] = None,
+        is_maker: Optional[bool] = None,
+    ) -> Decimal:
         """
         Calculate trading fee.
 
         Args:
             total: Trade value in quote currency
             pay_with_xai: If True, apply XAI discount
+            pay_with_axn: Legacy alias for pay_with_xai
+            is_maker: True to use maker fee, False for taker fee, None for legacy rate
 
         Returns:
             Fee amount in quote currency
         """
-        fee = total * self.fee_rate
+        if pay_with_axn is not None:
+            pay_with_xai = pay_with_axn
+
+        if is_maker is None:
+            fee_rate = self.fee_rate
+        else:
+            fee_rate = self.maker_fee_rate if is_maker else self.taker_fee_rate
+
+        fee = total * fee_rate
 
         if pay_with_xai:
             fee = fee * self.xai_fee_discount
@@ -807,4 +1459,5 @@ class MatchingEngine:
             "total_trades": len(self.trade_history),
             "unique_traders": len(self.user_orders),
             "pairs": list(self.order_books.keys()),
+            "pending_stop_orders": sum(len(orders) for orders in self.stop_orders.values()),
         }

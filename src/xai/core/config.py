@@ -13,11 +13,13 @@ SECURITY NOTICE:
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import secrets as secrets_module
 from datetime import datetime, timezone
 from enum import Enum
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +90,7 @@ P2P_MAX_UNKNOWN_GEO = int(os.getenv("XAI_P2P_MAX_UNKNOWN_GEO", "32"))
 P2P_GEOIP_ENDPOINT = os.getenv("XAI_P2P_GEOIP_ENDPOINT", "https://ipinfo.io/{ip}/json").strip()
 P2P_GEOIP_TIMEOUT = float(os.getenv("XAI_P2P_GEOIP_TIMEOUT", "2.5"))
 P2P_GEOIP_CACHE_TTL = int(os.getenv("XAI_P2P_GEOIP_CACHE_TTL", "3600"))
+P2P_CONNECTION_IDLE_TIMEOUT_SECONDS = int(os.getenv("XAI_P2P_IDLE_TIMEOUT_SECONDS", "900"))
 
 MAX_CONTRACT_GAS = int(os.getenv("XAI_MAX_CONTRACT_GAS", "20000000"))
 
@@ -99,9 +102,21 @@ TIME_CAPSULE_MASTER_KEY = _get_required_secret("XAI_TIME_CAPSULE_MASTER_KEY", NE
 PERSONAL_AI_WEBHOOK_URL = os.getenv("XAI_PERSONAL_AI_WEBHOOK_URL", "")
 PERSONAL_AI_WEBHOOK_TIMEOUT = int(os.getenv("XAI_PERSONAL_AI_WEBHOOK_TIMEOUT", "5"))
 WALLET_PASSWORD = os.getenv("XAI_WALLET_PASSWORD", "")
+
+def _parse_origin_list(raw: str) -> List[str]:
+    """Convert comma-separated origins into normalized list."""
+    origins: List[str] = []
+    for chunk in raw.split(","):
+        origin = chunk.strip()
+        if origin:
+            origins.append(origin)
+    return origins
+
+
 API_RATE_LIMIT = int(os.getenv("XAI_API_RATE_LIMIT", "120"))
 API_RATE_WINDOW_SECONDS = int(os.getenv("XAI_API_RATE_WINDOW_SECONDS", "60"))
 API_MAX_JSON_BYTES = int(os.getenv("XAI_API_MAX_JSON_BYTES", "1048576"))
+API_ALLOWED_ORIGINS = _parse_origin_list(os.getenv("XAI_API_ALLOWED_ORIGINS", ""))
 API_KEY_STORE_PATH = os.getenv(
     "XAI_API_KEY_STORE",
     os.path.join(os.getcwd(), "secure_keys", "api_keys.json"),
@@ -120,6 +135,63 @@ if API_ADMIN_TOKEN:
     API_ADMIN_KEYS.append(API_ADMIN_TOKEN)
 API_AUTH_REQUIRED = bool(int(os.getenv("XAI_API_AUTH_REQUIRED", "0")))
 API_AUTH_KEYS = [key.strip() for key in os.getenv("XAI_API_KEYS", "").split(",") if key.strip()]
+
+
+def _parse_supported_versions(raw: str) -> list[str]:
+    versions = [segment.strip() for segment in raw.split(",") if segment.strip()]
+    return versions or ["v1"]
+
+
+API_SUPPORTED_VERSIONS = _parse_supported_versions(os.getenv("XAI_API_VERSIONS", "v1,v2"))
+API_DEFAULT_VERSION = os.getenv("XAI_API_DEFAULT_VERSION", "v2").strip() or API_SUPPORTED_VERSIONS[-1]
+if API_DEFAULT_VERSION not in API_SUPPORTED_VERSIONS:
+    API_DEFAULT_VERSION = API_SUPPORTED_VERSIONS[-1]
+
+
+def _parse_int_list(raw: str) -> List[int]:
+    values: List[int] = []
+    for chunk in raw.split(","):
+        entry = chunk.strip()
+        if not entry:
+            continue
+        try:
+            values.append(int(entry))
+        except ValueError:
+            continue
+    return values
+
+
+BLOCK_HEADER_VERSION = int(os.getenv("XAI_BLOCK_HEADER_VERSION", "1"))
+_allowed_versions_env = os.getenv("XAI_BLOCK_HEADER_ALLOWED_VERSIONS", "")
+BLOCK_HEADER_ALLOWED_VERSIONS = _parse_int_list(_allowed_versions_env)
+if not BLOCK_HEADER_ALLOWED_VERSIONS:
+    BLOCK_HEADER_ALLOWED_VERSIONS = [BLOCK_HEADER_VERSION]
+
+
+def _parse_deprecations(raw: str) -> dict[str, dict[str, str]]:
+    mapping: dict[str, dict[str, str]] = {}
+    for chunk in raw.split(","):
+        entry = chunk.strip()
+        if not entry:
+            continue
+        version, _, sunset = entry.partition("=")
+        version = version.strip()
+        if not version:
+            continue
+        info: dict[str, str] = {}
+        if sunset.strip():
+            info["sunset"] = sunset.strip()
+        mapping[version] = info
+    return mapping
+
+
+API_DEPRECATED_VERSIONS = _parse_deprecations(
+    os.getenv("XAI_API_VERSION_DEPRECATIONS", "v1=Wed, 01 Jan 2025 00:00:00 GMT")
+)
+API_VERSION_DOCS_URL = os.getenv(
+    "XAI_API_VERSION_DOCS_URL",
+    "https://github.com/xai-blockchain/xai/blob/main/docs/api/versioning.md",
+).strip()
 LEDGER_DERIVATION_PATH = os.getenv("XAI_LEDGER_PATH", "44'/0'/0'/0/0")
 # SECURITY: Embedded wallet salt must be unique per deployment
 EMBEDDED_WALLET_SALT = _get_required_secret("XAI_EMBEDDED_SALT", NETWORK)
@@ -130,6 +202,38 @@ TRUSTED_PEER_CERT_FINGERPRINTS = [
 ]
 TRUSTED_PEER_PUBKEYS_FILE = os.getenv("XAI_TRUSTED_PEER_PUBKEYS_FILE", "").strip()
 TRUSTED_PEER_CERT_FPS_FILE = os.getenv("XAI_TRUSTED_PEER_CERT_FPS_FILE", "").strip()
+
+
+def _parse_deposit_sources(raw: str) -> Dict[str, Any]:
+    """Parse JSON object describing crypto deposit sources."""
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        logger.error("Invalid XAI_CRYPTO_DEPOSIT_SOURCES JSON: %s", exc)
+        return {}
+    if not isinstance(data, dict):
+        logger.error("XAI_CRYPTO_DEPOSIT_SOURCES must be a JSON object mapping currency to config")
+        return {}
+    normalized: Dict[str, Any] = {}
+    for currency, cfg in data.items():
+        if not isinstance(cfg, dict):
+            continue
+        normalized[currency.upper()] = cfg
+    return normalized
+
+
+CRYPTO_DEPOSIT_MONITOR_ENABLED = bool(int(os.getenv("XAI_CRYPTO_DEPOSIT_MONITOR_ENABLED", "0")))
+CRYPTO_DEPOSIT_MONITOR_POLL_INTERVAL = int(os.getenv("XAI_CRYPTO_DEPOSIT_POLL_INTERVAL", "30"))
+CRYPTO_DEPOSIT_MONITOR_POLL_JITTER = int(os.getenv("XAI_CRYPTO_DEPOSIT_POLL_JITTER", "5"))
+CRYPTO_DEPOSIT_SOURCES = _parse_deposit_sources(os.getenv("XAI_CRYPTO_DEPOSIT_SOURCES", ""))
+CRYPTO_DEPOSIT_MONITOR = {
+    "ENABLED": CRYPTO_DEPOSIT_MONITOR_ENABLED,
+    "POLL_INTERVAL": CRYPTO_DEPOSIT_MONITOR_POLL_INTERVAL,
+    "JITTER_SECONDS": CRYPTO_DEPOSIT_MONITOR_POLL_JITTER,
+    "SOURCES": CRYPTO_DEPOSIT_SOURCES,
+}
 PEER_NONCE_TTL_SECONDS = int(os.getenv("XAI_PEER_NONCE_TTL_SECONDS", "300"))
 PEER_REQUIRE_CLIENT_CERT = bool(int(os.getenv("XAI_PEER_REQUIRE_CLIENT_CERT", "0")))
 P2P_DNS_SEEDS = [seed.strip() for seed in os.getenv("XAI_P2P_DNS_SEEDS", "").split(",") if seed.strip()]
@@ -209,9 +313,14 @@ class TestnetConfig:
     API_RATE_WINDOW_SECONDS = API_RATE_WINDOW_SECONDS
     API_MAX_JSON_BYTES = API_MAX_JSON_BYTES
     API_KEY_STORE_PATH = API_KEY_STORE_PATH
+    API_ALLOWED_ORIGINS = API_ALLOWED_ORIGINS
     API_ADMIN_KEYS = API_ADMIN_KEYS
     API_AUTH_REQUIRED = API_AUTH_REQUIRED
     API_AUTH_KEYS = API_AUTH_KEYS
+    API_SUPPORTED_VERSIONS = API_SUPPORTED_VERSIONS
+    API_DEFAULT_VERSION = API_DEFAULT_VERSION
+    API_DEPRECATED_VERSIONS = API_DEPRECATED_VERSIONS
+    API_VERSION_DOCS_URL = API_VERSION_DOCS_URL
     PEER_API_KEY = API_PEER_SHARED_KEY
     PEER_TLS_REQUIRED = bool(int(os.getenv("XAI_PEER_TLS_REQUIRED", "0")))
     PEER_CA_BUNDLE = os.getenv("XAI_PEER_CA_BUNDLE", "").strip()
@@ -238,7 +347,11 @@ class TestnetConfig:
     P2P_GEOIP_ENDPOINT = P2P_GEOIP_ENDPOINT
     P2P_GEOIP_TIMEOUT = P2P_GEOIP_TIMEOUT
     P2P_GEOIP_CACHE_TTL = P2P_GEOIP_CACHE_TTL
+    BLOCK_HEADER_VERSION = BLOCK_HEADER_VERSION
+    BLOCK_HEADER_ALLOWED_VERSIONS = BLOCK_HEADER_ALLOWED_VERSIONS
     WALLET_TRADE_PEER_SECRET = WALLET_TRADE_PEER_SECRET
+    BLOCK_HEADER_VERSION = BLOCK_HEADER_VERSION
+    BLOCK_HEADER_ALLOWED_VERSIONS = BLOCK_HEADER_ALLOWED_VERSIONS
 
 # Mempool limits
 MEMPOOL_MAX_SIZE = int(os.getenv("XAI_MEMPOOL_MAX_SIZE", "10000"))
@@ -316,9 +429,14 @@ class MainnetConfig:
     API_RATE_WINDOW_SECONDS = API_RATE_WINDOW_SECONDS
     API_MAX_JSON_BYTES = API_MAX_JSON_BYTES
     API_KEY_STORE_PATH = API_KEY_STORE_PATH
+    API_ALLOWED_ORIGINS = API_ALLOWED_ORIGINS
     API_ADMIN_KEYS = API_ADMIN_KEYS
     API_AUTH_REQUIRED = API_AUTH_REQUIRED
     API_AUTH_KEYS = API_AUTH_KEYS
+    API_SUPPORTED_VERSIONS = API_SUPPORTED_VERSIONS
+    API_DEFAULT_VERSION = API_DEFAULT_VERSION
+    API_DEPRECATED_VERSIONS = API_DEPRECATED_VERSIONS
+    API_VERSION_DOCS_URL = API_VERSION_DOCS_URL
     PEER_API_KEY = API_PEER_SHARED_KEY
     SECURITY_WEBHOOK_URL = SECURITY_WEBHOOK_URL
     SECURITY_WEBHOOK_TOKEN = SECURITY_WEBHOOK_TOKEN
@@ -387,6 +505,8 @@ Config.MEMPOOL_ALERT_INVALID_DELTA = MEMPOOL_ALERT_INVALID_DELTA
 Config.MEMPOOL_ALERT_BAN_DELTA = MEMPOOL_ALERT_BAN_DELTA
 Config.MEMPOOL_ALERT_ACTIVE_BANS = MEMPOOL_ALERT_ACTIVE_BANS
 Config.P2P_QUIC_DIAL_TIMEOUT = P2P_QUIC_DIAL_TIMEOUT
+Config.P2P_CONNECTION_IDLE_TIMEOUT_SECONDS = P2P_CONNECTION_IDLE_TIMEOUT_SECONDS
+Config.CRYPTO_DEPOSIT_MONITOR = CRYPTO_DEPOSIT_MONITOR
 
 # Wallet trade peers
 

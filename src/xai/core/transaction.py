@@ -322,7 +322,7 @@ class Transaction:
         self.nonce = nonce
 
         # Validate tx_type
-        valid_types = {"normal", "coinbase", "contract", "governance", "stake", "unstake"}
+        valid_types = {"normal", "coinbase", "contract", "governance", "stake", "unstake", "trade_settlement"}
         if tx_type not in valid_types:
             logger.warning(
                 "Non-standard tx_type: %s (allowed but may not be processed)",

@@ -1,7 +1,7 @@
 import hashlib
 import json
 import logging
-import random
+import secrets
 from typing import Dict, Any
 
 logger = logging.getLogger("xai.blockchain.front_running_protection")
@@ -75,9 +75,11 @@ class FrontRunningProtectionManager:
         # For simplicity, we'll just process all revealed transactions.
         # In a real system, this would be a batch from the mempool.
 
-        # Simulate a fair ordering (e.g., random for demonstration)
+        # Use cryptographically secure shuffling to ensure unpredictable transaction ordering
+        # This prevents front-running attacks by making order manipulation infeasible
         ordered_tx_hashes = list(self.revealed_transactions.keys())
-        random.shuffle(ordered_tx_hashes)
+        sr = secrets.SystemRandom()
+        sr.shuffle(ordered_tx_hashes)
 
         for tx_hash in ordered_tx_hashes:
             tx = self.revealed_transactions[tx_hash]

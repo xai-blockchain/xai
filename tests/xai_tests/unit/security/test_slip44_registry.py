@@ -18,6 +18,7 @@ def test_registry_contains_registered_xai_coin_type():
     assert entry.coin_type == HDWallet.XAI_COIN_TYPE
     assert entry.name == "Xai Blockchain"
     assert "XAI" in entry.symbol
+    assert entry.reference.endswith("XAI-SLIP44-22593")
 
 
 def test_registry_validates_coin_type_mismatch():
@@ -25,6 +26,10 @@ def test_registry_validates_coin_type_mismatch():
 
     with pytest.raises(Slip44RegistrationError):
         registry.validate_coin_type("XAI", 9999)
+
+
+def test_hd_wallet_coin_type_matches_registry_assignment():
+    assert HDWallet.XAI_COIN_TYPE == 22593
 
 
 def test_hd_wallet_uses_registered_coin_type_in_paths():

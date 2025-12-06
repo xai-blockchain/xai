@@ -30,6 +30,7 @@ services:
       XAI_MAX_PEERS: 50
       XAI_MIN_PEERS: 3
       LOG_LEVEL: DEBUG
+      XAI_DEFAULT_HOST: 0.0.0.0
       POSTGRES_HOST: testnet-postgres
       REDIS_HOST: testnet-redis
       POSTGRES_DB: xai_testnet
@@ -79,6 +80,7 @@ services:
       XAI_MINING_THREADS: 1
       XAI_MAX_PEERS: 25
       LOG_LEVEL: INFO
+      XAI_DEFAULT_HOST: 0.0.0.0
       POSTGRES_HOST: testnet-postgres
       REDIS_HOST: testnet-redis
       POSTGRES_DB: xai_testnet
@@ -121,6 +123,7 @@ services:
       XAI_ENABLE_MINING: "false"
       XAI_MAX_PEERS: 25
       LOG_LEVEL: INFO
+      XAI_DEFAULT_HOST: 0.0.0.0
       POSTGRES_HOST: testnet-postgres
       REDIS_HOST: testnet-redis
       POSTGRES_DB: xai_testnet

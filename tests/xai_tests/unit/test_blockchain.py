@@ -13,6 +13,9 @@ from decimal import Decimal
 # Add core directory to path
 
 from xai.core.blockchain import Blockchain, Transaction, Block
+from xai.core.block_header import BlockHeader
+from xai.core.crypto_utils import sign_message_hex
+from xai.core.blockchain_security import BlockchainSecurityConfig, BlockSizeValidator
 from xai.core.wallet import Wallet
 
 
@@ -735,6 +738,203 @@ class TestCirculatingSupply:
 
         new_supply = bc.get_circulating_supply()
         assert new_supply > initial_supply
+
+
+class TestDifficultyGuardrails:
+    """Ensure deterministic difficulty schedule is enforced."""
+
+    @staticmethod
+    def _build_coinbase_tx(blockchain: Blockchain, wallet: Wallet) -> Transaction:
+        reward = blockchain.get_block_reward(len(blockchain.chain))
+        tx = Transaction(
+            "COINBASE",
+            wallet.address,
+            reward,
+            tx_type="coinbase",
+            outputs=[{"address": wallet.address, "amount": reward}],
+        )
+        tx.txid = tx.calculate_hash()
+        return tx
+
+    @staticmethod
+    def _mine_without_fast_cap(blockchain: Blockchain, header: BlockHeader) -> None:
+        """Mine a header without allowing fast-mining overrides to mutate difficulty."""
+        original_flag = blockchain.fast_mining_enabled
+        blockchain.fast_mining_enabled = False
+        try:
+            header.hash = blockchain.mine_block(header)
+        finally:
+            blockchain.fast_mining_enabled = original_flag
+
+    def test_add_block_rejects_mismatched_difficulty(self, tmp_path):
+        """Nodes must refuse blocks that deviate from the difficulty schedule."""
+        bc = Blockchain(data_dir=str(tmp_path))
+        wallet = Wallet()
+        coinbase_tx = self._build_coinbase_tx(bc, wallet)
+        merkle_root = bc.calculate_merkle_root([coinbase_tx])
+        expected_diff = bc.calculate_next_difficulty()
+        wrong_diff = expected_diff - 1 if expected_diff > 1 else expected_diff + 1
+
+        header = BlockHeader(
+            index=len(bc.chain),
+            previous_hash=bc.chain[-1].hash,
+            merkle_root=merkle_root,
+            timestamp=time.time(),
+            difficulty=wrong_diff,
+            nonce=0,
+            miner_pubkey=wallet.public_key,
+        )
+        self._mine_without_fast_cap(bc, header)
+        header.signature = sign_message_hex(wallet.private_key, header.hash.encode())
+        forged_block = Block(header, [coinbase_tx])
+
+        assert bc.add_block(forged_block) is False
+
+    def test_validate_chain_catches_difficulty_schedule_violation(self, tmp_path):
+        """Full chain validation should reject tampered difficulty announcements."""
+        bc = Blockchain(data_dir=str(tmp_path))
+        wallet = Wallet()
+        coinbase_tx = self._build_coinbase_tx(bc, wallet)
+        merkle_root = bc.calculate_merkle_root([coinbase_tx])
+        wrong_diff = bc.calculate_next_difficulty() + 1
+
+        header = BlockHeader(
+            index=len(bc.chain),
+            previous_hash=bc.chain[-1].hash,
+            merkle_root=merkle_root,
+            timestamp=time.time(),
+            difficulty=wrong_diff,
+            nonce=0,
+            miner_pubkey=wallet.public_key,
+        )
+        self._mine_without_fast_cap(bc, header)
+        header.signature = sign_message_hex(wallet.private_key, header.hash.encode())
+        forged_block = Block(header, [coinbase_tx])
+
+        genesis_block = bc.get_block(0)
+        assert genesis_block is not None
+        assert bc.validate_chain(chain=[genesis_block, forged_block]) is False
+
+
+class TestHeaderVersionEnforcement:
+    """Ensure unsupported header versions are rejected."""
+
+    def test_add_block_rejects_unsupported_version(self, tmp_path, monkeypatch):
+        """Nodes must refuse blocks advertising disallowed header versions."""
+        bc = Blockchain(data_dir=str(tmp_path))
+        wallet = Wallet()
+        coinbase_tx = TestDifficultyGuardrails._build_coinbase_tx(bc, wallet)
+        merkle_root = bc.calculate_merkle_root([coinbase_tx])
+        invalid_version = max(bc._allowed_block_header_versions) + 5
+
+        header = BlockHeader(
+            index=len(bc.chain),
+            previous_hash=bc.chain[-1].hash,
+            merkle_root=merkle_root,
+            timestamp=time.time(),
+            difficulty=bc.calculate_next_difficulty(),
+            nonce=0,
+            miner_pubkey=wallet.public_key,
+            version=invalid_version,
+        )
+        TestDifficultyGuardrails._mine_without_fast_cap(bc, header)
+        header.signature = sign_message_hex(wallet.private_key, header.hash.encode())
+        forged_block = Block(header, [coinbase_tx])
+
+        assert bc.add_block(forged_block) is False
+
+    def test_validate_chain_detects_bad_header_version(self, tmp_path):
+        """Chain validation path must also reject unsupported header versions."""
+        bc = Blockchain(data_dir=str(tmp_path))
+        wallet = Wallet()
+        coinbase_tx = TestDifficultyGuardrails._build_coinbase_tx(bc, wallet)
+        merkle_root = bc.calculate_merkle_root([coinbase_tx])
+        invalid_version = min(bc._allowed_block_header_versions) - 1
+
+        header = BlockHeader(
+            index=len(bc.chain),
+            previous_hash=bc.chain[-1].hash,
+            merkle_root=merkle_root,
+            timestamp=time.time(),
+            difficulty=bc.calculate_next_difficulty(),
+            nonce=0,
+            miner_pubkey=wallet.public_key,
+            version=invalid_version,
+        )
+        TestDifficultyGuardrails._mine_without_fast_cap(bc, header)
+        header.signature = sign_message_hex(wallet.private_key, header.hash.encode())
+        forged_block = Block(header, [coinbase_tx])
+
+        genesis_block = bc.get_block(0)
+        assert genesis_block is not None
+        assert bc.validate_chain(chain=[genesis_block, forged_block]) is False
+
+
+class TestBlockSizeEnforcement:
+    """Ensure oversized blocks are rejected early."""
+
+    @staticmethod
+    def _create_padding_transaction(wallet: Wallet) -> Transaction:
+        tx = Transaction(
+            "COINBASE",
+            wallet.address,
+            0.0,
+            tx_type="coinbase",
+            outputs=[{"address": wallet.address, "amount": 0.0}],
+            metadata={"padding": "x" * 512},
+        )
+        tx.txid = tx.calculate_hash()
+        return tx
+
+    def _build_oversized_block(self, blockchain: Blockchain, wallet: Wallet) -> Block:
+        """Construct a block whose serialized size exceeds the configured maximum."""
+        transactions: List[Transaction] = []
+        target_index = len(blockchain.chain)
+        previous_hash = blockchain.chain[-1].hash
+
+        while True:
+            transactions.append(self._create_padding_transaction(wallet))
+            merkle_root = blockchain.calculate_merkle_root(transactions)
+            header = BlockHeader(
+                index=target_index,
+                previous_hash=previous_hash,
+                merkle_root=merkle_root,
+                timestamp=time.time(),
+                difficulty=blockchain.difficulty,
+                nonce=0,
+                miner_pubkey=wallet.public_key,
+            )
+            candidate = Block(header, list(transactions))
+            fits, _ = BlockSizeValidator.validate_block_size(candidate)
+            if not fits:
+                TestDifficultyGuardrails._mine_without_fast_cap(blockchain, header)
+                header.signature = sign_message_hex(wallet.private_key, header.hash.encode())
+                oversized = Block(header, list(transactions))
+                oversized.miner = wallet.address
+                return oversized
+
+            if len(transactions) > 2000:
+                raise AssertionError("Failed to construct oversized block for testing")
+
+    def test_add_block_rejects_oversized_block(self, tmp_path, monkeypatch):
+        """Inbound oversized blocks are rejected before touching state."""
+        monkeypatch.setattr(BlockchainSecurityConfig, "MAX_BLOCK_SIZE", 15_000, raising=False)
+        bc = Blockchain(data_dir=str(tmp_path))
+        wallet = Wallet()
+        oversized_block = self._build_oversized_block(bc, wallet)
+        fits, _ = BlockSizeValidator.validate_block_size(oversized_block)
+        assert fits is False
+        assert bc.add_block(oversized_block) is False
+
+    def test_validate_chain_blocks_oversized_candidate(self, tmp_path, monkeypatch):
+        """Chain validation rejects oversized blocks when verifying alternate histories."""
+        monkeypatch.setattr(BlockchainSecurityConfig, "MAX_BLOCK_SIZE", 15_000, raising=False)
+        bc = Blockchain(data_dir=str(tmp_path))
+        wallet = Wallet()
+        oversized_block = self._build_oversized_block(bc, wallet)
+        genesis_block = bc.get_block(0)
+        assert genesis_block is not None
+        assert bc.validate_chain(chain=[genesis_block, oversized_block]) is False
 
 
 if __name__ == "__main__":

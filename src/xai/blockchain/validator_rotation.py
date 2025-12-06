@@ -1,5 +1,5 @@
 import logging
-import random
+import secrets
 from typing import List, Dict, Any
 
 logger = logging.getLogger("xai.blockchain.validator_rotation")
@@ -66,9 +66,10 @@ class ValidatorSetManager:
         # Calculate weights: stake * reputation (can be more complex)
         weights = [v.stake * v.reputation for v in eligible_validators]
 
-        # Use random.choices for weighted random selection
-        # k is the number of validators to select
-        selected_set = random.choices(eligible_validators, weights=weights, k=self.set_size)
+        # Use cryptographically secure random selection for validator rotation
+        # This prevents prediction and manipulation of validator selection
+        sr = secrets.SystemRandom()
+        selected_set = sr.choices(eligible_validators, weights=weights, k=self.set_size)
 
         # Ensure uniqueness if random.choices can return duplicates (it can if k > len(population))
         # For simplicity, if duplicates are selected, we'll just have a smaller set or re-select.

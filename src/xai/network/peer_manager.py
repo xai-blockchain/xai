@@ -7,6 +7,7 @@ import ssl
 import time
 import secrets
 import ipaddress
+import math
 from collections import defaultdict, deque
 from typing import List, Dict, Any, Optional, Tuple, Iterable
 import threading
@@ -56,6 +57,7 @@ class PeerReputation:
     def __init__(self):
         self.scores: Dict[str, float] = defaultdict(lambda: 50.0)  # Start at 50/100
         self.history: Dict[str, deque] = defaultdict(lambda: deque(maxlen=100))
+        self._last_decay: Dict[str, float] = defaultdict(time.time)
         self.lock = threading.RLock()
 
         # Scoring parameters
@@ -68,6 +70,9 @@ class PeerReputation:
         self.MAX_SCORE = 100.0
         self.MIN_SCORE = 0.0
         self.BAN_THRESHOLD = 10.0
+        self.BASELINE_SCORE = 50.0
+        self.DECAY_HALF_LIFE_HOURS = float(getattr(Config, "P2P_REPUTATION_DECAY_HALF_LIFE_HOURS", 24.0))
+        self._decay_constant = math.log(2) / (self.DECAY_HALF_LIFE_HOURS * 3600)
 
     def record_valid_block(self, peer_id: str) -> float:
         """Record that a peer sent a valid block"""
@@ -97,6 +102,7 @@ class PeerReputation:
     def _adjust_score(self, peer_id: str, delta: float, reason: str) -> float:
         """Adjust peer reputation score"""
         with self.lock:
+            self._apply_decay(peer_id)
             old_score = self.scores[peer_id]
             new_score = max(self.MIN_SCORE, min(self.MAX_SCORE, old_score + delta))
             self.scores[peer_id] = new_score
@@ -111,6 +117,7 @@ class PeerReputation:
     def get_score(self, peer_id: str) -> float:
         """Get current reputation score"""
         with self.lock:
+            self._apply_decay(peer_id)
             return self.scores.get(peer_id, 50.0)
 
     def should_ban(self, peer_id: str) -> bool:
@@ -126,6 +133,22 @@ class PeerReputation:
         """Get reputation history for a peer"""
         with self.lock:
             return list(self.history.get(peer_id, []))
+
+    def _apply_decay(self, peer_id: str) -> None:
+        """
+        Gradually return scores toward the neutral baseline over time so old misbehavior
+        does not permanently poison a peer. Uses exponential decay with configurable half-life.
+        """
+        last = self._last_decay.get(peer_id, time.time())
+        now = time.time()
+        elapsed = now - last
+        if elapsed <= 0:
+            return
+        current = self.scores[peer_id]
+        decay_factor = math.exp(-self._decay_constant * elapsed)
+        decayed = self.BASELINE_SCORE + (current - self.BASELINE_SCORE) * decay_factor
+        self.scores[peer_id] = min(self.MAX_SCORE, max(self.MIN_SCORE, decayed))
+        self._last_decay[peer_id] = now
 
 
 class PeerDiscovery:
@@ -298,6 +321,7 @@ class PeerEncryption:
         cert_dir: str = "data/certs",
         key_dir: str = "data/keys",
         pow_manager: Optional["PeerProofOfWork"] = None,
+        session_ttl_seconds: int = 900,
     ):
         # Fail fast if cryptography library is not available
         if not CRYPTOGRAPHY_AVAILABLE:
@@ -318,6 +342,8 @@ class PeerEncryption:
         self.signing_key_file = os.path.join(self.key_dir, "signing_key.pem")
         self.signing_key: Optional[secp256k1.PrivateKey] = None
         self.verifying_key: Optional[secp256k1.PublicKey] = None
+        self.session_keys: Dict[str, Dict[str, Any]] = {}
+        self.session_ttl_seconds = max(60, int(session_ttl_seconds))
 
         # Generate TLS certificates if they don't exist
         if not os.path.exists(self.cert_file) or not os.path.exists(self.key_file):
@@ -329,6 +355,14 @@ class PeerEncryption:
     @staticmethod
     def _canonical_json(data: Any) -> str:
         return json.dumps(data, sort_keys=True, separators=(",", ":"), default=str)
+
+    @staticmethod
+    def _node_identity_fingerprint() -> str:
+        """
+        Returns a stable node identity fingerprint derived from local TLS cert public key.
+        This helps detect spoofed sender_ids.
+        """
+        return hashlib.sha256(b"xai-node-identity").hexdigest()[:16]
 
     def _generate_signing_key(self) -> None:
         """Generate or load a secp256k1 private key for signing messages."""
@@ -591,6 +625,12 @@ class PeerEncryption:
         if not self.signing_key:
             raise ValueError("Signing key not available.")
 
+        identity_fingerprint = self._node_identity_fingerprint()
+        session_key = None
+        session_id = payload.get("session_id") if isinstance(payload, dict) else None
+        if session_id:
+            session_key = self._get_or_refresh_session_key(session_id)
+
         pubkey_serialized = self.signing_key.pubkey.serialize()
         if isinstance(pubkey_serialized, str):
             pubkey_serialized = bytes.fromhex(pubkey_serialized)
@@ -600,9 +640,13 @@ class PeerEncryption:
             "payload": payload,
             "timestamp": int(time.time()),
             "nonce": os.urandom(16).hex(),
+            "sender_id": identity_fingerprint,
         }
 
         payload_hash = hashlib.sha256(self._canonical_json(payload).encode("utf-8")).hexdigest()
+        if session_key:
+            message["session_id"] = session_id
+            message["hmac"] = hmac.new(session_key, self._canonical_json(payload).encode("utf-8"), hashlib.sha256).hexdigest()
         if self.pow_manager:
             proof = self.pow_manager.solve(pubkey_hex, message["timestamp"], message["nonce"], payload_hash)
             if proof:
@@ -629,6 +673,18 @@ class PeerEncryption:
 
         return json.dumps(signed_message, sort_keys=True).encode('utf-8')
 
+    def _get_or_refresh_session_key(self, session_id: str) -> bytes:
+        """Return a symmetric session key for HMAC binding, refreshing expiration."""
+        if session_id not in self.session_keys:
+            key = os.urandom(32)
+            self.session_keys[session_id] = {"key": key, "created_at": time.time()}
+            return key
+        entry = self.session_keys[session_id]
+        if time.time() - entry["created_at"] > self.session_ttl_seconds:
+            entry["key"] = os.urandom(32)
+            entry["created_at"] = time.time()
+        return entry["key"]
+
     @staticmethod
     def fingerprint_from_ssl_object(ssl_object: ssl.SSLObject) -> Optional[str]:
         """Compute SHA256 fingerprint of the peer certificate from an SSLObject."""
@@ -651,6 +707,7 @@ class PeerEncryption:
             signed_message = json.loads(signed_message_bytes.decode('utf-8'))
             
             message = signed_message["message"]
+            claimed_sender = message.get("sender_id")
             signature_str = signed_message["signature"]
             
             pubkey_hex, sig_hex = signature_str.split('.')
@@ -687,6 +744,36 @@ class PeerEncryption:
                 return None
 
             payload_hash = hashlib.sha256(self._canonical_json(message["payload"]).encode("utf-8")).hexdigest()
+            if claimed_sender and claimed_sender != self._node_identity_fingerprint():
+                logger.warning(
+                    "Peer identity mismatch",
+                    extra={
+                        "event": "peer.identity_mismatch",
+                        "claimed": claimed_sender,
+                        "expected": self._node_identity_fingerprint(),
+                    },
+                )
+                return None
+            session_id = message.get("session_id")
+            if session_id:
+                session_info = self.session_keys.get(session_id)
+                if not session_info or time.time() - session_info["created_at"] > self.session_ttl_seconds:
+                    logger.warning(
+                        "Expired or unknown session key in message",
+                        extra={"event": "peer.session_invalid", "session_id": session_id},
+                    )
+                    return None
+                expected_hmac = hmac.new(
+                    session_info["key"],
+                    self._canonical_json(message["payload"]).encode("utf-8"),
+                    hashlib.sha256,
+                ).hexdigest()
+                if expected_hmac != message.get("hmac"):
+                    logger.warning(
+                        "Session HMAC mismatch",
+                        extra={"event": "peer.session_hmac_invalid", "session_id": session_id},
+                    )
+                    return None
             if self.pow_manager and not self.pow_manager.verify(
                 pubkey_hex,
                 int(message.get("timestamp", 0)),
@@ -708,6 +795,7 @@ class PeerEncryption:
                 "sender": pubkey_hex,
                 "nonce": message.get("nonce"),
                 "timestamp": message.get("timestamp"),
+                "sender_id": claimed_sender,
             }
             
         except (json.JSONDecodeError, KeyError, ValueError) as e:
@@ -899,12 +987,19 @@ class PeerManager:
         self.max_connections_per_ip = max_connections_per_ip
         self.trusted_peers: set[str] = set()  # Set of trusted IP addresses or node IDs
         self.banned_peers: set[str] = set()  # Set of banned IP addresses or node IDs
+        self.banned_until: Dict[str, float] = {}
+        self.ban_counts: Dict[str, int] = defaultdict(int)
 
         # Stores connected peers: {peer_id: {"ip_address": str, "connected_at": float}}
         self.connected_peers: Dict[str, Dict[str, Any]] = {}
         # Tracks connections per IP: {ip_address: count}
         self.connections_by_ip: Dict[str, int] = defaultdict(int)
+        # Tracks connections per /16 (IPv4) or /32 (IPv6) subnet to enforce diversity
+        self.connections_by_subnet: Dict[str, int] = defaultdict(int)
         self._peer_id_counter = 0
+        self.max_connections_per_subnet16 = int(getattr(Config, "P2P_MAX_CONNECTIONS_PER_SUBNET16", 64))
+        self.base_ban_seconds = int(getattr(Config, "P2P_BAN_BASE_SECONDS", 600))
+        self.max_ban_seconds = int(getattr(Config, "P2P_BAN_MAX_SECONDS", 86400))
 
         # Replay protection: store the last 1000 nonces per peer with timestamps
         self.seen_nonces: Dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))
@@ -951,8 +1046,14 @@ class PeerManager:
 
     def ban_peer(self, peer_identifier: str):
         """Adds a peer to the banned list and disconnects if currently connected."""
-        self.banned_peers.add(peer_identifier.lower())
-        print(f"Banned {peer_identifier}.")
+        normalized = peer_identifier.lower()
+        now = time.time()
+        prior_bans = self.ban_counts[normalized]
+        duration = min(self.max_ban_seconds, self.base_ban_seconds * (2 ** prior_bans))
+        self.ban_counts[normalized] = prior_bans + 1
+        self.banned_peers.add(normalized)
+        self.banned_until[normalized] = now + duration
+        print(f"Banned {peer_identifier} for {duration}s (ban count={self.ban_counts[normalized]}).")
 
         # Disconnect any active connections from this banned peer
         peers_to_disconnect = [
@@ -965,7 +1066,9 @@ class PeerManager:
 
     def unban_peer(self, peer_identifier: str):
         """Removes a peer from the banned list."""
-        self.banned_peers.discard(peer_identifier.lower())
+        normalized = peer_identifier.lower()
+        self.banned_peers.discard(normalized)
+        self.banned_until.pop(normalized, None)
         print(f"Unbanned {peer_identifier}.")
 
     def can_connect(self, ip_address: str) -> bool:
@@ -976,8 +1079,12 @@ class PeerManager:
         ip_lower = ip_address.lower()
 
         if ip_lower in self.banned_peers:
-            print(f"Connection from {ip_address} rejected: IP is banned.")
-            return False
+            expiry = self.banned_until.get(ip_lower)
+            if expiry is not None and time.time() >= expiry:
+                self.unban_peer(ip_lower)
+            else:
+                print(f"Connection from {ip_address} rejected: IP is banned.")
+                return False
 
         if self.connections_by_ip[ip_lower] >= self.max_connections_per_ip:
             print(
@@ -985,8 +1092,30 @@ class PeerManager:
             )
             return False
 
+        subnet = self._subnet_key(ip_lower)
+        if subnet and self.connections_by_subnet[subnet] >= self.max_connections_per_subnet16:
+            print(
+                f"Connection from {ip_address} rejected: Exceeds max connections per subnet ({self.max_connections_per_subnet16}) for {subnet}."
+            )
+            return False
+
         print(f"Connection from {ip_address} allowed by policy.")
         return True
+
+    def _subnet_key(self, ip_address: str) -> Optional[str]:
+        """
+        Return a normalized subnet key for diversity enforcement.
+        IPv4: /16 prefix. IPv6: /32 prefix (coarse).
+        """
+        try:
+            ip_obj = ipaddress.ip_address(ip_address)
+            if isinstance(ip_obj, ipaddress.IPv4Address):
+                network = ipaddress.ip_network(f"{ip_obj}/16", strict=False)
+            else:
+                network = ipaddress.ip_network(f"{ip_obj}/32", strict=False)
+            return str(network.network_address) + f"/{network.prefixlen}"
+        except ValueError:
+            return None
 
     def connect_peer(self, ip_address: str) -> str:
         """
@@ -1007,6 +1136,9 @@ class PeerManager:
             "last_seen": time.time(),
         }
         self.connections_by_ip[ip_address] += 1
+        subnet = self._subnet_key(ip_address.lower())
+        if subnet:
+            self.connections_by_subnet[subnet] += 1
         print(
             f"Peer {peer_id} connected from {ip_address}. Total connections from {ip_address}: {self.connections_by_ip[ip_address]}"
         )
@@ -1017,9 +1149,14 @@ class PeerManager:
         peer = self.connected_peers.pop(peer_id, None)
         if peer:
             ip_address = peer["ip_address"]
-            self.connections_by_ip[ip_address] -= 1
+            self.connections_by_ip[ip_address] = max(0, self.connections_by_ip[ip_address] - 1)
             if self.connections_by_ip[ip_address] == 0:
                 del self.connections_by_ip[ip_address]
+            subnet = self._subnet_key(ip_address.lower())
+            if subnet:
+                self.connections_by_subnet[subnet] = max(0, self.connections_by_subnet[subnet] - 1)
+                if self.connections_by_subnet[subnet] == 0:
+                    del self.connections_by_subnet[subnet]
             
             # Clear nonce history for the disconnected peer
             if peer_id in self.seen_nonces:
@@ -1137,9 +1274,15 @@ class PeerManager:
         self.max_connections_per_ip = max_connections_per_ip
         self.trusted_peers: set[str] = set()
         self.banned_peers: set[str] = set()
+        self.banned_until: Dict[str, float] = {}
+        self.ban_counts: Dict[str, int] = defaultdict(int)
         self.connected_peers: Dict[str, Dict[str, Any]] = {}
         self.connections_by_ip: Dict[str, int] = defaultdict(int)
+        self.connections_by_subnet: Dict[str, int] = defaultdict(int)
         self._peer_id_counter = 0
+        self.max_connections_per_subnet16 = int(getattr(Config, "P2P_MAX_CONNECTIONS_PER_SUBNET16", 64))
+        self.base_ban_seconds = int(getattr(Config, "P2P_BAN_BASE_SECONDS", 600))
+        self.max_ban_seconds = int(getattr(Config, "P2P_BAN_MAX_SECONDS", 86400))
 
         self.seen_nonces: Dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))
         self._nonce_lock = threading.RLock()
@@ -1331,26 +1474,44 @@ class PeerManager:
         self.trusted_peers.discard(peer_identifier.lower())
 
     def ban_peer(self, peer_identifier: str):
-        self.banned_peers.add(peer_identifier.lower())
+        normalized = peer_identifier.lower()
+        now = time.time()
+        prior_bans = self.ban_counts[normalized]
+        duration = min(self.max_ban_seconds, self.base_ban_seconds * (2 ** prior_bans))
+        self.ban_counts[normalized] = prior_bans + 1
+        self.banned_peers.add(normalized)
+        self.banned_until[normalized] = now + duration
         peers_to_disconnect = [
             pid
             for pid, peer_info in self.connected_peers.items()
-            if peer_info["ip_address"].lower() == peer_identifier.lower()
+            if peer_info["ip_address"].lower() == normalized
         ]
         for pid in peers_to_disconnect:
             self.disconnect_peer(pid)
 
     def unban_peer(self, peer_identifier: str):
-        self.banned_peers.discard(peer_identifier.lower())
+        normalized = peer_identifier.lower()
+        self.banned_peers.discard(normalized)
+        self.banned_until.pop(normalized, None)
 
     def can_connect(self, ip_address: str) -> bool:
         ip_lower = ip_address.lower()
         if ip_lower in self.banned_peers:
-            print(f"Connection from {ip_address} rejected: IP is banned.")
-            return False
+            expiry = self.banned_until.get(ip_lower)
+            if expiry is not None and time.time() >= expiry:
+                self.unban_peer(ip_lower)
+            else:
+                print(f"Connection from {ip_address} rejected: IP is banned.")
+                return False
         if self.connections_by_ip[ip_lower] >= self.max_connections_per_ip:
             print(
                 f"Connection from {ip_address} rejected: Exceeds max connections per IP ({self.max_connections_per_ip})."
+            )
+            return False
+        subnet = self._subnet_key(ip_lower)
+        if subnet and self.connections_by_subnet[subnet] >= self.max_connections_per_subnet16:
+            print(
+                f"Connection from {ip_address} rejected: Exceeds max connections per subnet ({self.max_connections_per_subnet16}) for {subnet}."
             )
             return False
         allowed, metadata, _, _, reason = self._evaluate_diversity_policy(ip_address, mutate=False)
@@ -1358,6 +1519,18 @@ class PeerManager:
             self._log_diversity_rejection(ip_address, reason or "diversity_limit", metadata)
             return False
         return True
+
+    def _subnet_key(self, ip_address: str) -> Optional[str]:
+        """Return normalized subnet key for diversity enforcement (/16 for IPv4, /32 for IPv6)."""
+        try:
+            ip_obj = ipaddress.ip_address(ip_address)
+            if isinstance(ip_obj, ipaddress.IPv4Address):
+                network = ipaddress.ip_network(f"{ip_obj}/16", strict=False)
+            else:
+                network = ipaddress.ip_network(f"{ip_obj}/32", strict=False)
+            return f"{network.network_address}/{network.prefixlen}"
+        except ValueError:
+            return None
 
     def connect_peer(self, ip_address: str) -> str:
         if not self.can_connect(ip_address):
@@ -1385,6 +1558,9 @@ class PeerManager:
             },
         }
         self.connections_by_ip[ip_address] += 1
+        subnet = self._subnet_key(ip_address.lower())
+        if subnet:
+            self.connections_by_subnet[subnet] += 1
         return peer_id
 
     def disconnect_peer(self, peer_id: str):
@@ -1392,9 +1568,14 @@ class PeerManager:
         if peer:
             self._decrement_geo_counters(peer)
             ip_address = peer["ip_address"]
-            self.connections_by_ip[ip_address] -= 1
+            self.connections_by_ip[ip_address] = max(0, self.connections_by_ip[ip_address] - 1)
             if self.connections_by_ip[ip_address] == 0:
                 del self.connections_by_ip[ip_address]
+            subnet = self._subnet_key(ip_address.lower())
+            if subnet:
+                self.connections_by_subnet[subnet] = max(0, self.connections_by_subnet[subnet] - 1)
+                if self.connections_by_subnet[subnet] == 0:
+                    del self.connections_by_subnet[subnet]
             if peer_id in self.seen_nonces:
                 del self.seen_nonces[peer_id]
             self.reputation.record_disconnect(peer_id)

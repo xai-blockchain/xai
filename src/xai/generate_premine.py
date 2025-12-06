@@ -20,7 +20,8 @@ RUN ONCE ONLY - generates genesis block and all pre-mine wallets
 import sys
 import os
 import json
-import random
+import random  # Used for deterministic seed-based time capsule selection (line 288)
+import secrets  # Used for cryptographically secure wallet amount randomization
 from datetime import datetime, timezone
 
 # Add core directory to path
@@ -211,9 +212,11 @@ class PreMineGenerator:
 
         premium_wallets = []
 
+        sr = secrets.SystemRandom()
         for i in range(2323):
             wallet = Wallet()
-            amount = random.randint(1352, 1602)
+            # Use cryptographically secure random for amount distribution
+            amount = sr.randint(1352, 1602)
 
             wallet_data = {
                 "address": wallet.address,
@@ -247,9 +250,11 @@ class PreMineGenerator:
 
         bonus_wallets = []
 
+        sr = secrets.SystemRandom()
         for i in range(5320):
             wallet = Wallet()
-            amount = random.randint(400, 463)
+            # Use cryptographically secure random for amount distribution
+            amount = sr.randint(400, 463)
 
             wallet_data = {
                 "address": wallet.address,

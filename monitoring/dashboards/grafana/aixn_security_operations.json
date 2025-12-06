@@ -242,6 +242,72 @@
         "linewidth": 2
       },
       {
+        "id": 20,
+        "title": "Withdrawal Processor Queue Depth",
+        "type": "stat",
+        "gridPos": {
+          "h": 6,
+          "w": 12,
+          "x": 0,
+          "y": 22
+        },
+        "targets": [
+          {
+            "expr": "xai_withdrawal_pending_queue",
+            "legendFormat": "pending"
+          }
+        ],
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "justifyMode": "center",
+          "reduceOptions": {
+            "calcs": [
+              "last"
+            ],
+            "fields": "",
+            "values": false
+          }
+        }
+      },
+      {
+        "id": 21,
+        "title": "Withdrawal Processor Outcomes (24h)",
+        "type": "graph",
+        "gridPos": {
+          "h": 6,
+          "w": 12,
+          "x": 12,
+          "y": 22
+        },
+        "targets": [
+          {
+            "expr": "increase(xai_withdrawal_processor_completed_total[24h])",
+            "legendFormat": "completed"
+          },
+          {
+            "expr": "increase(xai_withdrawal_processor_flagged_total[24h])",
+            "legendFormat": "flagged"
+          },
+          {
+            "expr": "increase(xai_withdrawal_processor_failed_total[24h])",
+            "legendFormat": "failed"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "count",
+            "logBase": 1
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "lines": true,
+        "linewidth": 2
+      },
+      {
         "id": 8,
         "title": "Threshold Tuning Runbook",
         "type": "text",
@@ -249,7 +315,7 @@
           "h": 6,
           "w": 24,
           "x": 0,
-          "y": 22
+          "y": 28
         },
         "options": {
           "mode": "markdown",
@@ -412,6 +478,46 @@
         ],
         "lines": true,
         "linewidth": 2
+      },
+      {
+        "id": 121,
+        "title": "/send Rejections by Reason (5m rate)",
+        "description": "Spike indicates broken client clocks or tampered payloads. Investigate immediately when non-zero.",
+        "type": "graph",
+        "gridPos": {
+          "h": 6,
+          "w": 24,
+          "x": 0,
+          "y": 48
+        },
+        "lines": true,
+        "linewidth": 2,
+        "stack": false,
+        "fill": 4,
+        "targets": [
+          {
+            "expr": "increase(xai_send_rejections_stale_timestamp_total[5m])",
+            "legendFormat": "stale timestamp"
+          },
+          {
+            "expr": "increase(xai_send_rejections_future_timestamp_total[5m])",
+            "legendFormat": "future timestamp"
+          },
+          {
+            "expr": "increase(xai_send_rejections_txid_mismatch_total[5m])",
+            "legendFormat": "txid mismatch"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "label": "events / 5m",
+            "logBase": 1
+          },
+          {
+            "format": "short"
+          }
+        ]
       }
     ]
   }

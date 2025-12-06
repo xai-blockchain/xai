@@ -22,7 +22,7 @@ import os
 import tempfile
 from types import SimpleNamespace
 from unittest.mock import Mock, MagicMock, patch
-from flask import Flask
+from flask import Flask, jsonify
 from xai.network.peer_manager import PeerManager
 from xai.core.config import Config, NetworkType
 
@@ -30,6 +30,7 @@ VALID_SENDER = "XAI" + "A" * 40
 VALID_RECIPIENT = "XAI" + "B" * 40
 VALID_PUBLIC_KEY = "04" + "C" * 128
 VALID_SIGNATURE = "AB" * 64
+DEFAULT_TIMESTAMP = 1_700_000_000.0
 VALID_API_KEY = "secret123"
 VALID_GUARDIAN_1 = "XAI" + "D" * 40
 VALID_GUARDIAN_2 = "XAI" + "E" * 40
@@ -104,6 +105,14 @@ class TestNodeAPICoreRoutes:
         data = response.get_json()
         assert data['status'] == 'unhealthy'
         assert 'error' in data
+
+    def test_versioned_health_endpoint(self, client):
+        """Test GET /v1/health returns deprecation headers."""
+        response = client.get('/v1/health')
+        assert response.status_code == 200
+        assert response.headers.get("X-API-Version") == "v1"
+        assert response.headers.get("Deprecation") == 'version="v1"'
+        assert "Sunset" in response.headers
 
     def test_metrics_endpoint(self, client):
         """Test GET /metrics - Prometheus metrics."""
@@ -184,6 +193,30 @@ class TestNodeAPICoreRoutes:
         assert data['peers'] == 2
         assert data['is_mining'] == False
         assert 'node_uptime' in data
+
+    def test_payload_size_limit_rejects_large_body(self, mock_node, monkeypatch):
+        """POST requests exceeding configured limit return 413 with structured error."""
+        from xai.core.node_api import NodeAPIRoutes
+
+        monkeypatch.setattr(Config, "API_MAX_JSON_BYTES", 256, raising=False)
+        routes = NodeAPIRoutes(mock_node)
+
+        @routes.app.route("/echo", methods=["POST"])
+        def echo_handler():
+            return jsonify({"echo": True})
+
+        routes.setup_routes()
+        client = routes.app.test_client()
+
+        oversized_payload = json.dumps({"data": "x" * 300})
+        response = client.post("/echo", data=oversized_payload, content_type="application/json")
+        assert response.status_code == 413
+        body = response.get_json()
+        assert body["code"] == "payload_too_large"
+
+        allowed_payload = json.dumps({"data": "ok"})
+        ok_response = client.post("/echo", data=allowed_payload, content_type="application/json")
+        assert ok_response.status_code == 200
 
 
 class TestNodeAPIBlockchainRoutes:
@@ -410,6 +443,7 @@ class TestNodeAPITransactionRoutes:
         mock_tx = Mock()
         mock_tx.verify_signature = Mock(return_value=True)
         mock_tx.txid = "new_tx_id"
+        mock_tx.calculate_hash = Mock(return_value="new_tx_id")
         mock_tx_class.return_value = mock_tx
 
         # Setup mock node
@@ -423,6 +457,7 @@ class TestNodeAPITransactionRoutes:
             "public_key": VALID_PUBLIC_KEY,
             "nonce": 1,
             "signature": VALID_SIGNATURE,
+            "timestamp": time.time(),
         }
 
         response = client.post('/send',
@@ -462,6 +497,7 @@ class TestNodeAPITransactionRoutes:
             "public_key": VALID_PUBLIC_KEY,
             "nonce": 1,
             "signature": VALID_SIGNATURE,
+            "timestamp": time.time(),
         }
 
         response = client.post('/send', data=json.dumps(tx_data), content_type='application/json')
@@ -496,6 +532,7 @@ class TestNodeAPITransactionRoutes:
             "public_key": VALID_PUBLIC_KEY,
             "nonce": 1,
             "signature": VALID_SIGNATURE,
+            "timestamp": time.time(),
         }
 
         response = client.post('/send',
@@ -523,6 +560,7 @@ class TestNodeAPITransactionRoutes:
             "public_key": VALID_PUBLIC_KEY,
             "nonce": 1,
             "signature": VALID_SIGNATURE,
+            "timestamp": time.time(),
         }
 
         response = client.post('/send',
@@ -550,6 +588,7 @@ class TestNodeAPITransactionRoutes:
             "public_key": VALID_PUBLIC_KEY,
             "nonce": 1,
             "signature": VALID_SIGNATURE,
+            "timestamp": time.time(),
         }
 
         response = client.post('/send', data=json.dumps(tx_data), content_type='application/json')
@@ -565,6 +604,7 @@ class TestNodeAPITransactionRoutes:
         mock_tx = Mock()
         mock_tx.verify_signature = Mock(return_value=True)
         mock_tx.txid = "api_key_tx"
+        mock_tx.calculate_hash = Mock(return_value="api_key_tx")
         mock_tx_class.return_value = mock_tx
         mock_node_with_tx.blockchain.add_transaction = Mock(return_value=True)
         mock_node_with_tx.broadcast_transaction = Mock()
@@ -577,6 +617,7 @@ class TestNodeAPITransactionRoutes:
             "public_key": VALID_PUBLIC_KEY,
             "nonce": 1,
             "signature": VALID_SIGNATURE,
+            "timestamp": time.time(),
         }
 
         response = client.post(
@@ -601,10 +642,15 @@ class TestNodeAPIWalletRoutes:
         node.app = Flask(__name__)
         node.blockchain = Mock()
         node.blockchain.get_balance = Mock(return_value=100.5)
-        node.blockchain.get_transaction_history = Mock(return_value=[
-            {"txid": "tx1", "amount": 10.0},
-            {"txid": "tx2", "amount": 20.0}
-        ])
+        node.blockchain.get_transaction_history_window = Mock(
+            return_value=(
+                [
+                    {"txid": "tx1", "amount": 10.0},
+                    {"txid": "tx2", "amount": 20.0},
+                ],
+                2,
+            )
+        )
         return node
 
     @pytest.fixture
@@ -638,11 +684,16 @@ class TestNodeAPIWalletRoutes:
 
     def test_get_history_with_pagination(self, client, mock_node):
         """Test GET /history/<address> with limit and offset."""
-        mock_node.blockchain.get_transaction_history.return_value = [
+        history = [
             {"txid": "tx1", "amount": 10.0},
             {"txid": "tx2", "amount": 20.0},
             {"txid": "tx3", "amount": 30.0},
         ]
+
+        def _history_window(address, limit, offset):
+            return history[offset : offset + limit], len(history)
+
+        mock_node.blockchain.get_transaction_history_window.side_effect = _history_window
         response = client.get('/history/test_address?limit=1&offset=1')
         assert response.status_code == 200
         data = response.get_json()
@@ -786,8 +837,12 @@ class TestNodeAPIPeerRoutes:
     """Test P2P networking endpoints."""
 
     @pytest.fixture
-    def mock_node(self):
+    def mock_node(self, monkeypatch):
         """Create mock node."""
+        # Disable PoW for test determinism
+        monkeypatch.setattr(Config, "P2P_POW_ENABLED", False, raising=False)
+        monkeypatch.setattr(Config, "P2P_POW_DIFFICULTY_BITS", 1, raising=False)
+        monkeypatch.setattr(Config, "P2P_POW_MAX_ITERATIONS", 1, raising=False)
         node = Mock()
         node.app = Flask(__name__)
         node.peers = set(["http://peer1:5000", "http://peer2:5000"])
@@ -824,6 +879,44 @@ class TestNodeAPIPeerRoutes:
         data = response.get_json()
         assert data['count'] == 2
         assert len(data['peers']) == 2
+        assert data["verbose"] is False
+
+    def test_get_peers_verbose(self, client, mock_node):
+        """Test GET /peers?verbose=true returns detailed peer metadata."""
+        peer_mgr: PeerManager = mock_node.peer_manager
+        now = time.time()
+        peer_mgr.connected_peers.clear()
+        peer_mgr.connected_peers["peer_alpha"] = {
+            "ip_address": "10.1.1.5",
+            "connected_at": now - 60,
+            "last_seen": now - 1,
+            "geo": {
+                "country": "US",
+                "country_name": "United States",
+                "asn": "AS64512",
+                "prefix": "10.1.0.0/16",
+                "source": "test",
+                "is_unknown": False,
+            },
+        }
+        peer_mgr.seen_nonces["peer_alpha"].append(("nonce-1", now))
+        peer_mgr.reputation.scores["peer_alpha"] = 88.75
+        peer_mgr.prefix_counts["10.1.0.0/16"] = 1
+        peer_mgr.asn_counts["AS64512"] = 1
+        peer_mgr.country_counts["US"] = 1
+        peer_mgr.trusted_peers.add("10.1.1.5")
+
+        response = client.get('/peers?verbose=true')
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["verbose"] is True
+        assert data["connected_total"] == 1
+        assert data["connections"][0]["peer_id"] == "peer_alpha"
+        assert data["connections"][0]["nonce_window"] == 1
+        assert data["connections"][0]["trusted"] is True
+        assert data["connections"][0]["reputation"] == pytest.approx(88.75, rel=1e-3)
+        assert data["diversity"]["unique_prefixes"] == 1
+        assert data["limits"]["max_connections_per_ip"] == peer_mgr.max_connections_per_ip
 
     def test_add_peer_success(self, client, mock_node):
         """Test POST /peers/add - add new peer."""
@@ -1223,6 +1316,16 @@ class TestNodeAPIAdminAPIKeys:
         node.metrics_collector.get_metric.return_value = None
         node.metrics_collector.get_recent_withdrawals.return_value = []
         node.metrics_collector.withdrawal_event_log_path = None
+        node.exchange_wallet_manager = Mock()
+        node.exchange_wallet_manager.get_withdrawal_counts.return_value = {
+            "pending": 0,
+            "completed": 0,
+            "failed": 0,
+            "flagged": 0,
+            "total": 0,
+        }
+        node.exchange_wallet_manager.get_withdrawals_by_status.return_value = []
+        node.get_withdrawal_processor_stats = Mock(return_value=None)
         from xai.core.node_api import NodeAPIRoutes
 
         routes = NodeAPIRoutes(node)
@@ -1251,7 +1354,9 @@ class TestNodeAPIAdminAPIKeys:
         client = admin_setup["client"]
         mock_tx = Mock()
         mock_tx.verify_signature = Mock(return_value=True)
-        mock_tx.txid = "admin-issued"
+        admin_txid = "7c1e1b7f9f41b4f6cf1a8c6b9b580d054736a2f3a7a8fd62b77aeb6800a5b0aa"
+        mock_tx.txid = admin_txid
+        mock_tx.calculate_hash = Mock(return_value=admin_txid)
         mock_tx_class.return_value = mock_tx
 
         response = client.post(
@@ -1272,6 +1377,8 @@ class TestNodeAPIAdminAPIKeys:
             "public_key": VALID_PUBLIC_KEY,
             "nonce": 1,
             "signature": VALID_SIGNATURE,
+            "timestamp": time.time(),
+            "txid": admin_txid,
         }
         response = client.post(
             '/send',
@@ -1281,7 +1388,7 @@ class TestNodeAPIAdminAPIKeys:
         )
         assert response.status_code == 200
         data = response.get_json()
-        assert data['txid'] == 'admin-issued'
+        assert data['txid'] == admin_txid
 
         response = client.delete(
             f'/admin/api-keys/{key_id}',
@@ -1353,6 +1460,60 @@ class TestNodeAPIAdminAPIKeys:
             headers={"X-Admin-Token": ADMIN_TOKEN},
         )
         assert response.status_code == 429
+
+    def test_admin_withdrawal_status_snapshot(self, admin_setup):
+        client = admin_setup["client"]
+        node = admin_setup["node"]
+        routes = admin_setup["routes"]
+        manager = node.exchange_wallet_manager
+        manager.get_withdrawal_counts.return_value = {
+            "pending": 2,
+            "completed": 5,
+            "failed": 1,
+            "flagged": 1,
+            "total": 9,
+        }
+
+        def fake_by_status(status, limit):
+            return [{"id": f"{status}-tx", "status": status, "limit": limit}]
+
+        manager.get_withdrawals_by_status.side_effect = fake_by_status
+        node.get_withdrawal_processor_stats.return_value = {"checked": 3, "completed": 2}
+
+        response = client.get(
+            '/admin/withdrawals/status?limit=5&status=pending,flagged',
+            headers={"X-Admin-Token": ADMIN_TOKEN},
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["counts"]["pending"] == 2
+        assert data["queue_depth"] == 2
+        assert "pending" in data["withdrawals"]
+        assert "flagged" in data["withdrawals"]
+        assert "failed" not in data["withdrawals"]
+        assert data["latest_processor_run"]["checked"] == 3
+        routes._log_event.assert_called_with(
+            "admin_withdrawals_status_access",
+            {"queue_depth": 2, "statuses": ["flagged", "pending"], "limit": 5},
+            severity="INFO",
+        )
+
+    def test_admin_withdrawal_status_invalid_status(self, admin_setup):
+        client = admin_setup["client"]
+        response = client.get(
+            '/admin/withdrawals/status?status=invalid',
+            headers={"X-Admin-Token": ADMIN_TOKEN},
+        )
+        assert response.status_code == 400
+
+    def test_admin_withdrawal_status_service_unavailable(self, admin_setup):
+        client = admin_setup["client"]
+        admin_setup["node"].exchange_wallet_manager = None
+        response = client.get(
+            '/admin/withdrawals/status',
+            headers={"X-Admin-Token": ADMIN_TOKEN},
+        )
+        assert response.status_code == 503
 
 
 class TestNodeAPIGamificationRoutes:

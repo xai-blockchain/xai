@@ -10,9 +10,10 @@ This test file achieves 98%+ coverage of node_p2p.py by testing:
 - All edge cases
 """
 
+import asyncio
 import time
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, MagicMock, patch, AsyncMock
 import requests
 
 from xai.core.p2p_security import P2PSecurityConfig
@@ -681,3 +682,65 @@ class TestMessageDeduplication:
         assert p2p_manager._is_duplicate_message("transaction", "tx-b", now + 0.002) is False
         # tx-a should be evicted once cache hit max size (1 entry)
         assert p2p_manager._is_duplicate_message("transaction", "tx-a", now + 0.003) is False
+
+    @pytest.mark.asyncio
+    async def test_inventory_request_only_missing_items(self, p2p_manager):
+        websocket = AsyncMock()
+        p2p_manager._has_transaction = MagicMock(return_value=False)
+        p2p_manager._has_block = MagicMock(return_value=True)
+        p2p_manager._send_signed_message = AsyncMock()
+        await p2p_manager._handle_inventory_announcement(
+            websocket,
+            "peer-inv",
+            {"transactions": ["tx-1"], "blocks": ["block-keep"]},
+        )
+        p2p_manager._send_signed_message.assert_awaited_once()
+        call = p2p_manager._send_signed_message.await_args
+        assert call.args[2]["type"] == "getdata"
+        assert call.args[2]["payload"]["transactions"] == ["tx-1"]
+        assert "blocks" not in call.args[2]["payload"]
+
+    @pytest.mark.asyncio
+    async def test_getdata_responses_for_transactions_and_blocks(self, p2p_manager):
+        tx = Mock()
+        tx.to_dict = Mock(return_value={"txid": "tx-get"})
+        block = Mock()
+        block.to_dict = Mock(return_value={"hash": "block-get"})
+        p2p_manager._find_pending_transaction = MagicMock(return_value=tx)
+        p2p_manager.blockchain.get_block_by_hash = MagicMock(return_value=block)
+        websocket = AsyncMock()
+        p2p_manager._send_signed_message = AsyncMock()
+        payload = {"transactions": ["tx-get"], "blocks": ["block-get"]}
+        await p2p_manager._handle_getdata_request(websocket, "peer", payload)
+        assert p2p_manager._send_signed_message.await_count == 2
+        sent_types = [
+            call.args[2]["type"] for call in p2p_manager._send_signed_message.await_args_list
+        ]
+        assert sent_types == ["transaction", "block"]
+
+    def test_announce_inventory_dispatches_message(self, p2p_manager, monkeypatch):
+        captured = {}
+
+        def fake_dispatch(coro):
+            captured["called"] = True
+            asyncio.run(coro)
+
+        p2p_manager._dispatch_async = fake_dispatch
+        p2p_manager._announce_inventory(transactions=["tx-announce"], blocks=["blk-announce"])
+        assert captured["called"] is True
+
+    @pytest.mark.asyncio
+    async def test_disconnect_idle_connections(self, p2p_manager):
+        peer_id = "idle-peer"
+        connection = AsyncMock()
+        connection.close = AsyncMock()
+        p2p_manager.connections[peer_id] = connection
+        p2p_manager.websocket_peer_ids[connection] = peer_id
+        p2p_manager._connection_last_seen[peer_id] = time.time() - 9999
+        p2p_manager.idle_timeout_seconds = 10
+        p2p_manager.peer_manager.disconnect_peer = MagicMock()
+
+        await p2p_manager._disconnect_idle_connections()
+
+        connection.close.assert_awaited_once()
+        p2p_manager.peer_manager.disconnect_peer.assert_called_once_with(peer_id)

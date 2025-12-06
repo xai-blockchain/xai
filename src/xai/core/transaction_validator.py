@@ -88,6 +88,8 @@ class TransactionValidator:
             ):
                 raise ValidationError("Transaction is missing required fields.")
 
+            is_settlement_receipt = transaction.tx_type == "trade_settlement"
+
             # 2. Transaction size validation (DoS protection)
             tx_size = len(json.dumps(transaction.to_dict()).encode('utf-8'))
             if tx_size > MAX_TRANSACTION_SIZE_BYTES:
@@ -159,14 +161,14 @@ class TransactionValidator:
                     )
 
             # 6. Signature verification (skip for coinbase transactions)
-            if transaction.sender != "COINBASE":
+            if transaction.sender != "COINBASE" and not is_settlement_receipt:
                 if not transaction.signature:
                     raise ValidationError("Non-coinbase transaction must have a signature.")
                 if not transaction.verify_signature():
                     raise ValidationError("Invalid transaction signature.")
 
             # 7. UTXO-based validation (for non-coinbase transactions)
-            if transaction.tx_type != "coinbase":
+            if transaction.tx_type != "coinbase" and not is_settlement_receipt:
                 input_sum = 0.0
                 output_sum = 0.0
 

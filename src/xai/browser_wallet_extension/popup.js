@@ -230,14 +230,22 @@ async function confirmWalletConnectHandshake(address, handshake) {
   );
   const derivedHex = bufferToHex(derivedBits);
   const clientPublicBase64 = bufferToBase64(clientPublicRaw);
+  const confirmationPayload = {
+    handshake_id: handshake.handshake_id,
+    wallet_address: address,
+    client_public: clientPublicBase64
+  };
+
+  const payloadStr = stableStringify(confirmationPayload);
+  const approved = await presentSigningPreview(confirmationPayload, payloadStr);
+  if (!approved) {
+    return null;
+  }
+
   const response = await fetch(`${host}/wallet-trades/wc/confirm`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      handshake_id: handshake.handshake_id,
-      wallet_address: address,
-      client_public: clientPublicBase64
-    })
+    body: payloadStr
   });
   const payload = await response.json();
   if (!payload.success) return null;
@@ -274,6 +282,67 @@ async function setApiHost(host) {
 
 function $(selector) {
   return document.querySelector(selector);
+}
+
+async function presentSigningPreview(payload, payloadStr) {
+  const modal = $('#signingPreview');
+  if (!modal) {
+    return true;
+  }
+
+  const previewEl = $('#signingPayloadPreview');
+  const hashEl = $('#signingPayloadHash');
+  const confirmBtn = $('#confirmSigning');
+  const cancelBtn = $('#cancelSigning');
+  const acknowledge = $('#signingAcknowledge');
+
+  previewEl.textContent = JSON.stringify(payload, null, 2);
+  acknowledge.checked = false;
+  confirmBtn.disabled = true;
+  hashEl.textContent = 'calculating…';
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+
+  const encoder = new TextEncoder();
+  const digestBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(payloadStr));
+  hashEl.textContent = bufferToHex(digestBuffer);
+
+  return new Promise((resolve) => {
+    const onAcknowledge = () => {
+      confirmBtn.disabled = !acknowledge.checked;
+    };
+
+    const cleanup = () => {
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+      confirmBtn.removeEventListener('click', onConfirm);
+      cancelBtn.removeEventListener('click', onCancel);
+      acknowledge.removeEventListener('change', onAcknowledge);
+      document.removeEventListener('keydown', onEsc);
+    };
+
+    const onConfirm = () => {
+      cleanup();
+      resolve(true);
+    };
+
+    const onCancel = () => {
+      cleanup();
+      resolve(false);
+    };
+
+    const onEsc = (event) => {
+      if (event.key === 'Escape') {
+        cleanup();
+        resolve(false);
+      }
+    };
+
+    acknowledge.addEventListener('change', onAcknowledge);
+    confirmBtn.addEventListener('click', onConfirm);
+    cancelBtn.addEventListener('click', onCancel);
+    document.addEventListener('keydown', onEsc);
+  });
 }
 
 async function updateMiningStatus() {
@@ -482,8 +551,13 @@ async function submitOrder(event) {
       nonce: Date.now(),
     };
 
-    // Step 3: Serialize deterministically for signing
+    // Step 3: Serialize deterministically for signing and show verification UI
     const payloadStr = stableStringify(payload);
+    const approved = await presentSigningPreview(payload, payloadStr);
+    if (!approved) {
+      $('#tradeMessage').textContent = 'Signing cancelled by user.';
+      return;
+    }
 
     // Step 4: Sign with ECDSA using private key
     $('#tradeMessage').textContent = 'Signing transaction with ECDSA...';

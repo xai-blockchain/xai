@@ -1353,7 +1353,7 @@ class EVMInterpreter:
         # Empty code = success with empty return
         if not code:
             # Still perform value transfer if applicable
-            if value > 0 and call_type == CallType.CALL:
+            if value > 0 and call_type in (CallType.CALL, CallType.CALLCODE):
                 if not self.context.transfer(caller, address, value):
                     return False, b""
             return True, b""
@@ -1370,7 +1370,7 @@ class EVMInterpreter:
                 return False, b""
 
         # Perform value transfer (for CALL only, before execution)
-        if value > 0 and call_type == CallType.CALL:
+        if value > 0 and call_type in (CallType.CALL, CallType.CALLCODE):
             if not self.context.transfer(caller, address, value):
                 return False, b""
 

@@ -223,6 +223,7 @@ class BlockchainStorage:
                                 nonce=header_data.get("nonce", 0),
                                 signature=header_data.get("signature"),
                                 miner_pubkey=header_data.get("miner_pubkey"),
+                                version=header_data.get("version"),
                             )
                             transactions = []
                             for tx_data in block_data["transactions"]:
@@ -290,6 +291,7 @@ class BlockchainStorage:
                             nonce=header_data.get("nonce", 0),
                             signature=header_data.get("signature"),
                             miner_pubkey=header_data.get("miner_pubkey"),
+                            version=header_data.get("version"),
                         )
                         if "hash" in header_data:
                             header.hash = header_data["hash"]
@@ -361,6 +363,7 @@ class BlockchainStorage:
             nonce=header_data.get("nonce", 0),
             signature=header_data.get("signature"),
             miner_pubkey=header_data.get("miner_pubkey"),
+            version=header_data.get("version"),
         )
         
         transactions = []

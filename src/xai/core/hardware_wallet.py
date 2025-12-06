@@ -19,11 +19,15 @@ from dataclasses import dataclass, field
 import hashlib
 import logging
 import os
-from typing import Protocol, runtime_checkable, Dict, Optional
+from typing import Protocol, runtime_checkable, Dict, Optional, TYPE_CHECKING
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+
+if TYPE_CHECKING:  # pragma: no cover - type checking only
+    from xai.core.hardware_wallet_ledger import LedgerHardwareWallet  # noqa: F401
+    from xai.core.hardware_wallet_trezor import TrezorHardwareWallet  # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +38,14 @@ HARDWARE_WALLET_ENABLED = os.getenv("XAI_HARDWARE_WALLET_ENABLED", "false").stri
     "on",
 }
 DEFAULT_HARDWARE_WALLET_NAME = os.getenv("XAI_HARDWARE_WALLET_PROVIDER", "mock")
+LEDGER_BIP32_PATH = os.getenv("XAI_LEDGER_BIP32_PATH", "m/44'/22593'/0'/0/0")
+TREZOR_BIP32_PATH = os.getenv("XAI_TREZOR_BIP32_PATH", LEDGER_BIP32_PATH)
+ALLOW_MOCK_HARDWARE_WALLET = os.getenv("XAI_ALLOW_MOCK_HARDWARE_WALLET", "false").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 # Curve constants for SECP256K1
 _CURVE = ec.SECP256K1()
@@ -234,8 +246,9 @@ class HardwareWalletManager:
         # Replace this dictionary with device discovery results in future.
         self.connected_devices: Dict[str, HardwareWallet] = {}
 
-        # Register default mock provider so the manager can always work during testing.
-        self.register_device(DEFAULT_HARDWARE_WALLET_NAME, MockHardwareWallet())
+        # Register mock provider only when explicitly allowed; production defaults to real devices.
+        if ALLOW_MOCK_HARDWARE_WALLET:
+            self.register_device("mock", MockHardwareWallet())
 
     def register_device(self, name: str, wallet: HardwareWallet):
         self.connected_devices[name] = wallet
@@ -259,4 +272,30 @@ def get_hardware_wallet_manager() -> HardwareWalletManager:
 
 def get_default_hardware_wallet() -> HardwareWallet | None:
     manager = get_hardware_wallet_manager()
-    return manager.get_device(DEFAULT_HARDWARE_WALLET_NAME) if HARDWARE_WALLET_ENABLED else None
+    if not HARDWARE_WALLET_ENABLED:
+        return None
+    provider = DEFAULT_HARDWARE_WALLET_NAME.lower()
+    if provider == "mock" and not ALLOW_MOCK_HARDWARE_WALLET:
+        raise ValueError(
+            "MockHardwareWallet is disabled for production. "
+            "Set XAI_ALLOW_MOCK_HARDWARE_WALLET=1 only in test environments."
+        )
+    if provider == "ledger":
+        wallet = manager.get_device("ledger")
+        if wallet is None:
+            try:
+                from xai.core.hardware_wallet_ledger import LedgerHardwareWallet
+            except ImportError as exc:  # pragma: no cover - optional dependency
+                raise ImportError("Ledger support requires ledgerblue. pip install ledgerblue") from exc
+            manager.register_device("ledger", LedgerHardwareWallet(bip32_path=LEDGER_BIP32_PATH))
+        return manager.get_device("ledger")
+    if provider == "trezor":
+        wallet = manager.get_device("trezor")
+        if wallet is None:
+            try:
+                from xai.core.hardware_wallet_trezor import TrezorHardwareWallet
+            except ImportError as exc:  # pragma: no cover - optional dependency
+                raise ImportError("Trezor support requires trezorlib. pip install trezor") from exc
+            manager.register_device("trezor", TrezorHardwareWallet(bip32_path=TREZOR_BIP32_PATH))
+        return manager.get_device("trezor")
+    return manager.get_device(DEFAULT_HARDWARE_WALLET_NAME)

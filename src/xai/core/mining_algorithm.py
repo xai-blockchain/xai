@@ -8,7 +8,6 @@ import json
 import time
 from decimal import Decimal
 from typing import Dict, Optional, List
-import random
 
 
 class MiningAlgorithm:

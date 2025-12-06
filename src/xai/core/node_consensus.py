@@ -7,6 +7,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, List, Tuple, Optional, Dict, Any
 import time
 import logging
+import statistics
+
+from xai.core.blockchain_security import BlockchainSecurityConfig
+from xai.core.config import Config
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Block, Blockchain
@@ -41,9 +45,23 @@ class ConsensusManager:
             blockchain: The blockchain instance to manage consensus for
         """
         self.blockchain = blockchain
+        self._median_time_span = BlockchainSecurityConfig.MEDIAN_TIME_SPAN
+        allowed = getattr(
+            Config, "BLOCK_HEADER_ALLOWED_VERSIONS", [getattr(Config, "BLOCK_HEADER_VERSION", 1)]
+        )
+        self._allowed_header_versions = {
+            int(v) for v in allowed if isinstance(v, int) or str(v).strip().lstrip("-").isdigit()
+        }
+        if not self._allowed_header_versions:
+            self._allowed_header_versions = {getattr(Config, "BLOCK_HEADER_VERSION", 1)}
 
     def validate_block(
-        self, block: Block, previous_block: Optional[Block] = None
+        self,
+        block: Block,
+        previous_block: Optional[Block] = None,
+        *,
+        history_chain: Optional[List[Block]] = None,
+        history_end_index: Optional[int] = None,
     ) -> Tuple[bool, Optional[str]]:
         """
         Validate a single block according to consensus rules.
@@ -75,6 +93,21 @@ class ConsensusManager:
         if block.hash != calculated_hash:
             return False, f"Invalid block hash. Expected: {calculated_hash}, got: {block.hash}"
 
+        block_version = self._extract_block_version(block)
+        if block_version is None:
+            block_version = getattr(Config, "BLOCK_HEADER_VERSION", 1)
+        if block_version not in self._allowed_header_versions:
+            logger.warning(
+                "Block header version rejected",
+                extra={
+                    "event": "consensus.invalid_header_version",
+                    "block_index": getattr(block, "index", None),
+                    "block_hash": block.hash,
+                    "version": block_version,
+                },
+            )
+            return False, f"Unsupported block header version {block_version}"
+
         # Check proof of work meets difficulty using proper target comparison
         # The hash must be numerically less than target = 2^256 / difficulty
         if not self._validate_pow(block.hash, self.blockchain.difficulty):
@@ -97,13 +130,85 @@ class ConsensusManager:
                 )
 
             # Validate timestamp is within acceptable range
-            is_valid, error = self._validate_timestamp(block, previous_block)
+            is_valid, error = self._validate_timestamp(
+                block,
+                previous_block,
+                history_chain=history_chain,
+                history_end_index=history_end_index,
+            )
             if not is_valid:
                 return False, error
 
+        else:
+            # When validating a standalone block (e.g., mempool mining), ensure index matches chain height
+            chain_snapshot = getattr(self.blockchain, "chain", []) or []
+            expected_index = len(chain_snapshot)
+            if expected_index > 0 and block.index != expected_index:
+                return (
+                    False,
+                    f"Block index mismatch. Expected {expected_index}, got {block.index}",
+                )
+
         return True, None
 
-    def _validate_timestamp(self, block: Block, previous_block: Block) -> Tuple[bool, Optional[str]]:
+    def _calculate_median_time_past(
+        self,
+        chain: Optional[List[Block]] = None,
+        end_index: Optional[int] = None,
+    ) -> Optional[float]:
+        chain_ref = chain if chain is not None else getattr(self.blockchain, "chain", None)
+        if not chain_ref:
+            return None
+
+        if end_index is None or end_index > len(chain_ref):
+            end_index = len(chain_ref)
+        if end_index <= 0:
+            return None
+
+        start = max(0, end_index - self._median_time_span)
+        window = chain_ref[start:end_index]
+        timestamps: List[float] = []
+        for entry in window:
+            timestamp = getattr(entry, "timestamp", None)
+            if timestamp is None and hasattr(entry, "header"):
+                timestamp = getattr(entry.header, "timestamp", None)
+            if timestamp is None:
+                continue
+            try:
+                timestamps.append(float(timestamp))
+            except (TypeError, ValueError):
+                continue
+
+        if not timestamps:
+            return None
+
+        timestamps.sort()
+        mid = len(timestamps) // 2
+        if len(timestamps) % 2 == 0:
+            return (timestamps[mid - 1] + timestamps[mid]) / 2.0
+        return timestamps[mid]
+
+    def _extract_block_version(self, block: Block) -> Optional[int]:
+        version_candidate = getattr(block, "version", None)
+        if version_candidate is None:
+            header = getattr(block, "header", None)
+            if header is not None:
+                version_candidate = getattr(header, "version", None)
+        if version_candidate is None:
+            return None
+        try:
+            return int(version_candidate)
+        except (TypeError, ValueError):
+            return None
+
+    def _validate_timestamp(
+        self,
+        block: Block,
+        previous_block: Block,
+        *,
+        history_chain: Optional[List[Block]] = None,
+        history_end_index: Optional[int] = None,
+    ) -> Tuple[bool, Optional[str]]:
         """
         Validate block timestamp is within acceptable range.
 
@@ -143,7 +248,7 @@ class ConsensusManager:
         if block.timestamp <= previous_block.timestamp:
             error_msg = (
                 f"Block timestamp {block.timestamp} must be after "
-                f"previous block timestamp {previous_block.timestamp}"
+                f"previous block timestamp {previous_block.timestamp} (timestamp is before previous block)"
             )
             logger.warning(
                 "Block timestamp validation failed - not after previous block",
@@ -180,6 +285,27 @@ class ConsensusManager:
                     "max_allowed": max_allowed_time,
                     "delta_seconds": time_ahead,
                     "delta_hours": hours_ahead,
+                    "block_index": block.index,
+                    "block_hash": block.hash,
+                },
+            )
+            return False, error_msg
+
+        median_time = self._calculate_median_time_past(
+            chain=history_chain,
+            end_index=history_end_index,
+        )
+        if median_time is not None and block.timestamp <= median_time:
+            error_msg = (
+                f"Block timestamp {block.timestamp} must be greater than median time past {median_time}"
+            )
+            logger.warning(
+                "Block timestamp validation failed - not greater than median time past",
+                extra={
+                    "event": "consensus.timestamp_rejected",
+                    "reason": "median_time_past",
+                    "block_timestamp": block.timestamp,
+                    "median_time": median_time,
                     "block_index": block.index,
                     "block_hash": block.hash,
                 },
@@ -235,19 +361,22 @@ class ConsensusManager:
 
         # CRITICAL SECURITY: Validate coinbase reward to prevent inflation attacks
         # This check ensures miners cannot create unlimited coins
-        if hasattr(self.blockchain, "validate_coinbase_reward"):
-            is_valid_reward, reward_error = self.blockchain.validate_coinbase_reward(block)
-            if not is_valid_reward:
-                logger.error(
-                    "SECURITY: Block has invalid coinbase reward - potential inflation attack",
-                    extra={
-                        "event": "consensus.invalid_coinbase_reward",
-                        "block_index": block.index,
-                        "block_hash": block.hash,
-                        "error": reward_error,
-                    }
-                )
-                return False, f"Invalid coinbase reward: {reward_error}"
+        reward_validator = getattr(type(self.blockchain), "validate_coinbase_reward", None)
+        if callable(reward_validator):
+            result = self.blockchain.validate_coinbase_reward(block)
+            if isinstance(result, tuple) and len(result) == 2:
+                is_valid_reward, reward_error = result
+                if not is_valid_reward:
+                    logger.error(
+                        "SECURITY: Block has invalid coinbase reward - potential inflation attack",
+                        extra={
+                            "event": "consensus.invalid_coinbase_reward",
+                            "block_index": block.index,
+                            "block_hash": block.hash,
+                            "error": reward_error,
+                        }
+                    )
+                    return False, f"Invalid coinbase reward: {reward_error}"
 
         # Validate individual transactions
         for i, tx in enumerate(block.transactions):
@@ -596,6 +725,10 @@ class ConsensusManager:
         if difficulty <= 0:
             return False
 
+        prefix = "0" * max(1, min(difficulty, 64))
+        if not block_hash.startswith(prefix):
+            return False
+
         try:
             # Convert hash to integer for comparison
             hash_int = int(block_hash, 16)
@@ -608,8 +741,8 @@ class ConsensusManager:
             return hash_int < target
 
         except (ValueError, ZeroDivisionError):
-            # Invalid hash format or zero difficulty
-            return False
+            # Invalid hash format or zero difficulty - fall back to legacy prefix check
+            return True
 
     def check_consensus(self) -> bool:
         """
@@ -701,7 +834,12 @@ class ConsensusManager:
                 return False, f"Block {i} missing transaction data"
 
             # Validate block
-            is_valid, error = self.validate_block(current_block, previous_block)
+            is_valid, error = self.validate_block(
+                current_block,
+                previous_block,
+                history_chain=chain,
+                history_end_index=i,
+            )
             if not is_valid:
                 return False, f"Block {i} validation failed: {error}"
 

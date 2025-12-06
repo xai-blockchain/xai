@@ -90,6 +90,25 @@
       <p id="tradeMessage" class="status"></p>
     </section>
 
+    <div id="signingPreview" class="signing-modal hidden" aria-hidden="true">
+      <div class="signing-modal__content" role="dialog" aria-labelledby="signingPreviewTitle">
+        <h3 id="signingPreviewTitle">Review Transaction Before Signing</h3>
+        <p class="signing-modal__hash">
+          SHA-256 Payload Hash:
+          <code id="signingPayloadHash">calculating…</code>
+        </p>
+        <pre id="signingPayloadPreview" class="signing-modal__payload"></pre>
+        <label class="signing-modal__ack">
+          <input type="checkbox" id="signingAcknowledge" />
+          I understand I am signing the payload above.
+        </label>
+        <div class="button-row">
+          <button type="button" id="cancelSigning" class="secondary">Cancel</button>
+          <button type="button" id="confirmSigning" disabled>Sign &amp; Submit</button>
+        </div>
+      </div>
+    </div>
+
     <section class="card">
       <h2>Trade History</h2>
       <div id="tradeHistory" class="list-section">

@@ -15,7 +15,7 @@ Features:
 """
 
 import hashlib
-import random
+import secrets
 import time
 import logging
 from typing import Dict, List, Optional
@@ -81,10 +81,13 @@ class ProofOfIntelligence:
 
         if challenge_type is None:
             # Rotate through challenge types to prevent specialization
-            challenge_type = random.choice(list(ChallengeType))
+            # Use cryptographically secure random selection to prevent prediction attacks
+            challenge_type = secrets.choice(list(ChallengeType))
 
+        # Use cryptographically secure random token for task ID generation
+        # to prevent task ID prediction and precomputation attacks
         task_id = hashlib.sha256(
-            f"{time.time()}{random.random()}".encode()
+            f"{time.time()}{secrets.token_hex(16)}".encode()
         ).hexdigest()[:16]
 
         task = {

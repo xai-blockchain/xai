@@ -154,6 +154,30 @@ class NonceTracker:
 
             self._save_nonces()
 
+    def set_nonce(self, address: str, nonce: int) -> None:
+        """
+        Force-set an address nonce. Used when replaying historical blocks
+        (e.g., chain reorganizations or VM state sync).
+        """
+        if nonce < -1:
+            raise ValueError("nonce must be >= -1")
+
+        with self.lock:
+            self.nonces[address] = int(nonce)
+            pending = self.pending_nonces.get(address)
+            if pending is not None and pending <= nonce:
+                self.pending_nonces.pop(address, None)
+            self._save_nonces()
+
+    def reset(self) -> None:
+        """
+        Clear all tracked nonces. Used when rebuilding from chain state.
+        """
+        with self.lock:
+            self.nonces.clear()
+            self.pending_nonces.clear()
+            self._save_nonces()
+
     def reset_nonce(self, address: str) -> None:
         """
         Reset nonce to 0 (for testing only)

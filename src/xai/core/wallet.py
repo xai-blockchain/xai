@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from copy import deepcopy
 from typing import Optional, Dict, Tuple, Any, List
 
 from xai.core.hardware_wallet import HardwareWallet, HARDWARE_WALLET_ENABLED, get_default_hardware_wallet
@@ -26,6 +27,8 @@ import logging
 from cryptography.fernet import Fernet
 import hmac
 
+from xai.security.hd_wallet import HDWallet
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,8 +41,14 @@ class Wallet:
     - All security-sensitive operations are logged for audit trails
     """
 
-    def __init__(self, private_key: Optional[str] = None, hardware_wallet: Optional[HardwareWallet] = None) -> None:
+    def __init__(
+        self,
+        private_key: Optional[str] = None,
+        hardware_wallet: Optional[HardwareWallet] = None,
+        hd_metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
         self.hardware_wallet = hardware_wallet or (get_default_hardware_wallet() if HARDWARE_WALLET_ENABLED else None)
+        self._hd_metadata: Optional[Dict[str, Any]] = deepcopy(hd_metadata) if hd_metadata else None
 
         if self.hardware_wallet:
             self.private_key = ""
@@ -185,6 +194,8 @@ class Wallet:
             "public_key": self.public_key,
             "address": self.address,
         }
+        if self._hd_metadata:
+            wallet_data["derivation_metadata"] = deepcopy(self._hd_metadata)
 
         # Generate HMAC salt for key derivation (stored with file)
         hmac_salt = os.urandom(16)
@@ -539,7 +550,7 @@ class Wallet:
                 extra={"event": "wallet.load_unencrypted", "wallet_file": os.path.basename(filename)}
             )
 
-        wallet = Wallet(private_key=wallet_data["private_key"])
+        wallet = Wallet(private_key=wallet_data["private_key"], hd_metadata=wallet_data.get("derivation_metadata"))
 
         # Verify HMAC if present
         if needs_hmac_verification:
@@ -626,13 +637,16 @@ class Wallet:
         except Exception as e:
             raise ValueError(f"Bad decrypt: {e}")
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> Dict[str, Any]:
         """Export public wallet data only (alias for to_public_dict)."""
         return self.to_public_dict()
 
-    def to_public_dict(self) -> Dict[str, str]:
+    def to_public_dict(self) -> Dict[str, Any]:
         """Export public wallet data only"""
-        return {"address": self.address, "public_key": self.public_key}
+        data: Dict[str, Any] = {"address": self.address, "public_key": self.public_key}
+        if self._hd_metadata:
+            data["derivation_metadata"] = deepcopy(self._hd_metadata)
+        return data
 
     def to_full_dict_unsafe(self) -> Dict[str, str]:
         """
@@ -644,6 +658,15 @@ class Wallet:
             "public_key": self.public_key,
             "private_key": self.private_key,
         }
+
+    def get_derivation_metadata(self) -> Optional[Dict[str, Any]]:
+        """
+        Return derivation metadata for HD wallets.
+
+        Returns:
+            Copy of derivation metadata dict, or None if not HD-derived.
+        """
+        return deepcopy(self._hd_metadata) if self._hd_metadata else None
 
     # ===== BIP-39 MNEMONIC METHODS (TASK 24) =====
 
@@ -713,33 +736,49 @@ class Wallet:
             return False
 
     @staticmethod
-    def from_mnemonic(mnemonic_phrase: str, passphrase: str = "", account_index: int = 0) -> "Wallet":
+    def from_mnemonic(
+        mnemonic_phrase: str,
+        passphrase: str = "",
+        account_index: int = 0,
+        change: int = 0,
+        address_index: int = 0,
+        hardened_address: bool = False,
+    ) -> "Wallet":
         """
-        Create wallet from BIP-39 mnemonic phrase.
+        Create wallet from BIP-39 mnemonic phrase using the production BIP-44 pipeline.
 
         Args:
             mnemonic_phrase: BIP-39 mnemonic phrase
-            passphrase: Optional passphrase
-            account_index: Account index for derivation (default: 0)
+            passphrase: Optional passphrase for seed generation
+            account_index: Account index for derivation (default: 0, hardened automatically)
+            change: Address chain (0 = receiving, 1 = change)
+            address_index: Address index within the chain (default: 0)
+            hardened_address: Force hardened derivation for the address node
 
         Returns:
-            New Wallet instance
+            New Wallet instance with derivation metadata
 
         Raises:
-            ValueError: If mnemonic is invalid
+            ValueError: If mnemonic or derivation parameters are invalid
         """
-        # Convert mnemonic to seed
-        seed = Wallet.mnemonic_to_seed(mnemonic_phrase, passphrase)
+        hd_wallet = HDWallet(mnemonic=mnemonic_phrase, passphrase=passphrase)
+        address_info = hd_wallet.derive_address(
+            account_index=account_index,
+            change=change,
+            address_index=address_index,
+            hardened=hardened_address,
+        )
 
-        # Derive master key using BIP-32 (simplified)
-        # In production, use full BIP-32/BIP-44 derivation
-        master_key = hmac.new(b"Bitcoin seed", seed, hashlib.sha512).digest()
-        master_private_key = master_key[:32]
-
-        # Convert to hex for wallet creation
-        private_key_hex = master_private_key.hex()
-
-        return Wallet(private_key=private_key_hex)
+        metadata = {
+            "type": "bip44",
+            "derivation_path": address_info["path"],
+            "account_index": account_index,
+            "change": change,
+            "address_index": address_index,
+            "hardened_address": hardened_address,
+            "coin_type": HDWallet.XAI_COIN_TYPE,
+        }
+        return Wallet(private_key=address_info["private_key"], hd_metadata=metadata)
 
     def export_mnemonic_backup(self, mnemonic_phrase: str, password: Optional[str] = None) -> Dict[str, str]:
         """
@@ -759,6 +798,8 @@ class Wallet:
             "public_key": self.public_key,
             "backup_date": str(os.times()),
         }
+        if self._hd_metadata:
+            backup_data["derivation_metadata"] = deepcopy(self._hd_metadata)
 
         if password:
             return {"encrypted": True, "payload": self._encrypt_payload(json.dumps(backup_data), password)}
@@ -783,6 +824,8 @@ class Wallet:
             "address": self.address,
             "public_key": self.public_key,
         }
+        if self._hd_metadata:
+            export_data["derivation_metadata"] = deepcopy(self._hd_metadata)
 
         if include_private:
             export_data["private_key"] = self.private_key
@@ -897,7 +940,7 @@ class Wallet:
             if not private_key:
                 raise ValueError("No private key in wallet data")
 
-        return Wallet(private_key=private_key)
+        return Wallet(private_key=private_key, hd_metadata=json_data.get("derivation_metadata"))
 
     def export_hardware_compatible(self) -> Dict[str, str]:
         """

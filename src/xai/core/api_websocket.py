@@ -18,6 +18,9 @@ from collections import defaultdict, deque
 from flask import Flask, request
 from flask_sock import Sock
 
+from xai.core.api_auth import APIAuthManager
+from xai.core.security_validation import log_security_event
+
 logger = logging.getLogger(__name__)
 
 
@@ -184,7 +187,7 @@ class WebSocketLimiter:
 class WebSocketAPIHandler:
     """Handles all WebSocket-related API endpoints and functionality."""
 
-    def __init__(self, node: Any, app: Flask):
+    def __init__(self, node: Any, app: Flask, api_auth: Optional[APIAuthManager] = None):
         """
         Initialize WebSocket API Handler.
 
@@ -194,6 +197,7 @@ class WebSocketAPIHandler:
         """
         self.node = node
         self.app = app
+        self.api_auth = api_auth or getattr(getattr(node, "api_routes", None), "api_auth", None)
 
         # WebSocket support
         self.sock = Sock(self.app)
@@ -227,6 +231,18 @@ class WebSocketAPIHandler:
         """
         client_id = hashlib.sha256(f"{time.time()}".encode()).hexdigest()[:16]
         ip_address = request.remote_addr or "unknown"
+
+        # Enforce API authentication before allocating connection slots
+        auth_allowed, auth_error = self._authenticate_ws_request()
+        if not auth_allowed:
+            logger.warning(
+                "WebSocket authentication failed for %s: %s",
+                ip_address,
+                auth_error or "unauthorized",
+                extra={"event": "ws.auth_failure", "client_id": client_id}
+            )
+            self._close_with_error(ws, auth_error or "Unauthorized", code="WS_AUTH_FAILED")
+            return
 
         # Check connection limits (Task 66)
         can_connect, error = self.limiter.can_connect(ip_address)
@@ -282,6 +298,65 @@ class WebSocketAPIHandler:
             if client_id in self.ws_subscriptions:
                 del self.ws_subscriptions[client_id]
             logger.info(f"WebSocket client {client_id} disconnected")
+
+    def _authenticate_ws_request(self) -> Tuple[bool, Optional[str]]:
+        """Authenticate incoming WebSocket upgrade request if API auth is enabled."""
+
+        if not self.api_auth or not self.api_auth.is_enabled():
+            return True, None
+
+        try:
+            allowed, reason = self.api_auth.authorize(request)
+        except Exception as exc:
+            logger.error(
+                "WebSocket authentication raised error: %s",
+                exc,
+                extra={"event": "ws.auth_exception"}
+            )
+            log_security_event(
+                "websocket.auth.exception",
+                {
+                    "remote_addr": request.remote_addr or "unknown",
+                    "user_agent": request.headers.get("User-Agent", "unknown"),
+                    "error": type(exc).__name__,
+                },
+                severity="ERROR"
+            )
+            return False, "Authentication error"
+
+        if not allowed:
+            log_security_event(
+                "websocket.auth.denied",
+                {
+                    "remote_addr": request.remote_addr or "unknown",
+                    "user_agent": request.headers.get("User-Agent", "unknown"),
+                    "reason": reason or "unauthorized",
+                },
+                severity="WARNING"
+            )
+        return allowed, reason
+
+    @staticmethod
+    def _close_with_error(ws: Any, message: str, code: str = "WS_ERROR") -> None:
+        """Send structured error payload and close socket safely."""
+
+        try:
+            ws.send(json.dumps({"error": message, "code": code}))
+        except Exception as exc:
+            logger.debug(
+                "Failed to send WebSocket error response: %s",
+                type(exc).__name__,
+                extra={"event": "ws.error_send_failed"}
+            )
+        finally:
+            try:
+                ws.close()
+            except Exception as exc:
+                logger.debug(
+                    "Failed to close WebSocket after error: %s",
+                    type(exc).__name__,
+                    extra={"event": "ws.close_failed"}
+                )
 
     def _handle_ws_message(self, client_id: str, ws: Any, data: Dict[str, Any]) -> None:
         """

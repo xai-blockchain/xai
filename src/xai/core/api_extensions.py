@@ -53,7 +53,8 @@ class APIExtensions:
             self._register_trade_peer(peer)
 
         # Initialize WebSocket handler first (needed by other handlers)
-        self.websocket_handler = WebSocketAPIHandler(node, self.app)
+        api_auth = getattr(getattr(node, "api_routes", None), "api_auth", None)
+        self.websocket_handler = WebSocketAPIHandler(node, self.app, api_auth=api_auth)
 
         # Initialize specialized API handlers
         self.mining_handler = MiningAPIHandler(node, self.app, self.websocket_handler.broadcast_ws)

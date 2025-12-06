@@ -11,6 +11,7 @@ import time
 import json
 import os
 import tempfile
+import hashlib
 from unittest.mock import Mock, MagicMock, patch
 from decimal import Decimal
 
@@ -499,6 +500,7 @@ class TestBlockSizeValidator:
         mock_block = Mock()
         mock_block.transactions = []
         mock_block.to_dict.return_value = {"index": 1, "transactions": []}
+        mock_block.estimate_size_bytes.return_value = 1024
 
         is_valid, error = BlockSizeValidator.validate_block_size(mock_block)
 
@@ -510,6 +512,7 @@ class TestBlockSizeValidator:
         mock_block = Mock()
         mock_block.transactions = [Mock() for _ in range(BlockchainSecurityConfig.MAX_TRANSACTIONS_PER_BLOCK + 1)]
         mock_block.to_dict.return_value = {"index": 1}
+        mock_block.estimate_size_bytes.return_value = 1024
 
         is_valid, error = BlockSizeValidator.validate_block_size(mock_block)
 
@@ -520,9 +523,8 @@ class TestBlockSizeValidator:
         """Test rejection of oversized block"""
         mock_block = Mock()
         mock_block.transactions = []
-        # Create large block data
-        large_data = {"data": "x" * BlockchainSecurityConfig.MAX_BLOCK_SIZE}
-        mock_block.to_dict.return_value = large_data
+        mock_block.to_dict.return_value = {"index": 1}
+        mock_block.estimate_size_bytes.return_value = BlockchainSecurityConfig.MAX_BLOCK_SIZE + 1
 
         is_valid, error = BlockSizeValidator.validate_block_size(mock_block)
 
@@ -563,6 +565,7 @@ class TestResourceLimiter:
         mock_block = Mock()
         mock_block.transactions = []
         mock_block.to_dict.return_value = {"index": 1}
+        mock_block.estimate_size_bytes.return_value = 128
 
         is_valid, error = limiter.validate_block_size(mock_block)
 
@@ -799,6 +802,90 @@ class TestTimeValidator:
 
         assert is_valid is False
         assert "median" in error.lower()
+
+
+class TestBlockchainTimestampEnforcement:
+    """Ensure Blockchain enforces MTP + future-drift when adding blocks."""
+
+    @staticmethod
+    def _forge_block(previous_block, index: int, timestamp: float) -> Block:
+        """Create a synthetic block with deterministic PoW for testing."""
+        block = Block(
+            index,
+            [],
+            previous_hash=previous_block.hash,
+            difficulty=2,
+            timestamp=timestamp,
+            nonce=0,
+            signature="deadbeef",
+            miner_pubkey="cafebabe",
+        )
+        # Force a deterministic hash that satisfies difficulty constraints
+        suffix = hashlib.sha256(f"{index}-{timestamp}".encode()).hexdigest()
+        forged_hash = ("0" * block.difficulty) + suffix[block.difficulty :]
+        block.hash = forged_hash
+        block.header.calculate_hash = lambda: forged_hash
+        return block
+
+    def test_add_block_rejects_timestamp_not_past_median(self, tmp_path, monkeypatch):
+        """Blocks more recent than previous but older than MTP window should be rejected."""
+        blockchain = Blockchain(data_dir=str(tmp_path))
+        monkeypatch.setattr(blockchain, "verify_block_signature", lambda header: True)
+        base_time = time.time()
+
+        # Populate history with high timestamps so the rolling median stays high.
+        span = BlockchainSecurityConfig.MEDIAN_TIME_SPAN
+        for offset in range(1, span):
+            forged = self._forge_block(blockchain.chain[-1], len(blockchain.chain), base_time + 10_000 + offset)
+            blockchain.chain.append(forged)
+
+        # Latest block intentionally has a low timestamp.
+        low_block = self._forge_block(blockchain.chain[-1], len(blockchain.chain), base_time)
+        blockchain.chain.append(low_block)
+
+        candidate = self._forge_block(blockchain.chain[-1], len(blockchain.chain), base_time + 5)
+        result = blockchain.add_block(candidate)
+
+        assert result is False
+
+    def test_add_block_rejects_far_future_timestamp(self, tmp_path, monkeypatch):
+        """Blocks more than MAX_FUTURE_BLOCK_TIME seconds in the future must be dropped."""
+        blockchain = Blockchain(data_dir=str(tmp_path))
+        monkeypatch.setattr(blockchain, "verify_block_signature", lambda header: True)
+        future_timestamp = time.time() + BlockchainSecurityConfig.MAX_FUTURE_BLOCK_TIME + 120
+
+        candidate = self._forge_block(blockchain.chain[-1], len(blockchain.chain), future_timestamp)
+        result = blockchain.add_block(candidate)
+
+        assert result is False
+
+    def test_add_block_with_valid_timestamp_is_accepted(self, tmp_path, monkeypatch):
+        """Blocks respecting MTP and future drift should be accepted."""
+        blockchain = Blockchain(data_dir=str(tmp_path))
+        monkeypatch.setattr(blockchain, "verify_block_signature", lambda header: True)
+        base_time = time.time()
+
+        forged = self._forge_block(blockchain.chain[-1], len(blockchain.chain), base_time + 10)
+        result = blockchain.add_block(forged)
+
+        assert result is True
+        assert blockchain.chain[-1] is forged
+
+    def test_timestamp_drift_history_tracks_recent_entries(self, tmp_path, monkeypatch):
+        """Timestamp drift telemetry records recent additions for diagnostics."""
+        blockchain = Blockchain(data_dir=str(tmp_path))
+        monkeypatch.setattr(blockchain, "verify_block_signature", lambda header: True)
+        base_time = time.time()
+
+        forged = self._forge_block(blockchain.chain[-1], len(blockchain.chain), base_time + 25)
+        blockchain.add_block(forged)
+
+        history = blockchain.get_recent_timestamp_drift()
+        assert history, "Expected drift history to capture the latest block"
+        latest = history[-1]
+        assert latest["index"] == forged.index
+        assert latest["history_length"] == forged.index
+        assert "wall_clock_drift" in latest
 
 
 class TestEmergencyGovernanceTimelock:

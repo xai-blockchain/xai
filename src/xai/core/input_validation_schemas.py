@@ -8,7 +8,9 @@ class NodeTransactionInput(BaseModel):
     fee: float = 0.0
     public_key: str
     nonce: int
+    timestamp: float
     signature: str
+    txid: Optional[str] = Field(default=None, min_length=64, max_length=64)
     metadata: Optional[Dict[str, Any]] = None
 
 class PeerTransactionInput(BaseModel):
@@ -123,6 +125,7 @@ class ReferralCreateInput(BaseModel):
 class ReferralUseInput(BaseModel):
     new_address: str
     referral_code: str
+    metadata: Optional[Dict[str, Any]] = None
 
 class FraudCheckInput(BaseModel):
     payload: Dict[str, Any]

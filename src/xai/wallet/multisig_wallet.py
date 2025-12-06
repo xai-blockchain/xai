@@ -1,7 +1,7 @@
 import json
 import logging
 import time
-from typing import List, Dict, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -51,7 +51,64 @@ class MultiSigWallet:
         self.max_signers = max_signers
 
         # TASK 210: Storage for partial signatures
-        self.pending_transactions: Dict[str, Dict] = {}
+        self.pending_transactions: Dict[str, Dict[str, Any]] = {}
+
+        # Nonce/sequence tracking to prevent replay attacks
+        self._next_nonce: int = 0
+        self._sequence_counter: int = 0
+        self._consumed_nonces: Set[int] = set()
+
+    def _allocate_nonce_and_sequence(
+        self,
+        provided_nonce: Optional[int],
+        provided_sequence: Optional[int],
+    ) -> Tuple[int, int]:
+        """
+        Allocate a nonce/sequence pair for a new transaction.
+
+        Raises:
+            ValueError: If provided values are invalid or already used
+        """
+        if provided_nonce is not None:
+            if provided_nonce < 0:
+                raise ValueError("Nonce must be non-negative")
+            nonce = provided_nonce
+            if nonce in self._consumed_nonces or any(
+                tx["nonce"] == nonce for tx in self.pending_transactions.values()
+            ):
+                raise ValueError(f"Nonce {nonce} already used or pending")
+            if nonce >= self._next_nonce:
+                self._next_nonce = nonce + 1
+        else:
+            nonce = self._next_nonce
+            self._next_nonce += 1
+
+        if provided_sequence is not None:
+            if provided_sequence <= self._sequence_counter:
+                raise ValueError("Sequence must be strictly increasing")
+            sequence = provided_sequence
+            self._sequence_counter = sequence
+        else:
+            self._sequence_counter += 1
+            sequence = self._sequence_counter
+
+        return nonce, sequence
+
+    @staticmethod
+    def _serialize_for_signing(tx: Dict[str, Any]) -> bytes:
+        """
+        Build canonical payload for signature binding.
+
+        Includes nonce/sequence fields so previously signed payloads cannot
+        be replayed after the transaction is finalized.
+        """
+        envelope = {
+            "tx_id": tx["tx_id"],
+            "nonce": tx["nonce"],
+            "sequence": tx["sequence"],
+            "tx_data": tx["tx_data"],
+        }
+        return json.dumps(envelope, sort_keys=True, separators=(",", ":")).encode()
 
     def verify_signatures(self, message: bytes, signatures: Dict[str, str]) -> bool:
         """
@@ -144,19 +201,29 @@ class MultiSigWallet:
 
     # ===== PARTIAL SIGNATURE SUPPORT (TASK 210) =====
 
-    def create_transaction(self, tx_id: str, tx_data: Dict) -> Dict:
+    def create_transaction(
+        self,
+        tx_id: str,
+        tx_data: Dict,
+        nonce: Optional[int] = None,
+        sequence: Optional[int] = None,
+    ) -> Dict:
         """
         Create a new pending transaction for signature collection.
 
         Args:
             tx_id: Unique transaction identifier
             tx_data: Transaction data to be signed
+            nonce: Optional explicit nonce (must be unique if provided)
+            sequence: Optional explicit sequence number (must increase monotonically)
 
         Returns:
             Transaction info
         """
         if tx_id in self.pending_transactions:
             raise ValueError(f"Transaction {tx_id} already exists")
+
+        assigned_nonce, assigned_sequence = self._allocate_nonce_and_sequence(nonce, sequence)
 
         self.pending_transactions[tx_id] = {
             "tx_id": tx_id,
@@ -167,6 +234,8 @@ class MultiSigWallet:
             "threshold": self.threshold,
             "signers_required": self.threshold,
             "signers_collected": 0,
+            "nonce": assigned_nonce,
+            "sequence": assigned_sequence,
         }
 
         return self.pending_transactions[tx_id]
@@ -202,8 +271,8 @@ class MultiSigWallet:
         if public_key_hex in tx["signatures"]:
             raise ValueError(f"Public key {public_key_hex[:16]}... has already signed")
 
-        # Validate signature
-        message = json.dumps(tx["tx_data"], sort_keys=True).encode()
+        # Validate signature against canonical payload (includes nonce/sequence)
+        message = self._serialize_for_signing(tx)
         message_hash = hashes.Hash(hashes.SHA256())
         message_hash.update(message)
         digest = message_hash.finalize()
@@ -289,6 +358,9 @@ class MultiSigWallet:
         tx["status"] = "finalized"
         tx["finalized_at"] = time.time()
 
+        # Burn nonce to prevent replay
+        self._consumed_nonces.add(tx["nonce"])
+
         # Return complete transaction
         result = {
             "tx_id": tx["tx_id"],
@@ -296,6 +368,8 @@ class MultiSigWallet:
             "signatures": tx["signatures"],
             "status": "finalized",
             "threshold_met": True,
+            "nonce": tx["nonce"],
+            "sequence": tx["sequence"],
         }
 
         # Remove from pending

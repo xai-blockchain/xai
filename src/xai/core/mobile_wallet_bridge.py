@@ -22,6 +22,8 @@ from xai.core.blockchain import Transaction
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_BLOCK_CAPACITY = 500
+
 
 class MobileWalletBridge:
     """Draft/commit flow for mobile wallets and air-gapped signers."""
@@ -82,6 +84,7 @@ class MobileWalletBridge:
             "memo": memo,
             "metadata": metadata,
             "timestamp": timestamp,
+            "fee_telemetry": fee_quote.get("telemetry"),
         }
 
         draft_id = str(uuid.uuid4())
@@ -168,19 +171,49 @@ class MobileWalletBridge:
             Fee quote dictionary with recommended_fee and conditions
         """
         pending = len(self.blockchain.pending_transactions)
+        optimizer_quote: Optional[Dict[str, Any]] = None
         if self.fee_optimizer:
             try:
-                return self.fee_optimizer.predict_optimal_fee(pending, priority=priority)
+                optimizer_quote = self.fee_optimizer.predict_optimal_fee(
+                    pending_tx_count=pending,
+                    priority=priority,
+                )
             except Exception as e:
-                # Fee optimizer failed - log and fall back to basic calculation
                 logger.warning(
                     "Fee optimizer failed, using fallback calculation",
                     extra={
                         "event": "mobile_bridge.fee_optimizer_error",
                         "error_type": type(e).__name__,
-                        "priority": priority
-                    }
+                        "priority": priority,
+                    },
                 )
+
+        if optimizer_quote and optimizer_quote.get("success", True):
+            telemetry = {
+                "congestion_level": optimizer_quote.get("congestion_level"),
+                "fee_percentiles": optimizer_quote.get("fee_percentiles") or {},
+                "pressure": optimizer_quote.get("pressure") or {},
+                "mempool_bytes": optimizer_quote.get("mempool_bytes"),
+                "estimated_confirmation_blocks": optimizer_quote.get("estimated_confirmation_blocks"),
+            }
+            recommended_fee = optimizer_quote.get("recommended_fee")
+            if recommended_fee is None:
+                recommended_fee = optimizer_quote.get("recommended_fee_per_byte")
+            try:
+                fee_value = float(recommended_fee)
+            except (TypeError, ValueError):
+                fee_value = None
+            if fee_value is not None:
+                return {
+                    "recommended_fee": fee_value,
+                    "conditions": {
+                        "priority": priority,
+                        "pending_transactions": pending,
+                        "congestion_level": telemetry.get("congestion_level"),
+                    },
+                    "confidence": optimizer_quote.get("confidence"),
+                    "telemetry": telemetry,
+                }
 
         base_fee = Decimal("0.05")
         if priority == "high":
@@ -192,6 +225,17 @@ class MobileWalletBridge:
         recommended_fee = float(
             (base_fee * (1 + Decimal(str(congestion)))).quantize(Decimal("0.00000001"))
         )
+        backlog_ratio = pending / DEFAULT_BLOCK_CAPACITY if DEFAULT_BLOCK_CAPACITY else pending
+        telemetry = {
+            "congestion_level": self._classify_congestion(backlog_ratio),
+            "fee_percentiles": {},
+            "pressure": {
+                "backlog_ratio": round(backlog_ratio, 3),
+                "block_capacity": DEFAULT_BLOCK_CAPACITY,
+            },
+            "mempool_bytes": None,
+            "estimated_confirmation_blocks": max(1, int(backlog_ratio + 1)),
+        }
 
         return {
             "recommended_fee": recommended_fee,
@@ -200,8 +244,19 @@ class MobileWalletBridge:
                 "pending_transactions": pending,
                 "congestion_factor": round(congestion, 2),
             },
-            "confidence": 0.5,
+            "confidence": min(1.0, 0.5 + pending / 1000.0),
+            "telemetry": telemetry,
         }
+
+    @staticmethod
+    def _classify_congestion(backlog_ratio: float) -> str:
+        if backlog_ratio < 0.5:
+            return "low"
+        if backlog_ratio < 1.0:
+            return "moderate"
+        if backlog_ratio < 2.0:
+            return "high"
+        return "critical"
 
     def _active_drafts_for_sender(self, sender: str) -> List[str]:
         return [

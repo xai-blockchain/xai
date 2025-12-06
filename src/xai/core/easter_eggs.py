@@ -6,7 +6,6 @@ XAI Easter Eggs & Hidden Features
 3. Cryptic Airdrop Clues
 """
 
-import random
 import hashlib
 import time
 from typing import Dict, List, Optional
@@ -110,6 +109,10 @@ class HiddenTreasureWallets:
         for i in range(count):
             wallet = Wallet()
 
+            # Use cryptographically secure random for treasure wallet generation
+            # to prevent predictability of treasure locations
+            sr = secrets.SystemRandom()
+
             wallet_data = {
                 "index": i + 1,
                 "address": wallet.address,
@@ -118,7 +121,7 @@ class HiddenTreasureWallets:
                 "balance": 1000.0,
                 "discovered": False,
                 "discovery_clue": self._generate_clue(i, wallet.address),
-                "hidden_in_block": random.randint(100, 10000),  # Clue hidden in random block
+                "hidden_in_block": sr.randint(100, 10000),  # Clue hidden in random block
             }
 
             wallets.append(wallet_data)
@@ -133,22 +136,24 @@ class HiddenTreasureWallets:
         return wallets
 
     def _generate_clue(self, index: int, address: str) -> str:
-        """Generate cryptic clue for finding wallet"""
+        """Generate cryptic clue for finding wallet using cryptographic randomness"""
+        # Use cryptographically secure random to prevent clue prediction
+        sr = secrets.SystemRandom()
 
         clues = [
             f"Seek the block where {address[:8]} whispers",
             f"Between the echoes of transactions, {address[8:16]} awaits",
             f"In the shadow of the merkle tree, look for {address[-8:]}",
-            f"The {index + 1}th secret sleeps in block {random.randint(100, 10000)}",
+            f"The {index + 1}th secret sleeps in block {sr.randint(100, 10000)}",
             f"Hash the genesis timestamp thrice, add {index}, find truth",
             f"Where the sine wave peaks, {address[:12]} reveals itself",
             f"Count the lucky blocks, multiply by {index + 1}, seek there",
             f"The price floor knows: {address[4:12]} is the key",
-            f"In block {random.randint(100, 10000)}, fortune favors the clever",
+            f"In block {sr.randint(100, 10000)}, fortune favors the clever",
             f"When the node count reaches {(index + 1) * 10}, the door opens",
         ]
 
-        return random.choice(clues)
+        return secrets.choice(clues)
 
     def hide_clues_in_blocks(self, blockchain) -> Dict:
         """

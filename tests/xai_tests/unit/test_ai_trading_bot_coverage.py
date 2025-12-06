@@ -594,7 +594,7 @@ class TestAICallMocking:
             user_address="XAI_Test",
             ai_provider="unsupported_provider",
             ai_model="model",
-            user_api_key="key",
+            user_api_key="sk-unsupported-provider-key",
             strategy=TradingStrategy.BALANCED,
             config=basic_config,
             blockchain=mock_blockchain,

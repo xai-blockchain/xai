@@ -75,8 +75,10 @@ class HDWallet:
         self.master_key = Bip32Slip10Secp256k1.FromSeed(self.seed)
 
         # Track derived accounts
-        self.accounts: Dict[int, Any] = {}
+        self.accounts: Dict[int, Dict[str, Any]] = {}
         self.address_cache: Dict[str, Dict] = {}
+        self.selected_account: int = 0
+        self.next_account_index: int = 0
 
     def get_mnemonic(self) -> str:
         """
@@ -118,9 +120,13 @@ class HDWallet:
             "path": f"m/44'/{self.XAI_COIN_TYPE}'/{account_index}'",
             "master_public_key": account.PublicKey().RawCompressed().ToHex(),
             "chain_code": account.ChainCode().ToHex(),
+            "receiving_index": 0,
+            "change_index": 0,
         }
 
         self.accounts[account_index] = account_info
+        if account_index + 1 > self.next_account_index:
+            self.next_account_index = account_index + 1
         return account_info
 
     def derive_address(
@@ -154,6 +160,8 @@ class HDWallet:
             raise ValueError("Change must be 0 (external) or 1 (internal)")
 
         # Build derivation path: m/44'/coin_type'/account'/change/address_index
+        account_info = self.derive_account(account_index)
+
         purpose = self.master_key.ChildKey(Bip32KeyIndex.HardenIndex(44))
         coin_type = purpose.ChildKey(Bip32KeyIndex.HardenIndex(self.XAI_COIN_TYPE))
         account = coin_type.ChildKey(Bip32KeyIndex.HardenIndex(account_index))
@@ -169,10 +177,14 @@ class HDWallet:
 
         # Extract keys
         private_key = address_key.PrivateKey().Raw().ToHex()
-        public_key = address_key.PublicKey().RawCompressed().ToHex()
+        raw_uncompressed = address_key.PublicKey().RawUncompressed().ToHex()
+        if raw_uncompressed.startswith("04"):
+            public_key = raw_uncompressed[2:]
+        else:
+            public_key = raw_uncompressed
 
-        # Generate XAI address (using SHA256 of public key bytes)
-        # Convert hex string to bytes before hashing for consistency with main wallet
+        # Generate XAI address using the canonical wallet hashing scheme (SHA256 of
+        # the uncompressed public key bytes without the 0x04 prefix).
         pub_key_bytes = bytes.fromhex(public_key)
         pub_hash = hashlib.sha256(pub_key_bytes).hexdigest()
         address = f"XAI{pub_hash[:40]}"
@@ -193,6 +205,11 @@ class HDWallet:
         cache_key = f"{account_index}/{change}/{address_index}"
         self.address_cache[cache_key] = result
 
+        if change == 0:
+            account_info["receiving_index"] = max(account_info["receiving_index"], address_index + 1)
+        else:
+            account_info["change_index"] = max(account_info["change_index"], address_index + 1)
+
         return result
 
     def derive_receiving_address(self, account_index: int = 0, index: int = 0) -> Dict[str, str]:
@@ -201,11 +218,14 @@ class HDWallet:
 
         Args:
             account_index: Account number
-            index: Address index
+            index: Address index (set to -1 to consume the next unused slot)
 
         Returns:
             Address info
         """
+        account = self.derive_account(account_index)
+        if index == -1:
+            index = account["receiving_index"]
         return self.derive_address(account_index=account_index, change=0, address_index=index)
 
     def derive_change_address(self, account_index: int = 0, index: int = 0) -> Dict[str, str]:
@@ -214,11 +234,14 @@ class HDWallet:
 
         Args:
             account_index: Account number
-            index: Address index
+            index: Address index (set to -1 to consume the next unused slot)
 
         Returns:
             Address info
         """
+        account = self.derive_account(account_index)
+        if index == -1:
+            index = account["change_index"]
         return self.derive_address(account_index=account_index, change=1, address_index=index)
 
     # ===== GAP LIMIT SCANNING (TASK 99) =====
@@ -409,6 +432,60 @@ class HDWallet:
 
         return addresses
 
+    def create_account(self, account_name: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Allocate the next unused account following BIP-44 rules.
+
+        Args:
+            account_name: Optional human-friendly label
+
+        Returns:
+            Account metadata dictionary
+        """
+        account_index = self.next_account_index
+        self.next_account_index += 1
+
+        account_info = self.derive_account(account_index)
+        account_info["name"] = account_name or f"Account {account_index}"
+
+        return account_info
+
+    def list_accounts(self) -> List[Dict[str, Any]]:
+        """
+        Return all derived accounts with balance indexes.
+        """
+        return [self.derive_account(idx) for idx in sorted(self.accounts)]
+
+    def select_account(self, account_index: int) -> Dict[str, Any]:
+        """
+        Mark the active account for helper accessors.
+        """
+        account_info = self.derive_account(account_index)
+        self.selected_account = account_index
+        return account_info
+
+    def get_selected_account(self) -> Dict[str, Any]:
+        """
+        Return metadata for the currently selected account.
+        """
+        return self.derive_account(self.selected_account)
+
+    def derive_next_receiving(self, account_index: Optional[int] = None) -> Dict[str, str]:
+        """
+        Convenience helper for sequential receiving addresses.
+        """
+        idx = self.selected_account if account_index is None else account_index
+        account = self.derive_account(idx)
+        return self.derive_receiving_address(idx, index=account["receiving_index"])
+
+    def derive_next_change(self, account_index: Optional[int] = None) -> Dict[str, str]:
+        """
+        Convenience helper for sequential change addresses.
+        """
+        idx = self.selected_account if account_index is None else account_index
+        account = self.derive_account(idx)
+        return self.derive_change_address(idx, index=account["change_index"])
+
 
 # Example Usage (for development/testing only)
 if __name__ == "__main__":
@@ -431,13 +508,19 @@ if __name__ == "__main__":
     logger.info("Master Public Key: %s...", account['master_public_key'][:32])
 
     # Derive receiving addresses
-    logger.info("3. Deriving receiving addresses (m/44'/9999'/0'/0/x)...")
+    logger.info(
+        "3. Deriving receiving addresses (m/44'/%d'/0'/0/x)...",
+        HDWallet.XAI_COIN_TYPE,
+    )
     for i in range(3):
         addr = wallet.derive_receiving_address(account_index=0, index=i)
         logger.info("   [%d] %s - %s", i, addr['address'], addr['path'])
 
     # Derive change addresses
-    logger.info("4. Deriving change addresses (m/44'/9999'/0'/1/x)...")
+    logger.info(
+        "4. Deriving change addresses (m/44'/%d'/0'/1/x)...",
+        HDWallet.XAI_COIN_TYPE,
+    )
     for i in range(2):
         addr = wallet.derive_change_address(account_index=0, index=i)
         logger.info("   [%d] %s - %s", i, addr['address'], addr['path'])

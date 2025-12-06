@@ -13,7 +13,7 @@ Implements:
 
 import time
 import json
-import random
+import secrets
 import threading
 import logging
 import requests
@@ -518,8 +518,10 @@ class PeerDiscoveryManager:
         new_peers = 0
 
         # Sample some connected peers to ask for their peer lists
+        # Use cryptographically secure sampling to prevent peer selection prediction
         sample_size = min(5, len(self.connected_peers))
-        sample_peers = random.sample(list(self.connected_peers), sample_size)
+        sr = secrets.SystemRandom()
+        sample_peers = sr.sample(list(self.connected_peers), sample_size)
 
         for peer_url in sample_peers:
             peer_list = PeerDiscoveryProtocol.send_get_peers_request(peer_url)

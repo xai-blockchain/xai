@@ -50,6 +50,7 @@ class BlockHeader:
         nonce: int,
         signature: Optional[str] = None,
         miner_pubkey: Optional[str] = None,
+        version: Optional[int] = None,
     ) -> None:
         self.index = index
         self.previous_hash = previous_hash
@@ -59,6 +60,12 @@ class BlockHeader:
         self.nonce = nonce
         self.signature = signature
         self.miner_pubkey = miner_pubkey
+        if version is None:
+            self.version = Config.BLOCK_HEADER_VERSION
+            self._hash_includes_version = False
+        else:
+            self.version = int(version)
+            self._hash_includes_version = True
         self.hash = self.calculate_hash()
 
     def calculate_hash(self) -> str:
@@ -71,12 +78,14 @@ class BlockHeader:
             "difficulty": self.difficulty,
             "nonce": self.nonce,
         }
+        if self._hash_includes_version:
+            header_data["version"] = self.version
         header_string = json.dumps(header_data, sort_keys=True)
         return hashlib.sha256(header_string.encode()).hexdigest()
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
-        return {
+        payload = {
             "index": self.index,
             "previous_hash": self.previous_hash,
             "merkle_root": self.merkle_root,
@@ -87,3 +96,6 @@ class BlockHeader:
             "miner_pubkey": self.miner_pubkey,
             "hash": self.hash,
         }
+        if self._hash_includes_version:
+            payload["version"] = self.version
+        return payload

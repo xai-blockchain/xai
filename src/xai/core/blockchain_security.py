@@ -14,6 +14,7 @@ from __future__ import annotations
 import time
 import json
 import os
+import logging
 from typing import Dict, List, Optional, Tuple, Any, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -21,6 +22,8 @@ if TYPE_CHECKING:
 from decimal import Decimal, getcontext
 
 from xai.core.config import Config
+
+logger = logging.getLogger(__name__)
 
 # Set high precision for overflow protection
 getcontext().prec = 50
@@ -395,17 +398,24 @@ class BlockSizeValidator:
         Returns:
             (valid, error_message)
         """
+        transactions = getattr(block, "transactions", []) or []
+
         # Check transaction count
-        tx_count = len(block.transactions)
+        tx_count = len(transactions)
         if tx_count > BlockchainSecurityConfig.MAX_TRANSACTIONS_PER_BLOCK:
             return (
                 False,
                 f"Too many transactions in block: {tx_count} (max {BlockchainSecurityConfig.MAX_TRANSACTIONS_PER_BLOCK})",
             )
 
-        # Check total block size
-        block_json = json.dumps(block.to_dict())
-        block_size = len(block_json.encode())
+        # Check total block size using deterministic serialization
+        try:
+            block_size = block.estimate_size_bytes()
+        except AttributeError:
+            block_json = json.dumps(block.to_dict())
+            block_size = len(block_json.encode())
+        except Exception:
+            block_size = BlockchainSecurityConfig.MAX_BLOCK_SIZE + 1
 
         if block_size > BlockchainSecurityConfig.MAX_BLOCK_SIZE:
             return (

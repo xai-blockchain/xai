@@ -44,7 +44,7 @@ def mock_node(temp_blockchain_dir):
         "private_key": identity_wallet.private_key,
         "public_key": identity_wallet.public_key,
     }
-    node.miner_address = "miner_test_address"
+    node.miner_address = "XAI" + "9" * 40
     node.peers = set()
     node.is_mining = False
     node.start_time = time.time()
@@ -56,11 +56,27 @@ def mock_node(temp_blockchain_dir):
 
     # Mock algorithmic features
     node.fee_optimizer = Mock()
-    node.fee_optimizer.predict_optimal_fee = lambda pending_tx_count, priority="normal": {
-        "recommended_fee": 0.01,
-        "priority": priority,
-        "confidence": 80,
-    }
+
+    def _mock_fee_quote(pending_tx_count, priority="normal", **kwargs):
+        return {
+            "recommended_fee": 0.01,
+            "recommended_fee_per_byte": 0.01,
+            "priority": priority,
+            "estimated_confirmation_blocks": 2,
+            "pending_transactions": pending_tx_count,
+            "mempool_bytes": kwargs.get("mempool_bytes", 0),
+            "congestion_level": "low",
+            "fee_percentiles": kwargs.get("fee_rates") or {},
+            "pressure": {"backlog_ratio": 0.0, "block_capacity": kwargs.get("avg_block_capacity", 500)},
+            "conditions": {
+                "priority": priority,
+                "pending_transactions": pending_tx_count,
+                "congestion_level": "low",
+                "mempool_bytes": kwargs.get("mempool_bytes", 0),
+            },
+        }
+
+    node.fee_optimizer.predict_optimal_fee = Mock(side_effect=_mock_fee_quote)
     node.fee_optimizer.fee_history = []
 
     node.fraud_detector = Mock()
@@ -387,7 +403,7 @@ class TestTransactionEndpoints:
     def test_get_transaction_pending(self, flask_app, mock_node):
         """Test GET /transaction/<txid> for pending transaction"""
         wallet = Wallet()
-        tx = Transaction(wallet.address, "recipient", 10.0)
+        tx = Transaction(wallet.address, "XAI" + "F" * 40, 10.0)
         tx.txid = tx.calculate_hash()
         mock_node.blockchain.pending_transactions.append(tx)
 
@@ -410,14 +426,15 @@ class TestTransactionEndpoints:
 
     def test_send_transaction_invalid_signature(self, flask_app):
         """Test POST /send with invalid signature"""
+        wallet = Wallet()
         tx_data = {
-            "sender": "sender_addr",
-            "recipient": "recipient_addr",
+            "sender": wallet.address,
+            "recipient": "XAI" + "2" * 40,
             "amount": 10.0,
             "fee": 0.01,
-            "public_key": "fake_public_key",
+            "public_key": wallet.public_key,
             "nonce": 1,
-            "signature": "invalid_signature"
+            "signature": "deadbeef" * 16,
         }
 
         response = flask_app.post('/send',
@@ -431,7 +448,7 @@ class TestTransactionEndpoints:
     def test_send_transaction_validation_failed(self, flask_app, mock_node):
         """Test POST /send when blockchain validation fails"""
         wallet = Wallet()
-        tx = Transaction(wallet.address, "recipient", 10.0)
+        tx = Transaction(wallet.address, "XAI" + "3" * 40, 10.0)
         tx.sign_transaction(wallet.private_key)
 
         # Mock blockchain to reject transaction
@@ -535,7 +552,7 @@ class TestMiningEndpoints:
         """Test POST /mine handles exceptions"""
         # Add a pending transaction
         wallet = Wallet()
-        tx = Transaction(wallet.address, "recipient", 10.0)
+        tx = Transaction(wallet.address, "XAI" + "4" * 40, 10.0)
         mock_node.blockchain.pending_transactions.append(tx)
 
         # Make mining raise exception
@@ -980,7 +997,7 @@ class TestGamificationEndpoints:
         mock_node.blockchain.treasure_manager.create_treasure_hunt.return_value = "treasure_123"
 
         treasure_data = {
-            "creator": "creator_addr",
+            "creator": "XAI" + "5" * 40,
             "amount": 100.0,
             "puzzle_type": "riddle",
             "puzzle_data": {"question": "What am I?"}
@@ -1008,7 +1025,7 @@ class TestGamificationEndpoints:
 
         claim_data = {
             "treasure_id": "treasure_123",
-            "claimer": "claimer_addr",
+            "claimer": "XAI" + "6" * 40,
             "solution": "correct answer"
         }
 
@@ -1027,7 +1044,7 @@ class TestGamificationEndpoints:
 
         claim_data = {
             "treasure_id": "treasure_123",
-            "claimer": "claimer_addr",
+            "claimer": "XAI" + "6" * 40,
             "solution": "wrong answer"
         }
 
@@ -1366,6 +1383,77 @@ class TestExchangeEndpoints:
         data = json.loads(response.data)
         assert data['success'] is True
         assert 'prices' in data
+
+
+class TestContractInterfaceEndpoints:
+    """Test the contract interface detection endpoint."""
+
+    def test_contract_interfaces_vm_disabled(self, flask_app, mock_node):
+        address = "XAI" + "12" * 20
+        mock_node.blockchain.contracts[address.upper()] = {
+            "address": address.upper(),
+            "code": "00",
+            "creator": "tester",
+            "storage": {},
+        }
+        response = flask_app.get(f"/contracts/{address}/interfaces")
+        assert response.status_code == 503
+
+    def test_contract_interfaces_success(self, flask_app, mock_node):
+        from types import SimpleNamespace
+
+        address = "XAI" + "34" * 20
+        mock_node.blockchain.contracts[address.upper()] = {
+            "address": address.upper(),
+            "code": "00",
+            "creator": "tester",
+            "storage": {},
+        }
+        manager = Mock()
+        manager.static_call.side_effect = [
+            SimpleNamespace(success=True, return_data=(1).to_bytes(32, "big")),
+            SimpleNamespace(success=True, return_data=(0).to_bytes(32, "big")),
+        ]
+        mock_node.blockchain.smart_contract_manager = manager
+
+        response = flask_app.get(f"/contracts/{address}/interfaces")
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["interfaces"]["erc1363_receiver"] is True
+        assert data["interfaces"]["erc721_receiver"] is False
+        assert data["metadata"]["cached"] is False
+        assert data["metadata"]["source"] == "erc165_probe"
+
+    def test_contract_interfaces_uses_cache(self, flask_app, mock_node):
+        from types import SimpleNamespace
+
+        address = "XAI" + "56" * 20
+        mock_node.blockchain.contracts[address.upper()] = {
+            "address": address.upper(),
+            "code": "00",
+            "creator": "tester",
+            "storage": {},
+        }
+        manager = Mock()
+        manager.static_call.side_effect = [
+            SimpleNamespace(success=True, return_data=(1).to_bytes(32, "big")),
+            SimpleNamespace(success=True, return_data=(1).to_bytes(32, "big")),
+        ]
+        mock_node.blockchain.smart_contract_manager = manager
+
+        first_response = flask_app.get(f"/contracts/{address}/interfaces")
+        assert first_response.status_code == 200
+        initial_payload = json.loads(first_response.data)
+        assert initial_payload["metadata"]["cached"] is False
+
+        manager.static_call.reset_mock()
+
+        second_response = flask_app.get(f"/contracts/{address}/interfaces")
+        assert second_response.status_code == 200
+        cached_payload = json.loads(second_response.data)
+        assert cached_payload["metadata"]["cached"] is True
+        assert cached_payload["interfaces"] == initial_payload["interfaces"]
+        manager.static_call.assert_not_called()
 
     def test_get_exchange_stats(self, flask_app, temp_blockchain_dir):
         """Test GET /exchange/stats"""

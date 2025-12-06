@@ -6,8 +6,9 @@ Handles deposits, withdrawals, and balance management for all supported currenci
 import json
 import os
 import time
+import threading
 from decimal import Decimal
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any, Iterable
 import hashlib
 
 
@@ -107,19 +108,34 @@ class ExchangeWallet:
 class ExchangeWalletManager:
     """Manages all user wallets and handles custody"""
 
+    _WITHDRAWAL_STATUSES = {"pending", "completed", "failed", "flagged"}
+
     def __init__(self, data_dir: str = "exchange_data"):
         self.data_dir = data_dir
         self.wallets: Dict[str, ExchangeWallet] = {}
         self.transactions: List[dict] = []
+        self.pending_withdrawals: Dict[str, dict] = {}
+        self.lock = threading.RLock()
         self.load_wallets()
+        self._refresh_pending_withdrawals()
+
+    def _refresh_pending_withdrawals(self) -> None:
+        """Rebuild the cache of pending withdrawal transactions."""
+        with self.lock:
+            self.pending_withdrawals = {
+                tx["id"]: tx
+                for tx in self.transactions
+                if tx.get("type") == "withdrawal" and tx.get("status") == "pending"
+            }
 
     def get_wallet(self, user_address: str) -> ExchangeWallet:
         """Get or create wallet for user"""
-        if user_address not in self.wallets:
-            wallet = ExchangeWallet(user_address)
-            self.wallets[user_address] = wallet
+        with self.lock:
+            if user_address not in self.wallets:
+                wallet = ExchangeWallet(user_address)
+                self.wallets[user_address] = wallet
 
-        return self.wallets[user_address]
+            return self.wallets[user_address]
 
     def deposit(
         self,
@@ -130,67 +146,75 @@ class ExchangeWalletManager:
         tx_hash: Optional[str] = None,
     ) -> dict:
         """Deposit funds into user's exchange wallet"""
-        wallet = self.get_wallet(user_address)
         amount_decimal = Decimal(str(amount))
+        with self.lock:
+            wallet = self.get_wallet(user_address)
 
-        if wallet.deposit(currency, amount_decimal):
-            # Record transaction
-            tx = {
-                "id": self._generate_tx_id(),
-                "type": "deposit",
-                "user_address": user_address,
-                "currency": currency,
-                "amount": float(amount_decimal),
-                "deposit_type": deposit_type,  # manual, bank_transfer, crypto_deposit
-                "tx_hash": tx_hash,
-                "timestamp": time.time(),
-                "status": "completed",
-            }
-            self.transactions.append(tx)
-            self.save_wallets()
+            if wallet.deposit(currency, amount_decimal):
+                tx = {
+                    "id": self._generate_tx_id(),
+                    "type": "deposit",
+                    "user_address": user_address,
+                    "currency": currency,
+                    "amount": float(amount_decimal),
+                    "deposit_type": deposit_type,
+                    "tx_hash": tx_hash,
+                    "timestamp": time.time(),
+                    "status": "completed",
+                }
+                self.transactions.append(tx)
+                self.save_wallets()
 
-            return {
-                "success": True,
-                "transaction": tx,
-                "new_balance": float(wallet.get_total_balance(currency)),
-            }
+                return {
+                    "success": True,
+                    "transaction": tx.copy(),
+                    "new_balance": float(wallet.get_total_balance(currency)),
+                }
 
         return {"success": False, "error": "Invalid deposit amount"}
 
-    def withdraw(self, user_address: str, currency: str, amount: float, destination: str) -> dict:
+    def withdraw(
+        self,
+        user_address: str,
+        currency: str,
+        amount: float,
+        destination: str,
+        *,
+        compliance_metadata: Optional[Dict[str, Any]] = None,
+    ) -> dict:
         """Withdraw funds from user's exchange wallet"""
-        wallet = self.get_wallet(user_address)
-        amount_decimal = Decimal(str(amount))
-
-        # Check minimum withdrawal
         min_withdrawals = {"USD": 10.0, "AXN": 100.0, "BTC": 0.001, "ETH": 0.01, "USDT": 10.0}
-
         if amount < min_withdrawals.get(currency, 0):
             return {
                 "success": False,
                 "error": f"Minimum withdrawal: {min_withdrawals.get(currency, 0)} {currency}",
             }
 
-        if wallet.withdraw(currency, amount_decimal):
-            # Record transaction
-            tx = {
-                "id": self._generate_tx_id(),
-                "type": "withdrawal",
-                "user_address": user_address,
-                "currency": currency,
-                "amount": float(amount_decimal),
-                "destination": destination,
-                "timestamp": time.time(),
-                "status": "pending",  # Would be processed by withdrawal processor
-            }
-            self.transactions.append(tx)
-            self.save_wallets()
+        amount_decimal = Decimal(str(amount))
+        with self.lock:
+            wallet = self.get_wallet(user_address)
+            if wallet.withdraw(currency, amount_decimal):
+                timestamp = time.time()
+                tx = {
+                    "id": self._generate_tx_id(),
+                    "type": "withdrawal",
+                    "user_address": user_address,
+                    "currency": currency,
+                    "amount": float(amount_decimal),
+                    "destination": destination,
+                    "timestamp": timestamp,
+                    "status": "pending",
+                    "compliance": compliance_metadata or {},
+                }
+                self.transactions.append(tx)
+                self.pending_withdrawals[tx["id"]] = tx
+                self.save_wallets()
 
-            return {
-                "success": True,
-                "transaction": tx,
-                "new_balance": float(wallet.get_total_balance(currency)),
-            }
+                return {
+                    "success": True,
+                    "transaction": tx.copy(),
+                    "new_balance": float(wallet.get_total_balance(currency)),
+                }
 
         return {"success": False, "error": "Insufficient balance"}
 
@@ -204,90 +228,172 @@ class ExchangeWalletManager:
         quote_amount: float,
     ) -> dict:
         """Execute a trade between two users with balance transfers"""
-        buyer_wallet = self.get_wallet(buyer_address)
-        seller_wallet = self.get_wallet(seller_address)
-
         base_amt = Decimal(str(base_amount))
         quote_amt = Decimal(str(quote_amount))
 
-        # Verify buyer has enough quote currency (USD/BTC/ETH)
-        if buyer_wallet.get_available_balance(quote_currency) < quote_amt:
-            return {"success": False, "error": f"Buyer insufficient {quote_currency} balance"}
+        with self.lock:
+            buyer_wallet = self.get_wallet(buyer_address)
+            seller_wallet = self.get_wallet(seller_address)
 
-        # Verify seller has enough base currency (AXN)
-        if seller_wallet.get_available_balance(base_currency) < base_amt:
-            return {"success": False, "error": f"Seller insufficient {base_currency} balance"}
+            if buyer_wallet.get_available_balance(quote_currency) < quote_amt:
+                return {"success": False, "error": f"Buyer insufficient {quote_currency} balance"}
 
-        # Execute transfers
-        # Buyer: pays quote currency, receives base currency
-        buyer_wallet.withdraw(quote_currency, quote_amt)
-        buyer_wallet.deposit(base_currency, base_amt)
+            if seller_wallet.get_available_balance(base_currency) < base_amt:
+                return {"success": False, "error": f"Seller insufficient {base_currency} balance"}
 
-        # Seller: pays base currency, receives quote currency
-        seller_wallet.withdraw(base_currency, base_amt)
-        seller_wallet.deposit(quote_currency, quote_amt)
+            buyer_wallet.withdraw(quote_currency, quote_amt)
+            buyer_wallet.deposit(base_currency, base_amt)
+            seller_wallet.withdraw(base_currency, base_amt)
+            seller_wallet.deposit(quote_currency, quote_amt)
 
-        # Record transaction
-        tx = {
-            "id": self._generate_tx_id(),
-            "type": "trade",
-            "buyer": buyer_address,
-            "seller": seller_address,
-            "base_currency": base_currency,
-            "quote_currency": quote_currency,
-            "base_amount": float(base_amt),
-            "quote_amount": float(quote_amt),
-            "price": float(quote_amt / base_amt),
-            "timestamp": time.time(),
-        }
-        self.transactions.append(tx)
-        self.save_wallets()
+            tx = {
+                "id": self._generate_tx_id(),
+                "type": "trade",
+                "buyer": buyer_address,
+                "seller": seller_address,
+                "base_currency": base_currency,
+                "quote_currency": quote_currency,
+                "base_amount": float(base_amt),
+                "quote_amount": float(quote_amt),
+                "price": float(quote_amt / base_amt),
+                "timestamp": time.time(),
+            }
+            self.transactions.append(tx)
+            self.save_wallets()
 
-        return {
-            "success": True,
-            "transaction": tx,
-            "buyer_balances": buyer_wallet.to_dict()["available_balances"],
-            "seller_balances": seller_wallet.to_dict()["available_balances"],
-        }
+            return {
+                "success": True,
+                "transaction": tx.copy(),
+                "buyer_balances": buyer_wallet.to_dict()["available_balances"],
+                "seller_balances": seller_wallet.to_dict()["available_balances"],
+            }
 
     def lock_for_order(self, user_address: str, currency: str, amount: float) -> bool:
         """Lock balance when placing order"""
-        wallet = self.get_wallet(user_address)
-        return wallet.lock_balance(currency, Decimal(str(amount)))
+        with self.lock:
+            wallet = self.get_wallet(user_address)
+            return wallet.lock_balance(currency, Decimal(str(amount)))
 
     def unlock_from_order(self, user_address: str, currency: str, amount: float) -> bool:
         """Unlock balance when order cancelled"""
-        wallet = self.get_wallet(user_address)
-        return wallet.unlock_balance(currency, Decimal(str(amount)))
+        with self.lock:
+            wallet = self.get_wallet(user_address)
+            return wallet.unlock_balance(currency, Decimal(str(amount)))
 
     def get_balance(self, user_address: str, currency: str) -> dict:
         """Get balance for specific currency"""
-        wallet = self.get_wallet(user_address)
-        return {
-            "currency": currency,
-            "total": float(wallet.get_total_balance(currency)),
-            "available": float(wallet.get_available_balance(currency)),
-            "locked": float(wallet.locked_balances.get(currency, Decimal("0"))),
-        }
+        with self.lock:
+            wallet = self.get_wallet(user_address)
+            return {
+                "currency": currency,
+                "total": float(wallet.get_total_balance(currency)),
+                "available": float(wallet.get_available_balance(currency)),
+                "locked": float(wallet.locked_balances.get(currency, Decimal("0"))),
+            }
 
     def get_all_balances(self, user_address: str) -> dict:
         """Get all balances for user"""
-        wallet = self.get_wallet(user_address)
-        return wallet.to_dict()
+        with self.lock:
+            wallet = self.get_wallet(user_address)
+            return wallet.to_dict()
 
     def get_transaction_history(self, user_address: str, limit: int = 50) -> List[dict]:
         """Get transaction history for user"""
-        user_txs = [
-            tx
-            for tx in self.transactions
-            if tx.get("user_address") == user_address
-            or tx.get("buyer") == user_address
-            or tx.get("seller") == user_address
-        ]
+        with self.lock:
+            user_txs = [
+                tx
+                for tx in self.transactions
+                if tx.get("user_address") == user_address
+                or tx.get("buyer") == user_address
+                or tx.get("seller") == user_address
+            ]
+            user_txs.sort(key=lambda x: x["timestamp"], reverse=True)
+            return [tx.copy() for tx in user_txs[:limit]]
 
-        # Sort by timestamp, most recent first
-        user_txs.sort(key=lambda x: x["timestamp"], reverse=True)
-        return user_txs[:limit]
+    def get_pending_count(self) -> int:
+        """Return the total number of pending withdrawals."""
+        with self.lock:
+            return len(self.pending_withdrawals)
+
+    def list_pending_withdrawals(self) -> List[dict]:
+        """Return all pending withdrawal transactions."""
+        with self.lock:
+            pending = sorted(
+                self.pending_withdrawals.values(), key=lambda tx: tx["timestamp"], reverse=True
+            )
+            return [tx.copy() for tx in pending]
+
+    def get_withdrawal_counts(self) -> Dict[str, int]:
+        """Return counts of withdrawals grouped by status."""
+        with self.lock:
+            counts = {
+                "pending": len(self.pending_withdrawals),
+                "completed": 0,
+                "failed": 0,
+                "flagged": 0,
+            }
+            for tx in self.transactions:
+                if tx.get("type") != "withdrawal":
+                    continue
+                status = tx.get("status")
+                if status in counts and status != "pending":
+                    counts[status] += 1
+            counts["total"] = sum(counts.values())
+            return counts
+
+    def get_withdrawals_by_status(self, status: str, limit: int = 50) -> List[dict]:
+        """Return withdrawals that match a status ordered by recency."""
+        normalized = status.lower()
+        if normalized not in self._WITHDRAWAL_STATUSES:
+            raise ValueError(f"Unsupported withdrawal status '{status}'")
+        with self.lock:
+            if normalized == "pending":
+                items: Iterable[dict] = self.pending_withdrawals.values()
+            else:
+                items = (
+                    tx
+                    for tx in self.transactions
+                    if tx.get("type") == "withdrawal" and tx.get("status") == normalized
+                )
+            sorted_items = sorted(items, key=lambda tx: tx["timestamp"], reverse=True)
+            return [tx.copy() for tx in sorted_items[: max(1, limit)]]
+
+    def get_pending_withdrawal(self, tx_id: str) -> Optional[dict]:
+        """Fetch a pending withdrawal by transaction id."""
+        with self.lock:
+            tx = self.pending_withdrawals.get(tx_id)
+            return tx.copy() if tx else None
+
+    def update_withdrawal_status(self, tx_id: str, status: str, **fields: Any) -> dict:
+        """Update the status of a specific withdrawal transaction."""
+        valid_status = {"pending", "completed", "failed", "flagged"}
+        if status not in valid_status:
+            raise ValueError(f"Unsupported withdrawal status '{status}'")
+
+        with self.lock:
+            tx = self.pending_withdrawals.get(tx_id)
+            if not tx:
+                for entry in self.transactions:
+                    if entry.get("id") == tx_id and entry.get("type") == "withdrawal":
+                        tx = entry
+                        break
+            if not tx:
+                raise KeyError(f"Withdrawal {tx_id} not found")
+
+            tx.update(fields)
+            tx["status"] = status
+            if status != "pending":
+                self.pending_withdrawals.pop(tx_id, None)
+            if status == "failed" and not tx.get("refunded"):
+                self._refund_withdrawal_locked(tx)
+            self.save_wallets()
+            return tx.copy()
+
+    def _refund_withdrawal_locked(self, tx: dict) -> None:
+        """Refund a failed withdrawal back to the user's available balance."""
+        wallet = self.get_wallet(tx["user_address"])
+        wallet.deposit(tx["currency"], Decimal(str(tx["amount"])))
+        tx["refunded"] = True
 
     def _generate_tx_id(self) -> str:
         """Generate unique transaction ID"""
@@ -296,63 +402,65 @@ class ExchangeWalletManager:
 
     def save_wallets(self):
         """Save wallets to disk"""
-        os.makedirs(self.data_dir, exist_ok=True)
-
-        # Save wallets
-        wallets_file = os.path.join(self.data_dir, "wallets.json")
-        wallets_data = {
-            address: {
-                "balances": {k: float(v) for k, v in wallet.balances.items()},
-                "locked_balances": {k: float(v) for k, v in wallet.locked_balances.items()},
+        with self.lock:
+            os.makedirs(self.data_dir, exist_ok=True)
+            wallets_file = os.path.join(self.data_dir, "wallets.json")
+            wallets_data = {
+                address: {
+                    "balances": {k: float(v) for k, v in wallet.balances.items()},
+                    "locked_balances": {k: float(v) for k, v in wallet.locked_balances.items()},
+                }
+                for address, wallet in self.wallets.items()
             }
-            for address, wallet in self.wallets.items()
-        }
+            with open(wallets_file, "w", encoding="utf-8") as handle:
+                json.dump(wallets_data, handle, indent=2)
 
-        with open(wallets_file, "w") as f:
-            json.dump(wallets_data, f, indent=2)
-
-        # Save transactions (keep last 10000)
-        tx_file = os.path.join(self.data_dir, "transactions.json")
-        with open(tx_file, "w") as f:
-            json.dump(self.transactions[-10000:], f, indent=2)
+            tx_file = os.path.join(self.data_dir, "transactions.json")
+            with open(tx_file, "w", encoding="utf-8") as handle:
+                json.dump(self.transactions[-10000:], handle, indent=2)
 
     def load_wallets(self):
         """Load wallets from disk"""
         wallets_file = os.path.join(self.data_dir, "wallets.json")
         tx_file = os.path.join(self.data_dir, "transactions.json")
+        with self.lock:
+            if os.path.exists(wallets_file):
+                with open(wallets_file, "r", encoding="utf-8") as handle:
+                    wallets_data = json.load(handle)
 
-        # Load wallets
-        if os.path.exists(wallets_file):
-            with open(wallets_file, "r") as f:
-                wallets_data = json.load(f)
+                for address, data in wallets_data.items():
+                    wallet = ExchangeWallet(address)
+                    wallet.balances = {k: Decimal(str(v)) for k, v in data["balances"].items()}
+                    wallet.locked_balances = {
+                        k: Decimal(str(v)) for k, v in data["locked_balances"].items()
+                    }
+                    self.wallets[address] = wallet
 
-            for address, data in wallets_data.items():
-                wallet = ExchangeWallet(address)
-                wallet.balances = {k: Decimal(str(v)) for k, v in data["balances"].items()}
-                wallet.locked_balances = {
-                    k: Decimal(str(v)) for k, v in data["locked_balances"].items()
-                }
-                self.wallets[address] = wallet
-
-        # Load transactions
-        if os.path.exists(tx_file):
-            with open(tx_file, "r") as f:
-                self.transactions = json.load(f)
+            if os.path.exists(tx_file):
+                with open(tx_file, "r", encoding="utf-8") as handle:
+                    self.transactions = json.load(handle)
+            else:
+                self.transactions = []
+        self._refresh_pending_withdrawals()
 
     def get_stats(self) -> dict:
         """Get exchange statistics"""
-        total_users = len(self.wallets)
-        total_volume = {}
+        with self.lock:
+            total_users = len(self.wallets)
+            total_volume: Dict[str, float] = {}
+            for tx in self.transactions:
+                if tx.get("type") == "trade":
+                    currency = tx["quote_currency"]
+                    amount = tx["quote_amount"]
+                    total_volume[currency] = total_volume.get(currency, 0) + amount
 
-        for tx in self.transactions:
-            if tx["type"] == "trade":
-                currency = tx["quote_currency"]
-                amount = tx["quote_amount"]
-                total_volume[currency] = total_volume.get(currency, 0) + amount
+            pending_count = len(self.pending_withdrawals)
+            total_transactions = len(self.transactions)
 
         return {
             "total_users": total_users,
-            "total_transactions": len(self.transactions),
+            "total_transactions": total_transactions,
             "total_volume_24h": total_volume,
+            "pending_withdrawals": pending_count,
             "currencies_supported": ["USD", "AXN", "BTC", "ETH", "USDT", "LTC", "BNB"],
         }

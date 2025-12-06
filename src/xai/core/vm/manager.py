@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any, Dict, List, TYPE_CHECKING
 
 from .executor import (
@@ -53,6 +54,9 @@ class SmartContractManager:
 
         contract_address = tx.recipient or self.blockchain.derive_contract_address(tx.sender, tx.nonce)
         normalized = contract_address.upper()
+        block_index = getattr(block, "index", getattr(block.header, "index", None))
+        block_hash = getattr(block, "hash", getattr(getattr(block, "header", None), "hash", None))
+        block_timestamp = getattr(block, "timestamp", getattr(getattr(block, "header", None), "timestamp", time.time()))
         receipt: Dict[str, Any] = {
             "txid": tx.txid,
             "contract": normalized,
@@ -60,10 +64,26 @@ class SmartContractManager:
             "gas_used": result.gas_used,
             "return_data": result.return_data.hex(),
             "logs": [dict(log) for log in result.logs],
+            "block_index": block_index,
+            "block_hash": block_hash,
+            "timestamp": block_timestamp,
         }
 
         metadata["vm_result"] = receipt
         tx.metadata = metadata
+
+        if tx.tx_type == "contract_deploy" and metadata.get("abi"):
+            try:
+                self.blockchain.store_contract_abi(
+                    normalized,
+                    metadata.get("abi"),
+                    verified=True,
+                    source="deployment",
+                )
+            except (ValueError, TypeError) as exc:  # pragma: no cover - defensive
+                logger = getattr(self.blockchain, "logger", None)
+                if logger:
+                    logger.warn(f"Failed to persist contract ABI: {exc}")
         return receipt
 
     def static_call(

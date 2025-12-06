@@ -12,10 +12,14 @@ import os
 import copy
 import statistics
 import tempfile
-from typing import List, Dict, Optional, Tuple, Any, Union
+import math
+from pathlib import Path
+from typing import List, Dict, Optional, Tuple, Any, Union, Sequence
+from types import SimpleNamespace
 from datetime import datetime
 import base58
 from xai.core.config import Config
+from xai.core.advanced_consensus import DynamicDifficultyAdjustment
 from xai.core.gamification import (
     AirdropManager,
     StreakTracker,
@@ -34,10 +38,19 @@ from xai.core.vm.manager import SmartContractManager
 from xai.core.governance_execution import GovernanceExecutionEngine
 from xai.core.governance_transactions import GovernanceState, GovernanceTxType, GovernanceTransaction
 from xai.core.checkpoints import CheckpointManager
-from collections import defaultdict
+from collections import defaultdict, deque
 from xai.core.structured_logger import StructuredLogger, get_structured_logger
 from xai.core.block_header import BlockHeader
 from xai.core.blockchain_interface import BlockchainDataProvider, GamificationBlockchainInterface
+from xai.core.blockchain_security import BlockchainSecurityConfig, BlockSizeValidator
+from xai.core.finality import (
+    FinalityManager,
+    FinalityCertificate,
+    FinalityConfigurationError,
+    FinalityValidationError,
+    ValidatorIdentity,
+)
+from xai.blockchain.slashing_manager import SlashingManager
 
 from xai.core.transaction import Transaction
 from xai.core.node_identity import load_or_create_identity
@@ -82,6 +95,7 @@ class Block:
                 nonce=nonce,
                 signature=signature,
                 miner_pubkey=miner_pubkey,
+                version=Config.BLOCK_HEADER_VERSION,
             )
 
         self.header = block_header
@@ -127,6 +141,10 @@ class Block:
     @hash.setter
     def hash(self, value: str) -> None:
         self.header.hash = value
+
+    @property
+    def version(self) -> int:
+        return getattr(self.header, "version", getattr(Config, "BLOCK_HEADER_VERSION", 1))
 
     @property
     def previous_hash(self) -> str:
@@ -202,6 +220,32 @@ class Block:
             "transactions": [tx.to_dict() for tx in self.transactions],
             "miner": self.miner,
         }
+
+    def estimate_size_bytes(self) -> int:
+        """
+        Estimate the serialized size of the block for strict resource enforcement.
+
+        The estimation uses deterministic JSON serialization for the header and
+        transactions, falling back to structural approximations if a transaction
+        is missing helpers (should never happen in production).
+        """
+        header_bytes = len(json.dumps(self.header.to_dict(), sort_keys=True).encode("utf-8"))
+
+        tx_bytes = 0
+        for tx in self.transactions:
+            if tx is None:
+                continue
+            try:
+                tx_bytes += tx.get_size()
+            except AttributeError:
+                try:
+                    tx_bytes += len(json.dumps(tx.to_dict(), sort_keys=True).encode("utf-8"))
+                except Exception:
+                    tx_bytes += 0
+
+        miner_bytes = len((self.miner or "").encode("utf-8"))
+        structure_overhead = 8 + len(self.transactions) * 4
+        return header_bytes + tx_bytes + miner_bytes + structure_overhead
     
     def calculate_merkle_root(self) -> str:
         """Calculate merkle root of transactions"""
@@ -408,6 +452,33 @@ class Blockchain:
         except (OSError, json.JSONDecodeError, ValueError) as exc:
             self.logger.warn(f"Failed to initialize node identity: {exc}")
             self.node_identity = {"private_key": "", "public_key": ""}
+        self._finality_quorum_threshold = float(os.getenv("XAI_FINALITY_QUORUM", "0.67"))
+        self._validator_set: List[ValidatorIdentity] = []
+        try:
+            self._validator_set = self._load_validator_set()
+        except FinalityConfigurationError as exc:
+            self.logger.error(
+                "Validator set initialization failed",
+                error=str(exc),
+            )
+            self._validator_set = []
+        self.slashing_manager: Optional[SlashingManager] = None
+        if self._validator_set:
+            self.slashing_manager = self._initialize_slashing_manager(data_dir, self._validator_set)
+        else:
+            self.logger.warn("Slashing manager disabled: no validator set available")
+        self.finality_manager: Optional[FinalityManager] = None
+        if self._validator_set:
+            try:
+                self.finality_manager = self._initialize_finality_manager(data_dir, self._validator_set)
+            except FinalityConfigurationError as exc:
+                self.logger.error(
+                    "Finality disabled due to configuration error",
+                    error=str(exc),
+                )
+                self.finality_manager = None
+        else:
+            self.logger.warn("Finality disabled: validator set unavailable")
         # Mempool management
         self.seen_txids: set[str] = set()
         self._sender_pending_count: dict[str, int] = defaultdict(int)
@@ -442,10 +513,15 @@ class Blockchain:
             self._mempool_invalid_ban_seconds = 900
             self._mempool_invalid_window_seconds = 900
 
+        self._max_contract_abi_bytes = int(os.getenv("XAI_MAX_CONTRACT_ABI_BYTES", "262144"))
+
         # Difficulty adjustment parameters
         self.target_block_time = 120  # 2 minutes per block (from whitepaper)
         self.difficulty_adjustment_interval = 2016  # Adjust every ~2.8 days
         self.max_difficulty_change = 4  # Maximum 4x change per adjustment period
+        self.dynamic_difficulty_adjuster = DynamicDifficultyAdjustment(
+            target_block_time=self.target_block_time
+        )
         self.utxo_manager = UTXOManager()
         self.nonce_tracker = NonceTracker(data_dir=os.path.join(data_dir, "nonces"))
 
@@ -486,6 +562,30 @@ class Blockchain:
         self._mempool_evicted_low_fee_total = 0
         self._mempool_expired_total = 0
         self._state_integrity_snapshots: list[Dict[str, Any]] = []
+        self._default_block_header_version = int(getattr(Config, "BLOCK_HEADER_VERSION", 1))
+        allowed_versions_cfg = getattr(Config, "BLOCK_HEADER_ALLOWED_VERSIONS", None)
+        if not allowed_versions_cfg:
+            allowed_versions_cfg = [self._default_block_header_version]
+        normalized_versions: set[int] = set()
+        for candidate in allowed_versions_cfg:
+            try:
+                normalized_versions.add(int(candidate))
+            except (TypeError, ValueError):
+                self.logger.warn(
+                    "Ignoring invalid block header version configuration entry",
+                    candidate=candidate,
+                )
+        if not normalized_versions:
+            normalized_versions = {self._default_block_header_version}
+        self._allowed_block_header_versions = normalized_versions
+        self._max_block_size_bytes = int(
+            getattr(BlockchainSecurityConfig, "MAX_BLOCK_SIZE", 1_000_000)
+        )
+        self._max_transactions_per_block = int(
+            getattr(BlockchainSecurityConfig, "MAX_TRANSACTIONS_PER_BLOCK", 10_000)
+        )
+        self._max_pow_target = int("f" * 64, 16)
+        self._block_work_cache: Dict[str, int] = {}
 
         if not self._load_from_disk():
             self.create_genesis_block()
@@ -503,6 +603,143 @@ class Blockchain:
         self.governance_executor = GovernanceExecutionEngine(self)
         self._rebuild_governance_state_from_chain()
         self.sync_smart_contract_vm()
+        self._median_time_span = int(
+            getattr(BlockchainSecurityConfig, "MEDIAN_TIME_SPAN", 11)
+        )
+        self._max_future_block_time = int(
+            getattr(BlockchainSecurityConfig, "MAX_FUTURE_BLOCK_TIME", 2 * 3600)
+        )
+        self._timestamp_drift_history: deque[Dict[str, float]] = deque(maxlen=256)
+
+    def _initialize_finality_manager(
+        self,
+        data_dir: str,
+        validators: List[ValidatorIdentity],
+    ) -> FinalityManager:
+        return FinalityManager(
+            data_dir=os.path.join(data_dir, "finality"),
+            validators=validators,
+            quorum_threshold=self._finality_quorum_threshold,
+            misbehavior_callback=self._handle_finality_misbehavior,
+        )
+
+    def _initialize_slashing_manager(
+        self,
+        data_dir: str,
+        validators: List[ValidatorIdentity],
+    ) -> Optional[SlashingManager]:
+        stakes: Dict[str, float] = {v.address: float(v.voting_power) for v in validators}
+        try:
+            return SlashingManager(
+                db_path=Path(os.path.join(data_dir, "slashing.db")),
+                initial_validators=stakes,
+            )
+        except Exception as exc:
+            self.logger.error(
+                "Failed to initialize slashing manager",
+                error=str(exc),
+            )
+            return None
+
+    def _load_validator_set(self) -> List[ValidatorIdentity]:
+        """
+        Load validator identities from environment or configuration file.
+        Falls back to the local node identity for development/test networks.
+        """
+        raw = os.getenv("XAI_VALIDATOR_SET", "").strip()
+        config_entries: List[Dict[str, Any]] = []
+        if raw:
+            try:
+                config_entries = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise FinalityConfigurationError(f"Invalid XAI_VALIDATOR_SET payload: {exc}") from exc
+        else:
+            default_path = os.getenv(
+                "XAI_VALIDATOR_SET_PATH",
+                os.path.join(os.getcwd(), "config", "validators.json"),
+            )
+            if os.path.exists(default_path):
+                try:
+                    with open(default_path, "r", encoding="utf-8") as handle:
+                        config_entries = json.load(handle)
+                except (OSError, json.JSONDecodeError) as exc:
+                    raise FinalityConfigurationError(
+                        f"Failed to load validator set from {default_path}: {exc}"
+                    ) from exc
+
+        validators: List[ValidatorIdentity] = []
+        for entry in config_entries:
+            public_key = entry.get("public_key", "").strip()
+            if not public_key:
+                raise FinalityConfigurationError("Validator entry missing public_key")
+            address = entry.get("address", "").strip()
+            if not address:
+                address = self._derive_address_from_public(public_key)
+            voting_power = int(entry.get("voting_power", 1))
+            validators.append(
+                ValidatorIdentity(
+                    address=address,
+                    public_key=public_key,
+                    voting_power=voting_power,
+                )
+            )
+
+        if validators:
+            return validators
+
+        fallback_pub = self.node_identity.get("public_key")
+        fallback_priv = self.node_identity.get("private_key")
+        if not fallback_pub or not fallback_priv:
+            raise FinalityConfigurationError(
+                "Validator set not configured and node identity unavailable for fallback."
+            )
+        fallback_address = self.node_identity.get("address") or self._derive_address_from_public(
+            fallback_pub
+        )
+        self.logger.warn(
+            "Finality validator set not configured. Falling back to single-node validator.",
+            validator=fallback_address[:16],
+        )
+        return [
+            ValidatorIdentity(
+                address=fallback_address,
+                public_key=fallback_pub,
+                voting_power=1,
+            )
+        ]
+
+    def _derive_address_from_public(self, public_key_hex: str) -> str:
+        digest = hashlib.sha256(bytes.fromhex(public_key_hex)).hexdigest()
+        return f"XAI{digest[:40]}"
+
+    def _handle_finality_misbehavior(self, validator_address: str, block_height: int, proof: Dict[str, Any]) -> None:
+        """Slash validators that violate finality guarantees."""
+        if not self.slashing_manager:
+            return
+        evidence = proof or {}
+        conflicting = evidence.get("conflicting_signatures") if isinstance(evidence, dict) else None
+        if isinstance(conflicting, list) and len(conflicting) >= 2:
+            normalized_evidence = {
+                "header1": conflicting[0],
+                "header2": conflicting[1],
+                "block_height": block_height,
+            }
+        else:
+            normalized_evidence = evidence
+        try:
+            self.slashing_manager.report_misbehavior(
+                reporter_id="finality_manager",
+                validator_id=validator_address,
+                misbehavior_type="DOUBLE_SIGNING",
+                evidence=normalized_evidence,
+            )
+        except Exception as exc:
+            self.logger.error(
+                "Failed to record slashing for finality violation",
+                validator=validator_address,
+                block_height=block_height,
+                error=str(exc),
+            )
 
     @property
     def blockchain(self) -> "Blockchain":
@@ -566,6 +803,80 @@ class Blockchain:
         """
         return self.utxo_manager.get_balance(address)
 
+    def submit_finality_vote(
+        self,
+        *,
+        validator_address: str,
+        signature: str,
+        block_hash: Optional[str] = None,
+        block_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Record a validator finality vote for a specific block.
+
+        Returns metadata describing whether the quorum was reached.
+        """
+        if not self.finality_manager:
+            raise RuntimeError("Finality manager is not enabled for this node.")
+
+        target_block = None
+        if block_index is not None:
+            target_block = self.get_block(block_index)
+        if target_block is None and block_hash:
+            target_block = self.get_block_by_hash(block_hash)
+        if target_block is None:
+            raise ValueError("Block not found for finality vote.")
+
+        try:
+            certificate = self.finality_manager.record_vote(
+                validator_address=validator_address,
+                header=target_block.header if hasattr(target_block, "header") else target_block,
+                signature=signature,
+            )
+        except FinalityValidationError as exc:
+            raise ValueError(str(exc)) from exc
+
+        finalized = certificate is not None
+        if finalized:
+            self.logger.info(
+                "Block finalized via validator vote",
+                block_index=certificate.block_height,
+                block_hash=certificate.block_hash,
+                aggregated_power=certificate.aggregated_power,
+            )
+
+        return {
+            "finalized": finalized,
+            "block_hash": target_block.hash,
+            "block_index": target_block.index,
+            "quorum_power": self.finality_manager.quorum_power,
+            "aggregated_power": certificate.aggregated_power if certificate else self.finality_manager.pending_power.get(target_block.hash, 0),
+        }
+
+    def get_finality_certificate(
+        self,
+        *,
+        block_hash: Optional[str] = None,
+        block_index: Optional[int] = None,
+    ) -> Optional[FinalityCertificate]:
+        if not self.finality_manager:
+            return None
+        if block_hash:
+            return self.finality_manager.get_certificate_by_hash(block_hash)
+        if block_index is not None:
+            return self.finality_manager.get_certificate_by_height(block_index)
+        return None
+
+    def is_block_finalized(
+        self,
+        *,
+        block_hash: Optional[str] = None,
+        block_index: Optional[int] = None,
+    ) -> bool:
+        if not self.finality_manager:
+            return False
+        return self.finality_manager.is_finalized(block_hash=block_hash, block_height=block_index)
+
     @property
     def block_reward(self) -> float:
         """
@@ -573,29 +884,58 @@ class Blockchain:
         """
         return self.get_block_reward(len(self.chain))
 
-    def get_transaction_history(self, address: str, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_transaction_history_window(
+        self, address: str, limit: int, offset: int
+    ) -> Tuple[List[Dict[str, Any]], int]:
         """
-        Return a lightweight transaction history for an address by scanning confirmed blocks.
+        Stream a transaction history window without materializing the full list.
+
+        Args:
+            address: Target address
+            limit: Maximum number of entries to return
+            offset: Number of matching entries to skip before collecting results
+
+        Returns:
+            Tuple of (window, total_matching_transactions)
         """
-        history: List[Dict[str, Any]] = []
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        if offset < 0:
+            raise ValueError("offset cannot be negative")
+
+        total_matches = 0
+        window: List[Dict[str, Any]] = []
+
         for idx in range(len(self.chain)):
             block_obj = self.get_block(idx)
             if not block_obj or not getattr(block_obj, "transactions", None):
                 try:
                     block_obj = self.storage.load_block_from_disk(idx)
-                except Exception as e:
-                    self.logger.debug(f"Skipping block {idx} in history scan: {type(e).__name__}")
+                except Exception:
+                    self.logger.debug("Skipping block %s in history scan due to load failure", idx)
                     continue
             if not block_obj or not getattr(block_obj, "transactions", None):
                 continue
+
             for tx in block_obj.transactions:
-                if tx.sender == address or tx.recipient == address:
+                if tx.sender != address and tx.recipient != address:
+                    continue
+
+                if total_matches >= offset and len(window) < limit:
                     entry = tx.to_dict()
                     entry["block_index"] = getattr(block_obj, "index", idx)
-                    history.append(entry)
-                    if len(history) >= limit:
-                        return history
-        return history
+                    window.append(entry)
+
+                total_matches += 1
+
+        return window, total_matches
+
+    def get_transaction_history(self, address: str, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Backwards-compatible helper that returns up to `limit` history entries.
+        """
+        window, _ = self.get_transaction_history_window(address, limit=limit, offset=0)
+        return window
 
     @staticmethod
     def _transaction_from_dict(tx_data: Dict[str, Any]) -> Transaction:
@@ -630,6 +970,7 @@ class Blockchain:
             nonce=header_data.get("nonce", 0),
             signature=header_data.get("signature"),
             miner_pubkey=header_data.get("miner_pubkey"),
+            version=header_data.get("version"),
         )
         transactions = [cls._transaction_from_dict(td) for td in block_data.get("transactions", [])]
         return Block(header, transactions)
@@ -648,6 +989,7 @@ class Blockchain:
                 nonce=header_data.get("nonce", 0),
                 signature=header_data.get("signature"),
                 miner_pubkey=header_data.get("miner_pubkey"),
+                version=header_data.get("version"),
             )
             headers.append(header)
         return headers
@@ -913,6 +1255,13 @@ class Blockchain:
             "gas_limit": gas_limit,
             "balance": value,
             "created_at": time.time(),
+            "abi": None,
+            "abi_verified": False,
+            "interfaces": {
+                "supports": {},
+                "detected_at": None,
+                "source": "unknown",
+            },
         }
 
     def get_contract_state(self, address: str) -> Optional[Dict[str, Any]]:
@@ -926,7 +1275,144 @@ class Blockchain:
             "gas_limit": contract.get("gas_limit"),
             "balance": contract.get("balance"),
             "created_at": contract.get("created_at"),
+            "abi_available": bool(contract.get("abi")),
+            "interfaces": dict(contract.get("interfaces") or {}),
         }
+
+    def normalize_contract_abi(self, abi: Any) -> Optional[List[Dict[str, Any]]]:
+        if abi is None:
+            return None
+        payload = abi
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"ABI must be valid JSON: {exc}")
+        if isinstance(payload, dict):
+            payload = [payload]
+        if not isinstance(payload, list):
+            raise ValueError("ABI must be a list of entries")
+
+        sanitized: List[Dict[str, Any]] = []
+        for entry in payload:
+            if not isinstance(entry, dict):
+                raise ValueError("ABI entries must be JSON objects")
+            normalized_entry: Dict[str, Any] = {}
+            for key, value in entry.items():
+                if not isinstance(key, str):
+                    raise ValueError("ABI entry keys must be strings")
+                normalized_entry[key] = value
+            sanitized.append(normalized_entry)
+
+        serialized = json.dumps(sanitized, sort_keys=True, separators=(",", ":"))
+        if len(serialized.encode("utf-8")) > self._max_contract_abi_bytes:
+            raise ValueError("ABI exceeds maximum size limit")
+
+        return json.loads(serialized)
+
+    def store_contract_abi(
+        self,
+        address: str,
+        abi: Any,
+        *,
+        verified: bool = True,
+        source: str = "deployment",
+    ) -> bool:
+        normalized = address.upper()
+        contract = self.contracts.get(normalized)
+        if not contract:
+            raise ValueError("Contract not registered")
+
+        normalized_abi = self.normalize_contract_abi(abi)
+        if normalized_abi is None:
+            raise ValueError("ABI payload is empty")
+
+        contract["abi"] = normalized_abi
+        contract["abi_verified"] = bool(verified)
+        contract["abi_source"] = source
+        contract["abi_updated_at"] = time.time()
+        return True
+
+    def get_contract_abi(self, address: str) -> Optional[Dict[str, Any]]:
+        contract = self.contracts.get(address.upper())
+        if not contract:
+            return None
+        abi = contract.get("abi")
+        if not abi:
+            return None
+        return {
+            "abi": abi,
+            "verified": bool(contract.get("abi_verified", False)),
+            "source": contract.get("abi_source", "unknown"),
+            "updated_at": contract.get("abi_updated_at"),
+        }
+
+    def get_contract_interface_metadata(self, address: str) -> Optional[Dict[str, Any]]:
+        """Return cached interface detection metadata, if available."""
+        contract = self.contracts.get(address.upper())
+        if not contract:
+            return None
+
+        metadata = contract.get("interfaces")
+        if not metadata:
+            return None
+        supports = metadata.get("supports")
+        if not isinstance(supports, dict) or not supports:
+            return None
+        return {
+            "supports": {key: bool(value) for key, value in supports.items()},
+            "detected_at": metadata.get("detected_at"),
+            "source": metadata.get("source", "unknown"),
+        }
+
+    def update_contract_interface_metadata(
+        self,
+        address: str,
+        supports: Dict[str, bool],
+        *,
+        source: str = "probe",
+    ) -> Dict[str, Any]:
+        """Persist interface detection results for downstream consumers."""
+        normalized = address.upper()
+        contract = self.contracts.get(normalized)
+        if not contract:
+            raise ValueError("Contract not registered")
+
+        metadata = {
+            "supports": {key: bool(value) for key, value in supports.items()},
+            "detected_at": time.time(),
+            "source": source,
+        }
+        if "interfaces" not in contract or not isinstance(contract["interfaces"], dict):
+            contract["interfaces"] = metadata
+        else:
+            contract["interfaces"].update(metadata)
+        return metadata
+
+    def get_contract_events(self, address: str, limit: int, offset: int) -> Tuple[List[Dict[str, Any]], int]:
+        normalized = address.upper()
+        events: List[Dict[str, Any]] = []
+        for receipt in reversed(self.contract_receipts):
+            if receipt.get("contract") != normalized:
+                continue
+            logs = receipt.get("logs") or []
+            for idx, log in enumerate(logs):
+                log_copy = dict(log)
+                events.append(
+                    {
+                        "event": log_copy.get("event") or log_copy.get("name") or "Log",
+                        "log_index": idx,
+                        "txid": receipt.get("txid"),
+                        "block_index": receipt.get("block_index"),
+                        "block_hash": receipt.get("block_hash"),
+                        "timestamp": receipt.get("timestamp"),
+                        "success": receipt.get("success"),
+                        "data": log_copy,
+                    }
+                )
+        total = len(events)
+        window = events[offset : offset + limit] if limit is not None else events
+        return window, total
 
     def _rebuild_contract_state(self) -> None:
         if not self.smart_contract_manager:
@@ -995,6 +1481,7 @@ class Blockchain:
                 difficulty=self.difficulty,
                 nonce=genesis_data.get("nonce", 0),
                 miner_pubkey="genesis_miner_pubkey",
+                version=genesis_data.get("version", Config.BLOCK_HEADER_VERSION),
             )
             # Ensure genesis hash reflects real PoW for deterministic startup
             declared_hash = genesis_data.get("hash")
@@ -1055,6 +1542,7 @@ class Blockchain:
                 difficulty=self.difficulty,
                 nonce=0,
                 miner_pubkey="genesis_miner_pubkey",
+                version=Config.BLOCK_HEADER_VERSION,
             )
             genesis_block = Block(header, genesis_transactions)
             genesis_block.header.hash = self.mine_block(genesis_block.header)
@@ -1205,7 +1693,13 @@ class Blockchain:
 
         return True, None
 
-    def calculate_next_difficulty(self) -> int:
+    def calculate_next_difficulty(
+        self,
+        *,
+        chain: Optional[Sequence[Union["Block", BlockHeader]]] = None,
+        current_difficulty: Optional[int] = None,
+        emit_log: bool = True,
+    ) -> int:
         """
         Calculate the next difficulty based on actual vs target block times.
         Implements Bitcoin-style difficulty adjustment algorithm.
@@ -1216,19 +1710,76 @@ class Blockchain:
         Returns:
             int: New difficulty level (number of leading zeros required)
         """
-        current_height = len(self.chain)
+        override_chain = chain is not None
+        override_difficulty = current_difficulty is not None
+
+        if override_chain:
+            chain_view: Sequence[Union["Block", BlockHeader]] = list(chain or [])
+        else:
+            chain_view = self.chain
+
+        def _extract_header(entry: Union["Block", BlockHeader]) -> BlockHeader:
+            return entry.header if hasattr(entry, "header") else entry
+
+        if current_difficulty is None:
+            if chain_view:
+                last_header = _extract_header(chain_view[-1])
+                baseline = getattr(last_header, "difficulty", None)
+                current_baseline = int(baseline) if baseline is not None else int(self.difficulty or 1)
+            else:
+                current_baseline = int(self.difficulty or 1)
+        else:
+            current_baseline = int(current_difficulty)
+        current_baseline = max(1, current_baseline)
+
+        adjuster = getattr(self, "dynamic_difficulty_adjuster", None)
+        if adjuster is None:
+            adjuster = DynamicDifficultyAdjustment(target_block_time=self.target_block_time)
+            self.dynamic_difficulty_adjuster = adjuster
+
+        adjuster.target_block_time = self.target_block_time
+        adjuster.min_difficulty = 1
+        derived_cap = max(
+            int(max(1, current_baseline) * max(1, self.max_difficulty_change)),
+            int(current_baseline + 1),
+            getattr(adjuster, "max_difficulty", 1),
+        )
+        adjuster.max_difficulty = max(derived_cap, adjuster.min_difficulty + 1)
+
+        context_obj: Union["Blockchain", SimpleNamespace]
+        if override_chain or override_difficulty:
+            context_obj = SimpleNamespace(chain=chain_view, difficulty=current_baseline)
+        else:
+            context_obj = self
+
+        should_log = emit_log and not (override_chain or override_difficulty)
+
+        if adjuster.should_adjust_difficulty(context_obj):
+            new_difficulty = adjuster.calculate_new_difficulty(context_obj)
+            if should_log and new_difficulty != current_baseline:
+                self.logger.info(
+                    "Dynamic difficulty adjustment applied",
+                    window=adjuster.adjustment_window,
+                    old_difficulty=current_baseline,
+                    new_difficulty=new_difficulty,
+                )
+            return new_difficulty
+
+        current_height = len(chain_view)
 
         # Don't adjust if we haven't reached the adjustment interval
         if current_height < self.difficulty_adjustment_interval:
-            return self.difficulty
+            return current_baseline
 
         # Only adjust at the interval boundaries
         if current_height % self.difficulty_adjustment_interval != 0:
-            return self.difficulty
+            return current_baseline
 
         # Get the blocks from the last adjustment period
-        interval_start_block_header = self.chain[current_height - self.difficulty_adjustment_interval]
-        latest_block_header = self.chain[-1]
+        interval_start_block_header = _extract_header(
+            chain_view[current_height - self.difficulty_adjustment_interval]
+        )
+        latest_block_header = _extract_header(chain_view[-1])
 
         # Calculate actual time taken for the last interval
         actual_time = latest_block_header.timestamp - interval_start_block_header.timestamp
@@ -1252,16 +1803,21 @@ class Blockchain:
         # Calculate new difficulty
         # If blocks are too slow (actual_time > expected_time), ratio > 1, difficulty decreases
         # If blocks are too fast (actual_time < expected_time), ratio < 1, difficulty increases
-        new_difficulty_float = self.difficulty / adjustment_ratio
+        new_difficulty_float = current_baseline / adjustment_ratio
 
         # Ensure difficulty is at least 1 and is an integer
         new_difficulty = max(1, int(round(new_difficulty_float)))
 
         # Log the adjustment for monitoring
-        self.logger.info(f"Difficulty Adjustment at block {current_height}:",
-                          actual_time=actual_time, expected_time=expected_time,
-                          old_difficulty=self.difficulty, new_difficulty=new_difficulty,
-                          adjustment_percent=((new_difficulty/self.difficulty - 1) * 100))
+        if should_log:
+            self.logger.info(
+                f"Difficulty Adjustment at block {current_height}:",
+                actual_time=actual_time,
+                expected_time=expected_time,
+                old_difficulty=current_baseline,
+                new_difficulty=new_difficulty,
+                adjustment_percent=((new_difficulty / current_baseline - 1) * 100),
+            )
 
         return new_difficulty
 
@@ -1836,8 +2392,8 @@ class Blockchain:
             node_identity = getattr(self, "node_identity", None)
         if not node_identity or not node_identity.get("private_key") or not node_identity.get("public_key"):
             raise ValueError("node_identity with private_key and public_key is required for block signing.")
-        # Block size limit (1 MB)
-        MAX_BLOCK_SIZE_BYTES = 1000000
+        max_block_size_bytes = self._max_block_size_bytes
+        max_transactions_per_block = self._max_transactions_per_block
 
         # Adjust difficulty based on recent block times
         self.difficulty = self.calculate_next_difficulty()
@@ -1865,6 +2421,12 @@ class Blockchain:
         current_block_size = 0
 
         for tx in prioritized_txs:
+            if len(selected_txs) + 1 >= max_transactions_per_block:
+                self.logger.info(
+                    "Transaction limit reached for block assembly",
+                    limit=max_transactions_per_block,
+                )
+                break
             # Re-validate transaction against current state before inclusion
             if tx.sender != "COINBASE":
                 confirmed_nonce = self.nonce_tracker.get_nonce(tx.sender)
@@ -1898,7 +2460,7 @@ class Blockchain:
             tx_size = len(json.dumps(tx.to_dict()).encode('utf-8'))
 
             # Check if adding this transaction would exceed block size limit
-            if current_block_size + tx_size <= MAX_BLOCK_SIZE_BYTES:
+            if current_block_size + tx_size <= max_block_size_bytes:
                 selected_txs.append(tx)
                 current_block_size += tx_size
             else:
@@ -1944,6 +2506,7 @@ class Blockchain:
             difficulty=self.difficulty,
             nonce=0,
             miner_pubkey=node_identity['public_key'],
+            version=Config.BLOCK_HEADER_VERSION,
         )
 
         # Mine the block
@@ -1954,6 +2517,9 @@ class Blockchain:
         new_block.miner = miner_address
         # Provide ancestry context to peers for fork resolution without optional data loss
         new_block.lineage = list(self.chain)
+
+        if not self._block_within_size_limits(new_block, context="local_mining"):
+            raise ValueError("Locally mined block violates block size or transaction limits")
 
         if self.smart_contract_manager:
             receipts = self.smart_contract_manager.process_block(new_block)
@@ -2116,6 +2682,51 @@ class Blockchain:
         if not self.verify_block_signature(header):
             self.logger.warn("Block has invalid signature", block_hash=header.hash, miner_pubkey=header.miner_pubkey)
             return False
+
+        if not self._validate_header_version(header):
+            return False
+
+        if not self._block_within_size_limits(block, context="inbound_block"):
+            return False
+
+        history_view = self.chain[:header.index] if header.index <= len(self.chain) else self.chain
+        time_valid, time_error = self._validate_block_timestamp(
+            header,
+            history_view,
+            emit_metrics=True,
+        )
+        if not time_valid:
+            self.logger.warn(
+                "Block rejected due to timestamp violation",
+                block_hash=header.hash,
+                block_index=header.index,
+                reason=time_error,
+            )
+            return False
+
+        # Enforce deterministic difficulty schedule when parent history is known
+        if header.index > 0 and header.index <= len(self.chain):
+            history_view = list(self.chain[: header.index])
+            if history_view:
+                parent_obj = history_view[-1]
+                parent_hash = parent_obj.hash if hasattr(parent_obj, "hash") else getattr(parent_obj, "hash", None)
+                if parent_hash == header.previous_hash:
+                    expected_difficulty = self._expected_difficulty_for_block(
+                        block_index=header.index,
+                        history=history_view,
+                    )
+                    if (
+                        expected_difficulty is not None
+                        and header.difficulty != expected_difficulty
+                    ):
+                        self.logger.warn(
+                            "Block rejected due to unexpected difficulty",
+                            block_index=header.index,
+                            block_hash=header.hash,
+                            declared_difficulty=header.difficulty,
+                            expected_difficulty=expected_difficulty,
+                        )
+                        return False
 
         # Case 1: Block extends our current chain directly
         if header.index == len(self.chain):
@@ -2308,6 +2919,27 @@ class Blockchain:
                     self.logger.warn("Chain validation failed: invalid proof-of-work", index=header.index)
                     return False
 
+                if not self._validate_header_version(header):
+                    self.logger.warn("Chain validation failed: unsupported header version", index=header.index)
+                    return False
+
+                if not self._block_within_size_limits(block, context="chain_validation"):
+                    self.logger.warn("Chain validation failed: block size exceeded", index=header.index)
+                    return False
+
+                expected_difficulty = self._expected_difficulty_for_block(
+                    block_index=header.index,
+                    history=blocks[:idx],
+                )
+                if expected_difficulty is not None and header.difficulty != expected_difficulty:
+                    self.logger.warn(
+                        "Chain validation failed: unexpected difficulty",
+                        index=header.index,
+                        expected_difficulty=expected_difficulty,
+                        declared_difficulty=header.difficulty,
+                    )
+                    return False
+
                 # Signature optional for genesis (no miner), enforced for others when present
                 if header.signature is not None or header.index != 0:
                     if not self.verify_block_signature(header):
@@ -2381,17 +3013,57 @@ class Blockchain:
             except Exception as e:
                 self.logger.debug(f"Failed to save nonces after chain validation restore: {type(e).__name__}")
 
-    def _calculate_chain_work(self, chain: List[BlockHeader]) -> int:
+    def _calculate_block_work(self, block_like: Union["Block", BlockHeader, Any]) -> int:
         """
-        Calculate cumulative work (difficulty) for a chain.
+        Convert a block's declared difficulty into an absolute work value using the
+        2^256 / (target + 1) formulation popularized by Bitcoin. This prevents
+        peers from gaming fork choice with chains that merely have more headers.
+        """
+        header = block_like.header if hasattr(block_like, "header") else block_like
+        if header is None:
+            return 0
 
-        This is used for fork choice: the chain with the most cumulative work
-        is considered the canonical chain, not just the longest chain.
+        block_hash = getattr(header, "hash", None)
+        if block_hash:
+            cached = self._block_work_cache.get(block_hash)
+            if cached is not None:
+                return cached
+
+        try:
+            claimed_difficulty = int(getattr(header, "difficulty", 0))
+        except (TypeError, ValueError):
+            claimed_difficulty = 0
+        claimed_difficulty = max(0, claimed_difficulty)
+
+        shift_bits = min(claimed_difficulty * 4, 256)
+        if shift_bits >= 256:
+            target = 0
+        else:
+            target = self._max_pow_target >> shift_bits
+
+        denominator = max(target + 1, 1)
+        work = self._max_pow_target // denominator
+
+        if block_hash:
+            self._block_work_cache[block_hash] = work
+        return work
+
+    def _calculate_chain_work(self, chain: List[Union["Block", BlockHeader, Any]]) -> int:
+        """
+        Calculate cumulative work for a candidate chain using precise PoW arithmetic.
+
+        Args:
+            chain: Sequence of block headers/blocks.
 
         Returns:
-            Total cumulative difficulty of the chain
+            Integer work sum suitable for fork choice comparisons.
         """
-        return sum(header.difficulty for header in chain)
+        if not chain:
+            return 0
+        total = 0
+        for block_like in chain:
+            total += self._calculate_block_work(block_like)
+        return total
 
     def _handle_fork(self, block: Block) -> bool:
         """
@@ -2573,6 +3245,17 @@ class Blockchain:
                         max_depth=self.max_reorg_depth,
                     )
                     return False
+        else:
+            fork_point = self._find_fork_point(new_chain) if new_chain else None
+
+        if self.finality_manager:
+            if not self.finality_manager.can_reorg_to_height(fork_point):
+                self.logger.error(
+                    "Rejecting chain reorganization: violates finalized block",
+                    fork_point=fork_point,
+                    highest_finalized=self.finality_manager.get_highest_finalized_height(),
+                )
+                return False
 
         # Materialize new chain blocks up-front for validation/metrics
         materialized_chain: List[Block] = []
@@ -2646,6 +3329,65 @@ class Blockchain:
             # Failing to rebuild would cause mempool validation to use stale nonces
             self._rebuild_nonce_tracker(materialized_chain)
 
+            # CRITICAL: Revalidate mempool transactions against new chain state
+            # Transactions valid in the old chain may become invalid after reorg
+            # (double-spends, invalid nonces, insufficient balance, etc.)
+            original_pending_count = len(self.pending_transactions)
+            valid_pending = []
+            evicted_count = 0
+
+            for tx in self.pending_transactions:
+                try:
+                    # Validate against new chain state (nonces, balances, UTXOs)
+                    if self.transaction_validator.validate_transaction(tx, is_mempool_check=True):
+                        valid_pending.append(tx)
+                    else:
+                        evicted_count += 1
+                        self.logger.warning(
+                            f"Evicting transaction {tx.txid} from mempool after chain reorganization - "
+                            f"invalid in new chain state",
+                            extra={
+                                "txid": tx.txid,
+                                "sender": tx.sender,
+                                "recipient": tx.recipient,
+                                "amount": tx.amount,
+                                "reason": "validation_failed",
+                            }
+                        )
+                except Exception as e:
+                    evicted_count += 1
+                    self.logger.warning(
+                        f"Evicting transaction {tx.txid} from mempool after chain reorganization - "
+                        f"validation raised exception: {e}",
+                        extra={
+                            "txid": tx.txid,
+                            "sender": tx.sender,
+                            "error": str(e),
+                            "reason": "validation_exception",
+                        }
+                    )
+
+            # Replace mempool with revalidated transactions
+            self.pending_transactions = valid_pending
+
+            if evicted_count > 0:
+                self.logger.info(
+                    f"Mempool revalidation complete after chain reorganization: "
+                    f"{len(valid_pending)} valid transactions retained, "
+                    f"{evicted_count} invalid transactions evicted "
+                    f"(original count: {original_pending_count})",
+                    extra={
+                        "valid_count": len(valid_pending),
+                        "evicted_count": evicted_count,
+                        "original_count": original_pending_count,
+                    }
+                )
+            else:
+                self.logger.debug(
+                    f"Mempool revalidation complete: all {len(valid_pending)} transactions remain valid",
+                    extra={"valid_count": len(valid_pending)}
+                )
+
             # Save new chain to disk
             for block in materialized_chain:
                 self.storage._save_block_to_disk(block)
@@ -2656,6 +3398,7 @@ class Blockchain:
                 self.contracts,
                 self.contract_receipts,
             )
+            return True
 
         except Exception as e:
             # If reorg fails, restore the old state
@@ -2704,6 +3447,28 @@ class Blockchain:
                 self.logger.warn(f"Invalid chain structure: block {current_header.index} has invalid PoW")
                 return False
 
+            if not self._validate_header_version(current_header):
+                return False
+
+            expected_difficulty = self._expected_difficulty_for_block(
+                block_index=current_header.index,
+                history=chain[:i],
+            )
+            if expected_difficulty is not None and current_header.difficulty != expected_difficulty:
+                self.logger.warn(
+                    f"Invalid chain structure: block {current_header.index} difficulty mismatch",
+                    expected_difficulty=expected_difficulty,
+                    declared_difficulty=current_header.difficulty,
+                )
+                return False
+
+            time_valid, time_error = self._validate_block_timestamp(current_header, chain[:i])
+            if not time_valid:
+                self.logger.warn(
+                    f"Invalid chain structure: block {current_header.index} timestamp invalid ({time_error})"
+                )
+                return False
+
             # Verify block signature
             if current_header.index > 0:
                 if not self.verify_block_signature(current_header):
@@ -2721,6 +3486,226 @@ class Blockchain:
         """
         candidate_chain = chain if chain is not None else self.chain
         return self._validate_chain_structure(candidate_chain)
+
+    def _extract_timestamp(self, block_like: Union["Block", BlockHeader, Any]) -> Optional[float]:
+        """Return a floating-point timestamp from a block/header-like object."""
+        if hasattr(block_like, "timestamp"):
+            raw = getattr(block_like, "timestamp")
+            return float(raw) if raw is not None else None
+        if hasattr(block_like, "header"):
+            header_obj = getattr(block_like, "header")
+            if hasattr(header_obj, "timestamp"):
+                raw = header_obj.timestamp
+                return float(raw) if raw is not None else None
+        return None
+
+    def _median_time_from_history(
+        self,
+        history: Sequence[Union["Block", BlockHeader, Any]],
+    ) -> Optional[float]:
+        """Compute the median timestamp over the rolling history window."""
+        if not history:
+            return None
+        window = list(history)[-self._median_time_span :]
+        timestamps: List[float] = []
+        for entry in window:
+            ts = self._extract_timestamp(entry)
+            if ts is not None:
+                timestamps.append(ts)
+        if not timestamps:
+            return None
+        timestamps.sort()
+        mid = len(timestamps) // 2
+        if len(timestamps) % 2 == 0:
+            return (timestamps[mid - 1] + timestamps[mid]) / 2
+        return timestamps[mid]
+
+    def _validate_block_timestamp(
+        self,
+        block_like: Union["Block", BlockHeader, Any],
+        history: Sequence[Union["Block", BlockHeader, Any]],
+        *,
+        emit_metrics: bool = False,
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Enforce timestamp constraints:
+        - each block must be newer than the median of the trailing window
+        - blocks cannot be more than MAX_FUTURE_BLOCK_TIME seconds ahead of wall clock
+        """
+        header = block_like.header if hasattr(block_like, "header") else block_like
+        index = getattr(header, "index", 0)
+        timestamp = self._extract_timestamp(header)
+        if index == 0:
+            return True, None
+        if timestamp is None:
+            return False, "missing timestamp"
+        median_time = self._median_time_from_history(history)
+        if median_time is not None and timestamp <= median_time:
+            return False, f"timestamp {timestamp} <= median time past {median_time}"
+        future_cutoff = time.time() + self._max_future_block_time
+        if timestamp > future_cutoff:
+            return (
+                False,
+                f"timestamp {timestamp} exceeds future drift allowance ({self._max_future_block_time}s)",
+            )
+        if emit_metrics:
+            self._record_timestamp_metrics(
+                index=index,
+                timestamp=timestamp,
+                median_time=median_time,
+                history_length=len(history),
+            )
+        return True, None
+
+    def _expected_difficulty_for_block(
+        self,
+        *,
+        block_index: int,
+        history: Sequence[Union["Block", BlockHeader]],
+    ) -> Optional[int]:
+        """
+        Determine the deterministic difficulty for a block based on prior history.
+
+        Args:
+            block_index: Index of the block being evaluated.
+            history: Sequence of blocks/headers representing the canonical chain
+                     up to (but excluding) the block being validated.
+
+        Returns:
+            Expected integer difficulty or None if insufficient context.
+        """
+        if block_index <= 0:
+            return None
+        history_view = list(history)
+        if not history_view or len(history_view) != block_index:
+            return None
+
+        previous_entry = history_view[-1]
+        previous_header = previous_entry.header if hasattr(previous_entry, "header") else previous_entry
+        previous_index = getattr(previous_header, "index", None)
+        if previous_index is None or previous_index != block_index - 1:
+            return None
+
+        baseline = getattr(previous_header, "difficulty", None)
+        if baseline is None:
+            return None
+
+        expected = self.calculate_next_difficulty(
+            chain=history_view,
+            current_difficulty=int(baseline),
+            emit_log=False,
+        )
+        if self.fast_mining_enabled:
+            return min(expected, self.max_test_mining_difficulty)
+        return expected
+
+    def _validate_header_version(self, header: BlockHeader) -> bool:
+        """
+        Ensure block header versions are integers and part of the allowed set.
+        """
+        declared_version = getattr(header, "version", None)
+        version_to_check = (
+            declared_version if declared_version is not None else self._default_block_header_version
+        )
+        try:
+            version_int = int(version_to_check)
+        except (TypeError, ValueError):
+            self.logger.warn(
+                "Block rejected: non-integer header version",
+                block_index=getattr(header, "index", None),
+                version=version_to_check,
+            )
+            return False
+
+        if version_int not in self._allowed_block_header_versions:
+            self.logger.warn(
+                "Block rejected: unsupported header version",
+                block_index=getattr(header, "index", None),
+                version=version_int,
+                allowed_versions=sorted(self._allowed_block_header_versions),
+            )
+            return False
+
+        return True
+
+    def _block_within_size_limits(self, block: Block, *, context: str) -> bool:
+        """
+        Validate block size/resource limits using the hardened validator.
+        """
+        try:
+            valid, error = BlockSizeValidator.validate_block_size(block)
+        except Exception as exc:
+            self.logger.error(
+                "Block size validation failed unexpectedly",
+                context=context,
+                error=str(exc),
+            )
+            return False
+
+        if not valid:
+            header = block.header if hasattr(block, "header") else None
+            self.logger.warn(
+                "Block violates size limits",
+                context=context,
+                block_index=getattr(header, "index", getattr(block, "index", None)),
+                block_hash=getattr(header, "hash", getattr(block, "hash", "")),
+                reason=error,
+            )
+            return False
+
+        return True
+
+    def _record_timestamp_metrics(
+        self,
+        *,
+        index: int,
+        timestamp: float,
+        median_time: Optional[float],
+        history_length: int,
+    ) -> None:
+        """Persist timestamp drift history and emit monitoring signals."""
+        observed_at = time.time()
+        median_drift = timestamp - median_time if median_time is not None else None
+        wall_clock_drift = timestamp - observed_at
+        record = {
+            "index": index,
+            "timestamp": timestamp,
+            "median_drift": median_drift,
+            "wall_clock_drift": wall_clock_drift,
+            "history_length": history_length,
+            "observed_at": observed_at,
+        }
+        self._timestamp_drift_history.append(record)
+        if abs(wall_clock_drift) > self._max_future_block_time * 0.75:
+            self.logger.warning(
+                "Block timestamp drift warning",
+                block_index=index,
+                wall_clock_drift_seconds=wall_clock_drift,
+                median_drift_seconds=median_drift,
+            )
+        try:
+            from xai.core.monitoring import MetricsCollector
+
+            collector = MetricsCollector.instance()
+            if collector:
+                median_metric = collector.get_metric("xai_block_timestamp_median_drift_seconds")
+                if median_metric and median_drift is not None:
+                    median_metric.observe(median_drift)
+                wall_metric = collector.get_metric("xai_block_timestamp_wall_clock_drift_seconds")
+                if wall_metric:
+                    wall_metric.observe(wall_clock_drift)
+                history_gauge = collector.get_metric("xai_block_timestamp_history_entries")
+                if history_gauge:
+                    history_gauge.set(len(self._timestamp_drift_history))
+        except (ImportError, AttributeError, RuntimeError) as exc:
+            self.logger.debug(
+                "Timestamp telemetry unavailable",
+                error=str(exc),
+            )
+
+    def get_recent_timestamp_drift(self) -> List[Dict[str, float]]:
+        """Return a copy of the recent timestamp drift history for diagnostics."""
+        return list(self._timestamp_drift_history)
 
     def _add_block_to_chain(self, block: Block) -> bool:
         """Helper method to add a validated block to the chain."""
@@ -2929,40 +3914,6 @@ class Blockchain:
             return self.replace_chain(best_candidate)
 
         return False
-
-    def _calculate_chain_work(self, chain: List) -> int:
-        """
-        Calculate cumulative work for a chain.
-
-        Cumulative work represents the total computational effort required to produce
-        the chain. It's calculated as the sum of 2^difficulty for each block.
-
-        This is more accurate than chain length for fork choice because:
-        - A chain with 10 blocks at difficulty 20 has more work than
-        - A chain with 15 blocks at difficulty 10
-
-        Args:
-            chain: List of blocks or block headers
-
-        Returns:
-            Total cumulative work (sum of 2^difficulty for each block)
-        """
-        total_work = 0
-        for block_or_header in chain:
-            # Handle both Block and BlockHeader objects
-            if hasattr(block_or_header, 'header'):
-                difficulty = block_or_header.header.difficulty
-            elif hasattr(block_or_header, 'difficulty'):
-                difficulty = block_or_header.difficulty
-            else:
-                continue
-
-            # Work = 2^difficulty (exponential, like Bitcoin)
-            # Cap difficulty to prevent overflow
-            capped_difficulty = min(difficulty, 256)
-            total_work += 2 ** capped_difficulty
-
-        return total_work
 
     def _record_state_snapshot(self, label: str) -> None:
         """Store a bounded history of state integrity snapshots for audit/debug."""
@@ -3294,7 +4245,18 @@ class Blockchain:
             order_type = SwapOrderType.SELL if token_offered.upper() == "AXN" else SwapOrderType.BUY
 
         price = order_data.get("price")
-        price_value = float(price) if price is not None else (amount_requested / amount_offered)
+        if price is None:
+            if amount_offered <= 0:
+                raise ValueError("amount_offered must be positive to derive price")
+            price_value = amount_requested / amount_offered
+        else:
+            try:
+                price_value = float(price)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("price must be a numeric value") from exc
+
+        if price_value <= 0 or not math.isfinite(price_value):
+            raise ValueError("price must be a finite positive number")
 
         return {
             "maker_address": wallet_address,

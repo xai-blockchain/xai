@@ -15,7 +15,7 @@ import psutil
 import os
 import json
 import logging
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List, Optional, Callable, Tuple
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -60,7 +60,12 @@ class Metric:
         self.name = name
         self.description = description
         self.metric_type = metric_type
-        self.labels = labels or {}
+        if isinstance(labels, dict):
+            self.labels = labels
+        elif isinstance(labels, (list, tuple, set)):
+            self.labels = {str(label): "" for label in labels}
+        else:
+            self.labels = {}
         self.value = 0
         self.timestamp = time.time()
 
@@ -132,41 +137,62 @@ class Histogram(Metric):
         self.sum = 0
         self.count = 0
 
-    def observe(self, value: float):
-        """Observe a value"""
-        self.sum += value
-        self.count += 1
+        # Optional per-label series (keyed by sorted label tuples)
+        self._labeled_series: Dict[Tuple[Tuple[str, str], ...], Dict[str, Any]] = {}
 
-        for bucket in self.buckets:
-            if value <= bucket:
-                self.bucket_counts[bucket] += 1
+    def observe(self, value: float, labels: Optional[Dict[str, Any]] = None):
+        """Observe a value, optionally tracking per-label buckets."""
 
-        self.timestamp = time.time()
+        def _record(target_buckets: Dict[float, int], series: Dict[str, Any]) -> None:
+            for bucket in self.buckets:
+                if value <= bucket:
+                    target_buckets[bucket] += 1
+            series["sum"] += value
+            series["count"] += 1
+
+        if labels:
+            key = tuple(sorted((str(k), str(v)) for k, v in labels.items()))
+            series = self._labeled_series.setdefault(
+                key,
+                {
+                    "bucket_counts": defaultdict(int),
+                    "sum": 0.0,
+                    "count": 0,
+                    "labels": {**self.labels, **{str(k): str(v) for k, v in labels.items()}},
+                },
+            )
+            _record(series["bucket_counts"], series)
+            series["timestamp"] = time.time()
+        else:
+            base_series = {"sum": self.sum, "count": self.count}
+            _record(self.bucket_counts, base_series)
+            self.sum = base_series["sum"]
+            self.count = base_series["count"]
+            self.timestamp = time.time()
 
     def to_prometheus(self) -> str:
         """Convert histogram to Prometheus format"""
-        label_str = ",".join([f'{k}="{v}"' for k, v in self.labels.items()])
-        base_labels = f"{{{label_str}}}" if label_str else ""
-
         lines = [f"# HELP {self.name} {self.description}", f"# TYPE {self.name} histogram"]
 
-        # Bucket counts
-        for bucket in sorted(self.buckets):
-            count = self.bucket_counts.get(bucket, 0)
-            bucket_labels = f'le="{bucket}"'
-            if label_str:
-                bucket_labels = f"{label_str},{bucket_labels}"
-            lines.append(f"{self.name}_bucket{{{bucket_labels}}} {count}")
+        def _emit_series(label_map: Dict[str, Any], bucket_counts: Dict[float, int], count: int, total_sum: float) -> None:
+            normalized_labels = {str(k): str(v) for k, v in label_map.items() if v != ""}
+            label_str = ",".join([f'{k}="{v}"' for k, v in normalized_labels.items()])
+            base_labels = f"{{{label_str}}}" if label_str else ""
+            for bucket in sorted(self.buckets):
+                bucket_label_entries = dict(normalized_labels)
+                bucket_label_entries["le"] = str(bucket)
+                bucket_label_str = ",".join([f'{k}="{v}"' for k, v in bucket_label_entries.items()])
+                lines.append(f"{self.name}_bucket{{{bucket_label_str}}} {bucket_counts.get(bucket, 0)}")
+            inf_label_entries = dict(normalized_labels)
+            inf_label_entries["le"] = "+Inf"
+            inf_label_str = ",".join([f'{k}="{v}"' for k, v in inf_label_entries.items()])
+            lines.append(f"{self.name}_bucket{{{inf_label_str}}} {count}")
+            lines.append(f"{self.name}_sum{base_labels} {total_sum}")
+            lines.append(f"{self.name}_count{base_labels} {count}")
 
-        # +Inf bucket
-        inf_labels = f'le="+Inf"'
-        if label_str:
-            inf_labels = f"{label_str},{inf_labels}"
-        lines.append(f"{self.name}_bucket{{{inf_labels}}} {self.count}")
-
-        # Sum and count
-        lines.append(f"{self.name}_sum{base_labels} {self.sum}")
-        lines.append(f"{self.name}_count{base_labels} {self.count}")
+        _emit_series(self.labels, self.bucket_counts, self.count, self.sum)
+        for series in self._labeled_series.values():
+            _emit_series(series["labels"], series["bucket_counts"], series["count"], series["sum"])
 
         return "\n".join(lines)
 
@@ -317,6 +343,38 @@ class MetricsCollector:
         self.register_gauge("xai_difficulty", "Current mining difficulty")
         self.register_gauge("xai_pending_transactions", "Number of pending transactions in mempool")
         self.register_gauge("xai_total_supply", "Total XAI in circulation")
+        self.register_histogram(
+            "xai_block_timestamp_median_drift_seconds",
+            "Difference between block timestamp and rolling median time past",
+            buckets=[
+                -1200,
+                -600,
+                -300,
+                -120,
+                -60,
+                -30,
+                -10,
+                -1,
+                0,
+                1,
+                10,
+                30,
+                60,
+                120,
+                300,
+                600,
+                1200,
+            ],
+        )
+        self.register_histogram(
+            "xai_block_timestamp_wall_clock_drift_seconds",
+            "Difference between block timestamp and system clock",
+            buckets=[-7200, -3600, -1200, -600, -300, -120, -60, -30, -10, 0, 10, 30, 60, 120, 300, 600, 1200, 3600, 7200],
+        )
+        self.register_gauge(
+            "xai_block_timestamp_history_entries",
+            "Number of timestamp drift samples stored in memory",
+        )
 
         # Network metrics
         self.register_gauge("xai_peers_connected", "Number of connected peers")
@@ -365,6 +423,18 @@ class MetricsCollector:
         self.register_counter(
             "xai_mempool_expired_total",
             "Total transactions expired out of mempool",
+        )
+        self.register_counter(
+            "xai_send_rejections_stale_timestamp_total",
+            "Total /send requests rejected due to stale timestamps",
+        )
+        self.register_counter(
+            "xai_send_rejections_future_timestamp_total",
+            "Total /send requests rejected due to future timestamps",
+        )
+        self.register_counter(
+            "xai_send_rejections_txid_mismatch_total",
+            "Total /send requests rejected due to TXID mismatch",
         )
         self.register_gauge(
             "xai_mempool_active_bans",
@@ -424,6 +494,38 @@ class MetricsCollector:
         )
         self.register_gauge(
             "xai_withdrawals_time_locked_backlog", "Number of pending time-locked withdrawals"
+        )
+        self.register_counter(
+            "xai_withdrawal_processor_completed_total",
+            "Total withdrawals completed by the exchange withdrawal processor",
+        )
+        self.register_counter(
+            "xai_withdrawal_processor_flagged_total",
+            "Total withdrawals flagged for manual review by the processor",
+        )
+        self.register_counter(
+            "xai_withdrawal_processor_failed_total",
+            "Total withdrawals rejected by the processor",
+        )
+        self.register_gauge(
+            "xai_withdrawal_pending_queue", "Current pending exchange withdrawal queue depth"
+        )
+        # Crypto deposit metrics
+        self.register_counter(
+            "xai_crypto_deposit_events_total",
+            "Total crypto deposit events processed by the monitor",
+        )
+        self.register_counter(
+            "xai_crypto_deposit_credited_total",
+            "Total crypto deposits credited to exchange wallets",
+        )
+        self.register_gauge(
+            "xai_crypto_deposit_pending_events",
+            "Number of crypto deposits awaiting confirmations",
+        )
+        self.register_counter(
+            "xai_crypto_deposit_errors_total",
+            "Total crypto deposit monitoring errors",
         )
 
         # Consensus metrics
@@ -507,6 +609,19 @@ class MetricsCollector:
         except (TypeError, ValueError, AttributeError) as e:
             # Metric update failed - log but don't break monitoring
             logger.debug(f"Failed to set metric {name}: {e}")
+
+    def record_send_rejection(self, reason: str) -> None:
+        """Increment /send rejection counters by reason."""
+        name = {
+            "stale_timestamp": "xai_send_rejections_stale_timestamp_total",
+            "future_timestamp": "xai_send_rejections_future_timestamp_total",
+            "txid_mismatch": "xai_send_rejections_txid_mismatch_total",
+        }.get(reason)
+        if not name:
+            return
+        metric = self.metrics.get(name)
+        if isinstance(metric, Counter):
+            metric.inc()
 
     def _process_mempool_alert_state(self, stats: Dict[str, Any]) -> None:
         """
@@ -758,6 +873,46 @@ class MetricsCollector:
         gauge = self.get_metric("xai_withdrawals_time_locked_backlog")
         if gauge:
             gauge.set(pending_backlog)
+
+    def record_withdrawal_processor_stats(self, stats: Dict[str, Any], queue_depth: int) -> None:
+        """Record counters and gauges emitted by the withdrawal processor."""
+        if not stats:
+            return
+        completed = self.get_metric("xai_withdrawal_processor_completed_total")
+        flagged = self.get_metric("xai_withdrawal_processor_flagged_total")
+        failed = self.get_metric("xai_withdrawal_processor_failed_total")
+        if completed:
+            completed.inc(float(stats.get("completed", 0)))
+        if flagged:
+            flagged.inc(float(stats.get("flagged", 0)))
+        if failed:
+            failed.inc(float(stats.get("failed", 0)))
+        queue_gauge = self.get_metric("xai_withdrawal_pending_queue")
+        if queue_gauge:
+            queue_gauge.set(queue_depth)
+
+    def record_crypto_deposit_stats(self, stats: Dict[str, Any]) -> None:
+        """Ingest crypto deposit monitor statistics into metrics."""
+        if not stats:
+            return
+        processed = float(stats.get("processed", 0) or 0)
+        credited = float(stats.get("credited", 0) or 0)
+        pending = float(stats.get("pending", 0) or 0)
+        errors = float(stats.get("errors", 0) or 0)
+
+        events_counter = self.get_metric("xai_crypto_deposit_events_total")
+        credited_counter = self.get_metric("xai_crypto_deposit_credited_total")
+        pending_gauge = self.get_metric("xai_crypto_deposit_pending_events")
+        errors_counter = self.get_metric("xai_crypto_deposit_errors_total")
+
+        if events_counter and processed:
+            events_counter.inc(processed)
+        if credited_counter and credited:
+            credited_counter.inc(credited)
+        if pending_gauge is not None:
+            pending_gauge.set(pending)
+        if errors_counter and errors:
+            errors_counter.inc(errors)
 
     def record_security_event(
         self, event_type: str, severity: str, payload: Optional[Dict[str, Any]] = None

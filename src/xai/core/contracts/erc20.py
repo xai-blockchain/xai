@@ -732,12 +732,23 @@ class ERC20Factory:
 
         # Store in blockchain
         if self.blockchain:
+            metadata = {
+                "name": name,
+                "symbol": symbol,
+                "decimals": decimals,
+                "owner": creator,
+                "max_supply": max_supply,
+                "initial_supply": initial_supply,
+                "initial_holder": mint_to or creator,
+            }
             self.blockchain.contracts[token.address.upper()] = {
                 "type": "ERC20",
                 "address": token.address,
+                "metadata": metadata,
                 "data": token.to_dict(),
                 "created_at": time.time(),
                 "creator": creator,
+                "storage": {},
             }
 
         logger.info(

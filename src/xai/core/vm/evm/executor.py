@@ -17,6 +17,8 @@ from .context import ExecutionContext, CallContext, CallType, BlockContext, Log
 from .memory import EVMMemory
 from .stack import EVMStack
 from .storage import EVMStorage
+from .builtin_tokens import execute_builtin_contract
+from .abi import encode_call, keccak256
 from ..executor import ExecutionMessage, ExecutionResult, BaseExecutor
 from ..exceptions import VMExecutionError
 
@@ -25,6 +27,13 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+ZERO_ADDRESS = "0x" + "0" * 40
+ERC20_RECEIVE_SIGNATURE = "onTransferReceived(address,address,uint256,bytes)"
+ERC20_RECEIVE_MAGIC = keccak256(ERC20_RECEIVE_SIGNATURE.encode("utf-8"))[:4]
+ERC721_RECEIVE_SIGNATURE = "onERC721Received(address,address,uint256,bytes)"
+# bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"))
+ERC721_RECEIVE_MAGIC = b"\x15\x0b\x7a\x02"
 
 
 class EVMBytecodeExecutor(BaseExecutor):
@@ -383,8 +392,17 @@ class EVMBytecodeExecutor(BaseExecutor):
 
         contract_address = self._normalize_address(message.to)
 
-        # Get contract code
-        code = self._get_contract_code(contract_address)
+        record = self._get_contract_record(contract_address)
+        code = self._get_contract_code(contract_address, record)
+
+        builtin_type = (record or {}).get("type")
+        if builtin_type in {"ERC20", "ERC721"}:
+            return self._execute_builtin_contract(
+                contract_address=contract_address,
+                record=record or {},
+                message=message,
+                static=static,
+            )
         if not code:
             # Empty account - transfer value only
             return ExecutionResult(
@@ -582,17 +600,150 @@ class EVMBytecodeExecutor(BaseExecutor):
             return address.lower()
         return f"0x{address.lower()}"
 
-    def _get_contract_code(self, address: str) -> bytes:
-        """Get contract bytecode from blockchain."""
-        normalized = address.upper().replace("0X", "")
-        contract_data = self.blockchain.contracts.get(f"0X{normalized}", {})
-        if not contract_data:
-            contract_data = self.blockchain.contracts.get(normalized, {})
+    def _get_contract_record(self, address: str) -> Optional[Dict[str, Any]]:
+        """Fetch raw contract metadata from the blockchain registry."""
+        normalized = address.upper()
+        return self.blockchain.contracts.get(normalized)
 
-        code = contract_data.get("code", b"")
+    def _get_contract_code(self, address: str, record: Optional[Dict[str, Any]] = None) -> bytes:
+        """Get contract bytecode from blockchain."""
+        if record is None:
+            record = self._get_contract_record(address)
+        if not record:
+            return b""
+
+        code = record.get("code", b"")
         if isinstance(code, str):
             return bytes.fromhex(code)
         return code
+
+    def _execute_builtin_contract(
+        self,
+        *,
+        contract_address: str,
+        record: Dict[str, Any],
+        message: ExecutionMessage,
+        static: bool,
+    ) -> ExecutionResult:
+        """Execute ERC builtin contracts via the storage-backed adapter."""
+        selector = (message.data or b"")[:4].hex()
+        calldata = (message.data or b"")[4:]
+        metadata = record.get("metadata") or record.get("data") or {}
+        storage_data = record.get("storage", {})
+
+        def erc20_hook(operator: str, from_addr: str, to_addr: str, amount: int, data: bytes) -> None:
+            self._invoke_receive_hook(
+                hook_type="erc20",
+                token_address=contract_address,
+                operator=operator,
+                from_addr=from_addr,
+                to_addr=to_addr,
+                amount=amount,
+                data=data,
+            )
+
+        def erc721_hook(operator: str, from_addr: str, to_addr: str, token_id: int, data: bytes) -> None:
+            self._invoke_receive_hook(
+                hook_type="erc721",
+                token_address=contract_address,
+                operator=operator,
+                from_addr=from_addr,
+                to_addr=to_addr,
+                token_id=token_id,
+                data=data,
+            )
+
+        try:
+            output, gas_used, logs, storage = execute_builtin_contract(
+                contract_type=str(record.get("type")),
+                contract_address=contract_address,
+                storage_data=storage_data,
+                metadata=metadata,
+                selector=selector,
+                calldata=calldata,
+                sender=message.sender,
+                value=message.value,
+                static=static,
+                erc20_receive_hook=erc20_hook,
+                erc721_receive_hook=erc721_hook,
+            )
+        except VMExecutionError as exc:
+            return ExecutionResult(
+                success=False,
+                gas_used=message.gas_limit,
+                return_data=b"",
+                logs=[{"event": "CallFailed", "error": str(exc)}],
+            )
+
+        # Persist storage back
+        record["storage"] = storage.to_dict()
+        self.blockchain.contracts[contract_address.upper()] = record
+
+        return ExecutionResult(
+            success=True,
+            gas_used=min(message.gas_limit, gas_used),
+            return_data=output,
+            logs=logs,
+        )
+
+    def _invoke_receive_hook(
+        self,
+        *,
+        hook_type: str,
+        token_address: str,
+        operator: str,
+        from_addr: str,
+        to_addr: str,
+        amount: int = 0,
+        token_id: Optional[int] = None,
+        data: bytes,
+    ) -> None:
+        normalized_target = self._normalize_address(to_addr)
+        if normalized_target == ZERO_ADDRESS:
+            return
+
+        record = self._get_contract_record(normalized_target)
+        if not record:
+            return
+
+        if record.get("type") in {"ERC20", "ERC721"}:
+            # Builtin tokens do not expose receive hooks to avoid recursion
+            return
+
+        code = self._get_contract_code(normalized_target, record)
+        if not code:
+            return
+
+        if hook_type == "erc20":
+            if amount <= 0:
+                return
+            signature = ERC20_RECEIVE_SIGNATURE
+            args = [operator, from_addr, amount, data]
+            expected_magic = ERC20_RECEIVE_MAGIC
+        elif hook_type == "erc721":
+            if token_id is None:
+                raise VMExecutionError("ERC721 receive hook missing token_id")
+            signature = ERC721_RECEIVE_SIGNATURE
+            args = [operator, from_addr, token_id, data]
+            expected_magic = ERC721_RECEIVE_MAGIC
+        else:
+            raise VMExecutionError(f"Unknown receive hook type '{hook_type}'")
+
+        calldata = encode_call(signature, args)
+        hook_message = ExecutionMessage(
+            sender=token_address,
+            to=normalized_target,
+            value=0,
+            gas_limit=min(200_000, self.DEFAULT_GAS_LIMIT),
+            data=calldata,
+            nonce=0,
+        )
+
+        result = self._call_contract(hook_message, static=False)
+        if not result.success:
+            raise VMExecutionError("Token receive hook reverted execution")
+        if len(result.return_data) < 4 or result.return_data[:4] != expected_magic:
+            raise VMExecutionError("Token receive hook rejected transfer")
 
     def _store_contract(
         self,
@@ -645,6 +796,19 @@ class EVMPrecompiles:
     ECPAIRING = "0x0000000000000000000000000000000000000008"
     BLAKE2F = "0x0000000000000000000000000000000000000009"
     POINT_EVALUATION = "0x000000000000000000000000000000000000000a"
+
+    # KZG / EIP-4844 parameters for POINT_EVALUATION precompile
+    _KZG_POINT_EVAL_GAS = 50_000
+    _KZG_FIELD_ELEMENTS_PER_BLOB = 4096
+    _KZG_BLS_MODULUS = 52435875175126190479447740508185965837690552500527637822603658699938581184513
+    _KZG_VERSIONED_HASH_VERSION = 0x01
+    # Trusted setup g2^{tau} (monomial index 1) from ethereum/c-kzg-4844 src/trusted_setup.txt
+    _KZG_G2_TAU_COMPRESSED = bytes.fromhex(
+        "b5bfd7dd8cdeb128843bc287230af38926187075cbfbefa81009a2ce615ac53d"
+        "2914e5870cb452d2afaaab24f3499f72185cbfee53492714734429b7b38608e2"
+        "3926c911cceceac9a36851477ba4c60b087041de621000edc98edada20c1def2"
+    )
+    _KZG_G2_TAU_POINT = None
 
     @classmethod
     def is_precompile(cls, address: str) -> bool:
@@ -1033,12 +1197,107 @@ class EVMPrecompiles:
         return out, gas_cost
 
     @classmethod
+    def _kzg_to_versioned_hash(cls, commitment: bytes) -> bytes:
+        """Compute VERSIONED_HASH_VERSION_KZG || sha256(commitment)[1:]."""
+        digest = hashlib.sha256(commitment).digest()
+        return bytes([cls._KZG_VERSIONED_HASH_VERSION]) + digest[1:]
+
+    @staticmethod
+    def _decode_g1_point(
+        data: bytes,
+        label: str,
+        decompress_G1,
+        g1_type,
+    ):
+        """Decode a compressed G1 point, raising VMExecutionError on failure."""
+        if len(data) != 48:
+            raise VMExecutionError(f"{label} must be 48 bytes")
+        try:
+            return decompress_G1(g1_type(int.from_bytes(data, "big")))
+        except ValueError as exc:  # pragma: no cover - defensive
+            raise VMExecutionError(f"Invalid {label}: {exc}") from exc
+
+    @classmethod
+    def _get_kzg_g2_tau(cls, decompress_G2, g2_type):
+        """Decompress and cache g2^{tau} from the trusted setup."""
+        if cls._KZG_G2_TAU_POINT is None:
+            z1 = int.from_bytes(cls._KZG_G2_TAU_COMPRESSED[:48], "big")
+            z2 = int.from_bytes(cls._KZG_G2_TAU_COMPRESSED[48:], "big")
+            try:
+                cls._KZG_G2_TAU_POINT = decompress_G2(g2_type((z1, z2)))
+            except ValueError as exc:  # pragma: no cover - defensive
+                raise VMExecutionError(f"Invalid KZG g2^tau entry: {exc}") from exc
+        return cls._KZG_G2_TAU_POINT
+
+    @classmethod
     def _point_evaluation(cls, data: bytes, gas: int) -> tuple[bytes, int]:
         """
         POINT_EVALUATION (0x0a) per EIP-4844.
-        Placeholder that returns a clear error until KZG integration lands.
+
+        Validates a KZG commitment proof asserting that polynomial p(x) committed
+        by `commitment` evaluates to y at point z. Returns the tuple
+        (FIELD_ELEMENTS_PER_BLOB, BLS_MODULUS) encoded as 64 bytes on success.
         """
-        gas_cost = 50_000
+        gas_cost = cls._KZG_POINT_EVAL_GAS
         if gas < gas_cost:
             raise VMExecutionError("Out of gas for POINT_EVALUATION")
-        raise VMExecutionError("POINT_EVALUATION precompile not yet implemented")
+
+        if len(data) != 192:
+            raise VMExecutionError("POINT_EVALUATION input must be exactly 192 bytes")
+
+        versioned_hash = data[:32]
+        z_bytes = data[32:64]
+        y_bytes = data[64:96]
+        commitment_bytes = data[96:144]
+        proof_bytes = data[144:192]
+
+        if cls._kzg_to_versioned_hash(commitment_bytes) != versioned_hash:
+            raise VMExecutionError("Commitment/versioned hash mismatch")
+
+        z_int = int.from_bytes(z_bytes, "big")
+        y_int = int.from_bytes(y_bytes, "big")
+
+        if z_int >= cls._KZG_BLS_MODULUS or y_int >= cls._KZG_BLS_MODULUS:
+            raise VMExecutionError("POINT_EVALUATION inputs contain non-canonical field elements")
+
+        try:
+            from py_ecc.bls.point_compression import (
+                G1Compressed,
+                G2Compressed,
+                decompress_G1,
+                decompress_G2,
+            )
+            from py_ecc.optimized_bls12_381 import (
+                G1,
+                G2,
+                add,
+                neg,
+                multiply,
+                pairing,
+                curve_order,
+            )
+        except Exception as exc:  # pragma: no cover - dependency/import guard
+            raise VMExecutionError(f"KZG dependency error: {exc}") from exc
+
+        commitment_point = cls._decode_g1_point(
+            commitment_bytes, "commitment", decompress_G1, G1Compressed
+        )
+        proof_point = cls._decode_g1_point(
+            proof_bytes, "proof", decompress_G1, G1Compressed
+        )
+        g2_tau = cls._get_kzg_g2_tau(decompress_G2, G2Compressed)
+
+        y_mul = multiply(G1, y_int % curve_order)
+        p_minus_y = add(commitment_point, neg(y_mul))
+
+        z_mul = multiply(G2, z_int % curve_order)
+        x_minus_z = add(g2_tau, neg(z_mul))
+
+        if pairing(G2, p_minus_y) != pairing(x_minus_z, proof_point):
+            raise VMExecutionError("POINT_EVALUATION proof verification failed")
+
+        output = (
+            cls._KZG_FIELD_ELEMENTS_PER_BLOB.to_bytes(32, "big")
+            + cls._KZG_BLS_MODULUS.to_bytes(32, "big")
+        )
+        return output, gas_cost

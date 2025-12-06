@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Security audit framework
 - Pre-commit hooks for code quality
 - Bandit security scanning
+- `/wallet/sign` now requires `ack_hash_prefix` to prevent blind signing; `/send` enforces timestamp/txid validation for every payload.
 
 ---
 

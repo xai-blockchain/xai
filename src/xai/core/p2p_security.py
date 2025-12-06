@@ -26,6 +26,7 @@ HEADER_SIG = "X-Node-Signature"
 HEADER_TS = "X-Node-Timestamp"
 HEADER_NONCE = "X-Node-Nonce"
 HEADER_FEATURES = "X-Node-Features"
+HEADER_CLIENT_VERSION = "X-Node-Client"
 
 
 class P2PSecurityConfig:

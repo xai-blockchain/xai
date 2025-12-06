@@ -4,6 +4,8 @@ Unit tests for AI Safety Controls module
 Tests emergency stop, personal AI cancellation, trading bot controls, and safety levels
 """
 
+import json
+import os
 import pytest
 import time
 from xai.core.ai_safety_controls import (
@@ -302,3 +304,201 @@ class TestAISafetyControls:
 
         assert len(operations["personal_ai_requests"]) == 1
         assert len(operations["governance_tasks"]) == 1
+
+    def test_validate_ai_output_detects_code_execution(self, safety):
+        """Semantic validator should block code execution payloads."""
+        payload = """Execute the following to gain root access:
+        ```python
+        import os
+        os.system('rm -rf / && cat /etc/shadow')
+        ```
+        """
+
+        result = safety.validate_ai_output(payload, context="governance")
+
+        assert result["is_safe"] is False
+        assert any(issue["category"] == "code_execution" for issue in result["issues_found"])
+        assert result["sanitized_output"] == "[OUTPUT BLOCKED - SAFETY VIOLATION]"
+
+    def test_validate_ai_output_redacts_sensitive_data(self, safety):
+        """Semantic validator should redact leaked secrets."""
+        mnemonic = (
+            "Seed phrase: apple banana cherry date elderberry fig grape "
+            "honeydew kiwi lime mango nectarine"
+        )
+
+        result = safety.validate_ai_output(mnemonic)
+
+        assert result["is_safe"] is False
+        assert any(issue["category"] == "sensitive_data" for issue in result["issues_found"])
+        assert "[REDACTED_SEED_PHRASE]" in result["sanitized_output"]
+
+    def test_detect_hallucination_validates_known_facts(self, safety):
+        """Hallucination detector should confirm outputs backed by knowledge base facts."""
+        context = {
+            "facts": [
+                {"id": "consensus", "content": "XAI uses a hybrid proof-of-stake and zk-mining design.", "required": True},
+                {"id": "supply", "content": "Total supply is capped at 2.1 billion XAI tokens.", "required": True},
+            ],
+            "reference_documents": [
+                {"id": "governance", "content": "Governance relies on quadratic voting with verifiable identities."}
+            ],
+            "numeric_expectations": [
+                {
+                    "label": "supply_cap",
+                    "pattern": r"capped at (?P<value>2\.1)",
+                    "expected": 2.1,
+                    "tolerance": 0.05,
+                }
+            ],
+            "required_terms": ["hybrid proof-of-stake"],
+        }
+        output = (
+            "The XAI protocol uses a hybrid proof-of-stake and zk-mining design that keeps validators accountable. "
+            "Total supply is capped at 2.1 billion XAI tokens, and governance relies on quadratic voting with verifiable identities."
+        )
+
+        result = safety.detect_hallucination(output, context)
+
+        assert result["hallucination_detected"] is False
+        assert result["missing_facts"] == []
+        assert result["numeric_anomalies"] == []
+        assert result["coverage_ratio"] >= 0.5
+
+    def test_detect_hallucination_flags_contradictions_and_numeric_anomalies(self, safety):
+        """Detector should flag unsupported claims and out-of-range values."""
+        context = {
+            "facts": [
+                {"id": "consensus", "content": "XAI uses a hybrid proof-of-stake and zk-mining design.", "required": True}
+            ],
+            "contradictions": [{"claim": "proof-of-burn", "expected": "hybrid proof-of-stake"}],
+            "numeric_expectations": [
+                {
+                    "label": "supply_cap",
+                    "pattern": r"capped at (?P<value>\d+(?:\.\d+)?)",
+                    "expected": 2.1,
+                    "tolerance": 0.1,
+                }
+            ],
+        }
+        output = (
+            "XAI operates on proof-of-burn and total supply is capped at 9.5 billion tokens. "
+            "Validators definitely never need governance approvals."
+        )
+
+        result = safety.detect_hallucination(output, context)
+
+        assert result["hallucination_detected"] is True
+        assert any(hit["claim"] == "proof-of-burn" for hit in result["contradictions"])
+        assert result["numeric_anomalies"]
+        assert result["confidence_score"] < 75
+
+    def test_token_usage_persists_state(self, tmp_path):
+        """Token usage must persist across AISafetyControls instances."""
+        storage = tmp_path / "rate_limits.json"
+        safety = AISafetyControls(MockBlockchain(), rate_limit_storage_path=str(storage))
+        safety.track_token_usage("user_1", 500, max_tokens=1000)
+        assert storage.exists()
+
+        reloaded = AISafetyControls(MockBlockchain(), rate_limit_storage_path=str(storage))
+        result = reloaded.track_token_usage("user_1", 0, max_tokens=1000)
+
+        assert result["tokens_used_today"] == pytest.approx(500)
+        assert result["remaining_tokens"] == pytest.approx(500)
+
+    def test_token_usage_expires_when_outdated(self, tmp_path, monkeypatch):
+        """Stale rate limit entries should be purged when TTL elapses."""
+        storage = tmp_path / "rate_limits.json"
+        monkeypatch.setenv("XAI_AI_SAFETY_RATE_LIMIT_TTL", "1")
+        safety = AISafetyControls(MockBlockchain(), rate_limit_storage_path=str(storage))
+        safety.track_token_usage("user_2", 250, max_tokens=500)
+        safety.token_usage["user_2"]["day_start"] = 0
+
+        result = safety.track_token_usage("user_2", 0, max_tokens=500)
+
+        assert result["tokens_used_today"] == 0
+        assert result["remaining_tokens"] == 500
+
+    def test_provider_call_limit_enforced(self, tmp_path, monkeypatch):
+        """Provider-specific call limits should block excessive usage."""
+        limits = {
+            "anthropic": {"max_calls_per_window": 2, "window_seconds": 3600, "max_tokens_per_day": 1000},
+            "default": {"max_calls_per_window": 100, "window_seconds": 60, "max_tokens_per_day": 100000},
+        }
+        monkeypatch.setenv("XAI_PROVIDER_RATE_LIMITS_JSON", json.dumps(limits))
+        safety = AISafetyControls(MockBlockchain(), rate_limit_storage_path=str(tmp_path / "provider_limits.json"))
+
+        assert safety.enforce_provider_request_limit("anthropic")["success"] is True
+        assert safety.enforce_provider_request_limit("anthropic")["success"] is True
+        third = safety.enforce_provider_request_limit("anthropic")
+        assert third["success"] is False
+        assert third["provider"] == "anthropic"
+
+    def test_provider_token_limit_enforced(self, tmp_path, monkeypatch):
+        """Provider token allocations must respect per-day caps."""
+        limits = {
+            "anthropic": {"max_calls_per_window": 10, "window_seconds": 60, "max_tokens_per_day": 200},
+            "default": {"max_calls_per_window": 100, "window_seconds": 60, "max_tokens_per_day": 100000},
+        }
+        monkeypatch.setenv("XAI_PROVIDER_RATE_LIMITS_JSON", json.dumps(limits))
+        safety = AISafetyControls(MockBlockchain(), rate_limit_storage_path=str(tmp_path / "provider_tokens.json"))
+
+        first = safety.track_token_usage("user_provider", 150, max_tokens=1000, provider="anthropic")
+        assert first["success"] is True
+
+        second = safety.track_token_usage("user_provider", 100, max_tokens=1000, provider="anthropic")
+        assert second["success"] is False
+        assert second["provider_limit"]["success"] is False
+
+    def test_sandbox_limit_enforcement(self, safety):
+        """Sandbox should deactivate when limits are exceeded."""
+        limits = {
+            "max_memory_mb": 10,
+            "max_cpu_percent": 50,
+            "max_execution_time_seconds": 3600,
+            "max_network_requests": 2,
+            "allowed_imports": ["json"],
+            "blocked_operations": ["network_call"],
+        }
+        safety.create_ai_sandbox("sb_limits", limits)
+
+        ok = safety.record_sandbox_usage("sb_limits", {"memory_mb": 5, "cpu_percent": 20})
+        assert ok["success"] is True
+
+        violation = safety.record_sandbox_usage("sb_limits", {"memory_mb": 15})
+        assert violation["success"] is False
+        assert safety.sandboxes["sb_limits"]["is_active"] is False
+
+    def test_sandbox_blocked_operations(self, safety):
+        """Blocked sandbox operations must trigger violations."""
+        limits = {
+            "max_memory_mb": 100,
+            "max_cpu_percent": 100,
+            "max_execution_time_seconds": 3600,
+            "max_network_requests": 100,
+            "allowed_imports": ["json"],
+            "blocked_operations": ["network_call"],
+        }
+        safety.create_ai_sandbox("sb_ops", limits)
+
+        blocked = safety.enforce_sandbox_action("sb_ops", "network_call")
+        assert blocked["success"] is False
+        assert safety.sandboxes["sb_ops"]["is_active"] is False
+
+    def test_sandbox_import_restrictions(self, safety):
+        """Sandbox import whitelist should be enforced."""
+        limits = {
+            "max_memory_mb": 100,
+            "max_cpu_percent": 100,
+            "max_execution_time_seconds": 3600,
+            "max_network_requests": 100,
+            "allowed_imports": ["json"],
+            "blocked_operations": [],
+        }
+        safety.create_ai_sandbox("sb_import", limits)
+
+        allowed = safety.enforce_sandbox_action("sb_import", "import", {"module": "json"})
+        assert allowed["success"] is True
+
+        denied = safety.enforce_sandbox_action("sb_import", "import", {"module": "os"})
+        assert denied["success"] is False

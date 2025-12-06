@@ -1,5 +1,7 @@
 """Personal AI assistant implementation for the XAI blockchain."""
 
+import hashlib
+import json
 import logging
 import math
 import os
@@ -8,7 +10,7 @@ import time
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Iterable, Tuple
 
 try:
     import requests
@@ -175,6 +177,9 @@ class PersonalAIAssistant:
         self.webhook_timeout = getattr(Config, "PERSONAL_AI_WEBHOOK_TIMEOUT", 5)
         self.micro_network = MicroAssistantNetwork()
         self.additional_providers = self._init_additional_providers()
+        self._cache_ttl = float(getattr(Config, "PERSONAL_AI_CACHE_TTL", 60))
+        self._cache_max_entries = int(getattr(Config, "PERSONAL_AI_CACHE_MAX_ENTRIES", 256))
+        self._response_cache: Dict[str, Dict[str, Any]] = {}
 
     @staticmethod
     def _build_empty_usage_bucket():
@@ -213,6 +218,85 @@ class PersonalAIAssistant:
             except Exception as exc:
                 print(f"Warning: failed to init {key} provider: {exc}")
         return providers
+
+    def _build_cache_key(self, provider: str, model: str, prompt: str) -> str:
+        digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+        return f"{provider}:{model}:{digest}"
+
+    def _get_cached_response(self, cache_key: str) -> Optional[Dict[str, Any]]:
+        if self._cache_ttl <= 0:
+            return None
+        entry = self._response_cache.get(cache_key)
+        if not entry:
+            return None
+        if time.time() - entry["timestamp"] > self._cache_ttl:
+            self._response_cache.pop(cache_key, None)
+            return None
+        result = dict(entry["result"])
+        result["cached"] = True
+        return result
+
+    def _store_cached_response(self, cache_key: str, result: Dict[str, Any]) -> None:
+        if self._cache_ttl <= 0 or not result.get("success"):
+            return
+        if len(self._response_cache) >= self._cache_max_entries:
+            oldest_key = min(
+                self._response_cache.items(), key=lambda item: item[1]["timestamp"]
+            )[0]
+            self._response_cache.pop(oldest_key, None)
+        self._response_cache[cache_key] = {"timestamp": time.time(), "result": dict(result)}
+
+    def _handle_ai_failure(
+        self,
+        request_id: Optional[str],
+        profile: MicroAssistantProfile,
+        ai_response: Dict[str, Any],
+        ai_provider: str,
+    ) -> Dict[str, Any]:
+        """Finalize request when AI provider is unavailable."""
+        if request_id:
+            self._finalize_request(request_id)
+        self.micro_network.record_interaction(profile, 0, satisfied=False)
+        return {
+            "success": False,
+            "error": ai_response.get("code") or "AI_PROVIDER_UNAVAILABLE",
+            "message": ai_response.get("error") or "AI provider unavailable",
+            "provider": self._normalize_provider(ai_provider),
+            "details": ai_response.get("stub_text"),
+        }
+
+    def _chunk_stream_text(self, text: str) -> Iterable[str]:
+        chunk_size = int(getattr(Config, "PERSONAL_AI_STREAM_CHUNK_SIZE", 120))
+        for i in range(0, len(text), max(1, chunk_size)):
+            yield text[i : i + chunk_size]
+
+    def _format_stream_event(self, event_type: str, payload: Dict[str, Any]) -> str:
+        body = {"type": event_type, **payload}
+        return f"data: {json.dumps(body)}\n\n"
+
+    def _stream_ai_response(
+        self,
+        ai_provider: str,
+        ai_model: str,
+        user_api_key: str,
+        prompt: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Dict[str, Any], Iterable[str]]:
+        result = self._call_ai_provider(ai_provider, ai_model, user_api_key, prompt)
+
+        def generator():
+            if not result.get("success"):
+                yield self._format_stream_event(
+                    "error", {"message": result.get("error", "AI request failed")}
+                )
+                return
+            text = result.get("text", "")
+            yield self._format_stream_event("metadata", metadata or {})
+            for chunk in self._chunk_stream_text(text):
+                yield self._format_stream_event("token", {"text": chunk})
+            yield self._format_stream_event("complete", {"text": text, "metadata": metadata or {}})
+
+        return result, generator()
 
     def _trim_usage(self, stats: Dict[str, List[float]], now: float):
         for window, window_seconds in self.RATE_WINDOW_SECONDS.items():
@@ -436,10 +520,17 @@ class PersonalAIAssistant:
         prompt: str,
     ) -> Dict[str, object]:
         provider = self._normalize_provider(ai_provider)
+        cache_key = self._build_cache_key(provider, ai_model, prompt)
+        cached = self._get_cached_response(cache_key)
+        if cached:
+            return cached
 
         additional_result = self._call_additional_provider(provider, user_api_key, prompt)
         if additional_result is not None:
-            return additional_result
+            normalized = self._normalize_ai_result(additional_result, provider)
+            if normalized.get("success"):
+                self._store_cached_response(cache_key, normalized)
+            return normalized
 
         try:
             if provider == "anthropic":
@@ -496,7 +587,35 @@ class PersonalAIAssistant:
         except Exception as exc:  # pragma: no cover - best-effort provider call
             return {"success": False, "error": str(exc)}
 
-        return {"success": True, "text": text.strip() if isinstance(text, str) else str(text)}
+        result = {"success": True, "text": text.strip() if isinstance(text, str) else str(text)}
+        normalized = self._normalize_ai_result(result, provider)
+        if normalized.get("success"):
+            self._store_cached_response(cache_key, normalized)
+        return normalized
+
+    def _generate_ai_text(
+        self,
+        *,
+        ai_provider: str,
+        ai_model: str,
+        user_api_key: str,
+        prompt: str,
+        streaming: bool = False,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        normalized = self._normalize_provider(ai_provider)
+        if streaming:
+            stream_result, stream = self._stream_ai_response(
+                normalized, ai_model, user_api_key, prompt, metadata
+            )
+            if not stream_result.get("success"):
+                return stream_result
+            return {
+                "success": True,
+                "stream": stream,
+                "metadata": metadata or {},
+            }
+        return self._call_ai_provider(normalized, ai_model, user_api_key, prompt)
 
     def _call_additional_provider(self, provider, api_key, prompt):
         normalized = self._normalize_provider(provider)
@@ -523,6 +642,41 @@ class PersonalAIAssistant:
                 "output_tokens": result.get("output_tokens"),
             },
         }
+
+    def _normalize_ai_result(self, response: Dict[str, Any], provider: str) -> Dict[str, Any]:
+        """
+        Ensure AI responses are valid; downgrade stubs/empty payloads to errors.
+        """
+        if not isinstance(response, dict):
+            return {
+                "success": False,
+                "error": "AI provider returned malformed response",
+                "code": "ai_response_invalid",
+                "provider": provider,
+            }
+
+        if not response.get("success"):
+            return response
+
+        if response.get("stub_text"):
+            return {
+                "success": False,
+                "error": response.get("error") or "AI provider unavailable",
+                "code": response.get("code") or "ai_provider_stub",
+                "provider": provider,
+                "stub_text": response.get("stub_text"),
+            }
+
+        text = response.get("text")
+        if not isinstance(text, str) or not text.strip():
+            return {
+                "success": False,
+                "error": "AI provider returned empty response",
+                "code": "ai_response_empty",
+                "provider": provider,
+            }
+
+        return response
 
     def _estimate_ai_cost(self, prompt: str) -> Dict[str, object]:
         tokens = max(150, len(prompt) // 3)
@@ -560,6 +714,7 @@ class PersonalAIAssistant:
         user_api_key: str,
         swap_details: Dict[str, object],
         assistant_name: Optional[str] = None,
+        streaming: bool = False,
     ) -> Dict[str, object]:
         profile = self._prepare_assistant(assistant_name)
         request_id, error = self._begin_request(
@@ -601,7 +756,17 @@ class PersonalAIAssistant:
             rate,
         )
         ai_cost = self._estimate_ai_cost(prompt)
-        ai_response = self._call_ai_provider(ai_provider, ai_model, user_api_key, prompt)
+        ai_response = self._generate_ai_text(
+            ai_provider=ai_provider,
+            ai_model=ai_model,
+            user_api_key=user_api_key,
+            prompt=prompt,
+            streaming=streaming,
+            metadata={"operation": "atomic_swap"},
+        )
+
+        if not ai_response.get("success"):
+            return self._handle_ai_failure(request_id, profile, ai_response, ai_provider)
 
         swap_tx = {
             "type": "atomic_swap",
@@ -629,6 +794,16 @@ class PersonalAIAssistant:
             "Keep the hash preimage private until your partner claims",
             "Transactions expire after the timeout; be ready to reissue",
         ]
+        if streaming and ai_response.get("success"):
+            def stream_generator():
+                try:
+                    for chunk in ai_response["stream"]:
+                        yield chunk
+                finally:
+                    self._finalize_request(request_id)
+                    self.micro_network.record_interaction(profile, ai_cost["tokens_used"], True)
+            return {"success": True, "stream": stream_generator()}
+
         ai_notes = (
             ai_response.get("text")
             if ai_response.get("success")
@@ -674,6 +849,8 @@ class PersonalAIAssistant:
         prompt = self._build_contract_prompt(user_address, contract_description, contract_type)
         ai_cost = self._estimate_ai_cost(prompt)
         ai_response = self._call_ai_provider(ai_provider, ai_model, user_api_key, prompt)
+        if not ai_response.get("success"):
+            return self._handle_ai_failure(request_id, profile, ai_response, ai_provider)
         generated_code = ai_response.get("text")
         if not generated_code:
             generated_code = self._generate_contract_template(contract_type, contract_description)
@@ -942,6 +1119,8 @@ class PersonalAIAssistant:
 
         ai_cost = self._estimate_ai_cost(prompt)
         ai_response = self._call_ai_provider(ai_provider, ai_model, user_api_key, prompt)
+        if not ai_response.get("success"):
+            return self._handle_ai_failure(request_id, profile, ai_response, ai_provider)
         guidance = ai_response.get("text") or (
             "Use multi-factor verification, approve via guardians, and rotate keys after recovery."
         )
@@ -991,6 +1170,8 @@ class PersonalAIAssistant:
 
         ai_cost = self._estimate_ai_cost(prompt)
         ai_response = self._call_ai_provider(ai_provider, ai_model, user_api_key, prompt)
+        if not ai_response.get("success"):
+            return self._handle_ai_failure(request_id, profile, ai_response, ai_provider)
         recommendations = ai_response.get("text") or (
             "Use resilient storage, monitor peers, and keep node software updated."
         )
@@ -1041,6 +1222,8 @@ class PersonalAIAssistant:
 
         ai_cost = self._estimate_ai_cost(prompt)
         ai_response = self._call_ai_provider(ai_provider, ai_model, user_api_key, prompt)
+        if not ai_response.get("success"):
+            return self._handle_ai_failure(request_id, profile, ai_response, ai_provider)
         alert_message = ai_response.get("text") or (
             "Monitor liquidity, stagger large trades, and rebalance LP shares."
         )
@@ -1062,6 +1245,47 @@ class PersonalAIAssistant:
         }
         result = self._attach_ai_cost(result, ai_cost)
         return self._finalize_assistant_usage(result, profile)
+
+    def stream_prompt_with_ai(
+        self,
+        user_address: str,
+        ai_provider: str,
+        ai_model: str,
+        user_api_key: str,
+        prompt: str,
+        assistant_name: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        profile = self._prepare_assistant(assistant_name)
+        request_id, error = self._begin_request(
+            user_address, ai_provider, ai_model, "stream_prompt", assistant_name=profile.name
+        )
+        if error:
+            return error
+
+        ai_cost = self._estimate_ai_cost(prompt)
+        metadata = {
+            "assistant": profile.name,
+            "tokens_planned": ai_cost.get("tokens_used"),
+            "estimated_usd": ai_cost.get("estimated_usd"),
+        }
+
+        stream_result, stream = self._stream_ai_response(
+            ai_provider, ai_model, user_api_key, prompt, metadata=metadata
+        )
+        if not stream_result.get("success"):
+            return self._handle_ai_failure(request_id, profile, stream_result, ai_provider)
+
+        def generator():
+            try:
+                for chunk in stream:
+                    yield chunk
+            finally:
+                self._finalize_request(request_id)
+                self.micro_network.record_interaction(
+                    profile, ai_cost.get("tokens_used", 0), True
+                )
+
+        return {"success": True, "stream": generator()}
 
     def list_micro_assistants(self) -> Dict[str, object]:
         """Expose the available micro-assistants and their aggregated metrics."""

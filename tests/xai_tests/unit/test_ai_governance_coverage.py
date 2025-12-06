@@ -359,6 +359,51 @@ class TestAIWorkloadDistribution:
         assert workload.contributor_pool["alice"]["quality_score"] == 1.0
         assert workload.contributor_pool["alice"]["tasks_completed"] == 0
 
+    def test_record_task_feedback_updates_quality(self):
+        """High-quality execution should boost quality score and track tasks."""
+        workload = AIWorkloadDistribution()
+        workload.add_contributor("alice", "claude-sonnet-4", 120, time.time())
+
+        previous = workload.contributor_pool["alice"]["quality_score"]
+        updated = workload.record_task_feedback(
+            "alice",
+            planned_minutes=60,
+            actual_minutes=45,
+            satisfaction_score=0.95,
+            incidents=0,
+        )
+
+        assert updated > previous
+        assert workload.contributor_pool["alice"]["tasks_completed"] == 1
+        assert workload.contributor_pool["alice"]["last_feedback"]["incidents"] == 0
+
+    def test_record_task_feedback_penalizes_incidents(self):
+        """Repeated incidents and breaches should reduce quality score."""
+        workload = AIWorkloadDistribution()
+        workload.add_contributor("alice", "claude-sonnet-4", 200, time.time())
+
+        # Establish baseline with a good run
+        workload.record_task_feedback(
+            "alice",
+            planned_minutes=30,
+            actual_minutes=25,
+            satisfaction_score=0.9,
+        )
+        good_score = workload.contributor_pool["alice"]["quality_score"]
+
+        degraded = workload.record_task_feedback(
+            "alice",
+            planned_minutes=30,
+            actual_minutes=80,
+            satisfaction_score=0.2,
+            incidents=3,
+            breach_detected=True,
+        )
+
+        assert degraded < good_score
+        assert workload.contributor_pool["alice"]["tasks_completed"] == 2
+        assert workload.contributor_pool["alice"]["quality_score"] == degraded
+
     def test_calculate_workload_shares_single(self):
         """Test workload shares with single contributor."""
         workload = AIWorkloadDistribution()
@@ -384,6 +429,62 @@ class TestAIWorkloadDistribution:
         assert abs(shares["alice"]["minutes_assigned"] - 20) < 0.01
         assert abs(shares["bob"]["minutes_assigned"] - 10) < 0.01
         assert abs(shares["alice"]["share_percentage"] - 66.67) < 0.01
+
+    def test_calculate_workload_shares_consider_quality(self):
+        """Quality scores should weight the workload allocation."""
+        workload = AIWorkloadDistribution()
+        now = time.time()
+        workload.add_contributor("alice", "claude-sonnet-4", 100, now)
+        workload.add_contributor("bob", "gpt-4", 100, now)
+
+        workload.record_task_feedback(
+            "alice",
+            planned_minutes=40,
+            actual_minutes=30,
+            satisfaction_score=1.0,
+        )
+        workload.record_task_feedback(
+            "bob",
+            planned_minutes=40,
+            actual_minutes=80,
+            satisfaction_score=0.3,
+            incidents=2,
+        )
+        shares = workload.calculate_workload_shares(60)
+
+        assert shares["alice"]["minutes_assigned"] > shares["bob"]["minutes_assigned"]
+        assert shares["alice"]["quality_weight"] >= shares["bob"]["quality_weight"]
+        assert shares["alice"]["effective_minutes"] > shares["bob"]["effective_minutes"]
+
+    def test_apply_execution_feedback_updates_multiple_contributors(self):
+        """Batch feedback updates quality metrics and returns new scores."""
+        workload = AIWorkloadDistribution()
+        now = time.time()
+        workload.add_contributor("alice", "claude-sonnet-4", 80, now)
+        workload.add_contributor("bob", "gpt-4", 80, now)
+
+        updates = workload.apply_execution_feedback(
+            [
+                {
+                    "address": "alice",
+                    "planned_minutes": 30,
+                    "actual_minutes": 20,
+                    "satisfaction_score": 0.95,
+                },
+                {
+                    "address": "bob",
+                    "planned_minutes": 30,
+                    "actual_minutes": 40,
+                    "satisfaction_score": 0.4,
+                    "incidents": 1,
+                },
+            ]
+        )
+
+        assert set(updates.keys()) == {"alice", "bob"}
+        assert updates["alice"] > updates["bob"]
+        assert workload.contributor_pool["alice"]["tasks_completed"] == 1
+        assert workload.contributor_pool["bob"]["tasks_completed"] == 1
 
     def test_calculate_workload_shares_empty_pool(self):
         """Test workload shares with empty contributor pool."""
@@ -969,6 +1070,115 @@ class TestAIGovernance:
 
         assert result is False  # Double voting prevented
 
+    def test_fraud_detection_identity_cluster(self):
+        """Multiple votes from same subnet should trigger identity cluster alert."""
+        gov = AIGovernance()
+        proposal_id = gov.create_proposal("alice", "Fraud Test", "Desc", "ai_improvement")
+
+        for idx in range(3):
+            gov.cast_vote(
+                proposal_id,
+                f"sybil_{idx}",
+                "yes",
+                6.0,
+                metadata={
+                    "ip_address": f"10.77.5.{idx}",
+                    "device_fingerprint": "fp-shared",
+                    "account_age_days": 0.5,
+                },
+            )
+
+        alerts = gov.get_fraud_alerts(proposal_id)
+        assert any(alert["type"] == "identity_cluster" for alert in alerts)
+        cluster_alert = next(alert for alert in alerts if alert["type"] == "identity_cluster")
+        assert "ip_subnet" in cluster_alert["cluster"]["dimension"]
+        assert len(cluster_alert["unique_voters"]) == 3
+
+    def test_fraud_detection_new_account_swarm(self):
+        """Coordinated newly created accounts should trigger swarm alert."""
+        gov = AIGovernance()
+        proposal_id = gov.create_proposal("alice", "Fraud Test 2", "Desc", "ai_improvement")
+
+        for idx in range(5):
+            gov.cast_vote(
+                proposal_id,
+                f"newbie_{idx}",
+                "yes",
+                5.0,
+                metadata={
+                    "ip_address": f"172.16.{idx}.10",
+                    "account_age_days": 0.2,
+                    "wallet_cluster": "cluster-newbies",
+                },
+            )
+
+        alerts = gov.get_fraud_alerts(proposal_id)
+        assert any(alert["type"] == "new_account_suspicion" for alert in alerts)
+        swarm_alert = next(alert for alert in alerts if alert["type"] == "new_account_suspicion")
+        assert len(swarm_alert["unique_voters"]) >= 5
+        assert swarm_alert["total_voting_power"] >= 25
+
+    def test_fraud_detection_burst_activity(self):
+        """Rapid bursts of voting activity should be detected."""
+        gov = AIGovernance()
+        proposal_id = gov.create_proposal("alice", "Burst Test", "Desc", "ai_improvement")
+
+        for idx in range(6):
+            gov.cast_vote(
+                proposal_id,
+                f"burst_{idx}",
+                "yes",
+                5.0,
+                metadata={"account_age_days": 10},
+            )
+
+        alerts = gov.get_fraud_alerts(proposal_id)
+        assert any(alert["type"] == "burst_activity" for alert in alerts)
+        burst = next(alert for alert in alerts if alert["type"] == "burst_activity")
+        assert burst["votes_in_window"] >= 6
+
+    def test_fraud_detection_power_anomaly(self):
+        """Shared metadata controlling majority of power triggers alert."""
+        gov = AIGovernance()
+        proposal_id = gov.create_proposal("alice", "Power Test", "Desc", "ai_improvement")
+
+        for idx in range(4):
+            gov.cast_vote(
+                proposal_id,
+                f"cluster_{idx}",
+                "yes",
+                30.0,
+                metadata={"wallet_cluster": "cluster-a"},
+            )
+
+        gov.cast_vote(proposal_id, "other1", "no", 5.0, metadata={"wallet_cluster": "solo"})
+        gov.cast_vote(proposal_id, "other2", "no", 5.0, metadata={"wallet_cluster": "solo"})
+
+        alerts = gov.get_fraud_alerts(proposal_id)
+        assert any(alert["type"] == "power_anomaly" for alert in alerts)
+        power_alert = next(alert for alert in alerts if alert["type"] == "power_anomaly")
+        assert power_alert["share_of_total"] >= 65.0
+
+    def test_sybil_risk_report(self):
+        """Sybil risk report aggregates alerts into a normalized score."""
+        gov = AIGovernance()
+        proposal_id = gov.create_proposal("alice", "Sybil Test", "Desc", "ai_improvement")
+        for idx in range(6):
+            gov.cast_vote(
+                proposal_id,
+                f"sybil_{idx}",
+                "yes",
+                5.0,
+                metadata={
+                    "ip_address": f"10.0.0.{idx}",
+                    "wallet_cluster": "cluster-x",
+                    "account_age_days": 0.5,
+                },
+            )
+        report = gov.get_sybil_report(proposal_id)
+        assert report["risk_score"] > 0
+        assert report["alert_count"] >= 1
+
     def test_calculate_quadratic_power(self):
         """Test quadratic power calculation."""
         gov = AIGovernance()
@@ -1055,6 +1265,70 @@ class TestAIGovernance:
 
         assert result["status"] == "executed"
         assert result["executed"] is True
+
+    def test_execute_proposal_records_history_and_workload(self):
+        """Execution attempts should append structured history with workload plans."""
+        gov = AIGovernance()
+        gov.parameters["timelock_days"] = 0
+        gov.register_ai_contribution("alice", "claude-sonnet-4", 120, time.time())
+        proposal_id = gov.create_proposal(
+            "alice",
+            "AI Test",
+            "Improve AI system",
+            "ai_improvement",
+            estimated_minutes=25,
+        )
+        gov.cast_vote(proposal_id, "bob", "yes", 25.0)
+        gov.cast_vote(proposal_id, "carol", "yes", 25.0)
+
+        result = gov.execute_proposal(proposal_id)
+
+        assert result["status"] == "executed"
+        assert "workload_plan" in result
+        history = gov.proposals[proposal_id]["execution_history"]
+        assert history and history[-1]["result"] == "executed"
+        assert history[-1]["workload_plan"] == result["workload_plan"]
+
+    def test_record_execution_feedback_updates_quality(self):
+        """Feedback should adjust contributor quality and annotate execution history."""
+        gov = AIGovernance()
+        gov.parameters["timelock_days"] = 0
+        now = time.time()
+        gov.register_ai_contribution("alice", "claude-sonnet-4", 100, now)
+        gov.register_ai_contribution("bob", "gpt-4", 100, now)
+        proposal_id = gov.create_proposal(
+            "alice",
+            "AI Ops",
+            "Improve ops AI",
+            "ai_improvement",
+            estimated_minutes=40,
+        )
+        gov.cast_vote(proposal_id, "bob", "yes", 40.0)
+        gov.cast_vote(proposal_id, "carol", "yes", 15.0)
+        gov.execute_proposal(proposal_id)
+
+        feedback = [
+            {
+                "address": "alice",
+                "planned_minutes": 20,
+                "actual_minutes": 18,
+                "satisfaction_score": 0.9,
+            },
+            {
+                "address": "bob",
+                "planned_minutes": 20,
+                "actual_minutes": 28,
+                "satisfaction_score": 0.5,
+                "incidents": 1,
+            },
+        ]
+        response = gov.record_execution_feedback(proposal_id, feedback)
+
+        assert response["success"] is True
+        assert set(response["quality_updates"]) == {"alice", "bob"}
+        history = gov.proposals[proposal_id]["execution_history"]
+        assert "quality_updates" in history[-1]
+        assert history[-1]["quality_updates"]["alice"] > history[-1]["quality_updates"]["bob"]
 
     def test_execute_proposal_failed_vote(self):
         """Test executing proposal that failed vote."""

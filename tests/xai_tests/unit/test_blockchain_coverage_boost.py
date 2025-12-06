@@ -256,6 +256,20 @@ class TestGetTransactionHistory:
             assert len(history1) > 0
             assert len(history2) > 0
 
+    def test_transaction_history_window_paginates(self, tmp_path):
+        """Ensure get_transaction_history_window enforces limit/offset without materializing full list."""
+        bc = Blockchain(data_dir=str(tmp_path))
+        wallet = Wallet()
+
+        for _ in range(3):
+            bc.mine_pending_transactions(wallet.address)
+
+        window, total = bc.get_transaction_history_window(wallet.address, limit=1, offset=1)
+
+        assert total >= 3
+        assert len(window) == 1
+        assert window[0]["block_index"] >= 0
+
 
 class TestGovernanceProposals:
     """Test governance proposal submission and voting"""

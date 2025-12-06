@@ -49,11 +49,15 @@ dependencies = [
     "base58>=2.1.0",
     "mnemonic>=0.21",
     "bip-utils>=2.8.0",
+    "qrcode[pil]>=7.4",
+    "pyotp>=2.9.0",
     "PyJWT>=2.9.0",
     "flask-sock>=0.7.0",
     "py-ecc>=8.0.0",
     "pqcrypto==0.3.4",
     "gmpy2>=2.2.0",
+    "click>=8.1.0", # For enhanced CLI
+    "rich>=13.7.0", # For beautiful terminal output
 ]
 
 [project.optional-dependencies]

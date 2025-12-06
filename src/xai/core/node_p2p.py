@@ -15,13 +15,13 @@ import os
 import threading
 import time
 from urllib.parse import urlparse
+from collections import defaultdict, deque
 import websockets
 from websockets.exceptions import ConnectionClosed, WebSocketException
 from websockets.server import WebSocketServerProtocol
 import json
 import hashlib
 import logging
-from collections import deque
 from typing import TYPE_CHECKING, Set, Optional, Dict, Any, Union, Tuple
 
 logger = logging.getLogger(__name__)
@@ -68,6 +68,7 @@ class P2PNetworkManager:
         max_connections: int = 50,
         max_bandwidth_in: int = 1024 * 1024, # 1 MB/s
         max_bandwidth_out: int = 1024 * 1024, # 1 MB/s
+        peer_api_key: Optional[str] = None,
     ) -> None:
         self.blockchain = blockchain
         storage_ref = getattr(self.blockchain, "storage", None)
@@ -108,6 +109,10 @@ class P2PNetworkManager:
         self.security_log_limiter = MessageRateLimiter(max_rate=security_log_rate)
         self.bandwidth_limiter_in = BandwidthLimiter(max_bandwidth_in, max_bandwidth_in // 10)
         self.bandwidth_limiter_out = BandwidthLimiter(max_bandwidth_out, max_bandwidth_out // 10)
+        global_in = int(getattr(Config, "P2P_GLOBAL_BANDWIDTH_IN", 0))
+        global_out = int(getattr(Config, "P2P_GLOBAL_BANDWIDTH_OUT", 0))
+        self.global_bandwidth_in = BandwidthLimiter(global_in, max(1, global_in // 10)) if global_in > 0 else None
+        self.global_bandwidth_out = BandwidthLimiter(global_out, max(1, global_out // 10)) if global_out > 0 else None
         self.received_chains = []
         self._quic_server: Optional[QUICServer] = None
         self._dedup_max_items = max(100, int(getattr(Config, "P2P_DEDUP_MAX_ITEMS", 5000)))
@@ -116,6 +121,14 @@ class P2PNetworkManager:
         self._tx_seen_queue: deque[Tuple[str, float]] = deque()
         self._block_seen_ids: Set[str] = set()
         self._block_seen_queue: deque[Tuple[str, float]] = deque()
+        self.idle_timeout_seconds = max(60, int(getattr(Config, "P2P_CONNECTION_IDLE_TIMEOUT_SECONDS", 900)))
+        self._connection_last_seen: Dict[str, float] = {}
+        self.peer_api_key = peer_api_key
+        self._http_timeout = getattr(Config, "P2P_HTTP_TIMEOUT_SECONDS", 2)
+        self._reset_window_seconds = int(getattr(Config, "P2P_RESET_STORM_WINDOW_SECONDS", 300))
+        self._reset_threshold = max(1, int(getattr(Config, "P2P_RESET_STORM_THRESHOLD", 5)))
+        self._reset_events: Dict[str, deque[float]] = defaultdict(deque)
+        self.peer_features: Dict[str, Dict[str, Any]] = {}
 
     @staticmethod
     def _normalize_peer_uri(peer_uri: str) -> str:
@@ -174,6 +187,12 @@ class P2PNetworkManager:
 
     def add_peer(self, peer_uri: str) -> bool:
         """Register a peer URI for HTTP/WebSocket communication."""
+        if not peer_uri:
+            with self._peer_lock:
+                if peer_uri in self.http_peers:
+                    return False
+                self.http_peers.add(peer_uri)
+            return True
         normalized = self._normalize_peer_uri(peer_uri)
         host = urlparse(normalized).hostname
         with self._peer_lock:
@@ -279,6 +298,8 @@ class P2PNetworkManager:
                 self.quic_enabled = False
         asyncio.create_task(self._connect_to_peers())
         asyncio.create_task(self._health_check())
+        asyncio.create_task(self._broadcast_handshake_periodically())
+        asyncio.create_task(self._broadcast_handshake_periodically())
 
     async def stop(self) -> None:
         """Stops the P2P network manager."""
@@ -288,9 +309,23 @@ class P2PNetworkManager:
         for conn in self.connections.values():
             await conn.close()
         self.connections.clear()
+        self._connection_last_seen.clear()
         if self._quic_server:
             await self._quic_server.close()
         logger.info("P2P server stopped", extra={"event": "p2p.server_stopped"})
+
+    async def _send_handshake(self, websocket: Any, peer_id: str) -> None:
+        """Send protocol version/capabilities handshake to a peer."""
+        handshake_payload = {
+            "type": "handshake",
+            "payload": {
+                "version": getattr(P2PSecurityConfig, "PROTOCOL_VERSION", "1"),
+                "features": list(getattr(P2PSecurityConfig, "SUPPORTED_FEATURES", set())),
+                "node_id": self.peer_manager.encryption._node_identity_fingerprint(),  # noqa: SLF001
+                "height": len(self.blockchain.chain),
+            },
+        }
+        await self._send_signed_message(websocket, peer_id, handshake_payload)
 
     async def _handler(self, websocket: Any, path: str) -> None:
         """Handles incoming WebSocket connections."""
@@ -322,6 +357,8 @@ class P2PNetworkManager:
         peer_id = self.peer_manager.connect_peer(remote_ip)
         self.connections[peer_id] = websocket
         self.websocket_peer_ids[websocket] = peer_id
+        self._connection_last_seen[peer_id] = time.time()
+        await self._send_handshake(websocket, peer_id)
         logger.info(
             "Peer connected: %s",
             remote_ip,
@@ -332,6 +369,7 @@ class P2PNetworkManager:
             async for message in websocket:
                 await self._handle_message(websocket, message)
         except ConnectionClosed as exc:
+            self._record_connection_reset_event(peer_id, reason=str(exc))
             logger.debug(
                 "Connection to peer %s closed: %s",
                 remote_ip,
@@ -343,12 +381,51 @@ class P2PNetworkManager:
                 conn = self.connections.pop(peer_id, None)
                 if conn:
                     self.websocket_peer_ids.pop(conn, None)
+                self._connection_last_seen.pop(peer_id, None)
                 self.peer_manager.disconnect_peer(peer_id)
             logger.info(
                 "Peer disconnected: %s",
                 remote_ip,
                 extra={"event": "p2p.peer_disconnected", "peer": peer_id}
             )
+
+    def _record_connection_reset_event(self, peer_id: str, *, reason: Optional[str] = None, now: Optional[float] = None) -> None:
+        """
+        Track connection reset/disconnect storms and ban peers that repeatedly reset
+        connections within a short time window to mitigate connection reset floods.
+        """
+        now_ts = now if now is not None else time.time()
+        dq = self._reset_events[peer_id]
+        dq.append(now_ts)
+        cutoff = now_ts - self._reset_window_seconds
+        while dq and dq[0] < cutoff:
+            dq.popleft()
+        if len(dq) >= self._reset_threshold:
+            logger.warning(
+                "Peer %s triggering connection reset storm (count=%d within %ds) - banning",
+                peer_id[:16],
+                len(dq),
+                self._reset_window_seconds,
+                extra={
+                    "event": "p2p.connection_reset_storm",
+                    "peer": peer_id,
+                    "count": len(dq),
+                    "window_seconds": self._reset_window_seconds,
+                    "reason": reason or "reset_storm",
+                },
+            )
+            self.peer_manager.ban_peer(peer_id)
+            self._emit_security_event(
+                "p2p.connection_reset_storm",
+                severity="WARNING",
+                payload={
+                    "peer": peer_id,
+                    "count": len(dq),
+                    "window_seconds": self._reset_window_seconds,
+                    "reason": reason or "reset_storm",
+                },
+            )
+            dq.clear()
 
     async def _connect_to_peers(self) -> None:
         """Connects to the initial set of peers with backoff/retry."""
@@ -375,11 +452,13 @@ class P2PNetworkManager:
                 peer_id = self.peer_manager.connect_peer(websocket.remote_address[0])
                 self.connections[peer_id] = websocket
                 self.websocket_peer_ids[websocket] = peer_id
+                self._connection_last_seen[peer_id] = time.time()
                 logger.info(
                     "Connected to peer: %s",
                     peer_uri,
                     extra={"event": "p2p.outbound_connected", "peer": peer_uri}
                 )
+                await self._send_handshake(websocket, peer_id)
                 return
             except (WebSocketException, OSError, ConnectionError, asyncio.TimeoutError, ValueError) as e:
                 logger.debug(
@@ -413,6 +492,79 @@ class P2PNetworkManager:
                 "Health check: %d peers connected",
                 self.get_peer_count(),
                 extra={"event": "p2p.health_check"}
+            )
+            await self._disconnect_idle_connections()
+
+    async def _broadcast_handshake_periodically(self) -> None:
+        """Re-announce capabilities/version periodically to connected peers."""
+        interval = int(getattr(Config, "P2P_HANDSHAKE_INTERVAL_SECONDS", 900))
+        while True:
+            await asyncio.sleep(interval)
+            for peer_id, conn in list(self.connections.items()):
+                try:
+                    await self._send_handshake(conn, peer_id)
+                except Exception as exc:  # pragma: no cover - defensive logging
+                    logger.debug(
+                        "Failed to send periodic handshake to %s: %s",
+                        peer_id[:16],
+                        exc,
+                        extra={"event": "p2p.handshake_send_failed", "peer": peer_id},
+                    )
+
+    async def _disconnect_idle_connections(self) -> None:
+        """Close peers that have been idle beyond the configured timeout."""
+        if self.idle_timeout_seconds <= 0:
+            return
+        now = time.time()
+        cutoff = now - self.idle_timeout_seconds
+        for peer_id, last_seen in list(self._connection_last_seen.items()):
+            if last_seen >= cutoff:
+                continue
+            conn = self.connections.get(peer_id)
+            idle_duration = now - last_seen
+            if not conn:
+                self._connection_last_seen.pop(peer_id, None)
+                continue
+            logger.warning(
+                "Disconnecting idle peer %s after %.0fs of inactivity",
+                peer_id[:16],
+                idle_duration,
+                extra={"event": "p2p.idle_disconnect", "peer": peer_id, "idle_seconds": int(idle_duration)},
+            )
+            try:
+                await conn.close()
+            except Exception as exc:
+                logger.debug(
+                    "Error closing idle connection for %s: %s",
+                    peer_id[:16],
+                    exc,
+                    extra={"event": "p2p.idle_disconnect_error", "peer": peer_id},
+                )
+            self.connections.pop(peer_id, None)
+            self.websocket_peer_ids.pop(conn, None)
+            self._connection_last_seen.pop(peer_id, None)
+            self.peer_manager.disconnect_peer(peer_id)
+            self._emit_security_event(
+                "p2p.idle_disconnect",
+                severity="INFO",
+                payload={"peer": peer_id, "idle_seconds": int(idle_duration)},
+            )
+
+    def _disconnect_peer(self, peer_id: str, conn: Optional[Any]) -> None:
+        """Centralized cleanup for peer disconnections without duplicating dict removals."""
+        if peer_id in self.connections:
+            self.connections.pop(peer_id, None)
+        if conn:
+            self.websocket_peer_ids.pop(conn, None)
+        self._connection_last_seen.pop(peer_id, None)
+        try:
+            self.peer_manager.disconnect_peer(peer_id)
+        except Exception as exc:
+            logger.debug(
+                "Error disconnecting peer %s: %s",
+                peer_id[:16],
+                exc,
+                extra={"event": "p2p.disconnect_cleanup_failed", "peer": peer_id},
             )
 
     def _emit_security_event(
@@ -475,8 +627,19 @@ class P2PNetworkManager:
         fallback_peer = remote_addr[0] if isinstance(remote_addr, (tuple, list)) and remote_addr else str(remote_addr)
         peer_id = self.websocket_peer_ids.get(websocket, fallback_peer)
         raw_bytes = message if isinstance(message, (bytes, bytearray)) else message.encode("utf-8")
+        now = time.time()
+        if peer_id in self._connection_last_seen:
+            self._connection_last_seen[peer_id] = now
         
         message_size = len(raw_bytes)
+        if self.global_bandwidth_in and not self.global_bandwidth_in.consume("global", message_size):
+            logger.warning(
+                "Global inbound bandwidth exceeded, closing connection",
+                extra={"event": "p2p.global_bandwidth_exceeded_in", "peer": peer_id},
+            )
+            await websocket.close()
+            self._disconnect_peer(peer_id, websocket)
+            return
         if not self.bandwidth_limiter_in.consume(peer_id, message_size):
             logger.warning(
                 "Peer %s exceeding incoming bandwidth, disconnecting",
@@ -488,6 +651,7 @@ class P2PNetworkManager:
                 conn = self.connections.pop(peer_id, None)
                 if conn:
                     self.websocket_peer_ids.pop(conn, None)
+                self._connection_last_seen.pop(peer_id, None)
                 self.peer_manager.disconnect_peer(peer_id)
             return
 
@@ -549,6 +713,9 @@ class P2PNetworkManager:
             message_type = data.get("type")
             payload = data.get("payload")
 
+            if message_type == "handshake":
+                self.peer_features[peer_id] = payload or {}
+                return
             if message_type == "transaction":
                 dedup_id = self._derive_payload_fingerprint(payload, ("txid", "hash", "id"))
                 if self._is_duplicate_message("transaction", dedup_id):
@@ -603,6 +770,20 @@ class P2PNetworkManager:
                 )
             elif message_type == "peers":
                 self.peer_manager.discovery.exchange_peers(payload)
+            elif message_type == "get_checkpoint":
+                metadata = self._get_checkpoint_metadata()
+                await self._send_signed_message(
+                    websocket,
+                    peer_id,
+                    {"type": "checkpoint", "payload": metadata},
+                )
+            elif message_type == "checkpoint":
+                self.peer_features[peer_id] = self.peer_features.get(peer_id, {})
+                self.peer_features[peer_id]["checkpoint"] = payload
+            elif message_type == "inv":
+                await self._handle_inventory_announcement(websocket, peer_id, payload)
+            elif message_type == "getdata":
+                await self._handle_getdata_request(websocket, peer_id, payload)
             elif message_type == "ping":
                 await self._send_signed_message(websocket, peer_id, {"type": "pong"})
             elif message_type == "pong":
@@ -629,6 +810,60 @@ class P2PNetworkManager:
                 extra={"event": "p2p.message_handling_error", "peer": peer_id}
             )
             self.peer_manager.reputation.record_invalid_transaction(peer_id)
+
+    async def _handle_inventory_announcement(
+        self,
+        websocket: Optional[WebSocketServerProtocol],
+        peer_id: str,
+        payload: Optional[Dict[str, Any]],
+    ) -> None:
+        if not websocket:
+            return
+        payload = payload or {}
+        tx_ids = payload.get("transactions") or []
+        block_hashes = payload.get("blocks") or []
+        missing_txs = [txid for txid in tx_ids if not self._has_transaction(txid)]
+        missing_blocks = [block_hash for block_hash in block_hashes if not self._has_block(block_hash)]
+        if not missing_txs and not missing_blocks:
+            return
+        request_payload: Dict[str, List[str]] = {}
+        if missing_txs:
+            request_payload["transactions"] = missing_txs
+        if missing_blocks:
+            request_payload["blocks"] = missing_blocks
+        await self._send_signed_message(
+            websocket,
+            peer_id,
+            {"type": "getdata", "payload": request_payload},
+        )
+
+    async def _handle_getdata_request(
+        self,
+        websocket: Optional[WebSocketServerProtocol],
+        peer_id: str,
+        payload: Optional[Dict[str, Any]],
+    ) -> None:
+        if not websocket:
+            return
+        payload = payload or {}
+        for txid in payload.get("transactions") or []:
+            tx = self._find_pending_transaction(txid)
+            if not tx:
+                continue
+            await self._send_signed_message(
+                websocket,
+                peer_id,
+                {"type": "transaction", "payload": tx.to_dict()},
+            )
+        for block_hash in payload.get("blocks") or []:
+            block = self.blockchain.get_block_by_hash(block_hash)
+            if not block:
+                continue
+            await self._send_signed_message(
+                websocket,
+                peer_id,
+                {"type": "block", "payload": block.to_dict()},
+            )
 
     async def _send_signed_message(
         self,
@@ -657,10 +892,15 @@ class P2PNetworkManager:
             )
             await websocket.close()
             if peer_id in self.connections:
-                conn = self.connections.pop(peer_id, None)
-                if conn:
-                    self.websocket_peer_ids.pop(conn, None)
-                self.peer_manager.disconnect_peer(peer_id)
+                self._disconnect_peer(peer_id, self.connections.get(peer_id))
+            return
+        if self.global_bandwidth_out and not self.global_bandwidth_out.consume("global", message_size):
+            logger.warning(
+                "Global outbound bandwidth exceeded, closing connection",
+                extra={"event": "p2p.global_bandwidth_exceeded_out", "peer": peer_id},
+            )
+            await websocket.close()
+            self._disconnect_peer(peer_id, websocket)
             return
 
         try:
@@ -695,6 +935,12 @@ class P2PNetworkManager:
 
         message_size = len(signed_message)
         message_str = signed_message.decode("utf-8")
+        if self.global_bandwidth_out and not self.global_bandwidth_out.consume("global", message_size * len(self.connections)):
+            logger.warning(
+                "Global outbound bandwidth exceeded during broadcast; skipping message",
+                extra={"event": "p2p.broadcast_global_bandwidth_exceeded"}
+            )
+            return
         
         for peer_id, conn in list(self.connections.items()):
             if not self.bandwidth_limiter_out.consume(peer_id, message_size):
@@ -733,6 +979,28 @@ class P2PNetworkManager:
             loop.create_task(coro)
         except RuntimeError:
             asyncio.run(coro)
+
+    def _get_checkpoint_metadata(self) -> Optional[Dict[str, Any]]:
+        """Return latest checkpoint metadata for partial sync."""
+        cm = getattr(self.blockchain, "checkpoint_manager", None)
+        if not cm:
+            return None
+        checkpoint = cm.load_latest_checkpoint()
+        if not checkpoint:
+            height = getattr(cm, "latest_checkpoint_height", None)
+            if height is None:
+                return None
+            try:
+                checkpoint = cm.load_checkpoint(height)
+            except Exception:
+                return None
+        if not checkpoint:
+            return None
+        return {
+            "height": getattr(checkpoint, "height", None),
+            "block_hash": getattr(checkpoint, "block_hash", None),
+            "timestamp": getattr(checkpoint, "timestamp", None),
+        }
 
     def _derive_payload_fingerprint(self, payload: Any, candidate_fields: Tuple[str, ...]) -> Optional[str]:
         """Return a stable fingerprint for deduplication."""
@@ -791,8 +1059,83 @@ class P2PNetworkManager:
             return self._block_seen_ids, self._block_seen_queue
         return None, None
 
+    def _peer_headers(self) -> Optional[Dict[str, str]]:
+        if not self.peer_api_key:
+            return None
+        return {"X-API-Key": self.peer_api_key}
+
+    def _announce_inventory(
+        self,
+        *,
+        transactions: Optional[List[str]] = None,
+        blocks: Optional[List[str]] = None,
+    ) -> None:
+        payload: Dict[str, List[str]] = {}
+        if transactions:
+            payload["transactions"] = [txid for txid in transactions if txid]
+        if blocks:
+            payload["blocks"] = [block_hash for block_hash in blocks if block_hash]
+        if not payload:
+            return
+        message = {"type": "inv", "payload": payload}
+        self._dispatch_async(self.broadcast(message))
+
+    def _has_transaction(self, txid: Optional[str]) -> bool:
+        if not txid:
+            return False
+        if txid in getattr(self.blockchain, "seen_txids", set()):
+            return True
+        pending = getattr(self.blockchain, "pending_transactions", []) or []
+        return any(getattr(tx, "txid", None) == txid for tx in pending)
+
+    def _find_pending_transaction(self, txid: Optional[str]):
+        if not txid:
+            return None
+        for tx in getattr(self.blockchain, "pending_transactions", []) or []:
+            if getattr(tx, "txid", None) == txid:
+                return tx
+        return None
+
+    def _has_block(self, block_hash: Optional[str]) -> bool:
+        if not block_hash:
+            return False
+        lookup = getattr(self.blockchain, "get_block_by_hash", None)
+        if callable(lookup):
+            return lookup(block_hash) is not None
+        # Fallback: scan chain if helper missing
+        for block in getattr(self.blockchain, "chain", []) or []:
+            candidate = getattr(block, "hash", None)
+            if candidate == block_hash:
+                return True
+        return False
+
+    def _normalize_remote_header(self, header_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """Fill missing header fields with safe defaults for sync fallback paths."""
+        defaults = {
+            "previous_hash": "0" * 64,
+            "timestamp": time.time(),
+            "merkle_root": "",
+            "nonce": 0,
+            "difficulty": getattr(self.blockchain, "difficulty", 1),
+            "miner_pubkey": None,
+            "signature": None,
+            "version": getattr(Config, "BLOCK_HEADER_VERSION", 1),
+        }
+        normalized = defaults.copy()
+        normalized.update({k: v for k, v in header_dict.items() if v is not None})
+        normalized["index"] = header_dict.get("index", len(self.blockchain.chain))
+        if "hash" in header_dict:
+            normalized["hash"] = header_dict["hash"]
+        return normalized
+
     async def _handle_quic_payload(self, data: bytes) -> None:
         """Handle incoming QUIC payloads by reusing the websocket message handler."""
+        if self.global_bandwidth_in and not self.global_bandwidth_in.consume("global", len(data)):
+            logger.warning(
+                "Dropping QUIC payload due to global inbound bandwidth cap",
+                extra={"event": "p2p.quic_global_bandwidth_exceeded"},
+            )
+            return
         try:
             await self._handle_message(None, data)
         except (json.JSONDecodeError, TypeError, ValueError) as e:
@@ -802,6 +1145,12 @@ class P2PNetworkManager:
 
     async def _quic_send_payload(self, host: str, payload: bytes) -> None:
         """Send QUIC payload with bounded timeout and metrics on failure."""
+        if self.global_bandwidth_out and not self.global_bandwidth_out.consume("global", len(payload)):
+            logger.warning(
+                "Skipping QUIC send due to global outbound bandwidth cap",
+                extra={"event": "p2p.quic_global_bandwidth_exceeded_out", "peer": host},
+            )
+            return
         try:
             quic_config = QuicConfiguration(is_client=True, alpn_protocols=["xai-p2p"])
             await quic_client_send_with_timeout(
@@ -816,20 +1165,28 @@ class P2PNetworkManager:
 
     def broadcast_transaction(self, transaction: "Transaction") -> None:
         """Broadcast a transaction to all connected peers."""
+        payload = transaction.to_dict()
         message = {
             "type": "transaction",
-            "payload": transaction.to_dict(),
+            "payload": payload,
         }
-        payload = transaction.to_dict()
+        txid = payload.get("txid")
+        if txid:
+            self._announce_inventory(transactions=[txid])
         for peer_uri in self._http_peers_snapshot():
-            endpoint = f"{peer_uri.rstrip('/')}/transaction"
+            endpoint = f"{peer_uri.rstrip('/')}/transaction/receive"
             try:
-                response = requests.post(endpoint, json=payload, timeout=5)
+                response = requests.post(
+                    endpoint,
+                    json=payload,
+                    headers=self._peer_headers(),
+                    timeout=self._http_timeout,
+                )
                 if response.status_code >= 400:
                     self.peer_manager.reputation.record_invalid_transaction(peer_uri)
                 else:
                     self.peer_manager.reputation.record_valid_transaction(peer_uri)
-            except (requests.RequestException, ConnectionError, TimeoutError) as e:
+            except Exception as e:
                 # Network error broadcasting transaction - record reputation penalty
                 logger.debug(f"Failed to broadcast transaction to {peer_uri}: {e}")
                 self.peer_manager.reputation.record_invalid_transaction(peer_uri)
@@ -844,15 +1201,24 @@ class P2PNetworkManager:
 
     def broadcast_block(self, block: "Block") -> None:
         """Broadcast a newly mined block to all connected peers."""
+        payload = block.to_dict()
         message = {
             "type": "block",
-            "payload": block.to_dict(),
+            "payload": payload,
         }
+        block_hash = payload.get("hash") or payload.get("block_hash")
+        if block_hash:
+            self._announce_inventory(blocks=[block_hash])
         for peer_uri in self._http_peers_snapshot():
             endpoint = f"{peer_uri.rstrip('/')}/block/receive"
             try:
-                requests.post(endpoint, json=message["payload"], timeout=5)
-            except (requests.RequestException, ConnectionError, TimeoutError) as e:
+                requests.post(
+                    endpoint,
+                    json=message["payload"],
+                    headers=self._peer_headers(),
+                    timeout=self._http_timeout,
+                )
+            except Exception as e:
                 # Network error broadcasting block - peer may be down, continue to others
                 logger.debug(f"Failed to broadcast block to {peer_uri}: {e}")
         self._dispatch_async(self.broadcast(message))
@@ -869,7 +1235,7 @@ class P2PNetworkManager:
         for peer_uri in self._http_peers_snapshot():
             try:
                 base_endpoint = f"{peer_uri.rstrip('/')}/blocks"
-                response = requests.get(base_endpoint, timeout=5)
+                response = requests.get(base_endpoint, timeout=self._http_timeout)
                 if response.status_code != 200:
                     continue
                 data = response.json()
@@ -878,7 +1244,9 @@ class P2PNetworkManager:
                 if remote_total > len(self.blockchain.chain):
                     # Fetch full chain snapshot if remote height is greater
                     response_full = requests.get(
-                        base_endpoint, params={"limit": remote_total, "offset": 0}, timeout=5
+                        base_endpoint,
+                        params={"limit": remote_total, "offset": 0},
+                        timeout=self._http_timeout,
                     )
                     if response_full.status_code != 200:
                         continue
@@ -902,29 +1270,37 @@ class P2PNetworkManager:
                             valid_chain = False
                             break
                         try:
+                            normalized_header = self._normalize_remote_header(header_dict)
                             header = BlockHeader(
-                                index=header_dict["index"],
-                                previous_hash=header_dict["previous_hash"],
-                                timestamp=header_dict["timestamp"],
-                                merkle_root=header_dict["merkle_root"],
-                                nonce=header_dict["nonce"],
-                                difficulty=header_dict["difficulty"],
-                                miner_pubkey=header_dict.get("miner_pubkey"),
-                                signature=header_dict.get("signature"),
+                                index=normalized_header["index"],
+                                previous_hash=normalized_header["previous_hash"],
+                                timestamp=normalized_header["timestamp"],
+                                merkle_root=normalized_header["merkle_root"],
+                                nonce=normalized_header["nonce"],
+                                difficulty=normalized_header["difficulty"],
+                                miner_pubkey=normalized_header.get("miner_pubkey"),
+                                signature=normalized_header.get("signature"),
+                                version=normalized_header.get("version"),
                             )
-                            # Preserve advertised hash if present for downstream integrity checks
-                            if "hash" in header_dict:
-                                header.hash = header_dict["hash"]
+                            if "hash" in normalized_header:
+                                header.hash = normalized_header["hash"]
                             new_chain_headers.append(header)
                         except (KeyError, TypeError, ValueError) as e:
-                            # Invalid block header format - reject this chain
                             logger.debug(f"Invalid block header in chain from {peer_uri}: {e}")
                             valid_chain = False
                             break
                     if valid_chain and self.blockchain.replace_chain(new_chain_headers):
                         return True
-            except (requests.RequestException, ConnectionError, TimeoutError) as e:
-                # Network error syncing with peer - try next peer
+                    if not valid_chain:
+                        deserializer = getattr(self.blockchain, "deserialize_chain", None)
+                        if callable(deserializer):
+                            try:
+                                deserialized = deserializer(remote_blocks)
+                                if deserialized and self.blockchain.replace_chain(deserialized):
+                                    return True
+                            except Exception as exc:
+                                logger.debug(f"deserialize_chain failed for peer {peer_uri}: {exc}")
+            except Exception as e:
                 logger.debug(f"Failed to sync with peer {peer_uri}: {e}")
                 continue
             except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:

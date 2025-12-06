@@ -800,12 +800,19 @@ class ERC721Factory:
         self.deployed_collections[collection.address] = collection
 
         if self.blockchain:
+            metadata = {
+                "name": name,
+                "symbol": symbol,
+                "owner": creator,
+            }
             self.blockchain.contracts[collection.address.upper()] = {
                 "type": "ERC721",
                 "address": collection.address,
+                "metadata": metadata,
                 "data": collection.to_dict(),
                 "created_at": time.time(),
                 "creator": creator,
+                "storage": {},
             }
 
         logger.info(

@@ -49,6 +49,7 @@ class TestAIAPIHandlerInit:
         assert '/personal-ai/node/setup' in route_rules
         assert '/personal-ai/liquidity/alert' in route_rules
         assert '/personal-ai/assistants' in route_rules
+        assert '/personal-ai/stream' in route_rules
 
         # Questioning endpoints
         assert '/questioning/submit' in route_rules
@@ -1088,6 +1089,59 @@ class TestPersonalAIAssistantsEndpoint:
         data = json.loads(response.data)
         assert data['success'] is False
         assert data['error'] == 'PERSONAL_AI_DISABLED'
+
+
+class TestPersonalAIStreamEndpoint:
+    """Test /personal-ai/stream endpoint."""
+
+    @pytest.fixture
+    def setup(self):
+        """Setup test environment."""
+        from xai.core.api_ai import AIAPIHandler
+
+        node = Mock()
+        node.personal_ai = Mock()
+        node.validator = Mock()
+        app = Flask(__name__)
+        app.config['TESTING'] = True
+
+        handler = AIAPIHandler(node, app)
+        client = app.test_client()
+
+        return {'handler': handler, 'client': client, 'node': node}
+
+    def test_stream_success(self, setup):
+        """Test successful streaming response."""
+        node = setup['node']
+        node.personal_ai.stream_prompt_with_ai.return_value = {
+            'success': True,
+            'stream': iter(["data: chunk\n\n"])
+        }
+
+        response = setup['client'].post(
+            '/personal-ai/stream',
+            json={'prompt': 'hello'},
+            headers={
+                'X-User-Address': 'XAI123',
+                'X-User-API-Key': 'key',
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.mimetype == 'text/event-stream'
+
+    def test_stream_requires_prompt(self, setup):
+        """Test streaming validation when prompt missing."""
+        response = setup['client'].post(
+            '/personal-ai/stream',
+            json={},
+            headers={
+                'X-User-Address': 'XAI123',
+                'X-User-API-Key': 'key',
+            },
+        )
+
+        assert response.status_code == 400
 
 
 class TestQuestioningEndpoints:

@@ -139,19 +139,24 @@ python src/xai/wallet/cli.py export-key --address YOUR_ADDRESS
 ### Send Transactions
 
 ```bash
-# Simple transaction
+# Secure local signing with hash preview (recommended)
 python src/xai/wallet/cli.py send \
   --from YOUR_ADDRESS \
   --to RECIPIENT_ADDRESS \
-  --amount 10.5 \
-  --private-key YOUR_PRIVATE_KEY
+  --amount 10.5
+  # The CLI will fetch your nonce, display the canonical payload and signing
+  # hash, require you to type the first 8+ characters of that hash, and only
+  # then prompt for your private key (never sent to the node). The node /send
+  # endpoint receives a fully signed payload with timestamp/txid.
 
-# Multi-signature transaction
+# Multi-signature transaction (prepare and collect sigs)
 python src/xai/wallet/cli.py send-multisig \
   --multisig-address MULTISIG_ADDRESS \
   --to RECIPIENT_ADDRESS \
   --amount 5.0
 ```
+
+> **API clients:** when submitting directly to `/send`, include `timestamp` (UNIX seconds) and optionally `txid`. When calling `/wallet/sign`, you must display the SHA-256 hash to the signer and pass the acknowledged prefix via `ack_hash_prefix`. See `docs/api/wallet_signing.md` for the canonical payload schema and examples.
 
 ### Merkle Proof Verification
 

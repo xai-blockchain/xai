@@ -17,7 +17,7 @@ No API key can EVER be used beyond its donated limit.
 import time
 import json
 import hashlib
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any, Set
 import os
 import tempfile
 from collections import deque
@@ -27,6 +27,7 @@ import anthropic
 import openai
 from google import generativeai as genai
 from xai.core.ai_metrics import metrics
+from xai.core.ai_task_metrics import get_ai_task_metrics
 
 
 class AIProvider(Enum):
@@ -164,6 +165,11 @@ class StrictAIPoolManager:
             AIProvider.OPENAI: deque(),
             AIProvider.GOOGLE: deque(),
         }
+        self._provider_rotation: Dict[AIProvider, deque[str]] = {
+            AIProvider.ANTHROPIC: deque(),
+            AIProvider.OPENAI: deque(),
+            AIProvider.GOOGLE: deque(),
+        }
 
         # Persistence path under ~/.xai to avoid storing in repo
         default_path = os.path.expanduser("~/.xai/ai_pool_usage.json")
@@ -174,6 +180,7 @@ class StrictAIPoolManager:
             self._state_path = default_path
         os.makedirs(os.path.dirname(self._state_path), exist_ok=True)
         self._load_state()
+        self._initialize_rotation_state()
 
     def submit_api_key_donation(
         self,
@@ -248,6 +255,7 @@ class StrictAIPoolManager:
         )
 
         self.donated_keys[key_id] = donated_key
+        self._register_key_for_rotation(provider, key_id)
 
         # Update totals
         self.total_tokens_donated += donated_tokens
@@ -281,64 +289,227 @@ class StrictAIPoolManager:
         This is the core function that actually calls AI APIs
         with hard limits to prevent over-usage
         """
-        # Import metrics
-        from xai.core.ai_task_metrics import get_ai_task_metrics
-        metrics = get_ai_task_metrics()
+        task_metrics = self._get_task_metrics()
+        queue_recorded = False
 
-        # Record pool utilization
-        total_keys = len(self.donated_keys)
-        active_keys = sum(1 for k in self.donated_keys.values() if not k.is_depleted)
-        if total_keys > 0:
-            utilization = ((total_keys - active_keys) / total_keys) * 100
-            metrics.pool_utilization.labels(pool_id=provider.value).set(utilization)
+        def _safe_metrics_call(callback) -> None:
+            if not task_metrics:
+                return
+            try:
+                callback()
+            except Exception:
+                pass
 
-        # Emergency stop check
-        if self.emergency_stop:
-            metrics.jobs_failed.labels(provider=provider.value, reason="emergency_stop").inc()
-            return {
-                "success": False,
-                "error": "EMERGENCY_STOP_ACTIVE",
-                "message": "Pool is in emergency stop mode",
-            }
-
-        # Safety check: prevent excessively large requests
-        if estimated_tokens > self.max_tokens_per_call:
-            return {
-                "success": False,
-                "error": "REQUEST_TOO_LARGE",
-                "message": f"Request exceeds safety limit of {self.max_tokens_per_call} tokens",
-            }
-
-        # Enforce provider request rate limits
-        if not self._allow_provider_call(provider):
-            return {
-                "success": False,
-                "error": "PROVIDER_RATE_LIMIT",
-                "message": f"Rate limit reached for provider {provider.value}",
-            }
-
-        # Find suitable API key(s) with enough balance
-        suitable_keys = self._find_suitable_keys(provider, estimated_tokens)
-
-        if not suitable_keys:
-            return {
-                "success": False,
-                "error": "INSUFFICIENT_DONATED_CREDITS",
-                "message": f"No {provider.value} keys with {estimated_tokens} tokens available",
-                "needed_tokens": estimated_tokens,
-                "available_tokens": self._get_available_tokens(provider),
-            }
-
-        # Use the key(s) to execute the task
-        result = self._execute_with_strict_limits(
-            keys=suitable_keys,
-            task_description=task_description,
-            estimated_tokens=estimated_tokens,
-            max_tokens=max_tokens_override or estimated_tokens,
-            provider=provider,
+        _safe_metrics_call(
+            lambda: task_metrics.jobs_submitted.labels(job_type="strict_pool_task").inc()
         )
+        _safe_metrics_call(lambda: task_metrics.job_queue_size.inc())
+        queue_recorded = task_metrics is not None
 
-        return result
+        job_start_time = time.time()
+        metrics.record_queue_event()
+
+        def _fail(reason: str, message: str, extra: Optional[Dict[str, Any]] = None) -> Dict:
+            _safe_metrics_call(
+                lambda: task_metrics.jobs_failed.labels(provider=provider.value, reason=reason).inc()
+            )
+            _safe_metrics_call(
+                lambda: task_metrics.jobs_completed.labels(
+                    provider=provider.value, status="failed"
+                ).inc()
+            )
+            response = {"success": False, "error": reason, "message": message}
+            if extra:
+                response.update(extra)
+            return response
+
+        try:
+            try:
+                estimated_tokens_int = int(estimated_tokens)
+            except (TypeError, ValueError):
+                return _fail("INVALID_ESTIMATE", "estimated_tokens must be an integer")
+
+            if estimated_tokens_int <= 0:
+                return _fail("INVALID_ESTIMATE", "estimated_tokens must be greater than zero")
+
+            sanitized_estimate = max(1, estimated_tokens_int)
+
+            override_specified = max_tokens_override is not None
+            if override_specified:
+                try:
+                    override_value = int(max_tokens_override)
+                except (TypeError, ValueError):
+                    return _fail("INVALID_OVERRIDE", "max_tokens_override must be an integer")
+                if override_value <= 0:
+                    return _fail("INVALID_OVERRIDE", "max_tokens_override must be positive")
+            else:
+                override_value = sanitized_estimate
+
+            per_call_limit = min(self.max_tokens_per_call, override_value)
+            per_call_limit = max(1, per_call_limit)
+
+            # Record pool utilization snapshot
+            total_keys = len(self.donated_keys)
+            active_keys = sum(1 for k in self.donated_keys.values() if not k.is_depleted)
+            if total_keys > 0:
+                utilization = ((total_keys - active_keys) / total_keys) * 100
+                _safe_metrics_call(
+                    lambda: task_metrics.pool_utilization.labels(pool_id=provider.value).set(
+                        utilization
+                    )
+                )
+
+            if self.emergency_stop:
+                return _fail("EMERGENCY_STOP_ACTIVE", "Pool is in emergency stop mode")
+
+            if (
+                not override_specified
+                and sanitized_estimate > self.max_tokens_per_call
+            ):
+                return _fail(
+                    "REQUEST_TOO_LARGE",
+                    f"Request exceeds safety limit of {self.max_tokens_per_call} tokens per call",
+                )
+
+            suitable_keys = self._find_suitable_keys(provider, sanitized_estimate)
+
+            if not suitable_keys:
+                return _fail(
+                    "INSUFFICIENT_DONATED_CREDITS",
+                    f"No {provider.value} keys with {sanitized_estimate} tokens available",
+                    {
+                        "needed_tokens": sanitized_estimate,
+                        "available_tokens": self._get_available_tokens(provider),
+                    },
+                )
+
+            _safe_metrics_call(
+                lambda: task_metrics.jobs_accepted.labels(provider=provider.value).inc()
+            )
+
+            execution_plan, remaining = self._plan_key_allocations(
+                suitable_keys, sanitized_estimate, per_call_limit
+            )
+
+            if remaining > 0:
+                return _fail(
+                    "INSUFFICIENT_DONATED_CREDITS",
+                    "Unable to schedule entire request even after pooling keys",
+                    {"tokens_unallocated": remaining},
+                )
+
+            combined_output: List[str] = []
+            segment_metadata: List[Dict[str, Any]] = []
+            total_tokens_used = 0
+            total_minutes_elapsed = 0.0
+
+            for idx, (key, segment_tokens) in enumerate(execution_plan):
+                if not self._allow_provider_call(provider):
+                    return _fail(
+                        "PROVIDER_RATE_LIMIT",
+                        f"Rate limit reached for provider {provider.value}",
+                        {
+                            "segment_index": idx,
+                            "tokens_processed": total_tokens_used,
+                            "partial_output": "\n".join(combined_output).strip(),
+                        },
+                    )
+
+                if idx == 0:
+                    segment_task = task_description
+                else:
+                    previous_context = "\n".join(combined_output)[-2000:]
+                    segment_task = (
+                        f"{task_description}\n\n"
+                        f"Context from previous segments:\n{previous_context}\n\n"
+                        f"Continue response segment {idx + 1} of {len(execution_plan)} "
+                        "without repeating earlier content."
+                    )
+
+                if override_specified:
+                    segment_max_tokens = min(self.max_tokens_per_call, override_value)
+                else:
+                    segment_max_tokens = min(self.max_tokens_per_call, segment_tokens)
+
+                segment_result = self._execute_with_strict_limits(
+                    keys=[key],
+                    task_description=segment_task,
+                    estimated_tokens=segment_tokens,
+                    max_tokens=segment_max_tokens,
+                    provider=provider,
+                )
+
+                if not segment_result.get("success"):
+                    failure_details = {
+                        "segment_index": idx,
+                        "tokens_processed": total_tokens_used,
+                        "partial_output": "\n".join(combined_output).strip(),
+                    }
+                    failure_details.update(
+                        {
+                            "provider_response": segment_result.get("message")
+                            or segment_result.get("error"),
+                        }
+                    )
+                    return _fail(
+                        segment_result.get("error", "API_CALL_FAILED"),
+                        segment_result.get("message", "Segment execution failed"),
+                        failure_details,
+                    )
+
+                segment_output = segment_result.get("result")
+                if segment_output:
+                    combined_output.append(segment_output.strip())
+
+                segment_tokens_used = segment_result.get("tokens_used", 0)
+                total_tokens_used += segment_tokens_used
+                total_minutes_elapsed += segment_result.get("minutes_elapsed", 0.0)
+
+                segment_metadata.append(
+                    {
+                        "key_id": key.key_id,
+                        "tokens_requested": segment_tokens,
+                        "tokens_used": segment_tokens_used,
+                        "minutes_elapsed": segment_result.get("minutes_elapsed", 0.0),
+                    }
+                )
+
+            total_duration = time.time() - job_start_time
+            _safe_metrics_call(
+                lambda: task_metrics.jobs_completed.labels(
+                    provider=provider.value, status="success"
+                ).inc()
+            )
+            _safe_metrics_call(
+                lambda: task_metrics.job_execution_time.observe(total_duration)
+            )
+            _safe_metrics_call(
+                lambda: task_metrics.task_costs.observe(total_tokens_used)
+            )
+            metrics.record_completed_task()
+
+            self.total_minutes_used += total_minutes_elapsed
+            self._save_state()
+
+            final_output = "\n".join(combined_output).strip()
+
+            return {
+                "success": True,
+                "output": final_output,
+                "result": final_output,
+                "tokens_used": total_tokens_used,
+                "tokens_estimated": sanitized_estimate,
+                "accuracy": (
+                    (total_tokens_used / sanitized_estimate * 100) if sanitized_estimate > 0 else 0
+                ),
+                "segments_executed": len(execution_plan),
+                "segment_details": segment_metadata,
+                "provider": provider.value,
+                "minutes_elapsed": round(total_minutes_elapsed, 2),
+            }
+        finally:
+            if queue_recorded:
+                _safe_metrics_call(lambda: task_metrics.job_queue_size.dec())
 
     def _find_suitable_keys(self, provider: AIProvider, tokens_needed: int) -> List[DonatedAPIKey]:
         """
@@ -346,44 +517,102 @@ class StrictAIPoolManager:
         Can combine multiple keys if one doesn't have enough
         """
 
-        suitable = []
-        remaining_needed = tokens_needed
+        if tokens_needed <= 0:
+            return []
 
-        # Get all active keys for this provider, sorted by most depleted first
-        # (use up nearly-empty keys first)
-        active_keys = [
-            key
-            for key in self.donated_keys.values()
-            if key.provider == provider
-            and key.is_active
-            and not key.is_depleted
-            and key.remaining_tokens() > 0
-        ]
+        self._cleanup_rotation(provider)
+        rotation_queue = self._provider_rotation[provider]
 
-        active_keys.sort(key=lambda k: k.remaining_tokens())
+        if not rotation_queue:
+            for key in self._active_keys_for_provider(provider):
+                rotation_queue.append(key.key_id)
 
-        for key in active_keys:
-            available = key.remaining_tokens()
+        selected: List[DonatedAPIKey] = []
+        selected_ids: Set[str] = set()
+        remaining = tokens_needed
 
-            if available >= remaining_needed:
-                # This key alone has enough
-                suitable.append(key)
+        inspected = 0
+        max_iterations = len(rotation_queue)
+        while remaining > 0 and rotation_queue and inspected < max_iterations:
+            key_id = rotation_queue.popleft()
+            rotation_queue.append(key_id)
+            inspected += 1
+
+            key = self.donated_keys.get(key_id)
+            if (
+                not key
+                or key.provider != provider
+                or not key.is_active
+                or key.is_depleted
+                or key.remaining_tokens() <= 0
+                or key_id in selected_ids
+            ):
+                continue
+
+            selected.append(key)
+            selected_ids.add(key_id)
+            remaining -= key.remaining_tokens()
+
+            if remaining <= 0:
                 break
-            else:
-                # Use what's available from this key
-                suitable.append(key)
-                remaining_needed -= available
 
-                if remaining_needed <= 0:
+        if remaining > 0:
+            for key in self._active_keys_for_provider(provider):
+                if key.key_id in selected_ids or key.remaining_tokens() <= 0:
+                    continue
+                selected.append(key)
+                selected_ids.add(key.key_id)
+                if key.key_id not in rotation_queue:
+                    rotation_queue.append(key.key_id)
+                remaining -= key.remaining_tokens()
+                if remaining <= 0:
                     break
 
-        # Verify we have enough total
-        total_available = sum(k.remaining_tokens() for k in suitable)
+        if sum(k.remaining_tokens() for k in selected) < tokens_needed:
+            return []
 
-        if total_available < tokens_needed:
-            return []  # Not enough even with multiple keys
+        if rotation_queue and selected:
+            last_key_id = selected[-1].key_id
+            # Rotate so the next call starts after the last used key
+            shift_count = 0
+            while rotation_queue and rotation_queue[0] != last_key_id and shift_count < len(rotation_queue):
+                rotation_queue.rotate(-1)
+                shift_count += 1
+            if rotation_queue and rotation_queue[0] == last_key_id:
+                rotation_queue.rotate(-1)
 
-        return suitable
+        return selected
+
+    def _plan_key_allocations(
+        self, keys: List[DonatedAPIKey], tokens_needed: int, per_call_limit: int
+    ) -> Tuple[List[Tuple[DonatedAPIKey, int]], int]:
+        """Plan how tokens will be allocated across keys respecting per-call limits."""
+        if per_call_limit <= 0:
+            return [], tokens_needed
+
+        key_budgets = {key.key_id: key.remaining_tokens() for key in keys}
+        remaining = tokens_needed
+        plan: List[Tuple[DonatedAPIKey, int]] = []
+
+        while remaining > 0:
+            progress = False
+            for key in keys:
+                available_budget = key_budgets.get(key.key_id, 0)
+                if available_budget <= 0:
+                    continue
+                allocation = min(available_budget, per_call_limit, remaining)
+                if allocation <= 0:
+                    continue
+                plan.append((key, allocation))
+                key_budgets[key.key_id] -= allocation
+                remaining -= allocation
+                progress = True
+                if remaining <= 0:
+                    break
+            if not progress:
+                break
+
+        return plan, remaining
 
     def _execute_with_strict_limits(
         self,
@@ -611,6 +840,7 @@ class StrictAIPoolManager:
 
         # Destroy the encrypted key in SecureAPIKeyManager
         self.key_manager._destroy_api_key(key.key_id)
+        self._unregister_key_from_rotation(key.provider, key.key_id)
 
         # Log the depletion
         print(f"✅ Key {key.key_id} depleted and destroyed")
@@ -757,6 +987,58 @@ class StrictAIPoolManager:
             "by_provider": by_provider,
             "strict_limits_enforced": True,
         }
+
+    def _get_task_metrics(self):
+        """Safely fetch task metrics collector."""
+        try:
+            return get_ai_task_metrics()
+        except Exception:
+            return None
+
+    # ===== Rotation & Active Key Management =====
+
+    def _initialize_rotation_state(self) -> None:
+        for provider in self._provider_rotation.keys():
+            rotation = self._provider_rotation[provider]
+            rotation.clear()
+            for key in self._active_keys_for_provider(provider):
+                rotation.append(key.key_id)
+
+    def _active_keys_for_provider(self, provider: AIProvider) -> List[DonatedAPIKey]:
+        return [
+            key
+            for key in self.donated_keys.values()
+            if key.provider == provider
+            and key.is_active
+            and not key.is_depleted
+            and key.remaining_tokens() > 0
+        ]
+
+    def _register_key_for_rotation(self, provider: AIProvider, key_id: str) -> None:
+        rotation = self._provider_rotation.get(provider)
+        if rotation is None:
+            rotation = deque()
+            self._provider_rotation[provider] = rotation
+        if key_id not in rotation:
+            rotation.append(key_id)
+
+    def _unregister_key_from_rotation(self, provider: AIProvider, key_id: str) -> None:
+        rotation = self._provider_rotation.get(provider)
+        if not rotation:
+            return
+        filtered = deque(entry for entry in rotation if entry != key_id)
+        self._provider_rotation[provider] = filtered
+
+    def _cleanup_rotation(self, provider: AIProvider) -> None:
+        rotation = self._provider_rotation.get(provider)
+        if not rotation:
+            return
+        valid_ids = {
+            key.key_id
+            for key in self._active_keys_for_provider(provider)
+        }
+        cleaned = deque(entry for entry in rotation if entry in valid_ids)
+        self._provider_rotation[provider] = cleaned
 
 
 # Example usage

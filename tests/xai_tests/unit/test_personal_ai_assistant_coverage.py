@@ -746,6 +746,118 @@ class TestAIProviderCalls:
         assert "anthropic" in result["error"].lower()
         assert "stub_text" in result
 
+    def test_call_ai_provider_caches_successful_response(self, personal_ai):
+        """Repeated prompts should hit cache instead of provider."""
+        personal_ai._cache_ttl = 120
+        personal_ai._cache_max_entries = 10
+        with patch.object(
+            personal_ai,
+            "_call_additional_provider",
+            return_value={"success": True, "text": "cached-response"},
+        ) as mock_provider:
+            result1 = personal_ai._call_ai_provider(
+                ai_provider="groq",
+                ai_model="mixtral",
+                user_api_key="key",
+                prompt="Cache this response",
+            )
+            result2 = personal_ai._call_ai_provider(
+                ai_provider="groq",
+                ai_model="mixtral",
+                user_api_key="key",
+                prompt="Cache this response",
+            )
+
+        assert mock_provider.call_count == 1
+        assert result1["success"] is True
+        assert result2.get("cached") is True
+        assert result2["text"] == "cached-response"
+
+    def test_cache_expires_after_ttl(self, personal_ai):
+        """Cached entries should expire after TTL."""
+        personal_ai._cache_ttl = 0.01
+        personal_ai._cache_max_entries = 10
+        with patch.object(
+            personal_ai,
+            "_call_additional_provider",
+            return_value={"success": True, "text": "fresh-response"},
+        ) as mock_provider:
+            personal_ai._call_ai_provider(
+                ai_provider="groq",
+                ai_model="mixtral",
+                user_api_key="key",
+                prompt="expire soon",
+            )
+            assert mock_provider.call_count == 1
+            time.sleep(0.02)
+            personal_ai._call_ai_provider(
+                ai_provider="groq",
+                ai_model="mixtral",
+                user_api_key="key",
+                prompt="expire soon",
+            )
+        assert mock_provider.call_count == 2
+
+    def test_stream_ai_response_chunks(self, personal_ai):
+        """Stream helper should emit metadata, tokens, and completion."""
+        with patch.object(
+            personal_ai,
+            "_call_ai_provider",
+            return_value={"success": True, "text": "Hello World"},
+        ):
+            result, stream = personal_ai._stream_ai_response(
+                "openai", "gpt-4", "key", "prompt"
+            )
+            chunks = list(stream)
+
+        assert result["success"] is True
+        assert any('"type": "metadata"' in chunk for chunk in chunks)
+        assert any('"type": "token"' in chunk for chunk in chunks)
+        assert any('"type": "complete"' in chunk for chunk in chunks)
+
+    def test_stream_prompt_with_ai_returns_generator(self, personal_ai):
+        """stream_prompt_with_ai should return SSE generator."""
+        with patch.object(
+            personal_ai,
+            "_stream_ai_response",
+            return_value=({"success": True}, iter(["data: chunk\n\n"])),
+        ):
+            result = personal_ai.stream_prompt_with_ai(
+                user_address="XAI1",
+                ai_provider="openai",
+                ai_model="gpt-4",
+                user_api_key="key",
+                prompt="hello",
+            )
+
+        assert result["success"] is True
+        generator = result["stream"]
+        assert next(generator).startswith("data:")
+
+    def test_stream_prompt_with_ai_failure_returns_error(self, personal_ai):
+        """Streaming prompt should fail closed when provider missing."""
+        failure = {
+            "success": False,
+            "error": "Provider not installed",
+            "code": "provider_module_missing",
+            "stub_text": "stub",
+        }
+        with patch.object(
+            personal_ai,
+            "_stream_ai_response",
+            return_value=(failure, iter([])),
+        ):
+            result = personal_ai.stream_prompt_with_ai(
+                user_address="XAI1",
+                ai_provider="openai",
+                ai_model="gpt-4",
+                user_api_key="key",
+                prompt="hello",
+            )
+
+        assert result["success"] is False
+        assert result["error"] == "provider_module_missing"
+
     def test_call_additional_provider_success(self, personal_ai):
         """Test calling additional provider successfully."""
         mock_provider = Mock()
@@ -902,6 +1014,33 @@ class TestAtomicSwap:
         assert "ai_analysis" in result
         assert "assistant_profile" in result
 
+    def test_execute_atomic_swap_ai_failure_returns_error(self, personal_ai):
+        """AI provider failure should surface error response."""
+        swap_details = {
+            "from_coin": "XAI",
+            "to_coin": "ADA",
+            "amount": 10,
+        }
+        failure = {
+            "success": False,
+            "error": "Provider missing",
+            "code": "provider_module_missing",
+            "stub_text": "stub",
+        }
+
+        with patch.object(personal_ai, "_generate_ai_text", return_value=failure):
+            result = personal_ai.execute_atomic_swap_with_ai(
+                user_address="XAI_USER",
+                ai_provider="openai",
+                ai_model="gpt-4",
+                user_api_key="test-key",
+                swap_details=swap_details,
+            )
+
+        assert result["success"] is False
+        assert result["error"] == "provider_module_missing"
+        assert result["message"] == "Provider missing"
+
     def test_execute_atomic_swap_missing_fields(self, personal_ai):
         """Test atomic swap with missing required fields."""
         swap_details = {
@@ -1017,6 +1156,28 @@ class TestSmartContract:
 
         assert result["success"] is True
         assert "AuctionContract" in result["contract_code"]
+
+    def test_create_smart_contract_ai_failure(self, personal_ai):
+        """AI provider failure should bubble up for smart contract generation."""
+        with patch.object(personal_ai, "_call_ai_provider") as mock_ai:
+            mock_ai.return_value = {
+                "success": False,
+                "error": "Provider offline",
+                "code": "provider_unavailable",
+            }
+
+            result = personal_ai.create_smart_contract_with_ai(
+                user_address="XAI_USER",
+                ai_provider="openai",
+                ai_model="gpt-4",
+                user_api_key="key",
+                contract_description="Test",
+                contract_type="escrow",
+            )
+
+        assert result["success"] is False
+        assert result["error"] == "provider_unavailable"
+        assert result["message"] == "Provider offline"
 
     def test_deploy_smart_contract_success(self, personal_ai):
         """Test deploying smart contract successfully."""
@@ -1173,6 +1334,27 @@ class TestWalletAnalysis:
         assert "recovery_steps" in result
         assert result["guardians"] == ["guardian1", "guardian2"]
 
+    def test_wallet_recovery_ai_failure_returns_error(self, personal_ai):
+        """Wallet recovery should fail closed when provider unavailable."""
+        with patch.object(personal_ai, "_call_ai_provider") as mock_ai:
+            mock_ai.return_value = {
+                "success": False,
+                "error": "Anthropic missing",
+                "code": "provider_module_missing",
+            }
+
+            result = personal_ai.wallet_recovery_advice(
+                user_address="XAI_USER",
+                ai_provider="anthropic",
+                ai_model="claude-3",
+                user_api_key="key",
+                recovery_details={},
+            )
+
+        assert result["success"] is False
+        assert result["error"] == "provider_module_missing"
+        assert "Anthropic missing" in result["message"]
+
 
 # ============================================================================
 # Node Setup Tests
@@ -1206,6 +1388,27 @@ class TestNodeSetup:
         assert result["region"] == "us-east"
         assert "checklist" in result
 
+    def test_node_setup_ai_failure_returns_error(self, personal_ai):
+        """Node setup advice should fail when AI unavailable."""
+        with patch.object(personal_ai, "_call_ai_provider") as mock_ai:
+            mock_ai.return_value = {
+                "success": False,
+                "error": "Together AI down",
+                "code": "provider_unavailable",
+            }
+
+            result = personal_ai.node_setup_recommendations(
+                user_address="XAI_USER",
+                ai_provider="together",
+                ai_model="llama",
+                user_api_key="key",
+                setup_request={},
+            )
+
+        assert result["success"] is False
+        assert result["error"] == "provider_unavailable"
+        assert "Together AI down" in result["message"]
+
 
 # ============================================================================
 # Liquidity Alert Tests
@@ -1238,6 +1441,28 @@ class TestLiquidityAlert:
         assert result["threshold_pct"] == 3.0
         assert result["current_slippage_pct"] == 4.5
         assert "mitigation" in result
+
+    def test_liquidity_alert_ai_failure_returns_error(self, personal_ai):
+        """Liquidity alert should fail when AI provider unavailable."""
+        with patch.object(personal_ai, "_call_ai_provider") as mock_ai:
+            mock_ai.return_value = {
+                "success": False,
+                "error": "Provider timeout",
+                "code": "provider_timeout",
+            }
+
+            result = personal_ai.liquidity_alert_response(
+                user_address="XAI_USER",
+                ai_provider="openai",
+                ai_model="gpt-4",
+                user_api_key="key",
+                pool_name="XAI-ETH",
+                alert_details={},
+            )
+
+        assert result["success"] is False
+        assert result["error"] == "provider_timeout"
+        assert "Provider timeout" in result["message"]
 
     def test_liquidity_alert_response_legacy_slippage_key(self, personal_ai):
         """Test liquidity alert with legacy slippage key."""

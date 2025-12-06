@@ -141,32 +141,60 @@ def test_client(flask_app, wallet_api_handler):
 class TestWalletCreationEndpoints:
     """Test wallet creation endpoints"""
 
-    def test_create_wallet_success(self, test_client):
-        """Test successful wallet creation"""
-        response = test_client.post("/wallet/create")
+    def test_create_wallet_requires_password(self, test_client):
+        """Test wallet creation requires encryption password"""
+        response = test_client.post(
+            "/wallet/create",
+            data=json.dumps({}),
+            content_type="application/json"
+        )
 
-        assert response.status_code == 200
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data["success"] is False
+        assert "encryption_password required" in data["error"]
+
+    def test_create_wallet_success_with_password(self, test_client):
+        """Test successful wallet creation with encryption password"""
+        response = test_client.post(
+            "/wallet/create",
+            data=json.dumps({"encryption_password": "StrongPassword123!"}),
+            content_type="application/json"
+        )
+
+        assert response.status_code == 201
         data = json.loads(response.data)
 
         assert data["success"] is True
         assert "address" in data
         assert "public_key" in data
-        assert "private_key" in data
+        # SECURITY: private_key should NOT be in response
+        assert "private_key" not in data
+        # Instead, encrypted_keystore should be present
+        assert "encrypted_keystore" in data
         assert "warning" in data
         assert data["address"].startswith("XAI")
         assert len(data["public_key"]) > 0
-        assert len(data["private_key"]) > 0
 
     def test_create_wallet_generates_unique_wallets(self, test_client):
         """Test multiple wallet creations are unique"""
-        response1 = test_client.post("/wallet/create")
-        response2 = test_client.post("/wallet/create")
+        response1 = test_client.post(
+            "/wallet/create",
+            data=json.dumps({"encryption_password": "Password1234567!"}),
+            content_type="application/json"
+        )
+        response2 = test_client.post(
+            "/wallet/create",
+            data=json.dumps({"encryption_password": "Password1234567!"}),
+            content_type="application/json"
+        )
 
         data1 = json.loads(response1.data)
         data2 = json.loads(response2.data)
 
         assert data1["address"] != data2["address"]
-        assert data1["private_key"] != data2["private_key"]
+        # Compare encrypted keystores instead of private keys
+        assert data1["encrypted_keystore"]["ciphertext"] != data2["encrypted_keystore"]["ciphertext"]
 
     def test_create_embedded_wallet_success(self, test_client):
         """Test successful embedded wallet creation"""
@@ -1024,13 +1052,17 @@ class TestEdgeCases:
     def test_concurrent_wallet_creation(self, test_client):
         """Test multiple simultaneous wallet creations"""
         responses = []
-        for _ in range(5):
-            response = test_client.post("/wallet/create")
+        for i in range(5):
+            response = test_client.post(
+                "/wallet/create",
+                data=json.dumps({"encryption_password": f"ConcurrentPassword{i}!23"}),
+                content_type="application/json"
+            )
             responses.append(response)
 
         # All should succeed
         for response in responses:
-            assert response.status_code == 200
+            assert response.status_code == 201
 
         # All should be unique
         addresses = [json.loads(r.data)["address"] for r in responses]
@@ -1195,7 +1227,11 @@ class TestResponseFormats:
 
     def test_success_response_format(self, test_client):
         """Test success responses have consistent format"""
-        response = test_client.post("/wallet/create")
+        response = test_client.post(
+            "/wallet/create",
+            data=json.dumps({"encryption_password": "TestPassword123!"}),
+            content_type="application/json"
+        )
         data = json.loads(response.data)
 
         # Success responses should have success field

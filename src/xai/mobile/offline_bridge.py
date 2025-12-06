@@ -148,7 +148,8 @@ class OfflineSigningBridge:
     def sign_transaction_offline(
         unsigned_tx: UnsignedTransaction,
         private_key: str,
-        public_key: str
+        public_key: str,
+        acknowledged_digest: str,
     ) -> SignedTransaction:
         """
         Sign transaction on offline device
@@ -157,27 +158,21 @@ class OfflineSigningBridge:
             unsigned_tx: Unsigned transaction
             private_key: Private key for signing
             public_key: Public key
+            acknowledged_digest: Prefix of the transaction hash acknowledged by the signer
 
         Returns:
             Signed transaction
         """
-        # Import here to avoid circular dependencies
-        from xai.core.crypto_utils import sign_message_hex
+        from xai.wallet.offline_signing import sign_offline
 
-        # Calculate transaction hash
-        tx_data = unsigned_tx.to_dict()
-        tx_string = json.dumps(tx_data, sort_keys=True)
-        txid = hashlib.sha256(tx_string.encode()).hexdigest()
-
-        # Sign the transaction
-        message = txid.encode()
-        signature = sign_message_hex(private_key, message)
+        tx_payload = unsigned_tx.to_dict()
+        signed_payload = sign_offline(tx_payload, private_key, acknowledged_digest=acknowledged_digest)
 
         return SignedTransaction(
             unsigned_tx=unsigned_tx,
-            signature=signature,
-            public_key=public_key,
-            txid=txid
+            signature=signed_payload["signature"],
+            public_key=signed_payload["public_key"],
+            txid=signed_payload["txid"],
         )
 
     @staticmethod
@@ -355,7 +350,8 @@ class BatchOfflineSigning:
     def sign_batch(
         unsigned_txs: List[UnsignedTransaction],
         private_key: str,
-        public_key: str
+        public_key: str,
+        acknowledgements: List[str],
     ) -> List[SignedTransaction]:
         """
         Sign a batch of transactions offline
@@ -364,14 +360,18 @@ class BatchOfflineSigning:
             unsigned_txs: List of unsigned transactions
             private_key: Private key
             public_key: Public key
+            acknowledgements: List of hash prefixes acknowledged by the signer (one per tx)
 
         Returns:
             List of signed transactions
         """
+        if len(unsigned_txs) != len(acknowledgements):
+            raise ValueError("Acknowledgements must be provided for every unsigned transaction")
+
         bridge = OfflineSigningBridge()
         return [
-            bridge.sign_transaction_offline(tx, private_key, public_key)
-            for tx in unsigned_txs
+            bridge.sign_transaction_offline(tx, private_key, public_key, acknowledged_digest=ack)
+            for tx, ack in zip(unsigned_txs, acknowledgements)
         ]
 
     @staticmethod

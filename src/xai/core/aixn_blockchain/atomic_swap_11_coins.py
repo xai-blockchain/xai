@@ -8,10 +8,13 @@ import hashlib
 import json
 import os
 import time
-from typing import Dict, Optional, Tuple, List
+from decimal import Decimal, InvalidOperation
+from typing import Any, Dict, Optional, Tuple, List
 from enum import Enum
 import secrets
 import threading
+
+import requests
 
 
 class CoinType(Enum):
@@ -624,17 +627,48 @@ class CrossChainVerifier:
     to verify transactions on external blockchains.
     """
 
-    def __init__(self):
+    DEFAULT_TIMEOUT = 8.0
+    CACHE_TTL_SECONDS = 300
+
+    def __init__(self, session: Optional[requests.Session] = None):
         """Initialize cross-chain verifier"""
         self.verified_transactions: Dict[str, Dict] = {}
-        self.oracle_endpoints: Dict[str, str] = {
-            "BTC": "https://blockstream.info/api",
-            "ETH": "https://api.etherscan.io/api",
-            "LTC": "https://api.blockcypher.com/v1/ltc/main",
-            "DOGE": "https://dogechain.info/api/v1",
-            # Add more as needed
-        }
         self.lock = threading.RLock()
+        self.session = session or requests.Session()
+        self.session.headers.update({"User-Agent": "xai-atomic-swap-verifier/1.0"})
+
+        # Providers must return deterministic JSON structures; tests patch _http_get_json
+        self.oracle_endpoints: Dict[str, Dict[str, Any]] = {
+            "BTC": {
+                "type": "utxo",
+                "tx_url": "https://blockstream.info/api/tx/{txid}",
+                "tip_url": "https://blockstream.info/api/blocks/tip/height",
+                "value_is_base_units": True,
+                "decimals": 8,
+            },
+            "LTC": {
+                "type": "utxo",
+                "tx_url": "https://api.blockcypher.com/v1/ltc/main/txs/{txid}",
+                "tip_url": "https://api.blockcypher.com/v1/ltc/main",
+                "value_is_base_units": True,
+                "decimals": 8,
+            },
+            "DOGE": {
+                "type": "utxo",
+                "tx_url": "https://dogechain.info/api/v1/transaction/{txid}",
+                "tip_url": "https://dogechain.info/api/v1/block/latest",
+                "value_is_base_units": True,
+                "decimals": 8,
+            },
+            "ETH": {
+                "type": "account",
+                "tx_url": "https://api.etherscan.io/api",
+                "tip_url": "https://api.etherscan.io/api",
+                "value_is_base_units": True,  # wei
+                "decimals": 18,
+                "api_key_env": "XAI_ETHERSCAN_API_KEY",
+            },
+        }
 
     def verify_spv_proof(
         self, coin_type: str, tx_hash: str, merkle_proof: List[str], block_header: Dict
@@ -674,7 +708,14 @@ class CrossChainVerifier:
             return False, f"SPV verification error: {str(e)}"
 
     def verify_transaction_on_chain(
-        self, coin_type: str, tx_hash: str, expected_amount: float, recipient: str
+        self,
+        coin_type: str,
+        tx_hash: str,
+        expected_amount: float,
+        recipient: str,
+        *,
+        min_confirmations: int = 1,
+        amount_tolerance: Decimal = Decimal("0.00000001"),
     ) -> Tuple[bool, str, Optional[Dict]]:
         """
         Verify a transaction on an external blockchain using oracle/API
@@ -684,79 +725,338 @@ class CrossChainVerifier:
             tx_hash: Transaction hash
             expected_amount: Expected transaction amount
             recipient: Expected recipient address
+            min_confirmations: Minimum confirmations required for acceptance
+            amount_tolerance: Allowed underflow tolerance when comparing amounts
 
         Returns:
             tuple: (is_valid, message, transaction_data)
         """
-        # Check cache first
-        cache_key = f"{coin_type}:{tx_hash}"
+        normalized_coin = coin_type.upper()
+        min_confirmations = max(1, int(min_confirmations))
+
+        if not self._is_supported_coin(normalized_coin):
+            return False, f"Unsupported coin type: {coin_type}", None
+
+        if not self._is_valid_tx_hash(tx_hash):
+            return False, "Invalid transaction hash format", None
+
+        try:
+            expected_amount_dec = Decimal(str(expected_amount))
+        except (InvalidOperation, ValueError):
+            return False, "Invalid expected amount", None
+
+        if expected_amount_dec <= 0:
+            return False, "Expected amount must be positive", None
+
+        cache_key = f"{normalized_coin}:{tx_hash}:{min_confirmations}"
         with self.lock:
             if cache_key in self.verified_transactions:
                 cached = self.verified_transactions[cache_key]
-                return cached["valid"], cached["message"], cached.get("data")
+                if time.time() - cached.get("timestamp", 0) < self.CACHE_TTL_SECONDS:
+                    return cached["valid"], cached["message"], cached.get("data")
 
-        # In production, this would make actual API calls to blockchain explorers
-        # For now, we'll simulate the verification
-        verification_result = self._simulate_blockchain_verification(
-            coin_type, tx_hash, expected_amount, recipient
-        )
+        provider = self.oracle_endpoints[normalized_coin]
+        try:
+            tx_data = self._fetch_transaction(provider, normalized_coin, tx_hash)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            return False, f"Verification failed: {exc}", None
 
-        # Cache the result
-        with self.lock:
-            self.verified_transactions[cache_key] = verification_result
+        if not tx_data:
+            result = {"valid": False, "message": "Transaction not found", "data": None}
+            self._cache_result(cache_key, result)
+            return False, result["message"], None
 
-        return (
-            verification_result["valid"],
-            verification_result["message"],
-            verification_result.get("data"),
-        )
-
-    def _simulate_blockchain_verification(
-        self, coin_type: str, tx_hash: str, expected_amount: float, recipient: str
-    ) -> Dict:
-        """
-        Simulate blockchain verification (in production, use real APIs)
-
-        Args:
-            coin_type: Coin type
-            tx_hash: Transaction hash
-            expected_amount: Expected amount
-            recipient: Expected recipient
-
-        Returns:
-            Verification result dictionary
-        """
-        # Production implementation would:
-        # 1. Query blockchain API/oracle for transaction
-        # 2. Verify transaction exists and is confirmed
-        # 3. Check amount matches
-        # 4. Check recipient matches
-        # 5. Verify sufficient confirmations
-
-        # Simulated verification
-        tx_data = {
-            "txid": tx_hash,
-            "confirmations": 6,  # Simulated confirmations
-            "amount": expected_amount,
-            "recipient": recipient,
-            "timestamp": time.time(),
-            "block_height": 700000,  # Simulated
-        }
-
-        # Simple validation
-        if len(tx_hash) != 64:
-            return {
+        confirmations = tx_data.get("confirmations", 0)
+        if confirmations < min_confirmations:
+            result = {
                 "valid": False,
-                "message": "Invalid transaction hash format",
-                "data": None,
+                "message": f"Insufficient confirmations: {confirmations}/{min_confirmations}",
+                "data": tx_data,
+            }
+            self._cache_result(cache_key, result)
+            return False, result["message"], tx_data
+
+        amount_received = self._calculate_amount_to_recipient(
+            tx_data, recipient, normalized_coin
+        )
+        tx_data["amount_to_recipient"] = float(amount_received)
+        if amount_received + amount_tolerance < expected_amount_dec:
+            result = {
+                "valid": False,
+                "message": (
+                    f"Amount mismatch. Expected {expected_amount_dec} "
+                    f"received {amount_received}"
+                ),
+                "data": tx_data,
+            }
+            self._cache_result(cache_key, result)
+            return False, result["message"], tx_data
+
+        result = {
+            "valid": True,
+            "message": f"Transaction verified on {normalized_coin} blockchain",
+            "data": {
+                **tx_data,
+                "amount_to_recipient": float(amount_received),
+                "recipient": recipient,
+                "expected_amount": float(expected_amount_dec),
+                "coin": normalized_coin,
+            },
+        }
+        self._cache_result(cache_key, result)
+        return True, result["message"], result["data"]
+
+    def _is_supported_coin(self, coin_type: str) -> bool:
+        return coin_type in self.oracle_endpoints
+
+    @staticmethod
+    def _is_valid_tx_hash(tx_hash: str) -> bool:
+        if not isinstance(tx_hash, str):
+            return False
+        tx_hash = tx_hash.strip()
+        if len(tx_hash) != 64:
+            return False
+        try:
+            int(tx_hash, 16)
+            return True
+        except ValueError:
+            return False
+
+    def _cache_result(self, cache_key: str, result: Dict[str, Any]) -> None:
+        with self.lock:
+            self.verified_transactions[cache_key] = {
+                **result,
+                "timestamp": time.time(),
             }
 
-        # In production, verify actual transaction details
+    def _fetch_transaction(
+        self, provider: Dict[str, Any], coin_type: str, tx_hash: str
+    ) -> Optional[Dict[str, Any]]:
+        fetch_type = provider.get("type")
+        if fetch_type == "utxo":
+            return self._fetch_utxo_transaction(provider, coin_type, tx_hash)
+        if fetch_type == "account":
+            return self._fetch_account_transaction(provider, coin_type, tx_hash)
+        raise ValueError(f"Unsupported provider type: {fetch_type}")
+
+    def _fetch_utxo_transaction(
+        self, provider: Dict[str, Any], coin_type: str, tx_hash: str
+    ) -> Optional[Dict[str, Any]]:
+        tx_url = provider["tx_url"].format(txid=tx_hash)
+        tx_json = self._http_get_json(tx_url, timeout=provider.get("timeout", self.DEFAULT_TIMEOUT))
+        if not tx_json:
+            return None
+
+        block_height = self._extract_block_height(tx_json)
+        confirmations = self._extract_confirmations(tx_json)
+        if confirmations is None and block_height is not None and provider.get("tip_url"):
+            tip_json = self._http_get_json(
+                provider["tip_url"], timeout=provider.get("timeout", self.DEFAULT_TIMEOUT)
+            )
+            tip_height = self._extract_tip_height(tip_json)
+            if tip_height and tip_height >= block_height:
+                confirmations = (tip_height - block_height) + 1
+
+        outputs = self._parse_utxo_outputs(
+            tx_json,
+            coin_type,
+            value_is_base_units=provider.get("value_is_base_units", True),
+        )
+        if confirmations is None:
+            confirmations = 0
+
         return {
-            "valid": True,
-            "message": f"Transaction verified on {coin_type} blockchain",
-            "data": tx_data,
+            "txid": tx_hash,
+            "confirmations": confirmations,
+            "block_height": block_height,
+            "outputs": outputs,
+            "raw": tx_json,
         }
+
+    def _fetch_account_transaction(
+        self, provider: Dict[str, Any], coin_type: str, tx_hash: str
+    ) -> Optional[Dict[str, Any]]:
+        api_key = os.getenv(provider.get("api_key_env", ""), "")
+        params = {
+            "module": "proxy",
+            "action": "eth_getTransactionByHash",
+            "txhash": tx_hash,
+        }
+        if api_key:
+            params["apikey"] = api_key
+
+        response = self._http_get_json(
+            provider["tx_url"], params=params, timeout=provider.get("timeout", self.DEFAULT_TIMEOUT)
+        )
+        result = response.get("result") if isinstance(response, dict) else None
+        if not result:
+            return None
+
+        to_address = str(result.get("to") or "").lower()
+        value_hex = result.get("value", "0x0")
+        block_hex = result.get("blockNumber")
+
+        try:
+            value_wei = Decimal(int(value_hex, 16))
+        except (ValueError, InvalidOperation):
+            return None
+
+        decimals = provider.get("decimals", 18)
+        amount = self._normalize_amount(value_wei, coin_type, decimals, in_base_units=True)
+
+        confirmations = 0
+        block_number = None
+        if block_hex:
+            try:
+                block_number = int(block_hex, 16)
+            except ValueError:
+                block_number = None
+
+        if block_number is not None:
+            tip_params = {"module": "proxy", "action": "eth_blockNumber"}
+            if api_key:
+                tip_params["apikey"] = api_key
+            tip_response = self._http_get_json(
+                provider["tip_url"],
+                params=tip_params,
+                timeout=provider.get("timeout", self.DEFAULT_TIMEOUT),
+            )
+            tip_hex = tip_response.get("result") if isinstance(tip_response, dict) else None
+            try:
+                tip_number = int(tip_hex, 16) if tip_hex else None
+            except ValueError:
+                tip_number = None
+            if tip_number is not None and block_number is not None and tip_number >= block_number:
+                confirmations = (tip_number - block_number) + 1
+
+        outputs = [{"address": to_address, "amount": amount}]
+        return {
+            "txid": tx_hash,
+            "confirmations": confirmations,
+            "block_height": block_number,
+            "outputs": outputs,
+            "raw": result,
+        }
+
+    def _http_get_json(
+        self, url: str, params: Optional[Dict[str, Any]] = None, *, timeout: float = DEFAULT_TIMEOUT
+    ) -> Dict[str, Any]:
+        response = self.session.get(url, params=params, timeout=timeout)
+        response.raise_for_status()
+        return response.json()
+
+    @staticmethod
+    def _extract_block_height(tx_json: Dict[str, Any]) -> Optional[int]:
+        status = tx_json.get("status") or {}
+        for key in ("block_height", "blockHeight"):
+            height = status.get(key) if isinstance(status, dict) else None
+            if height is None:
+                height = tx_json.get(key)
+            if height is not None:
+                try:
+                    return int(height)
+                except (TypeError, ValueError):
+                    continue
+        return None
+
+    @staticmethod
+    def _extract_confirmations(tx_json: Dict[str, Any]) -> Optional[int]:
+        confirmations = tx_json.get("confirmations")
+        if confirmations is None and isinstance(tx_json.get("status"), dict):
+            confirmations = tx_json["status"].get("confirmations")
+        if confirmations is None:
+            return None
+        try:
+            return int(confirmations)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _extract_tip_height(tip_json: Any) -> Optional[int]:
+        if isinstance(tip_json, dict):
+            for key in ("height", "block_height", "latest_height"):
+                height = tip_json.get(key)
+                if height is not None:
+                    try:
+                        return int(height)
+                    except (TypeError, ValueError):
+                        continue
+        else:
+            try:
+                return int(tip_json)
+            except (TypeError, ValueError):
+                return None
+        return None
+
+    def _normalize_amount(
+        self, raw_value: Any, coin_type: str, decimals: int, *, in_base_units: bool
+    ) -> Decimal:
+        value = Decimal(str(raw_value))
+        if in_base_units:
+            scale = Decimal(10) ** decimals
+            return value / scale
+        return value
+
+    def _parse_utxo_outputs(
+        self, tx_json: Dict[str, Any], coin_type: str, *, value_is_base_units: bool
+    ) -> List[Dict[str, Any]]:
+        outputs: List[Dict[str, Any]] = []
+        candidates = tx_json.get("vout") or tx_json.get("outputs") or []
+        decimals = self.oracle_endpoints.get(coin_type, {}).get("decimals", 8)
+
+        for output in candidates:
+            address = self._extract_output_address(output)
+            raw_value = self._extract_output_value(output)
+            if address is None or raw_value is None:
+                continue
+            try:
+                amount = self._normalize_amount(raw_value, coin_type, decimals, in_base_units=value_is_base_units)
+            except (InvalidOperation, ValueError):
+                continue
+            outputs.append({"address": address, "amount": amount})
+        return outputs
+
+    @staticmethod
+    def _extract_output_address(output: Dict[str, Any]) -> Optional[str]:
+        address_fields = [
+            output.get("scriptpubkey_address"),
+            output.get("address"),
+        ]
+        script_pubkey = output.get("scriptPubKey") or {}
+        if isinstance(script_pubkey, dict):
+            address_fields.extend(script_pubkey.get("addresses", []))
+        address_fields.extend(output.get("addresses", []))
+        for candidate in address_fields:
+            if candidate:
+                return str(candidate)
+        return None
+
+    @staticmethod
+    def _extract_output_value(output: Dict[str, Any]) -> Optional[Any]:
+        for key in ("value", "valueSat", "satoshis", "amount"):
+            if key in output and output[key] is not None:
+                return output[key]
+        return None
+
+    @staticmethod
+    def _normalize_address(address: str, coin_type: str) -> str:
+        if coin_type == "ETH":
+            return address.lower()
+        return address
+
+    def _calculate_amount_to_recipient(
+        self, tx_data: Dict[str, Any], recipient: str, coin_type: str
+    ) -> Decimal:
+        normalized_recipient = self._normalize_address(recipient, coin_type)
+        total = Decimal("0")
+        for output in tx_data.get("outputs", []):
+            address = output.get("address")
+            amount = output.get("amount")
+            if address is None or amount is None:
+                continue
+            if self._normalize_address(str(address), coin_type) == normalized_recipient:
+                total += Decimal(str(amount))
+        return total
 
     def verify_minimum_confirmations(
         self, coin_type: str, tx_hash: str, min_confirmations: int = 6

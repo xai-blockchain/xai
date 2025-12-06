@@ -11,6 +11,9 @@ const NODE_URL = 'http://127.0.0.1:5000';
 
 const PYTHON_PATH = process.env.PYTHON_PATH || 'python';
 
+const isWindows = process.platform === 'win32';
+const powershellExec = isWindows ? 'powershell.exe' : 'pwsh';
+
 let nodeProcess;
 let explorerProcess;
 let mainWindow;
@@ -18,7 +21,22 @@ let tray;
 
 function spawnScript(script, args = []) {
   const scriptPath = path.join(XAI_DIR, script);
-  const proc = spawn('powershell.exe', ['-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...args], {
+  let command;
+  let commandArgs;
+
+  if (script.endsWith('.ps1')) {
+    // Respect system execution policy instead of forcing Bypass
+    command = powershellExec;
+    commandArgs = ['-NoProfile', '-File', scriptPath, ...args];
+  } else if (script.endsWith('.py')) {
+    command = PYTHON_PATH;
+    commandArgs = [scriptPath, ...args];
+  } else {
+    command = scriptPath;
+    commandArgs = args;
+  }
+
+  const proc = spawn(command, commandArgs, {
     cwd: XAI_DIR,
     env: {
       ...process.env,

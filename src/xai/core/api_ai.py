@@ -12,9 +12,10 @@ Handles all AI-related API endpoints including:
 - Liquidity pool alerts
 """
 
+import json
 import logging
 from typing import Dict, Any, Tuple, Optional
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response, stream_with_context
 from xai.core.security_validation import ValidationError
 
 logger = logging.getLogger(__name__)
@@ -89,6 +90,11 @@ class AIAPIHandler:
         def personal_ai_assistants() -> Tuple[Dict[str, Any], int]:
             """List available AI assistants."""
             return self.personal_ai_assistants_handler()
+
+        @self.app.route("/personal-ai/stream", methods=["POST"])
+        def personal_ai_stream() -> Response:
+            """Stream AI response chunks."""
+            return self.personal_ai_stream_handler()
 
         @self.app.route("/questioning/submit", methods=["POST"])
         def submit_question() -> Tuple[Dict[str, Any], int]:
@@ -419,6 +425,48 @@ class AIAPIHandler:
         return (
             jsonify({"success": True, "assistants": assistant_layer.list_micro_assistants()}),
             200,
+        )
+
+    def personal_ai_stream_handler(self) -> Response:
+        """Stream personal AI output via Server-Sent Events."""
+        ctx = self._personal_ai_context()
+        if not ctx["success"]:
+            return Response(
+                json.dumps(ctx), status=400, mimetype="application/json"
+            )
+
+        payload = request.get_json(silent=True) or {}
+        prompt = payload.get("prompt")
+        if not prompt:
+            return Response(
+                json.dumps(
+                    {
+                        "success": False,
+                        "error": "PROMPT_REQUIRED",
+                        "message": "Provide a prompt to stream",
+                    }
+                ),
+                status=400,
+                mimetype="application/json",
+            )
+
+        result = ctx["personal_ai"].stream_prompt_with_ai(
+            user_address=ctx["user_address"],
+            ai_provider=ctx["ai_provider"],
+            ai_model=ctx["ai_model"],
+            user_api_key=ctx["user_api_key"],
+            prompt=prompt,
+            assistant_name=ctx.get("assistant_name"),
+        )
+
+        if not result.get("success"):
+            return Response(
+                json.dumps(result), status=400, mimetype="application/json"
+            )
+
+        return Response(
+            stream_with_context(result["stream"]),
+            mimetype="text/event-stream",
         )
 
     def submit_question_handler(self) -> Tuple[Dict[str, Any], int]:

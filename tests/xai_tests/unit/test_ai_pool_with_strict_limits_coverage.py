@@ -506,6 +506,60 @@ class TestExecuteAITaskWithLimits:
         assert result["success"] is True
         assert "tokens_used" in result
 
+    @patch.object(StrictAIPoolManager, "_execute_with_strict_limits")
+    def test_execute_task_splits_across_multiple_keys(
+        self, mock_execute, pool_manager, mock_key_manager
+    ):
+        """Large tasks should be split across multiple donated keys."""
+        mock_key_manager.submit_api_key.side_effect = [
+            {"success": True, "key_id": "key_001"},
+            {"success": True, "key_id": "key_002"},
+        ]
+
+        pool_manager.submit_api_key_donation(
+            donor_address="XAI111",
+            provider=AIProvider.ANTHROPIC,
+            api_key="key-one",
+            donated_tokens=150,
+        )
+        pool_manager.submit_api_key_donation(
+            donor_address="XAI222",
+            provider=AIProvider.ANTHROPIC,
+            api_key="key-two",
+            donated_tokens=150,
+        )
+
+        mock_execute.side_effect = [
+            {
+                "success": True,
+                "result": "segment-one",
+                "tokens_used": 120,
+                "minutes_elapsed": 0.4,
+            },
+            {
+                "success": True,
+                "result": "segment-two",
+                "tokens_used": 80,
+                "minutes_elapsed": 0.3,
+            },
+        ]
+
+        result = pool_manager.execute_ai_task_with_limits(
+            task_description="Long task needs pooling",
+            estimated_tokens=200,
+            provider=AIProvider.ANTHROPIC,
+        )
+
+        assert result["success"] is True
+        assert result["segments_executed"] == 2
+        assert result["tokens_used"] == 200
+        assert "segment-two" in result["output"]
+        assert mock_execute.call_count == 2
+        first_call_keys = mock_execute.call_args_list[0][1]["keys"]
+        second_call_keys = mock_execute.call_args_list[1][1]["keys"]
+        assert first_call_keys[0].key_id == "key_001"
+        assert second_call_keys[0].key_id == "key_002"
+
 
 # ==================== Key Finding and Selection Tests ====================
 
@@ -572,8 +626,8 @@ class TestFindSuitableKeys:
 
         assert len(keys) == 0
 
-    def test_find_keys_sorts_by_remaining(self, pool_manager, mock_key_manager):
-        """Test keys are sorted by remaining tokens (most depleted first)"""
+    def test_find_keys_rotation_balances_usage(self, pool_manager, mock_key_manager):
+        """Key selection should rotate between donations for fair usage."""
         mock_key_manager.submit_api_key.side_effect = [
             {"success": True, "key_id": "key_001"},
             {"success": True, "key_id": "key_002"},
@@ -583,23 +637,39 @@ class TestFindSuitableKeys:
             donor_address="XAI123456789",
             provider=AIProvider.ANTHROPIC,
             api_key="sk-ant-test-key-1",
-            donated_tokens=10000,
+            donated_tokens=8000,
         )
 
         pool_manager.submit_api_key_donation(
             donor_address="XAI987654321",
             provider=AIProvider.ANTHROPIC,
             api_key="sk-ant-test-key-2",
-            donated_tokens=5000,
+            donated_tokens=8000,
         )
 
-        # Deplete first key partially
-        pool_manager.donated_keys["key_001"].used_tokens = 8000
+        keys_first = pool_manager._find_suitable_keys(AIProvider.ANTHROPIC, 1000)
+        assert keys_first and keys_first[0].key_id == "key_001"
 
-        keys = pool_manager._find_suitable_keys(AIProvider.ANTHROPIC, 1000)
+        keys_second = pool_manager._find_suitable_keys(AIProvider.ANTHROPIC, 1000)
+        assert keys_second and keys_second[0].key_id == "key_002"
+        assert keys_second[0] is not keys_first[0]
 
-        # Should use the nearly-depleted key first
-        assert keys[0].key_id == "key_001"
+    def test_rotation_cleanup_removes_depleted_keys(self, pool_manager):
+        """Rotation queues should drop depleted keys automatically."""
+        pool_manager.submit_api_key_donation(
+            donor_address="XAI123456789",
+            provider=AIProvider.ANTHROPIC,
+            api_key="sk-ant-test-key",
+            donated_tokens=1000,
+        )
+
+        rotation = pool_manager._provider_rotation[AIProvider.ANTHROPIC]
+        assert "test_key_123" in rotation
+
+        pool_manager.donated_keys["test_key_123"].is_depleted = True
+        pool_manager._cleanup_rotation(AIProvider.ANTHROPIC)
+
+        assert "test_key_123" not in pool_manager._provider_rotation[AIProvider.ANTHROPIC]
 
     def test_find_keys_skips_depleted(self, pool_manager):
         """Test finding keys skips depleted ones"""
@@ -1081,6 +1151,7 @@ class TestHelperMethods:
         assert key.is_depleted is True
         assert key.is_active is False
         mock_key_manager._destroy_api_key.assert_called_once_with("test_key_123")
+        assert "test_key_123" not in pool_manager._provider_rotation[AIProvider.ANTHROPIC]
 
 
 # ==================== Edge Cases and Integration Tests ====================

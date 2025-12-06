@@ -665,7 +665,25 @@ class TestEVMExecutor:
         import os
         mock_chain = MockChain()
         # Echo contract: returns first 32 bytes of calldata
-        echo_code = bytes([0x60, 0x20, 0x60, 0x00, 0xF3])
+        # Assembly:
+        #   calldatacopy(0, 0, 32)
+        #   return(0, 32)
+        echo_code = bytes(
+            [
+                0x60,
+                0x20,  # size
+                0x60,
+                0x00,  # data offset
+                0x60,
+                0x00,  # dest offset
+                0x37,  # CALLDATACOPY
+                0x60,
+                0x20,  # size
+                0x60,
+                0x00,  # offset
+                0xF3,  # RETURN
+            ]
+        )
         addr = "0x" + "1" * 40
         mock_chain.contracts[addr.upper()] = {"code": echo_code.hex(), "storage": {}}
 

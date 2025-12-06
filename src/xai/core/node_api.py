@@ -17,8 +17,8 @@ This module contains all API endpoint handlers organized by category:
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Dict, Any, Tuple, List, Optional
-from flask import jsonify, request
+from typing import TYPE_CHECKING, Dict, Any, Tuple, List, Optional, Sequence
+from flask import Flask, jsonify, request, g
 import time
 import json
 import logging
@@ -26,8 +26,20 @@ import os
 import uuid
 import re
 import html
+import math
+from contextlib import nullcontext
+
+from xai.core.vm.evm.abi import keccak256
+from werkzeug.exceptions import RequestEntityTooLarge
 
 logger = logging.getLogger(__name__)
+
+ERC165_SELECTOR = keccak256(b"supportsInterface(bytes4)")[:4]
+INTERFACE_PROBE_ADDRESS = "0x" + "b" * 40
+KNOWN_TOKEN_RECEIVER_INTERFACES = {
+    "erc1363_receiver": bytes.fromhex("b7b04c6b"),
+    "erc721_receiver": bytes.fromhex("150b7a02"),
+}
 
 from pydantic import ValidationError as PydanticValidationError
 from xai.core.config import Config, NetworkType
@@ -74,6 +86,7 @@ from xai.core.api_auth import APIAuthManager, APIKeyStore
 from xai.core.governance_execution import ProposalType
 from xai.network.peer_manager import PeerManager
 from xai.wallet.spending_limits import SpendingLimitManager
+from xai.core.vm.evm.abi import keccak256
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Transaction
@@ -310,6 +323,173 @@ class PaginationError(ValueError):
     """Raised when pagination query parameters are invalid."""
 
 
+_API_VERSION_ENV_KEY = "xai.api_version"
+
+
+class _VersionPrefixMiddleware:
+    """WSGI middleware that strips version prefixes and records requested version."""
+
+    def __init__(
+        self,
+        app,
+        supported_versions: Sequence[str],
+        default_version: str,
+        docs_url: str = "",
+    ) -> None:
+        self.app = app
+        self.supported_versions = tuple(supported_versions) or ("v1",)
+        self.default_version = default_version if default_version in self.supported_versions else self.supported_versions[-1]
+        self.docs_url = docs_url
+
+    @staticmethod
+    def _looks_like_version(token: str) -> bool:
+        return token.startswith("v") and token[1:].isdigit()
+
+    def __call__(self, environ, start_response):  # type: ignore[override]
+        path = environ.get("PATH_INFO", "") or "/"
+        version, trimmed = self._extract_version(path)
+
+        if version is None:
+            logger.warning(
+                "Unsupported API version requested",
+                extra={
+                    "event": "api.version.unsupported",
+                    "requested": self._requested_token(path) or "unknown",
+                    "remote": environ.get("REMOTE_ADDR", "unknown"),
+                },
+            )
+            requested = self._requested_token(path)
+            payload = json.dumps(
+                {
+                    "success": False,
+                    "error": "Unsupported API version",
+                    "code": "unsupported_api_version",
+                    "requested_version": requested or "unknown",
+                    "supported_versions": list(self.supported_versions),
+                }
+            )
+            headers = [
+                ("Content-Type", "application/json"),
+                ("Content-Length", str(len(payload))),
+                ("X-API-Version", "unknown"),
+            ]
+            if self.docs_url:
+                headers.append(("Link", f"<{self.docs_url}>; rel=\"deprecation\""))
+            start_response("404 NOT FOUND", headers)
+            return [payload.encode("utf-8")]
+
+        environ[_API_VERSION_ENV_KEY] = version
+        environ["PATH_INFO"] = trimmed
+        return self.app(environ, start_response)
+
+    def _extract_version(self, path: str) -> Tuple[Optional[str], str]:
+        normalized = path or "/"
+        for version in self.supported_versions:
+            prefix = f"/{version}"
+            if normalized == prefix or normalized.startswith(f"{prefix}/"):
+                remainder = normalized[len(prefix) :]
+                if not remainder:
+                    remainder = "/"
+                elif not remainder.startswith("/"):
+                    remainder = f"/{remainder}"
+                return version, remainder
+
+        token = self._requested_token(normalized)
+        if token and self._looks_like_version(token) and token not in self.supported_versions:
+            return None, normalized
+
+        # Default version applies when no explicit prefix provided
+        return self.default_version, normalized
+
+    @staticmethod
+    def _requested_token(path: str) -> Optional[str]:
+        if not path.startswith("/"):
+            return None
+        segments = path.split("/", 2)
+        if len(segments) < 2:
+            return None
+        token = segments[1]
+        return token or None
+
+
+class APIVersioningManager:
+    """Installs API version prefix handling and response headers."""
+
+    def __init__(
+        self,
+        app: Flask,
+        supported_versions: Optional[Sequence[str]] = None,
+        default_version: Optional[str] = None,
+        deprecated_versions: Optional[Dict[str, Dict[str, str]]] = None,
+        docs_url: str = "",
+    ) -> None:
+        if not isinstance(app, Flask):  # type: ignore[unreachable]
+            raise TypeError("APIVersioningManager requires a Flask application instance")
+
+        config = Config
+        versions = tuple(supported_versions or getattr(config, "API_SUPPORTED_VERSIONS", ("v1",)))
+        if not versions:
+            versions = ("v1",)
+        normalized_versions = tuple(dict.fromkeys(v.strip() or "v1" for v in versions))
+
+        source_default = default_version or getattr(config, "API_DEFAULT_VERSION", normalized_versions[-1])
+        if source_default not in normalized_versions:
+            source_default = normalized_versions[-1]
+
+        raw_deprecations = deprecated_versions or getattr(config, "API_DEPRECATED_VERSIONS", {})
+        self.deprecated_versions: Dict[str, Dict[str, str]] = {}
+        for version, info in raw_deprecations.items():
+            if not version:
+                continue
+            if isinstance(info, dict):
+                self.deprecated_versions[version] = dict(info)
+            elif isinstance(info, str) and info:
+                self.deprecated_versions[version] = {"sunset": info}
+            else:
+                self.deprecated_versions[version] = {}
+
+        self.app = app
+        self.supported_versions = normalized_versions
+        self.default_version = source_default
+        self.docs_url = docs_url or getattr(config, "API_VERSION_DOCS_URL", "")
+
+        self._install_middleware()
+
+    def _install_middleware(self) -> None:
+        if getattr(self.app, "xai_api_versioning", False):
+            return
+
+        original_wsgi_app = self.app.wsgi_app
+        self.app.wsgi_app = _VersionPrefixMiddleware(
+            original_wsgi_app,
+            supported_versions=self.supported_versions,
+            default_version=self.default_version,
+            docs_url=self.docs_url,
+        )
+
+        @self.app.before_request
+        def _set_api_version_context() -> None:
+            g.api_version = request.environ.get(_API_VERSION_ENV_KEY, self.default_version)
+
+        @self.app.after_request
+        def _inject_version_headers(response):
+            version = getattr(g, "api_version", self.default_version)
+            response.headers["X-API-Version"] = version
+            if version in self.deprecated_versions:
+                response.headers["Deprecation"] = f'version="{version}"'
+                sunset = self.deprecated_versions[version].get("sunset")
+                if sunset:
+                    response.headers.setdefault("Sunset", sunset)
+                if self.docs_url:
+                    response.headers.setdefault(
+                        "Link",
+                        f"<{self.docs_url}>; rel=\"deprecation\"; type=\"text/html\"",
+                    )
+            return response
+
+        setattr(self.app, "xai_api_versioning", True)
+
+
 class NodeAPIRoutes:
     """
     Manages all API routes for the blockchain node.
@@ -344,6 +524,47 @@ class NodeAPIRoutes:
         self.security_validator = getattr(node, "validator", SecurityValidator())
         self.api_auth = APIAuthManager.from_config(store=self.api_key_store)
         self.spending_limits = SpendingLimitManager()
+        self.api_versioning = APIVersioningManager(self.app)
+        self._body_size_limit = max(1, int(getattr(Config, "API_MAX_JSON_BYTES", 1_000_000)))
+        self._install_request_size_limits()
+
+    def _install_request_size_limits(self) -> None:
+        """
+        Enforce global request payload limits using MAX_CONTENT_LENGTH and
+        a before_request guard so oversized payloads are rejected before
+        reaching any route logic.
+        """
+        current_limit = self.app.config.get("MAX_CONTENT_LENGTH")
+        if not current_limit or current_limit > self._body_size_limit:
+            self.app.config["MAX_CONTENT_LENGTH"] = self._body_size_limit
+
+        @self.app.before_request
+        def _enforce_payload_limit():
+            content_length = request.content_length
+            if content_length and content_length > self._body_size_limit:
+                description = (
+                    f"Payload {content_length} bytes exceeds {self._body_size_limit} byte limit"
+                )
+                raise RequestEntityTooLarge(description=description)
+
+        self.app.register_error_handler(RequestEntityTooLarge, self._handle_payload_too_large)
+
+    def _handle_payload_too_large(self, error: RequestEntityTooLarge):
+        """Return a structured error when payload exceeds allowed limit."""
+        content_length = request.content_length or 0
+        context = {
+            "limit_bytes": self._body_size_limit,
+            "content_length": content_length,
+            "path": request.path,
+            "method": request.method,
+        }
+        return self._error_response(
+            f"Request body exceeds maximum size of {self._body_size_limit} bytes",
+            status=413,
+            code="payload_too_large",
+            context=context,
+            event_type="api.payload_too_large",
+        )
 
     def _verify_signed_peer_message(self) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
         """
@@ -406,6 +627,21 @@ class NodeAPIRoutes:
         sanitized = SecurityValidator.sanitize_for_logging(payload or {})
         log_security_event(event_type, {"details": sanitized}, severity=severity)
 
+    def _record_send_rejection(self, reason: str) -> None:
+        """Forward /send rejection metrics to the collector when available."""
+        collector = getattr(self.node, "metrics_collector", None)
+        if collector is None:
+            try:
+                collector = MetricsCollector.instance()
+            except Exception:
+                collector = None
+        if collector is None:
+            return
+        try:
+            collector.record_send_rejection(reason)
+        except AttributeError:
+            pass
+
     def _success_response(self, payload: Dict[str, Any], status: int = 200):
         """Return a success payload with consistent structure."""
         body = {"success": True, **payload}
@@ -436,6 +672,130 @@ class NodeAPIRoutes:
             context=details,
             event_type="node_api_exception",
         )
+
+    def _format_timestamp(self, timestamp: Optional[float]) -> Optional[str]:
+        """Return RFC3339-ish string for telemetry fields."""
+        if timestamp is None:
+            return None
+        try:
+            return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(float(timestamp)))
+        except (ValueError, TypeError, OverflowError):
+            return None
+
+    def _build_peer_diversity_stats(self, manager: PeerManager) -> Dict[str, Any]:
+        """Snapshot peer diversity counters under lock for consistent reporting."""
+        diversity_lock = getattr(manager, "_diversity_lock", None)
+        context = diversity_lock if hasattr(diversity_lock, "__enter__") else nullcontext()
+        with context:
+            prefix_counts = dict(getattr(manager, "prefix_counts", {}))
+            asn_counts = dict(getattr(manager, "asn_counts", {}))
+            country_counts = dict(getattr(manager, "country_counts", {}))
+            unknown_geo = int(getattr(manager, "unknown_geo_peers", 0))
+
+        return {
+            "prefix_counts": prefix_counts,
+            "asn_counts": asn_counts,
+            "country_counts": country_counts,
+            "unknown_geo_peers": unknown_geo,
+            "unique_prefixes": len(prefix_counts),
+            "unique_asns": len(asn_counts),
+            "unique_countries": len(country_counts),
+            "thresholds": {
+                "min_unique_prefixes": getattr(manager, "min_unique_prefixes", None),
+                "min_unique_asns": getattr(manager, "min_unique_asns", None),
+                "min_unique_countries": getattr(manager, "min_unique_countries", None),
+                "max_unknown_geo": getattr(manager, "max_unknown_geo", None),
+            },
+        }
+
+    def _build_peer_snapshot(self) -> Dict[str, Any]:
+        """Assemble detailed peer metadata for verbose peer queries."""
+        manager = getattr(self, "peer_manager", None)
+        if not isinstance(manager, PeerManager):
+            return {"connections": [], "diversity": {}, "limits": {}, "connected_total": 0}
+
+        now = time.time()
+        connected = getattr(manager, "connected_peers", {}) or {}
+        seen_nonces = getattr(manager, "seen_nonces", {}) or {}
+        trusted_set = {peer.lower() for peer in getattr(manager, "trusted_peers", set())}
+        banned_set = {peer.lower() for peer in getattr(manager, "banned_peers", set())}
+
+        connections: List[Dict[str, Any]] = []
+        for peer_id, info in list(connected.items()):
+            connected_at = float(info.get("connected_at", now) or now)
+            last_seen = info.get("last_seen")
+            ip_address = (info.get("ip_address") or "").lower()
+            geo = info.get("geo") or {}
+            nonce_window = seen_nonces.get(peer_id, [])
+            reputation = None
+            if getattr(manager, "reputation", None):
+                reputation = round(manager.reputation.get_score(peer_id), 4)
+
+            connections.append(
+                {
+                    "peer_id": peer_id,
+                    "ip_address": info.get("ip_address"),
+                    "connected_at": connected_at,
+                    "connected_at_iso": self._format_timestamp(connected_at),
+                    "uptime_seconds": max(0.0, now - connected_at),
+                    "last_seen": last_seen,
+                    "last_seen_iso": self._format_timestamp(last_seen) if last_seen else None,
+                    "geo": geo,
+                    "reputation": reputation,
+                    "nonce_window": len(nonce_window),
+                    "trusted": ip_address in trusted_set,
+                    "banned": ip_address in banned_set,
+                }
+            )
+
+        connections.sort(key=lambda entry: entry.get("connected_at") or 0.0, reverse=True)
+        diversity = self._build_peer_diversity_stats(manager)
+        limits = {
+            "max_connections_per_ip": getattr(manager, "max_connections_per_ip", None),
+            "max_per_prefix": getattr(manager, "max_per_prefix", None),
+            "max_per_asn": getattr(manager, "max_per_asn", None),
+            "max_per_country": getattr(manager, "max_per_country", None),
+            "max_unknown_geo": getattr(manager, "max_unknown_geo", None),
+            "require_client_cert": getattr(manager, "require_client_cert", False),
+        }
+        discovery = getattr(getattr(manager, "discovery", None), "discovered_peers", [])
+
+        return {
+            "connections": connections,
+            "connected_total": len(connections),
+            "diversity": diversity,
+            "limits": limits,
+            "trusted_peers": sorted(trusted_set),
+            "banned_peers": sorted(banned_set),
+            "discovered": discovery[:50] if isinstance(discovery, list) else [],
+        }
+
+    def _detect_contract_interfaces(self, contract_address: str) -> Dict[str, bool]:
+        """Check ERC-165 interface support for known token receiver standards."""
+        manager = self.blockchain.smart_contract_manager
+        if not manager:
+            raise RuntimeError("Smart-contract manager unavailable")
+
+        supports: Dict[str, bool] = {}
+        for name, interface_id in KNOWN_TOKEN_RECEIVER_INTERFACES.items():
+            calldata = ERC165_SELECTOR + interface_id.rjust(32, b"\x00")
+            try:
+                result = manager.static_call(
+                    INTERFACE_PROBE_ADDRESS,
+                    contract_address,
+                    calldata,
+                    gas_limit=200_000,
+                )
+            except Exception:
+                supports[name] = False
+                continue
+
+            if not result.success or len(result.return_data) < 32:
+                supports[name] = False
+                continue
+
+            supports[name] = bool(int.from_bytes(result.return_data[-32:], "big"))
+        return supports
 
     def _require_api_auth(self):
         if not self.api_auth.is_enabled():
@@ -1111,6 +1471,7 @@ class NodeAPIRoutes:
 
             try:
                 from xai.core.blockchain import Transaction
+                from xai.core.config import Config
 
                 tx = Transaction(
                     sender=model.sender,
@@ -1123,6 +1484,39 @@ class NodeAPIRoutes:
                 tx.signature = model.signature
                 if model.metadata:
                     tx.metadata = model.metadata
+
+                # Enforce timestamp bounds to prevent replay/delay abuse
+                now_ts = time.time()
+                max_future = float(getattr(Config, "TX_MAX_FUTURE_SKEW_SECONDS", 120))
+                max_age = float(getattr(Config, "TX_MAX_AGE_SECONDS", 86400))
+                if model.timestamp > now_ts + max_future:
+                    self._record_send_rejection("future_timestamp")
+                    return self._error_response(
+                        "Transaction timestamp too far in the future",
+                        status=400,
+                        code="future_timestamp",
+                        context={"timestamp": model.timestamp, "now": now_ts},
+                    )
+                if model.timestamp < now_ts - max_age:
+                    self._record_send_rejection("stale_timestamp")
+                    return self._error_response(
+                        "Transaction timestamp too old",
+                        status=400,
+                        code="stale_timestamp",
+                        context={"timestamp": model.timestamp, "age_seconds": now_ts - model.timestamp},
+                    )
+
+                tx.timestamp = float(model.timestamp)
+                expected_txid = tx.calculate_hash()
+                if model.txid and model.txid != expected_txid:
+                    self._record_send_rejection("txid_mismatch")
+                    return self._error_response(
+                        "Transaction hash mismatch",
+                        status=400,
+                        code="txid_mismatch",
+                        context={"expected": expected_txid, "provided": model.txid},
+                    )
+                tx.txid = expected_txid
 
                 # Enforce daily spending limits for non-AA wallets at API boundary
                 allowed, used, limit = self.spending_limits.can_spend(model.sender, float(model.amount))
@@ -1278,6 +1672,16 @@ class NodeAPIRoutes:
             metadata["data"] = bytes.fromhex(model.bytecode)
             metadata["gas_limit"] = model.gas_limit
             metadata["contract_address"] = contract_address
+            if "abi" in metadata:
+                try:
+                    metadata["abi"] = self.blockchain.normalize_contract_abi(metadata.get("abi"))
+                except ValueError as exc:
+                    return self._error_response(
+                        "Invalid contract ABI",
+                        status=400,
+                        code="invalid_contract_abi",
+                        context={"error": str(exc)},
+                    )
 
             try:
                 from xai.core.blockchain import Transaction
@@ -1418,12 +1822,112 @@ class NodeAPIRoutes:
                     status=503,
                     code="vm_feature_disabled",
                 )
-            state = self.blockchain.get_contract_state(address)
+            try:
+                normalized = InputSanitizer.validate_address(address)
+            except ValueError as exc:
+                return self._error_response(
+                    str(exc), status=400, code="invalid_address", event_type="contracts.invalid_address"
+                )
+            state = self.blockchain.get_contract_state(normalized)
             if not state:
                 return self._error_response(
                     "Contract not found", status=404, code="contract_not_found"
                 )
-            return self._success_response({"contract_address": address, "state": state})
+            return self._success_response({"contract_address": normalized, "state": state})
+
+        @self.app.route("/contracts/<address>/abi", methods=["GET"])
+        def contract_abi(address: str) -> Tuple[Dict[str, Any], int]:
+            try:
+                normalized = InputSanitizer.validate_address(address)
+            except ValueError as exc:
+                return self._error_response(
+                    str(exc), status=400, code="invalid_address", event_type="contracts.invalid_address"
+                )
+
+            abi_payload = self.blockchain.get_contract_abi(normalized)
+            if not abi_payload:
+                return self._error_response(
+                    "Contract ABI not found", status=404, code="contract_abi_missing"
+                )
+            response = {"contract_address": normalized, **abi_payload}
+            return self._success_response(response)
+
+        @self.app.route("/contracts/<address>/interfaces", methods=["GET"])
+        def contract_interfaces(address: str) -> Tuple[Dict[str, Any], int]:
+            try:
+                normalized = InputSanitizer.validate_address(address)
+            except ValueError as exc:
+                return self._error_response(
+                    str(exc), status=400, code="invalid_address", event_type="contracts.invalid_address"
+                )
+
+            if normalized.upper() not in self.blockchain.contracts:
+                return self._error_response(
+                    "Contract not found", status=404, code="contract_not_found"
+                )
+
+            cached_metadata = self.blockchain.get_contract_interface_metadata(normalized)
+            served_from_cache = bool(cached_metadata)
+            interfaces = cached_metadata["supports"] if cached_metadata else None
+
+            if interfaces is None:
+                if not self.blockchain.smart_contract_manager:
+                    return self._error_response(
+                        "Smart-contract VM feature is disabled",
+                        status=503,
+                        code="vm_feature_disabled",
+                    )
+                try:
+                    interfaces = self._detect_contract_interfaces(normalized)
+                except RuntimeError as exc:
+                    return self._error_response(
+                        str(exc),
+                        status=503,
+                        code="vm_feature_disabled",
+                    )
+                cached_metadata = self.blockchain.update_contract_interface_metadata(
+                    normalized, interfaces, source="erc165_probe"
+                )
+
+            return self._success_response(
+                {
+                    "contract_address": normalized,
+                    "interfaces": interfaces,
+                    "metadata": {
+                        "detected_at": cached_metadata.get("detected_at") if cached_metadata else None,
+                        "source": (cached_metadata or {}).get("source", "unknown"),
+                        "cached": served_from_cache,
+                    },
+                }
+            )
+
+        @self.app.route("/contracts/<address>/events", methods=["GET"])
+        def contract_events(address: str) -> Tuple[Dict[str, Any], int]:
+            try:
+                limit, offset = self._get_pagination_params(default_limit=50, max_limit=500)
+            except PaginationError as exc:
+                return self._error_response(
+                    str(exc), status=400, code="invalid_pagination", event_type="contracts.invalid_paging"
+                )
+
+            try:
+                normalized = InputSanitizer.validate_address(address)
+            except ValueError as exc:
+                return self._error_response(
+                    str(exc), status=400, code="invalid_address", event_type="contracts.invalid_address"
+                )
+
+            events, total = self.blockchain.get_contract_events(normalized, limit, offset)
+            return self._success_response(
+                {
+                    "contract_address": normalized,
+                    "events": events,
+                    "count": len(events),
+                    "total": total,
+                    "limit": limit,
+                    "offset": offset,
+                }
+            )
 
         @self.app.route("/contracts/governance/status", methods=["GET"])
         def contract_feature_status() -> Tuple[Dict[str, Any], int]:
@@ -1567,9 +2071,16 @@ class NodeAPIRoutes:
                     event_type="api.invalid_paging",
                 )
 
-            history = self.blockchain.get_transaction_history(address) or []
-            total = len(history)
-            window = history[offset : offset + limit]
+            try:
+                window, total = self.blockchain.get_transaction_history_window(address, limit, offset)
+            except ValueError as exc:
+                return self._error_response(
+                    str(exc),
+                    status=400,
+                    code="invalid_pagination",
+                    event_type="api.invalid_paging",
+                )
+
             return jsonify(
                 {
                     "address": address,
@@ -1779,7 +2290,12 @@ class NodeAPIRoutes:
         @self.app.route("/peers", methods=["GET"])
         def get_peers() -> Dict[str, Any]:
             """Get connected peers."""
-            return jsonify({"count": len(self.node.peers), "peers": list(self.node.peers)})
+            verbose = request.args.get("verbose", "false")
+            verbose_requested = str(verbose).lower() in {"1", "true", "yes", "on"}
+            payload: Dict[str, Any] = {"count": len(self.node.peers), "peers": list(self.node.peers), "verbose": verbose_requested}
+            if verbose_requested:
+                payload.update(self._build_peer_snapshot())
+            return jsonify(payload)
 
         @self.app.route("/peers/add", methods=["POST"])
         @validate_request(self.request_validator, PeerAddInput)
@@ -1819,10 +2335,44 @@ class NodeAPIRoutes:
                 return jsonify({"error": "Algorithmic features not available"}), 503
 
             priority = request.args.get("priority", "normal")
-            pending_count = len(self.blockchain.pending_transactions)
+            pending_transactions = list(getattr(self.blockchain, "pending_transactions", []) or [])
+            pending_count = len(pending_transactions)
+
+            fee_rates: List[float] = []
+            mempool_bytes = 0
+            size_samples = 0
+
+            for tx in pending_transactions:
+                rate_callable = getattr(tx, "get_fee_rate", None)
+                if callable(rate_callable):
+                    try:
+                        rate_value = rate_callable()
+                        if isinstance(rate_value, (int, float)) and math.isfinite(rate_value) and rate_value > 0:
+                            fee_rates.append(float(rate_value))
+                    except Exception:
+                        pass
+
+                size_callable = getattr(tx, "get_size", None)
+                if callable(size_callable):
+                    try:
+                        size_value = size_callable()
+                        if isinstance(size_value, (int, float)) and size_value > 0:
+                            mempool_bytes += int(size_value)
+                            size_samples += 1
+                    except Exception:
+                        pass
+
+            avg_tx_size = (mempool_bytes / size_samples) if size_samples else 450.0
+            max_block_bytes = 1_000_000
+            avg_tx_size = max(avg_tx_size, 200.0)
+            approx_block_capacity = max(1, min(5000, int(max_block_bytes / avg_tx_size)))
 
             recommendation = fee_optimizer.predict_optimal_fee(
-                pending_tx_count=pending_count, priority=priority
+                pending_tx_count=pending_count,
+                priority=priority,
+                fee_rates=fee_rates,
+                mempool_bytes=mempool_bytes,
+                avg_block_capacity=approx_block_capacity,
             )
             return jsonify(recommendation), 200
 
@@ -2334,7 +2884,9 @@ class NodeAPIRoutes:
 
             try:
                 result = self.node.bonus_manager.use_referral_code(
-                    model.new_address, model.referral_code
+                    model.new_address,
+                    model.referral_code,
+                    metadata=getattr(model, "metadata", None),
                 )
                 return self._success_response(result if isinstance(result, dict) else {"result": result})
             except Exception as exc:
@@ -2357,6 +2909,20 @@ class NodeAPIRoutes:
             try:
                 leaderboard = self.node.bonus_manager.get_leaderboard(limit)
                 return jsonify({"success": True, "limit": limit, "leaderboard": leaderboard}), 200
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/mining/leaderboard/unified", methods=["GET"])
+        def get_unified_leaderboard() -> Tuple[Dict[str, Any], int]:
+            """Get unified leaderboard that blends XP, streaks, and referrals."""
+            limit = request.args.get("limit", default=10, type=int)
+            metric = request.args.get("metric", default="composite", type=str)
+
+            try:
+                leaderboard = self.node.bonus_manager.get_unified_leaderboard(metric, limit)
+                return jsonify(
+                    {"success": True, "limit": limit, "metric": metric, "leaderboard": leaderboard}
+                ), 200
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
 
@@ -3108,6 +3674,70 @@ class NodeAPIRoutes:
                     "rate_per_minute": payload["rate_per_minute"],
                     "time_locked_backlog": payload["time_locked_backlog"],
                     "events_served": len(events),
+                },
+                severity="INFO",
+            )
+            return self._success_response(payload)
+
+        @self.app.route("/admin/withdrawals/status", methods=["GET"])
+        def get_withdrawal_status_snapshot() -> Tuple[Dict[str, Any], int]:
+            auth_error = self._require_admin_auth()
+            if auth_error:
+                return auth_error
+            limiter = get_rate_limiter()
+            identifier = f"admin-withdrawal-status:{request.remote_addr or 'unknown'}"
+            allowed, error = limiter.check_rate_limit(identifier, "/admin/withdrawals/status")
+            if not allowed:
+                return self._error_response(
+                    error or "Rate limit exceeded",
+                    status=429,
+                    code="rate_limited",
+                    context={"identifier": identifier},
+                )
+            manager = getattr(self.node, "exchange_wallet_manager", None)
+            if not manager:
+                return self._error_response(
+                    "Exchange wallet manager unavailable",
+                    status=503,
+                    code="service_unavailable",
+                )
+            limit = request.args.get("limit", default=25, type=int) or 25
+            limit = max(1, min(limit, 200))
+            status_param = request.args.get("status", default="")
+            valid_statuses = {"pending", "completed", "failed", "flagged"}
+            if status_param:
+                requested = {item.strip().lower() for item in status_param.split(",") if item.strip()}
+                invalid = requested - valid_statuses
+                if invalid:
+                    return self._error_response(
+                        "Invalid status filter",
+                        status=400,
+                        code="invalid_status",
+                        context={"invalid": sorted(invalid)},
+                    )
+                target_statuses = requested or valid_statuses
+            else:
+                target_statuses = valid_statuses
+
+            withdrawals = {
+                status: manager.get_withdrawals_by_status(status, limit) for status in sorted(target_statuses)
+            }
+            counts = manager.get_withdrawal_counts()
+            processor_stats = None
+            if hasattr(self.node, "get_withdrawal_processor_stats"):
+                processor_stats = self.node.get_withdrawal_processor_stats()
+            payload = {
+                "counts": counts,
+                "queue_depth": counts.get("pending", 0),
+                "latest_processor_run": processor_stats,
+                "withdrawals": withdrawals,
+            }
+            self._log_event(
+                "admin_withdrawals_status_access",
+                {
+                    "queue_depth": payload["queue_depth"],
+                    "statuses": sorted(list(target_statuses)),
+                    "limit": limit,
                 },
                 severity="INFO",
             )

@@ -15,8 +15,8 @@ import pytest
 import uuid
 import tempfile
 import shutil
-from unittest.mock import Mock, MagicMock
-from xai.core.wallet_trade_manager_impl import WalletTradeManager, AuditSigner
+from unittest.mock import Mock, MagicMock, call
+from xai.core.wallet_trade_manager_impl import WalletTradeManager, AuditSigner, OrderRateLimitError
 from xai.core.trading import SwapOrderType, TradeMatchStatus
 
 
@@ -394,6 +394,62 @@ class TestPlaceOrder:
         assert len(matches) == 1
         assert hasattr(matches[0], 'match_id')
 
+    def test_place_order_respects_slippage(self, tmp_data_dir):
+        """Matching should respect per-order slippage tolerance."""
+        manager = WalletTradeManager(data_dir=tmp_data_dir)
+
+        manager.place_order(
+            maker_address="XAI123",
+            token_offered="XAI",
+            amount_offered=10.0,
+            token_requested="BTC",
+            amount_requested=0.001,
+            price=10000.0,
+            order_type=SwapOrderType.BUY,
+            max_slippage_bps=50,  # 0.5%
+        )
+
+        _, matches = manager.place_order(
+            maker_address="XAI456",
+            token_offered="BTC",
+            amount_offered=0.001,
+            token_requested="XAI",
+            amount_requested=10.0,
+            price=10010.0,  # within 0.1%
+            order_type=SwapOrderType.SELL,
+            max_slippage_bps=100,
+        )
+
+        assert len(matches) == 1
+
+    def test_place_order_slippage_guard_blocks_trade(self, tmp_data_dir):
+        """Trades exceeding slippage tolerance should not match."""
+        manager = WalletTradeManager(data_dir=tmp_data_dir)
+
+        manager.place_order(
+            maker_address="XAI123",
+            token_offered="XAI",
+            amount_offered=10.0,
+            token_requested="BTC",
+            amount_requested=0.001,
+            price=10000.0,
+            order_type=SwapOrderType.BUY,
+            max_slippage_bps=10,  # 0.1%
+        )
+
+        _, matches = manager.place_order(
+            maker_address="XAI456",
+            token_offered="BTC",
+            amount_offered=0.001,
+            token_requested="XAI",
+            amount_requested=10.0,
+            price=10100.0,  # 1% away
+            order_type=SwapOrderType.SELL,
+            max_slippage_bps=100,
+        )
+
+        assert len(matches) == 0
+
     def test_place_order_match_has_secret(self):
         """Test matched order has secret"""
         manager = WalletTradeManager()
@@ -450,6 +506,106 @@ class TestPlaceOrder:
         if matches:
             assert matches[0].status == TradeMatchStatus.MATCHED
 
+    def test_place_order_rate_limit_blocks_spam(self, tmp_data_dir):
+        """Per-user order rate limiting should block excessive submissions."""
+        manager = WalletTradeManager(
+            data_dir=tmp_data_dir,
+            order_limit_per_minute=2,
+            order_limit_window_seconds=60,
+        )
+
+        def submit(offset: int) -> None:
+            manager.place_order(
+                maker_address="XAILIMIT",
+                token_offered="XAI",
+                amount_offered=10.0,
+                token_requested="BTC",
+                amount_requested=0.001,
+                price=10000.0 + offset,
+                order_type=SwapOrderType.BUY,
+            )
+
+        submit(0)
+        submit(1)
+        with pytest.raises(OrderRateLimitError):
+            submit(2)
+
+    def test_place_order_rate_limit_disabled(self, tmp_data_dir):
+        """Setting the limit to zero disables throttling for trusted deployments."""
+        manager = WalletTradeManager(
+            data_dir=tmp_data_dir,
+            order_limit_per_minute=0,
+        )
+
+        for idx in range(5):
+            manager.place_order(
+                maker_address="XAIUNLIMITED",
+                token_offered="USDT",
+                amount_offered=500.0,
+                token_requested="XAI",
+                amount_requested=50.0,
+                price=10.0 + idx,
+                order_type=SwapOrderType.SELL,
+            )
+
+    def test_place_order_supports_iceberg_orders(self, tmp_data_dir):
+        """Iceberg orders should only expose the configured peak amount."""
+        manager = WalletTradeManager(data_dir=tmp_data_dir)
+
+        iceberg_order, _ = manager.place_order(
+            maker_address="ICEBERG",
+            token_offered="XAI",
+            amount_offered=100.0,
+            token_requested="USDT",
+            amount_requested=1000.0,
+            price=10.0,
+            order_type=SwapOrderType.SELL,
+            iceberg_total=100.0,
+            iceberg_peak=25.0,
+        )
+
+        assert iceberg_order.displayed_offered == pytest.approx(25.0)
+
+        _, matches = manager.place_order(
+            maker_address="TAKER",
+            token_offered="USDT",
+            amount_offered=250.0,
+            token_requested="XAI",
+            amount_requested=25.0,
+            price=10.0,
+            order_type=SwapOrderType.BUY,
+        )
+
+        assert matches, "iceberg should match"
+        refreshed_order = manager.get_order(iceberg_order.order_id)
+        assert refreshed_order.displayed_offered == pytest.approx(25.0)
+        assert refreshed_order.remaining_offered == pytest.approx(75.0)
+
+    def test_trailing_stop_orders_adjust_stop_price(self, tmp_data_dir):
+        """Trailing stop orders should move stop_price with favorable price action."""
+        manager = WalletTradeManager(data_dir=tmp_data_dir)
+
+        order, _ = manager.place_order(
+            maker_address="TRAIL",
+            token_offered="USDT",
+            amount_offered=1000.0,
+            token_requested="XAI",
+            amount_requested=100.0,
+            price=10.0,
+            order_type=SwapOrderType.BUY,
+            stop_price=10.5,
+            trail_amount=0.5,
+        )
+
+        assert order.stop_price == pytest.approx(10.5)
+
+        manager._ensure_stop_triggered(order, 9.0)
+        assert order.lowest_price_seen == pytest.approx(9.0)
+        assert order.stop_price == pytest.approx(9.5)
+
+        triggered = manager._ensure_stop_triggered(order, 9.6)
+        assert triggered is True
+
 
 class TestSettleMatch:
     """Test match settlement"""
@@ -494,6 +650,65 @@ class TestSettleMatch:
             # Verify the match status was updated
             settled_match = manager.get_match(match.match_id)
             assert settled_match.status == TradeMatchStatus.SETTLED
+
+    def test_settle_match_applies_maker_taker_fees(self, tmp_data_dir):
+        """Settlement should honor maker/taker fee splits and credit the fee collector."""
+        exchange = MagicMock()
+        manager = WalletTradeManager(
+            exchange_wallet_manager=exchange,
+            data_dir=tmp_data_dir,
+            maker_fee_bps=100,
+            taker_fee_bps=50,
+        )
+
+        maker_order, _ = manager.place_order(
+            maker_address="maker",
+            token_offered="XAI",
+            amount_offered=100.0,
+            token_requested="USDT",
+            amount_requested=1000.0,
+            price=10.0,
+            order_type=SwapOrderType.SELL,
+        )
+
+        _, matches = manager.place_order(
+            maker_address="taker",
+            token_offered="USDT",
+            amount_offered=1000.0,
+            token_requested="XAI",
+            amount_requested=100.0,
+            price=10.0,
+            order_type=SwapOrderType.BUY,
+        )
+
+        assert matches, "expected orders to match"
+        match = matches[0]
+        result = manager.settle_match(match.match_id, match.secret)
+
+        assert result["success"] is True
+        assert result.status == TradeMatchStatus.SETTLED
+        assert result["fees"] == {"maker_fee": pytest.approx(1.0), "taker_fee": pytest.approx(5.0)}
+
+        exchange.withdraw.assert_has_calls(
+            [
+                call("maker", "XAI", pytest.approx(100.0), destination="taker"),
+                call("taker", "USDT", pytest.approx(1000.0), destination="maker"),
+            ]
+        )
+        exchange.deposit.assert_has_calls(
+            [
+                call("taker", "XAI", pytest.approx(99.0), deposit_type="trade"),
+                call(manager.fee_collector_address, "XAI", pytest.approx(1.0), deposit_type="trade_fee"),
+                call("maker", "USDT", pytest.approx(995.0), deposit_type="trade"),
+                call(manager.fee_collector_address, "USDT", pytest.approx(5.0), deposit_type="trade_fee"),
+            ]
+        )
+
+        match_data = result["match"]
+        assert match_data["maker_fee_bps"] == 100
+        assert match_data["taker_fee_bps"] == 50
+        assert match_data["maker_net_amount"] == pytest.approx(99.0)
+        assert match_data["taker_net_amount"] == pytest.approx(995.0)
 
     def test_settle_match_not_found(self, tmp_data_dir):
         """Test settling non-existent match returns error"""
@@ -589,20 +804,71 @@ class TestEdgeCases:
         assert order.amount_requested == 0.00000001
 
     def test_place_order_zero_amounts(self):
-        """Test placing order with zero amounts"""
+        """Zero amounts should be rejected to avoid division by zero."""
         manager = WalletTradeManager()
 
-        order, _ = manager.place_order(
-            maker_address="XAI123",
-            token_offered="XAI",
-            amount_offered=0.0,
-            token_requested="BTC",
-            amount_requested=0.0,
-            price=0.0,
-            order_type=SwapOrderType.BUY
+        with pytest.raises(ValueError):
+            manager.place_order(
+                maker_address="XAI123",
+                token_offered="XAI",
+                amount_offered=0.0,
+                token_requested="BTC",
+                amount_requested=0.0,
+                price=0.0,
+            order_type=SwapOrderType.BUY,
         )
 
-        assert order.amount_offered == 0.0
+    def test_price_validation(self):
+        """Prices must be finite positive numbers."""
+        manager = WalletTradeManager()
+
+        with pytest.raises(ValueError):
+            manager.place_order(
+                maker_address="XAI123",
+                token_offered="XAI",
+                amount_offered=1.0,
+                token_requested="BTC",
+                amount_requested=0.0001,
+                price=0.0,
+                order_type=SwapOrderType.BUY,
+            )
+
+        with pytest.raises(ValueError):
+            manager.place_order(
+                maker_address="XAI123",
+                token_offered="XAI",
+                amount_offered=1.0,
+                token_requested="BTC",
+                amount_requested=0.0001,
+                price=float("inf"),
+                order_type=SwapOrderType.BUY,
+            )
+
+    def test_price_mismatch_prevents_match(self, tmp_data_dir):
+        """Orders with materially different prices should not match."""
+        manager = WalletTradeManager(data_dir=tmp_data_dir)
+
+        manager.place_order(
+            maker_address="XAI123",
+            token_offered="XAI",
+            amount_offered=10.0,
+            token_requested="BTC",
+            amount_requested=0.001,
+            price=9000.0,
+            order_type=SwapOrderType.BUY,
+        )
+
+        _, matches = manager.place_order(
+            maker_address="XAI456",
+            token_offered="BTC",
+            amount_offered=0.001,
+            token_requested="XAI",
+            amount_requested=10.0,
+            price=12000.0,
+            order_type=SwapOrderType.SELL,
+        )
+
+        assert len(matches) == 0
 
     def test_multiple_orders_same_user(self, tmp_data_dir):
         """Test placing multiple orders for same user with fresh state"""

@@ -624,6 +624,70 @@ class TestGossipTradeEvent:
         wallet_api._gossip_trade_event(event)
 
 
+class TestWalletAPISigning:
+    """Validate wallet signing endpoint security requirements."""
+
+    @pytest.fixture
+    def mock_node(self):
+        node = Mock()
+        node.blockchain = Mock()
+        return node
+
+    @pytest.fixture
+    def app(self):
+        return Flask(__name__)
+
+    @pytest.fixture
+    def wallet_api(self, mock_node, app):
+        from xai.core.api_wallet import WalletAPIHandler
+        return WalletAPIHandler(mock_node, app, broadcast_callback=Mock(), trade_peers={})
+
+    @pytest.fixture
+    def client(self, wallet_api):
+        wallet_api.app.config["TESTING"] = True
+        return wallet_api.app.test_client()
+
+    def test_wallet_sign_requires_ack_prefix(self, client):
+        from hashlib import sha256
+        from xai.core.crypto_utils import generate_secp256k1_keypair_hex, verify_signature_hex
+
+        priv, pub = generate_secp256k1_keypair_hex()
+        message_hash = sha256(b"sign-me").hexdigest()
+        ack_prefix = message_hash[:12]
+
+        response = client.post(
+            "/wallet/sign",
+            json={
+                "message_hash": message_hash,
+                "private_key": priv,
+                "ack_hash_prefix": ack_prefix,
+            },
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["success"] is True
+        signature = data["signature"]
+        assert verify_signature_hex(pub, bytes.fromhex(message_hash), signature) is True
+
+    def test_wallet_sign_rejects_mismatched_ack(self, client):
+        from hashlib import sha256
+        from xai.core.crypto_utils import generate_secp256k1_keypair_hex
+
+        priv, _ = generate_secp256k1_keypair_hex()
+        message_hash = sha256(b"bad-ack").hexdigest()
+
+        response = client.post(
+            "/wallet/sign",
+            json={
+                "message_hash": message_hash,
+                "private_key": priv,
+                "ack_hash_prefix": "deadbeef",
+            },
+        )
+        assert response.status_code == 400
+        assert response.get_json()["success"] is False
+
+
 class TestRegisterTradePeer:
     """Test trade peer registration."""
 

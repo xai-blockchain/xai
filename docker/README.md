@@ -68,8 +68,9 @@ docker-compose logs -f xai-node
 For a complete multi-node testnet:
 
 ```bash
+cp .env.example .env
 cd docker/testnet
-docker-compose up -d
+docker compose up -d
 ```
 
 This starts:
@@ -79,6 +80,69 @@ This starts:
 - Redis cache
 - Prometheus + Grafana monitoring
 - Block explorer
+
+### Monitoring Validation Workflow
+
+Use this when you need a locally running node plus Prometheus/Grafana to exercise new dashboards or alert rules.
+
+1. **Copy the default env file** (needed by several containers):
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Start the testnet stack**. If port `9091` is already in use on your workstation, scale `xai-testnet-node1` to zero so only the bootstrap node and node2 expose metrics ports:
+
+   ```bash
+   cd docker/testnet
+   docker compose up -d --scale xai-testnet-node1=0
+   ```
+
+   Exposed ports (all on localhost):
+   - Bootstrap API/WebSocket: `8080/8081`
+   - Bootstrap Prometheus exporter: `9090`
+   - Node2 API: `8085`
+   - Node2 Prometheus exporter: `9092`
+   - Postgres: `5433`
+   - Redis: `6380`
+   - Prometheus UI: `9093`
+   - Grafana UI: `3001`
+   - Explorer UI: `8082`
+
+3. **Verify containers are healthy**:
+
+   ```bash
+   docker ps
+   # Expect: xai-testnet-bootstrap, xai-testnet-node2, postgres, redis, prometheus, grafana, explorer
+   ```
+
+4. **Generate `/send` rejection metrics** so the new dashboard panels/alerts have data:
+
+   ```bash
+   # Stale timestamp
+   curl -s -X POST http://localhost:8080/send \
+     -H "Content-Type: application/json" \
+     -d '{"sender":"XAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","recipient":"XAIBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB","amount":1,"fee":0.001,"public_key":"04CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC","nonce":1,"signature":"ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB","timestamp":1000}'
+
+   # TXID mismatch (set timestamp to current time)
+   curl -s -X POST http://localhost:8080/send \
+     -H "Content-Type: application/json" \
+     -d '{"sender":"XAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","recipient":"XAIBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB","amount":1,"fee":0.001,"public_key":"04CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC","nonce":2,"signature":"ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB","timestamp":'$(date +%s)',"txid":"deadbeef"}'
+   ```
+
+   Each failing request increments `xai_send_rejections_*` counters.
+
+5. **Inspect dashboards/alerts**:
+   - Grafana: http://localhost:3001 (default credentials `admin/admin`). Open the “Security Operations” dashboard and look for the “/send Rejections by Reason” panel.
+   - Prometheus rules: http://localhost:9093/rules (the `SendTimestampDrift` alert transitions to `pending` after a few samples).
+
+6. **Stop the stack when finished**:
+
+   ```bash
+   docker compose down
+   ```
+
+   If you scaled node1 to zero when starting, the `down` command tears everything down (no need to repeat the `--scale` flag).
 
 ## Architecture
 

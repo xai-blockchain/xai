@@ -1,0 +1,633 @@
+{
+  "dashboard": {
+    "title": "XAI Blockchain - Comprehensive Metrics (97 Total)",
+    "tags": ["xai", "comprehensive", "ai-tasks", "dex", "all-modules"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "AI Task Module Overview (24 Metrics)",
+        "type": "row",
+        "gridPos": {"x": 0, "y": 0, "w": 24, "h": 1},
+        "collapsed": false
+      },
+      {
+        "id": 2,
+        "title": "AI: Jobs Submitted",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 1, "w": 8, "h": 6},
+        "targets": [
+          {
+            "expr": "rate(xai_ai_jobs_submitted_total[5m])",
+            "legendFormat": "{{job_type}}"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "AI: Jobs Accepted by Provider",
+        "type": "timeseries",
+        "gridPos": {"x": 8, "y": 1, "w": 8, "h": 6},
+        "targets": [
+          {
+            "expr": "rate(xai_ai_jobs_accepted_total[5m])",
+            "legendFormat": "{{provider}}"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "AI: Jobs Completed vs Failed",
+        "type": "timeseries",
+        "gridPos": {"x": 16, "y": 1, "w": 8, "h": 6},
+        "targets": [
+          {
+            "expr": "sum(rate(xai_ai_jobs_completed_total{status=\"success\"}[5m]))",
+            "legendFormat": "Completed"
+          },
+          {
+            "expr": "sum(rate(xai_ai_jobs_failed_total[5m]))",
+            "legendFormat": "Failed"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "AI: Job Execution Time",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 7, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(xai_ai_job_execution_seconds_bucket[5m]))",
+            "legendFormat": "p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(xai_ai_job_execution_seconds_bucket[5m]))",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(xai_ai_job_execution_seconds_bucket[5m]))",
+            "legendFormat": "p99"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s"
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "AI: Job Queue Size",
+        "type": "gauge",
+        "gridPos": {"x": 12, "y": 7, "w": 6, "h": 6},
+        "targets": [
+          {
+            "expr": "xai_ai_job_queue_size",
+            "legendFormat": "Queue Size"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 50, "color": "yellow"},
+                {"value": 200, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "AI: Active Providers",
+        "type": "stat",
+        "gridPos": {"x": 18, "y": 7, "w": 6, "h": 6},
+        "targets": [
+          {
+            "expr": "xai_ai_providers_active",
+            "legendFormat": "Active Providers"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "AI: Provider Reputation",
+        "type": "gauge",
+        "gridPos": {"x": 0, "y": 13, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "xai_ai_provider_reputation_score",
+            "legendFormat": "{{provider}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "AI: Provider Stake",
+        "type": "table",
+        "gridPos": {"x": 12, "y": 13, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "xai_ai_provider_stake",
+            "format": "table",
+            "legendFormat": "{{provider}}"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "AI: Provider Slashing Events",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 19, "w": 8, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(xai_ai_provider_slashing_events_total)",
+            "legendFormat": "Total Slashing"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "AI: Model Selections",
+        "type": "timeseries",
+        "gridPos": {"x": 8, "y": 19, "w": 8, "h": 4},
+        "targets": [
+          {
+            "expr": "rate(xai_ai_model_selections_total[5m])",
+            "legendFormat": "{{model}}"
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "AI: Model Switching Events",
+        "type": "stat",
+        "gridPos": {"x": 16, "y": 19, "w": 8, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(xai_ai_model_switching_total)",
+            "legendFormat": "Auto-Switching"
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "title": "AI: Pool Utilization",
+        "type": "gauge",
+        "gridPos": {"x": 0, "y": 23, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "xai_ai_pool_utilization_percentage",
+            "legendFormat": "Pool {{pool_id}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      {
+        "id": 14,
+        "title": "AI: Pool Queue Depth",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 23, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "xai_ai_pool_queue_depth",
+            "legendFormat": "Pool {{pool_id}}"
+          }
+        ]
+      },
+      {
+        "id": 15,
+        "title": "AI: Trading Bot Decisions",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 29, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "rate(xai_ai_trading_decisions_total[5m])",
+            "legendFormat": "{{decision_type}}"
+          }
+        ]
+      },
+      {
+        "id": 16,
+        "title": "AI: Trading Accuracy",
+        "type": "gauge",
+        "gridPos": {"x": 12, "y": 29, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "xai_ai_trading_accuracy_percentage",
+            "legendFormat": "{{model}} - {{timeframe}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      {
+        "id": 17,
+        "title": "AI: Task Cost Distribution",
+        "type": "heatmap",
+        "gridPos": {"x": 0, "y": 35, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "rate(xai_ai_task_cost_tokens_bucket[5m])",
+            "format": "heatmap"
+          }
+        ]
+      },
+      {
+        "id": 18,
+        "title": "AI: Provider Revenue",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 35, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "rate(xai_ai_revenue_by_provider_total[5m])",
+            "legendFormat": "{{provider}} - {{denom}}"
+          }
+        ]
+      },
+      {
+        "id": 19,
+        "title": "AI: Inference Latency",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 41, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(xai_ai_inference_latency_seconds_bucket[5m]))",
+            "legendFormat": "{{model}} - {{provider}}"
+          }
+        ]
+      },
+      {
+        "id": 20,
+        "title": "AI: Batch Processing Time",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 41, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(xai_ai_batch_processing_seconds_bucket[5m]))",
+            "legendFormat": "Batch {{batch_size}}"
+          }
+        ]
+      },
+      {
+        "id": 21,
+        "title": "AI: Task Retries",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 47, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "rate(xai_ai_task_retries_total[5m])",
+            "legendFormat": "{{provider}} - {{reason}}"
+          }
+        ]
+      },
+      {
+        "id": 22,
+        "title": "AI: Task Quality Score",
+        "type": "gauge",
+        "gridPos": {"x": 12, "y": 47, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "xai_ai_task_quality_score",
+            "legendFormat": "{{provider}} - {{task_type}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "max": 100
+          }
+        }
+      },
+      {
+        "id": 23,
+        "title": "DEX Module Overview (30 Metrics)",
+        "type": "row",
+        "gridPos": {"x": 0, "y": 53, "w": 24, "h": 1},
+        "collapsed": false
+      },
+      {
+        "id": 24,
+        "title": "DEX: Total Swaps",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 54, "w": 8, "h": 6},
+        "targets": [
+          {
+            "expr": "sum(rate(xai_dex_swaps_total{status=\"success\"}[5m])) by (pool)",
+            "legendFormat": "Success - {{pool}}"
+          },
+          {
+            "expr": "sum(rate(xai_dex_swaps_total{status=\"failed\"}[5m])) by (pool)",
+            "legendFormat": "Failed - {{pool}}"
+          }
+        ]
+      },
+      {
+        "id": 25,
+        "title": "DEX: Swap Volume",
+        "type": "timeseries",
+        "gridPos": {"x": 8, "y": 54, "w": 8, "h": 6},
+        "targets": [
+          {
+            "expr": "rate(xai_dex_swap_volume[5m])",
+            "legendFormat": "{{pool}} - {{denom}}"
+          }
+        ]
+      },
+      {
+        "id": 26,
+        "title": "DEX: Swap Latency",
+        "type": "timeseries",
+        "gridPos": {"x": 16, "y": 54, "w": 8, "h": 6},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(xai_dex_swap_latency_seconds_bucket[5m]))",
+            "legendFormat": "p95"
+          }
+        ]
+      },
+      {
+        "id": 27,
+        "title": "DEX: Swap Slippage",
+        "type": "gauge",
+        "gridPos": {"x": 0, "y": 60, "w": 8, "h": 6},
+        "targets": [
+          {
+            "expr": "avg(xai_dex_swap_slippage)",
+            "legendFormat": "Avg Slippage"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 28,
+        "title": "DEX: Swap Fees Collected",
+        "type": "timeseries",
+        "gridPos": {"x": 8, "y": 60, "w": 8, "h": 6},
+        "targets": [
+          {
+            "expr": "rate(xai_dex_swap_fees_collected[5m])",
+            "legendFormat": "{{pool}} - {{denom}}"
+          }
+        ]
+      },
+      {
+        "id": 29,
+        "title": "DEX: Price Impact",
+        "type": "gauge",
+        "gridPos": {"x": 16, "y": 60, "w": 8, "h": 6},
+        "targets": [
+          {
+            "expr": "avg(xai_dex_price_impact)",
+            "legendFormat": "Avg Impact %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 30,
+        "title": "DEX: Liquidity Added",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 66, "w": 8, "h": 6},
+        "targets": [
+          {
+            "expr": "rate(xai_dex_liquidity_added[5m])",
+            "legendFormat": "{{pool}} - {{denom}}"
+          }
+        ]
+      },
+      {
+        "id": 31,
+        "title": "DEX: Liquidity Removed",
+        "type": "timeseries",
+        "gridPos": {"x": 8, "y": 66, "w": 8, "h": 6},
+        "targets": [
+          {
+            "expr": "rate(xai_dex_liquidity_removed[5m])",
+            "legendFormat": "{{pool}} - {{denom}}"
+          }
+        ]
+      },
+      {
+        "id": 32,
+        "title": "DEX: Pool Reserves",
+        "type": "timeseries",
+        "gridPos": {"x": 16, "y": 66, "w": 8, "h": 6},
+        "targets": [
+          {
+            "expr": "xai_dex_pool_reserves",
+            "legendFormat": "{{pool}} - {{denom}}"
+          }
+        ]
+      },
+      {
+        "id": 33,
+        "title": "DEX: LP Token Supply",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 72, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(xai_dex_lp_token_supply)",
+            "legendFormat": "Total Supply"
+          }
+        ]
+      },
+      {
+        "id": 34,
+        "title": "DEX: Total TVL",
+        "type": "stat",
+        "gridPos": {"x": 6, "y": 72, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(xai_dex_pool_tvl)",
+            "legendFormat": "Total TVL"
+          }
+        ]
+      },
+      {
+        "id": 35,
+        "title": "DEX: Pool Count",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 72, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "xai_dex_pools_count",
+            "legendFormat": "Active Pools"
+          }
+        ]
+      },
+      {
+        "id": 36,
+        "title": "DEX: Pool Imbalance",
+        "type": "gauge",
+        "gridPos": {"x": 18, "y": 72, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "xai_dex_pool_imbalance",
+            "legendFormat": "{{pool}}"
+          }
+        ]
+      },
+      {
+        "id": 37,
+        "title": "DEX: Concentrated Liquidity Positions",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 76, "w": 12, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(xai_dex_concentrated_liquidity_positions)",
+            "legendFormat": "Active Positions"
+          }
+        ]
+      },
+      {
+        "id": 38,
+        "title": "DEX: Trading Orders Placed",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 76, "w": 12, "h": 4},
+        "targets": [
+          {
+            "expr": "rate(xai_dex_trading_orders_placed_total[5m])",
+            "legendFormat": "Orders/sec"
+          }
+        ]
+      },
+      {
+        "id": 39,
+        "title": "DEX: Circuit Breaker Status",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 80, "w": 8, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(xai_dex_circuit_breaker_active)",
+            "legendFormat": "Breakers Active"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 40,
+        "title": "DEX: MEV Protection Events",
+        "type": "stat",
+        "gridPos": {"x": 8, "y": 80, "w": 8, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(xai_dex_mev_protection_events_total)",
+            "legendFormat": "MEV Events"
+          }
+        ]
+      },
+      {
+        "id": 41,
+        "title": "DEX: Suspicious Activity Detected",
+        "type": "stat",
+        "gridPos": {"x": 16, "y": 80, "w": 8, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(xai_dex_suspicious_activity_total)",
+            "legendFormat": "Suspicious Events"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 1, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 42,
+        "title": "DEX: TWAP Updates",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 84, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "rate(xai_dex_twap_updates_total[5m])",
+            "legendFormat": "TWAP Updates/sec"
+          }
+        ]
+      },
+      {
+        "id": 43,
+        "title": "DEX: Atomic Swaps",
+        "type": "timeseries",
+        "gridPos": {"x": 12, "y": 84, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "rate(xai_dex_atomic_swaps_initiated_total[5m])",
+            "legendFormat": "Initiated"
+          },
+          {
+            "expr": "rate(xai_dex_atomic_swaps_completed_total[5m])",
+            "legendFormat": "Completed"
+          },
+          {
+            "expr": "rate(xai_dex_atomic_swaps_refunded_total[5m])",
+            "legendFormat": "Refunded"
+          }
+        ]
+      }
+    ]
+  }
+}

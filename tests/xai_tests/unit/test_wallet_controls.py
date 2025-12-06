@@ -20,10 +20,14 @@ def metrics_collector(tmp_path):
     reset_targets = {
         "xai_withdrawals_daily_total",
         "xai_withdrawals_time_locked_total",
+        "xai_withdrawal_processor_completed_total",
+        "xai_withdrawal_processor_flagged_total",
+        "xai_withdrawal_processor_failed_total",
     }
     gauge_targets = {
         "xai_withdrawals_rate_per_minute",
         "xai_withdrawals_time_locked_backlog",
+        "xai_withdrawal_pending_queue",
     }
     for metric_name in reset_targets:
         metric = collector.get_metric(metric_name)
@@ -81,7 +85,7 @@ def test_time_locked_withdrawal_persistence(metrics_collector, tmp_path):
 
 
 def test_daily_withdrawal_metrics_update(metrics_collector):
-    manager = DailyWithdrawalLimitManager(daily_limit=200.0)
+    manager = DailyWithdrawalLimitManager(daily_limit=200.0, metrics_collector=metrics_collector)
     base = ts(2025, 2, 1, 9)
 
     assert manager.check_and_record_withdrawal("user-metrics", 120, current_timestamp=base)
@@ -128,3 +132,16 @@ def test_time_locked_withdrawal_cancel(metrics_collector, tmp_path):
     assert withdrawal.withdrawal_id not in manager.pending_withdrawals
     with storage.open() as handle:
         assert json.load(handle) == []
+
+
+def test_withdrawal_processor_metrics_recording(metrics_collector):
+    stats = {"completed": 2, "flagged": 1, "failed": 1}
+    metrics_collector.record_withdrawal_processor_stats(stats, queue_depth=3)
+    completed = metrics_collector.get_metric("xai_withdrawal_processor_completed_total")
+    flagged = metrics_collector.get_metric("xai_withdrawal_processor_flagged_total")
+    failed = metrics_collector.get_metric("xai_withdrawal_processor_failed_total")
+    queue = metrics_collector.get_metric("xai_withdrawal_pending_queue")
+    assert completed.value == 2
+    assert flagged.value == 1
+    assert failed.value == 1
+    assert queue.value == 3

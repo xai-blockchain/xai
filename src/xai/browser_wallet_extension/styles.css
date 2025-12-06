@@ -120,3 +120,53 @@ button.secondary {
   gap: 6px;
   margin-top: 8px;
 }
+
+.hidden {
+  display: none !important;
+}
+
+.signing-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 12, 24, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1000;
+}
+
+.signing-modal__content {
+  background: rgba(4, 9, 20, 0.95);
+  border: 1px solid rgba(110, 190, 255, 0.4);
+  border-radius: 12px;
+  padding: 16px;
+  max-width: 520px;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.signing-modal__hash {
+  font-size: 12px;
+  color: #c5d7ff;
+  word-break: break-all;
+}
+
+.signing-modal__payload {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 12px;
+  max-height: 300px;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.signing-modal__ack {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin: 12px 0;
+  color: #bbc2ff;
+}
