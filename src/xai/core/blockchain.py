@@ -3499,6 +3499,9 @@ class Blockchain:
     def _validate_chain_structure(self, chain: List[BlockHeader]) -> bool:
         """
         Validates the structural integrity of a candidate chain (hashes, links).
+
+        SECURITY: Validates block size limits during chain reorganization to prevent
+        attackers from creating oversized blocks in a fork chain.
         """
         if not chain:
             return False
@@ -3508,6 +3511,16 @@ class Blockchain:
         if first.index != 0 or first.previous_hash != "0":
             return False
 
+        # SECURITY: Validate genesis block size as well
+        first_block = chain[0]
+        if hasattr(first_block, "header"):  # This is a full Block object
+            if not self._block_within_size_limits(first_block, context="chain_replacement"):
+                self.logger.warn(
+                    f"Genesis block exceeds size limits during chain reorganization",
+                    block_hash=first.hash,
+                )
+                return False
+
         for i in range(1, len(chain)):
             current_header = chain[i].header if hasattr(chain[i], "header") else chain[i]
             previous_header = chain[i-1].header if hasattr(chain[i-1], "header") else chain[i-1]
@@ -3516,7 +3529,7 @@ class Blockchain:
             if current_header.previous_hash != previous_header.hash:
                 self.logger.warn(f"Invalid chain structure: block {current_header.index} previous hash mismatch")
                 return False
-            
+
             # Check block hash (recalculate and compare)
             if current_header.hash != current_header.calculate_hash():
                 self.logger.warn(f"Invalid chain structure: block {current_header.index} hash mismatch")
@@ -3553,6 +3566,18 @@ class Blockchain:
             if current_header.index > 0:
                 if not self.verify_block_signature(current_header):
                     self.logger.warn(f"Invalid chain structure: block {current_header.index} has invalid signature")
+                    return False
+
+            # SECURITY: Validate block size limits during chain reorganization
+            # Prevents attackers from creating oversized blocks in a fork chain
+            # Note: We need the full Block object, not just the header
+            current_block = chain[i]
+            if hasattr(current_block, "header"):  # This is a full Block object
+                if not self._block_within_size_limits(current_block, context="chain_replacement"):
+                    self.logger.warn(
+                        f"Block {current_header.index} exceeds size limits during chain reorganization",
+                        block_hash=current_header.hash,
+                    )
                     return False
 
         return True

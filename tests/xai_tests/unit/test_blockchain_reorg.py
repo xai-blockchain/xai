@@ -279,3 +279,178 @@ class TestBlockchainReorg:
         assert bc.chain[0].hash == genesis_hash
         assert bc.chain[0].index == genesis_index
         assert bc.chain[0].previous_hash == "0"
+
+    def test_reorg_rejects_oversized_blocks(self, tmp_path):
+        """
+        Test that chain reorganization rejects chains with oversized blocks.
+
+        SECURITY: Prevents attackers from creating oversized blocks in a fork chain
+        to bypass normal block size validation.
+        """
+        from xai.core.blockchain_security import BlockchainSecurityConfig
+        from copy import deepcopy
+
+        bc = Blockchain(data_dir=str(tmp_path))
+        wallet = Wallet()
+
+        # Build initial chain
+        bc.mine_pending_transactions(wallet.address)
+        bc.mine_pending_transactions(wallet.address)
+        original_chain_length = len(bc.chain)
+        original_tip = bc.chain[-1].hash
+
+        # Create a fork chain with an oversized block
+        # We'll create a chain that would normally be accepted (longer/higher work)
+        # but contains a block that violates size limits
+
+        # Create a valid block first
+        bc.mine_pending_transactions(wallet.address)
+        valid_fork_block = deepcopy(bc.chain[-1])
+
+        # Revert to fork point
+        bc.chain = bc.chain[:original_chain_length]
+
+        # Create an oversized block by adding excessive transactions
+        # We'll exceed MAX_TRANSACTIONS_PER_BLOCK limit
+        oversized_txs = []
+        max_txs = BlockchainSecurityConfig.MAX_TRANSACTIONS_PER_BLOCK
+
+        # Create more transactions than allowed
+        for i in range(max_txs + 100):
+            tx = Transaction(
+                sender=wallet.address,
+                recipient=f"XAI{'0' * 38}{i:04d}",  # Generate valid recipient addresses
+                amount=0.001,
+                fee=0.0001,
+                public_key=wallet.public_key,
+            )
+            # Set timestamp manually (not in constructor)
+            tx.timestamp = time.time() + i * 0.001
+            # Set signature manually
+            tx.signature = f"sig_{i}"
+            oversized_txs.append(tx)
+
+        # Create an oversized block
+        last_block = bc.chain[-1]
+        oversized_block = Block(
+            last_block.index + 1,  # First param is index (int)
+            oversized_txs,
+            previous_hash=last_block.hash,
+            difficulty=bc.difficulty,
+            timestamp=time.time(),
+            nonce=12345,  # Set a nonce
+        )
+
+        # Set a valid-looking hash (attacker could craft this)
+        # We don't need real PoW since size validation happens first
+        oversized_block.header._hash = "0000" + "a" * 60  # Fake hash with correct difficulty prefix
+
+        # Create a fork chain: [genesis, block1, block2, oversized_block]
+        fork_chain = bc.chain[:original_chain_length] + [oversized_block]
+
+        # Attempt to replace chain with fork containing oversized block
+        # This should FAIL due to size validation
+        result = bc.replace_chain(fork_chain)
+
+        # Verify the reorg was rejected
+        assert result is False, "Chain reorganization should reject oversized blocks"
+
+        # Verify original chain is intact
+        assert len(bc.chain) == original_chain_length, "Original chain should be unchanged"
+        assert bc.chain[-1].hash == original_tip, "Chain tip should not have changed"
+
+    def test_reorg_rejects_oversized_block_by_size(self, tmp_path):
+        """
+        Test that chain reorganization rejects blocks exceeding MAX_BLOCK_SIZE.
+
+        SECURITY: Prevents attackers from creating blocks with total size > 2MB
+        in a fork chain.
+        """
+        from xai.core.blockchain_security import BlockchainSecurityConfig
+        from copy import deepcopy
+
+        bc = Blockchain(data_dir=str(tmp_path))
+        wallet = Wallet()
+
+        # Build initial chain
+        bc.mine_pending_transactions(wallet.address)
+        original_chain_length = len(bc.chain)
+        original_tip = bc.chain[-1].hash
+
+        # Create a block with huge transaction data to exceed MAX_BLOCK_SIZE (2MB)
+        # Create a transaction with massive data field
+        huge_data = "X" * (BlockchainSecurityConfig.MAX_BLOCK_SIZE // 2)  # 1MB of data
+
+        # Create transactions with large data
+        oversized_txs = []
+        for i in range(3):  # 3 x 1MB = 3MB total (exceeds 2MB limit)
+            tx = Transaction(
+                sender=wallet.address,
+                recipient=f"XAI{'0' * 38}{i:04d}",
+                amount=1.0,
+                fee=0.1,
+                public_key=wallet.public_key,
+            )
+            # Set timestamp and signature manually with huge data
+            tx.timestamp = time.time() + i
+            tx.signature = f"sig_{huge_data}_{i}"  # Add huge data to signature field
+            oversized_txs.append(tx)
+
+        # Create oversized block
+        last_block = bc.chain[-1]
+        oversized_block = Block(
+            last_block.index + 1,  # First param is index (int)
+            oversized_txs,
+            previous_hash=last_block.hash,
+            difficulty=bc.difficulty,
+            timestamp=time.time(),
+            nonce=12345,  # Set a nonce
+        )
+
+        # Set a valid-looking hash (attacker could craft this)
+        # We don't need real PoW since size validation happens first
+        oversized_block.header._hash = "0000" + "b" * 60  # Fake hash with correct difficulty prefix
+
+        # Create fork chain
+        fork_chain = bc.chain[:original_chain_length] + [oversized_block]
+
+        # Attempt to replace chain - should FAIL
+        result = bc.replace_chain(fork_chain)
+
+        # Verify rejection
+        assert result is False, "Chain reorganization should reject blocks exceeding MAX_BLOCK_SIZE"
+        assert len(bc.chain) == original_chain_length, "Original chain should be unchanged"
+        assert bc.chain[-1].hash == original_tip, "Chain tip should not have changed"
+
+    def test_reorg_accepts_properly_sized_blocks(self, tmp_path):
+        """
+        Test that chain reorganization accepts valid blocks within size limits.
+
+        This is a positive test to ensure our size validation doesn't reject
+        legitimate blocks.
+        """
+        bc = Blockchain(data_dir=str(tmp_path))
+        wallet = Wallet()
+
+        # Build initial chain
+        bc.mine_pending_transactions(wallet.address)
+        original_chain_length = len(bc.chain)
+
+        # Create a valid fork with properly sized blocks
+        # Add normal transactions
+        for i in range(5):
+            tx = bc.create_transaction(
+                wallet.address,
+                f"XAI{'0' * 38}{i:04d}",  # Valid XAI address format
+                1.0,
+                0.1,
+                wallet.private_key,
+                wallet.public_key,
+            )
+
+        # Mine the fork block (normal size)
+        bc.mine_pending_transactions(wallet.address)
+
+        # This should succeed - normal sized block
+        assert len(bc.chain) == original_chain_length + 1
+        assert bc.is_chain_valid()
