@@ -11,6 +11,12 @@ class MempoolManager:
     - Configurable maximum size with fee-based eviction
     - Automatic expiration of old unconfirmed transactions
     - Transaction prioritization by fee rate
+    - O(1) amortized lazy deletion for high-performance transaction removal
+
+    Performance:
+    - Transaction addition: O(log n)
+    - Transaction removal: O(1) amortized via lazy deletion
+    - Automatic compaction when deleted entries exceed 50% of heap size
     """
 
     def __init__(
@@ -42,6 +48,11 @@ class MempoolManager:
         self.transaction_queue: list[Tuple[float, int, str]] = []  # For lowest_fee policy
         self._transaction_id_counter = 0
         self.last_expiry_check = time.time()
+
+        # Lazy deletion optimization for heap operations
+        # Track deleted transaction IDs without rebuilding heap
+        self._deleted_tx_ids: Set[str] = set()
+        self._compaction_threshold = 0.5  # Compact when >50% deleted
 
         # Double-spend detection: track spent UTXOs in mempool
         # Set of "txid:vout" strings representing UTXOs being spent by pending transactions
@@ -114,18 +125,20 @@ class MempoolManager:
                 self.remove_transaction(oldest_tx_id)
                 print(f"Evicted oldest transaction: {oldest_tx_id}")
             elif self.eviction_policy == "lowest_fee":
-                # Evict the transaction with the lowest fee
-                if self.transaction_queue:
-                    lowest_fee_tx = heapq.heappop(self.transaction_queue)
-                    evicted_tx_id = lowest_fee_tx[2]
+                # Evict the transaction with the lowest fee using lazy deletion
+                lowest_fee_entry = self._pop_lowest_fee_transaction()
+
+                if lowest_fee_entry:
+                    evicted_tx_id = lowest_fee_entry[2]
+                    evicted_fee = lowest_fee_entry[0]
                     self.remove_transaction(evicted_tx_id)
                     print(
-                        f"Evicted lowest fee transaction: {evicted_tx_id} with fee {lowest_fee_tx[0]:.2f}"
+                        f"Evicted lowest fee transaction: {evicted_tx_id} with fee {evicted_fee:.2f}"
                     )
                 else:
                     # Should not happen if pending_transactions is not empty
                     raise RuntimeError(
-                        "Mempool full but transaction_queue is empty for lowest_fee policy."
+                        "Mempool full but no valid transactions in queue for lowest_fee policy."
                     )
 
         self.pending_transactions[tx_id] = {
@@ -153,7 +166,13 @@ class MempoolManager:
         return {"success": True, "tx_id": tx_id}
 
     def remove_transaction(self, tx_id: str):
-        """Removes a transaction from the mempool and frees spent UTXOs."""
+        """
+        Removes a transaction from the mempool and frees spent UTXOs.
+
+        Performance: O(1) amortized via lazy deletion pattern.
+        The transaction is marked as deleted without rebuilding the heap.
+        Periodic compaction occurs when >50% of heap entries are deleted.
+        """
         if tx_id in self.pending_transactions:
             tx_data = self.pending_transactions[tx_id]
 
@@ -163,17 +182,152 @@ class MempoolManager:
                 utxo_key = f"{inp['txid']}:{inp['vout']}"
                 self.spent_utxos.discard(utxo_key)
 
+            # Remove from pending transactions dictionary
             del self.pending_transactions[tx_id]
-            # For lowest_fee policy, removing from heap is more complex (lazy deletion or rebuild)
-            # For simplicity in this conceptual model, we'll assume it's handled or not critical for removal.
-            # In a real system, you'd need to mark it as removed or rebuild the heap.
+
+            # PERFORMANCE OPTIMIZATION: Lazy deletion for heap
+            # Mark as deleted instead of rebuilding heap (O(1) vs O(n log n))
+            if self.eviction_policy == "lowest_fee":
+                self._deleted_tx_ids.add(tx_id)
+
+                # Trigger compaction if too many deleted entries accumulate
+                self._maybe_compact_heap()
+
             print(f"Removed transaction {tx_id}. Mempool size: {len(self.pending_transactions)}")
         else:
             print(f"Transaction {tx_id} not found in mempool.")
 
+    def _maybe_compact_heap(self):
+        """
+        Compact the transaction heap if too many deleted entries have accumulated.
+
+        This removes lazy-deleted entries from the heap to prevent unbounded growth.
+        Triggered when deleted entries exceed 50% of total heap size.
+
+        Performance: O(n log n) but only runs when necessary.
+        """
+        if not self.transaction_queue:
+            # Empty heap, clear deleted set
+            self._deleted_tx_ids.clear()
+            return
+
+        # Calculate deletion ratio
+        heap_size = len(self.transaction_queue)
+        deleted_count = len(self._deleted_tx_ids)
+
+        if deleted_count > heap_size * self._compaction_threshold:
+            # Rebuild heap excluding deleted entries
+            old_heap_size = heap_size
+            self.transaction_queue = [
+                (fee, timestamp, tx_id)
+                for fee, timestamp, tx_id in self.transaction_queue
+                if tx_id not in self._deleted_tx_ids
+            ]
+            heapq.heapify(self.transaction_queue)
+            self._deleted_tx_ids.clear()
+
+            print(
+                f"Heap compaction: reduced from {old_heap_size} to "
+                f"{len(self.transaction_queue)} entries (removed {deleted_count} deleted)"
+            )
+
+    def _pop_lowest_fee_transaction(self) -> Optional[Tuple[float, int, str]]:
+        """
+        Pop the lowest fee transaction from the heap, skipping deleted entries.
+
+        Performance: O(log n) amortized. Deleted entries are skipped lazily.
+
+        Returns:
+            Tuple of (fee, timestamp, tx_id) or None if heap is empty
+        """
+        while self.transaction_queue:
+            entry = heapq.heappop(self.transaction_queue)
+            fee, timestamp, tx_id = entry
+
+            # Skip lazy-deleted entries
+            if tx_id in self._deleted_tx_ids:
+                self._deleted_tx_ids.discard(tx_id)
+                continue
+
+            # Skip entries that were removed from pending_transactions
+            if tx_id not in self.pending_transactions:
+                continue
+
+            return entry
+
+        return None
+
+    def batch_remove_transactions(self, tx_ids: List[str]):
+        """
+        Efficiently remove multiple transactions at once.
+
+        Used for confirmed transactions in a new block. Uses lazy deletion
+        for heap operations to avoid expensive rebuilds.
+
+        Performance: O(n) where n = number of transactions to remove.
+        Much faster than removing one-by-one due to deferred compaction.
+
+        Args:
+            tx_ids: List of transaction IDs to remove
+        """
+        if not tx_ids:
+            return
+
+        removed_count = 0
+
+        # Remove all transactions (marks as deleted for heap)
+        for tx_id in tx_ids:
+            if tx_id in self.pending_transactions:
+                tx_data = self.pending_transactions[tx_id]
+
+                # Free UTXOs
+                inputs = tx_data.get("inputs", [])
+                for inp in inputs:
+                    utxo_key = f"{inp['txid']}:{inp['vout']}"
+                    self.spent_utxos.discard(utxo_key)
+
+                # Remove from dictionary
+                del self.pending_transactions[tx_id]
+
+                # Mark as deleted in heap (lazy deletion)
+                if self.eviction_policy == "lowest_fee":
+                    self._deleted_tx_ids.add(tx_id)
+
+                removed_count += 1
+
+        if removed_count > 0:
+            print(
+                f"Batch removed {removed_count} transactions. "
+                f"Mempool size: {len(self.pending_transactions)}"
+            )
+
+            # Single compaction check after batch removal
+            if self.eviction_policy == "lowest_fee":
+                self._maybe_compact_heap()
+
     def get_mempool_size(self) -> int:
         """Returns the current number of transactions in the mempool."""
         return len(self.pending_transactions)
+
+    def get_heap_statistics(self) -> Dict[str, Any]:
+        """
+        Get statistics about heap efficiency for monitoring and debugging.
+
+        Returns:
+            Dictionary with heap size, deleted count, and efficiency metrics
+        """
+        heap_size = len(self.transaction_queue)
+        deleted_count = len(self._deleted_tx_ids)
+        valid_count = len(self.pending_transactions)
+
+        return {
+            "heap_size": heap_size,
+            "deleted_entries": deleted_count,
+            "valid_transactions": valid_count,
+            "heap_efficiency": (heap_size - deleted_count) / heap_size if heap_size > 0 else 1.0,
+            "compaction_threshold": self._compaction_threshold,
+            "needs_compaction": deleted_count > heap_size * self._compaction_threshold if heap_size > 0 else False,
+        }
 
     def remove_expired_transactions(self) -> int:
         """
@@ -181,6 +335,9 @@ class MempoolManager:
 
         This prevents the mempool from being clogged with old unconfirmed transactions
         that will likely never be mined (e.g., due to low fees or network issues).
+
+        Performance: O(n) for checking + O(1) amortized per removal via lazy deletion.
+        No expensive heap rebuild required.
 
         Returns:
             Number of expired transactions removed
@@ -200,24 +357,56 @@ class MempoolManager:
             if tx_age > self.transaction_expiry_seconds:
                 expired_tx_ids.append(tx_id)
 
-        # Remove expired transactions
+        # Remove expired transactions using lazy deletion (O(1) per removal)
         for tx_id in expired_tx_ids:
+            # Get timestamp before removal for logging
+            tx_timestamp = self.pending_transactions.get(tx_id, {}).get("timestamp", current_time)
+            tx_age = current_time - tx_timestamp
+
             self.remove_transaction(tx_id)
-            print(f"Expired transaction {tx_id} (age: {current_time - self.pending_transactions.get(tx_id, {}).get('timestamp', current_time):.0f}s)")
+            print(f"Expired transaction {tx_id} (age: {tx_age:.0f}s)")
 
         if expired_tx_ids:
             print(f"Removed {len(expired_tx_ids)} expired transactions from mempool")
-
-        # Rebuild transaction queue if using lowest_fee policy
-        if self.eviction_policy == "lowest_fee" and expired_tx_ids:
-            self.transaction_queue = []
-            for tx_id, tx_data in self.pending_transactions.items():
-                heapq.heappush(
-                    self.transaction_queue,
-                    (tx_data["fee"], tx_data["timestamp"], tx_id)
-                )
+            # Compaction will be triggered automatically if needed via remove_transaction
 
         return len(expired_tx_ids)
+
+    def get_transactions(self, limit: Optional[int] = None) -> list:
+        """
+        Get transactions from the mempool.
+
+        Args:
+            limit: Maximum number of transactions to return
+
+        Returns:
+            List of transactions
+        """
+        txs = list(self.pending_transactions.values())
+        if limit:
+            return txs[:limit]
+        return txs
+
+    def get_top_transactions_by_fee(self, limit: Optional[int] = None) -> list:
+        """
+        Get top transactions ordered by fee (highest first).
+
+        Args:
+            limit: Maximum number of transactions to return
+
+        Returns:
+            List of transactions ordered by fee
+        """
+        sorted_txs = sorted(
+            self.pending_transactions.values(),
+            key=lambda tx: tx["fee"],
+            reverse=True
+        )
+
+        if limit:
+            sorted_txs = sorted_txs[:limit]
+
+        return sorted_txs
 
     def get_transactions_by_fee_rate(self, limit: Optional[int] = None) -> list:
         """

@@ -2546,50 +2546,107 @@ class Blockchain:
             if receipts:
                 self.contract_receipts.extend(receipts)
 
-        # Add to chain (cache)
-        self.chain.append(new_block)
-        self._process_governance_block_transactions(new_block)
-        self.storage._save_block_to_disk(new_block)
+        # Snapshot state before any modifications for atomicity
+        # If block persistence fails, we can rollback to this state
+        utxo_snapshot = self.utxo_manager.snapshot()
+        nonce_snapshot = self.nonce_tracker.snapshot()
+        pending_txs_backup = list(self.pending_transactions)
 
-        # Update UTXO set and nonces
-        for tx in new_block.transactions:
-            if tx.sender != "COINBASE":  # Regular transactions spend inputs
-                self.utxo_manager.process_transaction_inputs(tx)
-                self.nonce_tracker.increment_nonce(tx.sender, tx.nonce)
-            self.utxo_manager.process_transaction_outputs(tx)
+        # Track nonce changes to commit only after successful persistence
+        nonce_changes = []
 
-        # Process gamification features for this block
-        self._process_gamification_features(self.gamification_adapter, new_block, miner_address)
+        try:
+            # Add to chain (cache)
+            self.chain.append(new_block)
+            self._process_governance_block_transactions(new_block)
+            self.storage._save_block_to_disk(new_block)
 
-        # Clear pending transactions
-        self.pending_transactions = []
+            # Update UTXO set (collect nonce changes but don't commit yet)
+            for tx in new_block.transactions:
+                if tx.sender != "COINBASE":  # Regular transactions spend inputs
+                    self.utxo_manager.process_transaction_inputs(tx)
+                    # Collect nonce change without committing
+                    nonce_changes.append((tx.sender, tx.nonce))
+                self.utxo_manager.process_transaction_outputs(tx)
 
-        # Log streak bonus if applied
-        if streak_bonus > 0:
+            # Process gamification features for this block
+            self._process_gamification_features(self.gamification_adapter, new_block, miner_address)
+
+            # Clear pending transactions
+            self.pending_transactions = []
+
+            # Log streak bonus if applied
+            if streak_bonus > 0:
+                self.logger.info(
+                    f"STREAK BONUS: +{streak_bonus:.4f} AXN ({self.streak_tracker.get_streak_bonus(miner_address) * 100:.0f}%)"
+                )
+
+            # Create checkpoint if needed (every N blocks)
+            if self.checkpoint_manager.should_create_checkpoint(new_block.index):
+                total_supply = self.get_circulating_supply()
+                checkpoint = self.checkpoint_manager.create_checkpoint(
+                    new_block, self.utxo_manager, total_supply
+                )
+                if checkpoint:
+                    self.logger.info(f"Created checkpoint at block {new_block.index}")
+
+            # Periodically compact the UTXO set to save memory
+            if new_block.index % 100 == 0:  # Compact every 100 blocks
+                self.utxo_manager.compact_utxo_set()
+
+            # CRITICAL: Persist state to disk BEFORE committing nonces
+            # This is the failure point we're protecting against
+            self.storage.save_state_to_disk(
+                self.utxo_manager,
+                self.pending_transactions,
+                self.contracts,
+                self.contract_receipts,
+            )
+
+            # Only commit nonce increments AFTER successful persistence
+            # This prevents nonce desynchronization if disk write fails
+            for sender, nonce in nonce_changes:
+                self.nonce_tracker.increment_nonce(sender, nonce)
+
             self.logger.info(
-                f"STREAK BONUS: +{streak_bonus:.4f} AXN ({self.streak_tracker.get_streak_bonus(miner_address) * 100:.0f}%)"
+                "Block mined and persisted successfully",
+                block_index=new_block.index,
+                block_hash=new_block.hash[:16],
+                nonce_updates=len(nonce_changes),
             )
 
-        # Create checkpoint if needed (every N blocks)
-        if self.checkpoint_manager.should_create_checkpoint(new_block.index):
-            total_supply = self.get_circulating_supply()
-            checkpoint = self.checkpoint_manager.create_checkpoint(
-                new_block, self.utxo_manager, total_supply
+            return new_block
+
+        except Exception as e:
+            # Block persistence failed - rollback all state changes
+            self.logger.error(
+                "Block persistence failed, rolling back state changes",
+                block_index=new_block.index,
+                error=str(e),
+                error_type=type(e).__name__,
             )
-            if checkpoint:
-                self.logger.info(f"Created checkpoint at block {new_block.index}")
 
-        # Periodically compact the UTXO set to save memory
-        if new_block.index % 100 == 0:  # Compact every 100 blocks
-            self.utxo_manager.compact_utxo_set()
+            # Rollback UTXO state
+            self.utxo_manager.restore(utxo_snapshot)
 
-        self.storage.save_state_to_disk(
-            self.utxo_manager,
-            self.pending_transactions,
-            self.contracts,
-            self.contract_receipts,
-        )
-        return new_block
+            # Rollback nonce state
+            self.nonce_tracker.restore(nonce_snapshot)
+
+            # Remove block from chain
+            if self.chain and self.chain[-1] == new_block:
+                self.chain.pop()
+
+            # Restore pending transactions
+            self.pending_transactions = pending_txs_backup
+
+            self.logger.warn(
+                "State rolled back after block persistence failure",
+                nonces_protected=len(nonce_changes),
+                utxo_state_restored=True,
+            )
+
+            # Re-raise exception for caller to handle
+            raise
     
     def _process_gamification_features(
         self,

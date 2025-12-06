@@ -56,7 +56,8 @@ class TestMempoolEviction:
         """Test transactions expire after 24 hours"""
         mempool = MempoolManager(transaction_expiry_seconds=86400)  # 24 hours
 
-        tx_id = mempool.add_transaction("tx_data", fee=1.0)
+        result = mempool.add_transaction("tx_data", fee=1.0)
+        tx_id = result["tx_id"]
 
         # Transaction should exist
         assert tx_id in mempool.pending_transactions
@@ -102,15 +103,19 @@ class TestMempoolEviction:
         )
 
         # Add transactions
-        tx1_id = mempool.add_transaction("tx1", fee=1.0)
+        result1 = mempool.add_transaction("tx1", fee=1.0)
+        tx1_id = result1["tx_id"]
         time.sleep(0.01)
-        tx2_id = mempool.add_transaction("tx2", fee=2.0)
+        result2 = mempool.add_transaction("tx2", fee=2.0)
+        tx2_id = result2["tx_id"]
         time.sleep(0.01)
-        tx3_id = mempool.add_transaction("tx3", fee=3.0)
+        result3 = mempool.add_transaction("tx3", fee=3.0)
+        tx3_id = result3["tx_id"]
 
         # Add 4th transaction (should evict oldest)
         time.sleep(0.01)
-        tx4_id = mempool.add_transaction("tx4", fee=4.0)
+        result4 = mempool.add_transaction("tx4", fee=4.0)
+        tx4_id = result4["tx_id"]
 
         # tx1 should be evicted (oldest)
         assert tx1_id not in mempool.pending_transactions
@@ -133,7 +138,8 @@ class TestMempoolEviction:
         mempool.add_transaction("tx3", fee=3.0)
 
         # Re-add tx1 with higher fee
-        new_tx1_id = mempool.add_transaction("tx1", fee=5.0)
+        result = mempool.add_transaction("tx1", fee=5.0)
+        new_tx1_id = result["tx_id"]
 
         # Should be in mempool now
         assert new_tx1_id in mempool.pending_transactions
@@ -166,7 +172,8 @@ class TestMempoolEviction:
         )
 
         # Add high fee transaction
-        high_fee_id = mempool.add_transaction("high_fee_tx", fee=100.0)
+        result = mempool.add_transaction("high_fee_tx", fee=100.0)
+        high_fee_id = result["tx_id"]
 
         # Add low fee transactions
         mempool.add_transaction("tx1", fee=1.0)
@@ -182,7 +189,8 @@ class TestMempoolEviction:
         """Test removing transaction from mempool"""
         mempool = MempoolManager()
 
-        tx_id = mempool.add_transaction("tx_data", fee=1.0)
+        result = mempool.add_transaction("tx_data", fee=1.0)
+        tx_id = result["tx_id"]
         assert tx_id in mempool.pending_transactions
 
         # Remove transaction
