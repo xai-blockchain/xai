@@ -204,6 +204,47 @@ class NonceTracker:
                 "total_transactions": sum(self.nonces.values()),
             }
 
+    def snapshot(self) -> Dict[str, any]:
+        """
+        Create a complete snapshot of the current nonce state.
+        Thread-safe atomic operation for chain reorganization rollback.
+
+        Returns:
+            A deep copy of the nonce state
+        """
+        import copy
+        with self.lock:
+            return {
+                "nonces": copy.deepcopy(self.nonces),
+                "pending_nonces": copy.deepcopy(self.pending_nonces),
+            }
+
+    def restore(self, snapshot: Dict[str, any]) -> None:
+        """
+        Restore nonce state from a snapshot.
+        Thread-safe atomic operation for chain reorganization rollback.
+
+        Args:
+            snapshot: Snapshot created by snapshot() method
+        """
+        import copy
+        with self.lock:
+            # Restore nonce state
+            self.nonces = copy.deepcopy(snapshot.get("nonces", {}))
+            self.pending_nonces = copy.deepcopy(snapshot.get("pending_nonces", {}))
+
+            # Persist restored state to disk
+            self._save_nonces()
+
+            logger.info(
+                "Nonce state restored from snapshot",
+                extra={
+                    "event": "nonce.restore",
+                    "address_count": len(self.nonces),
+                    "pending_count": len(self.pending_nonces),
+                }
+            )
+
 
 # Global nonce tracker instance
 _global_nonce_tracker = None

@@ -13,6 +13,7 @@ import copy
 import statistics
 import tempfile
 import math
+import threading
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Any, Union, Sequence
 from types import SimpleNamespace
@@ -482,6 +483,7 @@ class Blockchain:
         # Mempool management
         self.seen_txids: set[str] = set()
         self._sender_pending_count: dict[str, int] = defaultdict(int)
+        self._mempool_lock = threading.Lock()  # Protects mempool operations from TOCTOU races
         self.max_reorg_depth = int(os.getenv("XAI_MAX_REORG_DEPTH", "100"))
         self.max_orphan_blocks = int(os.getenv("XAI_MAX_ORPHAN_BLOCKS", "200"))
         try:
@@ -2059,7 +2061,17 @@ class Blockchain:
         return active
 
     def add_transaction(self, transaction: Transaction) -> bool:
-        """Add transaction to pending pool after validation"""
+        """
+        Add transaction to pending pool after validation.
+
+        This method implements atomic validation and insertion to prevent TOCTOU
+        race conditions in double-spend detection. The entire sequence from
+        validation through insertion is protected by a lock to ensure that
+        concurrent transactions spending the same UTXOs cannot both be accepted.
+
+        Security: Prevents double-spend attacks via race conditions between
+        validation (checking UTXO availability) and insertion (adding to mempool).
+        """
         # Check if transaction is None (can happen if create_transaction fails)
         if transaction is None:
             self.logger.warn("Attempted to add a None transaction")
@@ -2079,193 +2091,201 @@ class Blockchain:
                 self.logger.warn(f"Transaction rejected: failed to calculate txid: {type(e).__name__}")
                 return False
 
-        # Drop duplicates early
-        if transaction.txid in self.seen_txids:
-            return False
+        # CRITICAL SECTION: Acquire lock to ensure atomic validation and insertion
+        # This prevents TOCTOU race conditions where two threads could both validate
+        # transactions spending the same UTXO and both add them to the mempool
+        with self._mempool_lock:
+            # Drop duplicates early (under lock to prevent race)
+            if transaction.txid in self.seen_txids:
+                return False
 
-        if self._is_sender_banned(getattr(transaction, "sender", None), current_time):
-            self.logger.warn(
-                "Transaction rejected: sender temporarily banned for repeated invalid submissions",
-                sender=getattr(transaction, "sender", None),
-                txid=transaction.txid,
-            )
-            self._mempool_rejected_banned_total += 1
-            return False
+            if self._is_sender_banned(getattr(transaction, "sender", None), current_time):
+                self.logger.warn(
+                    "Transaction rejected: sender temporarily banned for repeated invalid submissions",
+                    sender=getattr(transaction, "sender", None),
+                    txid=transaction.txid,
+                )
+                self._mempool_rejected_banned_total += 1
+                return False
 
-        # Auto-populate UTXO inputs/outputs for backward compatibility (before validation)
-        # Only do this if transaction is NOT already signed (to avoid breaking signature)
-        if (
-            not transaction.signature
-            and not transaction.inputs
-            and transaction.sender != "COINBASE"
-            and transaction.tx_type != "coinbase"
-        ):
-            # Old-style transaction without explicit inputs - auto-create from UTXOs
-            sender_utxos = self.utxo_manager.get_utxos_for_address(transaction.sender)
-            total_needed = transaction.amount + transaction.fee
+            # Auto-populate UTXO inputs/outputs for backward compatibility (before validation)
+            # Only do this if transaction is NOT already signed (to avoid breaking signature)
+            if (
+                not transaction.signature
+                and not transaction.inputs
+                and transaction.sender != "COINBASE"
+                and transaction.tx_type != "coinbase"
+            ):
+                # Old-style transaction without explicit inputs - auto-create from UTXOs
+                sender_utxos = self.utxo_manager.get_utxos_for_address(transaction.sender)
+                total_needed = transaction.amount + transaction.fee
 
-            selected_utxos = []
-            selected_amount = 0.0
+                selected_utxos = []
+                selected_amount = 0.0
 
-            for utxo in sender_utxos:
-                selected_utxos.append(utxo)
-                selected_amount += utxo["amount"]
-                if selected_amount >= total_needed:
-                    break
-
-            if selected_amount < total_needed:
-                return False  # Insufficient funds
-
-            # Create inputs
-            transaction.inputs = [
-                {"txid": utxo["txid"], "vout": utxo["vout"]} for utxo in selected_utxos
-            ]
-
-            # Create outputs if not present
-            if not transaction.outputs:
-                transaction.outputs = [
-                    {"address": transaction.recipient, "amount": transaction.amount}
-                ]
-                # Add change output if necessary
-                change = selected_amount - total_needed
-                if change > 0.00000001:  # Minimum dust threshold
-                    transaction.outputs.append({"address": transaction.sender, "amount": change})
-
-        # Validate transaction
-        is_valid = self.transaction_validator.validate_transaction(transaction)
-
-        # If validation failed, check if it's because of missing UTXOs (orphan transaction)
-        if not is_valid and transaction.tx_type != "coinbase":
-            # Check if the transaction references unknown UTXOs
-            has_missing_utxos = False
-            if transaction.inputs:
-                for tx_input in transaction.inputs:
-                    utxo = self.utxo_manager.get_unspent_output(tx_input["txid"], tx_input["vout"])
-                    if not utxo:
-                        has_missing_utxos = True
+                for utxo in sender_utxos:
+                    selected_utxos.append(utxo)
+                    selected_amount += utxo["amount"]
+                    if selected_amount >= total_needed:
                         break
 
-            # If it has missing UTXOs, add to orphan pool instead of rejecting
-            if has_missing_utxos:
-                # Limit orphan pool size to prevent memory exhaustion
-                MAX_ORPHAN_TRANSACTIONS = 1000
-                if len(self.orphan_transactions) < MAX_ORPHAN_TRANSACTIONS:
-                    # Check if transaction is not already in orphan pool
-                    if not any(orphan.txid == transaction.txid for orphan in self.orphan_transactions):
-                        self.orphan_transactions.append(transaction)
-                        self.logger.info(f"Transaction {transaction.txid[:10]}... added to orphan pool (missing UTXOs)")
-                return False
-            else:
-                # Validation failed for other reasons, reject transaction
-                self.logger.warn(f"Transaction {transaction.txid[:10]}... rejected (validation failed for other reasons)")
+                if selected_amount < total_needed:
+                    return False  # Insufficient funds
+
+                # Create inputs
+                transaction.inputs = [
+                    {"txid": utxo["txid"], "vout": utxo["vout"]} for utxo in selected_utxos
+                ]
+
+                # Create outputs if not present
+                if not transaction.outputs:
+                    transaction.outputs = [
+                        {"address": transaction.recipient, "amount": transaction.amount}
+                    ]
+                    # Add change output if necessary
+                    change = selected_amount - total_needed
+                    if change > 0.00000001:  # Minimum dust threshold
+                        transaction.outputs.append({"address": transaction.sender, "amount": change})
+
+            # Validate transaction (still under lock to prevent TOCTOU)
+            is_valid = self.transaction_validator.validate_transaction(transaction)
+
+            # If validation failed, check if it's because of missing UTXOs (orphan transaction)
+            if not is_valid and transaction.tx_type != "coinbase":
+                # Check if the transaction references unknown UTXOs
+                has_missing_utxos = False
+                if transaction.inputs:
+                    for tx_input in transaction.inputs:
+                        utxo = self.utxo_manager.get_unspent_output(tx_input["txid"], tx_input["vout"])
+                        if not utxo:
+                            has_missing_utxos = True
+                            break
+
+                # If it has missing UTXOs, add to orphan pool instead of rejecting
+                if has_missing_utxos:
+                    # Limit orphan pool size to prevent memory exhaustion
+                    MAX_ORPHAN_TRANSACTIONS = 1000
+                    if len(self.orphan_transactions) < MAX_ORPHAN_TRANSACTIONS:
+                        # Check if transaction is not already in orphan pool
+                        if not any(orphan.txid == transaction.txid for orphan in self.orphan_transactions):
+                            self.orphan_transactions.append(transaction)
+                            self.logger.info(f"Transaction {transaction.txid[:10]}... added to orphan pool (missing UTXOs)")
+                    return False
+                else:
+                    # Validation failed for other reasons, reject transaction
+                    self.logger.warn(f"Transaction {transaction.txid[:10]}... rejected (validation failed for other reasons)")
+                    self._record_invalid_sender_attempt(transaction.sender, current_time)
+                    self._mempool_rejected_invalid_total += 1
+                    return False
+
+            if not is_valid:
                 self._record_invalid_sender_attempt(transaction.sender, current_time)
                 self._mempool_rejected_invalid_total += 1
                 return False
 
-        if not is_valid:
-            self._record_invalid_sender_attempt(transaction.sender, current_time)
-            self._mempool_rejected_invalid_total += 1
-            return False
+            # Double-spend detection: Check if any inputs are already spent in pending transactions
+            # This check is now atomic with validation - prevents TOCTOU race
+            if transaction.tx_type != "coinbase" and transaction.inputs:
+                for tx_input in transaction.inputs:
+                    input_key = f"{tx_input['txid']}:{tx_input['vout']}"
 
-        # Double-spend detection: Check if any inputs are already spent in pending transactions
-        if transaction.tx_type != "coinbase" and transaction.inputs:
-            for tx_input in transaction.inputs:
-                input_key = f"{tx_input['txid']}:{tx_input['vout']}"
+                    # Check if this input is already used by a pending transaction
+                    for pending_tx in self.pending_transactions:
+                        if pending_tx.tx_type != "coinbase" and pending_tx.inputs:
+                            for pending_input in pending_tx.inputs:
+                                pending_key = f"{pending_input['txid']}:{pending_input['vout']}"
+                                if input_key == pending_key:
+                                    # Check if this is an RBF replacement attempt
+                                    if not getattr(transaction, 'replaces_txid', None):
+                                        self.logger.warn(f"Double-spend detected: Input {input_key} already used in mempool by tx {pending_tx.txid}")
+                                        self._record_invalid_sender_attempt(transaction.sender, current_time)
+                                        self._mempool_rejected_invalid_total += 1
+                                        return False
 
-                # Check if this input is already used by a pending transaction
-                for pending_tx in self.pending_transactions:
-                    if pending_tx.tx_type != "coinbase" and pending_tx.inputs:
-                        for pending_input in pending_tx.inputs:
-                            pending_key = f"{pending_input['txid']}:{pending_input['vout']}"
-                            if input_key == pending_key:
-                                # Check if this is an RBF replacement attempt
-                                if not getattr(transaction, 'replaces_txid', None):
-                                    self.logger.warn(f"Double-spend detected: Input {input_key} already used in mempool by tx {pending_tx.txid}")
-                                    self._record_invalid_sender_attempt(transaction.sender, current_time)
-                                    self._mempool_rejected_invalid_total += 1
-                                    return False
-
-        # Handle Replace-By-Fee (RBF) if this transaction replaces another
-        if hasattr(transaction, 'replaces_txid') and transaction.replaces_txid:
-            if not self._handle_rbf_replacement(transaction):
-                return False
-
-        # Enforce per-sender cap
-        if transaction.sender and transaction.sender != "COINBASE":
-            if self._sender_pending_count.get(transaction.sender, 0) >= getattr(self, "_mempool_max_per_sender", 100):
-                self.logger.warn(f"Transaction {transaction.txid[:10]}... rejected (sender cap exceeded)")
-                self._mempool_rejected_sender_cap_total += 1
-                return False
-
-        # Enforce mempool size with admission control by fee rate
-        if len(self.pending_transactions) >= getattr(self, "_mempool_max_size", 10000):
-            # Evaluate if new tx has higher fee rate than current min
-            if self.pending_transactions:
-                lowest = min(self.pending_transactions, key=lambda t: t.get_fee_rate())
-                if transaction.get_fee_rate() > lowest.get_fee_rate():
-                    # Evict the lowest fee transaction to make room for the higher fee rate
-                    eviction_performed = False
-                    try:
-                        self.pending_transactions.remove(lowest)
-                        self.seen_txids.discard(lowest.txid)
-                        if lowest.sender and lowest.sender != "COINBASE":
-                            self._sender_pending_count[lowest.sender] = max(
-                                0, self._sender_pending_count[lowest.sender] - 1
-                            )
-                        self._mempool_evicted_low_fee_total += 1
-                        eviction_performed = True
-                        self.logger.info(f"Evicted transaction {lowest.txid[:10]}... from mempool (low fee rate)")
-                    except ValueError as exc:
-                        self.logger.error(
-                            "Failed to evict low-fee transaction due to inconsistent mempool state",
-                            txid=lowest.txid,
-                            error=str(exc),
-                            extra={"event": "mempool.eviction_failed"},
-                        )
-                    if not eviction_performed:
-                        self.logger.warn(
-                            f"Transaction {transaction.txid[:10]}... rejected (mempool full, eviction failed)"
-                        )
-                        self._mempool_rejected_low_fee_total += 1
-                        return False
-                else:
-                    self.logger.warn(f"Transaction {transaction.txid[:10]}... rejected (mempool full, low fee rate)")
-                    self._mempool_rejected_low_fee_total += 1
+            # Handle Replace-By-Fee (RBF) if this transaction replaces another
+            if hasattr(transaction, 'replaces_txid') and transaction.replaces_txid:
+                if not self._handle_rbf_replacement(transaction):
                     return False
 
-        self.pending_transactions.append(transaction)
-        self.seen_txids.add(transaction.txid)
-        if transaction.sender and transaction.sender != "COINBASE":
-            self._sender_pending_count[transaction.sender] = self._sender_pending_count.get(transaction.sender, 0) + 1
-            self.nonce_tracker.reserve_nonce(transaction.sender, transaction.nonce)
-        self._clear_sender_penalty(transaction.sender)
+            # Enforce per-sender cap
+            if transaction.sender and transaction.sender != "COINBASE":
+                if self._sender_pending_count.get(transaction.sender, 0) >= getattr(self, "_mempool_max_per_sender", 100):
+                    self.logger.warn(f"Transaction {transaction.txid[:10]}... rejected (sender cap exceeded)")
+                    self._mempool_rejected_sender_cap_total += 1
+                    return False
 
-        # Process gas sponsorship if applicable (Task 178: Account Abstraction)
-        if hasattr(transaction, 'gas_sponsor') and transaction.gas_sponsor:
-            sponsor_processor = get_sponsored_transaction_processor()
-            validation = sponsor_processor.validate_sponsored_transaction(transaction)
-            if validation.result == SponsorshipResult.APPROVED:
-                sponsor_processor.deduct_sponsor_fee(transaction)
-                self.logger.info(
-                    "Sponsored transaction added to mempool",
-                    txid=transaction.txid,
-                    sender=transaction.sender,
-                    sponsor=transaction.gas_sponsor,
-                    fee=transaction.fee
-                )
+            # Enforce mempool size with admission control by fee rate
+            if len(self.pending_transactions) >= getattr(self, "_mempool_max_size", 10000):
+                # Evaluate if new tx has higher fee rate than current min
+                if self.pending_transactions:
+                    lowest = min(self.pending_transactions, key=lambda t: t.get_fee_rate())
+                    if transaction.get_fee_rate() > lowest.get_fee_rate():
+                        # Evict the lowest fee transaction to make room for the higher fee rate
+                        eviction_performed = False
+                        try:
+                            self.pending_transactions.remove(lowest)
+                            self.seen_txids.discard(lowest.txid)
+                            if lowest.sender and lowest.sender != "COINBASE":
+                                self._sender_pending_count[lowest.sender] = max(
+                                    0, self._sender_pending_count[lowest.sender] - 1
+                                )
+                            self._mempool_evicted_low_fee_total += 1
+                            eviction_performed = True
+                            self.logger.info(f"Evicted transaction {lowest.txid[:10]}... from mempool (low fee rate)")
+                        except ValueError as exc:
+                            self.logger.error(
+                                "Failed to evict low-fee transaction due to inconsistent mempool state",
+                                txid=lowest.txid,
+                                error=str(exc),
+                                extra={"event": "mempool.eviction_failed"},
+                            )
+                        if not eviction_performed:
+                            self.logger.warn(
+                                f"Transaction {transaction.txid[:10]}... rejected (mempool full, eviction failed)"
+                            )
+                            self._mempool_rejected_low_fee_total += 1
+                            return False
+                    else:
+                        self.logger.warn(f"Transaction {transaction.txid[:10]}... rejected (mempool full, low fee rate)")
+                        self._mempool_rejected_low_fee_total += 1
+                        return False
+
+            # ATOMIC INSERTION: Add to mempool while still holding lock
+            # This ensures no gap between validation and insertion
+            self.pending_transactions.append(transaction)
+            self.seen_txids.add(transaction.txid)
+            if transaction.sender and transaction.sender != "COINBASE":
+                self._sender_pending_count[transaction.sender] = self._sender_pending_count.get(transaction.sender, 0) + 1
+                self.nonce_tracker.reserve_nonce(transaction.sender, transaction.nonce)
+            self._clear_sender_penalty(transaction.sender)
+
+            # Process gas sponsorship if applicable (Task 178: Account Abstraction)
+            if hasattr(transaction, 'gas_sponsor') and transaction.gas_sponsor:
+                sponsor_processor = get_sponsored_transaction_processor()
+                validation = sponsor_processor.validate_sponsored_transaction(transaction)
+                if validation.result == SponsorshipResult.APPROVED:
+                    sponsor_processor.deduct_sponsor_fee(transaction)
+                    self.logger.info(
+                        "Sponsored transaction added to mempool",
+                        txid=transaction.txid,
+                        sender=transaction.sender,
+                        sponsor=transaction.gas_sponsor,
+                        fee=transaction.fee
+                    )
+                else:
+                    # Sponsorship validation failed - log but don't reject
+                    # The transaction can still be processed if sender has funds
+                    self.logger.warn(
+                        f"Sponsorship validation failed: {validation.message}",
+                        txid=transaction.txid,
+                        sender=transaction.sender,
+                        sponsor=transaction.gas_sponsor
+                    )
             else:
-                # Sponsorship validation failed - log but don't reject
-                # The transaction can still be processed if sender has funds
-                self.logger.warn(
-                    f"Sponsorship validation failed: {validation.message}",
-                    txid=transaction.txid,
-                    sender=transaction.sender,
-                    sponsor=transaction.gas_sponsor
-                )
-        else:
-            self.logger.info("Transaction added to mempool", txid=transaction.txid, sender=transaction.sender)
+                self.logger.info("Transaction added to mempool", txid=transaction.txid, sender=transaction.sender)
 
-        return True
+            return True
+        # End of atomic lock section
 
     def _handle_rbf_replacement(self, replacement_tx: Transaction) -> bool:
         """
@@ -3304,6 +3324,7 @@ class Blockchain:
         # Create atomic snapshot of current state (CRITICAL: don't create new instance!)
         old_chain = self.chain.copy()
         utxo_snapshot = self.utxo_manager.snapshot()  # Thread-safe atomic snapshot
+        nonce_snapshot = self.nonce_tracker.snapshot() if self.nonce_tracker else None  # Thread-safe atomic snapshot
 
         try:
             # Clear UTXO set (don't create new instance - maintains singleton pattern)
@@ -3405,6 +3426,8 @@ class Blockchain:
             self.logger.error(f"Chain reorganization failed: {e}. Rolling back to previous state.")
             self.chain = old_chain
             self.utxo_manager.restore(utxo_snapshot)
+            if nonce_snapshot and self.nonce_tracker:
+                self.nonce_tracker.restore(nonce_snapshot)
             return False
 
     def _find_fork_point(self, new_chain: List[BlockHeader]) -> Optional[int]:

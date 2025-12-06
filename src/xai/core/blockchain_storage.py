@@ -13,6 +13,7 @@ import logging
 import os
 import time
 from typing import List, Dict, Optional, TYPE_CHECKING, Any
+from xai.core.block_index import BlockIndex
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ class BlockchainStorage:
     Manages the persistence of blockchain data to disk.
     """
 
-    def __init__(self, data_dir: str = "data", compact_on_startup: bool = False) -> None:
+    def __init__(self, data_dir: str = "data", compact_on_startup: bool = False, enable_index: bool = True) -> None:
         self.data_dir = data_dir
         os.makedirs(self.data_dir, exist_ok=True)
         self.blocks_dir = os.path.join(self.data_dir, "blocks")
@@ -40,6 +41,17 @@ class BlockchainStorage:
         self.journal_file = os.path.join(self.data_dir, "journal.log")
         self.block_file_index = 0
         self._set_block_file_index()
+
+        # Initialize block index for O(1) lookups
+        self.enable_index = enable_index
+        if enable_index:
+            index_db_path = os.path.join(self.data_dir, "block_index.db")
+            self.block_index = BlockIndex(db_path=index_db_path, cache_size=256)
+            # Check if we need to build index for existing blocks
+            self._ensure_index_built()
+        else:
+            self.block_index = None
+
         if compact_on_startup:
             self.compact()
 
@@ -55,6 +67,94 @@ class BlockchainStorage:
         )
         if block_files:
             self.block_file_index = int(block_files[-1].split("_")[1].split(".")[0])
+
+    def _ensure_index_built(self) -> None:
+        """
+        Ensure block index is built for all existing blocks.
+
+        This runs on startup to index any blocks that were written before
+        the index was enabled. Uses efficient streaming to handle large chains.
+        """
+        if not self.block_index:
+            return
+
+        # Check if index needs building
+        max_indexed = self.block_index.get_max_indexed_height()
+        if max_indexed is not None:
+            # Index exists, check if it's up to date
+            logger.info(
+                "Block index loaded",
+                extra={
+                    "event": "storage.index_loaded",
+                    "max_height": max_indexed,
+                    "total_blocks": self.block_index.get_index_count(),
+                }
+            )
+            return
+
+        # Index is empty, need to build it
+        logger.info("Building block index for existing chain...")
+        start_time = time.time()
+
+        block_files = sorted(
+            [
+                f
+                for f in os.listdir(self.blocks_dir)
+                if f.startswith("blocks_") and f.endswith(".json")
+            ],
+            key=lambda x: int(x.split("_")[1].split(".")[0]),
+        )
+
+        blocks_indexed = 0
+        for block_file in block_files:
+            file_path = os.path.join(self.blocks_dir, block_file)
+            relative_path = os.path.join("blocks", block_file)
+
+            with open(file_path, "r", encoding="utf-8") as f:
+                file_offset = 0
+                for line in f:
+                    line_size = len(line.encode("utf-8"))
+                    try:
+                        block_data = json.loads(line)
+                        block_index = block_data["header"]["index"]
+
+                        # Calculate block hash for integrity
+                        # Use the stored hash if available, otherwise calculate
+                        block_hash = block_data.get("header", {}).get("hash", "")
+                        if not block_hash:
+                            # Fallback: hash the entire block data
+                            block_hash = hashlib.sha256(line.encode("utf-8")).hexdigest()
+
+                        # Index this block
+                        self.block_index.index_block(
+                            block_index=block_index,
+                            block_hash=block_hash,
+                            file_path=relative_path,
+                            file_offset=file_offset,
+                            file_size=line_size,
+                        )
+                        blocks_indexed += 1
+
+                        if blocks_indexed % 1000 == 0:
+                            logger.info(f"Indexed {blocks_indexed} blocks...")
+
+                    except (json.JSONDecodeError, KeyError) as e:
+                        logger.warning(
+                            f"Skipping corrupt block at offset {file_offset} in {block_file}: {e}"
+                        )
+
+                    file_offset += line_size
+
+        elapsed = time.time() - start_time
+        logger.info(
+            "Block index built successfully",
+            extra={
+                "event": "storage.index_built",
+                "blocks_indexed": blocks_indexed,
+                "elapsed_seconds": f"{elapsed:.2f}",
+                "blocks_per_second": int(blocks_indexed / elapsed) if elapsed > 0 else 0,
+            }
+        )
 
     def compact(self) -> None:
         """Compacts all block files into a single file with durable writes."""
@@ -89,6 +189,8 @@ class BlockchainStorage:
         Uses fsync after write to ensure block data is persisted to disk
         before the function returns. This prevents data loss on power failure
         or system crash.
+
+        Also updates the block index for O(1) lookups.
         """
         block_file = os.path.join(self.blocks_dir, f"blocks_{self.block_file_index}.json")
 
@@ -96,10 +198,33 @@ class BlockchainStorage:
             self.block_file_index += 1
             block_file = os.path.join(self.blocks_dir, f"blocks_{self.block_file_index}.json")
 
+        # Get file offset before write
+        file_offset = os.path.getsize(block_file) if os.path.exists(block_file) else 0
+
+        block_dict = block.to_dict()
+        block_json = json.dumps(block_dict) + "\n"
+        block_size = len(block_json.encode("utf-8"))
+
         with open(block_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(block.to_dict()) + "\n")
+            f.write(block_json)
             f.flush()
             os.fsync(f.fileno())
+
+        # Update index after successful write
+        if self.block_index:
+            relative_path = os.path.join("blocks", f"blocks_{self.block_file_index}.json")
+            block_hash = block_dict.get("header", {}).get("hash", "")
+            if not block_hash:
+                # Fallback: use block header hash
+                block_hash = block.header.calculate_hash() if hasattr(block, "header") else ""
+
+            self.block_index.index_block(
+                block_index=block.header.index if hasattr(block, "header") else block_dict["header"]["index"],
+                block_hash=block_hash,
+                file_path=relative_path,
+                file_offset=file_offset,
+                file_size=block_size,
+            )
     
     def save_state_to_disk(
         self,
@@ -193,7 +318,148 @@ class BlockchainStorage:
             jf.truncate(0)
 
     def load_block_from_disk(self, block_index: int) -> Optional[Block]:
-        """Load a single block from its file."""
+        """
+        Load a single block from disk using O(1) index lookup.
+
+        This method uses the block index for fast lookups. If the index
+        is not available, it falls back to sequential scanning (legacy mode).
+
+        Args:
+            block_index: Block height to load
+
+        Returns:
+            Block object or None if not found
+        """
+        from xai.core.blockchain import Block, Transaction
+        from xai.core.block_header import BlockHeader
+
+        # Try index lookup first (O(1))
+        if self.block_index:
+            # Check cache first
+            cached_block = self.block_index.cache.get(block_index)
+            if cached_block:
+                return cached_block
+
+            # Look up in index
+            location = self.block_index.get_block_location(block_index)
+            if location:
+                file_path, file_offset, file_size = location
+                full_path = os.path.join(self.data_dir, file_path)
+
+                try:
+                    with open(full_path, "r", encoding="utf-8") as f:
+                        # Seek to exact position
+                        f.seek(file_offset)
+                        # Read exact size
+                        line = f.read(file_size)
+                        block_data = json.loads(line.strip())
+
+                        # Parse block
+                        block = self._parse_block_data(block_data)
+
+                        # Cache the parsed block
+                        if block:
+                            self.block_index.cache.put(block_index, block)
+
+                        return block
+
+                except (IOError, json.JSONDecodeError, KeyError) as e:
+                    logger.error(
+                        "Failed to load block from index",
+                        extra={
+                            "event": "storage.index_load_failed",
+                            "block_index": block_index,
+                            "error": str(e),
+                            "file_path": file_path,
+                        }
+                    )
+                    # Fall through to sequential scan as fallback
+            else:
+                # Block not in index, fall through to sequential scan
+                pass
+
+        # Fallback: sequential scan (legacy mode or index miss)
+        return self._load_block_fallback(block_index)
+
+    def _parse_block_data(self, block_data: Dict[str, Any]) -> Optional[Block]:
+        """
+        Parse block data dictionary into Block object.
+
+        Args:
+            block_data: Block dictionary from JSON
+
+        Returns:
+            Block object or None on parse error
+        """
+        from xai.core.blockchain import Block, Transaction
+        from xai.core.block_header import BlockHeader
+
+        try:
+            header_data = block_data.get("header", {})
+            header = BlockHeader(
+                index=header_data.get("index", 0),
+                previous_hash=header_data.get("previous_hash", "0"),
+                merkle_root=header_data.get("merkle_root", "0"),
+                timestamp=header_data.get("timestamp", time.time()),
+                difficulty=header_data.get("difficulty", 4),
+                nonce=header_data.get("nonce", 0),
+                signature=header_data.get("signature"),
+                miner_pubkey=header_data.get("miner_pubkey"),
+                version=header_data.get("version"),
+            )
+
+            # Preserve hash if available
+            if "hash" in header_data:
+                header.hash = header_data["hash"]
+
+            transactions = []
+            for tx_data in block_data["transactions"]:
+                tx = Transaction(
+                    tx_data["sender"],
+                    tx_data["recipient"],
+                    tx_data["amount"],
+                    tx_data["fee"],
+                    tx_data["public_key"],
+                    tx_data["tx_type"],
+                    tx_data.get("nonce"),
+                    tx_data.get("inputs", []),
+                    tx_data.get("outputs", []),
+                )
+                tx.timestamp = tx_data["timestamp"]
+                tx.signature = tx_data["signature"]
+                tx.txid = tx_data["txid"]
+                tx.metadata = tx_data.get("metadata", {})
+                transactions.append(tx)
+
+            block = Block(header, transactions)
+            if block_data.get("miner"):
+                block.miner = block_data.get("miner")
+
+            return block
+
+        except (KeyError, TypeError, ValueError) as e:
+            logger.error(
+                "Failed to parse block data",
+                extra={
+                    "event": "storage.block_parse_failed",
+                    "error": str(e),
+                }
+            )
+            return None
+
+    def _load_block_fallback(self, block_index: int) -> Optional[Block]:
+        """
+        Legacy sequential scan fallback for loading blocks.
+
+        Used when index is disabled or lookup fails.
+        This is the original O(n) implementation.
+
+        Args:
+            block_index: Block height to load
+
+        Returns:
+            Block object or None if not found
+        """
         from xai.core.blockchain import Block, Transaction
         from xai.core.block_header import BlockHeader
 
@@ -208,53 +474,27 @@ class BlockchainStorage:
 
         found_block: Optional[Block] = None
         for block_file in block_files:
-            with open(os.path.join(self.blocks_dir, block_file), "r") as f:
+            with open(os.path.join(self.blocks_dir, block_file), "r", encoding="utf-8") as f:
                 for line in f:
                     try:
                         block_data = json.loads(line)
                         if block_data["header"]["index"] == block_index:
-                            header_data = block_data.get("header", {})
-                            header = BlockHeader(
-                                index=header_data.get("index", 0),
-                                previous_hash=header_data.get("previous_hash", "0"),
-                                merkle_root=header_data.get("merkle_root", "0"),
-                                timestamp=header_data.get("timestamp", time.time()),
-                                difficulty=header_data.get("difficulty", 4),
-                                nonce=header_data.get("nonce", 0),
-                                signature=header_data.get("signature"),
-                                miner_pubkey=header_data.get("miner_pubkey"),
-                                version=header_data.get("version"),
-                            )
-                            transactions = []
-                            for tx_data in block_data["transactions"]:
-                                tx = Transaction(
-                                    tx_data["sender"],
-                                    tx_data["recipient"],
-                                    tx_data["amount"],
-                                    tx_data["fee"],
-                                    tx_data["public_key"],
-                                    tx_data["tx_type"],
-                                    tx_data.get("nonce"),
-                                    tx_data.get("inputs", []),
-                                    tx_data.get("outputs", []),
-                                )
-                                tx.timestamp = tx_data["timestamp"]
-                                tx.signature = tx_data["signature"]
-                                tx.txid = tx_data["txid"]
-                                tx.metadata = tx_data.get("metadata", {})
-                                transactions.append(tx)
-                            block = Block(header, transactions)
-                            if block_data.get("miner"):
-                                block.miner = block_data.get("miner")
-                            found_block = block  # keep last occurrence to honor reorg writes
+                            block = self._parse_block_data(block_data)
+                            if block:
+                                found_block = block  # keep last occurrence to honor reorg writes
                     except (json.JSONDecodeError, KeyError) as e:
                         logger.error(
                             "Failed to load block %d from disk: %s",
                             block_index,
                             type(e).__name__,
-                            extra={"event": "storage.block_load_failed", "block_index": block_index, "error": str(e)}
+                            extra={
+                                "event": "storage.block_load_failed",
+                                "block_index": block_index,
+                                "error": str(e),
+                            }
                         )
-                        return None
+                        continue  # Try next line instead of returning None
+
         return found_block
 
     # Legacy alias for tests that reference the previous private API name
@@ -479,3 +719,45 @@ class BlockchainStorage:
             "contracts": contracts_state,
             "receipts": receipts,
         }
+
+    def handle_reorg(self, fork_point: int) -> None:
+        """
+        Handle blockchain reorganization by invalidating index entries.
+
+        Called when a reorg occurs to ensure index consistency.
+        Removes all blocks from fork_point onwards from the index.
+
+        Args:
+            fork_point: Block height where the fork occurred
+        """
+        if self.block_index:
+            removed = self.block_index.remove_blocks_from(fork_point)
+            logger.info(
+                "Index updated for reorg",
+                extra={
+                    "event": "storage.reorg_handled",
+                    "fork_point": fork_point,
+                    "blocks_removed": removed,
+                }
+            )
+
+    def get_index_stats(self) -> Dict[str, Any]:
+        """
+        Get block index statistics.
+
+        Returns:
+            Dictionary with index statistics or empty dict if index disabled
+        """
+        if self.block_index:
+            return self.block_index.get_stats()
+        return {"enabled": False}
+
+    def close(self) -> None:
+        """
+        Clean shutdown of storage subsystem.
+
+        Closes database connections and flushes caches.
+        """
+        if self.block_index:
+            self.block_index.close()
+            logger.info("Block index closed", extra={"event": "storage.closed"})
