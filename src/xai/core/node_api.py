@@ -18,7 +18,7 @@ This module contains all API endpoint handlers organized by category:
 
 from __future__ import annotations
 from typing import TYPE_CHECKING, Dict, Any, Tuple, List, Optional, Sequence
-from flask import Flask, jsonify, request, g
+from flask import Flask, jsonify, request, g, make_response
 import time
 import json
 import logging
@@ -1201,6 +1201,35 @@ class NodeAPIRoutes:
                     payload["index"] = header["index"]
             if not isinstance(payload, dict):
                 return jsonify({"error": "Block not available"}), 404
+
+            # ETag-based caching for immutable blocks
+            # Extract block hash from payload or block object
+            block_hash = None
+            if isinstance(payload, dict):
+                block_hash = payload.get("hash")
+                if not block_hash and "header" in payload and isinstance(payload["header"], dict):
+                    block_hash = payload["header"].get("hash")
+            if not block_hash and hasattr(block_obj, "hash"):
+                block_hash = block_obj.hash
+
+            if block_hash:
+                # Generate ETag from block hash (immutable identifier)
+                etag = f'"{block_hash}"'
+
+                # Check If-None-Match header for conditional request
+                client_etag = request.headers.get("If-None-Match")
+                if client_etag == etag:
+                    # Client has cached version - return 304 Not Modified
+                    return "", 304
+
+                # Create response with caching headers
+                response = make_response(jsonify(payload), 200)
+                response.headers["ETag"] = etag
+                # Immutable blocks can be cached forever (1 year)
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+                return response
+
+            # Fallback for blocks without hash (shouldn't happen in production)
             return jsonify(payload), 200
 
         @self.app.route("/block/<block_hash>", methods=["GET"])
@@ -1256,6 +1285,27 @@ class NodeAPIRoutes:
             if "hash" not in payload:
                 payload["hash"] = getattr(block_obj, "hash", None)
 
+            # ETag-based caching for immutable blocks
+            # Use the block hash as the ETag (it's immutable)
+            final_hash = payload.get("hash") or block_hash
+            if final_hash:
+                # Generate ETag from block hash
+                etag = f'"{final_hash}"'
+
+                # Check If-None-Match header for conditional request
+                client_etag = request.headers.get("If-None-Match")
+                if client_etag == etag:
+                    # Client has cached version - return 304 Not Modified
+                    return "", 304
+
+                # Create response with caching headers
+                response = make_response(jsonify(payload), 200)
+                response.headers["ETag"] = etag
+                # Immutable blocks can be cached forever (1 year)
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+                return response
+
+            # Fallback for blocks without hash (shouldn't happen in production)
             return jsonify(payload), 200
 
         @self.app.route("/block/receive", methods=["POST"])
