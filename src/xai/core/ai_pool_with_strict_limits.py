@@ -17,6 +17,7 @@ No API key can EVER be used beyond its donated limit.
 import time
 import json
 import hashlib
+import logging
 from typing import Dict, List, Optional, Tuple, Any, Set
 import os
 import tempfile
@@ -28,6 +29,8 @@ import openai
 from google import generativeai as genai
 from xai.core.ai_metrics import metrics
 from xai.core.ai_task_metrics import get_ai_task_metrics
+
+logger = logging.getLogger(__name__)
 
 
 class AIProvider(Enum):
@@ -297,8 +300,11 @@ class StrictAIPoolManager:
                 return
             try:
                 callback()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(
+                    "Failed to record task metrics",
+                    extra={"error": str(e), "event": "ai_pool.metrics_error"}
+                )
 
         _safe_metrics_call(
             lambda: task_metrics.jobs_submitted.labels(job_type="strict_pool_task").inc()
@@ -1064,10 +1070,20 @@ if __name__ == "__main__":
     print("SUBMITTING API KEY WITH STRICT LIMITS")
     print("=" * 80)
 
+    # Load API key from environment variable
+    import os
+    demo_api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not demo_api_key:
+        print("\n⚠️  ERROR: ANTHROPIC_API_KEY environment variable not set")
+        print("   Set your API key: export ANTHROPIC_API_KEY='your-key-here'")
+        print("   Get your API key from: https://console.anthropic.com/")
+        print("\n   Skipping demonstration.")
+        exit(1)
+
     submission = pool.submit_api_key_donation(
         donor_address="XAI7f3a9c2e1b8d4f6a5c9e2d1f8b4a7c3e9d2f1b",
         provider=AIProvider.ANTHROPIC,
-        api_key="sk-ant-api03-test-key-123456789",
+        api_key=demo_api_key,
         donated_tokens=500000,  # HARD LIMIT: 500k tokens max
         donated_minutes=60,  # HARD LIMIT: 60 minutes max
     )

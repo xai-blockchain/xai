@@ -544,8 +544,12 @@ class BlockchainMetrics:
                 try:
                     process = psutil.Process(os.getpid())
                     self.process_num_threads.set(process.num_threads())
-                except (AttributeError, psutil.NoSuchProcess):
-                    pass
+                except (AttributeError, psutil.NoSuchProcess) as e:
+                    # Expected when process terminates or psutil is unavailable
+                    self.logger.debug(
+                        "Failed to get thread count",
+                        extra={"error": str(e), "event": "metrics.thread_count_unavailable"}
+                    )
 
                 # Alert on high resource usage
                 if cpu_percent > 80:

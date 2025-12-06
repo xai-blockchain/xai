@@ -1142,7 +1142,7 @@ class BlockchainNode:
             while True:
                 await asyncio.sleep(3600)  # Keep the event loop running
         except asyncio.CancelledError:
-            pass
+            logger.info("Node event loop cancelled, shutting down", extra={"event": "node.cancelled"})
         finally:
             await self.stop_services()
 

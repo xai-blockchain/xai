@@ -10,10 +10,13 @@ from __future__ import annotations
 
 import json
 import hashlib
+import logging
 import time
 from typing import Dict, Any, List, Optional, Set, Callable
 from dataclasses import dataclass, asdict
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 
 class AppPermission(Enum):
@@ -416,7 +419,8 @@ class MiniAppRegistry:
 
                 self.verified_developers = set(data.get("verified_developers", []))
         except FileNotFoundError:
-            pass
+            # No registry file exists yet - this is expected on first run
+            logger.debug("Mini app registry file not found, starting with empty registry")
 
     def _save_apps(self) -> None:
         """Save apps to storage"""

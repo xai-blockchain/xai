@@ -593,10 +593,11 @@ def _send_transaction(args: argparse.Namespace) -> int:
         print(f"Network error: {exc}", file=sys.stderr)
         return 2
     finally:
-        # Ensure cleanup
+        # Ensure cleanup - NameError is expected if variable was never assigned
         try:
             del private_key
         except NameError:
+            # Variable was never created due to early error - this is expected
             pass
 
 
@@ -755,10 +756,11 @@ def _export_wallet(args: argparse.Namespace) -> int:
         return 0
     except Exception as e:
         print(f"Export error: {e}", file=sys.stderr)
-        # Clear sensitive data on error
+        # Clear sensitive data on error - NameError is expected if variables were never assigned
         try:
             del private_key, wallet_data
         except NameError:
+            # One or more variables were never created due to early error - this is expected
             pass
         return 1
 

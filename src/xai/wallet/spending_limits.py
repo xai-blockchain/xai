@@ -9,10 +9,13 @@ spending limits by protecting simple wallet flows at the API layer.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Dict, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 DEFAULT_LIMIT_PER_DAY = float(os.getenv("XAI_DAILY_SPEND_LIMIT", "1000000"))  # 1,000,000 units default
@@ -43,8 +46,17 @@ class SpendingLimitManager:
                 with open(self.path, "r", encoding="utf-8") as fh:
                     data = json.load(fh)
                 return SpendingState(limits=data.get("limits", {}), usage=data.get("usage", {}))
-            except Exception:
-                pass
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning(
+                    "Failed to load spending limits state, using defaults",
+                    extra={"error": str(e), "path": self.path, "event": "spending_limits.load_failed"}
+                )
+            except Exception as e:
+                logger.error(
+                    "Unexpected error loading spending limits",
+                    extra={"error": str(e), "path": self.path, "event": "spending_limits.load_error"},
+                    exc_info=True
+                )
         return SpendingState(limits={}, usage={})
 
     def _save(self) -> None:

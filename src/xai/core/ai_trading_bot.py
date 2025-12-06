@@ -942,16 +942,23 @@ if __name__ == "__main__":
     print("\n📝 Creating AI Trading Bot...")
     print("   Strategy: Balanced")
     print("   User: XAI_Trader_1")
-    print("\n⚠️  IMPORTANT: Replace 'YOUR_ANTHROPIC_API_KEY_HERE' with your actual API key")
-    print("   Get your API key from: https://console.anthropic.com/")
 
-    # SECURITY NOTE: Never use demo keys in production!
-    # Replace YOUR_ANTHROPIC_API_KEY_HERE with your actual API key from Anthropic
+    # Load API key from environment variable
+    import os
+    user_api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not user_api_key:
+        print("\n⚠️  ERROR: ANTHROPIC_API_KEY environment variable not set")
+        print("   Set your API key: export ANTHROPIC_API_KEY='your-key-here'")
+        print("   Get your API key from: https://console.anthropic.com/")
+        print("\n   Skipping bot creation demonstration.")
+        exit(1)
+
+    # SECURITY NOTE: API keys loaded from environment variables only
     bot = AITradingBot(
         user_address="XAI_Trader_1",
         ai_provider="anthropic",
         ai_model="claude-sonnet-4",
-        user_api_key="YOUR_ANTHROPIC_API_KEY_HERE",  # REPLACE WITH YOUR ACTUAL API KEY
+        user_api_key=user_api_key,
         strategy=TradingStrategy.BALANCED,
         config=STRATEGY_TEMPLATES["balanced"],
         blockchain=blockchain,

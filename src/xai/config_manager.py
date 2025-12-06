@@ -12,11 +12,14 @@ Centralized configuration management system supporting:
 
 import os
 import json
+import logging
 import yaml
 from typing import Any, Dict, Optional, Union
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 try:
     from dotenv import load_dotenv
     HAS_DOTENV = True
@@ -437,13 +440,15 @@ class ConfigManager:
         try:
             return int(value)
         except ValueError:
-            pass
+            # Not an integer, try float
+            logger.debug("Value is not an integer, trying float", extra={"value": str(value)})
 
         # Float
         try:
             return float(value)
         except ValueError:
-            pass
+            # Not a float either, treat as string
+            logger.debug("Value is not a number, treating as string", extra={"value": str(value)})
 
         # String
         return value

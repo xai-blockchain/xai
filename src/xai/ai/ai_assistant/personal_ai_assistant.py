@@ -421,8 +421,11 @@ class PersonalAIAssistant:
         }
         try:
             requests.post(self.webhook_url, json=body, timeout=self.webhook_timeout)
-        except RequestException:
-            pass
+        except RequestException as e:
+            logger.debug(
+                "Failed to deliver webhook notification",
+                extra={"error": str(e), "event": "assistant.webhook_failed"}
+            )
 
     def _get_pool_status(self) -> Dict[str, object]:
         stats_fn = getattr(self.blockchain, "get_ai_pool_stats", None)

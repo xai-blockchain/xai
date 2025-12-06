@@ -639,8 +639,11 @@ class NodeAPIRoutes:
             return
         try:
             collector.record_send_rejection(reason)
-        except AttributeError:
-            pass
+        except AttributeError as e:
+            logger.debug(
+                "Metrics collector missing record_send_rejection method",
+                extra={"error": str(e), "event": "metrics.missing_method"}
+            )
 
     def _success_response(self, payload: Dict[str, Any], status: int = 200):
         """Return a success payload with consistent structure."""
@@ -1545,8 +1548,11 @@ class NodeAPIRoutes:
                     # Record spend on acceptance
                     try:
                         self.spending_limits.record_spend(model.sender, float(model.amount))
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(
+                            "Failed to record spending limit for transaction",
+                            extra={"error": str(e), "sender": model.sender, "event": "spending_limits.record_failed"}
+                        )
                     self.node.broadcast_transaction(tx)
                     return self._success_response(
                         {
@@ -2349,8 +2355,11 @@ class NodeAPIRoutes:
                         rate_value = rate_callable()
                         if isinstance(rate_value, (int, float)) and math.isfinite(rate_value) and rate_value > 0:
                             fee_rates.append(float(rate_value))
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(
+                            "Failed to get fee rate from transaction",
+                            extra={"error": str(e), "event": "mempool.fee_rate_error"}
+                        )
 
                 size_callable = getattr(tx, "get_size", None)
                 if callable(size_callable):
@@ -2359,8 +2368,11 @@ class NodeAPIRoutes:
                         if isinstance(size_value, (int, float)) and size_value > 0:
                             mempool_bytes += int(size_value)
                             size_samples += 1
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug(
+                            "Failed to get size from transaction",
+                            extra={"error": str(e), "event": "mempool.size_error"}
+                        )
 
             avg_tx_size = (mempool_bytes / size_samples) if size_samples else 450.0
             max_block_bytes = 1_000_000

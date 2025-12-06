@@ -10,8 +10,11 @@ from __future__ import annotations
 
 import json
 import base64
+import logging
 from typing import Dict, Any, Optional
 from io import BytesIO
+
+logger = logging.getLogger(__name__)
 
 try:
     import qrcode
@@ -173,8 +176,12 @@ class TransactionQRGenerator:
         if "amount" in params:
             try:
                 result["amount"] = float(params["amount"])
-            except ValueError:
-                pass
+            except ValueError as e:
+                # Invalid amount format - skip it
+                logger.debug(
+                    "Invalid amount in payment request QR code",
+                    extra={"error": str(e), "amount": params["amount"], "event": "qr.invalid_amount"}
+                )
 
         # Add label and message
         if "label" in params:

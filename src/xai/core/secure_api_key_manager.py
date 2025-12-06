@@ -601,10 +601,20 @@ if __name__ == "__main__":
     print("SUBMITTING API KEY DONATION")
     print("=" * 80)
 
+    # Load API key from environment variable
+    import os
+    demo_api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not demo_api_key:
+        print("\n⚠️  ERROR: ANTHROPIC_API_KEY environment variable not set")
+        print("   Set your API key: export ANTHROPIC_API_KEY='your-key-here'")
+        print("   Get your API key from: https://console.anthropic.com/")
+        print("\n   Skipping demonstration.")
+        exit(1)
+
     result = manager.submit_api_key(
         donor_address="XAI7f3a9c2e1b8d4f6a5c9e2d1f8b4a7c3e9d2f1b",
         provider=AIProvider.ANTHROPIC,
-        api_key="sk-ant-api03-test-key-123456789-actual-key-would-be-longer",
+        api_key=demo_api_key,
         donated_tokens=500000,
         expiration_days=180,  # 6 months
     )

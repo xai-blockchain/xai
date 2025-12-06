@@ -26,9 +26,11 @@ def storage():
 
     yield storage
 
+    # Cleanup - AttributeError is expected if storage doesn't have close() method
     try:
         storage.close()
     except AttributeError:
+        # Storage doesn't have close() method - this is fine for some implementations
         pass
 
     shutil.rmtree(temp_dir, ignore_errors=True)

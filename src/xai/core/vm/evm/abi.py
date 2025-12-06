@@ -13,7 +13,10 @@ following the Ethereum ABI specification.
 from __future__ import annotations
 
 import hashlib
+import logging
 from typing import Any, Iterable, List, Sequence, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 def keccak256(data: bytes) -> bytes:
@@ -32,8 +35,10 @@ def keccak256(data: bytes) -> bytes:
         k = sha3.keccak_256()
         k.update(data)
         return k.digest()
-    except Exception:
-        pass
+    except ImportError:
+        logger.debug("sha3 library not available, trying fallback")
+    except Exception as e:
+        logger.warning("Failed to use sha3 library", extra={"error": str(e)})
 
     # pycryptodome
     try:
@@ -42,16 +47,21 @@ def keccak256(data: bytes) -> bytes:
         k = keccak.new(digest_bits=256)
         k.update(data)
         return k.digest()
-    except Exception:
-        pass
+    except ImportError:
+        logger.debug("pycryptodome library not available, trying fallback")
+    except Exception as e:
+        logger.warning("Failed to use pycryptodome library", extra={"error": str(e)})
 
     # hashlib keccak (not widely available)
     try:
         return hashlib.new("keccak256", data).digest()
-    except Exception:
-        pass
+    except ValueError:
+        logger.debug("hashlib keccak256 not available, using SHA3-256 fallback")
+    except Exception as e:
+        logger.warning("Failed to use hashlib keccak256", extra={"error": str(e)})
 
     # Fallback (SHA3-256) - not identical to Keccak-256
+    logger.debug("Using SHA3-256 fallback (not identical to Keccak-256)")
     return hashlib.sha3_256(data).digest()
 
 
