@@ -1,16 +1,16 @@
 from types import SimpleNamespace
 
 from xai.core.mobile_wallet_bridge import MobileWalletBridge
+from xai.core.validation import validate_address, validate_amount
 
 
 class DummyValidator:
+    """Validator using centralized validation functions"""
     def validate_address(self, address: str, _: str) -> str:
-        return address
+        return validate_address(address, allow_special=True)
 
     def validate_amount(self, amount: float, _: str) -> float:
-        if amount <= 0:
-            raise ValueError("amount must be positive")
-        return amount
+        return validate_amount(amount, allow_zero=False)
 
 
 class DummyNonceTracker:

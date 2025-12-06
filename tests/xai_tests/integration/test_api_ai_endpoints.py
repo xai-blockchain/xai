@@ -19,6 +19,9 @@ import hashlib
 from unittest.mock import Mock, MagicMock, patch, PropertyMock
 from flask import Flask
 
+# Import centralized validation
+from xai.core.validation import validate_address, validate_string
+
 
 class TestAIAPIIntegrationSetup:
     """Test AI API integration setup and initialization."""
@@ -30,9 +33,9 @@ class TestAIAPIIntegrationSetup:
         node.validator = Mock()
         node.personal_ai = Mock()
 
-        # Mock validator methods
-        node.validator.validate_address = Mock(return_value=None)
-        node.validator.validate_string = Mock(return_value=None)
+        # Mock validator methods using centralized validation
+        node.validator.validate_address = Mock(side_effect=lambda addr, _: validate_address(addr, allow_special=True))
+        node.validator.validate_string = Mock(side_effect=lambda s, _: validate_string(s))
 
         return node
 

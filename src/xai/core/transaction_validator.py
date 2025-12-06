@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 from xai.core.config import Config
 from xai.core.wallet import Wallet
 from xai.core.security_validation import SecurityValidator, ValidationError
+from xai.core.validation import validate_address, validate_amount, validate_fee
 from xai.core.nonce_tracker import NonceTracker, get_nonce_tracker
 from xai.core.structured_logger import StructuredLogger, get_structured_logger
 from xai.core.utxo_manager import UTXOManager, get_utxo_manager

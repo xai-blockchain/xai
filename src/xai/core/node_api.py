@@ -29,6 +29,10 @@ import html
 import math
 from contextlib import nullcontext
 
+# Import centralized validation
+from xai.core.validation import validate_address as core_validate_address
+from xai.core.validation import validate_hex_string
+
 from xai.core.vm.evm.abi import keccak256
 from werkzeug.exceptions import RequestEntityTooLarge
 
@@ -168,6 +172,8 @@ class InputSanitizer:
     def validate_address(address: str) -> str:
         """Validate blockchain address format.
 
+        Uses centralized validation from xai.core.validation module.
+
         XAI addresses follow the format:
         - Mainnet: XAI + 40 hex characters (e.g., XAI1234567890abcdef...)
         - Testnet: TXAI + 40 hex characters (e.g., TXAI1234567890abcdef...)
@@ -182,31 +188,13 @@ class InputSanitizer:
         Raises:
             ValueError: If address format is invalid
         """
-        if not isinstance(address, str):
-            raise ValueError("Address must be a string")
-
-        address = address.strip()
-
-        # Special addresses
-        if address in ("COINBASE", "XAITRADEFEE", "TXAITRADEFEE"):
-            return address
-
-        # Standard XAI/TXAI addresses: prefix + 40 hex chars
-        if re.fullmatch(r'(XAI|TXAI)[A-Fa-f0-9]{40}', address):
-            return address
-
-        # Legacy format: just XAI/TXAI prefix + variable hex (26-64 total)
-        # Kept for backward compatibility but logged
-        if re.fullmatch(r'(XAI|TXAI)[A-Fa-f0-9]{22,60}', address):
-            return address
-
-        raise ValueError(
-            "Invalid address format: must be XAI/TXAI prefix followed by hex characters"
-        )
+        return core_validate_address(address, allow_special=True)
 
     @staticmethod
     def validate_hash(hash_value: str, expected_length: int = 64) -> str:
         """Validate transaction/block hash format.
+
+        Uses centralized validation from xai.core.validation module.
 
         Args:
             hash_value: Hash to validate
@@ -218,13 +206,7 @@ class InputSanitizer:
         Raises:
             ValueError: If hash format is invalid
         """
-        if not re.fullmatch(r'[0-9a-fA-F]+', hash_value):
-            raise ValueError("Hash must be hexadecimal")
-
-        if len(hash_value) != expected_length:
-            raise ValueError(f"Hash must be {expected_length} characters")
-
-        return hash_value.lower()
+        return validate_hex_string(hash_value, exact_length=expected_length)
 
     @staticmethod
     def reject_invalid_utf8(value: str) -> str:
