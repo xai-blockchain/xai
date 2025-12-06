@@ -20,7 +20,7 @@ class TestBlockchainForkAtomicity:
         bc = Blockchain(data_dir=str(tmp_path / "blockchain_test"))
         bc.create_genesis_block()
         # Build a small chain for testing
-        test_wallet_address = "test_wallet_123"
+        test_wallet_address = "XAI" + "a" * 40  # Valid XAI address format
         for i in range(5):
             block = bc.mine_pending_transactions(test_wallet_address)
             if block:
@@ -160,11 +160,13 @@ class TestBlockchainForkAtomicity:
         # Build a longer alternative chain
         alt_chain = [blockchain.chain[0].header if hasattr(blockchain.chain[0], 'header') else blockchain.chain[0]]
 
+        test_wallet = "XAI" + "b" * 40  # Valid XAI address format
         # Create blocks on the alternative chain
         for i in range(1, 8):  # Longer than original chain (6 blocks)
-            block = blockchain.create_block([])
-            alt_chain.append(block.header if hasattr(block, 'header') else block)
-            blockchain.storage._save_block_to_disk(block)
+            block = blockchain.mine_pending_transactions(test_wallet)
+            if block:
+                alt_chain.append(block.header if hasattr(block, 'header') else block)
+                blockchain.storage._save_block_to_disk(block)
 
         initial_utxo_digest = blockchain.utxo_manager.snapshot_digest()
 

@@ -35,17 +35,17 @@ def create_test_block(index: int, previous_hash: str = "0" * 64) -> Block:
     # Calculate hash
     header.hash = header.calculate_hash()
 
-    # Create a test transaction
+    # Create a test transaction with valid XAI addresses
     tx = Transaction(
-        sender="sender",
-        recipient="recipient",
+        sender="XAI" + "0" * 60,  # Valid XAI address format
+        recipient="XAI" + "1" * 60,  # Valid XAI address format
         amount=100,
         fee=1,
-        public_key="pubkey",
+        public_key="0" * 128,  # Valid hex pubkey
         tx_type="transfer",
     )
     tx.txid = f"tx{index}"
-    tx.signature = "sig"
+    tx.signature = "0" * 128  # Valid hex signature
 
     return Block(header, [tx])
 
