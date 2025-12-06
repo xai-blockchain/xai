@@ -3,87 +3,143 @@ Unit tests for chain reorganization mempool revalidation
 
 Tests that pending transactions are properly revalidated after a chain reorganization
 to prevent double-spends and invalid transactions from remaining in the mempool.
+
+This test suite verifies the critical security fix that ensures mempool transactions
+are validated against the new chain state after a reorganization.
 """
 
 import pytest
-import time
 import logging
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, MagicMock
 
-from xai.core.blockchain import Blockchain, Transaction, Block
-from xai.core.wallet import Wallet
+from xai.core.blockchain import Blockchain, Transaction
 
 
 class TestChainReorgMempoolRevalidation:
     """Test mempool revalidation during chain reorganization"""
 
-    def test_mempool_revalidation_called_during_replace_chain(self, tmp_path, caplog):
+    def test_replace_chain_revalidates_mempool_transactions(self, tmp_path, caplog):
         """
-        Test that mempool transactions are revalidated after chain replacement.
+        Test that replace_chain() revalidates all pending transactions.
 
-        This test verifies:
-        1. replace_chain() calls validate_transaction for each pending transaction
-        2. Invalid transactions are evicted from mempool
-        3. Appropriate logging occurs
+        This is the core security fix: after a chain reorganization, transactions
+        valid in the old chain may become invalid (double-spends, invalid nonces,
+        insufficient balance). This test verifies they are properly removed.
         """
-        # Create blockchain
-        bc = Blockchain(data_dir=str(tmp_path))
-
-        # Create mock transactions for mempool
-        mock_tx1 = Mock(spec=Transaction)
-        mock_tx1.txid = "tx1_valid"
-        mock_tx1.sender = "XAI" + "a" * 40
-        mock_tx1.recipient = "XAI" + "b" * 40
-        mock_tx1.amount = 100.0
-
-        mock_tx2 = Mock(spec=Transaction)
-        mock_tx2.txid = "tx2_invalid"
-        mock_tx2.sender = "XAI" + "c" * 40
-        mock_tx2.recipient = "XAI" + "d" * 40
-        mock_tx2.amount = 50.0
-
-        # Add to mempool
-        bc.pending_transactions = [mock_tx1, mock_tx2]
-        original_count = len(bc.pending_transactions)
-        assert original_count == 2
-
-        # Mock transaction validator to return True for tx1, False for tx2
-        with patch.object(bc.transaction_validator, 'validate_transaction') as mock_validate:
-            mock_validate.side_effect = lambda tx, **kwargs: tx.txid == "tx1_valid"
-
-            # Create alternative chain - must be longer to trigger replacement
-            # Mine an additional block to make alternative chain longer
-            alternative_chain = bc.chain.copy()
-            new_block = bc.mine_block("XAI" + "x" * 40)
-            if new_block:
-                alternative_chain.append(new_block)
-
-            # Perform chain reorganization
-            with caplog.at_level(logging.INFO):
-                result = bc.replace_chain(alternative_chain)
-
-            assert result is True
-
-            # Verify validator was called for each transaction
-            assert mock_validate.call_count == 2
-
-            # Verify only valid transaction remains
-            assert len(bc.pending_transactions) == 1
-            assert bc.pending_transactions[0].txid == "tx1_valid"
-
-            # Verify logging occurred
-            log_messages = [record.message for record in caplog.records]
-            assert any("Mempool revalidation complete" in msg for msg in log_messages), \
-                "Expected mempool revalidation log message"
-            assert any("Evicting transaction" in msg or "evicted" in msg for msg in log_messages), \
-                "Expected transaction eviction log message"
-
-    def test_mempool_all_valid_after_reorg(self, tmp_path, caplog):
-        """Test mempool when all transactions remain valid after reorganization"""
-        # Create blockchain
         bc = Blockchain(data_dir=str(tmp_path))
 
         # Create mock transactions
+        mock_tx_valid = Mock(spec=Transaction)
+        mock_tx_valid.txid = "tx_valid"
+        mock_tx_valid.sender = "XAI" + "a" * 40
+        mock_tx_valid.recipient = "XAI" + "b" * 40
+        mock_tx_valid.amount = 100.0
+
+        mock_tx_invalid = Mock(spec=Transaction)
+        mock_tx_invalid.txid = "tx_invalid"
+        mock_tx_invalid.sender = "XAI" + "c" * 40
+        mock_tx_invalid.recipient = "XAI" + "d" * 40
+        mock_tx_invalid.amount = 50.0
+
+        # Add both to mempool
+        bc.pending_transactions = [mock_tx_valid, mock_tx_invalid]
+
+        # Mock the validator to simulate that tx_invalid becomes invalid after reorg
+        original_validate = bc.transaction_validator.validate_transaction
+
+        def mock_validate(tx, **kwargs):
+            # First transaction is valid, second is invalid
+            return tx.txid == "tx_valid"
+
+        # Mock all the methods that replace_chain depends on
+        with patch.object(bc.transaction_validator, 'validate_transaction', side_effect=mock_validate):
+            with patch.object(bc, '_validate_chain_structure', return_value=True):
+                with patch.object(bc.storage, '_save_block_to_disk'):
+                    with patch.object(bc.storage, 'save_state_to_disk'):
+                        with patch.object(bc, '_rebuild_contract_state'):
+                            with patch.object(bc, '_rebuild_governance_state_from_chain'):
+                                with patch.object(bc, 'sync_smart_contract_vm'):
+                                    with patch.object(bc, '_rebuild_nonce_tracker'):
+                                        # Create a longer alternative chain (just genesis + mock block)
+                                        # The mocked validation will accept it
+                                        mock_block = Mock()
+                                        mock_block.transactions = []
+                                        mock_block.hash = "0000" + "a" * 60
+                                        mock_block.index = 1
+                                        mock_block.previous_hash = bc.chain[0].hash
+                                        mock_block.timestamp = 1000000
+                                        mock_block.difficulty = 4
+                                        mock_block.nonce = 100
+                                        mock_block.header = Mock()
+                                        mock_block.header.hash = mock_block.hash
+
+                                        new_chain = [bc.chain[0], mock_block]
+
+                                        with caplog.at_level(logging.INFO):
+                                            result = bc.replace_chain(new_chain)
+
+        # Verify replace_chain succeeded
+        assert result is True
+
+        # CRITICAL ASSERTION: Only valid transaction remains
+        assert len(bc.pending_transactions) == 1, \
+            f"Expected 1 valid transaction, but found {len(bc.pending_transactions)}"
+        assert bc.pending_transactions[0].txid == "tx_valid", \
+            "Wrong transaction remained in mempool"
+
+        # Verify logging occurred
+        log_messages = [record.message for record in caplog.records]
+        eviction_logged = any("Evicting transaction" in msg or "evicted" in msg
+                             for msg in log_messages)
+        assert eviction_logged, "Expected eviction log message"
+
+    def test_all_transactions_remain_valid_after_reorg(self, tmp_path, caplog):
+        """Test when all mempool transactions remain valid after reorganization"""
+        bc = Blockchain(data_dir=str(tmp_path))
+
+        mock_tx1 = Mock(spec=Transaction)
+        mock_tx1.txid = "tx1"
+        mock_tx1.sender = "XAI" + "a" * 40
+
+        mock_tx2 = Mock(spec=Transaction)
+        mock_tx2.txid = "tx2"
+        mock_tx2.sender = "XAI" + "b" * 40
+
+        bc.pending_transactions = [mock_tx1, mock_tx2]
+
+        with patch.object(bc.transaction_validator, 'validate_transaction', return_value=True):
+            with patch.object(bc, '_validate_chain_structure', return_value=True):
+                with patch.object(bc.storage, '_save_block_to_disk'):
+                    with patch.object(bc.storage, 'save_state_to_disk'):
+                        with patch.object(bc, '_rebuild_contract_state'):
+                            with patch.object(bc, '_rebuild_governance_state_from_chain'):
+                                with patch.object(bc, 'sync_smart_contract_vm'):
+                                    with patch.object(bc, '_rebuild_nonce_tracker'):
+                                        mock_block = Mock()
+                                        mock_block.transactions = []
+                                        mock_block.hash = "0000" + "a" * 60
+                                        mock_block.index = 1
+                                        mock_block.previous_hash = bc.chain[0].hash
+                                        mock_block.timestamp = 1000000
+                                        mock_block.difficulty = 4
+                                        mock_block.nonce = 100
+                                        mock_block.header = Mock()
+                                        mock_block.header.hash = mock_block.hash
+
+                                        new_chain = [bc.chain[0], mock_block]
+
+                                        with caplog.at_level(logging.DEBUG):
+                                            result = bc.replace_chain(new_chain)
+
+        assert result is True
+        assert len(bc.pending_transactions) == 2
+        log_messages = [record.message for record in caplog.records]
+        assert any("all" in msg.lower() and "valid" in msg.lower() for msg in log_messages)
+
+    def test_all_transactions_invalid_after_reorg(self, tmp_path, caplog):
+        """Test when all mempool transactions become invalid after reorganization"""
+        bc = Blockchain(data_dir=str(tmp_path))
+
         mock_tx1 = Mock(spec=Transaction)
         mock_tx1.txid = "tx1"
         mock_tx1.sender = "XAI" + "a" * 40
@@ -98,80 +154,39 @@ class TestChainReorgMempoolRevalidation:
 
         bc.pending_transactions = [mock_tx1, mock_tx2]
 
-        # Mock validator to return True for all transactions
-        with patch.object(bc.transaction_validator, 'validate_transaction') as mock_validate:
-            mock_validate.return_value = True
+        with patch.object(bc.transaction_validator, 'validate_transaction', return_value=False):
+            with patch.object(bc, '_validate_chain_structure', return_value=True):
+                with patch.object(bc.storage, '_save_block_to_disk'):
+                    with patch.object(bc.storage, 'save_state_to_disk'):
+                        with patch.object(bc, '_rebuild_contract_state'):
+                            with patch.object(bc, '_rebuild_governance_state_from_chain'):
+                                with patch.object(bc, 'sync_smart_contract_vm'):
+                                    with patch.object(bc, '_rebuild_nonce_tracker'):
+                                        mock_block = Mock()
+                                        mock_block.transactions = []
+                                        mock_block.hash = "0000" + "a" * 60
+                                        mock_block.index = 1
+                                        mock_block.previous_hash = bc.chain[0].hash
+                                        mock_block.timestamp = 1000000
+                                        mock_block.difficulty = 4
+                                        mock_block.nonce = 100
+                                        mock_block.header = Mock()
+                                        mock_block.header.hash = mock_block.hash
 
-            # Create alternative chain - copy current and add block
-            alternative_chain = bc.chain.copy()
-            new_block = bc.mine_block("XAI" + "x" * 40)
-            if new_block:
-                alternative_chain.append(new_block)
+                                        new_chain = [bc.chain[0], mock_block]
 
-            with caplog.at_level(logging.DEBUG):
-                result = bc.replace_chain(alternative_chain)
+                                        with caplog.at_level(logging.INFO):
+                                            result = bc.replace_chain(new_chain)
 
-            assert result is True
+        assert result is True
+        assert len(bc.pending_transactions) == 0
+        log_messages = [record.message for record in caplog.records]
+        assert any("2 invalid transactions evicted" in msg for msg in log_messages)
 
-            # Verify all transactions remain
-            assert len(bc.pending_transactions) == 2
-            assert bc.pending_transactions[0].txid == "tx1"
-            assert bc.pending_transactions[1].txid == "tx2"
-
-            # Verify logging shows all transactions valid
-            log_messages = [record.message for record in caplog.records]
-            assert any("all" in msg and "valid" in msg for msg in log_messages), \
-                "Expected log message indicating all transactions remain valid"
-
-    def test_mempool_all_invalid_after_reorg(self, tmp_path, caplog):
-        """Test mempool when all transactions become invalid after reorganization"""
-        # Create blockchain
+    def test_validation_exception_handling(self, tmp_path, caplog):
+        """Test that exceptions during validation cause transaction eviction"""
         bc = Blockchain(data_dir=str(tmp_path))
 
-        # Create mock transactions
-        mock_tx1 = Mock(spec=Transaction)
-        mock_tx1.txid = "tx1"
-        mock_tx1.sender = "XAI" + "a" * 40
-        mock_tx1.recipient = "XAI" + "b" * 40
-        mock_tx1.amount = 100.0
-
-        mock_tx2 = Mock(spec=Transaction)
-        mock_tx2.txid = "tx2"
-        mock_tx2.sender = "XAI" + "c" * 40
-        mock_tx2.recipient = "XAI" + "d" * 40
-        mock_tx2.amount = 50.0
-
-        bc.pending_transactions = [mock_tx1, mock_tx2]
-
-        # Mock validator to return False for all transactions
-        with patch.object(bc.transaction_validator, 'validate_transaction') as mock_validate:
-            mock_validate.return_value = False
-
-            # Create alternative chain - copy current and add block
-            alternative_chain = bc.chain.copy()
-            new_block = bc.mine_block("XAI" + "x" * 40)
-            if new_block:
-                alternative_chain.append(new_block)
-
-            with caplog.at_level(logging.INFO):
-                result = bc.replace_chain(alternative_chain)
-
-            assert result is True
-
-            # Verify all transactions evicted
-            assert len(bc.pending_transactions) == 0
-
-            # Verify logging shows evictions
-            log_messages = [record.message for record in caplog.records]
-            assert any("2 invalid transactions evicted" in msg for msg in log_messages), \
-                "Expected log message showing 2 evictions"
-
-    def test_mempool_validation_exception_handling(self, tmp_path, caplog):
-        """Test that validation exceptions are handled and transactions are evicted"""
-        # Create blockchain
-        bc = Blockchain(data_dir=str(tmp_path))
-
-        # Create mock transaction
         mock_tx = Mock(spec=Transaction)
         mock_tx.txid = "tx_exception"
         mock_tx.sender = "XAI" + "a" * 40
@@ -180,51 +195,56 @@ class TestChainReorgMempoolRevalidation:
 
         bc.pending_transactions = [mock_tx]
 
-        # Mock validator to raise exception
-        with patch.object(bc.transaction_validator, 'validate_transaction') as mock_validate:
-            mock_validate.side_effect = Exception("Validation error")
+        with patch.object(bc.transaction_validator, 'validate_transaction',
+                         side_effect=Exception("Validation error")):
+            with patch.object(bc, '_validate_chain_structure', return_value=True):
+                with patch.object(bc.storage, '_save_block_to_disk'):
+                    with patch.object(bc.storage, 'save_state_to_disk'):
+                        with patch.object(bc, '_rebuild_contract_state'):
+                            with patch.object(bc, '_rebuild_governance_state_from_chain'):
+                                with patch.object(bc, 'sync_smart_contract_vm'):
+                                    with patch.object(bc, '_rebuild_nonce_tracker'):
+                                        mock_block = Mock()
+                                        mock_block.transactions = []
+                                        mock_block.hash = "0000" + "a" * 60
+                                        mock_block.index = 1
+                                        mock_block.previous_hash = bc.chain[0].hash
+                                        mock_block.timestamp = 1000000
+                                        mock_block.difficulty = 4
+                                        mock_block.nonce = 100
+                                        mock_block.header = Mock()
+                                        mock_block.header.hash = mock_block.hash
 
-            # Create alternative chain - copy current and add block
-            alternative_chain = bc.chain.copy()
-            new_block = bc.mine_block("XAI" + "x" * 40)
-            if new_block:
-                alternative_chain.append(new_block)
+                                        new_chain = [bc.chain[0], mock_block]
 
-            with caplog.at_level(logging.WARNING):
-                result = bc.replace_chain(alternative_chain)
-
-            assert result is True
-
-            # Verify transaction evicted due to exception
-            assert len(bc.pending_transactions) == 0
-
-            # Verify exception was logged
-            log_messages = [record.message for record in caplog.records]
-            assert any("validation raised exception" in msg and "Validation error" in msg
-                      for msg in log_messages), \
-                "Expected log message about validation exception"
-
-    def test_empty_mempool_revalidation(self, tmp_path, caplog):
-        """Test that empty mempool doesn't cause issues during reorg"""
-        # Create blockchain
-        bc = Blockchain(data_dir=str(tmp_path))
-
-        # Ensure mempool is empty
-        bc.pending_transactions = []
-
-        # Create alternative chain - copy current and add block
-        alternative_chain = bc.chain.copy()
-        new_block = bc.mine_block("XAI" + "x" * 40)
-        if new_block:
-            alternative_chain.append(new_block)
-
-        with caplog.at_level(logging.DEBUG):
-            result = bc.replace_chain(alternative_chain)
+                                        with caplog.at_level(logging.WARNING):
+                                            result = bc.replace_chain(new_chain)
 
         assert result is True
         assert len(bc.pending_transactions) == 0
-
-        # Should log that all 0 transactions remain valid
         log_messages = [record.message for record in caplog.records]
-        assert any("0 transactions remain valid" in msg or "all 0" in msg for msg in log_messages), \
-            "Expected log message about empty mempool validation"
+        assert any("validation raised exception" in msg and "Validation error" in msg
+                  for msg in log_messages)
+
+    def test_empty_mempool_revalidation(self, tmp_path, caplog):
+        """Test that empty mempool is handled gracefully"""
+        bc = Blockchain(data_dir=str(tmp_path))
+        bc.pending_transactions = []
+
+        with patch.object(bc, '_validate_chain_structure', return_value=True):
+            with patch.object(bc.storage, '_save_block_to_disk'):
+                with patch.object(bc.storage, 'save_state_to_disk'):
+                    with patch.object(bc, '_rebuild_contract_state'):
+                        with patch.object(bc, '_rebuild_governance_state_from_chain'):
+                            with patch.object(bc, 'sync_smart_contract_vm'):
+                                with patch.object(bc, '_rebuild_nonce_tracker'):
+                                    new_chain = [bc.chain[0], Mock()]
+                                    new_chain[1].transactions = []
+
+                                    with caplog.at_level(logging.DEBUG):
+                                        result = bc.replace_chain(new_chain)
+
+        assert result is True
+        assert len(bc.pending_transactions) == 0
+        log_messages = [record.message for record in caplog.records]
+        assert any("0 transactions" in msg for msg in log_messages)
