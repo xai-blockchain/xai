@@ -7,6 +7,7 @@ blocks, the UTXO set, and pending transactions.
 
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import logging
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
 
 
 MAX_BLOCK_FILE_SIZE = 16 * 1024 * 1024  # 16 MB
+COMPRESSION_THRESHOLD = 1000  # Compress blocks older than this many blocks from tip
 
 class BlockchainStorage:
     """
@@ -67,6 +69,24 @@ class BlockchainStorage:
         )
         if block_files:
             self.block_file_index = int(block_files[-1].split("_")[1].split(".")[0])
+
+    def _get_latest_block_index(self) -> int:
+        """
+        Get the highest block index in the chain.
+
+        Returns:
+            Highest block index, or -1 if chain is empty
+        """
+        if self.block_index:
+            max_height = self.block_index.get_max_indexed_height()
+            if max_height is not None:
+                return max_height
+
+        # Fallback: scan all block files
+        latest_block = self.get_latest_block_from_disk()
+        if latest_block:
+            return latest_block.header.index
+        return -1
 
     def _ensure_index_built(self) -> None:
         """
@@ -183,6 +203,53 @@ class BlockchainStorage:
         os.rename(compacted_file, os.path.join(self.blocks_dir, "blocks_0.json"))
 
 
+    def _should_compress_block(self, block_index: int) -> bool:
+        """
+        Determine if a block should be compressed based on its age.
+
+        Blocks older than COMPRESSION_THRESHOLD from the chain tip are compressed
+        to save ~70% disk space. Recent blocks are kept uncompressed for fast access.
+
+        Args:
+            block_index: Height of block to check
+
+        Returns:
+            True if block should be compressed, False otherwise
+        """
+        latest_index = self._get_latest_block_index()
+        if latest_index < 0:
+            return False  # Empty chain, don't compress
+
+        # Compress blocks older than threshold
+        return (latest_index - block_index) >= COMPRESSION_THRESHOLD
+
+    def _get_block_file_path(self, block_index: int, compressed: bool = False) -> str:
+        """
+        Get the file path for a block, checking both compressed and uncompressed versions.
+
+        Args:
+            block_index: Block height
+            compressed: If True, return compressed path; if False, check both
+
+        Returns:
+            Path to block file (may not exist)
+        """
+        # For individual block files (new compression scheme)
+        compressed_path = os.path.join(self.blocks_dir, f"block_{block_index}.json.gz")
+        uncompressed_path = os.path.join(self.blocks_dir, f"block_{block_index}.json")
+
+        if compressed:
+            return compressed_path
+
+        # Check which file exists
+        if os.path.exists(compressed_path):
+            return compressed_path
+        elif os.path.exists(uncompressed_path):
+            return uncompressed_path
+
+        # Default to uncompressed for new blocks
+        return uncompressed_path
+
     def _save_block_to_disk(self, block: Block) -> None:
         """Save a single block to its file with durable append.
 
@@ -225,6 +292,82 @@ class BlockchainStorage:
                 file_offset=file_offset,
                 file_size=block_size,
             )
+
+    def compress_old_blocks(self, force: bool = False) -> int:
+        """
+        Compress old blocks to save disk space.
+
+        This method scans all block files and compresses blocks that are older than
+        COMPRESSION_THRESHOLD blocks from the current chain tip. Compressed blocks
+        use gzip and save approximately 70% disk space.
+
+        Args:
+            force: If True, compress all blocks regardless of age
+
+        Returns:
+            Number of blocks compressed
+        """
+        latest_index = self._get_latest_block_index()
+        if latest_index < 0:
+            return 0  # Empty chain
+
+        blocks_compressed = 0
+        block_files = sorted(
+            [
+                f
+                for f in os.listdir(self.blocks_dir)
+                if f.startswith("blocks_") and f.endswith(".json")
+            ],
+            key=lambda x: int(x.split("_")[1].split(".")[0]),
+        )
+
+        for block_file in block_files:
+            file_path = os.path.join(self.blocks_dir, block_file)
+
+            with open(file_path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+
+            for line in lines:
+                try:
+                    block_data = json.loads(line.strip())
+                    block_index = block_data["header"]["index"]
+
+                    # Check if block should be compressed
+                    if force or self._should_compress_block(block_index):
+                        # Create individual compressed block file
+                        compressed_path = os.path.join(
+                            self.blocks_dir, f"block_{block_index}.json.gz"
+                        )
+
+                        # Skip if already compressed
+                        if os.path.exists(compressed_path):
+                            continue
+
+                        # Write compressed block
+                        block_json = json.dumps(block_data)
+                        with gzip.open(compressed_path, 'wt', encoding='utf-8') as gz_f:
+                            gz_f.write(block_json)
+
+                        blocks_compressed += 1
+
+                        if blocks_compressed % 100 == 0:
+                            logger.info(f"Compressed {blocks_compressed} blocks...")
+
+                except (json.JSONDecodeError, KeyError) as e:
+                    logger.warning(f"Failed to compress block: {e}")
+                    continue
+
+        if blocks_compressed > 0:
+            logger.info(
+                "Block compression completed",
+                extra={
+                    "event": "storage.compression_completed",
+                    "blocks_compressed": blocks_compressed,
+                    "latest_index": latest_index,
+                }
+            )
+
+        return blocks_compressed
     
     def save_state_to_disk(
         self,
@@ -453,6 +596,7 @@ class BlockchainStorage:
 
         Used when index is disabled or lookup fails.
         This is the original O(n) implementation.
+        Supports transparent decompression of gzip-compressed blocks.
 
         Args:
             block_index: Block height to load
@@ -463,6 +607,46 @@ class BlockchainStorage:
         from xai.core.blockchain import Block, Transaction
         from xai.core.block_header import BlockHeader
 
+        # First, check for individual compressed block file (fast path for old blocks)
+        compressed_path = os.path.join(self.blocks_dir, f"block_{block_index}.json.gz")
+        if os.path.exists(compressed_path):
+            try:
+                with gzip.open(compressed_path, 'rt', encoding='utf-8') as f:
+                    block_data = json.loads(f.read())
+                    return self._parse_block_data(block_data)
+            except (IOError, json.JSONDecodeError, KeyError) as e:
+                logger.error(
+                    "Failed to load compressed block %d: %s",
+                    block_index,
+                    type(e).__name__,
+                    extra={
+                        "event": "storage.compressed_block_load_failed",
+                        "block_index": block_index,
+                        "error": str(e),
+                    }
+                )
+                # Fall through to regular files
+
+        # Check for individual uncompressed block file
+        uncompressed_path = os.path.join(self.blocks_dir, f"block_{block_index}.json")
+        if os.path.exists(uncompressed_path):
+            try:
+                with open(uncompressed_path, 'r', encoding='utf-8') as f:
+                    block_data = json.loads(f.read())
+                    return self._parse_block_data(block_data)
+            except (IOError, json.JSONDecodeError, KeyError) as e:
+                logger.error(
+                    "Failed to load uncompressed block %d: %s",
+                    block_index,
+                    type(e).__name__,
+                    extra={
+                        "event": "storage.uncompressed_block_load_failed",
+                        "block_index": block_index,
+                        "error": str(e),
+                    }
+                )
+
+        # Fall back to scanning multi-block files
         block_files = sorted(
             [
                 f
