@@ -35,6 +35,29 @@ from xai.core.checkpoints import CheckpointManager
 from collections import defaultdict
 from xai.core.structured_logger import StructuredLogger, get_structured_logger
 
+
+def canonical_json(data: Dict[str, Any]) -> str:
+    """Produce deterministic JSON string for consensus-critical hashing.
+
+    Uses canonical serialization to ensure identical hashes across all nodes:
+    - sort_keys=True: Consistent key ordering
+    - separators=(',', ':'): No whitespace variations
+    - ensure_ascii=True: No unicode encoding variations
+
+    Args:
+        data: Dictionary to serialize
+
+    Returns:
+        Canonical JSON string suitable for hashing
+    """
+    return json.dumps(
+        data,
+        sort_keys=True,
+        separators=(',', ':'),
+        ensure_ascii=True
+    )
+
+
 class BlockHeader:
     """
     Represents the header of a block.
@@ -69,7 +92,7 @@ class BlockHeader:
         self.hash = self.calculate_hash()
 
     def calculate_hash(self) -> str:
-        """Calculate block hash"""
+        """Calculate block hash using canonical JSON serialization"""
         header_data = {
             "index": self.index,
             "previous_hash": self.previous_hash,
@@ -80,7 +103,7 @@ class BlockHeader:
         }
         if self._hash_includes_version:
             header_data["version"] = self.version
-        header_string = json.dumps(header_data, sort_keys=True)
+        header_string = canonical_json(header_data)
         return hashlib.sha256(header_string.encode()).hexdigest()
 
     def to_dict(self) -> Dict[str, Any]:

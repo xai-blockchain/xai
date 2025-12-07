@@ -183,7 +183,8 @@ class TransactionValidator:
                             f"Transaction input {i} is missing required fields (txid, vout)."
                         )
 
-                    utxo = self.utxo_manager.get_unspent_output(tx_input["txid"], tx_input["vout"])
+                    # During validation, check if UTXO exists (don't exclude pending - that's for selection only)
+                    utxo = self.utxo_manager.get_unspent_output(tx_input["txid"], tx_input["vout"], exclude_pending=False)
                     if not utxo and hasattr(self.blockchain, "pending_transactions"):
                         # Allow spending outputs from pending transactions (intra-block chaining)
                         for pending in self.blockchain.pending_transactions:

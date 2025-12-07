@@ -41,7 +41,7 @@ from xai.core.governance_transactions import GovernanceState, GovernanceTxType, 
 from xai.core.checkpoints import CheckpointManager
 from collections import defaultdict, deque
 from xai.core.structured_logger import StructuredLogger, get_structured_logger
-from xai.core.block_header import BlockHeader
+from xai.core.block_header import BlockHeader, canonical_json
 from xai.core.blockchain_interface import BlockchainDataProvider, GamificationBlockchainInterface
 from xai.core.blockchain_security import BlockchainSecurityConfig, BlockSizeValidator
 from xai.core.finality import (
@@ -230,7 +230,7 @@ class Block:
         transactions, falling back to structural approximations if a transaction
         is missing helpers (should never happen in production).
         """
-        header_bytes = len(json.dumps(self.header.to_dict(), sort_keys=True).encode("utf-8"))
+        header_bytes = len(canonical_json(self.header.to_dict()).encode("utf-8"))
 
         tx_bytes = 0
         for tx in self.transactions:
@@ -240,7 +240,7 @@ class Block:
                 tx_bytes += tx.get_size()
             except AttributeError:
                 try:
-                    tx_bytes += len(json.dumps(tx.to_dict(), sort_keys=True).encode("utf-8"))
+                    tx_bytes += len(canonical_json(tx.to_dict()).encode("utf-8"))
                 except Exception:
                     tx_bytes += 0
 
@@ -1921,6 +1921,17 @@ class Blockchain:
         if selected_amount < total_needed:
             return None
 
+        # Lock the selected UTXOs to prevent double-spend in concurrent transactions
+        # This is critical for preventing TOCTOU race conditions
+        if not self.utxo_manager.lock_utxos(selected_utxos):
+            # UTXOs are already locked by another pending transaction
+            self.logger.warn(
+                "Failed to lock UTXOs for transaction - already locked by pending transaction",
+                sender=sender_address,
+                extra={"event": "transaction.utxo_lock_failed"}
+            )
+            return None
+
         # Create inputs from selected UTXOs
         inputs = [{"txid": utxo["txid"], "vout": utxo["vout"]} for utxo in selected_utxos]
 
@@ -1970,6 +1981,10 @@ class Blockchain:
                 if tx.sender and tx.sender != "COINBASE":
                     sender_counts[tx.sender] += 1
             else:
+                # Unlock UTXOs for expired transaction
+                if tx.inputs:
+                    utxo_keys = [(inp["txid"], inp["vout"]) for inp in tx.inputs]
+                    self.utxo_manager.unlock_utxos_by_keys(utxo_keys)
                 removed += 1
 
         if removed:
@@ -2168,7 +2183,8 @@ class Blockchain:
                 has_missing_utxos = False
                 if transaction.inputs:
                     for tx_input in transaction.inputs:
-                        utxo = self.utxo_manager.get_unspent_output(tx_input["txid"], tx_input["vout"])
+                        # Check if UTXO exists (don't exclude pending - we're checking existence, not availability)
+                        utxo = self.utxo_manager.get_unspent_output(tx_input["txid"], tx_input["vout"], exclude_pending=False)
                         if not utxo:
                             has_missing_utxos = True
                             break
@@ -2182,17 +2198,29 @@ class Blockchain:
                         if not any(orphan.txid == transaction.txid for orphan in self.orphan_transactions):
                             self.orphan_transactions.append(transaction)
                             self.logger.info(f"Transaction {transaction.txid[:10]}... added to orphan pool (missing UTXOs)")
+                    # Unlock UTXOs since transaction not accepted to mempool
+                    if transaction.inputs:
+                        utxo_keys = [(inp["txid"], inp["vout"]) for inp in transaction.inputs]
+                        self.utxo_manager.unlock_utxos_by_keys(utxo_keys)
                     return False
                 else:
                     # Validation failed for other reasons, reject transaction
                     self.logger.warn(f"Transaction {transaction.txid[:10]}... rejected (validation failed for other reasons)")
                     self._record_invalid_sender_attempt(transaction.sender, current_time)
                     self._mempool_rejected_invalid_total += 1
+                    # Unlock UTXOs since transaction rejected
+                    if transaction.inputs:
+                        utxo_keys = [(inp["txid"], inp["vout"]) for inp in transaction.inputs]
+                        self.utxo_manager.unlock_utxos_by_keys(utxo_keys)
                     return False
 
             if not is_valid:
                 self._record_invalid_sender_attempt(transaction.sender, current_time)
                 self._mempool_rejected_invalid_total += 1
+                # Unlock UTXOs since transaction rejected
+                if transaction.inputs:
+                    utxo_keys = [(inp["txid"], inp["vout"]) for inp in transaction.inputs]
+                    self.utxo_manager.unlock_utxos_by_keys(utxo_keys)
                 return False
 
             # Double-spend detection: Check if any inputs are already spent in pending transactions
@@ -2212,6 +2240,10 @@ class Blockchain:
                                         self.logger.warn(f"Double-spend detected: Input {input_key} already used in mempool by tx {pending_tx.txid}")
                                         self._record_invalid_sender_attempt(transaction.sender, current_time)
                                         self._mempool_rejected_invalid_total += 1
+                                        # Unlock UTXOs since transaction rejected
+                                        if transaction.inputs:
+                                            utxo_keys = [(inp["txid"], inp["vout"]) for inp in transaction.inputs]
+                                            self.utxo_manager.unlock_utxos_by_keys(utxo_keys)
                                         return False
 
             # Handle Replace-By-Fee (RBF) if this transaction replaces another
@@ -2488,8 +2520,8 @@ class Blockchain:
                 self.nonce_tracker.pending_nonces[tx.sender] = expected
                 sender_next_nonce[tx.sender] = expected + 1
 
-            # Calculate transaction size
-            tx_size = len(json.dumps(tx.to_dict()).encode('utf-8'))
+            # Calculate transaction size using canonical JSON
+            tx_size = len(canonical_json(tx.to_dict()).encode('utf-8'))
 
             # Check if adding this transaction would exceed block size limit
             if current_block_size + tx_size <= max_block_size_bytes:
@@ -2583,6 +2615,12 @@ class Blockchain:
 
             # Process gamification features for this block
             self._process_gamification_features(self.gamification_adapter, new_block, miner_address)
+
+            # Unlock UTXOs for mined transactions (no longer pending)
+            for tx in new_block.transactions:
+                if tx.inputs:
+                    utxo_keys = [(inp["txid"], inp["vout"]) for inp in tx.inputs]
+                    self.utxo_manager.unlock_utxos_by_keys(utxo_keys)
 
             # Clear pending transactions
             self.pending_transactions = []
@@ -2721,6 +2759,9 @@ class Blockchain:
         Add a block received from a peer to the blockchain.
         Handles chain reorganization if the incoming block is part of a longer valid chain.
 
+        ATOMIC OPERATION: Uses snapshot/restore for safe rollback on failure.
+        All state modifications (chain, UTXO, nonces) are applied atomically or not at all.
+
         Args:
             block: Block to add to the chain
 
@@ -2855,24 +2896,57 @@ class Blockchain:
         # Case 3: Block conflicts with our chain (fork/reorganization scenario)
         # The block is at an index we already have, but with a different hash
         if header.index < len(self.chain) and self.chain[header.index].hash != header.hash:
-            if self._attempt_lineage_sync(block):
-                return True
-            # Check if this block links to a previous block in our chain
-            if header.index > 0 and header.index - 1 < len(self.chain):
-                if header.previous_hash == self.chain[header.index - 1].hash:
-                    # This is a valid fork from our chain
-                    # Try to build a longer chain from this fork point
-                    self.logger.info("Received fork block", block_index=header.index, block_hash=header.hash)
-                    return self._handle_fork(block)
+            # ATOMIC OPERATION: Create snapshots before any state modifications
+            # This ensures we can rollback if fork handling fails partway through
+            old_chain = self.chain.copy()
+            utxo_snapshot = self.utxo_manager.snapshot()  # Thread-safe atomic snapshot
+            nonce_snapshot = self.nonce_tracker.snapshot() if self.nonce_tracker else None
 
-            # Block doesn't connect to our immediate parent, but might be part
-            # of a competing fork. Store as orphan and check for reorganization.
-            if header.index not in self.orphan_blocks:
-                self.orphan_blocks[header.index] = []
-            self.orphan_blocks[header.index].append(block)
-            self.logger.info("Received orphan block", block_index=header.index, block_hash=header.hash)
-            self._check_orphan_chains_for_reorg()
-            return False
+            try:
+                if self._attempt_lineage_sync(block):
+                    return True
+                # Check if this block links to a previous block in our chain
+                if header.index > 0 and header.index - 1 < len(self.chain):
+                    if header.previous_hash == self.chain[header.index - 1].hash:
+                        # This is a valid fork from our chain
+                        # Try to build a longer chain from this fork point
+                        self.logger.info("Received fork block", block_index=header.index, block_hash=header.hash)
+                        result = self._handle_fork(block)
+                        if not result:
+                            # Fork handling failed - restore snapshots to maintain consistency
+                            self.logger.debug(
+                                "Fork handling failed, restoring state",
+                                block_index=header.index,
+                                block_hash=header.hash
+                            )
+                            self.chain = old_chain
+                            self.utxo_manager.restore(utxo_snapshot)
+                            if nonce_snapshot and self.nonce_tracker:
+                                self.nonce_tracker.restore(nonce_snapshot)
+                        return result
+
+                # Block doesn't connect to our immediate parent, but might be part
+                # of a competing fork. Store as orphan and check for reorganization.
+                if header.index not in self.orphan_blocks:
+                    self.orphan_blocks[header.index] = []
+                self.orphan_blocks[header.index].append(block)
+                self.logger.info("Received orphan block", block_index=header.index, block_hash=header.hash)
+                self._check_orphan_chains_for_reorg()
+                return False
+
+            except Exception as e:
+                # If any exception occurs during fork handling, restore state
+                self.logger.error(
+                    f"Exception during fork handling: {e}. Rolling back to previous state.",
+                    block_index=header.index,
+                    block_hash=header.hash,
+                    error=str(e)
+                )
+                self.chain = old_chain
+                self.utxo_manager.restore(utxo_snapshot)
+                if nonce_snapshot and self.nonce_tracker:
+                    self.nonce_tracker.restore(nonce_snapshot)
+                return False
 
         return False
 

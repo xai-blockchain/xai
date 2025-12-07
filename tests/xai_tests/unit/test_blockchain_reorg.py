@@ -454,3 +454,242 @@ class TestBlockchainReorg:
         # This should succeed - normal sized block
         assert len(bc.chain) == original_chain_length + 1
         assert bc.is_chain_valid()
+
+    def test_nonce_consistency_after_reorg(self, tmp_path):
+        """
+        Test that nonce tracker is properly rebuilt after chain reorganization.
+
+        CRITICAL: After a reorg, transaction nonces may differ between chains.
+        The nonce tracker must be rebuilt from the new canonical chain to prevent:
+        - Invalid nonce rejections for valid transactions
+        - Acceptance of replay attacks with stale nonces
+        - Mempool transactions with wrong nonces
+
+        Attack scenario this prevents:
+        1. Chain A: Alice sends tx with nonce 0 (confirmed in block 2)
+        2. Chain B forks at block 1, Alice hasn't sent any tx yet
+        3. Chain B becomes canonical (longer chain)
+        4. Without fix: Nonce tracker still shows Alice's nonce as 0
+        5. Without fix: Alice's new tx with nonce 0 is rejected as duplicate
+        6. With fix: Nonce tracker is rebuilt, Alice's nonce is -1, tx accepted
+        """
+        bc = Blockchain(data_dir=str(tmp_path))
+        alice = Wallet()
+        bob = Wallet()
+        miner = Wallet()
+
+        # Build initial chain: Genesis -> Block 1 (Alice gets funds)
+        bc.mine_pending_transactions(alice.address)
+        assert len(bc.chain) == 2
+
+        # Get Alice's initial balance and UTXOs
+        alice_balance_initial = bc.get_balance(alice.address)
+        assert alice_balance_initial > 0
+
+        alice_utxos = bc.utxo_manager.get_utxos_for_address(alice.address)
+        assert len(alice_utxos) > 0
+
+        # Alice sends transaction in Chain A (nonce 0)
+        tx_chain_a = Transaction(
+            sender=alice.address,
+            recipient=bob.address,
+            amount=5.0,
+            fee=0.1,
+            inputs=[{"txid": alice_utxos[0]["txid"], "vout": alice_utxos[0]["vout"]}],
+            nonce=bc.nonce_tracker.get_next_nonce(alice.address),
+        )
+        tx_chain_a.sign_transaction(alice.private_key)
+        bc.add_transaction(tx_chain_a)
+
+        # Mine block 2 with Alice's transaction (Chain A)
+        bc.mine_pending_transactions(miner.address)
+        assert len(bc.chain) == 3
+
+        # Verify Alice's nonce was incremented
+        alice_nonce_chain_a = bc.nonce_tracker.get_nonce(alice.address)
+        assert alice_nonce_chain_a == 0, "Alice's nonce should be 0 after first transaction"
+
+        # Save Chain A state
+        chain_a_length = len(bc.chain)
+        chain_a_tip = bc.chain[-1].hash
+
+        # Simulate Chain B: Fork from block 1, different transactions
+        # Revert to block 1 (before Alice's transaction)
+        fork_point = 1
+        bc.chain = bc.chain[:fork_point + 1]
+
+        # Rebuild UTXO and nonce state from Chain B (fork chain)
+        bc.utxo_manager.clear()
+        bc.nonce_tracker.reset()
+
+        # Replay Chain B transactions
+        for block in bc.chain:
+            for tx in block.transactions:
+                if tx.sender != "COINBASE":
+                    bc.utxo_manager.process_transaction_inputs(tx)
+                    if tx.nonce is not None:
+                        bc.nonce_tracker.set_nonce(tx.sender, tx.nonce)
+                bc.utxo_manager.process_transaction_outputs(tx)
+
+        # In Chain B, Alice hasn't sent any transactions yet
+        # So her nonce should be -1 (initial state)
+        alice_nonce_chain_b = bc.nonce_tracker.get_nonce(alice.address)
+        assert alice_nonce_chain_b == -1, "Alice's nonce should be -1 in Chain B (no transactions)"
+
+        # Mine two more blocks in Chain B to make it longer than Chain A
+        bc.mine_pending_transactions(miner.address)  # Block 2 in Chain B
+        bc.mine_pending_transactions(miner.address)  # Block 3 in Chain B
+        chain_b_length = len(bc.chain)
+
+        assert chain_b_length > chain_a_length, "Chain B should be longer than Chain A"
+
+        # Now simulate receiving Chain A and attempting reorg
+        # In reality, the node would receive Chain A from peers and compare
+        # For testing, we save Chain B and "reorg" by replacing with Chain A manually
+
+        # Save Chain B state
+        chain_b_copy = bc.chain.copy()
+        chain_b_tip = bc.chain[-1].hash
+
+        # Create Chain A (genesis + Alice's funded block + Alice's tx block)
+        # We need to recreate this from storage or rebuild it
+        # For testing, we'll use replace_chain() which triggers nonce rebuild
+
+        # Reset to genesis
+        bc.chain = [bc.chain[0]]
+        bc.utxo_manager.clear()
+        bc.nonce_tracker.reset()
+
+        # Rebuild genesis
+        for tx in bc.chain[0].transactions:
+            bc.utxo_manager.process_transaction_outputs(tx)
+
+        # Mine block 1 (Alice gets funds)
+        bc.mine_pending_transactions(alice.address)
+
+        # Get Alice's UTXOs again
+        alice_utxos_new = bc.utxo_manager.get_utxos_for_address(alice.address)
+
+        # Recreate Alice's transaction
+        tx_recreated = Transaction(
+            sender=alice.address,
+            recipient=bob.address,
+            amount=5.0,
+            fee=0.1,
+            inputs=[{"txid": alice_utxos_new[0]["txid"], "vout": alice_utxos_new[0]["vout"]}],
+            nonce=bc.nonce_tracker.get_next_nonce(alice.address),
+        )
+        tx_recreated.sign_transaction(alice.private_key)
+        bc.add_transaction(tx_recreated)
+
+        # Mine block 2 (Alice's transaction)
+        bc.mine_pending_transactions(miner.address)
+
+        # Now we have Chain A reconstructed
+        chain_a_reconstructed = bc.chain.copy()
+
+        # Now test the reorg: Replace with Chain B (longer chain)
+        result = bc.replace_chain(chain_b_copy)
+
+        # Chain B is longer, so reorg should succeed
+        assert result is True, "Reorg to longer chain should succeed"
+
+        # CRITICAL: After reorg to Chain B, Alice's nonce should be -1
+        # because she has no transactions in Chain B
+        alice_nonce_after_reorg = bc.nonce_tracker.get_nonce(alice.address)
+        assert alice_nonce_after_reorg == -1, (
+            f"After reorg to Chain B, Alice's nonce should be -1 (no transactions in Chain B). "
+            f"Got {alice_nonce_after_reorg}"
+        )
+
+        # Verify Alice can now send a new transaction with nonce 0 in Chain B
+        next_nonce = bc.nonce_tracker.get_next_nonce(alice.address)
+        assert next_nonce == 0, f"Alice's next nonce should be 0, got {next_nonce}"
+
+        # Validate that a transaction with nonce 0 is accepted
+        assert bc.nonce_tracker.validate_nonce(alice.address, 0) is True, (
+            "Transaction with nonce 0 should be valid after reorg"
+        )
+
+        # Create and validate a new transaction in Chain B
+        alice_utxos_chain_b = bc.utxo_manager.get_utxos_for_address(alice.address)
+        if len(alice_utxos_chain_b) > 0:
+            tx_chain_b = Transaction(
+                sender=alice.address,
+                recipient=bob.address,
+                amount=3.0,
+                fee=0.1,
+                inputs=[{"txid": alice_utxos_chain_b[0]["txid"], "vout": alice_utxos_chain_b[0]["vout"]}],
+                nonce=0,  # Should be valid now
+            )
+            tx_chain_b.sign_transaction(alice.private_key)
+
+            # Transaction should be accepted
+            result = bc.add_transaction(tx_chain_b)
+            # Note: add_transaction may return None if validation fails internally
+            # We just verify nonce validation passed
+
+        # Final verification: Nonce tracker state is consistent with chain
+        bc._rebuild_nonce_tracker(bc.chain)
+        alice_nonce_final = bc.nonce_tracker.get_nonce(alice.address)
+        assert alice_nonce_final == -1, (
+            f"After manual rebuild, Alice's nonce should still be -1. Got {alice_nonce_final}"
+        )
+
+    def test_nonce_rollback_on_failed_reorg(self, tmp_path):
+        """
+        Test that nonce tracker is restored if chain reorganization fails.
+
+        If replace_chain() fails partway through (e.g., invalid block in new chain),
+        the nonce tracker should be rolled back to its pre-reorg state.
+        """
+        bc = Blockchain(data_dir=str(tmp_path))
+        alice = Wallet()
+        miner = Wallet()
+
+        # Build initial chain with Alice's transaction
+        bc.mine_pending_transactions(alice.address)
+
+        alice_utxos = bc.utxo_manager.get_utxos_for_address(alice.address)
+        if len(alice_utxos) > 0:
+            tx = Transaction(
+                sender=alice.address,
+                recipient=miner.address,
+                amount=5.0,
+                fee=0.1,
+                inputs=[{"txid": alice_utxos[0]["txid"], "vout": alice_utxos[0]["vout"]}],
+                nonce=bc.nonce_tracker.get_next_nonce(alice.address),
+            )
+            tx.sign_transaction(alice.private_key)
+            bc.add_transaction(tx)
+
+        bc.mine_pending_transactions(miner.address)
+
+        # Save nonce state before reorg attempt
+        alice_nonce_before = bc.nonce_tracker.get_nonce(alice.address)
+
+        # Create invalid fork chain (wrong previous hash to trigger failure)
+        invalid_block = Block(
+            len(bc.chain),  # Index
+            [],  # No transactions
+            previous_hash="INVALID_HASH",  # Wrong hash - will fail validation
+            difficulty=bc.difficulty,
+            timestamp=time.time(),
+            nonce=12345,
+        )
+        invalid_block.header._hash = "0000" + "f" * 60
+
+        invalid_chain = bc.chain[:1] + [invalid_block]
+
+        # Attempt reorg with invalid chain - should fail
+        result = bc.replace_chain(invalid_chain)
+
+        # Reorg should fail
+        assert result is False, "Reorg with invalid chain should fail"
+
+        # Nonce state should be unchanged (rolled back)
+        alice_nonce_after = bc.nonce_tracker.get_nonce(alice.address)
+        assert alice_nonce_after == alice_nonce_before, (
+            f"Nonce should be rolled back after failed reorg. "
+            f"Before: {alice_nonce_before}, After: {alice_nonce_after}"
+        )

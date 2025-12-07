@@ -1,6 +1,28 @@
 import hashlib
 import json
-from typing import List, Tuple, Any
+from typing import List, Tuple, Any, Dict
+
+
+def canonical_json(data: Dict[str, Any]) -> str:
+    """Produce deterministic JSON string for consensus-critical hashing.
+
+    Uses canonical serialization to ensure identical hashes across all nodes:
+    - sort_keys=True: Consistent key ordering
+    - separators=(',', ':'): No whitespace variations
+    - ensure_ascii=True: No unicode encoding variations
+
+    Args:
+        data: Dictionary to serialize
+
+    Returns:
+        Canonical JSON string suitable for hashing
+    """
+    return json.dumps(
+        data,
+        sort_keys=True,
+        separators=(',', ':'),
+        ensure_ascii=True
+    )
 
 
 class MerkleTree:
@@ -13,9 +35,9 @@ class MerkleTree:
         self.root = self.tree[-1][0] if self.tree else None
 
     def _hash_leaf(self, leaf_data):
-        # Ensure consistent hashing for leaf data
+        # Ensure consistent hashing for leaf data using canonical JSON
         if isinstance(leaf_data, dict) or isinstance(leaf_data, list):
-            return hashlib.sha256(json.dumps(leaf_data, sort_keys=True).encode()).hexdigest()
+            return hashlib.sha256(canonical_json(leaf_data).encode()).hexdigest()
         return hashlib.sha256(str(leaf_data).encode()).hexdigest()
 
     def _hash_pair(self, hash1, hash2):
@@ -88,7 +110,7 @@ class MerkleTree:
     @staticmethod
     def _hash_leaf_static(leaf_data):
         if isinstance(leaf_data, dict) or isinstance(leaf_data, list):
-            return hashlib.sha256(json.dumps(leaf_data, sort_keys=True).encode()).hexdigest()
+            return hashlib.sha256(canonical_json(leaf_data).encode()).hexdigest()
         return hashlib.sha256(str(leaf_data).encode()).hexdigest()
 
     @staticmethod

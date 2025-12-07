@@ -330,3 +330,75 @@ class FinalityManager:
             "highest_finalized_height": highest,
             "finalized_blocks": len(self.certificates_by_hash),
         }
+
+    def snapshot(self) -> Dict[str, Any]:
+        """
+        Create a complete snapshot of the current finality state.
+        Thread-safe atomic operation for chain reorganization rollback.
+
+        Returns:
+            A deep copy of the finality state including certificates and pending votes
+        """
+        import copy
+        with self._lock:
+            return {
+                "pending_votes": copy.deepcopy(self.pending_votes),
+                "pending_power": copy.deepcopy(self.pending_power),
+                "certificates_by_hash": {
+                    k: {
+                        "block_hash": v.block_hash,
+                        "block_height": v.block_height,
+                        "signatures": copy.deepcopy(v.signatures),
+                        "timestamp": v.timestamp,
+                    }
+                    for k, v in self.certificates_by_hash.items()
+                },
+                "certificates_by_height": copy.deepcopy(self.certificates_by_height),
+                "detector_state": self.detector.get_state(),
+            }
+
+    def restore(self, snapshot: Dict[str, Any]) -> None:
+        """
+        Restore finality state from a snapshot.
+        Thread-safe atomic operation for chain reorganization rollback.
+
+        Args:
+            snapshot: Snapshot created by snapshot() method
+        """
+        import copy
+        with self._lock:
+            # Restore pending votes and power
+            self.pending_votes = copy.deepcopy(snapshot.get("pending_votes", {}))
+            self.pending_power = copy.deepcopy(snapshot.get("pending_power", {}))
+
+            # Restore certificates
+            self.certificates_by_hash = {}
+            for block_hash, cert_data in snapshot.get("certificates_by_hash", {}).items():
+                self.certificates_by_hash[block_hash] = FinalityCertificate(
+                    block_hash=cert_data["block_hash"],
+                    block_height=cert_data["block_height"],
+                    signatures=copy.deepcopy(cert_data["signatures"]),
+                    timestamp=cert_data["timestamp"],
+                )
+
+            self.certificates_by_height = {}
+            for height_str, cert in self.certificates_by_hash.items():
+                self.certificates_by_height[cert.block_height] = cert
+
+            # Restore detector state
+            detector_state = snapshot.get("detector_state")
+            if detector_state:
+                self.detector.restore_state(detector_state)
+
+            # Persist restored state to disk
+            self._save_certificates()
+            self._save_state()
+
+            self.logger.info(
+                "Finality state restored from snapshot",
+                extra={
+                    "event": "finality.restore",
+                    "certificate_count": len(self.certificates_by_hash),
+                    "pending_vote_count": len(self.pending_votes),
+                }
+            )

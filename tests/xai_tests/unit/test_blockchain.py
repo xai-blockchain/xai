@@ -937,5 +937,126 @@ class TestBlockSizeEnforcement:
         assert bc.validate_chain(chain=[genesis_block, oversized_block]) is False
 
 
+class TestAddBlockAtomicity:
+    """Test atomic state updates in add_block() method."""
+
+    def test_fork_failure_restores_state(self, tmp_path):
+        """
+        Test that when fork handling fails, all state (chain, UTXO, nonces) is restored.
+        This prevents UTXO corruption from partial fork processing.
+        """
+        # Create blockchain with initial chain
+        bc = Blockchain(data_dir=str(tmp_path))
+        wallet1 = Wallet()
+        wallet2 = Wallet()
+
+        # Mine block 1 on main chain (just mining rewards, no transactions)
+        block1 = bc.mine_pending_transactions(miner_address=wallet1.address)
+        assert block1 is not None
+
+        # Mine block 2 on main chain
+        block2 = bc.mine_pending_transactions(miner_address=wallet1.address)
+        assert block2 is not None
+
+        # Capture state before attempting fork
+        chain_len_before = len(bc.chain)
+        utxo_snapshot_before = bc.utxo_manager.snapshot()
+        nonce_snapshot_before = bc.nonce_tracker.snapshot()
+
+        # Create a fork block at index 1 that conflicts with our chain
+        # This block has a different hash than our block at index 1
+        fork_header = BlockHeader(
+            index=1,
+            previous_hash=bc.chain[0].hash,
+            merkle_root=bc.calculate_merkle_root([]),
+            timestamp=block1.header.timestamp + 1,  # Different timestamp = different hash
+            difficulty=bc.difficulty,
+            nonce=0,
+            miner_pubkey=wallet2.public_key,
+        )
+        # Mine the fork block
+        fork_header.hash = bc.mine_block(fork_header)
+        fork_header.signature = sign_message_hex(wallet2.private_key, fork_header.hash.encode())
+        fork_block = Block(fork_header, [])
+
+        # Verify it's actually a different hash (fork)
+        assert fork_block.header.hash != block1.header.hash
+
+        # Attempt to add fork block - this should fail because it's shorter than our chain
+        # and _handle_fork will reject it
+        result = bc.add_block(fork_block)
+
+        # Fork should be rejected
+        assert result is False
+
+        # CRITICAL: State must be restored exactly to pre-fork state
+        assert len(bc.chain) == chain_len_before, "Chain length changed after failed fork"
+        assert bc.chain[1].hash == block1.header.hash, "Block 1 was replaced despite fork failure"
+
+        # Verify UTXO state is unchanged
+        utxo_snapshot_after = bc.utxo_manager.snapshot()
+        assert utxo_snapshot_after == utxo_snapshot_before, "UTXO state corrupted after failed fork"
+
+        # Verify nonce state is unchanged
+        nonce_snapshot_after = bc.nonce_tracker.snapshot()
+        assert nonce_snapshot_after == nonce_snapshot_before, "Nonce state corrupted after failed fork"
+
+    def test_exception_during_fork_restores_state(self, tmp_path, monkeypatch):
+        """
+        Test that exceptions during fork processing trigger state restoration.
+        """
+        bc = Blockchain(data_dir=str(tmp_path))
+        wallet = Wallet()
+
+        # Build initial chain
+        block1 = bc.mine_pending_transactions(miner_address=wallet.address)
+        assert block1 is not None
+
+        # Capture state
+        chain_before = bc.chain.copy()
+        utxo_before = bc.utxo_manager.snapshot()
+        nonce_before = bc.nonce_tracker.snapshot()
+
+        # Create fork block
+        fork_header = BlockHeader(
+            index=1,
+            previous_hash=bc.chain[0].hash,
+            merkle_root=bc.calculate_merkle_root([]),
+            timestamp=block1.header.timestamp + 1,
+            difficulty=bc.difficulty,
+            nonce=0,
+            miner_pubkey=wallet.public_key,
+        )
+        fork_header.hash = bc.mine_block(fork_header)
+        fork_header.signature = sign_message_hex(wallet.private_key, fork_header.hash.encode())
+        fork_block = Block(fork_header, [])
+
+        # Inject an exception in _handle_fork to simulate failure
+        original_handle_fork = bc._handle_fork
+
+        def failing_handle_fork(block):
+            # Modify state before failing to test rollback
+            bc.chain.append(fork_block)
+            raise RuntimeError("Simulated fork processing failure")
+
+        monkeypatch.setattr(bc, "_handle_fork", failing_handle_fork)
+
+        # Try to add fork block - should catch exception and rollback
+        result = bc.add_block(fork_block)
+
+        # Should return False after catching exception
+        assert result is False
+
+        # State should be fully restored despite exception
+        assert len(bc.chain) == len(chain_before), "Chain not restored after exception"
+        assert bc.chain[1].hash == chain_before[1].hash, "Chain corrupted after exception"
+
+        utxo_after = bc.utxo_manager.snapshot()
+        assert utxo_after == utxo_before, "UTXO not restored after exception"
+
+        nonce_after = bc.nonce_tracker.snapshot()
+        assert nonce_after == nonce_before, "Nonce not restored after exception"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -668,3 +668,71 @@ class GovernanceExecutionEngine:
     def is_feature_enabled(self, feature_name: str) -> bool:
         """Check if feature is enabled"""
         return self.capability_registry.active_features.get(feature_name, False)
+
+    def snapshot(self) -> Dict[str, Any]:
+        """
+        Create a complete snapshot of the current governance state.
+        Thread-safe atomic operation for chain reorganization rollback.
+
+        Returns:
+            A deep copy of the governance state including registry and history
+        """
+        import copy
+        return {
+            "governance_state": copy.deepcopy(self.blockchain.governance_state.__dict__ if self.blockchain.governance_state else None),
+            "execution_history": copy.deepcopy(self.execution_history),
+            "capability_registry": {
+                "registered_parameters": copy.deepcopy(self.capability_registry.registered_parameters),
+                "registered_proposal_types": copy.deepcopy(self.capability_registry.registered_proposal_types),
+                "active_features": copy.deepcopy(self.capability_registry.active_features),
+            },
+        }
+
+    def restore(self, snapshot: Dict[str, Any]) -> None:
+        """
+        Restore governance state from a snapshot.
+        Thread-safe atomic operation for chain reorganization rollback.
+
+        Args:
+            snapshot: Snapshot created by snapshot() method
+        """
+        import copy
+        from xai.core.governance import GovernanceState
+
+        # Restore governance state
+        gov_state_data = snapshot.get("governance_state")
+        if gov_state_data:
+            # Recreate governance state object
+            mining_start = gov_state_data.get("mining_start_time", time.time())
+            self.blockchain.governance_state = GovernanceState(mining_start_time=mining_start)
+            # Restore all attributes
+            for key, value in gov_state_data.items():
+                setattr(self.blockchain.governance_state, key, copy.deepcopy(value))
+        else:
+            self.blockchain.governance_state = None
+
+        # Restore execution history
+        self.execution_history = copy.deepcopy(snapshot.get("execution_history", []))
+
+        # Restore capability registry
+        registry_data = snapshot.get("capability_registry", {})
+        self.capability_registry.registered_parameters = copy.deepcopy(
+            registry_data.get("registered_parameters", {})
+        )
+        self.capability_registry.registered_proposal_types = copy.deepcopy(
+            registry_data.get("registered_proposal_types", {})
+        )
+        self.capability_registry.active_features = copy.deepcopy(
+            registry_data.get("active_features", {})
+        )
+
+        logger = getattr(self.blockchain, "logger", None)
+        if logger:
+            logger.info(
+                "Governance state restored from snapshot",
+                extra={
+                    "event": "governance.restore",
+                    "execution_history_count": len(self.execution_history),
+                    "active_features": len(self.capability_registry.active_features),
+                }
+            )

@@ -103,3 +103,40 @@ class SmartContractManager:
             nonce=nonce,
         )
         return self.executor.call_static(message)
+
+    def snapshot(self) -> Dict[str, Any]:
+        """
+        Create a complete snapshot of the current contract state.
+        Thread-safe atomic operation for chain reorganization rollback.
+
+        Returns:
+            A deep copy of the contract state including contracts and receipts
+        """
+        import copy
+        return {
+            "contracts": copy.deepcopy(self.blockchain.contracts),
+            "contract_receipts": copy.deepcopy(self.blockchain.contract_receipts),
+        }
+
+    def restore(self, snapshot: Dict[str, Any]) -> None:
+        """
+        Restore contract state from a snapshot.
+        Thread-safe atomic operation for chain reorganization rollback.
+
+        Args:
+            snapshot: Snapshot created by snapshot() method
+        """
+        import copy
+        self.blockchain.contracts = copy.deepcopy(snapshot.get("contracts", {}))
+        self.blockchain.contract_receipts = copy.deepcopy(snapshot.get("contract_receipts", []))
+
+        logger = getattr(self.blockchain, "logger", None)
+        if logger:
+            logger.info(
+                "Contract state restored from snapshot",
+                extra={
+                    "event": "contract.restore",
+                    "contract_count": len(self.blockchain.contracts),
+                    "receipt_count": len(self.blockchain.contract_receipts),
+                }
+            )

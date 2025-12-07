@@ -26,6 +26,32 @@ from xai.core.crypto_utils import sign_message_hex, verify_signature_hex, derive
 
 logger = logging.getLogger(__name__)
 
+
+def canonical_json(data: Dict[str, Any]) -> str:
+    """Produce deterministic JSON string for consensus-critical hashing.
+
+    Uses canonical serialization to ensure identical hashes across all nodes:
+    - sort_keys=True: Consistent key ordering
+    - separators=(',', ':'): No whitespace variations
+    - ensure_ascii=True: No unicode encoding variations
+
+    This is critical for consensus - different JSON formatting would produce
+    different hashes for identical transactions, causing network forks.
+
+    Args:
+        data: Dictionary to serialize
+
+    Returns:
+        Canonical JSON string suitable for hashing
+    """
+    return json.dumps(
+        data,
+        sort_keys=True,
+        separators=(',', ':'),
+        ensure_ascii=True
+    )
+
+
 # Validation constants
 MAX_TRANSACTION_AMOUNT = 121_000_000.0  # Total supply cap
 MIN_TRANSACTION_AMOUNT = 0.0
@@ -392,7 +418,7 @@ class Transaction:
             "inputs": self.inputs,
             "outputs": self.outputs,
         }
-        tx_string = json.dumps(tx_data, sort_keys=True)
+        tx_string = canonical_json(tx_data)
         return hashlib.sha256(tx_string.encode()).hexdigest()
 
     def sign_transaction(self, private_key: str) -> None:
@@ -447,7 +473,7 @@ class Transaction:
         Calculate transaction size in bytes for fee-per-byte calculations.
         """
         try:
-            serialized = json.dumps(self.to_dict(), sort_keys=True)
+            serialized = canonical_json(self.to_dict())
             return len(serialized.encode('utf-8'))
         except Exception:
             base_size = 200

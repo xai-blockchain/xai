@@ -66,6 +66,8 @@ class TestUTXODoubleSpend:
         )
 
         assert tx1 is not None
+        # Add to mempool
+        bc.add_transaction(tx1)
         assert len(bc.pending_transactions) > 0
 
         # Try to create second transaction with same UTXOs

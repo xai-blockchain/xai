@@ -97,3 +97,26 @@ class DoubleSignDetector:
                 block_height,
             )
             return False, None
+
+    def get_state(self) -> Dict[str, Any]:
+        """
+        Get current detector state for snapshotting.
+
+        Returns:
+            Dictionary containing validator signatures state
+        """
+        import copy
+        return {
+            "validator_signatures": copy.deepcopy(self.validator_signatures)
+        }
+
+    def restore_state(self, state: Dict[str, Any]) -> None:
+        """
+        Restore detector state from a snapshot.
+
+        Args:
+            state: State dictionary from get_state()
+        """
+        import copy
+        self.validator_signatures = copy.deepcopy(state.get("validator_signatures", {}))
+        logger.info("DoubleSignDetector state restored from snapshot.")
