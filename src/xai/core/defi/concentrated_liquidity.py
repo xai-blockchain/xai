@@ -26,6 +26,14 @@ from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 from enum import Enum
 
 from ..vm.exceptions import VMExecutionError
+from .safe_math import (
+    SafeMath,
+    MAX_UINT256,
+    WAD,
+    RAY,
+    Q96 as SAFE_Q96,
+    Q128 as SAFE_Q128,
+)
 
 if TYPE_CHECKING:
     from ..blockchain import Blockchain
@@ -40,135 +48,21 @@ MIN_SQRT_RATIO = 4295128739
 MAX_SQRT_RATIO = 1461446703485210103287273052203988822378723970342
 
 # Q96 fixed point (2^96) for sqrt price representation
-Q96 = 2**96
-Q128 = 2**128
+Q96 = SAFE_Q96
+Q128 = SAFE_Q128
 
 # Precision for liquidity calculations
 LIQUIDITY_PRECISION = 10**18
 
-# Fixed-point precision constants
-WAD = 10 ** 18  # 18 decimal precision for amounts
-RAY = 10 ** 27  # 27 decimal precision for rates/percentages
 
-# Maximum safe integer (uint256 equivalent)
-MAX_UINT256 = 2**256 - 1
+# ==================== Fixed-Point Arithmetic (Using SafeMath) ====================
 
-
-# ==================== Fixed-Point Arithmetic ====================
-
-def safe_mul(a: int, b: int) -> int:
-    """
-    Safely multiply two integers with overflow protection.
-
-    Raises:
-        OverflowError: If result exceeds MAX_UINT256
-    """
-    if a == 0 or b == 0:
-        return 0
-
-    result = a * b
-
-    # Check for overflow
-    if result > MAX_UINT256:
-        raise OverflowError(f"Multiplication overflow: {a} * {b}")
-
-    # Verify no truncation occurred
-    if result // a != b:
-        raise OverflowError(f"Multiplication overflow detected: {a} * {b}")
-
-    return result
-
-
-def wad_mul(a: int, b: int, round_up: bool = False) -> int:
-    """
-    Multiply two WAD (18 decimal) fixed-point values.
-
-    Args:
-        a: First value in WAD precision
-        b: Second value in WAD precision
-        round_up: If True, round up (for charging users)
-                  If False, round down (for paying users)
-
-    Returns:
-        Product in WAD precision
-    """
-    result = safe_mul(a, b)
-
-    if round_up:
-        return (result + WAD - 1) // WAD
-    return result // WAD
-
-
-def wad_div(a: int, b: int, round_up: bool = False) -> int:
-    """
-    Divide two WAD (18 decimal) fixed-point values.
-
-    Args:
-        a: Numerator in WAD precision
-        b: Denominator in WAD precision
-        round_up: If True, round up (for charging users)
-                  If False, round down (for paying users)
-
-    Returns:
-        Quotient in WAD precision
-
-    Raises:
-        ValueError: If b is zero
-    """
-    if b == 0:
-        raise ValueError("Division by zero")
-
-    result = safe_mul(a, WAD)
-
-    if round_up:
-        return (result + b - 1) // b
-    return result // b
-
-
-def ray_mul(a: int, b: int, round_up: bool = False) -> int:
-    """
-    Multiply two RAY (27 decimal) fixed-point values.
-
-    Args:
-        a: First value in RAY precision
-        b: Second value in RAY precision
-        round_up: If True, round up (for charging users)
-                  If False, round down (for paying users)
-
-    Returns:
-        Product in RAY precision
-    """
-    result = safe_mul(a, b)
-
-    if round_up:
-        return (result + RAY - 1) // RAY
-    return result // RAY
-
-
-def ray_div(a: int, b: int, round_up: bool = False) -> int:
-    """
-    Divide two RAY (27 decimal) fixed-point values.
-
-    Args:
-        a: Numerator in RAY precision
-        b: Denominator in RAY precision
-        round_up: If True, round up (for charging users)
-                  If False, round down (for paying users)
-
-    Returns:
-        Quotient in RAY precision
-
-    Raises:
-        ValueError: If b is zero
-    """
-    if b == 0:
-        raise ValueError("Division by zero")
-
-    result = safe_mul(a, RAY)
-
-    if round_up:
-        return (result + b - 1) // b
-    return result // b
+# Import SafeMath functions for compatibility with existing code
+safe_mul = SafeMath.safe_mul
+wad_mul = SafeMath.wad_mul
+wad_div = SafeMath.wad_div
+ray_mul = SafeMath.ray_mul
+ray_div = SafeMath.ray_div
 
 
 def mul_div(a: int, b: int, denominator: int, round_up: bool = False) -> int:

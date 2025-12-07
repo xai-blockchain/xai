@@ -133,30 +133,42 @@ class TestTransactionEdgeCases:
         assert size > 1000  # Should be reasonably large
 
     def test_duplicate_inputs_should_fail(self, tmp_path):
-        """Test that duplicate inputs in transaction are detected"""
+        """Test that duplicate inputs in transaction are rejected by UTXO manager"""
+        from xai.core.utxo_manager import UTXOValidationError
+
+        bc = Blockchain(data_dir=str(tmp_path))
         wallet1 = Wallet()
         wallet2 = Wallet()
 
-        # Create transaction with duplicate inputs
-        duplicate_input = {"txid": "tx_abc123", "vout": 0, "signature": "sig"}
-        inputs = [duplicate_input, duplicate_input]
+        # Mine to create a UTXO
+        bc.mine_pending_transactions(wallet1.address)
+
+        # Get the UTXO that was created
+        utxos = bc.utxo_manager.get_utxos_for_address(wallet1.address)
+        assert len(utxos) > 0
+
+        utxo = utxos[0]
+        duplicate_input = {"txid": utxo["txid"], "vout": utxo["vout"]}
+
+        # Create transaction with duplicate inputs - same UTXO referenced twice
+        inputs = [duplicate_input, duplicate_input, duplicate_input]
+        outputs = [{"address": wallet2.address, "amount": 30.0}]  # Trying to spend 1 UTXO as if it were 3
 
         tx = Transaction(
-            wallet1.address, wallet2.address, 10.0, 0.1,
-            inputs=inputs
+            wallet1.address, wallet2.address, 30.0, 0.1,
+            inputs=inputs,
+            outputs=outputs
         )
+        tx.public_key = wallet1.public_key
+        tx.sign_transaction(wallet1.private_key)
 
-        # Check for duplicate inputs
-        input_set = set()
-        has_duplicates = False
-        for inp in tx.inputs:
-            key = (inp["txid"], inp["vout"])
-            if key in input_set:
-                has_duplicates = True
-                break
-            input_set.add(key)
+        # UTXO manager should reject this transaction due to duplicate inputs
+        with pytest.raises(UTXOValidationError) as exc_info:
+            bc.utxo_manager.process_transaction_inputs(tx)
 
-        assert has_duplicates is True
+        # Verify error message mentions duplicate input
+        assert "Duplicate input detected" in str(exc_info.value)
+        assert utxo["txid"] in str(exc_info.value) or f"{utxo['txid'][:8]}" in str(exc_info.value)
 
     def test_negative_output_amount_should_fail(self, tmp_path):
         """Test that negative output amounts are invalid"""

@@ -84,6 +84,17 @@ class PriceFeed:
     min_sources: int = 1  # Minimum sources for valid price
     aggregation_method: str = "median"  # median, mean, weighted
 
+    # TWAP protection
+    twap_period: int = 600  # TWAP calculation period (10 minutes default)
+    max_price_age: int = 3600  # Maximum price staleness (1 hour)
+
+    # Multi-source aggregation tracking
+    pending_updates: Dict[str, PriceData] = field(default_factory=dict)  # source -> price_data
+
+    # Rate limiting per source
+    last_update_time: Dict[str, float] = field(default_factory=dict)  # source -> timestamp
+    min_update_interval: int = 60  # Minimum seconds between updates from same source
+
 
 @dataclass
 class PriceOracle:
@@ -154,6 +165,10 @@ class PriceOracle:
         heartbeat: int = 3600,
         deviation_threshold: int = 100,
         min_sources: int = 1,
+        aggregation_method: str = "median",
+        twap_period: int = 600,
+        max_price_age: int = 3600,
+        min_update_interval: int = 60,
     ) -> bool:
         """
         Add a new price feed.
@@ -195,6 +210,10 @@ class PriceOracle:
             heartbeat=heartbeat,
             deviation_threshold=deviation_threshold,
             min_sources=min_sources,
+            aggregation_method=aggregation_method,
+            twap_period=twap_period,
+            max_price_age=max_price_age,
+            min_update_interval=min_update_interval,
         )
 
         logger.info(
@@ -218,6 +237,10 @@ class PriceOracle:
         heartbeat: int = 3600,
         deviation_threshold: int = 100,
         min_sources: int = 1,
+        aggregation_method: str = "median",
+        twap_period: int = 600,
+        max_price_age: int = 3600,
+        min_update_interval: int = 60,
     ) -> bool:
         """
         Add a new price feed with signature verification.
@@ -254,6 +277,10 @@ class PriceOracle:
             heartbeat=heartbeat,
             deviation_threshold=deviation_threshold,
             min_sources=min_sources,
+            aggregation_method=aggregation_method,
+            twap_period=twap_period,
+            max_price_age=max_price_age,
+            min_update_interval=min_update_interval,
         )
 
         logger.info(
@@ -301,7 +328,15 @@ class PriceOracle:
         timestamp: Optional[float] = None,
     ) -> bool:
         """
-        Update price for a feed.
+        Update price for a feed with comprehensive manipulation protection.
+
+        Security features:
+        - Rate limiting per source (prevents spam attacks)
+        - Deviation bounds checking (prevents price manipulation)
+        - Price staleness validation (prevents replay attacks)
+        - Multi-source aggregation (requires consensus)
+        - TWAP validation (prevents flash loan attacks)
+        - Atomic validation (check-then-act pattern)
 
         Args:
             caller: Must be authorized provider
@@ -311,58 +346,109 @@ class PriceOracle:
 
         Returns:
             True if successful
+
+        Raises:
+            VMExecutionError: If validation fails
         """
+        # ========== VALIDATION PHASE - NO STATE CHANGES ==========
+        # All checks must complete before any logging or state modification
+        # This prevents timing attacks and oracle manipulation
+
         self._require_authorized(caller)
         self._require_feed(pair)
         self._require_not_paused()
 
         feed = self.feeds[pair]
         timestamp = timestamp or time.time()
+        current_time = time.time()
 
-        # Validate price bounds
+        # 1. Price staleness check
+        price_age = current_time - timestamp
+        if price_age > feed.max_price_age:
+            raise VMExecutionError(
+                f"Price timestamp too old: {price_age:.0f}s > {feed.max_price_age}s"
+            )
+
+        # 2. Future timestamp prevention
+        if timestamp > current_time + 60:  # Allow 60s clock drift
+            raise VMExecutionError(
+                f"Price timestamp is in the future: {timestamp} > {current_time}"
+            )
+
+        # 3. Rate limiting per source
+        source_key = self._normalize(caller)
+        last_update = feed.last_update_time.get(source_key, 0)
+        time_since_update = current_time - last_update
+        if time_since_update < feed.min_update_interval:
+            raise VMExecutionError(
+                f"Rate limit: {time_since_update:.0f}s < {feed.min_update_interval}s minimum interval"
+            )
+
+        # 4. Price bounds validation
         if pair in self.price_bounds:
             min_price, max_price = self.price_bounds[pair]
             if price < min_price or price > max_price:
-                logger.warning(
-                    "Price outside bounds",
-                    extra={
-                        "event": "oracle.price_rejected",
-                        "pair": pair,
-                        "price": price,
-                        "bounds": (min_price, max_price),
-                    }
-                )
                 raise VMExecutionError(
                     f"Price {price} outside bounds [{min_price}, {max_price}]"
                 )
 
-        # Check deviation from last price
-        deviation = 0
-        if feed.latest_price > 0:
-            deviation = abs(price - feed.latest_price) * 10000 // feed.latest_price
+        # 5. Price must be positive
+        if price <= 0:
+            raise VMExecutionError(f"Invalid price: {price} must be positive")
+
+        # 6. Deviation check against TWAP (not just last price)
+        # This prevents flash loan manipulation
+        if feed.latest_price > 0 and len(feed.price_history) >= 3:
+            # Use TWAP as reference instead of single last price
+            twap = self._calculate_twap(feed, feed.twap_period)
+            deviation = abs(price - twap) * 10000 // twap if twap > 0 else 0
+
             if deviation > feed.deviation_threshold:
-                logger.error(
-                    "Price update rejected - deviation exceeds threshold",
+                raise VMExecutionError(
+                    f"Price deviation {deviation} bps exceeds threshold {feed.deviation_threshold} bps for {pair}. "
+                    f"TWAP: {twap}, Proposed: {price}"
+                )
+
+        # 7. Multi-source validation if required
+        if feed.min_sources > 1:
+            # Store pending update
+            feed.pending_updates[source_key] = PriceData(
+                price=price,
+                timestamp=timestamp,
+                round_id=feed.round_id + 1,
+                source=caller,
+            )
+
+            # Check if we have enough sources
+            if len(feed.pending_updates) < feed.min_sources:
+                # Not enough sources yet, store and wait
+                feed.last_update_time[source_key] = current_time
+                logger.info(
+                    "Price update pending (waiting for more sources)",
                     extra={
-                        "event": "oracle.price_rejected",
+                        "event": "oracle.price_pending",
                         "pair": pair,
-                        "current_price": feed.latest_price,
-                        "proposed_price": price,
-                        "deviation_bps": deviation,
-                        "threshold_bps": feed.deviation_threshold,
+                        "price": price,
+                        "sources_received": len(feed.pending_updates),
+                        "sources_required": feed.min_sources,
                         "reporter": caller,
                     }
                 )
-                raise VMExecutionError(
-                    f"Price deviation {deviation} bps exceeds threshold {feed.deviation_threshold} bps for {pair}. "
-                    f"Current: {feed.latest_price}, Proposed: {price}"
-                )
+                return True
 
-        # Update feed (only reaches here if deviation is acceptable)
+            # Enough sources - aggregate prices
+            price = self._aggregate_prices(feed)
+            # Clear pending updates after aggregation
+            feed.pending_updates.clear()
+
+        # ========== STATE UPDATE PHASE ==========
+        # All validations passed - safe to update state
+
         feed.round_id += 1
         feed.latest_price = price
         feed.latest_timestamp = timestamp
         feed.status = OracleStatus.ACTIVE
+        feed.last_update_time[source_key] = current_time
 
         # Add to history
         price_data = PriceData(
@@ -378,6 +464,12 @@ class PriceOracle:
             feed.price_history = feed.price_history[-feed.history_size:]
 
         self.total_updates += 1
+
+        # Calculate deviation for logging (after state update)
+        deviation = 0
+        if len(feed.price_history) >= 2:
+            prev_price = feed.price_history[-2].price
+            deviation = abs(price - prev_price) * 10000 // prev_price if prev_price > 0 else 0
 
         logger.info(
             "Price updated",
@@ -502,7 +594,7 @@ class PriceOracle:
 
     def get_twap(self, pair: str, period: int) -> int:
         """
-        Get time-weighted average price.
+        Get time-weighted average price (public interface).
 
         Args:
             pair: Price pair
@@ -510,21 +602,13 @@ class PriceOracle:
 
         Returns:
             TWAP
+
+        Raises:
+            VMExecutionError: If feed not found or insufficient data
         """
         self._require_feed(pair)
         feed = self.feeds[pair]
-
-        cutoff = time.time() - period
-        relevant_prices = [
-            p for p in feed.price_history
-            if p.timestamp >= cutoff
-        ]
-
-        if not relevant_prices:
-            return feed.latest_price
-
-        # Simple average (could weight by time intervals)
-        return sum(p.price for p in relevant_prices) // len(relevant_prices)
+        return self._calculate_twap(feed, period)
 
     # ==================== Feed Information ====================
 
@@ -687,9 +771,10 @@ class PriceOracle:
         timestamp: Optional[float] = None,
     ) -> bool:
         """
-        Update price for a feed with signature verification.
+        Update price for a feed with signature verification and manipulation protection.
 
         SECURE: Requires cryptographic proof that caller is authorized price feeder.
+        Includes all anti-manipulation protections from update_price().
 
         Args:
             request: Signed request from authorized provider
@@ -701,8 +786,10 @@ class PriceOracle:
             True if successful
 
         Raises:
-            VMExecutionError: If signature verification fails or not authorized
+            VMExecutionError: If signature verification fails or validation fails
         """
+        # ========== VALIDATION PHASE - NO STATE CHANGES ==========
+
         # Verify caller is authorized provider with valid signature
         if not self.authorized_providers.get(self._normalize(request.address), False):
             raise VMExecutionError(f"Address {request.address} is not authorized provider")
@@ -714,51 +801,87 @@ class PriceOracle:
 
         feed = self.feeds[pair]
         timestamp = timestamp or time.time()
+        current_time = time.time()
 
-        # Validate price bounds
+        # 1. Price staleness check
+        price_age = current_time - timestamp
+        if price_age > feed.max_price_age:
+            raise VMExecutionError(
+                f"Price timestamp too old: {price_age:.0f}s > {feed.max_price_age}s"
+            )
+
+        # 2. Future timestamp prevention
+        if timestamp > current_time + 60:  # Allow 60s clock drift
+            raise VMExecutionError(
+                f"Price timestamp is in the future: {timestamp} > {current_time}"
+            )
+
+        # 3. Rate limiting per source
+        source_key = self._normalize(request.address)
+        last_update = feed.last_update_time.get(source_key, 0)
+        time_since_update = current_time - last_update
+        if time_since_update < feed.min_update_interval:
+            raise VMExecutionError(
+                f"Rate limit: {time_since_update:.0f}s < {feed.min_update_interval}s minimum interval"
+            )
+
+        # 4. Price bounds validation
         if pair in self.price_bounds:
             min_price, max_price = self.price_bounds[pair]
             if price < min_price or price > max_price:
-                logger.warning(
-                    "Price outside bounds",
-                    extra={
-                        "event": "oracle.price_rejected",
-                        "pair": pair,
-                        "price": price,
-                        "bounds": (min_price, max_price),
-                    }
-                )
                 raise VMExecutionError(
                     f"Price {price} outside bounds [{min_price}, {max_price}]"
                 )
 
-        # Check deviation from last price
-        deviation = 0
-        if feed.latest_price > 0:
-            deviation = abs(price - feed.latest_price) * 10000 // feed.latest_price
+        # 5. Price must be positive
+        if price <= 0:
+            raise VMExecutionError(f"Invalid price: {price} must be positive")
+
+        # 6. Deviation check against TWAP
+        if feed.latest_price > 0 and len(feed.price_history) >= 3:
+            twap = self._calculate_twap(feed, feed.twap_period)
+            deviation = abs(price - twap) * 10000 // twap if twap > 0 else 0
+
             if deviation > feed.deviation_threshold:
-                logger.error(
-                    "Price update rejected - deviation exceeds threshold",
-                    extra={
-                        "event": "oracle.price_rejected",
-                        "pair": pair,
-                        "current_price": feed.latest_price,
-                        "proposed_price": price,
-                        "deviation_bps": deviation,
-                        "threshold_bps": feed.deviation_threshold,
-                        "reporter": request.address,
-                    }
-                )
                 raise VMExecutionError(
                     f"Price deviation {deviation} bps exceeds threshold {feed.deviation_threshold} bps for {pair}. "
-                    f"Current: {feed.latest_price}, Proposed: {price}"
+                    f"TWAP: {twap}, Proposed: {price}"
                 )
 
-        # Update feed
+        # 7. Multi-source validation if required
+        if feed.min_sources > 1:
+            feed.pending_updates[source_key] = PriceData(
+                price=price,
+                timestamp=timestamp,
+                round_id=feed.round_id + 1,
+                source=request.address,
+            )
+
+            if len(feed.pending_updates) < feed.min_sources:
+                feed.last_update_time[source_key] = current_time
+                logger.info(
+                    "Price update pending (secure, waiting for more sources)",
+                    extra={
+                        "event": "oracle.price_pending_secure",
+                        "pair": pair,
+                        "price": price,
+                        "sources_received": len(feed.pending_updates),
+                        "sources_required": feed.min_sources,
+                        "reporter": request.address[:10],
+                    }
+                )
+                return True
+
+            price = self._aggregate_prices(feed)
+            feed.pending_updates.clear()
+
+        # ========== STATE UPDATE PHASE ==========
+
         feed.round_id += 1
         feed.latest_price = price
         feed.latest_timestamp = timestamp
         feed.status = OracleStatus.ACTIVE
+        feed.last_update_time[source_key] = current_time
 
         # Add to history
         price_data = PriceData(
@@ -774,6 +897,12 @@ class PriceOracle:
             feed.price_history = feed.price_history[-feed.history_size:]
 
         self.total_updates += 1
+
+        # Calculate deviation for logging
+        deviation = 0
+        if len(feed.price_history) >= 2:
+            prev_price = feed.price_history[-2].price
+            deviation = abs(price - prev_price) * 10000 // prev_price if prev_price > 0 else 0
 
         logger.info(
             "Price updated (secure)",
@@ -928,6 +1057,102 @@ class PriceOracle:
         return True
 
     # ==================== Helpers ====================
+
+    def _calculate_twap(self, feed: PriceFeed, period: int) -> int:
+        """
+        Calculate time-weighted average price for a feed.
+
+        TWAP calculation properly weights prices by the time they were active,
+        preventing flash loan manipulation where a single block price spike
+        would heavily influence the average.
+
+        Args:
+            feed: Price feed
+            period: Time period in seconds
+
+        Returns:
+            Time-weighted average price
+
+        Algorithm:
+            For each price interval, calculate: price * duration
+            TWAP = sum(price * duration) / total_duration
+        """
+        if not feed.price_history:
+            return feed.latest_price
+
+        cutoff = time.time() - period
+        relevant_prices = [
+            p for p in feed.price_history
+            if p.timestamp >= cutoff
+        ]
+
+        if not relevant_prices:
+            return feed.latest_price
+
+        # Sort by timestamp (should already be sorted, but ensure it)
+        relevant_prices.sort(key=lambda p: p.timestamp)
+
+        # Calculate time-weighted average
+        total_weighted_price = 0
+        total_duration = 0
+
+        for i in range(len(relevant_prices)):
+            current_price = relevant_prices[i].price
+            current_time = relevant_prices[i].timestamp
+
+            # Duration is time until next price update (or now for last price)
+            if i < len(relevant_prices) - 1:
+                next_time = relevant_prices[i + 1].timestamp
+            else:
+                next_time = time.time()
+
+            duration = next_time - current_time
+            total_weighted_price += current_price * duration
+            total_duration += duration
+
+        if total_duration == 0:
+            return feed.latest_price
+
+        return int(total_weighted_price / total_duration)
+
+    def _aggregate_prices(self, feed: PriceFeed) -> int:
+        """
+        Aggregate prices from multiple sources.
+
+        Supports different aggregation methods:
+        - median: Median of all submitted prices (manipulation resistant)
+        - mean: Simple average
+        - weighted: Weighted by confidence (future enhancement)
+
+        Args:
+            feed: Price feed with pending updates
+
+        Returns:
+            Aggregated price
+
+        Raises:
+            VMExecutionError: If no valid prices available
+        """
+        if not feed.pending_updates:
+            raise VMExecutionError("No prices to aggregate")
+
+        prices = [p.price for p in feed.pending_updates.values()]
+
+        if feed.aggregation_method == "median":
+            return int(statistics.median(prices))
+        elif feed.aggregation_method == "mean":
+            return sum(prices) // len(prices)
+        elif feed.aggregation_method == "weighted":
+            # Weighted by confidence (all equal for now)
+            confidences = [p.confidence for p in feed.pending_updates.values()]
+            total_confidence = sum(confidences)
+            if total_confidence == 0:
+                return sum(prices) // len(prices)
+            weighted_sum = sum(p * c for p, c in zip(prices, confidences))
+            return int(weighted_sum / total_confidence)
+        else:
+            # Default to median (most manipulation resistant)
+            return int(statistics.median(prices))
 
     def _normalize(self, address: str) -> str:
         return address.lower()

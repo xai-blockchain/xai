@@ -27,6 +27,16 @@ from decimal import Decimal, ROUND_DOWN
 from enum import Enum
 
 from ..vm.exceptions import VMExecutionError
+from .safe_math import (
+    SafeMath,
+    MAX_SUPPLY,
+    MAX_DEBT,
+    MAX_COLLATERAL,
+    MAX_PRICE,
+    assert_supply_debt_invariant,
+    assert_utilization_in_bounds,
+    assert_health_factor_valid,
+)
 
 if TYPE_CHECKING:
     from ..blockchain import Blockchain
@@ -251,8 +261,9 @@ class LendingPool:
         self._require_not_paused()
         self._require_asset(asset)
 
-        if amount <= 0:
-            raise VMExecutionError("Amount must be positive")
+        # Validate amount bounds
+        SafeMath.require_positive(amount, "supply amount")
+        SafeMath.require_lte(amount, MAX_SUPPLY, "supply amount", "MAX_SUPPLY")
 
         config = self.assets[asset]
 
@@ -277,9 +288,17 @@ class LendingPool:
         # This ensures: underlying = aTokens * index / RAY
         a_tokens = (amount * self.RAY) // state.supply_index
 
-        # Update balances
-        position.supplied[asset] = position.supplied.get(asset, 0) + a_tokens
-        state.total_supplied += amount
+        # Update balances with overflow protection
+        current_supplied = position.supplied.get(asset, 0)
+        position.supplied[asset] = SafeMath.safe_add(
+            current_supplied, a_tokens, MAX_SUPPLY, "user supplied balance"
+        )
+        state.total_supplied = SafeMath.safe_add(
+            state.total_supplied, amount, MAX_SUPPLY, "total_supplied"
+        )
+
+        # Verify invariant
+        assert_supply_debt_invariant(state.total_supplied, state.total_borrowed)
 
         logger.info(
             "Asset supplied to lending pool",
@@ -343,10 +362,17 @@ class LendingPool:
                 f"Withdrawal would put position below liquidation threshold"
             )
 
-        # Update balances
+        # Update balances with underflow protection
         a_token_balance = position.supplied.get(asset, 0)
-        position.supplied[asset] = a_token_balance - a_tokens_to_burn
-        state.total_supplied -= amount
+        position.supplied[asset] = SafeMath.safe_sub(
+            a_token_balance, a_tokens_to_burn, "user aToken balance"
+        )
+        state.total_supplied = SafeMath.safe_sub(
+            state.total_supplied, amount, "total_supplied"
+        )
+
+        # Verify invariant
+        assert_supply_debt_invariant(state.total_supplied, state.total_borrowed)
 
         logger.info(
             "Asset withdrawn from lending pool",
@@ -397,37 +423,23 @@ class LendingPool:
         # Normalize borrower address
         borrower_norm = self._normalize(caller)
 
-        # VALIDATION 1: Amount must be positive
-        if amount <= 0:
+        # VALIDATION 1: Amount must be positive and within bounds
+        try:
+            SafeMath.require_positive(amount, "borrow amount")
+            SafeMath.require_lte(amount, MAX_DEBT, "borrow amount", "MAX_DEBT")
+        except VMExecutionError as e:
             logger.warning(
                 "Borrow rejected - invalid amount",
                 extra={
                     "event": "lending.borrow_rejected",
-                    "reason": "non_positive_amount",
+                    "reason": "invalid_amount",
                     "borrower": borrower_norm,
                     "asset": asset,
                     "amount": amount,
+                    "error": str(e),
                 }
             )
-            raise VMExecutionError(f"Borrow amount must be positive, got {amount}")
-
-        # VALIDATION 2: Amount must not exceed maximum safe value (prevent overflow)
-        MAX_BORROW = 10**27  # Reasonable upper bound (1 RAY)
-        if amount > MAX_BORROW:
-            logger.warning(
-                "Borrow rejected - exceeds maximum",
-                extra={
-                    "event": "lending.borrow_rejected",
-                    "reason": "exceeds_maximum",
-                    "borrower": borrower_norm,
-                    "asset": asset,
-                    "amount": amount,
-                    "max_borrow": MAX_BORROW,
-                }
-            )
-            raise VMExecutionError(
-                f"Borrow amount {amount} exceeds maximum {MAX_BORROW}"
-            )
+            raise
 
         # VALIDATION 3: Asset must support borrowing
         config = self.assets[asset]
@@ -578,7 +590,14 @@ class LendingPool:
         self._normalize_borrow_principal(position, asset, amount)
         position.interest_mode[asset] = interest_mode
 
-        state.total_borrowed += amount
+        # Safe addition with overflow protection
+        state.total_borrowed = SafeMath.safe_add(
+            state.total_borrowed, amount, MAX_DEBT, "total_borrowed"
+        )
+
+        # Verify invariant
+        assert_supply_debt_invariant(state.total_supplied, state.total_borrowed)
+        assert_utilization_in_bounds(state.total_supplied, state.total_borrowed)
 
         logger.info(
             "Asset borrowed from lending pool",
@@ -637,9 +656,14 @@ class LendingPool:
         # Use normalized repayment (caps at total debt)
         actual_repaid = self._normalize_repay_principal(position, asset, amount)
 
-        # Update pool state
+        # Update pool state with underflow protection
         state = self.pool_states[asset]
-        state.total_borrowed = max(0, state.total_borrowed - actual_repaid)
+        state.total_borrowed = SafeMath.safe_sub(
+            state.total_borrowed, actual_repaid, "total_borrowed"
+        )
+
+        # Verify invariant
+        assert_supply_debt_invariant(state.total_supplied, state.total_borrowed)
 
         logger.info(
             "Debt repaid to lending pool",
@@ -747,9 +771,14 @@ class LendingPool:
             liquidator_position.supplied.get(collateral_asset, 0) + a_tokens_seized
         )
 
-        # Update pool states
+        # Update pool states with underflow protection
         debt_state = self.pool_states[debt_asset]
-        debt_state.total_borrowed = max(0, debt_state.total_borrowed - debt_to_cover)
+        debt_state.total_borrowed = SafeMath.safe_sub(
+            debt_state.total_borrowed, debt_to_cover, "total_borrowed"
+        )
+
+        # Verify invariant
+        assert_supply_debt_invariant(debt_state.total_supplied, debt_state.total_borrowed)
 
         logger.warning(
             "Position liquidated",
@@ -820,9 +849,23 @@ class LendingPool:
 
                 # Calculate underlying: aTokens * index / RAY
                 underlying = (a_tokens * state.supply_index) // self.RAY
-                value = underlying * self._get_price(asset)
-                total_collateral += value
-                weighted_ltv += value * config.ltv // self.BASIS_POINTS
+
+                # Safe multiplication with overflow protection
+                price = self._get_price(asset)
+                value = SafeMath.safe_mul(
+                    underlying, price, MAX_COLLATERAL, "collateral value"
+                )
+
+                total_collateral = SafeMath.safe_add(
+                    total_collateral, value, MAX_COLLATERAL, "total_collateral"
+                )
+
+                # Safe weighted LTV calculation
+                ltv_value = SafeMath.safe_mul(value, config.ltv, MAX_COLLATERAL, "ltv_value")
+                ltv_value = ltv_value // self.BASIS_POINTS
+                weighted_ltv = SafeMath.safe_add(
+                    weighted_ltv, ltv_value, MAX_COLLATERAL, "weighted_ltv"
+                )
 
         for asset in position.borrowed.keys():
             # Update indices to get current accrued interest
@@ -830,7 +873,14 @@ class LendingPool:
             # Get debt with accrued interest via accumulator pattern
             debt = self._get_user_borrow_balance(position, asset)
             if debt > 0:
-                total_debt += debt * self._get_price(asset)
+                # Safe multiplication with overflow protection
+                price = self._get_price(asset)
+                debt_value = SafeMath.safe_mul(
+                    debt, price, MAX_COLLATERAL, "debt value"
+                )
+                total_debt = SafeMath.safe_add(
+                    total_debt, debt_value, MAX_COLLATERAL, "total_debt"
+                )
 
         health_factor = self._calculate_health_factor(position)
         available_borrow = max(0, weighted_ltv - total_debt) if total_collateral > 0 else 0
@@ -988,11 +1038,24 @@ class LendingPool:
 
                 # Calculate underlying: aTokens * index / RAY
                 underlying = (a_tokens * state.supply_index) // self.RAY
-                value = underlying * self._get_price(asset)
+
+                # Safe multiplication with overflow protection
+                price = self._get_price(asset)
+                value = SafeMath.safe_mul(
+                    underlying, price, MAX_COLLATERAL, "collateral value"
+                )
 
                 # Weight by liquidation threshold
-                total_collateral_threshold += (
-                    value * config.liquidation_threshold // self.BASIS_POINTS
+                threshold_value = SafeMath.safe_mul(
+                    value, config.liquidation_threshold, MAX_COLLATERAL, "threshold_value"
+                )
+                threshold_value = threshold_value // self.BASIS_POINTS
+
+                total_collateral_threshold = SafeMath.safe_add(
+                    total_collateral_threshold,
+                    threshold_value,
+                    MAX_COLLATERAL,
+                    "total_collateral_threshold",
                 )
 
         # Calculate total debt value
@@ -1006,22 +1069,46 @@ class LendingPool:
                 else:
                     # Hypothetical borrow - use principal directly
                     debt = principal
-                total_debt += debt * self._get_price(asset)
+
+                # Safe multiplication with overflow protection
+                price = self._get_price(asset)
+                debt_value = SafeMath.safe_mul(
+                    debt, price, MAX_COLLATERAL, "debt value"
+                )
+                total_debt = SafeMath.safe_add(
+                    total_debt, debt_value, MAX_COLLATERAL, "total_debt"
+                )
 
         if total_debt == 0:
             return self.RAY * 10  # No debt = infinite health factor
 
         # Health factor = collateral_threshold_value / debt_value
-        return (total_collateral_threshold * self.RAY) // total_debt
+        health_factor = SafeMath.safe_mul(
+            total_collateral_threshold, self.RAY, MAX_COLLATERAL, "health_factor"
+        )
+        health_factor = health_factor // total_debt
+
+        # Validate health factor is reasonable
+        assert_health_factor_valid(health_factor, self.RAY)
+
+        return health_factor
 
     # ==================== Oracle Integration ====================
 
     def _get_price(self, asset: str) -> int:
-        """Get asset price (with caching)."""
+        """
+        Get asset price (with caching and validation).
+
+        Returns:
+            Price with overflow protection
+        """
         # Check cache (30 second TTL)
         if asset in self._price_cache:
             price, timestamp = self._price_cache[asset]
             if time.time() - timestamp < 30:
+                # Validate cached price
+                SafeMath.require_positive(price, f"cached price for {asset}")
+                SafeMath.require_lte(price, MAX_PRICE, f"price for {asset}", "MAX_PRICE")
                 return price
 
         # In production, would call oracle contract
@@ -1035,6 +1122,11 @@ class LendingPool:
         }
 
         price = mock_prices.get(asset, 1_000_000_000)
+
+        # Validate price before caching
+        SafeMath.require_positive(price, f"price for {asset}")
+        SafeMath.require_lte(price, MAX_PRICE, f"price for {asset}", "MAX_PRICE")
+
         self._price_cache[asset] = (price, time.time())
 
         return price
@@ -1042,6 +1134,11 @@ class LendingPool:
     def set_price_oracle(self, caller: str, asset: str, price: int) -> bool:
         """Set price for an asset (for testing/admin)."""
         self._require_owner(caller)
+
+        # Validate price
+        SafeMath.require_positive(price, f"price for {asset}")
+        SafeMath.require_lte(price, MAX_PRICE, f"price for {asset}", "MAX_PRICE")
+
         self._price_cache[asset] = (price, time.time())
         return True
 
@@ -1130,8 +1227,10 @@ class LendingPool:
         # Get existing debt at current index
         existing_debt = self._get_user_borrow_balance(position, asset)
 
-        # Add new borrow
-        new_total_debt = existing_debt + amount
+        # Add new borrow with overflow protection
+        new_total_debt = SafeMath.safe_add(
+            existing_debt, amount, MAX_DEBT, "total debt"
+        )
 
         # Store as principal normalized to current index
         position.borrowed[asset] = new_total_debt

@@ -233,11 +233,20 @@ class PeerDiscovery:
                     })
 
     def get_random_peers(self, count: int = 10) -> List[str]:
-        """Get random peer addresses for connection attempts"""
-        import random
+        """
+        Get random peer addresses for connection attempts
+
+        Uses cryptographically secure random selection to prevent
+        predictable peer selection attacks.
+        """
+        import secrets
         with self.lock:
             addresses = [p["address"] for p in self.discovered_peers]
-            return random.sample(addresses, min(count, len(addresses)))
+            if not addresses:
+                return []
+            # Use cryptographically secure random sampling
+            sr = secrets.SystemRandom()
+            return sr.sample(addresses, min(count, len(addresses)))
 
     def get_discovered_peers(self) -> List[Dict]:
         """Get all discovered peers"""

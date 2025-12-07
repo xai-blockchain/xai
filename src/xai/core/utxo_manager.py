@@ -226,15 +226,45 @@ class UTXOManager:
         """
         Marks UTXOs consumed by a transaction's inputs as spent.
 
+        Security: Validates that no duplicate inputs exist within the same transaction
+        to prevent inflation attacks where the same UTXO is spent multiple times.
+
         Args:
             transaction: The transaction whose inputs are to be marked as spent.
 
         Returns:
             True if all inputs were successfully marked as spent, False otherwise.
+
+        Raises:
+            UTXOValidationError: If duplicate inputs are detected
         """
         if transaction.sender == "COINBASE":  # Coinbase transactions don't spend inputs
             return True
 
+        # CRITICAL SECURITY CHECK: Detect duplicate inputs within this transaction
+        # An attacker could reference the same UTXO multiple times to inflate value
+        seen_inputs = set()
+        for input_ref in transaction.inputs:
+            utxo_key = (input_ref["txid"], input_ref["vout"])
+            if utxo_key in seen_inputs:
+                # Security event: Duplicate input attack attempt detected
+                self.logger.error(
+                    "SECURITY: Duplicate UTXO input detected - inflation attack attempt",
+                    extra={
+                        "event": "utxo.duplicate_input_attack",
+                        "txid": transaction.txid,
+                        "duplicate_utxo": f"{utxo_key[0]}:{utxo_key[1]}",
+                        "sender": transaction.sender,
+                        "severity": "CRITICAL"
+                    }
+                )
+                raise UTXOValidationError(
+                    f"Duplicate input detected: {utxo_key[0]}:{utxo_key[1]}. "
+                    f"Same UTXO cannot be spent multiple times in a single transaction."
+                )
+            seen_inputs.add(utxo_key)
+
+        # Process each unique input - mark UTXOs as spent
         # Note: mark_utxo_spent already has lock, RLock allows reentrant locking
         for input_utxo_ref in transaction.inputs:
             txid = input_utxo_ref["txid"]

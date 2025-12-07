@@ -7,7 +7,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import random  # OK for timing jitter (non-security context)
 import threading
 import time
 from dataclasses import dataclass, field
@@ -424,7 +423,9 @@ class CryptoDepositMonitor:
             elapsed = time.time() - start
             sleep_for = max(1.0, self.poll_interval - elapsed)
             if self.jitter_seconds:
-                sleep_for += random.uniform(0, self.jitter_seconds)
+                # Use cryptographically secure random for jitter
+                import secrets
+                sleep_for += secrets.randbelow(int(self.jitter_seconds * 1000)) / 1000.0
             if self._stop_event.wait(sleep_for):
                 break
 

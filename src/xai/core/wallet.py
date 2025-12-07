@@ -290,118 +290,130 @@ class Wallet:
         )
         return kdf.derive(password.encode())
 
-    def _encrypt(self, data: str, password: str) -> str:
+    @staticmethod
+    def needs_migration(wallet_file: str) -> bool:
         """
-        Encrypt data using Fernet symmetric encryption.
-
-        SECURITY NOTE: This method uses weak key derivation (SHA256 only, no salt,
-        single iteration). It is DEPRECATED and maintained only for backward
-        compatibility with existing wallet files.
-
-        New code should use _encrypt_payload() which uses PBKDF2 with 100k iterations.
-        Existing wallets should be migrated using migrate_wallet_encryption().
+        Check if a wallet file uses legacy weak encryption.
 
         Args:
-            data: Plaintext data to encrypt
-            password: Encryption password
+            wallet_file: Path to wallet file
 
         Returns:
-            Base64-encoded ciphertext
+            True if wallet needs migration to secure encryption
         """
-        import warnings
-        warnings.warn(
-            "Wallet._encrypt uses weak key derivation. "
-            "Use _encrypt_payload() or migrate existing wallets.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        key = base64.urlsafe_b64encode(hashlib.sha256(password.encode()).digest())
-        f = Fernet(key)
-        encrypted_data = f.encrypt(data.encode())
-        return encrypted_data.decode()
+        try:
+            with open(wallet_file, "r") as f:
+                file_data = json.load(f)
 
-    def _decrypt(self, encrypted_data: str, password: str) -> str:
+            # Check if using legacy format
+            # Legacy wallets either have no version field, or use old encryption without payload
+            version = file_data.get("version", "1.0")
+
+            # If version is < 2.0, needs migration
+            if version != "2.0":
+                return True
+
+            # Check if data uses old encrypted format (has "data" field with "encrypted": true but no "payload")
+            data = file_data.get("data", file_data)
+            if data.get("encrypted") and "payload" not in data:
+                return True
+
+            return False
+        except (FileNotFoundError, json.JSONDecodeError, KeyError):
+            return False
+
+    def migrate_wallet_encryption(self, wallet_file: str, password: str) -> bool:
         """
-        Decrypt data using Fernet symmetric encryption.
-
-        SECURITY NOTE: This method uses weak key derivation. See _encrypt() warning.
-        Maintained for backward compatibility only.
-
-        Args:
-            encrypted_data: Base64-encoded ciphertext
-            password: Decryption password
-
-        Returns:
-            Decrypted plaintext
-        """
-        key = base64.urlsafe_b64encode(hashlib.sha256(password.encode()).digest())
-        f = Fernet(key)
-        decrypted_data = f.decrypt(encrypted_data.encode())
-        return decrypted_data.decode()
-
-    def migrate_wallet_encryption(self, old_password: str, new_password: str) -> bool:
-        """
-        Migrate wallet from weak SHA256-only encryption to secure PBKDF2-based encryption.
+        Migrate wallet file from weak SHA256-only encryption to secure PBKDF2-based encryption.
 
         This method:
-        1. Decrypts the wallet using the legacy weak encryption
-        2. Re-encrypts using secure PBKDF2 with 100k iterations and random salt
-        3. Updates the wallet file with the new secure format
+        1. Creates a backup of the original wallet file
+        2. Loads the wallet using legacy decryption (if needed)
+        3. Re-saves using secure PBKDF2 with 100,000 iterations and random salt
+        4. Validates the migration by reloading the wallet
 
         Args:
-            old_password: Password used with legacy encryption
-            new_password: Password for new secure encryption (can be same as old)
+            wallet_file: Path to the wallet file to migrate
+            password: Password for the wallet (used for both decrypt and re-encrypt)
 
         Returns:
             True if migration successful, False otherwise
 
         Raises:
             ValueError: If wallet is already using secure encryption
+            FileNotFoundError: If wallet file doesn't exist
         """
-        import logging
-        logger = logging.getLogger(__name__)
+        import shutil
+        import time
 
-        # Check if already migrated (has encryption_version field)
-        if hasattr(self, '_encryption_version') and self._encryption_version >= 2:
-            raise ValueError("Wallet already uses secure encryption")
+        # Check if migration needed
+        if not self.needs_migration(wallet_file):
+            logger.warning(
+                "Wallet already uses secure encryption - no migration needed",
+                extra={"event": "wallet.no_migration_needed", "wallet_file": os.path.basename(wallet_file)}
+            )
+            return True
 
-        logger.info(
-            "Migrating wallet to secure encryption",
+        logger.warning(
+            "SECURITY: Migrating wallet from weak to secure encryption",
             extra={
-                "event": "wallet.encryption_migration",
-                "address": self.address[:16] + "..." if self.address else "unknown"
+                "event": "wallet.encryption_migration_start",
+                "address": self.address[:16] + "...",
+                "wallet_file": os.path.basename(wallet_file)
             }
         )
 
-        # Store current private key
-        private_key_backup = self.private_key
-
-        # Re-encrypt with secure method
+        # Create backup with timestamp
+        backup_file = wallet_file + f".backup.{int(time.time())}"
         try:
-            wallet_data = {
-                "address": self.address,
-                "public_key": self.public_key,
-                "private_key": self.private_key,
-                "created_at": getattr(self, 'created_at', None),
-                "encryption_version": 2  # Mark as migrated
-            }
-            encrypted_payload = self._encrypt_payload(
-                json.dumps(wallet_data),
-                new_password
-            )
-            self._encryption_version = 2
+            shutil.copy2(wallet_file, backup_file)
             logger.info(
-                "Wallet encryption migration successful",
-                extra={"event": "wallet.encryption_migrated"}
+                "Created backup of wallet file",
+                extra={"event": "wallet.backup_created", "backup_file": os.path.basename(backup_file)}
+            )
+        except Exception as e:
+            logger.error(f"Failed to create backup: {e}", extra={"event": "wallet.backup_failed"})
+            return False
+
+        try:
+            # Re-save using secure encryption
+            # save_to_file now uses _encrypt_payload by default
+            self.save_to_file(wallet_file, password)
+
+            # Verify migration by reloading
+            test_wallet = Wallet.load_from_file(wallet_file, password)
+
+            # Verify private keys match
+            if test_wallet.private_key != self.private_key:
+                raise ValueError("Migration verification failed: private key mismatch")
+
+            logger.info(
+                "Wallet migration completed successfully",
+                extra={
+                    "event": "wallet.encryption_migrated",
+                    "address": self.address[:16] + "...",
+                    "backup_file": os.path.basename(backup_file)
+                }
             )
             return True
+
         except Exception as e:
             logger.error(
-                f"Wallet encryption migration failed: {e}",
+                f"Wallet migration failed: {e}",
                 extra={"event": "wallet.encryption_migration_failed"}
             )
-            # Restore private key in case of partial failure
-            self.private_key = private_key_backup
+            # Restore from backup
+            try:
+                shutil.copy2(backup_file, wallet_file)
+                logger.info(
+                    "Restored wallet from backup after failed migration",
+                    extra={"event": "wallet.backup_restored"}
+                )
+            except Exception as restore_error:
+                logger.critical(
+                    f"Failed to restore backup: {restore_error}",
+                    extra={"event": "wallet.backup_restore_failed"}
+                )
             return False
 
     def _encrypt_payload(self, data: str, password: str) -> Dict[str, str]:
@@ -537,7 +549,17 @@ class Wallet:
             if "payload" in data:
                 wallet_json = Wallet._decrypt_payload_static(data["payload"], password)
             else:
+                # Legacy weak encryption detected - emit warning
                 wallet_json = Wallet._decrypt_static(data["data"], password)
+                logger.warning(
+                    "SECURITY: Wallet uses weak legacy encryption. "
+                    "Run wallet.migrate_wallet_encryption(filename, password) to upgrade.",
+                    extra={
+                        "event": "wallet.legacy_format_loaded",
+                        "wallet_file": os.path.basename(filename),
+                        "action_required": "migrate_encryption"
+                    }
+                )
             wallet_data = json.loads(wallet_json)
             logger.info(
                 "Decrypted wallet file successfully",
@@ -599,7 +621,32 @@ class Wallet:
 
     @staticmethod
     def _decrypt_static(encrypted_data: str, password: str) -> str:
-        """Static decrypt method for Fernet encryption"""
+        """
+        Static decrypt method for legacy Fernet encryption.
+
+        SECURITY WARNING: This method uses weak key derivation (SHA256 only, no salt).
+        It is maintained ONLY for backward compatibility with old wallet files.
+        Wallets using this encryption should be migrated immediately.
+
+        Args:
+            encrypted_data: Base64-encoded Fernet ciphertext
+            password: Decryption password
+
+        Returns:
+            Decrypted plaintext
+
+        Note:
+            This will emit a critical security warning when called.
+        """
+        logger.critical(
+            "SECURITY WARNING: Loading wallet with weak legacy encryption! "
+            "Migrate immediately using wallet.migrate_wallet_encryption()",
+            extra={
+                "event": "wallet.legacy_encryption_detected",
+                "severity": "CRITICAL",
+                "action_required": "MIGRATE_WALLET"
+            }
+        )
         key = base64.urlsafe_b64encode(hashlib.sha256(password.encode()).digest())
         f = Fernet(key)
         decrypted_data = f.decrypt(encrypted_data.encode())
@@ -667,6 +714,44 @@ class Wallet:
             Copy of derivation metadata dict, or None if not HD-derived.
         """
         return deepcopy(self._hd_metadata) if self._hd_metadata else None
+
+    def __repr__(self) -> str:
+        """
+        Safe string representation - NEVER exposes private key.
+
+        Security: This prevents accidental private key exposure in logs,
+        debuggers, or console output.
+        """
+        return f"Wallet(address='{self.address[:16]}...', hw={bool(self.hardware_wallet)})"
+
+    def __str__(self) -> str:
+        """
+        Safe string representation - NEVER exposes private key.
+
+        Security: This prevents accidental private key exposure when
+        the wallet object is converted to string.
+        """
+        return f"XAI Wallet {self.address[:16]}..."
+
+    def __getstate__(self) -> Dict[str, Any]:
+        """
+        Custom pickle serialization - warns about private key exposure.
+
+        Security: Pickling wallets is discouraged as it may expose private keys.
+        This method logs a security warning when wallets are pickled.
+        """
+        logger.warning(
+            "SECURITY WARNING: Wallet being serialized (pickle). Private key will be included.",
+            extra={
+                "event": "wallet.pickle_serialization",
+                "address": self.address[:16] + "..."
+            }
+        )
+        return self.__dict__
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        """Custom pickle deserialization."""
+        self.__dict__.update(state)
 
     # ===== BIP-39 MNEMONIC METHODS (TASK 24) =====
 

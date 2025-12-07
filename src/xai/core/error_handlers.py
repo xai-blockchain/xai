@@ -197,9 +197,12 @@ class RetryStrategy:
                     delay = min(self.base_delay * (self.exponential_base**attempt), self.max_delay)
 
                     # Add jitter to prevent thundering herd
+                    # Use cryptographically secure random for jitter
                     if self.jitter:
-                        import random
-                        delay = delay * (0.5 + random.random())
+                        import secrets
+                        # Generate random float between 0.5 and 1.5
+                        jitter_factor = 0.5 + (secrets.randbelow(1000) / 1000.0)
+                        delay = delay * jitter_factor
 
                     self.logger.info(f"Retrying in {delay:.2f} seconds...")
                     time.sleep(delay)

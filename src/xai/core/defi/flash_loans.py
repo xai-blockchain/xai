@@ -77,6 +77,9 @@ class FlashLoanProvider:
     _active_loans: Dict[str, FlashLoanRequest] = field(default_factory=dict)
     _execution_lock: threading.Lock = field(default_factory=threading.Lock)
 
+    # Explicit reentrancy guard (defense-in-depth)
+    _reentrancy_guard: Dict[str, bool] = field(default_factory=dict)
+
     # Statistics
     total_loans: int = 0
     total_volume: Dict[str, int] = field(default_factory=dict)
@@ -108,6 +111,11 @@ class FlashLoanProvider:
         The callback function must return True and the borrowed amounts
         plus fees must be returned to this contract before the function returns.
 
+        SECURITY: This implementation uses defense-in-depth against reentrancy:
+        1. Explicit reentrancy guard (checked first, outside lock)
+        2. Single lock context for entire operation (no window for reentry)
+        3. Checks-effects-interactions pattern (state updates before external calls)
+
         Args:
             borrower: Address initiating the loan
             receiver: Address receiving the funds and callback
@@ -122,201 +130,224 @@ class FlashLoanProvider:
         Raises:
             VMExecutionError: If loan cannot be executed or repaid
         """
+        # ==================== CHECKS ====================
+        # Input validation (before any state changes)
         if len(assets) != len(amounts):
             raise VMExecutionError("Assets and amounts length mismatch")
 
         if len(assets) == 0:
             raise VMExecutionError("Must borrow at least one asset")
 
-        # Generate loan ID
-        loan_id = f"{borrower}:{time.time()}"
-
-        # Check for reentrancy
-        with self._execution_lock:
-            if borrower in self._active_loans:
-                raise VMExecutionError("Flash loan already in progress for borrower")
-
-            # Calculate fees
-            fee_amounts = [
-                (amount * self.flash_loan_fee) // self.BASIS_POINTS
-                for amount in amounts
-            ]
-
-            # Verify liquidity
-            for i, asset in enumerate(assets):
-                pool_liquidity = self.liquidity_pools.get(asset, 0)
-                if amounts[i] > pool_liquidity:
-                    raise VMExecutionError(
-                        f"Insufficient liquidity for {asset}: "
-                        f"requested {amounts[i]}, available {pool_liquidity}"
-                    )
-
-            # Record loan
-            loan = FlashLoanRequest(
-                id=loan_id,
-                borrower=borrower,
-                assets=assets,
-                amounts=amounts,
-                fee_amounts=fee_amounts,
-                receiver_callback=callback,
-                status="executing",
-            )
-            self._active_loans[borrower] = loan
+        # DEFENSE-IN-DEPTH: Check reentrancy guard FIRST, outside the lock
+        # This catches reentrancy attempts immediately before acquiring expensive lock
+        self._require_no_reentry(borrower)
 
         try:
-            # Record balances before
-            balances_before = {
-                asset: self.liquidity_pools.get(asset, 0)
-                for asset in assets
-            }
+            # CRITICAL SECURITY: Hold lock for ENTIRE flash loan operation
+            # This prevents any reentrancy window between checks and cleanup
+            with self._execution_lock:
+                # Generate loan ID
+                loan_id = f"{borrower}:{time.time()}"
 
-            # "Transfer" funds to borrower (in real impl would be actual transfer)
-            for i, asset in enumerate(assets):
-                self.liquidity_pools[asset] = (
-                    self.liquidity_pools.get(asset, 0) - amounts[i]
+                # Double-check for reentrancy (defense-in-depth)
+                if borrower in self._active_loans:
+                    raise VMExecutionError("Flash loan already in progress for borrower")
+
+                # Calculate fees
+                fee_amounts = [
+                    (amount * self.flash_loan_fee) // self.BASIS_POINTS
+                    for amount in amounts
+                ]
+
+                # Verify liquidity availability
+                for i, asset in enumerate(assets):
+                    pool_liquidity = self.liquidity_pools.get(asset, 0)
+                    if amounts[i] > pool_liquidity:
+                        raise VMExecutionError(
+                            f"Insufficient liquidity for {asset}: "
+                            f"requested {amounts[i]}, available {pool_liquidity}"
+                        )
+
+                # ==================== EFFECTS ====================
+                # State changes BEFORE any external calls (checks-effects-interactions)
+
+                # Record loan (marks borrower as having active loan)
+                loan = FlashLoanRequest(
+                    id=loan_id,
+                    borrower=borrower,
+                    assets=assets,
+                    amounts=amounts,
+                    fee_amounts=fee_amounts,
+                    receiver_callback=callback,
+                    status="executing",
                 )
+                self._active_loans[borrower] = loan
 
-            logger.info(
-                "Flash loan executed",
-                extra={
-                    "event": "flash_loan.borrow",
-                    "loan_id": loan_id,
-                    "borrower": borrower[:10],
-                    "assets": assets,
-                    "amounts": amounts,
+                # Record balances before transfer
+                balances_before = {
+                    asset: self.liquidity_pools.get(asset, 0)
+                    for asset in assets
                 }
-            )
 
-            # Execute callback
-            if callback:
-                success = callback(
-                    borrower,  # initiator
-                    assets,
-                    amounts,
-                    fee_amounts,
-                    params,
-                )
-                if not success:
-                    raise VMExecutionError("Flash loan callback failed")
-
-            # Verify repayment by checking actual pool balances
-            # The callback MUST have returned the borrowed funds + fees
-            # We verify by comparing current balance to expected balance
-            #
-            # SECURITY: Two-step verification to prevent attack where only fees are paid
-            # 1. Verify principal was returned (balance >= original)
-            # 2. Verify fees were paid (balance >= original + fees)
-
-            for i, asset in enumerate(assets):
-                current_balance = self.liquidity_pools.get(asset, 0)
-                original_balance = balances_before[asset]
-                required_return = amounts[i] + fee_amounts[i]
-                expected_with_fees = original_balance + fee_amounts[i]
-
-                # CRITICAL SECURITY CHECK #1: Verify principal was returned
-                # Attack scenario: Attacker borrows 1000 tokens, pays only 9 token fee, keeps 1000
-                # This check prevents that by ensuring balance is at least back to original
-                if current_balance < original_balance:
-                    principal_shortfall = original_balance - current_balance
-                    logger.error(
-                        "Flash loan principal not repaid",
-                        extra={
-                            "event": "flash_loan.principal_not_repaid",
-                            "asset": asset,
-                            "borrowed": amounts[i],
-                            "original_balance": original_balance,
-                            "current_balance": current_balance,
-                            "principal_shortfall": principal_shortfall,
-                            "borrower": borrower[:16],
-                        }
-                    )
-                    raise VMExecutionError(
-                        f"Flash loan principal not repaid for {asset}: "
-                        f"borrowed {amounts[i]}, "
-                        f"original balance {original_balance}, "
-                        f"current balance {current_balance}, "
-                        f"shortfall {principal_shortfall}"
+                # Update pool balances (transfer funds to borrower)
+                for i, asset in enumerate(assets):
+                    self.liquidity_pools[asset] = (
+                        self.liquidity_pools.get(asset, 0) - amounts[i]
                     )
 
-                # CRITICAL SECURITY CHECK #2: Verify fees were paid
-                # After confirming principal is back, verify the required fees were also paid
-                # Expected balance = original + fees (not original + principal + fees, since principal
-                # was borrowed from the pool, so returning it gets us back to original)
-                if current_balance < expected_with_fees:
-                    fee_shortfall = expected_with_fees - current_balance
-                    logger.error(
-                        "Flash loan fees not paid",
-                        extra={
-                            "event": "flash_loan.fees_not_paid",
-                            "asset": asset,
-                            "required_fee": fee_amounts[i],
-                            "expected_balance": expected_with_fees,
-                            "current_balance": current_balance,
-                            "fee_shortfall": fee_shortfall,
-                            "borrower": borrower[:16],
-                        }
-                    )
-                    raise VMExecutionError(
-                        f"Flash loan fees not paid for {asset}: "
-                        f"required fee {fee_amounts[i]}, "
-                        f"expected balance {expected_with_fees}, "
-                        f"current balance {current_balance}, "
-                        f"fee shortfall {fee_shortfall}"
-                    )
-
-                # Log successful repayment verification
                 logger.info(
-                    "Flash loan repayment verified",
+                    "Flash loan executed",
                     extra={
-                        "event": "flash_loan.repayment_verified",
-                        "asset": asset,
-                        "principal": amounts[i],
-                        "fee": fee_amounts[i],
-                        "total_returned": required_return,
-                        "new_balance": current_balance,
+                        "event": "flash_loan.borrow",
+                        "loan_id": loan_id,
                         "borrower": borrower[:10],
+                        "assets": assets,
+                        "amounts": amounts,
                     }
                 )
 
-                # Collect fees
-                self.collected_fees[asset] = (
-                    self.collected_fees.get(asset, 0) + fee_amounts[i]
-                )
+                # ==================== INTERACTIONS ====================
+                # External calls AFTER all state changes
 
-                # Update statistics
-                self.total_volume[asset] = (
-                    self.total_volume.get(asset, 0) + amounts[i]
-                )
+                try:
+                    # Execute callback (external interaction)
+                    if callback:
+                        success = callback(
+                            borrower,  # initiator
+                            assets,
+                            amounts,
+                            fee_amounts,
+                            params,
+                        )
+                        if not success:
+                            raise VMExecutionError("Flash loan callback failed")
 
-            loan.status = "repaid"
-            self.total_loans += 1
+                    # ==================== POST-INTERACTION VERIFICATION ====================
+                    # Verify repayment by checking actual pool balances
+                    # The callback MUST have returned the borrowed funds + fees
+                    #
+                    # SECURITY: Two-step verification to prevent partial repayment attacks
+                    # 1. Verify principal was returned (balance >= original)
+                    # 2. Verify fees were paid (balance >= original + fees)
 
-            logger.info(
-                "Flash loan repaid",
-                extra={
-                    "event": "flash_loan.repaid",
-                    "loan_id": loan_id,
-                    "borrower": borrower[:10],
-                    "fees_paid": fee_amounts,
-                }
-            )
+                    for i, asset in enumerate(assets):
+                        current_balance = self.liquidity_pools.get(asset, 0)
+                        original_balance = balances_before[asset]
+                        required_return = amounts[i] + fee_amounts[i]
+                        expected_with_fees = original_balance + fee_amounts[i]
 
-            return True
+                        # CRITICAL SECURITY CHECK #1: Verify principal was returned
+                        # Attack scenario: Attacker borrows 1000 tokens, pays only 9 token fee, keeps 1000
+                        # This check prevents that by ensuring balance is at least back to original
+                        if current_balance < original_balance:
+                            principal_shortfall = original_balance - current_balance
+                            logger.error(
+                                "Flash loan principal not repaid",
+                                extra={
+                                    "event": "flash_loan.principal_not_repaid",
+                                    "asset": asset,
+                                    "borrowed": amounts[i],
+                                    "original_balance": original_balance,
+                                    "current_balance": current_balance,
+                                    "principal_shortfall": principal_shortfall,
+                                    "borrower": borrower[:16],
+                                }
+                            )
+                            raise VMExecutionError(
+                                f"Flash loan principal not repaid for {asset}: "
+                                f"borrowed {amounts[i]}, "
+                                f"original balance {original_balance}, "
+                                f"current balance {current_balance}, "
+                                f"shortfall {principal_shortfall}"
+                            )
 
-        except Exception as e:
-            # Revert state on failure
-            for i, asset in enumerate(assets):
-                self.liquidity_pools[asset] = (
-                    self.liquidity_pools.get(asset, 0) + amounts[i]
-                )
-            loan.status = "defaulted"
-            raise VMExecutionError(f"Flash loan failed: {e}")
+                        # CRITICAL SECURITY CHECK #2: Verify fees were paid
+                        # After confirming principal is back, verify the required fees were also paid
+                        # Expected balance = original + fees (not original + principal + fees, since principal
+                        # was borrowed from the pool, so returning it gets us back to original)
+                        if current_balance < expected_with_fees:
+                            fee_shortfall = expected_with_fees - current_balance
+                            logger.error(
+                                "Flash loan fees not paid",
+                                extra={
+                                    "event": "flash_loan.fees_not_paid",
+                                    "asset": asset,
+                                    "required_fee": fee_amounts[i],
+                                    "expected_balance": expected_with_fees,
+                                    "current_balance": current_balance,
+                                    "fee_shortfall": fee_shortfall,
+                                    "borrower": borrower[:16],
+                                }
+                            )
+                            raise VMExecutionError(
+                                f"Flash loan fees not paid for {asset}: "
+                                f"required fee {fee_amounts[i]}, "
+                                f"expected balance {expected_with_fees}, "
+                                f"current balance {current_balance}, "
+                                f"fee shortfall {fee_shortfall}"
+                            )
+
+                        # Log successful repayment verification
+                        logger.info(
+                            "Flash loan repayment verified",
+                            extra={
+                                "event": "flash_loan.repayment_verified",
+                                "asset": asset,
+                                "principal": amounts[i],
+                                "fee": fee_amounts[i],
+                                "total_returned": required_return,
+                                "new_balance": current_balance,
+                                "borrower": borrower[:10],
+                            }
+                        )
+
+                        # Collect fees
+                        self.collected_fees[asset] = (
+                            self.collected_fees.get(asset, 0) + fee_amounts[i]
+                        )
+
+                        # Update statistics
+                        self.total_volume[asset] = (
+                            self.total_volume.get(asset, 0) + amounts[i]
+                        )
+
+                    # Mark loan as successfully repaid
+                    loan.status = "repaid"
+                    self.total_loans += 1
+
+                    logger.info(
+                        "Flash loan repaid",
+                        extra={
+                            "event": "flash_loan.repaid",
+                            "loan_id": loan_id,
+                            "borrower": borrower[:10],
+                            "fees_paid": fee_amounts,
+                        }
+                    )
+
+                    return True
+
+                except Exception as e:
+                    # Revert state on failure (restore pool balances)
+                    for i, asset in enumerate(assets):
+                        self.liquidity_pools[asset] = (
+                            self.liquidity_pools.get(asset, 0) + amounts[i]
+                        )
+                    loan.status = "defaulted"
+                    raise VMExecutionError(f"Flash loan failed: {e}")
+
+                finally:
+                    # Clean up active loan tracking
+                    # SECURITY: This happens INSIDE the lock, before lock is released
+                    # No reentrancy window exists
+                    if borrower in self._active_loans:
+                        del self._active_loans[borrower]
+                    # Lock is released here when exiting 'with' block
 
         finally:
-            # Clean up active loan
-            with self._execution_lock:
-                if borrower in self._active_loans:
-                    del self._active_loans[borrower]
+            # Clear reentrancy guard (defense-in-depth)
+            # This happens AFTER the lock is released
+            self._clear_reentry_guard(borrower)
 
     def flash_loan_simple(
         self,
@@ -493,6 +524,34 @@ class FlashLoanProvider:
         }
 
     # ==================== Helpers ====================
+
+    def _require_no_reentry(self, borrower: str) -> None:
+        """
+        Check and set reentrancy guard.
+
+        This provides defense-in-depth against reentrancy attacks by maintaining
+        a separate guard flag independent of the lock mechanism.
+
+        Args:
+            borrower: Borrower address to check
+
+        Raises:
+            VMExecutionError: If reentrancy is detected
+        """
+        if self._reentrancy_guard.get(borrower, False):
+            raise VMExecutionError(
+                f"Reentrancy detected for borrower {borrower[:16]}..."
+            )
+        self._reentrancy_guard[borrower] = True
+
+    def _clear_reentry_guard(self, borrower: str) -> None:
+        """
+        Clear reentrancy guard.
+
+        Args:
+            borrower: Borrower address to clear guard for
+        """
+        self._reentrancy_guard[borrower] = False
 
     def _normalize(self, address: str) -> str:
         return address.lower()

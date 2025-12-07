@@ -1,0 +1,178 @@
+# Non-Deterministic JSON Serialization for Transaction IDs
+
+---
+status: pending
+priority: p2
+issue_id: 031
+tags: [consensus, serialization, determinism, security, code-review]
+dependencies: []
+---
+
+## Problem Statement
+
+Transaction hash calculation uses `json.dumps()` with `sort_keys=True` but does not specify `separators` parameter. Python's JSON encoder can use different whitespace in different environments, causing the same transaction to have different hashes on different nodes.
+
+## Findings
+
+### Location
+**File:** `src/xai/core/transaction.py` (Lines 366-396)
+
+### Evidence
+
+```python
+# Line 395 - Missing separators parameter
+tx_string = json.dumps(tx_data, sort_keys=True)  # MISSING: separators=(',', ':')
+return hashlib.sha256(tx_string.encode()).hexdigest()
+```
+
+### Whitespace Variations
+
+Different Python versions/platforms can produce:
+```python
+# Default (may vary):
+'{"amount": 10.0, "sender": "XAI123"}'
+
+# With extra spaces:
+'{"amount": 10.0,  "sender": "XAI123"}'
+
+# Compact (desired):
+'{"amount":10.0,"sender":"XAI123"}'
+```
+
+### Impact
+
+- **Consensus Failure**: Same transaction rejected by some nodes
+- **Fork Risk**: Network splits when nodes disagree on validity
+- **Merkle Root Mismatch**: Block validation failures
+- **Cross-Platform Issues**: Windows vs Linux nodes disagree
+
+## Proposed Solutions
+
+### Option A: Canonical JSON Serialization (Recommended)
+**Effort:** Small | **Risk:** Low
+
+```python
+import json
+from typing import Any, Dict
+
+def canonical_json(data: Dict[str, Any]) -> str:
+    """Produce deterministic JSON string for hashing.
+
+    Uses:
+    - sort_keys=True: Consistent key ordering
+    - separators=(',', ':'): No whitespace
+    - ensure_ascii=True: No unicode variations
+    """
+    return json.dumps(
+        data,
+        sort_keys=True,
+        separators=(',', ':'),  # NO SPACES
+        ensure_ascii=True
+    )
+
+class Transaction:
+    def calculate_txid(self) -> str:
+        """Calculate deterministic transaction ID."""
+        tx_data = {
+            "sender": self.sender,
+            "recipient": self.recipient,
+            "amount": self.amount,
+            "timestamp": self.timestamp,
+            "nonce": self.nonce,
+            # ... other fields
+        }
+
+        # Use canonical serialization
+        tx_string = canonical_json(tx_data)
+        return hashlib.sha256(tx_string.encode('utf-8')).hexdigest()
+```
+
+### Option B: Binary Serialization (MessagePack)
+**Effort:** Medium | **Risk:** Medium (breaking change)
+
+```python
+import msgpack
+
+def canonical_serialize(data: Dict[str, Any]) -> bytes:
+    """Binary serialization for deterministic hashing."""
+    # Sort keys recursively
+    def sort_dict(d):
+        if isinstance(d, dict):
+            return {k: sort_dict(v) for k, v in sorted(d.items())}
+        elif isinstance(d, list):
+            return [sort_dict(x) for x in d]
+        return d
+
+    sorted_data = sort_dict(data)
+    return msgpack.packb(sorted_data, use_bin_type=True)
+
+class Transaction:
+    def calculate_txid(self) -> str:
+        tx_data = {...}
+        tx_bytes = canonical_serialize(tx_data)
+        return hashlib.sha256(tx_bytes).hexdigest()
+```
+
+### Option C: Explicit Field Ordering
+**Effort:** Small | **Risk:** Low
+
+```python
+from collections import OrderedDict
+
+class Transaction:
+    # Define canonical field order
+    CANONICAL_FIELDS = [
+        "sender",
+        "recipient",
+        "amount",
+        "timestamp",
+        "nonce",
+        "signature",
+    ]
+
+    def _to_canonical_dict(self) -> OrderedDict:
+        """Create ordered dict with canonical field order."""
+        return OrderedDict([
+            (field, getattr(self, field, None))
+            for field in self.CANONICAL_FIELDS
+            if getattr(self, field, None) is not None
+        ])
+
+    def calculate_txid(self) -> str:
+        ordered = self._to_canonical_dict()
+        tx_string = json.dumps(ordered, separators=(',', ':'))
+        return hashlib.sha256(tx_string.encode('utf-8')).hexdigest()
+```
+
+## Recommended Action
+
+Implement Option A immediately - it's a one-line fix with huge consensus impact.
+
+## Technical Details
+
+**Affected Components:**
+- Transaction ID calculation
+- Block merkle root calculation
+- Signature verification
+- Mempool deduplication
+
+**Migration:**
+No migration needed - fix before mainnet launch. Existing testnet transactions may have different IDs.
+
+## Acceptance Criteria
+
+- [ ] `separators=(',', ':')` added to all consensus-critical JSON
+- [ ] Unit test: same data = same hash across Python versions
+- [ ] Integration test: transactions valid across different nodes
+- [ ] Code review: all json.dumps in consensus code audited
+
+## Work Log
+
+| Date | Action | Result |
+|------|--------|--------|
+| 2025-12-07 | Issue identified by data-integrity-guardian agent | Consensus risk |
+
+## Resources
+
+- [JSON Canonical Form](https://www.rfc-editor.org/rfc/rfc8785)
+- [Bitcoin Consensus Bugs](https://bitcoincore.org/en/releases/)
