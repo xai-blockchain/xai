@@ -46,6 +46,11 @@ class UTXOManager:
         self.total_value = 0.0
         # Thread safety: RLock allows same thread to acquire lock multiple times
         self._lock = RLock()
+        # Pending UTXOs: Track UTXOs selected for pending transactions to prevent double-spend
+        # Format: {(txid, vout): timestamp} - timestamp enables timeout-based cleanup
+        self._pending_utxos: Dict[tuple, float] = {}
+        # Timeout for pending UTXO locks (5 minutes)
+        self._pending_timeout = 300.0
 
     def snapshot_digest(self) -> str:
         """
@@ -174,18 +179,29 @@ class UTXOManager:
             )
             return False
 
-    def get_utxos_for_address(self, address: str) -> List[Dict[str, Any]]:
+    def get_utxos_for_address(self, address: str, exclude_pending: bool = True) -> List[Dict[str, Any]]:
         """
         Retrieves all unspent UTXOs for a given address.
 
         Args:
             address: The address to query.
+            exclude_pending: If True, exclude UTXOs locked for pending transactions.
 
         Returns:
             A list of unspent UTXO dictionaries.
         """
         with self._lock:
-            return [utxo for utxo in self.utxo_set[address] if not utxo["spent"]]
+            utxos = [utxo for utxo in self.utxo_set[address] if not utxo["spent"]]
+
+            if exclude_pending:
+                # Filter out pending UTXOs
+                self._cleanup_expired_pending()
+                utxos = [
+                    utxo for utxo in utxos
+                    if (utxo["txid"], utxo["vout"]) not in self._pending_utxos
+                ]
+
+            return utxos
 
     def get_balance(self, address: str) -> float:
         """
@@ -283,18 +299,25 @@ class UTXOManager:
         )
         return True
 
-    def get_unspent_output(self, txid: str, vout: int) -> Optional[Dict[str, Any]]:
+    def get_unspent_output(self, txid: str, vout: int, exclude_pending: bool = True) -> Optional[Dict[str, Any]]:
         """
         Retrieves a specific unspent UTXO by its transaction ID and output index.
 
         Args:
             txid: The transaction ID of the UTXO.
             vout: The output index of the UTXO within the transaction.
+            exclude_pending: If True, return None if UTXO is locked for pending transaction.
 
         Returns:
             The UTXO dictionary if found and unspent, otherwise None.
         """
         with self._lock:
+            # Check if UTXO is pending
+            if exclude_pending:
+                self._cleanup_expired_pending()
+                if (txid, vout) in self._pending_utxos:
+                    return None
+
             for address_utxos in self.utxo_set.values():
                 for utxo in address_utxos:
                     if utxo["txid"] == txid and utxo["vout"] == vout and not utxo["spent"]:
@@ -325,6 +348,112 @@ class UTXOManager:
             return []  # Not enough spendable UTXOs
 
         return spendable_utxos
+
+    def lock_utxos(self, utxos: List[Dict[str, Any]]) -> bool:
+        """
+        Lock UTXOs for a pending transaction to prevent double-spending.
+
+        Security: This prevents TOCTOU race conditions where two threads could both
+        validate transactions spending the same UTXO. By locking UTXOs when selected,
+        we ensure atomic reservation.
+
+        Args:
+            utxos: List of UTXO dictionaries to lock
+
+        Returns:
+            True if all UTXOs were successfully locked, False if any were already locked
+        """
+        with self._lock:
+            import time
+            self._cleanup_expired_pending()
+
+            # Check if any UTXOs are already locked
+            for utxo in utxos:
+                utxo_key = (utxo["txid"], utxo["vout"])
+                if utxo_key in self._pending_utxos:
+                    self.logger.warn(
+                        f"UTXO {utxo['txid']}:{utxo['vout']} already locked for pending transaction",
+                        extra={"event": "utxo.lock_failed", "utxo": utxo_key}
+                    )
+                    return False
+
+            # Lock all UTXOs
+            current_time = time.time()
+            for utxo in utxos:
+                utxo_key = (utxo["txid"], utxo["vout"])
+                self._pending_utxos[utxo_key] = current_time
+                self.logger.debug(
+                    f"Locked UTXO {utxo['txid']}:{utxo['vout']} for pending transaction",
+                    extra={"event": "utxo.locked", "utxo": utxo_key}
+                )
+
+            return True
+
+    def unlock_utxos(self, utxos: List[Dict[str, Any]]):
+        """
+        Unlock UTXOs when transaction is rejected or mined.
+
+        Args:
+            utxos: List of UTXO dictionaries to unlock
+        """
+        with self._lock:
+            for utxo in utxos:
+                utxo_key = (utxo["txid"], utxo["vout"])
+                if utxo_key in self._pending_utxos:
+                    del self._pending_utxos[utxo_key]
+                    self.logger.debug(
+                        f"Unlocked UTXO {utxo['txid']}:{utxo['vout']}",
+                        extra={"event": "utxo.unlocked", "utxo": utxo_key}
+                    )
+
+    def unlock_utxos_by_keys(self, utxo_keys: List[tuple]):
+        """
+        Unlock UTXOs by their (txid, vout) keys.
+
+        Args:
+            utxo_keys: List of (txid, vout) tuples to unlock
+        """
+        with self._lock:
+            for utxo_key in utxo_keys:
+                if utxo_key in self._pending_utxos:
+                    del self._pending_utxos[utxo_key]
+                    self.logger.debug(
+                        f"Unlocked UTXO {utxo_key[0]}:{utxo_key[1]}",
+                        extra={"event": "utxo.unlocked", "utxo": utxo_key}
+                    )
+
+    def _cleanup_expired_pending(self):
+        """
+        Remove expired pending UTXO locks.
+
+        Called internally to clean up locks that have timed out, preventing
+        UTXOs from being locked indefinitely if a transaction fails to be
+        processed or rejected.
+        """
+        import time
+        current_time = time.time()
+        expired = [
+            utxo_key for utxo_key, timestamp in self._pending_utxos.items()
+            if current_time - timestamp > self._pending_timeout
+        ]
+
+        for utxo_key in expired:
+            del self._pending_utxos[utxo_key]
+            self.logger.info(
+                f"Released expired pending lock on UTXO {utxo_key[0]}:{utxo_key[1]}",
+                extra={"event": "utxo.lock_expired", "utxo": utxo_key, "age": current_time - self._pending_utxos.get(utxo_key, current_time)}
+            )
+
+    def get_pending_utxo_count(self) -> int:
+        """
+        Get the count of currently locked pending UTXOs.
+
+        Returns:
+            Number of UTXOs locked for pending transactions
+        """
+        with self._lock:
+            self._cleanup_expired_pending()
+            return len(self._pending_utxos)
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -413,6 +542,7 @@ class UTXOManager:
             self.utxo_set = defaultdict(list)
             self.total_utxos = 0
             self.total_value = 0.0
+            self._pending_utxos = {}
             self.logger.info("UTXO Manager reset.")
 
     def snapshot(self) -> Dict[str, Any]:
@@ -465,6 +595,7 @@ class UTXOManager:
             self.utxo_set = defaultdict(list)
             self.total_utxos = 0
             self.total_value = 0.0
+            self._pending_utxos = {}
 
     def compact_utxo_set(self) -> int:
         """

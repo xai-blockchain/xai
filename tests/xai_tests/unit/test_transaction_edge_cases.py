@@ -19,6 +19,8 @@ class TestTransactionEdgeCases:
 
     def test_zero_amount_transaction_should_fail(self, tmp_path):
         """Test that zero amount transactions are rejected"""
+        from xai.core.transaction import TransactionValidationError
+
         bc = Blockchain(data_dir=str(tmp_path))
         wallet1 = Wallet()
         wallet2 = Wallet()
@@ -26,17 +28,19 @@ class TestTransactionEdgeCases:
         # Mine to get funds
         bc.mine_pending_transactions(wallet1.address)
 
-        # Try to create transaction with zero amount
-        tx = bc.create_transaction(
-            wallet1.address, wallet2.address, 0.0, 0.1,
-            wallet1.private_key, wallet1.public_key
-        )
+        # Try to create transaction with zero amount - should raise validation error
+        with pytest.raises(TransactionValidationError) as exc_info:
+            bc.create_transaction(
+                wallet1.address, wallet2.address, 0.0, 0.1,
+                wallet1.private_key, wallet1.public_key
+            )
 
-        # Transaction should be rejected (returns None)
-        assert tx is None
+        assert "zero" in str(exc_info.value).lower() or "positive" in str(exc_info.value).lower()
 
     def test_negative_amount_transaction_should_fail(self, tmp_path):
         """Test that negative amount transactions are rejected"""
+        from xai.core.transaction import TransactionValidationError
+
         bc = Blockchain(data_dir=str(tmp_path))
         wallet1 = Wallet()
         wallet2 = Wallet()
@@ -44,17 +48,19 @@ class TestTransactionEdgeCases:
         # Mine to get funds
         bc.mine_pending_transactions(wallet1.address)
 
-        # Try to create transaction with negative amount
-        tx = bc.create_transaction(
-            wallet1.address, wallet2.address, -10.0, 0.1,
-            wallet1.private_key, wallet1.public_key
-        )
+        # Try to create transaction with negative amount - should raise validation error
+        with pytest.raises(TransactionValidationError) as exc_info:
+            bc.create_transaction(
+                wallet1.address, wallet2.address, -10.0, 0.1,
+                wallet1.private_key, wallet1.public_key
+            )
 
-        # Transaction should be rejected
-        assert tx is None
+        assert "negative" in str(exc_info.value).lower()
 
     def test_negative_fee_transaction_should_fail(self, tmp_path):
         """Test that transactions with negative fees are rejected"""
+        from xai.core.transaction import TransactionValidationError
+
         bc = Blockchain(data_dir=str(tmp_path))
         wallet1 = Wallet()
         wallet2 = Wallet()
@@ -62,14 +68,14 @@ class TestTransactionEdgeCases:
         # Mine to get funds
         bc.mine_pending_transactions(wallet1.address)
 
-        # Try to create transaction with negative fee
-        tx = bc.create_transaction(
-            wallet1.address, wallet2.address, 5.0, -0.1,
-            wallet1.private_key, wallet1.public_key
-        )
+        # Try to create transaction with negative fee - should raise validation error
+        with pytest.raises(TransactionValidationError) as exc_info:
+            bc.create_transaction(
+                wallet1.address, wallet2.address, 5.0, -0.1,
+                wallet1.private_key, wallet1.public_key
+            )
 
-        # Transaction should be rejected
-        assert tx is None
+        assert "negative" in str(exc_info.value).lower() or "fee" in str(exc_info.value).lower()
 
     def test_invalid_signature_should_fail(self, tmp_path):
         """Test that transactions with invalid signatures are rejected"""
@@ -106,10 +112,12 @@ class TestTransactionEdgeCases:
         wallet2 = Wallet()
 
         tx = Transaction(wallet1.address, wallet2.address, 10.0, 0.1)
-        # Don't set public key
+        # Don't set public key - sign_transaction may set it from private key
+        # But we explicitly clear it after
         tx.sign_transaction(wallet1.private_key)
+        tx.public_key = None  # Explicitly remove public key
 
-        # Verification should fail
+        # Verification should fail without public key
         assert tx.verify_signature() is False
 
     def test_maximum_transaction_size(self, tmp_path):
@@ -171,7 +179,9 @@ class TestTransactionEdgeCases:
         assert utxo["txid"] in str(exc_info.value) or f"{utxo['txid'][:8]}" in str(exc_info.value)
 
     def test_negative_output_amount_should_fail(self, tmp_path):
-        """Test that negative output amounts are invalid"""
+        """Test that negative output amounts are rejected at construction"""
+        from xai.core.transaction import TransactionValidationError
+
         wallet1 = Wallet()
         wallet2 = Wallet()
 
@@ -180,14 +190,14 @@ class TestTransactionEdgeCases:
             {"address": wallet2.address, "amount": -5.0}  # Invalid negative
         ]
 
-        tx = Transaction(
-            wallet1.address, wallet2.address, 10.0, 0.1,
-            outputs=outputs
-        )
+        # Should raise validation error due to negative output amount
+        with pytest.raises(TransactionValidationError) as exc_info:
+            Transaction(
+                wallet1.address, wallet2.address, 10.0, 0.1,
+                outputs=outputs
+            )
 
-        # Verify that there's a negative output
-        has_negative = any(out["amount"] < 0 for out in tx.outputs)
-        assert has_negative is True
+        assert "negative" in str(exc_info.value).lower()
 
     def test_inputs_less_than_outputs_should_fail(self, tmp_path):
         """Test that sum(inputs) < sum(outputs) is invalid"""

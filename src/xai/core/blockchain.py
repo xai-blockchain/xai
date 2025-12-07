@@ -53,7 +53,7 @@ from xai.core.finality import (
 )
 from xai.blockchain.slashing_manager import SlashingManager
 
-from xai.core.transaction import Transaction
+from xai.core.transaction import Transaction, TransactionValidationError
 from xai.core.node_identity import load_or_create_identity
 from xai.core.security_validation import SecurityEventRouter
 from xai.core.account_abstraction import (
@@ -1849,7 +1849,19 @@ class Blockchain:
 
         Returns:
             Transaction object if successful, None if insufficient funds
+
+        Raises:
+            TransactionValidationError: If amount or fee is invalid
         """
+        # Validate amount and fee before proceeding
+        if amount <= 0:
+            raise TransactionValidationError(
+                f"amount must be positive, got {amount}" if amount == 0
+                else f"amount cannot be negative: {amount}"
+            )
+        if fee < 0:
+            raise TransactionValidationError(f"fee cannot be negative: {fee}")
+
         # Get UTXOs for sender
         sender_utxos = self.utxo_manager.get_utxos_for_address(sender_address)
 
