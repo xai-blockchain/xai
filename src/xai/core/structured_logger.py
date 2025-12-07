@@ -201,6 +201,10 @@ class StructuredLogger:
         """Log warning message"""
         self._log("WARN", message, **kwargs)
 
+    def warning(self, message: str, **kwargs):
+        """Log warning message (alias for warn for Python logging compatibility)"""
+        self._log("WARN", message, **kwargs)
+
     def error(self, message: str, **kwargs):
         """Log error message"""
         self._log("ERROR", message, **kwargs)
