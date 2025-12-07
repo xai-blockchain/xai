@@ -108,13 +108,13 @@ class TestValidateAmount:
         """Test rejection of non-numeric amounts"""
         validator = SecurityValidator()
 
-        with pytest.raises(ValidationError, match="must be a number"):
+        with pytest.raises(ValidationError, match="must be numeric"):
             validator.validate_amount("100")
 
-        with pytest.raises(ValidationError, match="must be a number"):
+        with pytest.raises(ValidationError, match="must be numeric"):
             validator.validate_amount(None)
 
-        with pytest.raises(ValidationError, match="must be a number"):
+        with pytest.raises(ValidationError, match="must be numeric"):
             validator.validate_amount([])
 
     def test_reject_nan_amount(self):
@@ -248,7 +248,7 @@ class TestValidateAddress:
         """Test rejection of addresses with non-hexadecimal characters"""
         validator = SecurityValidator()
 
-        with pytest.raises(ValidationError, match="only hexadecimal"):
+        with pytest.raises(ValidationError, match="Invalid address format"):
             validator.validate_address("XAI" + "z" * 40)
 
     def test_sql_injection_detection(self, caplog):
@@ -329,7 +329,7 @@ class TestValidateFee:
         """Test rejection of fees above maximum"""
         validator = SecurityValidator()
 
-        with pytest.raises(ValidationError, match="too high"):
+        with pytest.raises(ValidationError, match="exceeds maximum"):
             validator.validate_fee(SecurityValidator.MAX_FEE + 1)
 
     def test_reject_negative_fee(self):
@@ -385,10 +385,10 @@ class TestValidateString:
         """Test rejection of control characters"""
         validator = SecurityValidator()
 
-        with pytest.raises(ValidationError, match="invalid characters"):
+        with pytest.raises(ValidationError, match="contains invalid control characters"):
             validator.validate_string("test\x00data")
 
-        with pytest.raises(ValidationError, match="invalid characters"):
+        with pytest.raises(ValidationError, match="contains invalid control characters"):
             validator.validate_string("test\x01data")
 
     def test_allow_newline_characters(self):
@@ -427,7 +427,7 @@ class TestValidatePositiveInteger:
         """Test rejection of negative integers"""
         validator = SecurityValidator()
 
-        with pytest.raises(ValidationError, match="must be positive"):
+        with pytest.raises(ValidationError, match="must be >="):
             validator.validate_positive_integer(-1)
 
     def test_reject_non_integer(self):
@@ -448,7 +448,7 @@ class TestValidatePositiveInteger:
         """Test rejection of integers exceeding max safe value"""
         validator = SecurityValidator()
 
-        with pytest.raises(ValidationError, match="too large"):
+        with pytest.raises(ValidationError, match="must be <="):
             validator.validate_positive_integer(2**63)
 
 
@@ -532,7 +532,7 @@ class TestValidateHexString:
         """Test rejection of non-hexadecimal characters"""
         validator = SecurityValidator()
 
-        with pytest.raises(ValidationError, match="must be hexadecimal"):
+        with pytest.raises(ValidationError, match="must contain only hexadecimal characters"):
             validator.validate_hex_string("xyz123")
 
     def test_exact_length_validation(self):
