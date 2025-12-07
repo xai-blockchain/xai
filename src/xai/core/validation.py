@@ -13,11 +13,14 @@ This module provides:
 All validation functions raise ValueError with clear error messages.
 """
 
-from typing import Any, Optional
-from decimal import Decimal
+from typing import Any, Optional, Union
+from decimal import Decimal, ROUND_DOWN, getcontext, InvalidOperation
 import re
 
 from xai.core.security_validation import SecurityValidator, ValidationError
+
+# Set global decimal precision for blockchain operations
+getcontext().prec = 28
 
 
 # Constants
@@ -28,7 +31,7 @@ MAX_FEE = 1000.0
 
 # Address validation
 VALID_PREFIXES = ("XAI", "TXAI")
-SPECIAL_ADDRESSES = ("COINBASE", "XAITRADEFEE", "TXAITRADEFEE")
+SPECIAL_ADDRESSES = ("COINBASE", "XAITRADEFEE", "TXAITRADEFEE", "GOVERNANCE", "STAKING", "TIMECAPSULE")
 MIN_ADDRESS_LENGTH = 40
 MAX_ADDRESS_LENGTH = 100
 
@@ -339,6 +342,128 @@ def validate_hex_string(
     return value
 
 
+class MonetaryAmount:
+    """
+    Fixed-precision monetary amount for blockchain financial calculations.
+
+    Uses Decimal internally to avoid floating-point precision errors.
+    All arithmetic rounds down to prevent inflation/fund creation.
+
+    Precision: 8 decimal places (like Bitcoin satoshis).
+    """
+
+    PRECISION = 8  # Decimal places (1 XAI = 100_000_000 base units)
+    _quantizer = Decimal(f"1e-{PRECISION}")
+
+    def __init__(self, value: Union[str, int, Decimal]):
+        """
+        Create a MonetaryAmount from string, int, or Decimal.
+
+        Args:
+            value: Numeric value (float is explicitly forbidden)
+
+        Raises:
+            TypeError: If value is a float
+            ValueError: If value is invalid or out of range
+        """
+        if isinstance(value, float):
+            raise TypeError(
+                "Float not allowed for monetary values due to precision loss. "
+                "Use string or Decimal instead."
+            )
+
+        try:
+            self._value = Decimal(str(value)).quantize(
+                self._quantizer, rounding=ROUND_DOWN
+            )
+        except (InvalidOperation, ValueError) as e:
+            raise ValueError(f"Invalid monetary value: {value}") from e
+
+        if self._value < 0:
+            raise ValueError(f"Monetary amount cannot be negative: {value}")
+        if self._value > Decimal(str(MAX_SUPPLY)):
+            raise ValueError(f"Amount exceeds max supply: {value}")
+
+    @property
+    def value(self) -> Decimal:
+        """Return the underlying Decimal value."""
+        return self._value
+
+    def __add__(self, other: "MonetaryAmount") -> "MonetaryAmount":
+        if not isinstance(other, MonetaryAmount):
+            raise TypeError(f"Cannot add MonetaryAmount and {type(other)}")
+        return MonetaryAmount(str(self._value + other._value))
+
+    def __sub__(self, other: "MonetaryAmount") -> "MonetaryAmount":
+        if not isinstance(other, MonetaryAmount):
+            raise TypeError(f"Cannot subtract {type(other)} from MonetaryAmount")
+        result = self._value - other._value
+        if result < 0:
+            raise ValueError("Subtraction would result in negative amount")
+        return MonetaryAmount(str(result))
+
+    def __mul__(self, other: Union["MonetaryAmount", int, Decimal]) -> "MonetaryAmount":
+        if isinstance(other, MonetaryAmount):
+            result = self._value * other._value
+        elif isinstance(other, (int, Decimal)):
+            result = self._value * Decimal(str(other))
+        else:
+            raise TypeError(f"Cannot multiply MonetaryAmount by {type(other)}")
+        return MonetaryAmount(str(result.quantize(self._quantizer, rounding=ROUND_DOWN)))
+
+    def __truediv__(self, other: Union["MonetaryAmount", int, Decimal]) -> "MonetaryAmount":
+        if isinstance(other, MonetaryAmount):
+            if other._value == 0:
+                raise ZeroDivisionError("Cannot divide by zero")
+            result = self._value / other._value
+        elif isinstance(other, (int, Decimal)):
+            if Decimal(str(other)) == 0:
+                raise ZeroDivisionError("Cannot divide by zero")
+            result = self._value / Decimal(str(other))
+        else:
+            raise TypeError(f"Cannot divide MonetaryAmount by {type(other)}")
+        return MonetaryAmount(str(result.quantize(self._quantizer, rounding=ROUND_DOWN)))
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, MonetaryAmount):
+            return self._value == other._value
+        return False
+
+    def __lt__(self, other: "MonetaryAmount") -> bool:
+        return self._value < other._value
+
+    def __le__(self, other: "MonetaryAmount") -> bool:
+        return self._value <= other._value
+
+    def __gt__(self, other: "MonetaryAmount") -> bool:
+        return self._value > other._value
+
+    def __ge__(self, other: "MonetaryAmount") -> bool:
+        return self._value >= other._value
+
+    def __repr__(self) -> str:
+        return f"MonetaryAmount('{self._value}')"
+
+    def __str__(self) -> str:
+        return str(self._value)
+
+    def to_base_units(self) -> int:
+        """Convert to smallest unit (like satoshis/wei)."""
+        return int(self._value * Decimal(10 ** self.PRECISION))
+
+    @classmethod
+    def from_base_units(cls, base_units: int) -> "MonetaryAmount":
+        """Create from smallest unit representation."""
+        if not isinstance(base_units, int):
+            raise TypeError("Base units must be integer")
+        return cls(str(Decimal(base_units) / Decimal(10 ** cls.PRECISION)))
+
+    @classmethod
+    def zero(cls) -> "MonetaryAmount":
+        """Return a zero amount."""
+        return cls("0")
+
+
 # Backwards compatibility: expose SecurityValidator for advanced use cases
 __all__ = [
     'validate_address',
@@ -349,4 +474,5 @@ __all__ = [
     'validate_hex_string',
     'SecurityValidator',
     'ValidationError',
+    'MonetaryAmount',
 ]

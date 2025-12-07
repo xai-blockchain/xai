@@ -10,10 +10,14 @@ Multi-stage review process before AI changes go live:
 """
 
 from __future__ import annotations
+import ast
 import time
 import hashlib
-from typing import Dict, List, Optional, Tuple, Any
+import logging
+from typing import Dict, List, Optional, Tuple, Any, Set
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 
 class ReviewStatus(Enum):
@@ -145,20 +149,90 @@ class AICodeSubmission:
         }
 
     def _check_syntax(self) -> bool:
-        """Validate Python syntax"""
-        # In real implementation: compile(code, 'string', 'exec')
-        return True  # Placeholder
+        """Validate Python syntax using AST parser."""
+        for file_path, changes in self.code_changes.items():
+            new_code = changes.get("new_code", "")
+            if not new_code:
+                continue
+            try:
+                ast.parse(new_code)
+            except SyntaxError as e:
+                logger.error(f"Syntax error in {file_path} at line {e.lineno}: {e.msg}")
+                return False
+        return True
 
     def _check_breaking_changes(self) -> bool:
-        """Ensure no breaking changes to existing functionality"""
-        # Check: No removal of public functions/classes
-        # Check: No changes to function signatures
-        return True  # Placeholder
+        """Ensure no breaking changes to existing functionality."""
+        for file_path, changes in self.code_changes.items():
+            old_code = changes.get("old_code", "")
+            new_code = changes.get("new_code", "")
+
+            if not old_code or not new_code:
+                continue
+
+            try:
+                old_public = self._extract_public_symbols(old_code)
+                new_public = self._extract_public_symbols(new_code)
+            except SyntaxError:
+                continue  # Syntax check handles invalid code
+
+            removed = old_public - new_public
+            if removed:
+                logger.error(f"Breaking change in {file_path}: removed public symbols {removed}")
+                return False
+        return True
 
     def _check_backwards_compatible(self) -> bool:
-        """Ensure old nodes can still validate blocks"""
-        # Critical: Don't break consensus compatibility
-        return True  # Placeholder
+        """Ensure old nodes can still validate blocks."""
+        consensus_constants = {
+            "MAX_BLOCK_SIZE", "BLOCK_TIME", "DIFFICULTY_ADJUSTMENT_INTERVAL",
+            "MAX_SUPPLY", "GENESIS_HASH", "COINBASE_REWARD"
+        }
+
+        for file_path, changes in self.code_changes.items():
+            old_code = changes.get("old_code", "")
+            new_code = changes.get("new_code", "")
+
+            if not old_code or not new_code:
+                continue
+
+            try:
+                old_consts = self._extract_constants(old_code, consensus_constants)
+                new_consts = self._extract_constants(new_code, consensus_constants)
+            except SyntaxError:
+                continue
+
+            for const_name, old_value in old_consts.items():
+                if const_name in new_consts and new_consts[const_name] != old_value:
+                    logger.error(
+                        f"Consensus constant {const_name} changed from {old_value} to {new_consts[const_name]}"
+                    )
+                    return False
+        return True
+
+    def _extract_public_symbols(self, code: str) -> Set[str]:
+        """Extract public function and class names from code."""
+        tree = ast.parse(code)
+        symbols: Set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                if not node.name.startswith("_"):
+                    symbols.add(node.name)
+        return symbols
+
+    def _extract_constants(self, code: str, filter_names: Set[str]) -> Dict[str, Any]:
+        """Extract constant assignments matching filter names."""
+        tree = ast.parse(code)
+        constants: Dict[str, Any] = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id in filter_names:
+                        try:
+                            constants[target.id] = ast.literal_eval(node.value)
+                        except (ValueError, TypeError):
+                            constants[target.id] = ast.dump(node.value)
+        return constants
 
     def _check_supply_unchanged(self) -> bool:
         """Verify AI didn't change token supply"""

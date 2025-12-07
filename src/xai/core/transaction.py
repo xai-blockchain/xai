@@ -91,7 +91,7 @@ class Transaction:
 
     @staticmethod
     def _validate_amount(value: Any, field_name: str, allow_zero: bool = True) -> float:
-        """Validate a monetary amount.
+        """Validate a monetary amount using centralized validation.
 
         Args:
             value: Value to validate
@@ -108,33 +108,14 @@ class Transaction:
             raise TransactionValidationError(f"{field_name} cannot be None")
 
         try:
-            amount = float(value)
-        except (TypeError, ValueError) as e:
-            raise TransactionValidationError(
-                f"{field_name} must be a number, got {type(value).__name__}: {e}"
+            return validate_amount(
+                value,
+                allow_zero=allow_zero,
+                min_value=MIN_TRANSACTION_AMOUNT if not allow_zero else 0,
+                max_value=MAX_TRANSACTION_AMOUNT
             )
-
-        if math.isnan(amount) or math.isinf(amount):
-            raise TransactionValidationError(
-                f"{field_name} must be a finite number, got {amount}"
-            )
-
-        if amount < MIN_TRANSACTION_AMOUNT:
-            raise TransactionValidationError(
-                f"{field_name} cannot be negative: {amount}"
-            )
-
-        if not allow_zero and amount == 0:
-            raise TransactionValidationError(
-                f"{field_name} cannot be zero"
-            )
-
-        if amount > MAX_TRANSACTION_AMOUNT:
-            raise TransactionValidationError(
-                f"{field_name} exceeds maximum ({MAX_TRANSACTION_AMOUNT}): {amount}"
-            )
-
-        return amount
+        except ValueError as e:
+            raise TransactionValidationError(f"{field_name}: {e}") from e
 
     @staticmethod
     def _validate_address(address: Any, field_name: str, allow_empty: bool = False) -> str:

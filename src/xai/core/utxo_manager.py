@@ -15,6 +15,7 @@ from typing import Dict, List, Any, Optional, TYPE_CHECKING
 from collections import defaultdict
 from threading import RLock
 from xai.core.structured_logger import StructuredLogger, get_structured_logger
+from xai.core.validation import validate_amount
 import hashlib
 import json
 import math
@@ -69,7 +70,7 @@ class UTXOManager:
 
     @staticmethod
     def _validate_amount(amount: Any, context: str = "amount") -> float:
-        """Validate a UTXO amount.
+        """Validate a UTXO amount using centralized validation.
 
         Args:
             amount: Value to validate
@@ -85,28 +86,14 @@ class UTXOManager:
             raise UTXOValidationError(f"UTXO {context} cannot be None")
 
         try:
-            value = float(amount)
-        except (TypeError, ValueError) as e:
-            raise UTXOValidationError(
-                f"UTXO {context} must be a number, got {type(amount).__name__}: {e}"
+            return validate_amount(
+                amount,
+                allow_zero=True,
+                min_value=MIN_UTXO_AMOUNT,
+                max_value=MAX_UTXO_AMOUNT
             )
-
-        if math.isnan(value) or math.isinf(value):
-            raise UTXOValidationError(
-                f"UTXO {context} must be finite, got {value}"
-            )
-
-        if value < MIN_UTXO_AMOUNT:
-            raise UTXOValidationError(
-                f"UTXO {context} cannot be negative: {value}"
-            )
-
-        if value > MAX_UTXO_AMOUNT:
-            raise UTXOValidationError(
-                f"UTXO {context} exceeds maximum ({MAX_UTXO_AMOUNT}): {value}"
-            )
-
-        return value
+        except ValueError as e:
+            raise UTXOValidationError(f"UTXO {context}: {e}") from e
 
     def add_utxo(self, address: str, txid: str, vout: int, amount: float, script_pubkey: str):
         """

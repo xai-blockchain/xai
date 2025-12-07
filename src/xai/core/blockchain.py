@@ -1966,11 +1966,17 @@ class Blockchain:
             TransactionValidationError: If amount or fee is invalid
         """
         # Validate amount and fee before proceeding
-        if amount <= 0:
+        # Allow zero amounts for special addresses (GOVERNANCE, STAKING, TIMECAPSULE, etc.)
+        special_recipients = {"GOVERNANCE", "STAKING", "TIMECAPSULE", "UNSTAKE"}
+        allow_zero_amount = recipient_address in special_recipients or recipient_address == ""
+
+        if not allow_zero_amount and amount <= 0:
             raise TransactionValidationError(
                 f"amount must be positive, got {amount}" if amount == 0
                 else f"amount cannot be negative: {amount}"
             )
+        if amount < 0:
+            raise TransactionValidationError(f"amount cannot be negative: {amount}")
         if fee < 0:
             raise TransactionValidationError(f"fee cannot be negative: {fee}")
 

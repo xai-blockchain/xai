@@ -220,7 +220,7 @@ class SecurityValidator:
     @staticmethod
     def validate_string(value: Any, field_name: str = "value", max_length: int = None) -> str:
         """
-        Validate and sanitize string input
+        Validate and sanitize string input using centralized validation.
 
         Args:
             value: String to validate
@@ -233,28 +233,18 @@ class SecurityValidator:
         Raises:
             ValidationError: If validation fails
         """
-        # Type check
-        if not isinstance(value, str):
-            raise ValidationError(f"{field_name} must be a string")
+        from xai.core.validation import validate_string as core_validate_string
 
-        # Length check
-        max_len = max_length or SecurityValidator.MAX_STRING_LENGTH
-        if len(value) > max_len:
-            raise ValidationError(f"{field_name} is too long (maximum: {max_len} characters)")
-
-        # No control characters
-        if any(ord(c) < 32 for c in value if c not in "\n\r\t"):
-            raise ValidationError(f"{field_name} contains invalid characters")
-
-        # Strip whitespace
-        value = value.strip()
-
-        return value
+        try:
+            max_len = max_length or SecurityValidator.MAX_STRING_LENGTH
+            return core_validate_string(value, max_length=max_len, allow_empty=False)
+        except ValueError as e:
+            raise ValidationError(f"{field_name}: {e}") from e
 
     @staticmethod
     def validate_positive_integer(value: Any, field_name: str = "value") -> int:
         """
-        Validate positive integer
+        Validate positive integer using centralized validation.
 
         Args:
             value: Value to validate
@@ -266,21 +256,12 @@ class SecurityValidator:
         Raises:
             ValidationError: If validation fails
         """
-        # Type check
-        if not isinstance(value, int):
-            try:
-                value = int(value)
-            except (ValueError, TypeError):
-                raise ValidationError(f"{field_name} must be an integer")
+        from xai.core.validation import validate_positive_integer as core_validate_positive_integer
 
-        # Range check
-        if value < 0:
-            raise ValidationError(f"{field_name} must be positive")
-
-        if value > 2**63 - 1:  # Max safe integer
-            raise ValidationError(f"{field_name} is too large")
-
-        return value
+        try:
+            return core_validate_positive_integer(value, min_value=0, max_value=2**63 - 1)
+        except ValueError as e:
+            raise ValidationError(f"{field_name}: {e}") from e
 
     @staticmethod
     def validate_timestamp(timestamp: Any, field_name: str = "timestamp") -> float:
@@ -323,7 +304,7 @@ class SecurityValidator:
     @staticmethod
     def validate_hex_string(value: Any, field_name: str = "value", exact_length: int = None) -> str:
         """
-        Validate hexadecimal string
+        Validate hexadecimal string using centralized validation.
 
         Args:
             value: Hex string to validate
@@ -336,19 +317,12 @@ class SecurityValidator:
         Raises:
             ValidationError: If validation fails
         """
-        # Type check
-        if not isinstance(value, str):
-            raise ValidationError(f"{field_name} must be a string")
+        from xai.core.validation import validate_hex_string as core_validate_hex_string
 
-        # Hex validation
-        if not re.match(r"^[0-9a-fA-F]+$", value):
-            raise ValidationError(f"{field_name} must be hexadecimal")
-
-        # Length check
-        if exact_length and len(value) != exact_length:
-            raise ValidationError(f"{field_name} must be exactly {exact_length} characters")
-
-        return value.lower()
+        try:
+            return core_validate_hex_string(value, exact_length=exact_length)
+        except ValueError as e:
+            raise ValidationError(f"{field_name}: {e}") from e
 
     @staticmethod
     def validate_network_type(network: Any) -> str:
