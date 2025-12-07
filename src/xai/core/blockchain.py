@@ -437,10 +437,6 @@ class Blockchain:
         if not self.storage.verify_integrity():
             raise Exception("Blockchain data integrity check failed. Data may be corrupted.")
 
-        # Write-Ahead Log for crash-safe chain reorganizations
-        self.reorg_wal_path = os.path.join(data_dir, "reorg_wal.json")
-        self._recover_from_incomplete_reorg()
-        
         self.chain: List[BlockHeader] = (
             []
         )  # This will be a cache of loaded block headers, not the full blocks
@@ -453,6 +449,11 @@ class Blockchain:
         self.max_supply = 121_000_000.0  # Per WHITEPAPER: Maximum Supply is 121 million XAI
         self.transaction_fee_percent = 0.24
         self.logger = get_structured_logger()
+
+        # Write-Ahead Log for crash-safe chain reorganizations
+        # Must be initialized AFTER logger
+        self.reorg_wal_path = os.path.join(data_dir, "reorg_wal.json")
+        self._recover_from_incomplete_reorg()
         try:
             self.node_identity = load_or_create_identity(data_dir)
         except (OSError, json.JSONDecodeError, ValueError) as exc:
