@@ -359,6 +359,7 @@ def api_stats():
 
 
 if __name__ == "__main__":
+    # User-facing startup banner (CLI output - keep print)
     print("=" * 60)
     print("XAI BLOCK EXPLORER")
     print("=" * 60)
@@ -368,6 +369,9 @@ if __name__ == "__main__":
     print("\nNOTE: This is for LOCAL TESTING ONLY!")
     print("      Not intended for production use.\n")
 
+    # Log startup for monitoring
+    logger.info("Block explorer starting", node_url=NODE_URL, cache_ttl=CACHE_TTL, cache_size=CACHE_SIZE)
+
     # Use debug mode only if explicitly enabled via environment variable
     import os
 
@@ -375,4 +379,6 @@ if __name__ == "__main__":
     # Security fix: Use environment variable with secure default (127.0.0.1)
     host = os.getenv("FLASK_HOST", "127.0.0.1")
     port = int(os.getenv("FLASK_PORT", "8080"))
+
+    logger.info("Starting Flask server", host=host, port=port, debug=debug_mode)
     app.run(host=host, port=port, debug=debug_mode)

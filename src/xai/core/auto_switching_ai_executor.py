@@ -803,11 +803,21 @@ if __name__ == "__main__":
     print("SIMULATING MULTIPLE SMALL API KEY DONATIONS")
     print("=" * 80)
 
+    # Load API key from environment variable
+    import os
+    demo_api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not demo_api_key:
+        print("\n⚠️  ERROR: ANTHROPIC_API_KEY environment variable not set")
+        print("   Set your API key: export ANTHROPIC_API_KEY='your-key-here'")
+        print("   Get your API key from: https://console.anthropic.com/")
+        print("\n   Skipping demonstration.")
+        exit(1)
+
     for i in range(3):
         pool.submit_api_key_donation(
             donor_address=f"XAI{i}{'a'*40}",
             provider=AIProvider.ANTHROPIC,
-            api_key=f"sk-ant-test-key-{i}",
+            api_key=demo_api_key,
             donated_tokens=100000,  # Small keys to force swapping
             donated_minutes=None,
         )

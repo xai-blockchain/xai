@@ -9,6 +9,9 @@ from decimal import Decimal
 from typing import List, Dict, Optional
 import requests
 import sys
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Set UTF-8 encoding for Windows console
 if sys.platform == "win32":
@@ -42,10 +45,11 @@ class MarketMaker:
         # Trading pairs
         self.pairs = ["AXN/USD", "AXN/BTC", "AXN/ETH"]
 
-        print(f"🤖 Market Maker initialized for {maker_address}")
-        print(f"   Base price: ${self.base_price}")
-        print(f"   Spread: {float(self.spread_percent * 100)}%")
-        print(f"   Order size: {self.order_size_min}-{self.order_size_max} AXN")
+        logger.info("Market Maker initialized",
+                   maker_address=maker_address,
+                   base_price=float(self.base_price),
+                   spread_percent=float(self.spread_percent * 100),
+                   order_size_range=f"{self.order_size_min}-{self.order_size_max}")
 
     def calculate_order_levels(self, pair: str = "AXN/USD") -> Dict:
         """Calculate buy and sell order levels"""
@@ -122,7 +126,7 @@ class MarketMaker:
                         placed_orders["total_usd_locked"] += level["total"]
 
             except Exception as e:
-                print(f"Failed to place buy order: {e}")
+                logger.error("Failed to place buy order", error=str(e), level=level)
 
         # Place sell orders
         for level in levels["sell_orders"]:
@@ -146,7 +150,7 @@ class MarketMaker:
                         placed_orders["total_axn_locked"] += level["amount"]
 
             except Exception as e:
-                print(f"Failed to place sell order: {e}")
+                logger.error("Failed to place sell order", error=str(e), level=level)
 
         return placed_orders
 
@@ -162,7 +166,7 @@ class MarketMaker:
                 return result.get("orders", [])
 
         except Exception as e:
-            print(f"Failed to get orders: {e}")
+            logger.error("Failed to get orders", error=str(e))
 
         return []
 
@@ -187,7 +191,7 @@ class MarketMaker:
                             cancelled.append(order["id"])
 
                     except Exception as e:
-                        print(f"Failed to cancel order {order['id']}: {e}")
+                        logger.error("Failed to cancel order", order_id=order['id'], error=str(e))
 
         return cancelled
 

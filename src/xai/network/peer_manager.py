@@ -12,6 +12,7 @@ from collections import defaultdict, deque
 from typing import List, Dict, Any, Optional, Tuple, Iterable
 import threading
 import websockets
+from websockets.client import WebSocketClientProtocol
 from xai.core.config import Config
 from xai.network.geoip_resolver import GeoIPResolver, GeoIPMetadata
 
@@ -49,6 +50,394 @@ On some systems you may need:
 The XAI node cannot run without TLS encryption.
 ========================================
 """
+
+
+class PeerConnectionPool:
+    """
+    Maintain persistent WebSocket connections to peers for reuse.
+
+    This pool reduces connection overhead by:
+    - Reusing established WebSocket connections instead of creating new ones
+    - Maintaining health checks via WebSocket ping/pong
+    - Implementing graceful connection lifecycle management
+    - Enforcing per-peer connection limits
+
+    Security considerations:
+    - Health checks prevent use of stale/dead connections
+    - Connection limits prevent resource exhaustion
+    - Automatic cleanup on errors prevents connection leaks
+    - Timeout enforcement prevents indefinite blocking
+    """
+
+    def __init__(
+        self,
+        max_connections_per_peer: int = 3,
+        connection_timeout: float = 30.0,
+        idle_timeout: float = 300.0,
+        ping_timeout: float = 5.0,
+    ):
+        """
+        Initialize the connection pool.
+
+        Args:
+            max_connections_per_peer: Maximum pooled connections per peer URI
+            connection_timeout: Timeout in seconds for acquiring a connection
+            idle_timeout: Maximum idle time before connection cleanup
+            ping_timeout: Timeout for health check ping/pong
+        """
+        self.pools: Dict[str, asyncio.Queue] = {}
+        self.max_per_peer = max(1, max_connections_per_peer)
+        self.connection_timeout = max(1.0, connection_timeout)
+        self.idle_timeout = max(60.0, idle_timeout)
+        self.ping_timeout = max(1.0, ping_timeout)
+        self._active_connections: Dict[str, int] = {}
+        self._lock = asyncio.Lock()
+        self._closed = False
+
+        # Metrics for pool utilization
+        self._total_connections_created = 0
+        self._total_connections_reused = 0
+        self._total_health_check_failures = 0
+
+        logger.info(
+            "PeerConnectionPool initialized",
+            extra={
+                "event": "peer.pool.initialized",
+                "max_per_peer": self.max_per_peer,
+                "connection_timeout": self.connection_timeout,
+                "idle_timeout": self.idle_timeout,
+            }
+        )
+
+    async def get_connection(self, peer_uri: str) -> WebSocketClientProtocol:
+        """
+        Get a connection from the pool or create a new one.
+
+        Args:
+            peer_uri: WebSocket URI of the peer (ws://host:port or wss://host:port)
+
+        Returns:
+            Active WebSocket connection
+
+        Raises:
+            asyncio.TimeoutError: If connection acquisition times out
+            RuntimeError: If pool is closed
+            websockets.exceptions.WebSocketException: If connection fails
+        """
+        if self._closed:
+            raise RuntimeError("Connection pool is closed")
+
+        async with self._lock:
+            if peer_uri not in self.pools:
+                self.pools[peer_uri] = asyncio.Queue(maxsize=self.max_per_peer)
+                self._active_connections[peer_uri] = 0
+
+        pool = self.pools[peer_uri]
+
+        # Try to get existing connection from pool
+        try:
+            conn = pool.get_nowait()
+            if await self._is_healthy(conn):
+                self._total_connections_reused += 1
+                logger.debug(
+                    "Reused pooled connection",
+                    extra={
+                        "event": "peer.pool.connection_reused",
+                        "peer_uri": peer_uri,
+                        "reuse_count": self._total_connections_reused,
+                    }
+                )
+                return conn
+            # Connection is dead, close it and fall through to create new one
+            await self._close_connection(conn)
+            async with self._lock:
+                self._active_connections[peer_uri] = max(0, self._active_connections[peer_uri] - 1)
+        except asyncio.QueueEmpty:
+            pass
+
+        # Check if we can create a new connection or must wait
+        async with self._lock:
+            if self._active_connections[peer_uri] < self.max_per_peer:
+                self._active_connections[peer_uri] += 1
+            else:
+                # Wait for a connection to become available
+                logger.debug(
+                    "Pool exhausted, waiting for connection",
+                    extra={
+                        "event": "peer.pool.waiting",
+                        "peer_uri": peer_uri,
+                        "active": self._active_connections[peer_uri],
+                    }
+                )
+                conn = await asyncio.wait_for(
+                    pool.get(),
+                    timeout=self.connection_timeout
+                )
+                if await self._is_healthy(conn):
+                    self._total_connections_reused += 1
+                    return conn
+                # Connection died while waiting, close and create new
+                await self._close_connection(conn)
+
+        # Create new connection
+        try:
+            conn = await websockets.connect(
+                peer_uri,
+                ping_interval=20,
+                ping_timeout=10,
+                close_timeout=5,
+                max_size=10 * 1024 * 1024,  # 10MB max message size
+            )
+            self._total_connections_created += 1
+            logger.debug(
+                "Created new pooled connection",
+                extra={
+                    "event": "peer.pool.connection_created",
+                    "peer_uri": peer_uri,
+                    "total_created": self._total_connections_created,
+                    "active": self._active_connections[peer_uri],
+                }
+            )
+            return conn
+        except Exception as e:
+            # Failed to create connection, decrement counter
+            async with self._lock:
+                self._active_connections[peer_uri] = max(0, self._active_connections[peer_uri] - 1)
+            logger.error(
+                "Failed to create pooled connection",
+                extra={
+                    "event": "peer.pool.connection_failed",
+                    "peer_uri": peer_uri,
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                }
+            )
+            raise
+
+    async def return_connection(
+        self,
+        peer_uri: str,
+        conn: WebSocketClientProtocol
+    ) -> None:
+        """
+        Return a connection to the pool for reuse.
+
+        Args:
+            peer_uri: WebSocket URI of the peer
+            conn: Connection to return to pool
+        """
+        if self._closed:
+            await self._close_connection(conn)
+            return
+
+        # Health check before returning to pool
+        if not await self._is_healthy(conn):
+            await self._close_connection(conn)
+            async with self._lock:
+                self._active_connections[peer_uri] = max(0, self._active_connections[peer_uri] - 1)
+            logger.debug(
+                "Connection failed health check, not returning to pool",
+                extra={
+                    "event": "peer.pool.unhealthy_return",
+                    "peer_uri": peer_uri,
+                }
+            )
+            return
+
+        # Try to return to pool
+        try:
+            pool = self.pools.get(peer_uri)
+            if pool:
+                pool.put_nowait(conn)
+                logger.debug(
+                    "Returned connection to pool",
+                    extra={
+                        "event": "peer.pool.connection_returned",
+                        "peer_uri": peer_uri,
+                        "pool_size": pool.qsize(),
+                    }
+                )
+            else:
+                # Pool was removed, close connection
+                await self._close_connection(conn)
+                async with self._lock:
+                    self._active_connections[peer_uri] = max(0, self._active_connections[peer_uri] - 1)
+        except asyncio.QueueFull:
+            # Pool full, close excess connection
+            await self._close_connection(conn)
+            async with self._lock:
+                self._active_connections[peer_uri] = max(0, self._active_connections[peer_uri] - 1)
+            logger.debug(
+                "Pool full, closing excess connection",
+                extra={
+                    "event": "peer.pool.excess_closed",
+                    "peer_uri": peer_uri,
+                }
+            )
+
+    async def _is_healthy(self, conn: WebSocketClientProtocol) -> bool:
+        """
+        Check if connection is still alive via ping/pong.
+
+        Args:
+            conn: Connection to check
+
+        Returns:
+            True if connection is healthy, False otherwise
+        """
+        try:
+            # Check if connection is already closed
+            if conn.closed:
+                return False
+
+            # Send ping and wait for pong
+            pong_waiter = await conn.ping()
+            await asyncio.wait_for(pong_waiter, timeout=self.ping_timeout)
+            return True
+        except asyncio.TimeoutError:
+            self._total_health_check_failures += 1
+            logger.debug(
+                "Connection health check timed out",
+                extra={
+                    "event": "peer.pool.health_check_timeout",
+                    "failures": self._total_health_check_failures,
+                }
+            )
+            return False
+        except Exception as e:
+            self._total_health_check_failures += 1
+            logger.debug(
+                "Connection health check failed",
+                extra={
+                    "event": "peer.pool.health_check_failed",
+                    "error_type": type(e).__name__,
+                    "failures": self._total_health_check_failures,
+                }
+            )
+            return False
+
+    async def _close_connection(self, conn: WebSocketClientProtocol) -> None:
+        """
+        Safely close a connection.
+
+        Args:
+            conn: Connection to close
+        """
+        try:
+            if not conn.closed:
+                await conn.close()
+        except Exception as e:
+            logger.debug(
+                "Error closing connection",
+                extra={
+                    "event": "peer.pool.close_error",
+                    "error_type": type(e).__name__,
+                    "error_message": str(e),
+                }
+            )
+
+    async def close_all(self) -> None:
+        """
+        Close all pooled connections and shut down the pool.
+
+        This should be called during graceful shutdown.
+        """
+        self._closed = True
+
+        async with self._lock:
+            for peer_uri, pool in list(self.pools.items()):
+                while not pool.empty():
+                    try:
+                        conn = pool.get_nowait()
+                        await self._close_connection(conn)
+                    except asyncio.QueueEmpty:
+                        break
+                    except Exception as e:
+                        logger.error(
+                            "Error closing pooled connection",
+                            extra={
+                                "event": "peer.pool.close_error",
+                                "peer_uri": peer_uri,
+                                "error_type": type(e).__name__,
+                                "error_message": str(e),
+                            }
+                        )
+
+        logger.info(
+            "PeerConnectionPool closed",
+            extra={
+                "event": "peer.pool.closed",
+                "total_created": self._total_connections_created,
+                "total_reused": self._total_connections_reused,
+                "health_failures": self._total_health_check_failures,
+                "reuse_ratio": (
+                    self._total_connections_reused / max(1, self._total_connections_created + self._total_connections_reused)
+                )
+            }
+        )
+
+    def get_metrics(self) -> Dict[str, Any]:
+        """
+        Get pool utilization metrics.
+
+        Returns:
+            Dictionary with pool metrics
+        """
+        total_ops = self._total_connections_created + self._total_connections_reused
+        return {
+            "connections_created": self._total_connections_created,
+            "connections_reused": self._total_connections_reused,
+            "total_operations": total_ops,
+            "reuse_ratio": self._total_connections_reused / max(1, total_ops),
+            "health_check_failures": self._total_health_check_failures,
+            "active_pools": len(self.pools),
+            "active_connections": sum(self._active_connections.values()),
+        }
+
+
+class PeerConnection:
+    """
+    Context manager for pooled peer connections.
+
+    Automatically acquires connection from pool on entry and returns it on exit.
+    Ensures connections are always returned to pool, even on exceptions.
+
+    Example:
+        async with PeerConnection(pool, "ws://peer:8333") as ws:
+            await ws.send(json.dumps({"type": "ping"}))
+            response = await ws.recv()
+    """
+
+    def __init__(self, pool: PeerConnectionPool, peer_uri: str):
+        """
+        Initialize context manager.
+
+        Args:
+            pool: Connection pool to use
+            peer_uri: WebSocket URI of the peer
+        """
+        self.pool = pool
+        self.peer_uri = peer_uri
+        self.conn: Optional[WebSocketClientProtocol] = None
+
+    async def __aenter__(self) -> WebSocketClientProtocol:
+        """
+        Acquire connection from pool.
+
+        Returns:
+            Active WebSocket connection
+        """
+        self.conn = await self.pool.get_connection(self.peer_uri)
+        return self.conn
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """
+        Return connection to pool.
+
+        Connection is returned even if an exception occurred during usage.
+        """
+        if self.conn:
+            await self.pool.return_connection(self.peer_uri, self.conn)
 
 
 class PeerReputation:
@@ -152,9 +541,19 @@ class PeerReputation:
 
 
 class PeerDiscovery:
-    """Peer discovery using DNS seeds and peer exchange"""
+    """
+    Peer discovery using DNS seeds and peer exchange.
 
-    def __init__(self, dns_seeds: Optional[List[str]] = None, bootstrap_nodes: Optional[List[str]] = None):
+    Maintains a connection pool for efficient communication with bootstrap nodes
+    and discovered peers.
+    """
+
+    def __init__(
+        self,
+        dns_seeds: Optional[List[str]] = None,
+        bootstrap_nodes: Optional[List[str]] = None,
+        connection_pool: Optional[PeerConnectionPool] = None,
+    ):
         self.dns_seeds = dns_seeds or [
             "seed1.xai-network.io",
             "seed2.xai-network.io",
@@ -167,6 +566,13 @@ class PeerDiscovery:
         ]
         self.discovered_peers: List[Dict[str, Any]] = []
         self.lock = threading.RLock()
+
+        # Initialize or use provided connection pool
+        self.connection_pool = connection_pool or PeerConnectionPool(
+            max_connections_per_peer=3,
+            connection_timeout=30.0,
+            idle_timeout=300.0,
+        )
 
     async def discover_from_dns(self) -> List[str]:
         """Discover peers from DNS seeds"""
@@ -195,20 +601,53 @@ class PeerDiscovery:
         return discovered
 
     async def discover_from_bootstrap(self) -> List[str]:
-        """Connect to bootstrap nodes and request peer lists"""
+        """
+        Connect to bootstrap nodes and request peer lists.
+
+        Uses connection pooling to reuse WebSocket connections across multiple
+        discovery attempts, significantly reducing connection overhead.
+
+        Returns:
+            List of discovered peer addresses
+        """
         discovered = []
 
         for bootstrap_uri in self.bootstrap_nodes:
             try:
-                async with websockets.connect(bootstrap_uri) as websocket:
+                # Use connection pool for efficient connection reuse
+                async with PeerConnection(self.connection_pool, bootstrap_uri) as websocket:
                     await websocket.send(json.dumps({"type": "get_peers"}))
                     response_str = await websocket.recv()
                     response = json.loads(response_str)
                     if response.get("type") == "peers":
                         peers = response.get("payload", [])
                         discovered.extend(peers)
+                        logger.debug(
+                            "Discovered peers from bootstrap node",
+                            extra={
+                                "event": "peer.discovery.bootstrap_success",
+                                "bootstrap_uri": bootstrap_uri,
+                                "peer_count": len(peers),
+                            }
+                        )
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Timeout discovering peers from bootstrap node",
+                    extra={
+                        "event": "peer.discovery.bootstrap_timeout",
+                        "bootstrap_uri": bootstrap_uri,
+                    }
+                )
             except Exception as e:
-                print(f"Failed to discover peers from bootstrap node {bootstrap_uri}: {e}")
+                logger.warning(
+                    "Failed to discover peers from bootstrap node",
+                    extra={
+                        "event": "peer.discovery.bootstrap_failed",
+                        "bootstrap_uri": bootstrap_uri,
+                        "error_type": type(e).__name__,
+                        "error_message": str(e),
+                    }
+                )
 
         with self.lock:
             for addr in discovered:
@@ -252,6 +691,23 @@ class PeerDiscovery:
         """Get all discovered peers"""
         with self.lock:
             return list(self.discovered_peers)
+
+    async def close(self) -> None:
+        """
+        Close the discovery service and clean up connection pool.
+
+        Should be called during graceful shutdown.
+        """
+        await self.connection_pool.close_all()
+
+    def get_pool_metrics(self) -> Dict[str, Any]:
+        """
+        Get connection pool metrics for monitoring.
+
+        Returns:
+            Dictionary with pool utilization statistics
+        """
+        return self.connection_pool.get_metrics()
 
 
 class PeerProofOfWork:

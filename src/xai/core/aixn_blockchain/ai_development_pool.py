@@ -554,19 +554,39 @@ if __name__ == "__main__":
     print("\n📊 SIMULATING AI CREDIT DONATIONS...")
     print("-" * 80)
 
+    # Load API keys from environment variables
+    import os
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    openai_key = os.environ.get("OPENAI_API_KEY", "")
+    google_key = os.environ.get("GOOGLE_API_KEY", "")
+    deepseek_key = os.environ.get("DEEPSEEK_API_KEY", "")
+
+    if not anthropic_key:
+        print("\n⚠️  WARNING: ANTHROPIC_API_KEY not set. Using placeholder for demo.")
+        anthropic_key = "ANTHROPIC_KEY_NOT_SET"
+    if not openai_key:
+        print("\n⚠️  WARNING: OPENAI_API_KEY not set. Using placeholder for demo.")
+        openai_key = "OPENAI_KEY_NOT_SET"
+    if not google_key:
+        print("\n⚠️  WARNING: GOOGLE_API_KEY not set. Using placeholder for demo.")
+        google_key = "GOOGLE_KEY_NOT_SET"
+    if not deepseek_key:
+        print("\n⚠️  WARNING: DEEPSEEK_API_KEY not set. Using placeholder for demo.")
+        deepseek_key = "DEEPSEEK_KEY_NOT_SET"
+
     donations_data = [
-        ("XAI7f3a9c2e1b8d4f6a5c9e2d1f8b4a7c3e9d2f1b", AIModel.CLAUDE_OPUS, "sk-ant-xxxxx", 500000),
-        ("XAI4b8f2d9a6c3e1f7b4d9a2c8f1e6b3d7a9c2e", AIModel.GPT4_TURBO, "sk-xxxxx", 750000),
-        ("XAI9e2f1b4d7a3c6e8f2b4d9a1c7e3f6b8d2a9c", AIModel.CLAUDE_SONNET, "sk-ant-xxxxx", 1000000),
-        ("XAI3c6e8f1b4d7a2c9e4f2b8d1a6c3e7f9b2d4a", AIModel.GEMINI_PRO, "xxxxx", 2000000),
-        ("XAI8d2a9c4e6f1b3d7a2c9e8f4b1d6a3c7e2f9b", AIModel.DEEPSEEK_CODER, "xxxxx", 3000000),
+        ("XAI7f3a9c2e1b8d4f6a5c9e2d1f8b4a7c3e9d2f1b", AIModel.CLAUDE_OPUS, anthropic_key, 500000),
+        ("XAI4b8f2d9a6c3e1f7b4d9a2c8f1e6b3d7a9c2e", AIModel.GPT4_TURBO, openai_key, 750000),
+        ("XAI9e2f1b4d7a3c6e8f2b4d9a1c7e3f6b8d2a9c", AIModel.CLAUDE_SONNET, anthropic_key, 1000000),
+        ("XAI3c6e8f1b4d7a2c9e4f2b8d1a6c3e7f9b2d4a", AIModel.GEMINI_PRO, google_key, 2000000),
+        ("XAI8d2a9c4e6f1b3d7a2c9e8f4b1d6a3c7e2f9b", AIModel.DEEPSEEK_CODER, deepseek_key, 3000000),
         (
             "XAI7f3a9c2e1b8d4f6a5c9e2d1f8b4a7c3e9d2f1b",
             AIModel.CLAUDE_OPUS,
-            "sk-ant-xxxxx",
+            anthropic_key,
             300000,
         ),  # Same donor again!
-        ("XAI2f9b4d6a1c8e3f7b2d9a4c6e1f8b3d7a2c9e", AIModel.O1_PREVIEW, "sk-xxxxx", 400000),
+        ("XAI2f9b4d6a1c8e3f7b2d9a4c6e1f8b3d7a2c9e", AIModel.O1_PREVIEW, openai_key, 400000),
     ]
 
     for donor, model, api_key, tokens in donations_data:

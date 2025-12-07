@@ -9,6 +9,9 @@ from typing import Any, Dict, Optional
 import urllib.request
 import urllib.error
 from urllib.parse import urljoin
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class APIError(Exception):
@@ -133,7 +136,7 @@ class Anthropic:
                 if retry_count < self.max_retries:
                     # Exponential backoff
                     wait_time = (2 ** retry_count) * 1.0
-                    print(f"Rate limited. Retrying in {wait_time}s...")
+                    logger.warning("Rate limited. Retrying in %.1fs...", wait_time, extra={"retry_count": retry_count})
                     time.sleep(wait_time)
                     return self._make_request(endpoint, method, data, retry_count + 1)
                 else:
@@ -146,7 +149,7 @@ class Anthropic:
             # Handle server errors with retry
             elif status_code >= 500 and retry_count < self.max_retries:
                 wait_time = (2 ** retry_count) * 0.5
-                print(f"Server error {status_code}. Retrying in {wait_time}s...")
+                logger.warning("Server error %d. Retrying in %.1fs...", status_code, wait_time, extra={"retry_count": retry_count})
                 time.sleep(wait_time)
                 return self._make_request(endpoint, method, data, retry_count + 1)
 
@@ -162,7 +165,7 @@ class Anthropic:
             if "timed out" in str(e.reason).lower():
                 if retry_count < self.max_retries:
                     wait_time = (2 ** retry_count) * 0.5
-                    print(f"Request timeout. Retrying in {wait_time}s...")
+                    logger.warning("Request timeout. Retrying in %.1fs...", wait_time, extra={"retry_count": retry_count})
                     time.sleep(wait_time)
                     return self._make_request(endpoint, method, data, retry_count + 1)
                 else:

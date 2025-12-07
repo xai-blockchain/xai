@@ -320,14 +320,19 @@ class _SecurityWebhookForwarder:
         key = raw_key.strip().encode("utf-8")
         try:
             return Fernet(key)
-        except Exception:
+        except Exception as e:
+            logger.debug(
+                "Failed to create Fernet cipher from raw key, trying hex decode",
+                error=str(e)
+            )
             try:
                 hex_bytes = bytes.fromhex(raw_key.strip())
                 return Fernet(base64.urlsafe_b64encode(hex_bytes))
             except Exception as exc:
                 logger.error(
                     "Invalid webhook queue encryption key",
-                    extra={"event": "security.webhook_queue_key_invalid"}
+                    extra={"event": "security.webhook_queue_key_invalid"},
+                    error=str(exc)
                 )
                 return None
 

@@ -615,7 +615,11 @@ class NodeAPIRoutes:
         if collector is None:
             try:
                 collector = MetricsCollector.instance()
-            except Exception:
+            except Exception as e:
+                logger.debug(
+                    "Metrics collector unavailable",
+                    error=str(e)
+                )
                 collector = None
         if collector is None:
             return
@@ -771,7 +775,13 @@ class NodeAPIRoutes:
                     calldata,
                     gas_limit=200_000,
                 )
-            except Exception:
+            except Exception as e:
+                logger.debug(
+                    f"Failed to check interface support for {name}",
+                    contract=contract_address,
+                    interface=name,
+                    error=str(e)
+                )
                 supports[name] = False
                 continue
 
@@ -913,7 +923,8 @@ class NodeAPIRoutes:
             p2p_manager = getattr(self.node, "p2p_manager", None)
             try:
                 from unittest.mock import Mock as _Mock  # type: ignore
-            except Exception:  # pragma: no cover - fallback when mock not present
+            except ImportError as e:  # pragma: no cover - fallback when mock not present
+                logger.debug("unittest.mock not available", error=str(e))
                 _Mock = None
             is_mock_manager = bool(_Mock and isinstance(p2p_manager, _Mock))
             if is_mock_manager and getattr(p2p_manager, "_mock_parent", None) is not None:
@@ -3798,7 +3809,8 @@ class NodeAPIRoutes:
             address = str(payload.get("address", "")).strip()
             try:
                 limit = float(payload.get("limit"))
-            except Exception:
+            except (TypeError, ValueError) as e:
+                logger.debug("Invalid limit value in spending limit request", error=str(e))
                 return self._error_response("Invalid limit", status=400, code="invalid_payload")
 
             if not address or limit <= 0:

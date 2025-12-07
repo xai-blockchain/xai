@@ -817,7 +817,12 @@ class Wallet:
         try:
             mnemo = Mnemonic(language)
             return mnemo.check(mnemonic_phrase)
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                "Mnemonic validation failed",
+                language=language,
+                error=str(e)
+            )
             return False
 
     @staticmethod
