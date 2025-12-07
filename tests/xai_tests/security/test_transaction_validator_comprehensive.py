@@ -137,18 +137,24 @@ class TestDataTypeValidation:
         validator = TransactionValidator(blockchain)
 
         wallet1 = Wallet()
+        wallet2 = Wallet()
 
         blockchain.mine_pending_transactions(wallet1.address)
 
-        # Create transaction with invalid recipient
+        # Create valid transaction first
         tx = blockchain.create_transaction(
             wallet1.address,
-            "INVALID456",  # Invalid address
+            wallet2.address,
             10.0,
             0.24,
             wallet1.private_key,
             wallet1.public_key
         )
+
+        # Tamper with recipient address after creation
+        tx.recipient = "INVALID456"  # Invalid address
+        # Recalculate txid to reflect tampered data
+        tx.txid = tx.calculate_hash()
 
         result = validator.validate_transaction(tx)
         assert result is False
@@ -162,15 +168,20 @@ class TestDataTypeValidation:
 
         blockchain.mine_pending_transactions(wallet1.address)
 
-        # Create transaction with negative amount
+        # Create valid transaction first
         tx = blockchain.create_transaction(
             wallet1.address,
             wallet2.address,
-            -10.0,  # Negative amount
+            10.0,
             0.24,
             wallet1.private_key,
             wallet1.public_key
         )
+
+        # Tamper with amount after creation
+        tx.amount = -10.0  # Negative amount
+        # Recalculate txid to reflect tampered data
+        tx.txid = tx.calculate_hash()
 
         result = validator.validate_transaction(tx)
         assert result is False
@@ -875,8 +886,20 @@ class TestExceptionHandling:
         """Test handling of ValidationError"""
         validator = TransactionValidator(blockchain)
 
-        # Create transaction that will fail validation
-        invalid_tx = Transaction("INVALID", "XAI123", -10.0, 0.24)
+        # Create mock transaction with invalid data that bypasses constructor validation
+        invalid_tx = Mock()
+        invalid_tx.sender = "INVALID"
+        invalid_tx.recipient = "XAI" + "1" * 40  # Valid format
+        invalid_tx.amount = -10.0  # Negative amount
+        invalid_tx.fee = 0.24
+        invalid_tx.txid = "a" * 64
+        invalid_tx.timestamp = time.time()
+        invalid_tx.signature = "0" * 128
+        invalid_tx.public_key = "04" + "a" * 128
+        invalid_tx.nonce = 0
+        invalid_tx.inputs = []
+        invalid_tx.outputs = []
+        invalid_tx.tx_type = "normal"
 
         result = validator.validate_transaction(invalid_tx)
         assert result is False
@@ -898,14 +921,29 @@ class TestExceptionHandling:
         validator = TransactionValidator(blockchain)
 
         wallet1 = Wallet()
+        wallet2 = Wallet()
 
-        tx = Transaction(wallet1.address, "INVALID123", 10.0, 0.24)
+        blockchain.mine_pending_transactions(wallet1.address)
+
+        # Create valid transaction first
+        tx = blockchain.create_transaction(
+            wallet1.address,
+            wallet2.address,
+            10.0,
+            0.24,
+            wallet1.private_key,
+            wallet1.public_key
+        )
+
+        # Tamper with recipient to make it invalid
+        tx.recipient = "INVALID123"
+        tx.txid = tx.calculate_hash()
 
         import logging
         with caplog.at_level(logging.WARNING):
             result = validator.validate_transaction(tx)
 
-        # Should log warning
+        # Should log warning and return False
         assert result is False
 
 
