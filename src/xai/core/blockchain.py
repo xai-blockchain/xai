@@ -492,10 +492,12 @@ class Blockchain:
                 self.finality_manager = None
         else:
             self.logger.warn("Finality disabled: validator set unavailable")
+        # Thread safety locks
+        self._chain_lock = threading.RLock()  # Protects chain state from concurrent modifications
+        self._mempool_lock = threading.Lock()  # Protects mempool operations from TOCTOU races
         # Mempool management
         self.seen_txids: set[str] = set()
         self._sender_pending_count: dict[str, int] = defaultdict(int)
-        self._mempool_lock = threading.Lock()  # Protects mempool operations from TOCTOU races
         self.max_reorg_depth = int(os.getenv("XAI_MAX_REORG_DEPTH", "100"))
         self.max_orphan_blocks = int(os.getenv("XAI_MAX_ORPHAN_BLOCKS", "200"))
         try:
@@ -1670,8 +1672,12 @@ class Blockchain:
         )
 
     def get_latest_block(self) -> Block:
-        """Get the last block in the chain by loading it from disk."""
-        latest_header = self.chain[-1]
+        """Get the last block in the chain by loading it from disk.
+
+        THREAD SAFETY: Uses _chain_lock for consistent chain access.
+        """
+        with self._chain_lock:
+            latest_header = self.chain[-1]
         latest_block = self.storage.load_block_from_disk(latest_header.index)
         if not latest_block:
             raise Exception("No blocks found in storage.")
@@ -2880,12 +2886,19 @@ class Blockchain:
         ATOMIC OPERATION: Uses snapshot/restore for safe rollback on failure.
         All state modifications (chain, UTXO, nonces) are applied atomically or not at all.
 
+        THREAD SAFETY: Uses _chain_lock to prevent concurrent modifications.
+
         Args:
             block: Block to add to the chain
 
         Returns:
             True if block was added successfully, False otherwise
         """
+        with self._chain_lock:
+            return self._add_block_internal(block)
+
+    def _add_block_internal(self, block: Block) -> bool:
+        """Internal add_block implementation. Must be called with _chain_lock held."""
         # Allow callers to provide either a full Block or a BlockHeader (load from disk)
         if isinstance(block, BlockHeader):
             loaded_block = self.storage.load_block_from_disk(block.index)
