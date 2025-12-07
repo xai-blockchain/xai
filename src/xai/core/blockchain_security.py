@@ -79,7 +79,12 @@ class ReorganizationProtection:
                 with open(self.checkpoint_file, "r") as f:
                     data = json.load(f)
                     self.checkpoints = {int(k): v for k, v in data.items()}
-            except Exception:
+            except Exception as e:
+                logger.warning(
+                    "Failed to load checkpoints from disk, starting fresh",
+                    checkpoint_file=self.checkpoint_file,
+                    error=str(e)
+                )
                 self.checkpoints = {}
 
     def _save_checkpoints(self) -> None:
@@ -290,24 +295,18 @@ class OverflowProtection:
             return None, False
 
     def validate_amount(self, amount: float) -> Tuple[bool, str]:
-        """Validate amount is within valid range"""
+        """Validate amount is within valid range using centralized validation"""
+        from xai.core.validation import validate_amount as core_validate_amount
+
         try:
-            if amount != amount:  # NaN
-                return False, "Amount cannot be NaN"
-        except TypeError:
-            return False, "Amount must be a number"
-
-        if amount < 0:
-            return False, "Amount cannot be negative"
-        if amount > BlockchainSecurityConfig.MAX_SUPPLY:
-            return False, "Amount exceeds max supply"
-
-        # Check precision (max 8 decimal places)
-        amount_str = f"{amount:.8f}"
-        if len(amount_str.split(".")[-1]) > 8:
-            return False, "Amount has too many decimal places"
-
-        return True, "Amount is valid"
+            core_validate_amount(
+                amount,
+                allow_zero=True,
+                max_value=BlockchainSecurityConfig.MAX_SUPPLY
+            )
+            return True, "Amount is valid"
+        except ValueError as e:
+            return False, str(e)
 
 
 class MempoolManager:
@@ -414,7 +413,12 @@ class BlockSizeValidator:
         except AttributeError:
             block_json = json.dumps(block.to_dict())
             block_size = len(block_json.encode())
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                "Failed to calculate block size, assuming oversized",
+                block_index=getattr(block, 'index', 'unknown'),
+                error=str(e)
+            )
             block_size = BlockchainSecurityConfig.MAX_BLOCK_SIZE + 1
 
         if block_size > BlockchainSecurityConfig.MAX_BLOCK_SIZE:
@@ -436,7 +440,12 @@ class ResourceLimiter:
         """Validate transaction payload size."""
         try:
             return BlockSizeValidator.validate_transaction_size(tx)
-        except Exception:
+        except Exception as e:
+            logger.debug(
+                "Failed to validate transaction size via BlockSizeValidator, using fallback",
+                tx_id=getattr(tx, 'txid', 'unknown'),
+                error=str(e)
+            )
             tx_repr = f"{getattr(tx, 'sender', '')}{getattr(tx, 'recipient', '')}"
             size = len(tx_repr)
             if size > BlockchainSecurityConfig.MAX_TRANSACTION_SIZE:

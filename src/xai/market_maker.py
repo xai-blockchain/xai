@@ -197,28 +197,29 @@ class MarketMaker:
 
     def maintain_liquidity(self):
         """Main loop to maintain market liquidity"""
-        print("🔄 Starting liquidity maintenance...")
+        logger.info("Starting liquidity maintenance")
 
         # Cancel old orders
         cancelled = self.cancel_stale_orders(max_age_seconds=1800)  # 30 min
         if cancelled:
-            print(f"   Cancelled {len(cancelled)} stale orders")
+            logger.info("Cancelled stale orders", count=len(cancelled))
 
         # Check current order book
         current_orders = self.get_current_orders()
         open_orders = [o for o in current_orders if o["status"] == "open"]
 
-        print(f"   Current open orders: {len(open_orders)}")
+        logger.info("Current open orders", count=len(open_orders))
 
         # Place new orders if needed
         if len(open_orders) < self.num_levels * 2:  # Need orders on both sides
-            print("   Placing new liquidity orders...")
+            logger.info("Placing new liquidity orders")
             result = self.place_liquidity_orders("AXN/USD")
 
-            print(f"   ✅ Placed {len(result['buy'])} buy orders")
-            print(f"   ✅ Placed {len(result['sell'])} sell orders")
-            print(f"   💰 Locked ${result['total_usd_locked']:.2f} USD")
-            print(f"   💰 Locked {result['total_axn_locked']:.2f} AXN")
+            logger.info("Orders placed",
+                       buy_orders=len(result['buy']),
+                       sell_orders=len(result['sell']),
+                       usd_locked=result['total_usd_locked'],
+                       axn_locked=result['total_axn_locked'])
 
         return {
             "orders_cancelled": len(cancelled) if cancelled else 0,
@@ -228,23 +229,27 @@ class MarketMaker:
 
     def run_continuously(self, interval_seconds: int = 300):
         """Run market maker continuously"""
+        # User-facing CLI output (keep print for startup banner)
         print(f"\n{'='*60}")
         print("🤖 MARKET MAKER BOT STARTED")
         print(f"{'='*60}")
         print(f"Running every {interval_seconds} seconds (Ctrl+C to stop)\n")
+
+        logger.info("Market maker bot started", interval_seconds=interval_seconds)
 
         try:
             while True:
                 try:
                     self.maintain_liquidity()
                 except Exception as e:
-                    print(f"❌ Error in maintenance cycle: {e}")
+                    logger.error("Error in maintenance cycle", error=str(e), exc_info=True)
 
-                print(f"\n⏰ Next cycle in {interval_seconds} seconds...\n")
+                logger.debug("Waiting for next cycle", interval_seconds=interval_seconds)
                 time.sleep(interval_seconds)
 
         except KeyboardInterrupt:
             print("\n\n🛑 Market maker stopped by user")
+            logger.info("Market maker stopped by user")
 
     def get_stats(self) -> Dict:
         """Get market maker statistics"""

@@ -10,12 +10,15 @@ import time
 import os
 import json
 import hashlib
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
 
 from xai.core.config import Config
 from xai.core.crypto_utils import deterministic_keypair_from_seed
+
+logger = logging.getLogger(__name__)
 
 
 class TimeCapsuleType:
@@ -130,7 +133,12 @@ class TimeCapsuleManager:
                 capsule = TimeCapsule.from_dict(capsule_data)
                 self.capsules[capsule.capsule_id] = capsule
             self.user_capsules = payload.get("users", {})
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                "Failed to load time capsules from disk, starting fresh",
+                storage_path=self.storage_path,
+                error=str(e)
+            )
             self.capsules = {}
             self.user_capsules = {}
 

@@ -12,10 +12,13 @@ Uses elliptic curve cryptography (py_ecc) for secure proof generation and verifi
 
 import hashlib
 import secrets
+import logging
 from typing import Tuple, Optional, Any, List, Dict
 from dataclasses import dataclass
 from py_ecc.secp256k1 import secp256k1
 import gmpy2
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -195,7 +198,11 @@ class ZeroKnowledgeProof:
 
             return challenge_expected == proof.challenge
 
-        except Exception:
+        except Exception as e:
+            logger.debug(
+                "Schnorr proof verification failed",
+                error=str(e)
+            )
             return False
 
     # ==================== Pedersen Commitments ====================
@@ -389,7 +396,11 @@ class ZeroKnowledgeProof:
 
             return C_expected == proof.commitment
 
-        except Exception:
+        except Exception as e:
+            logger.debug(
+                "Range proof verification failed",
+                error=str(e)
+            )
             return False
 
     # ==================== Set Membership Proofs ====================
@@ -472,7 +483,11 @@ class ZeroKnowledgeProof:
 
             return ring_hash == proof.proof_data['ring_hash']
 
-        except Exception:
+        except Exception as e:
+            logger.debug(
+                "Membership proof verification failed",
+                error=str(e)
+            )
             return False
 
     # ==================== Utility Functions ====================
@@ -597,7 +612,11 @@ class ZKP_Simulator:
                 proof,
                 public_statement
             )
-        except Exception:
+        except Exception as e:
+            logger.debug(
+                "Privacy-preserving identity verification failed",
+                error=str(e)
+            )
             return False
 
 

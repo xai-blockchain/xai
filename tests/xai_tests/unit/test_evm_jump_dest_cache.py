@@ -40,6 +40,8 @@ class TestJumpDestinationCache:
             block=block_ctx,
             tx_origin="0x" + "1" * 40,
             tx_gas_price=1000,
+            tx_gas_limit=1_000_000,
+            tx_value=0,
         )
 
     def test_cache_basic_functionality(self):
@@ -198,11 +200,12 @@ class TestJumpDestinationCache:
         interpreter = EVMInterpreter(context)
 
         # Realistic bytecode with JUMP operations
-        # Pattern: PUSH1 addr, JUMP, JUMPDEST, ... (repeated)
+        # Pattern: JUMPDEST, PUSH1, ... (repeated)
+        # Use smaller pattern to avoid PUSH1 byte overflow (max 255)
         code_parts = []
-        for i in range(100):
-            offset = i * 6 + 3  # Calculate JUMPDEST position
-            code_parts.extend([0x60, offset, 0x56, 0x5B, 0x60, 0x00])
+        for i in range(40):  # Reduced from 100 to avoid overflow
+            # Simple pattern: JUMPDEST, PUSH1, PUSH1
+            code_parts.extend([0x5B, 0x60, i % 256, 0x60, (i + 1) % 256])
 
         code = bytes(code_parts)
 
@@ -210,8 +213,8 @@ class TestJumpDestinationCache:
         start = time.time()
         for _ in range(100):
             jump_dests = interpreter._compute_jump_destinations(code)
-            # Verify a few JUMPDESTs exist
-            assert len(jump_dests) == 100
+            # Verify JUMPDESTs exist
+            assert len(jump_dests) == 40
         elapsed = time.time() - start
 
         # With caching, 100 executions should complete in <10ms
@@ -219,7 +222,7 @@ class TestJumpDestinationCache:
 
         # Verify high cache hit rate (99 hits out of 100 calls)
         stats = EVMInterpreter.get_cache_stats()
-        assert stats["hit_rate"] > 0.99
+        assert stats["hit_rate"] >= 0.99
 
     def test_cache_statistics_accuracy(self):
         """Test that cache statistics are accurate."""

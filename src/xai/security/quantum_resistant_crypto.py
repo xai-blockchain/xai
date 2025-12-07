@@ -14,9 +14,12 @@ import hashlib
 import secrets
 import json
 import base64
+import logging
 from typing import Tuple, Optional, Dict, Any, List
 from dataclasses import dataclass, asdict
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 # NIST PQC algorithms via pqcrypto library
 import pqcrypto.sign.ml_dsa_65 as ml_dsa_65
@@ -263,7 +266,12 @@ class QuantumResistantCryptoManager:
             algo_impl = self.SIGNATURE_ALGORITHMS[algorithm]
             algo_impl.verify(public_key, message, signature)
             return True
-        except Exception:
+        except Exception as e:
+            logger.debug(
+                "Post-quantum signature verification failed",
+                algorithm=algorithm.value,
+                error=str(e)
+            )
             return False
 
     def generate_kem_keypair(
@@ -470,7 +478,11 @@ class QuantumResistantCryptoManager:
                 ec.ECDSA(hashes.SHA256())
             )
             results["classical"] = True
-        except Exception:
+        except Exception as e:
+            logger.debug(
+                "Classical ECDSA signature verification failed in hybrid scheme",
+                error=str(e)
+            )
             results["classical"] = False
 
         # Verify post-quantum signature

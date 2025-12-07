@@ -992,7 +992,12 @@ class P2PNetworkManager:
                 return None
             try:
                 checkpoint = cm.load_checkpoint(height)
-            except Exception:
+            except Exception as e:
+                logger.debug(
+                    "Failed to load checkpoint for sync status",
+                    height=height,
+                    error=str(e)
+                )
                 return None
         if not checkpoint:
             return None

@@ -1127,7 +1127,14 @@ class ConcentratedLiquidityPool:
 
             return max(0, amount_out), price_impact
 
-        except Exception:
+        except Exception as e:
+            logger.warning(
+                "Failed to calculate swap quote",
+                pool_id=self.pool_id,
+                zero_for_one=zero_for_one,
+                amount_in=amount_in,
+                error=str(e)
+            )
             return 0, 0
 
     # ==================== Helpers ====================

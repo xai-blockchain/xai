@@ -26,7 +26,8 @@ try:
     from ipwhois import IPWhois  # type: ignore
 
     IPWHOIS_AVAILABLE = True
-except Exception:  # pragma: no cover - optional dependency
+except ImportError:  # pragma: no cover - optional dependency
+    logger.debug("ipwhois library not available, will use fallback GeoIP resolution")
     IPWHOIS_AVAILABLE = False
 
 

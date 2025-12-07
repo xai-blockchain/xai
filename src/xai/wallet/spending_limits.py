@@ -64,9 +64,13 @@ class SpendingLimitManager:
         try:
             with open(self.path, "w", encoding="utf-8") as fh:
                 json.dump(data, fh)
-        except Exception:
+        except Exception as e:
             # Persistence failures should not crash API
-            pass
+            logger.warning(
+                "Failed to persist spending limits to disk",
+                path=self.path,
+                error=str(e)
+            )
 
     def set_limit(self, address: str, amount_per_day: float) -> None:
         self.state.limits[address.lower()] = float(amount_per_day)

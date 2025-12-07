@@ -23,6 +23,7 @@ from decimal import Decimal, InvalidOperation
 from typing import List, Dict, Optional, Any, Union
 import base58
 from xai.core.crypto_utils import sign_message_hex, verify_signature_hex, derive_public_key_hex
+from xai.core.validation import validate_address, validate_amount
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +138,7 @@ class Transaction:
 
     @staticmethod
     def _validate_address(address: Any, field_name: str, allow_empty: bool = False) -> str:
-        """Validate an address format.
+        """Validate an address format using centralized validation.
 
         Args:
             address: Address to validate
@@ -155,24 +156,10 @@ class Transaction:
                 return ""
             raise TransactionValidationError(f"{field_name} cannot be empty")
 
-        if not isinstance(address, str):
-            raise TransactionValidationError(
-                f"{field_name} must be a string, got {type(address).__name__}"
-            )
-
-        address = address.strip()
-
-        # Special cases
-        if address == "COINBASE":
-            return address
-
-        # Check address format
-        if not ADDRESS_PATTERN.match(address):
-            raise TransactionValidationError(
-                f"{field_name} has invalid format: must start with XAI/TXAI and contain hex chars"
-            )
-
-        return address
+        try:
+            return validate_address(address, allow_special=True)
+        except ValueError as e:
+            raise TransactionValidationError(f"{field_name}: {e}") from e
 
     @staticmethod
     def _validate_inputs(inputs: Any) -> List[Dict[str, Any]]:
@@ -475,7 +462,12 @@ class Transaction:
         try:
             serialized = canonical_json(self.to_dict())
             return len(serialized.encode('utf-8'))
-        except Exception:
+        except Exception as e:
+            logger.debug(
+                "Failed to serialize transaction for size calculation, using estimate",
+                txid=self.txid,
+                error=str(e)
+            )
             base_size = 200
             input_size = len(self.inputs) * 50
             output_size = len(self.outputs) * 40

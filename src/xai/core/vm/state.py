@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:  # pragma: no cover - runtime imports deferred
     from xai.core.blockchain import Blockchain, Block
@@ -75,7 +78,13 @@ class EVMState:
             if account.nonce > current:
                 # Advance to the observed nonce. We do not decrease nonces.
                 tracker.set_nonce(account.address, int(account.nonce))
-        except Exception:
+        except Exception as e:
             # Nonce persistence is a best-effort optimization; never break execution
             # if the backing tracker is unavailable.
+            logger.debug(
+                "Failed to persist nonce state (non-critical)",
+                address=account.address,
+                nonce=account.nonce,
+                error=str(e)
+            )
             return

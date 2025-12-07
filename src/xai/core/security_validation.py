@@ -116,7 +116,7 @@ class SecurityValidator:
     @staticmethod
     def validate_amount(amount: Any, field_name: str = "amount") -> float:
         """
-        Validate transaction amount
+        Validate transaction amount using centralized validation.
 
         Args:
             amount: Amount to validate
@@ -128,51 +128,22 @@ class SecurityValidator:
         Raises:
             ValidationError: If validation fails
         """
-        # Type check
-        if not isinstance(amount, (int, float)):
-            raise ValidationError(f"{field_name} must be a number")
+        from xai.core.validation import validate_amount as core_validate_amount
 
-        # Convert to float
         try:
-            amount = float(amount)
-        except (ValueError, OverflowError):
-            raise ValidationError(f"Invalid {field_name} value")
-
-        # Check for special values
-        if not (amount == amount):  # NaN check
-            raise ValidationError(f"{field_name} cannot be NaN")
-
-        if amount == float("inf") or amount == float("-inf"):
-            raise ValidationError(f"{field_name} cannot be infinite")
-
-        # Range validation
-        if amount < 0:
-            raise ValidationError(f"{field_name} cannot be negative")
-
-        # Zero amounts are not allowed for transaction amounts
-        if amount == 0:
-            raise ValidationError(f"{field_name} cannot be zero")
-
-        if amount < SecurityValidator.MIN_AMOUNT:
-            raise ValidationError(
-                f"{field_name} too small (minimum: {SecurityValidator.MIN_AMOUNT})"
+            return core_validate_amount(
+                amount,
+                allow_zero=False,
+                min_value=SecurityValidator.MIN_AMOUNT,
+                max_value=SecurityValidator.MAX_TRANSACTION_AMOUNT
             )
-
-        if amount > SecurityValidator.MAX_TRANSACTION_AMOUNT:
-            raise ValidationError(
-                f"{field_name} exceeds maximum ({SecurityValidator.MAX_TRANSACTION_AMOUNT})"
-            )
-
-        # Precision check (max 8 decimal places)
-        if round(amount, 8) != amount:
-            amount = round(amount, 8)
-
-        return amount
+        except ValueError as e:
+            raise ValidationError(f"{field_name}: {e}") from e
 
     @staticmethod
     def validate_address(address: Any, field_name: str = "address") -> str:
         """
-        Validate XAI blockchain address
+        Validate XAI blockchain address using centralized validation with security checks.
 
         Args:
             address: Address to validate
@@ -184,31 +155,17 @@ class SecurityValidator:
         Raises:
             ValidationError: If validation fails
         """
+        from xai.core.validation import validate_address as core_validate_address
+
         # Type check
         if not isinstance(address, str):
             raise ValidationError(f"{field_name} must be a string")
 
-        # Strip whitespace and check if empty
         address = address.strip()
         if not address:
             raise ValidationError(f"{field_name} cannot be empty")
 
-        # Allow COINBASE as a special address for mining rewards
-        if address == "COINBASE":
-            return address
-
-        # Length check
-        if len(address) < SecurityValidator.MIN_ADDRESS_LENGTH:
-            raise ValidationError(
-                f"{field_name} is too short (minimum {SecurityValidator.MIN_ADDRESS_LENGTH} characters)"
-            )
-
-        if len(address) > SecurityValidator.MAX_ADDRESS_LENGTH:
-            raise ValidationError(
-                f"{field_name} is too long (maximum {SecurityValidator.MAX_ADDRESS_LENGTH} characters)"
-            )
-
-        # Injection pattern detection - SECURITY ENHANCEMENT
+        # SECURITY ENHANCEMENT: Injection pattern detection
         dangerous_patterns = [
             (r"['\";<>&|`$(){}]", "sql_injection_chars"),  # SQL injection, command injection chars
             (r"<script", "xss_attempt"),  # XSS attempts
@@ -233,34 +190,16 @@ class SecurityValidator:
                 )
                 raise ValidationError(f"{field_name} contains invalid or dangerous characters")
 
-        # Prefix check
-        has_valid_prefix = False
-        for prefix in SecurityValidator.VALID_PREFIXES:
-            if address.startswith(prefix):
-                has_valid_prefix = True
-                break
-
-        if not has_valid_prefix:
-            valid_prefixes = ", ".join(SecurityValidator.VALID_PREFIXES)
-            raise ValidationError(f"{field_name} must start with one of: {valid_prefixes}")
-
-        # Strict character validation (only alphanumeric after prefix)
-        # Remove the prefix and check the rest is hexadecimal
-        for prefix in SecurityValidator.VALID_PREFIXES:
-            if address.startswith(prefix):
-                remainder = address[len(prefix) :]
-                if not re.match(r"^[0-9a-fA-F]+$", remainder):
-                    raise ValidationError(
-                        f"{field_name} must contain only hexadecimal characters after the prefix"
-                    )
-                break
-
-        return address
+        # Use centralized validation
+        try:
+            return core_validate_address(address, allow_special=True)
+        except ValueError as e:
+            raise ValidationError(f"{field_name}: {e}") from e
 
     @staticmethod
     def validate_fee(fee: Any) -> float:
         """
-        Validate transaction fee (zero is allowed for fees)
+        Validate transaction fee using centralized validation.
 
         Args:
             fee: Fee to validate
@@ -271,35 +210,12 @@ class SecurityValidator:
         Raises:
             ValidationError: If validation fails
         """
-        # Type check
-        if not isinstance(fee, (int, float)):
-            raise ValidationError("fee must be a number")
+        from xai.core.validation import validate_fee as core_validate_fee
 
-        # Convert to float
         try:
-            fee = float(fee)
-        except (ValueError, OverflowError):
-            raise ValidationError("Invalid fee value")
-
-        # Check for special values
-        if not (fee == fee):  # NaN check
-            raise ValidationError("fee cannot be NaN")
-
-        if fee == float("inf") or fee == float("-inf"):
-            raise ValidationError("fee cannot be infinite")
-
-        # Range validation (zero is OK for fees)
-        if fee < 0:
-            raise ValidationError("fee cannot be negative")
-
-        if fee > SecurityValidator.MAX_FEE:
-            raise ValidationError(f"Fee too high (maximum: {SecurityValidator.MAX_FEE})")
-
-        # Precision check (max 8 decimal places)
-        if round(fee, 8) != fee:
-            fee = round(fee, 8)
-
-        return fee
+            return core_validate_fee(fee)
+        except ValueError as e:
+            raise ValidationError(f"fee: {e}") from e
 
     @staticmethod
     def validate_string(value: Any, field_name: str = "value", max_length: int = None) -> str:

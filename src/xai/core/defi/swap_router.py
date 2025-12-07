@@ -1092,8 +1092,13 @@ class SwapRouter:
                 sig_hex
             )
 
-        except Exception:
+        except Exception as e:
             # Any cryptographic error means invalid signature
+            logger.debug(
+                "Limit order signature verification failed",
+                address=address,
+                error=str(e)
+            )
             return False
 
     def register_public_key(self, address: str, public_key: str) -> None:
