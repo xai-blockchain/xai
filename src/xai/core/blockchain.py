@@ -651,6 +651,18 @@ class Blockchain:
         )
         self._timestamp_drift_history: deque[Dict[str, float]] = deque(maxlen=256)
 
+        # Initialize manager components for god class refactoring
+        # These managers encapsulate specific areas of blockchain functionality
+        from xai.core.mining_manager import MiningManager
+        from xai.core.validation_manager import ValidationManager
+        from xai.core.state_manager import StateManager
+        from xai.core.fork_manager import ForkManager
+
+        self.mining_manager = MiningManager(self)
+        self.validation_manager = ValidationManager(self)
+        self.state_manager = StateManager(self)
+        self.fork_manager = ForkManager(self)
+
     def _initialize_finality_manager(
         self,
         data_dir: str,

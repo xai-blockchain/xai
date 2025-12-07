@@ -6,6 +6,9 @@ and how much is held in the fee treasury, with helper functions that
 are safe to call from the settlement path.
 """
 
+from __future__ import annotations
+
+from typing import Any, Optional
 from prometheus_client import Counter, Gauge
 
 fee_collection_counter = Counter(
@@ -23,7 +26,7 @@ treasury_balance_gauge = Gauge(
 )
 
 
-def record_fee_collection(currency: str, amount: float):
+def record_fee_collection(currency: str, amount: float) -> None:
     """Increment the fee counters for the specified currency."""
     if amount <= 0:
         return
@@ -32,7 +35,7 @@ def record_fee_collection(currency: str, amount: float):
     fee_transfer_events.labels(direction="collected").inc()
 
 
-def update_fee_treasury_balance(blockchain, fee_address: str, currency: str = "XAI"):
+def update_fee_treasury_balance(blockchain: Any, fee_address: str, currency: str = "XAI") -> None:
     """Refresh the treasury balance gauge from on-chain UTXOs."""
     if not blockchain or not fee_address:
         return

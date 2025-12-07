@@ -13,12 +13,15 @@ ANONYMITY GUARANTEES:
 - Anonymous statistics only
 """
 
-from flask import jsonify, request
+from __future__ import annotations
+
+from typing import Any, Tuple
+from flask import jsonify, request, Response
 from xai.core.token_burning_engine import TokenBurningEngine, ServiceType
 from xai.core.anonymous_treasury import AnonymousTreasury
 
 
-def setup_burning_api(app, node):
+def setup_burning_api(app: Any, node: Any) -> TokenBurningEngine:
     """
     Setup token burning API endpoints
 
@@ -36,7 +39,7 @@ def setup_burning_api(app, node):
     )
 
     @app.route("/burn/consume-service", methods=["POST"])
-    def consume_service():
+    def consume_service() -> Tuple[Response, int] | Response:
         """
         Consume XAI for service usage
 
@@ -84,7 +87,7 @@ def setup_burning_api(app, node):
         return jsonify(result)
 
     @app.route("/burn/stats", methods=["GET"])
-    def get_burn_stats():
+    def get_burn_stats() -> Response:
         """
         Get anonymous burn statistics
 
@@ -107,7 +110,7 @@ def setup_burning_api(app, node):
         return jsonify(stats)
 
     @app.route("/burn/recent", methods=["GET"])
-    def get_recent_burns():
+    def get_recent_burns() -> Response:
         """
         Get recent anonymous burn transactions
 
@@ -134,7 +137,7 @@ def setup_burning_api(app, node):
         return jsonify({"burns": burns, "count": len(burns)})
 
     @app.route("/burn/service/<service_type>", methods=["GET"])
-    def get_service_burn_stats(service_type):
+    def get_service_burn_stats(service_type: str) -> Tuple[Response, int] | Response:
         """
         Get anonymous burn statistics for specific service
 
@@ -155,7 +158,7 @@ def setup_burning_api(app, node):
         return jsonify(stats)
 
     @app.route("/burn/price/<service_type>", methods=["GET"])
-    def get_service_price(service_type):
+    def get_service_price(service_type: str) -> Tuple[Response, int] | Response:
         """
         Get current XAI price for service (dynamic, USD-pegged)
 
