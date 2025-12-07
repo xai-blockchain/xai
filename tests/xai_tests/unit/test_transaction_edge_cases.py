@@ -126,8 +126,9 @@ class TestTransactionEdgeCases:
         wallet2 = Wallet()
 
         # Create transaction with many inputs and outputs
+        # Use properly formatted XAI addresses (40 hex chars after prefix)
         inputs = [{"txid": f"tx_{i}", "vout": i, "signature": "sig"} for i in range(100)]
-        outputs = [{"address": f"XAI{i}", "amount": 0.1} for i in range(100)]
+        outputs = [{"address": f"XAI{str(i).zfill(40)}", "amount": 0.1} for i in range(100)]
 
         tx = Transaction(
             wallet1.address, wallet2.address, 10.0, 0.1,
