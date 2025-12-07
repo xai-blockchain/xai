@@ -197,7 +197,7 @@ class TestChainValidation:
         assert bc.validate_chain()
 
     def test_detect_tampered_transaction(self, tmp_path):
-        """Test detection of tampered transactions in memory"""
+        """Test detection of tampered transactions through merkle root verification"""
         bc = Blockchain(data_dir=str(tmp_path))
         wallet = Wallet()
 
@@ -206,11 +206,19 @@ class TestChainValidation:
         # Tamper with transaction in memory
         if len(bc.chain[1].transactions) > 0:
             original_amount = bc.chain[1].transactions[0].amount
+            original_merkle = bc.chain[1].header.merkle_root
+
+            # Tamper with the transaction
             bc.chain[1].transactions[0].amount = 999999
 
-            # Recalculate hash with tampered data - hash should not match
-            tampered_hash = bc.chain[1].calculate_hash()
-            assert tampered_hash != bc.chain[1].hash  # Tampering changes the hash
+            # Clear the cached txid so it gets recalculated with the tampered data
+            bc.chain[1].transactions[0].txid = None
+
+            # Recalculate merkle root with tampered transaction
+            new_merkle = bc.calculate_merkle_root(bc.chain[1].transactions)
+
+            # The new merkle root should be different, showing tampering is detectable
+            assert new_merkle != original_merkle  # Tampering changes the merkle root
 
             # Restore for disk validation to pass
             bc.chain[1].transactions[0].amount = original_amount
@@ -405,9 +413,11 @@ class TestTransactionCreation:
 
     def test_coinbase_transaction_no_signature(self):
         """Test coinbase transactions don't require signatures"""
+        # Use a valid XAI address format
+        valid_address = "XAI" + "a" * 40
         tx = Transaction(
             sender="COINBASE",
-            recipient="miner_address",
+            recipient=valid_address,
             amount=12.0,
             fee=0.0
         )
@@ -506,8 +516,9 @@ class TestBlockStructure:
     def test_create_block(self):
         """Test creating a block"""
         transactions = []
+        # Block constructor accepts: (header_or_index, transactions, previous_hash, difficulty, ...)
         block = Block(
-            index=1,
+            header=1,  # index
             transactions=transactions,
             previous_hash="prev_hash",
             difficulty=4
@@ -521,8 +532,9 @@ class TestBlockStructure:
     def test_block_hash_calculation(self):
         """Test block hash calculation"""
         transactions = []
+        # Block constructor accepts: (header_or_index, transactions, previous_hash, difficulty, ...)
         block = Block(
-            index=1,
+            header=1,  # index
             transactions=transactions,
             previous_hash="prev_hash",
             difficulty=4
@@ -535,8 +547,9 @@ class TestBlockStructure:
     def test_block_hash_changes_with_nonce(self):
         """Test block hash changes when nonce changes"""
         transactions = []
+        # Block constructor accepts: (header_or_index, transactions, previous_hash, difficulty, ...)
         block = Block(
-            index=1,
+            header=1,  # index
             transactions=transactions,
             previous_hash="prev_hash",
             difficulty=4

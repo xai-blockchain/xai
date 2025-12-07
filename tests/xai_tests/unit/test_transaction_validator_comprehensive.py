@@ -89,14 +89,14 @@ class TestDataValidation:
 
         # Create transaction with invalid sender
         tx = Transaction(
-            sender="INVALID_ADDRESS",
+            sender=wallet.address,
             recipient="XAI" + "0" * 40,
             amount=10.0,
             fee=0.24,
             public_key=wallet.public_key
         )
         tx.sign_transaction(wallet.private_key)
-        tx.sender = "INVALID_ADDRESS"  # Override after creation
+        tx.sender = "INVALID_ADDRESS"  # Override after creation to make it invalid
 
         result = validator.validate_transaction(tx)
 
@@ -109,13 +109,13 @@ class TestDataValidation:
 
         tx = Transaction(
             sender=wallet.address,
-            recipient="INVALID_RECIPIENT",
+            recipient="XAI" + "0" * 40,
             amount=10.0,
             fee=0.24,
             public_key=wallet.public_key
         )
         tx.sign_transaction(wallet.private_key)
-        tx.recipient = "INVALID_RECIPIENT"
+        tx.recipient = "INVALID_RECIPIENT"  # Override after creation to make it invalid
 
         result = validator.validate_transaction(tx)
 
@@ -155,11 +155,12 @@ class TestDataValidation:
         tx = Transaction(
             sender=wallet.address,
             recipient="XAI" + "0" * 40,
-            amount=-10.0,  # Negative amount
+            amount=10.0,
             fee=0.24,
             public_key=wallet.public_key
         )
         tx.sign_transaction(wallet.private_key)
+        tx.amount = -10.0  # Override after creation to make it negative
 
         result = validator.validate_transaction(tx)
 
@@ -174,11 +175,11 @@ class TestDataValidation:
             sender=wallet.address,
             recipient="XAI" + "0" * 40,
             amount=10.0,
-            fee=-1.0,  # Negative fee
+            fee=0.24,
             public_key=wallet.public_key
         )
         tx.sign_transaction(wallet.private_key)
-        tx.fee = -1.0
+        tx.fee = -1.0  # Override after creation to make it negative
 
         result = validator.validate_transaction(tx)
 
@@ -778,7 +779,7 @@ class TestTransactionValidatorUTXOValidation:
         bc.utxo_manager.mark_utxo_spent(wallet.address, "tx_123", 0)
 
         # Try to spend already-spent UTXO
-        tx = Transaction(wallet.address, "XAI456", 5.0, 0.1)
+        tx = Transaction(wallet.address, "XAI" + "b" * 40, 5.0, 0.1)
         tx.inputs = [{"txid": "tx_123", "vout": 0, "signature": "sig"}]
         tx.public_key = wallet.public_key
         tx.sign_transaction(wallet.private_key)
@@ -843,9 +844,9 @@ class TestTransactionValidatorUTXOValidation:
         bc.utxo_manager.add_utxo(wallet.address, "tx_123", 0, 100.0, "script")
 
         # Create transaction where inputs cover outputs + fee
-        tx = Transaction(wallet.address, "XAI456", 90.0, 5.0)
+        tx = Transaction(wallet.address, "XAI" + "b" * 40, 90.0, 5.0)
         tx.inputs = [{"txid": "tx_123", "vout": 0}]
-        tx.outputs = [{"address": "XAI456", "amount": 90.0}]
+        tx.outputs = [{"address": "XAI" + "b" * 40, "amount": 90.0}]
         tx.public_key = wallet.public_key
         tx.sign_transaction(wallet.private_key)
 
@@ -865,7 +866,7 @@ class TestTransactionValidatorUTXOValidation:
         bc.utxo_manager.add_utxo(wallet.address, "tx_2", 0, 20.0, "script")
 
         # Create transaction using both
-        tx = Transaction(wallet.address, "XAI456", 25.0, 1.0)
+        tx = Transaction(wallet.address, "XAI" + "b" * 40, 25.0, 1.0)
         tx.inputs = [
             {"txid": "tx_1", "vout": 0},
             {"txid": "tx_2", "vout": 0}
@@ -885,9 +886,10 @@ class TestTransactionValidatorUTXOValidation:
         wallet = Wallet()
 
         # Create transaction with negative amount
-        tx = Transaction(wallet.address, "XAI456", -10.0, 0.1)
+        tx = Transaction(wallet.address, "XAI" + "b" * 40, 10.0, 0.1)
         tx.public_key = wallet.public_key
         tx.sign_transaction(wallet.private_key)
+        tx.amount = -10.0  # Override after creation to make it negative
 
         result = validator.validate_transaction(tx, is_mempool_check=False)
         assert result is False
@@ -899,7 +901,7 @@ class TestTransactionValidatorUTXOValidation:
         validator = TransactionValidator(bc)
         wallet = Wallet()
 
-        tx = Transaction(wallet.address, "XAI456", 0.0, 0.1)
+        tx = Transaction(wallet.address, "XAI" + "b" * 40, 0.0, 0.1)
         tx.public_key = wallet.public_key
         tx.sign_transaction(wallet.private_key)
 
@@ -918,7 +920,7 @@ class TestTransactionValidatorUTXOValidation:
         bc.utxo_manager.add_utxo(wallet1.address, "tx_123", 0, 10.0, "script")
 
         # wallet2 tries to spend wallet1's UTXO
-        tx = Transaction(wallet2.address, "XAI789", 5.0, 0.1)
+        tx = Transaction(wallet2.address, "XAI" + "c" * 40, 5.0, 0.1)
         tx.inputs = [{"txid": "tx_123", "vout": 0}]
         tx.public_key = wallet2.public_key
         tx.sign_transaction(wallet2.private_key)

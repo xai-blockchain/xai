@@ -264,11 +264,14 @@ class QuantumResistantCryptoManager:
 
         try:
             algo_impl = self.SIGNATURE_ALGORITHMS[algorithm]
-            algo_impl.verify(public_key, message, signature)
-            return True
+            # pqcrypto.sign modules return a boolean from verify()
+            # Returns True if valid, False if invalid
+            result = algo_impl.verify(public_key, message, signature)
+            return result
         except Exception as e:
+            # Catch any unexpected errors (e.g., malformed keys, wrong sizes)
             logger.debug(
-                "Post-quantum signature verification failed",
+                "Post-quantum signature verification error",
                 algorithm=algorithm.value,
                 error=str(e)
             )

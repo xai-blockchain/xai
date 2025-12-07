@@ -63,7 +63,7 @@ class TestTimeCapsuleValidation:
 
         tx = bc.create_transaction(
             wallet.address,
-            "recipient",
+            "XAI" + "b" * 40,
             10.0,
             0.1,
             wallet.private_key,
@@ -87,7 +87,7 @@ class TestTimeCapsuleValidation:
 
         tx = bc.create_transaction(
             wallet.address,
-            "recipient",
+            "XAI" + "b" * 40,
             10.0,
             0.1,
             wallet.private_key,
@@ -114,7 +114,7 @@ class TestTimeCapsuleValidation:
 
         tx = bc.create_transaction(
             wallet.address,
-            "recipient",
+            "XAI" + "b" * 40,
             10.0,
             0.1,
             wallet.private_key,
@@ -141,7 +141,7 @@ class TestTimeCapsuleValidation:
 
         tx = bc.create_transaction(
             wallet.address,
-            "recipient",
+            "XAI" + "b" * 40,
             10.0,
             0.1,
             wallet.private_key,
@@ -168,7 +168,7 @@ class TestTimeCapsuleValidation:
 
         tx = bc.create_transaction(
             wallet.address,
-            "recipient",
+            "XAI" + "b" * 40,
             10.0,
             0.1,
             wallet.private_key,
@@ -195,7 +195,7 @@ class TestTimeCapsuleValidation:
 
         tx = bc.create_transaction(
             wallet.address,
-            "recipient",
+            "XAI" + "b" * 40,
             10.0,
             0.1,
             wallet.private_key,
@@ -226,8 +226,8 @@ class TestGovernanceVoteValidation:
 
         tx = bc.create_transaction(
             wallet.address,
-            "GOVERNANCE",
-            0.0,
+            "XAI" + "c" * 40,
+            0.1,
             0.05,
             wallet.private_key,
             wallet.public_key
@@ -253,8 +253,8 @@ class TestGovernanceVoteValidation:
 
         tx = bc.create_transaction(
             wallet.address,
-            "GOVERNANCE",
-            0.0,
+            "XAI" + "c" * 40,
+            0.1,
             0.05,
             wallet.private_key,
             wallet.public_key
@@ -277,8 +277,8 @@ class TestGovernanceVoteValidation:
 
         tx = bc.create_transaction(
             wallet.address,
-            "GOVERNANCE",
-            0.0,
+            "XAI" + "c" * 40,
+            0.1,
             0.05,
             wallet.private_key,
             wallet.public_key
@@ -304,8 +304,8 @@ class TestGovernanceVoteValidation:
 
         tx = bc.create_transaction(
             wallet.address,
-            "GOVERNANCE",
-            0.0,
+            "XAI" + "c" * 40,
+            0.1,
             0.05,
             wallet.private_key,
             wallet.public_key
@@ -331,8 +331,8 @@ class TestGovernanceVoteValidation:
 
         tx = bc.create_transaction(
             wallet.address,
-            "GOVERNANCE",
-            0.0,
+            "XAI" + "c" * 40,
+            0.1,
             0.05,
             wallet.private_key,
             wallet.public_key
@@ -358,8 +358,8 @@ class TestGovernanceVoteValidation:
 
         tx = bc.create_transaction(
             wallet.address,
-            "GOVERNANCE",
-            0.0,
+            "XAI" + "c" * 40,
+            0.1,
             0.05,
             wallet.private_key,
             wallet.public_key
@@ -417,7 +417,7 @@ class TestUTXOValidationEdgeCases:
 
         tx = Transaction(
             wallet.address,
-            "recipient",
+            "XAI" + "b" * 40,
             10.0,
             0.1,
             public_key=wallet.public_key
@@ -437,13 +437,13 @@ class TestUTXOValidationEdgeCases:
 
         tx = Transaction(
             wallet.address,
-            "recipient",
+            "XAI" + "b" * 40,
             10.0,
             0.1,
             public_key=wallet.public_key
         )
         tx.inputs = [{"txid": "abc123"}]  # Missing vout
-        tx.outputs = [{"address": "recipient", "amount": 10.0}]
+        tx.outputs = [{"address": "XAI" + "b" * 40, "amount": 10.0}]
         tx.sign_transaction(wallet.private_key)
 
         is_valid = validator.validate_transaction(tx)
@@ -457,13 +457,13 @@ class TestUTXOValidationEdgeCases:
 
         tx = Transaction(
             wallet.address,
-            "recipient",
+            "XAI" + "b" * 40,
             10.0,
             0.1,
             public_key=wallet.public_key
         )
         tx.inputs = [{"txid": "nonexistent" * 8, "vout": 0}]
-        tx.outputs = [{"address": "recipient", "amount": 10.0}]
+        tx.outputs = [{"address": "XAI" + "b" * 40, "amount": 10.0}]
         tx.sign_transaction(wallet.private_key)
 
         is_valid = validator.validate_transaction(tx)
@@ -479,7 +479,7 @@ class TestUTXOValidationEdgeCases:
 
         tx = bc.create_transaction(
             wallet.address,
-            "recipient",
+            "XAI" + "b" * 40,
             10.0,
             0.1,
             wallet.private_key,
@@ -502,7 +502,7 @@ class TestUTXOValidationEdgeCases:
 
         tx = bc.create_transaction(
             wallet.address,
-            "recipient",
+            "XAI" + "b" * 40,
             10.0,
             0.1,
             wallet.private_key,
@@ -510,7 +510,7 @@ class TestUTXOValidationEdgeCases:
         )
 
         if tx:
-            tx.outputs = [{"address": "recipient"}]  # Missing amount
+            tx.outputs = [{"address": "XAI" + "b" * 40}]  # Missing amount
 
             is_valid = validator.validate_transaction(tx)
             assert is_valid is False
@@ -525,7 +525,7 @@ class TestUTXOValidationEdgeCases:
 
         tx = bc.create_transaction(
             wallet.address,
-            "recipient",
+            "XAI" + "b" * 40,
             5.0,
             0.1,
             wallet.private_key,
@@ -559,7 +559,7 @@ class TestBasicValidationErrors:
 
         # Create mock object missing fields
         class FakeTransaction:
-            sender = "XAI123"
+            sender = "XAI" + "a" * 40
             # Missing other required fields
 
         is_valid = validator.validate_transaction(FakeTransaction())
@@ -575,7 +575,7 @@ class TestBasicValidationErrors:
 
         tx = bc.create_transaction(
             wallet.address,
-            "recipient",
+            "XAI" + "b" * 40,
             10.0,
             0.1,
             wallet.private_key,
@@ -597,7 +597,7 @@ class TestBasicValidationErrors:
 
         tx = Transaction(
             wallet.address,
-            "recipient",
+            "XAI" + "b" * 40,
             10.0,
             0.1,
             public_key=wallet.public_key
@@ -617,7 +617,7 @@ class TestBasicValidationErrors:
 
         tx = Transaction(
             wallet1.address,
-            "recipient",
+            "XAI" + "b" * 40,
             10.0,
             0.1,
             public_key=wallet2.public_key  # Wrong public key
@@ -641,7 +641,7 @@ class TestNonceValidation:
 
         tx = bc.create_transaction(
             wallet.address,
-            "recipient",
+            "XAI" + "b" * 40,
             10.0,
             0.1,
             wallet.private_key,
@@ -664,7 +664,7 @@ class TestCoinbaseTransactionValidation:
         bc = Blockchain(data_dir=str(tmp_path))
         validator = bc.transaction_validator
 
-        tx = Transaction("COINBASE", "miner_address", 12.0)
+        tx = Transaction("COINBASE", "XAI" + "d" * 40, 12.0)
         tx.tx_type = "coinbase"
         tx.txid = tx.calculate_hash()
 
@@ -676,7 +676,8 @@ class TestCoinbaseTransactionValidation:
         bc = Blockchain(data_dir=str(tmp_path))
         validator = bc.transaction_validator
 
-        tx = Transaction("COINBASE", "miner_address", 12.0)
+        tx = Transaction("COINBASE", "XAI" + "d" * 40, 12.0)
+        tx.tx_type = "coinbase"
         tx.txid = tx.calculate_hash()
         tx.signature = None
 
@@ -692,7 +693,8 @@ class TestValidatorLogging:
         bc = Blockchain(data_dir=str(tmp_path))
         validator = bc.transaction_validator
 
-        tx = Transaction("COINBASE", "miner", 12.0)
+        tx = Transaction("COINBASE", "XAI" + "d" * 40, 12.0)
+        tx.tx_type = "coinbase"
         tx.txid = tx.calculate_hash()
 
         # Should log success
@@ -707,7 +709,7 @@ class TestValidatorLogging:
 
         tx = Transaction(
             wallet.address,
-            "recipient",
+            "XAI" + "b" * 40,
             10.0,
             0.1,
             public_key=wallet.public_key
@@ -725,8 +727,8 @@ class TestValidatorLogging:
         validator = bc.transaction_validator
 
         # Create transaction with problematic data
-        tx = Transaction("sender", "recipient", -1.0, 0.1)  # Negative amount
-        tx.txid = "invalid"
+        tx = Transaction("XAI" + "a" * 40, "XAI" + "b" * 40, 1.0, 0.1)
+        tx.txid = "invalid"  # Invalid txid will cause failure
 
         # Should catch exception and return False
         is_valid = validator.validate_transaction(tx)
@@ -746,7 +748,7 @@ class TestValidatorWithNoneRecipient:
 
         tx = bc.create_transaction(
             wallet.address,
-            "burn_address",
+            "XAI" + "b" * 40,
             10.0,
             0.1,
             wallet.private_key,
@@ -754,7 +756,7 @@ class TestValidatorWithNoneRecipient:
         )
 
         if tx:
-            tx.recipient = None
+            tx.recipient = None  # Burn transaction
 
             # Should handle None recipient
             is_valid = validator.validate_transaction(tx)

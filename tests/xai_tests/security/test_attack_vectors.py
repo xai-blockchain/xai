@@ -384,8 +384,9 @@ class TestResourceExhaustion:
 
         limiter = ResourceLimiter()
         wallet = Wallet()
+        recipient = Wallet()
 
-        tx = Transaction(wallet.address, "XAI123", 10.0, 0.24)
+        tx = Transaction(wallet.address, recipient.address, 10.0, 0.24)
 
         is_valid, msg = limiter.validate_transaction_size(tx)
 
@@ -487,12 +488,13 @@ class TestReplayAttack:
     def test_transaction_uniqueness(self):
         """Test transactions have unique identifiers"""
         wallet = Wallet()
+        recipient = Wallet()
 
-        tx1 = Transaction(wallet.address, "XAI123", 10.0, 0.24, nonce=1)
+        tx1 = Transaction(wallet.address, recipient.address, 10.0, 0.24, nonce=1)
         tx1.public_key = wallet.public_key
         tx1.sign_transaction(wallet.private_key)
 
-        tx2 = Transaction(wallet.address, "XAI123", 10.0, 0.24, nonce=2)
+        tx2 = Transaction(wallet.address, recipient.address, 10.0, 0.24, nonce=2)
         tx2.public_key = wallet.public_key
         tx2.sign_transaction(wallet.private_key)
 
