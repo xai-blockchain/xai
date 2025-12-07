@@ -432,9 +432,14 @@ class Blockchain:
 
         if os.environ.get("PYTEST_CURRENT_TEST") and data_dir == "data":
             data_dir = tempfile.mkdtemp(prefix="xai_chain_test_")
+        self.data_dir = data_dir
         self.storage = BlockchainStorage(data_dir, compact_on_startup)
         if not self.storage.verify_integrity():
             raise Exception("Blockchain data integrity check failed. Data may be corrupted.")
+
+        # Write-Ahead Log for crash-safe chain reorganizations
+        self.reorg_wal_path = os.path.join(data_dir, "reorg_wal.json")
+        self._recover_from_incomplete_reorg()
         
         self.chain: List[BlockHeader] = (
             []
@@ -3464,12 +3469,27 @@ class Blockchain:
         if not self._validate_chain_structure(materialized_chain):
             return False
 
-        # Create atomic snapshot of current state (CRITICAL: don't create new instance!)
+        # PHASE 1: SNAPSHOT ALL STATE (Two-Phase Commit Protocol)
+        # Create comprehensive atomic snapshots before making ANY changes
+        # This ensures complete rollback capability if ANY step fails
         old_chain = self.chain.copy()
         utxo_snapshot = self.utxo_manager.snapshot()  # Thread-safe atomic snapshot
-        nonce_snapshot = self.nonce_tracker.snapshot() if self.nonce_tracker else None  # Thread-safe atomic snapshot
+        nonce_snapshot = self.nonce_tracker.snapshot() if self.nonce_tracker else None
+        contract_snapshot = self.smart_contract_manager.snapshot() if self.smart_contract_manager else None
+        governance_snapshot = self.governance_executor.snapshot() if self.governance_executor else None
+        finality_snapshot = self.finality_manager.snapshot() if self.finality_manager else None
+        mempool_snapshot = self.pending_transactions.copy()
+
+        # Write-Ahead Log: Record reorg intention for crash recovery
+        wal_entry = self._write_reorg_wal(
+            old_tip=self.chain[-1].hash if self.chain else None,
+            new_tip=materialized_chain[-1].hash if materialized_chain else None,
+            fork_point=fork_point,
+        )
 
         try:
+            # PHASE 2: EXECUTE REORG ATOMICALLY
+            # All state changes happen here - if any fail, rollback restores everything
             # Clear UTXO set (don't create new instance - maintains singleton pattern)
             self.utxo_manager.clear()
 
@@ -3562,15 +3582,58 @@ class Blockchain:
                 self.contracts,
                 self.contract_receipts,
             )
+
+            # PHASE 3: COMMIT - Mark WAL entry as complete
+            self._commit_reorg_wal(wal_entry)
+
+            self.logger.info(
+                "Chain reorganization completed successfully",
+                extra={
+                    "event": "reorg.success",
+                    "old_tip": old_chain[-1].hash if old_chain else None,
+                    "new_tip": materialized_chain[-1].hash if materialized_chain else None,
+                    "fork_point": fork_point,
+                    "blocks_reorganized": len(old_chain) - (fork_point + 1) if fork_point is not None else 0,
+                }
+            )
+
             return True
 
         except Exception as e:
-            # If reorg fails, restore the old state
-            self.logger.error(f"Chain reorganization failed: {e}. Rolling back to previous state.")
+            # ROLLBACK: Restore ALL state atomically
+            self.logger.error(
+                f"Chain reorganization failed: {e}. Rolling back ALL state to previous snapshot.",
+                extra={
+                    "event": "reorg.rollback",
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                }
+            )
+
+            # Restore all snapshotted state in reverse dependency order
             self.chain = old_chain
             self.utxo_manager.restore(utxo_snapshot)
+
             if nonce_snapshot and self.nonce_tracker:
                 self.nonce_tracker.restore(nonce_snapshot)
+
+            if contract_snapshot and self.smart_contract_manager:
+                self.smart_contract_manager.restore(contract_snapshot)
+
+            if governance_snapshot and self.governance_executor:
+                self.governance_executor.restore(governance_snapshot)
+
+            if finality_snapshot and self.finality_manager:
+                self.finality_manager.restore(finality_snapshot)
+
+            # Restore mempool
+            self.pending_transactions = mempool_snapshot
+
+            # Clear WAL entry since rollback completed
+            self._rollback_reorg_wal(wal_entry)
+
+            self.logger.info("Rollback completed successfully - all state restored")
+
             return False
 
     def _find_fork_point(self, new_chain: List[BlockHeader]) -> Optional[int]:
