@@ -908,9 +908,9 @@ class StrictAIPoolManager:
             }
             with open(self._state_path, "w", encoding="utf-8") as f:
                 json.dump(state, f)
-        except Exception:
+        except Exception as e:
             # Persistence failures must not break runtime
-            pass
+            logging.debug("AI pool state save failed: %s", e)
 
     def _load_state(self) -> None:
         try:
@@ -945,10 +945,12 @@ class StrictAIPoolManager:
                         tasks_completed=int(item.get("tasks_completed", 0)),
                     )
                     self.donated_keys[dk.key_id] = dk
-                except Exception:
+                except Exception as e:
+                    logging.debug("Failed to load donated key: %s", e)
                     continue
-        except Exception:
+        except Exception as e:
             # Ignore load errors and start fresh
+            logging.debug("AI pool state load failed: %s", e)
             self.donated_keys = self.donated_keys or {}
 
     def get_pool_status(self) -> Dict:
@@ -998,7 +1000,8 @@ class StrictAIPoolManager:
         """Safely fetch task metrics collector."""
         try:
             return get_ai_task_metrics()
-        except Exception:
+        except Exception as e:
+            logging.debug("Failed to get AI task metrics: %s", e)
             return None
 
     # ===== Rotation & Active Key Management =====

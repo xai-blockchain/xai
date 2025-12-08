@@ -1158,7 +1158,8 @@ class PeerEncryption:
             if not der_cert:
                 return None
             return hashlib.sha256(der_cert).hexdigest()
-        except Exception:
+        except Exception as e:
+            logging.debug("Failed to get peer certificate fingerprint: %s", e)
             return None
 
     def verify_signed_message(self, signed_message_bytes: bytes) -> Optional[Dict[str, Any]]:

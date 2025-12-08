@@ -162,9 +162,10 @@ class TestResourceLimiter:
     def test_validate_transaction_size(self, tmp_path):
         """Test transaction size validation"""
         limiter = ResourceLimiter()
-        wallet = Wallet()
+        wallet1 = Wallet()
+        wallet2 = Wallet()
 
-        tx = Transaction(wallet.address, "XAI123", 10.0, 0.24)
+        tx = Transaction(wallet1.address, wallet2.address, 10.0, 0.24)
 
         is_valid, msg = limiter.validate_transaction_size(tx)
 
@@ -243,9 +244,9 @@ class TestDustProtection:
 
         bc.mine_pending_transactions(wallet1.address)
 
-        # Send valid amount
+        # Send valid amount (above dust threshold 0.00001)
         tx = bc.create_transaction(
-            wallet1.address, wallet2.address, 0.0001, 0.0, wallet1.private_key, wallet1.public_key
+            wallet1.address, wallet2.address, 0.001, 0.24, wallet1.private_key, wallet1.public_key
         )
 
         assert bc.validate_transaction(tx)
@@ -403,18 +404,17 @@ class TestInputValidation:
 
     def test_reject_invalid_address(self, tmp_path):
         """Test rejection of invalid addresses"""
+        from xai.core.transaction import TransactionValidationError
         bc = Blockchain(data_dir=str(tmp_path))
         wallet = Wallet()
 
         bc.mine_pending_transactions(wallet.address)
 
-        # Invalid address format
-        tx = bc.create_transaction(
-            wallet.address, "INVALID", 10.0, 0.24, wallet.private_key, wallet.public_key
-        )
-
-        # Should be rejected
-        assert not bc.validate_transaction(tx)
+        # Invalid address format - should raise validation error during creation
+        with pytest.raises(TransactionValidationError):
+            bc.create_transaction(
+                wallet.address, "INVALID", 10.0, 0.24, wallet.private_key, wallet.public_key
+            )
 
     def test_validate_amount_precision(self, tmp_path):
         """Test amount precision validation"""

@@ -142,7 +142,8 @@ class OpenAI:
                 response_body = e.read().decode('utf-8')
                 error_data = json.loads(response_body)
                 error_message = error_data.get("error", {}).get("message", str(e.reason))
-            except Exception:
+            except Exception as parse_err:
+                logger.debug("Failed to parse error response: %s", parse_err)
                 response_body = ""
                 error_message = str(e.reason)
 

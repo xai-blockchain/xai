@@ -9,6 +9,7 @@ This module provides different node operation modes for various use cases.
 
 from __future__ import annotations
 
+import logging
 import os
 import json
 import hashlib
@@ -16,6 +17,8 @@ import time
 from typing import Dict, Any, List, Optional, Set
 from dataclasses import dataclass, asdict
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 
 class NodeMode(Enum):
@@ -429,7 +432,8 @@ class FastSyncManager:
 
             self.snapshots[snapshot.block_height] = snapshot
             return snapshot
-        except Exception:
+        except Exception as e:
+            logger.debug("Failed to load state snapshot: %s", e)
             return None
 
 

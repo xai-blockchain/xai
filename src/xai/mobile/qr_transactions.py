@@ -211,8 +211,9 @@ class TransactionQRGenerator:
         try:
             decoded = base64.b64decode(tx_data).decode()
             return json.loads(decoded)
-        except Exception:
-            # Direct JSON
+        except Exception as e:
+            # Direct JSON fallback
+            logger.debug("Base64 decode failed, trying direct JSON: %s", e)
             return json.loads(tx_data)
 
 
@@ -306,7 +307,8 @@ class QRCodeValidator:
                     return False
 
             return True
-        except Exception:
+        except Exception as e:
+            logger.debug("Payment link validation failed: %s", e)
             return False
 
     @staticmethod
@@ -340,7 +342,8 @@ class QRCodeValidator:
                 return False
 
             return True
-        except Exception:
+        except Exception as e:
+            logger.debug("Transaction QR validation failed: %s", e)
             return False
 
     @staticmethod

@@ -432,7 +432,8 @@ class PersonalAIAssistant:
         if callable(stats_fn):
             try:
                 return stats_fn()
-            except Exception:
+            except Exception as e:
+                logger.debug("Failed to get AI pool stats: %s", e)
                 return {}
         return {}
 

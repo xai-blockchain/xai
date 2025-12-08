@@ -529,7 +529,8 @@ class HardwareSecurityModule:
 
             except InvalidSignature:
                 continue
-            except Exception:
+            except Exception as e:
+                logging.debug("Signature verification failed for key %s: %s", key_id, e)
                 continue
 
         return valid_count >= threshold

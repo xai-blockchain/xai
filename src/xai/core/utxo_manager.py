@@ -39,7 +39,7 @@ class UTXOManager:
     Thread-safe implementation using RLock to prevent concurrent access issues.
     """
 
-    def __init__(self, logger: Optional[StructuredLogger] = None):
+    def __init__(self, logger: Optional[StructuredLogger] = None) -> None:
         # utxo_set: {address: [{txid, vout, amount, script_pubkey}, ...]}
         self.utxo_set: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
         self.logger = logger or get_structured_logger()
@@ -95,7 +95,7 @@ class UTXOManager:
         except ValueError as e:
             raise UTXOValidationError(f"UTXO {context}: {e}") from e
 
-    def add_utxo(self, address: str, txid: str, vout: int, amount: float, script_pubkey: str):
+    def add_utxo(self, address: str, txid: str, vout: int, amount: float, script_pubkey: str) -> None:
         """
         Adds a new UTXO to the set.
 
@@ -203,7 +203,7 @@ class UTXOManager:
         # get_utxos_for_address already has lock, so this will reacquire (RLock allows this)
         return sum(utxo["amount"] for utxo in self.get_utxos_for_address(address))
 
-    def process_transaction_outputs(self, transaction: "Transaction"):
+    def process_transaction_outputs(self, transaction: "Transaction") -> None:
         """
         Adds new UTXOs created by a transaction's outputs.
         Each output in the transaction creates a new UTXO.
@@ -376,7 +376,7 @@ class UTXOManager:
 
             return True
 
-    def unlock_utxos(self, utxos: List[Dict[str, Any]]):
+    def unlock_utxos(self, utxos: List[Dict[str, Any]]) -> None:
         """
         Unlock UTXOs when transaction is rejected or mined.
 
@@ -393,7 +393,7 @@ class UTXOManager:
                         extra={"event": "utxo.unlocked", "utxo": utxo_key}
                     )
 
-    def unlock_utxos_by_keys(self, utxo_keys: List[tuple]):
+    def unlock_utxos_by_keys(self, utxo_keys: List[tuple]) -> None:
         """
         Unlock UTXOs by their (txid, vout) keys.
 
@@ -409,7 +409,7 @@ class UTXOManager:
                         extra={"event": "utxo.unlocked", "utxo": utxo_key}
                     )
 
-    def _cleanup_expired_pending(self):
+    def _cleanup_expired_pending(self) -> None:
         """
         Remove expired pending UTXO locks.
 
@@ -467,7 +467,7 @@ class UTXOManager:
         """
         return self.to_dict()
 
-    def load_utxo_set(self, utxo_set_data: Dict[str, Any]):
+    def load_utxo_set(self, utxo_set_data: Dict[str, Any]) -> None:
         """
         Loads the UTXO set from a dictionary.
         """
@@ -521,7 +521,7 @@ class UTXOManager:
                 "unique_addresses_with_utxos": len(self.utxo_set),
             }
 
-    def reset(self):
+    def reset(self) -> None:
         """
         Resets the UTXO manager to its initial state.
         """
@@ -547,7 +547,7 @@ class UTXOManager:
                 "total_value": self.total_value,
             }
 
-    def restore(self, snapshot: Dict[str, Any]):
+    def restore(self, snapshot: Dict[str, Any]) -> None:
         """
         Restores UTXO state from a snapshot.
         Thread-safe atomic operation for chain reorganization rollback.
@@ -573,7 +573,7 @@ class UTXOManager:
             self.total_value = snapshot.get("total_value", 0.0)
             self.logger.info("UTXO state restored from snapshot.")
 
-    def clear(self):
+    def clear(self) -> None:
         """
         Clears all UTXOs without resetting totals tracking.
         Used for chain reorganization before rebuilding.

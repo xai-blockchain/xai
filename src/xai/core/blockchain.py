@@ -494,7 +494,7 @@ class Blockchain:
             self.logger.warn("Finality disabled: validator set unavailable")
         # Thread safety locks
         self._chain_lock = threading.RLock()  # Protects chain state from concurrent modifications
-        self._mempool_lock = threading.Lock()  # Protects mempool operations from TOCTOU races
+        self._mempool_lock = threading.RLock()  # Protects mempool operations from TOCTOU races (re-entrant for nested calls)
         # Mempool management
         self.seen_txids: set[str] = set()
         self._sender_pending_count: dict[str, int] = defaultdict(int)

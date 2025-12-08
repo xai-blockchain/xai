@@ -7,12 +7,15 @@ Comprehensive stress testing framework for blockchain performance testing.
 
 from __future__ import annotations
 
+import logging
 import time
 import random  # OK for test data generation in performance simulation
 import threading
 from typing import List, Dict, Any, Callable, Optional
 from dataclasses import dataclass, field
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -153,7 +156,8 @@ class TransactionStressTest(StressTest):
             time.sleep(0.001)  # Simulate processing time
 
             return True
-        except Exception:
+        except Exception as e:
+            logger.debug("Transaction stress test failed: %s", e)
             return False
 
 
@@ -182,7 +186,8 @@ class MiningStressTest(StressTest):
                 nonce += 1
 
             return False
-        except Exception:
+        except Exception as e:
+            logger.debug("Mining stress test failed: %s", e)
             return False
 
 
@@ -199,7 +204,8 @@ class NetworkStressTest(StressTest):
             # Simulate peer communication
             time.sleep(random.uniform(0.001, 0.01))
             return True
-        except Exception:
+        except Exception as e:
+            logger.debug("Network stress test failed: %s", e)
             return False
 
 
@@ -219,7 +225,8 @@ class ConcurrencyStressTest(StressTest):
                 time.sleep(0.0001)
 
             return True
-        except Exception:
+        except Exception as e:
+            logger.debug("Concurrency stress test failed: %s", e)
             return False
 
 

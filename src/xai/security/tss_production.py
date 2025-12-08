@@ -12,6 +12,7 @@ This replaces the MockTSS with a production-ready implementation.
 from abc import ABC, abstractmethod
 import hashlib
 import json
+import logging
 import secrets
 from dataclasses import dataclass, asdict
 from typing import List, Tuple, Dict, Optional
@@ -188,7 +189,8 @@ class ShamirSecretSharing:
                 secret1 = cls.reconstruct_secret(test_shares[:2])
                 secret2 = cls.reconstruct_secret(test_shares[:2])
                 return secret1 == secret2
-        except Exception:
+        except Exception as e:
+            logging.debug("TSS share verification failed: %s", e)
             return False
 
         return True

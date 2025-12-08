@@ -814,7 +814,8 @@ class ConsensusManager:
             try:
                 loaded = self.blockchain.storage.load_block_from_disk(idx)
                 return loaded
-            except Exception:
+            except Exception as e:
+                logging.debug("Failed to load block %s from disk: %s", idx, e)
                 return None
 
         # Validate genesis block
