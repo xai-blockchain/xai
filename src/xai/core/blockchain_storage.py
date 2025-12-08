@@ -136,11 +136,16 @@ class BlockchainStorage:
                     line_size = len(line.encode("utf-8"))
                     try:
                         block_data = json.loads(line)
-                        block_index = block_data["header"]["index"]
+                        # Support both nested and flattened block formats
+                        if "header" in block_data and block_data["header"]:
+                            header_data = block_data["header"]
+                        else:
+                            header_data = block_data
+                        block_index = header_data.get("index", 0)
 
                         # Calculate block hash for integrity
                         # Use the stored hash if available, otherwise calculate
-                        block_hash = block_data.get("header", {}).get("hash", "")
+                        block_hash = header_data.get("hash", "")
                         if not block_hash:
                             # Fallback: hash the entire block data
                             block_hash = hashlib.sha256(line.encode("utf-8")).hexdigest()
@@ -280,13 +285,18 @@ class BlockchainStorage:
         # Update index after successful write
         if self.block_index:
             relative_path = os.path.join("blocks", f"blocks_{self.block_file_index}.json")
-            block_hash = block_dict.get("header", {}).get("hash", "")
+            # Support both nested and flattened block formats
+            if "header" in block_dict and block_dict["header"]:
+                header_data = block_dict["header"]
+            else:
+                header_data = block_dict
+            block_hash = header_data.get("hash", "")
             if not block_hash:
                 # Fallback: use block header hash
                 block_hash = block.header.calculate_hash() if hasattr(block, "header") else ""
 
             self.block_index.index_block(
-                block_index=block.header.index if hasattr(block, "header") else block_dict["header"]["index"],
+                block_index=block.header.index if hasattr(block, "header") else header_data.get("index", 0),
                 block_hash=block_hash,
                 file_path=relative_path,
                 file_offset=file_offset,
@@ -528,6 +538,9 @@ class BlockchainStorage:
         """
         Parse block data dictionary into Block object.
 
+        Supports both nested format (header: {index: ...}) and flattened format
+        where header fields are at the top level for backward compatibility.
+
         Args:
             block_data: Block dictionary from JSON
 
@@ -538,7 +551,15 @@ class BlockchainStorage:
         from xai.core.block_header import BlockHeader
 
         try:
-            header_data = block_data.get("header", {})
+            # Support both nested header format and flattened format
+            # If "header" key exists and has content, use nested format
+            # Otherwise, read header fields from top level (flattened format)
+            if "header" in block_data and block_data["header"]:
+                header_data = block_data["header"]
+            else:
+                # Flattened format: header fields are at the top level
+                header_data = block_data
+
             header = BlockHeader(
                 index=header_data.get("index", 0),
                 previous_hash=header_data.get("previous_hash", "0"),
@@ -662,7 +683,12 @@ class BlockchainStorage:
                 for line in f:
                     try:
                         block_data = json.loads(line)
-                        if block_data["header"]["index"] == block_index:
+                        # Support both nested and flattened block formats
+                        if "header" in block_data and block_data["header"]:
+                            data_index = block_data["header"].get("index")
+                        else:
+                            data_index = block_data.get("index")
+                        if data_index == block_index:
                             block = self._parse_block_data(block_data)
                             if block:
                                 found_block = block  # keep last occurrence to honor reorg writes
@@ -705,7 +731,11 @@ class BlockchainStorage:
                 for line in f:
                     try:
                         block_data = json.loads(line)
-                        header_data = block_data.get("header", {})
+                        # Support both nested and flattened block formats
+                        if "header" in block_data and block_data["header"]:
+                            header_data = block_data["header"]
+                        else:
+                            header_data = block_data
                         header = BlockHeader(
                             index=header_data.get("index", 0),
                             previous_hash=header_data.get("previous_hash", "0"),
@@ -776,8 +806,12 @@ class BlockchainStorage:
             return None
             
         latest_block_data = json.loads(lines[-1])
-        
-        header_data = latest_block_data.get("header", {})
+
+        # Support both nested and flattened block formats
+        if "header" in latest_block_data and latest_block_data["header"]:
+            header_data = latest_block_data["header"]
+        else:
+            header_data = latest_block_data
         header = BlockHeader(
             index=header_data.get("index", 0),
             previous_hash=header_data.get("previous_hash", "0"),
@@ -789,6 +823,8 @@ class BlockchainStorage:
             miner_pubkey=header_data.get("miner_pubkey"),
             version=header_data.get("version"),
         )
+        if "hash" in header_data:
+            header.hash = header_data["hash"]
         
         transactions = []
         for tx_data in latest_block_data["transactions"]:
