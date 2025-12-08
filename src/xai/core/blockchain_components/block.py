@@ -185,9 +185,27 @@ class Block:
         )
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary"""
+        """Convert to dictionary with flattened header fields for backward compatibility.
+
+        The block dictionary has top-level fields for index, timestamp, previous_hash,
+        merkle_root, nonce, hash, difficulty, signature, miner_pubkey, and version
+        (all from the header) along with transactions and miner. This maintains
+        backward compatibility with existing tests and APIs.
+        """
+        header_dict = self.header.to_dict()
         return {
-            "header": self.header.to_dict(),
+            # Header fields flattened to top level for backward compatibility
+            "index": header_dict.get("index"),
+            "timestamp": header_dict.get("timestamp"),
+            "previous_hash": header_dict.get("previous_hash"),
+            "merkle_root": header_dict.get("merkle_root"),
+            "nonce": header_dict.get("nonce"),
+            "hash": header_dict.get("hash"),
+            "difficulty": header_dict.get("difficulty"),
+            "signature": header_dict.get("signature"),
+            "miner_pubkey": header_dict.get("miner_pubkey"),
+            "version": header_dict.get("version"),
+            # Block-specific fields
             "transactions": [tx.to_dict() for tx in self.transactions],
             "miner": self.miner,
         }
