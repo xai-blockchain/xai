@@ -24,8 +24,8 @@ class Block:
 
     def __init__(
         self,
-        header: Union[BlockHeader, int],
-        transactions: List["Transaction"],
+        header: Union[BlockHeader, int, None] = None,
+        transactions: Optional[List["Transaction"]] = None,
         previous_hash: Optional[str] = None,
         difficulty: Optional[int] = None,
         timestamp: Optional[float] = None,
@@ -33,18 +33,34 @@ class Block:
         merkle_root: Optional[str] = None,
         signature: Optional[str] = None,
         miner_pubkey: Optional[str] = None,
+        *,
+        index: Optional[int] = None,
     ) -> None:
         """
         Accept either a fully constructed BlockHeader or legacy positional fields
         (index, transactions, previous_hash, difficulty, ...). The legacy path
         keeps backward compatibility with tests/utilities that still instantiate
         blocks directly from primitives.
+
+        Supports multiple call patterns:
+        - Block(header, transactions) - new style with BlockHeader
+        - Block(index, transactions, previous_hash, difficulty) - legacy positional
+        - Block(index=1, transactions=[], previous_hash="...", difficulty=4) - legacy kwargs
         """
         import time
+
+        # Handle legacy keyword argument style: Block(index=2, transactions=[], ...)
+        if header is None and index is not None:
+            header = index
+
+        if transactions is None:
+            transactions = []
 
         if isinstance(header, BlockHeader):
             block_header = header
         else:
+            if header is None:
+                raise ValueError("Either header (BlockHeader) or index (int) is required")
             if previous_hash is None or difficulty is None:
                 raise ValueError(
                     "previous_hash and difficulty are required for legacy block construction"
@@ -366,6 +382,33 @@ class Block:
             current_hash = hashlib.sha256(combined.encode()).hexdigest()
 
         return current_hash == merkle_root
+
+    def mine_block(self, difficulty: Optional[int] = None) -> None:
+        """
+        Mine this block by finding a valid proof-of-work nonce.
+
+        This method performs proof-of-work mining by incrementing the nonce
+        until the block hash has the required number of leading zeros.
+
+        Args:
+            difficulty: Number of leading zeros required. If None, uses the
+                       block's current difficulty setting.
+
+        Note:
+            This is a standalone mining method for use in tests and utilities.
+            Production mining typically uses the Blockchain's mining pipeline
+            which includes additional validation and transaction handling.
+        """
+        if difficulty is None:
+            difficulty = self.header.difficulty
+
+        target = "0" * difficulty
+        self.header.nonce = 0
+        self.header.hash = self.header.calculate_hash()
+
+        while not self.header.hash.startswith(target):
+            self.header.nonce += 1
+            self.header.hash = self.header.calculate_hash()
 
     def __repr__(self) -> str:
         return (
