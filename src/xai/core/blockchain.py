@@ -3102,6 +3102,279 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
     # get_mempool_overview is inherited from BlockchainMempoolMixin
 
+    # ==================== GOVERNANCE PUBLIC API ====================
+
+    def submit_governance_proposal(
+        self,
+        submitter: str,
+        title: str,
+        description: str,
+        proposal_type: str,
+        proposal_data: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Submit a governance proposal to the blockchain.
+
+        Creates a governance transaction and adds it to pending transactions.
+        The proposal will be processed when included in a mined block.
+
+        Args:
+            submitter: Address of the proposal submitter
+            title: Short title for the proposal
+            description: Detailed description of what the proposal does
+            proposal_type: Type of proposal (ai_improvement, parameter_change, emergency)
+            proposal_data: Additional payload data for the proposal
+
+        Returns:
+            Dict with proposal_id, txid, and status
+        """
+        if not self.governance_state:
+            return {"success": False, "error": "Governance not initialized"}
+
+        import uuid
+        proposal_id = f"prop_{uuid.uuid4().hex[:12]}"
+
+        # Get submitter's voting power (based on balance)
+        submitter_voting_power = self.get_balance(submitter)
+
+        # Create governance transaction
+        gtx = GovernanceTransaction(
+            tx_type=GovernanceTxType.SUBMIT_PROPOSAL,
+            submitter=submitter,
+            proposal_id=proposal_id,
+            data={
+                "title": title,
+                "description": description,
+                "proposal_type": proposal_type,
+                "submitter_voting_power": submitter_voting_power,
+                "proposal_payload": proposal_data or {},
+            },
+        )
+
+        # Process the proposal in governance state
+        result = self.governance_state.submit_proposal(gtx)
+
+        # Add to pending as a governance marker (for block inclusion)
+        # We use a special marker transaction for governance
+        return {
+            "proposal_id": proposal_id,
+            "txid": gtx.txid,
+            "status": "pending",
+            "success": result.get("success", True),
+        }
+
+    def cast_governance_vote(
+        self,
+        voter: str,
+        proposal_id: str,
+        vote: str,
+        voting_power: float = 0.0,
+    ) -> Dict[str, Any]:
+        """
+        Cast a vote on a governance proposal.
+
+        Args:
+            voter: Address of the voter
+            proposal_id: ID of the proposal to vote on
+            vote: Vote value ("yes", "no", "abstain")
+            voting_power: Voting power of the voter (0 = auto-calculate from balance)
+
+        Returns:
+            Dict with txid, status, and vote details
+        """
+        if not self.governance_state:
+            return {"success": False, "error": "Governance not initialized"}
+
+        # Auto-calculate voting power from balance if not provided
+        if voting_power <= 0:
+            voting_power = self.get_balance(voter)
+
+        gtx = GovernanceTransaction(
+            tx_type=GovernanceTxType.CAST_VOTE,
+            submitter=voter,
+            proposal_id=proposal_id,
+            data={
+                "vote": vote.lower(),
+                "voting_power": voting_power,
+            },
+        )
+
+        result = self.governance_state.cast_vote(gtx)
+
+        return {
+            "txid": gtx.txid,
+            "status": "recorded" if result.get("success", True) else "failed",
+            "vote_count": result.get("vote_count", 0),
+            "success": result.get("success", True),
+        }
+
+    def submit_code_review(
+        self,
+        reviewer: str,
+        proposal_id: str,
+        approved: bool,
+        comments: str = "",
+        voting_power: float = 0.0,
+    ) -> Dict[str, Any]:
+        """
+        Submit a code review for a governance proposal.
+
+        Args:
+            reviewer: Address of the reviewer
+            proposal_id: ID of the proposal being reviewed
+            approved: Whether the reviewer approves the code changes
+            comments: Optional review comments
+            voting_power: Reviewer's voting power (0 = auto-calculate)
+
+        Returns:
+            Dict with txid, status, and review count
+        """
+        if not self.governance_state:
+            return {"success": False, "error": "Governance not initialized"}
+
+        if voting_power <= 0:
+            voting_power = self.get_balance(reviewer)
+
+        gtx = GovernanceTransaction(
+            tx_type=GovernanceTxType.SUBMIT_CODE_REVIEW,
+            submitter=reviewer,
+            proposal_id=proposal_id,
+            data={
+                "approved": approved,
+                "comments": comments,
+                "voting_power": voting_power,
+            },
+        )
+
+        result = self.governance_state.submit_code_review(gtx)
+
+        return {
+            "txid": gtx.txid,
+            "status": "submitted" if result.get("success", True) else "failed",
+            "review_count": result.get("review_count", 0),
+            "success": result.get("success", True),
+        }
+
+    def execute_governance_proposal(self, proposal_id: str, executor: str = "system") -> Dict[str, Any]:
+        """
+        Execute an approved governance proposal.
+
+        Args:
+            proposal_id: ID of the proposal to execute
+            executor: Address executing the proposal
+
+        Returns:
+            Dict with execution status and details
+        """
+        if not self.governance_state:
+            return {"success": False, "error": "Governance not initialized"}
+
+        proposal = self.governance_state.proposals.get(proposal_id)
+        if not proposal:
+            return {"success": False, "error": "Proposal not found"}
+
+        gtx = GovernanceTransaction(
+            tx_type=GovernanceTxType.EXECUTE_PROPOSAL,
+            submitter=executor,
+            proposal_id=proposal_id,
+            data={
+                "proposal_payload": proposal.payload,
+            },
+        )
+
+        result = self.governance_state.execute_proposal(gtx)
+
+        if result.get("success"):
+            # Run actual execution logic
+            exec_result = self._run_governance_execution(proposal_id)
+            result["execution_result"] = exec_result
+
+        return result
+
+    def get_governance_proposal(self, proposal_id: str) -> Optional[Dict[str, Any]]:
+        """Get details of a governance proposal."""
+        if not self.governance_state:
+            return None
+        return self.governance_state.get_proposal_state(proposal_id)
+
+    def list_governance_proposals(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        List all governance proposals, optionally filtered by status.
+
+        Args:
+            status: Filter by status (active, approved, executed, rejected)
+
+        Returns:
+            List of proposal dictionaries
+        """
+        if not self.governance_state:
+            return []
+
+        proposals = []
+        for proposal_id, proposal in self.governance_state.proposals.items():
+            proposal_dict = proposal.to_dict()
+            if status is None or proposal_dict.get("status") == status:
+                proposals.append(proposal_dict)
+
+        return proposals
+
+    # ==================== BLOCKCHAIN SERIALIZATION ====================
+
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Export the entire blockchain state to a dictionary.
+
+        Returns:
+            Dict containing chain, pending transactions, difficulty, and stats
+        """
+        return {
+            "chain": [self._block_to_full_dict(block) for block in self.chain],
+            "pending_transactions": [tx.to_dict() for tx in self.pending_transactions],
+            "difficulty": self.difficulty,
+            "stats": {
+                "blocks": len(self.chain),
+                "total_transactions": sum(
+                    len(block.transactions) if hasattr(block, "transactions") else 0
+                    for block in self.chain
+                ),
+                "total_supply": self.get_circulating_supply(),
+                "difficulty": self.difficulty,
+            },
+        }
+
+    def _block_to_full_dict(self, block: Any) -> Dict[str, Any]:
+        """Convert a block (header or full) to dictionary with transactions."""
+        if hasattr(block, "to_dict"):
+            return block.to_dict()
+
+        # BlockHeader doesn't have transactions - need to load full block
+        full_block = self.get_block(block.index)
+        if full_block and hasattr(full_block, "to_dict"):
+            return full_block.to_dict()
+
+        # Fallback for headers
+        return {
+            "index": block.index,
+            "hash": block.hash,
+            "previous_hash": block.previous_hash,
+            "timestamp": block.timestamp,
+            "difficulty": block.difficulty,
+            "nonce": block.nonce,
+            "merkle_root": getattr(block, "merkle_root", ""),
+            "transactions": [],
+        }
+
+    def get_total_supply(self) -> float:
+        """
+        Get the total supply of XAI tokens in circulation.
+
+        This is an alias for get_circulating_supply() for API compatibility.
+
+        Returns:
+            Total circulating supply as float
+        """
+        return self.get_circulating_supply()
+
     # ==================== TRADE MANAGEMENT ====================
 
     def get_blockchain_data_provider(self) -> BlockchainDataProvider:

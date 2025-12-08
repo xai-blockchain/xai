@@ -261,6 +261,32 @@ class BlockchainMiningMixin:
                     utxo_keys = [(inp["txid"], inp["vout"]) for inp in tx.inputs]
                     self.utxo_manager.unlock_utxos_by_keys(utxo_keys)
 
+            # Index transactions for O(log n) address lookups
+            try:
+                for tx_index, tx in enumerate(new_block.transactions):
+                    self.address_index.index_transaction(
+                        tx,
+                        new_block.index,
+                        tx_index,
+                        new_block.timestamp
+                    )
+                self.address_index.commit()
+            except Exception as e:
+                self.logger.error(
+                    "Failed to index block transactions",
+                    block_index=new_block.index,
+                    error=str(e)
+                )
+                # Don't fail block addition if indexing fails - index can be rebuilt
+                try:
+                    self.address_index.rollback()
+                except Exception as rollback_err:
+                    self.logger.warning(
+                        "Failed to rollback address index after indexing failure",
+                        block_index=new_block.index,
+                        error=str(rollback_err)
+                    )
+
             # Clear pending transactions
             self.pending_transactions = []
 
