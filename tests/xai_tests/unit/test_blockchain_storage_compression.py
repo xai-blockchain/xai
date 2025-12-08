@@ -252,7 +252,11 @@ class TestBlockchainStorageCompression:
             # Manually verify gzip format
             with gzip.open(compressed_path, "rt", encoding="utf-8") as f:
                 decompressed_data = json.loads(f.read())
-                assert decompressed_data["header"]["index"] == 42
+                # Support both nested header format and flattened format
+                if "header" in decompressed_data and decompressed_data["header"]:
+                    assert decompressed_data["header"]["index"] == 42
+                else:
+                    assert decompressed_data["index"] == 42
 
             storage.close()
 

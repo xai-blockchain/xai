@@ -340,7 +340,11 @@ class BlockchainStorage:
             for line in lines:
                 try:
                     block_data = json.loads(line.strip())
-                    block_index = block_data["header"]["index"]
+                    # Support both nested header format and flattened format
+                    if "header" in block_data and block_data["header"]:
+                        block_index = block_data["header"]["index"]
+                    else:
+                        block_index = block_data["index"]
 
                     # Check if block should be compressed
                     if force or self._should_compress_block(block_index):
