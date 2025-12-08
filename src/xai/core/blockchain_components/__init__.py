@@ -6,5 +6,7 @@ monolithic blockchain.py file.
 """
 
 from xai.core.blockchain_components.block import Block
+from xai.core.blockchain_components.consensus_mixin import BlockchainConsensusMixin
+from xai.core.blockchain_components.mempool_mixin import BlockchainMempoolMixin
 
-__all__ = ["Block"]
+__all__ = ["Block", "BlockchainConsensusMixin", "BlockchainMempoolMixin"]
