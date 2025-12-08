@@ -61,17 +61,19 @@ class Block:
         else:
             if header is None:
                 raise ValueError("Either header (BlockHeader) or index (int) is required")
-            if previous_hash is None or difficulty is None:
+            if previous_hash is None:
                 raise ValueError(
-                    "previous_hash and difficulty are required for legacy block construction"
+                    "previous_hash is required for legacy block construction"
                 )
+            # Default difficulty to 4 (standard testnet difficulty) if not provided
+            effective_difficulty = difficulty if difficulty is not None else 4
             block_header = BlockHeader(
                 index=int(header),
                 previous_hash=previous_hash,
                 merkle_root=merkle_root
                 or self._calculate_merkle_root_static(transactions),
                 timestamp=timestamp or time.time(),
-                difficulty=int(difficulty),
+                difficulty=int(effective_difficulty),
                 nonce=nonce,
                 signature=signature,
                 miner_pubkey=miner_pubkey,
@@ -179,7 +181,23 @@ class Block:
 
     @property
     def miner(self) -> Optional[str]:
-        return self._miner or self.header.miner_pubkey
+        """Get the miner address.
+
+        Returns the miner address from:
+        1. Explicitly set _miner value
+        2. Header's miner_pubkey
+        3. Coinbase transaction's recipient (if present)
+        """
+        if self._miner:
+            return self._miner
+        if self.header.miner_pubkey:
+            return self.header.miner_pubkey
+        # Extract from coinbase transaction if available
+        if self.transactions:
+            coinbase_tx = self.transactions[0]
+            if hasattr(coinbase_tx, 'sender') and coinbase_tx.sender == "COINBASE":
+                return coinbase_tx.recipient
+        return None
 
     @miner.setter
     def miner(self, value: str) -> None:
@@ -383,7 +401,7 @@ class Block:
 
         return current_hash == merkle_root
 
-    def mine_block(self, difficulty: Optional[int] = None) -> None:
+    def mine_block(self, difficulty: Optional[int] = None) -> str:
         """
         Mine this block by finding a valid proof-of-work nonce.
 
@@ -393,6 +411,9 @@ class Block:
         Args:
             difficulty: Number of leading zeros required. If None, uses the
                        block's current difficulty setting.
+
+        Returns:
+            The block's hash after mining.
 
         Note:
             This is a standalone mining method for use in tests and utilities.
@@ -409,6 +430,8 @@ class Block:
         while not self.header.hash.startswith(target):
             self.header.nonce += 1
             self.header.hash = self.header.calculate_hash()
+
+        return self.header.hash
 
     def __repr__(self) -> str:
         return (
