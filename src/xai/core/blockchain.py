@@ -3291,6 +3291,63 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
         return result
 
+    def vote_implementation(
+        self,
+        voter: str,
+        proposal_id: str,
+        approved: bool = True,
+        voting_power: float = 0.0,
+    ) -> Dict[str, Any]:
+        """
+        Vote on a governance proposal implementation.
+
+        Args:
+            voter: Address of the voter
+            proposal_id: ID of the proposal to vote on
+            approved: Whether to approve the implementation
+            voting_power: Voting power (defaults to balance if 0)
+
+        Returns:
+            Dict with txid, status, and vote result
+        """
+        if not self.governance_state:
+            return {"success": False, "error": "Governance not initialized"}
+
+        if voting_power <= 0:
+            voting_power = self.get_balance(voter)
+
+        gtx = GovernanceTransaction(
+            tx_type=GovernanceTxType.VOTE_IMPLEMENTATION,
+            submitter=voter,
+            proposal_id=proposal_id,
+            data={
+                "approved": approved,
+                "voting_power": voting_power,
+            },
+        )
+
+        result = self.governance_state.vote_implementation(gtx)
+
+        return {
+            "txid": gtx.txid,
+            "status": "approved" if result.get("success", True) else "failed",
+            "success": result.get("success", True),
+            "error": result.get("error"),
+        }
+
+    def execute_proposal(self, executor: str, proposal_id: str) -> Dict[str, Any]:
+        """
+        Execute an approved governance proposal (alias for execute_governance_proposal).
+
+        Args:
+            executor: Address executing the proposal
+            proposal_id: ID of the proposal to execute
+
+        Returns:
+            Dict with execution status and details
+        """
+        return self.execute_governance_proposal(proposal_id, executor)
+
     def get_governance_proposal(self, proposal_id: str) -> Optional[Dict[str, Any]]:
         """Get details of a governance proposal."""
         if not self.governance_state:
