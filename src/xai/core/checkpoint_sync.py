@@ -49,6 +49,7 @@ class CheckpointSyncManager:
         self.trusted_pubkeys = set(
             getattr(getattr(blockchain, "config", None), "TRUSTED_CHECKPOINT_PUBKEYS", []) or []
         )
+        self.min_peer_diversity = int(getattr(getattr(blockchain, "config", None), "CHECKPOINT_MIN_PEERS", 2))
 
     def _local_checkpoint_metadata(self) -> Optional[Dict[str, Any]]:
         """Return latest local checkpoint metadata if available."""
@@ -188,7 +189,7 @@ class CheckpointSyncManager:
         # Inspect cached peer features for received payload hints with quorum logic
         features = getattr(self.p2p_manager, "peer_features", {}) or {}
         candidates: Dict[str, Dict[str, Any]] = {}
-        for info in features.values():
+        for peer_id, info in features.items():
             payload_data = info.get("checkpoint_payload") if isinstance(info, dict) else None
             if not payload_data:
                 continue
@@ -196,16 +197,26 @@ class CheckpointSyncManager:
                 height = int(payload_data["height"])
                 block_hash = str(payload_data["block_hash"])
                 state_hash = str(payload_data["state_hash"])
-                candidates.setdefault(block_hash, {"count": 0, "payload": payload_data})
-                candidates[block_hash]["count"] += 1
-                candidates[block_hash]["height"] = height
-                candidates[block_hash]["state_hash"] = state_hash
+                entry = candidates.setdefault(
+                    block_hash,
+                    {
+                        "count": 0,
+                        "payload": payload_data,
+                        "height": height,
+                        "state_hash": state_hash,
+                        "peers": set(),
+                    },
+                )
+                entry["count"] += 1
+                entry["peers"].add(peer_id)
             except (KeyError, ValueError, TypeError):
                 continue
 
         # Choose the highest-height candidate that meets quorum
         quorum_candidates = [
-            data for data in candidates.values() if data.get("count", 0) >= self.required_quorum
+            data
+            for data in candidates.values()
+            if data.get("count", 0) >= self.required_quorum and len(data.get("peers", set())) >= self.min_peer_diversity
         ]
         if not quorum_candidates:
             return None
