@@ -16,3 +16,23 @@ def test_validate_payload_integrity():
 
     bad = CheckpointPayload(height=1, block_hash="h", state_hash="deadbeef", data=data)
     assert CheckpointSyncManager.validate_payload(bad) is False
+
+
+def test_apply_payload_invokes_applier():
+    data = {"snapshot": "ok"}
+    digest = hashlib.sha256(str(data).encode("utf-8")).hexdigest()
+    payload = CheckpointPayload(height=1, block_hash="h", state_hash=digest, data=data)
+
+    applied = {}
+
+    class Applier:
+        def apply_checkpoint(self, p):
+            applied["payload"] = p
+
+    mgr = CheckpointSyncManager(blockchain=None)
+    assert mgr.apply_payload(payload, Applier()) is True
+    assert applied["payload"] is payload
+
+    # invalid payload should not be applied
+    bad = CheckpointPayload(height=1, block_hash="h", state_hash="bad", data=data)
+    assert mgr.apply_payload(bad, Applier()) is False

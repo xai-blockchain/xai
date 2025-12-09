@@ -108,6 +108,27 @@ class CheckpointSyncManager:
         """Validate payload integrity before application."""
         return payload.verify_integrity()
 
+    def apply_payload(self, payload: CheckpointPayload, applier: Any) -> bool:
+        """
+        Validate and apply a checkpoint payload using provided applier.
+
+        Args:
+            payload: CheckpointPayload with state snapshot info
+            applier: Callable or object with `.apply_checkpoint(payload)` to mutate state
+
+        Returns:
+            True if applied, False otherwise
+        """
+        if not self.validate_payload(payload):
+            return False
+        if hasattr(applier, "apply_checkpoint"):
+            applier.apply_checkpoint(payload)
+            return True
+        if callable(applier):
+            applier(payload)
+            return True
+        return False
+
     @staticmethod
     def choose_newer_metadata(*candidates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
