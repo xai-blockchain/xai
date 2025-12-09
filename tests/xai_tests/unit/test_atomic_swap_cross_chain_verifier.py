@@ -167,3 +167,51 @@ def test_invalid_tx_hash_rejected():
     assert valid is False
     assert "Invalid transaction hash" in message
     assert data is None
+
+
+def test_unsupported_coin_rejected():
+    verifier = FixtureVerifier({})
+    valid, message, data = verifier.verify_transaction_on_chain(
+        "XYZ",
+        "a" * 64,
+        expected_amount=Decimal("1"),
+        recipient="addr",
+        min_confirmations=1,
+    )
+    assert valid is False
+    assert "Unsupported coin" in message
+    assert data is None
+
+
+def test_cached_result_returned():
+    tx_hash = "f" * 64
+    recipient = "bc1qrecipient0000000000000000000000000000"
+    fixtures = {
+        ("https://blockstream.info/api/tx/" + tx_hash, None): {
+            "txid": tx_hash,
+            "status": {"block_height": 50},
+            "vout": [{"scriptpubkey_address": recipient, "value": 100000000}],
+        },
+        ("https://blockstream.info/api/blocks/tip/height", None): 55,
+    }
+    verifier = FixtureVerifier(fixtures)
+    valid, message, data = verifier.verify_transaction_on_chain(
+        "BTC",
+        tx_hash,
+        expected_amount=Decimal("1"),
+        recipient=recipient,
+        min_confirmations=1,
+    )
+    assert valid is True
+
+    # Second call should hit cache even if fixtures removed
+    verifier.fixtures.clear()
+    valid2, message2, data2 = verifier.verify_transaction_on_chain(
+        "BTC",
+        tx_hash,
+        expected_amount=Decimal("1"),
+        recipient=recipient,
+        min_confirmations=1,
+    )
+    assert valid2 is True
+    assert data2 == data
