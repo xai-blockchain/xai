@@ -66,3 +66,15 @@ def test_choose_newer_metadata_skips_incomplete():
     chosen = CheckpointSyncManager.choose_newer_metadata(older, bad, newer)
     assert chosen["height"] == 10
     assert chosen["block_hash"] == "b"
+
+
+def test_best_checkpoint_prefers_higher_height():
+    p2p_meta = {"height": 15, "block_hash": "peer", "timestamp": 1}
+    local_meta = {"height": 10, "block_hash": "local", "timestamp": 2}
+    bc = SimpleNamespace(checkpoint_manager=None)
+    mgr = CheckpointSyncManager(bc, p2p_manager=SimpleNamespace(_get_checkpoint_metadata=lambda: p2p_meta))
+    # Inject local via monkeypatch of helper
+    mgr._local_checkpoint_metadata = lambda: local_meta
+    chosen = mgr.get_best_checkpoint_metadata()
+    assert chosen["height"] == 15
+    assert chosen["block_hash"] == "peer"

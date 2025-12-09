@@ -54,13 +54,13 @@ class CheckpointSyncManager:
         """
         Pick a checkpoint candidate from P2P (preferred) or local store.
 
-        Preference is given to P2P metadata if present, otherwise falls back
-        to the latest local checkpoint.
+        Preference is given to P2P metadata if present and complete, otherwise
+        falls back to the latest local checkpoint. If both are available, the
+        newer height wins.
         """
         p2p_meta = self._p2p_checkpoint_metadata()
-        if p2p_meta and self._is_metadata_complete(p2p_meta):
-            return p2p_meta
-        return self._local_checkpoint_metadata()
+        local_meta = self._local_checkpoint_metadata()
+        return self.choose_newer_metadata(p2p_meta, local_meta)
 
     def apply_local_checkpoint(self, height: Optional[int] = None) -> Optional[Any]:
         """
