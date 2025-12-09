@@ -1343,6 +1343,20 @@ class SwapRecoveryService:
         refundable = self.planner.plan_refunds(candidates)
         return refundable
 
+    def auto_transition_refunds(self) -> List[str]:
+        """
+        Identify refundable swaps and transition them to REFUNDED state.
+        Returns list of swap_ids transitioned.
+        """
+        transitioned: List[str] = []
+        refundable = self.find_refundable_swaps()
+        for swap in refundable:
+            swap_id = swap["swap_id"]
+            ok, _ = self.state_machine.transition(swap_id, SwapState.REFUNDED, SwapEvent.REFUND, data=swap)
+            if ok:
+                transitioned.append(swap_id)
+        return transitioned
+
 
 # Trading pair manager
 class MeshDEXPairManager:
