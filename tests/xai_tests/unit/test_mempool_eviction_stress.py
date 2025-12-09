@@ -84,7 +84,7 @@ class DummyBlockchain(BlockchainMempoolMixin):
 
 
 class DummyTx:
-    def __init__(self, txid, sender, fee, nonce=None, fee_rate=None, inputs=None, timestamp=None):
+    def __init__(self, txid, sender, fee, nonce=None, fee_rate=None, inputs=None, timestamp=None, recipient="dest"):
         self.txid = txid
         self.sender = sender
         self.fee = fee
@@ -95,6 +95,7 @@ class DummyTx:
         self.inputs = inputs or []
         self.outputs = []
         self.amount = fee  # minimal attribute to satisfy fee math in some paths
+        self.recipient = recipient
         self.fee_rate = fee_rate if fee_rate is not None else fee
 
     def get_fee_rate(self):
@@ -102,6 +103,9 @@ class DummyTx:
 
     def calculate_hash(self):
         return self.txid
+
+    def get_size(self):
+        return 250
 
 
 def test_eviction_when_full_keeps_high_fee():
@@ -197,3 +201,26 @@ def test_prune_expired_resets_counters():
     assert bc.pending_transactions[0].txid == "fresh"
     assert bc._sender_pending_count == {"bob": 1}
     assert bc._mempool_expired_total == 1
+
+
+def test_orphan_pool_pruning_and_overview():
+    """Orphan expiry and overview stats reflect mempool contents."""
+    bc = DummyBlockchain()
+    old_orphan = DummyTx("orph1", "x", fee=0.01, timestamp=0)
+    fresh_orphan = DummyTx("orph2", "y", fee=0.02, timestamp=time.time())
+    bc.orphan_transactions = [old_orphan, fresh_orphan]
+
+    removed = bc._prune_orphan_pool(current_time=time.time())
+    assert removed == 1
+    assert bc.orphan_transactions == [fresh_orphan]
+
+    tx_a = DummyTx("a", "alice", fee=0.3, timestamp=time.time())
+    tx_b = DummyTx("b", "bob", fee=0.7, timestamp=time.time())
+    bc.pending_transactions = [tx_a, tx_b]
+    overview = bc.get_mempool_overview(limit=10)
+
+    assert overview["pending_count"] == 2
+    assert overview["limits"]["max_transactions"] == bc._mempool_max_size
+    assert overview["rejections"]["expired_total"] == bc._mempool_expired_total
+    assert overview["transactions_returned"] == 2
+    assert {t["txid"] for t in overview["transactions"]} == {"a", "b"}
