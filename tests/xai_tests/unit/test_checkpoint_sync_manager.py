@@ -57,3 +57,12 @@ def test_apply_local_checkpoint_specific_height():
     cp = mgr.apply_local_checkpoint(height=5)
     assert cp.height == 5
     assert cp.block_hash == "h"
+
+
+def test_choose_newer_metadata_skips_incomplete():
+    older = {"height": 5, "block_hash": "a"}
+    newer = {"height": 10, "block_hash": "b"}
+    bad = {"height": 20}  # missing hash
+    chosen = CheckpointSyncManager.choose_newer_metadata(older, bad, newer)
+    assert chosen["height"] == 10
+    assert chosen["block_hash"] == "b"

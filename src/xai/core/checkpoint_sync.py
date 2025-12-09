@@ -58,7 +58,7 @@ class CheckpointSyncManager:
         to the latest local checkpoint.
         """
         p2p_meta = self._p2p_checkpoint_metadata()
-        if p2p_meta:
+        if p2p_meta and self._is_metadata_complete(p2p_meta):
             return p2p_meta
         return self._local_checkpoint_metadata()
 
@@ -75,3 +75,17 @@ class CheckpointSyncManager:
         if height is not None:
             return cm.load_checkpoint(height)
         return cm.load_latest_checkpoint()
+
+    @staticmethod
+    def choose_newer_metadata(*candidates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Choose the highest-height valid checkpoint metadata from provided candidates.
+        """
+        valid = [c for c in candidates if c and CheckpointSyncManager._is_metadata_complete(c)]
+        if not valid:
+            return None
+        return max(valid, key=lambda m: m.get("height", -1))
+
+    @staticmethod
+    def _is_metadata_complete(meta: Dict[str, Any]) -> bool:
+        return bool(meta.get("height") is not None and meta.get("block_hash"))
