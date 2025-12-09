@@ -15,6 +15,7 @@ import secrets
 import threading
 
 import requests
+from eth_utils import keccak
 
 
 class CoinType(Enum):
@@ -346,6 +347,7 @@ class AtomicSwapHTLC:
         # Generate secret for HTLC
         secret = secrets.token_bytes(32)
         secret_hash = hashlib.sha256(secret).hexdigest()
+        secret_hash_keccak = keccak(secret).hex()
 
         # Calculate timelock (Unix timestamp)
         timelock = int(time.time()) + (timelock_hours * 3600)
@@ -357,7 +359,7 @@ class AtomicSwapHTLC:
             )
         elif self.protocol == SwapProtocol.HTLC_ETHEREUM:
             contract = self._create_ethereum_htlc(
-                secret_hash, timelock, counterparty_address, other_coin_amount
+                secret_hash_keccak, timelock, counterparty_address, other_coin_amount
             )
         elif self.protocol == SwapProtocol.HTLC_MONERO:
             contract = self._create_monero_htlc(
@@ -369,6 +371,7 @@ class AtomicSwapHTLC:
                 "success": True,
                 "secret": secret.hex(),  # Sender keeps this secret
                 "secret_hash": secret_hash,
+                "secret_hash_keccak": secret_hash_keccak,
                 "axn_amount": axn_amount,
                 "other_coin": self.coin_type.name,
                 "other_coin_amount": other_coin_amount,
