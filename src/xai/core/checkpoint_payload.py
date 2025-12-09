@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 @dataclass
@@ -26,3 +26,11 @@ class CheckpointPayload:
         serialized = json.dumps(self.data, sort_keys=True).encode("utf-8")
         digest = hashlib.sha256(serialized).hexdigest()
         return digest == self.state_hash
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "height": self.height,
+            "block_hash": self.block_hash,
+            "state_hash": self.state_hash,
+            "data": self.data,
+        }

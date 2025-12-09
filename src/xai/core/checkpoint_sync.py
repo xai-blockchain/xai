@@ -16,7 +16,6 @@ from typing import Any, Dict, Optional
 import requests
 
 from .checkpoint_payload import CheckpointPayload
-from xai.network.peer_manager import PeerReputation
 
 @dataclass
 class CheckpointMetadata:
@@ -184,7 +183,7 @@ class CheckpointSyncManager:
         # Inspect cached peer features for received payload hints with quorum logic
         features = getattr(self.p2p_manager, "peer_features", {}) or {}
         candidates: Dict[str, Dict[str, Any]] = {}
-        for peer_id, info in features.items():
+        for info in features.values():
             payload_data = info.get("checkpoint_payload") if isinstance(info, dict) else None
             if not payload_data:
                 continue
