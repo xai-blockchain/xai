@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
 from .checkpoint_payload import CheckpointPayload
-from .checkpoint_transport import CheckpointTransport
 
 @dataclass
 class CheckpointMetadata:
@@ -36,11 +35,10 @@ class CheckpointMetadata:
 class CheckpointSyncManager:
     """Coordinate checkpoint discovery and selection for partial sync."""
 
-    def __init__(self, blockchain: Any, p2p_manager: Optional[Any] = None, transport: Optional[CheckpointTransport] = None):
+    def __init__(self, blockchain: Any, p2p_manager: Optional[Any] = None):
         self.blockchain = blockchain
         self.p2p_manager = p2p_manager
         self.checkpoint_manager = getattr(blockchain, "checkpoint_manager", None)
-        self.transport = transport or CheckpointTransport(p2p_manager)
 
     def _local_checkpoint_metadata(self) -> Optional[Dict[str, Any]]:
         """Return latest local checkpoint metadata if available."""
@@ -131,17 +129,6 @@ class CheckpointSyncManager:
             return True
         return False
 
-    def fetch_and_apply(self) -> bool:
-        """
-        Fetch a remote checkpoint payload (if available) and apply after validation.
-        """
-        meta = self.get_best_checkpoint_metadata()
-        if not meta:
-            return False
-        payload = self.transport.fetch_payload(meta)
-        if not payload:
-            return False
-        return self.apply_payload(payload, self.blockchain)
 
     @staticmethod
     def choose_newer_metadata(*candidates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
