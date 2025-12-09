@@ -1253,6 +1253,61 @@ class CrossChainVerifier:
             return self.verified_transactions.get(cache_key)
 
 
+class SwapRefundPlanner:
+    """
+    Plan refundable atomic swaps by combining timelock checks with SPV-backed
+    confirmation verification.
+    """
+
+    REFUNDABLE_STATES = {
+        SwapState.FUNDED.value,
+        SwapState.COUNTERPARTY_FUNDED.value,
+        SwapState.FUNDED,
+        SwapState.COUNTERPARTY_FUNDED,
+    }
+
+    def __init__(self, verifier: CrossChainVerifier, now_fn=time.time):
+        self.verifier = verifier
+        self._now = now_fn
+
+    def plan_refunds(self, swaps: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Return swaps that are eligible for refund execution.
+
+        Expected swap fields:
+        - swap_id: unique identifier
+        - coin: coin symbol (e.g., BTC)
+        - funding_txid: on-chain funding transaction hash
+        - timelock: unix timestamp when refund becomes valid
+        - min_confirmations: minimum confirmations required before refund
+        - state: current swap state (string or SwapState)
+        """
+        refundable: List[Dict[str, Any]] = []
+        now = self._now()
+        for swap in swaps:
+            state = swap.get("state")
+            if state not in self.REFUNDABLE_STATES:
+                continue
+            timelock = swap.get("timelock")
+            if timelock is None or now < float(timelock):
+                continue
+            txid = swap.get("funding_txid")
+            coin = swap.get("coin")
+            min_conf = int(swap.get("min_confirmations", 1))
+            if not txid or not coin:
+                continue
+            try:
+                has_conf, confirmations = self.verifier.verify_minimum_confirmations(coin, txid, min_conf)
+            except Exception:
+                continue
+            if not has_conf:
+                continue
+            enriched = dict(swap)
+            enriched["confirmations"] = confirmations
+            refundable.append(enriched)
+        return refundable
+
+
 # Trading pair manager
 class MeshDEXPairManager:
     """Manages trading pairs"""
