@@ -154,15 +154,18 @@ class CheckpointSyncManager:
         End-to-end helper: pick best checkpoint metadata, fetch payload, validate, and apply.
         """
         meta = self.get_best_checkpoint_metadata()
-        if not meta:
-            return False
-        payload = self.fetch_payload(meta)
+        payload = None
+        if meta:
+            payload = self.fetch_payload(meta)
         # Fallback: use local checkpoint manager if metadata is local and no URL present
-        if not payload and meta.get("source") == "local" and self.checkpoint_manager:
+        if not payload and meta and meta.get("source") == "local" and self.checkpoint_manager:
             try:
                 payload = self.checkpoint_manager.load_latest_checkpoint()
             except Exception:
                 payload = None
+        # Fallback: request from peers if nothing was obtained
+        if not payload:
+            payload = self.request_checkpoint_from_peers()
         if not payload:
             return False
         return self.apply_payload(payload, self.blockchain)
