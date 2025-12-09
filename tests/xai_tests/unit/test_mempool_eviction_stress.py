@@ -224,3 +224,17 @@ def test_orphan_pool_pruning_and_overview():
     assert overview["rejections"]["expired_total"] == bc._mempool_expired_total
     assert overview["transactions_returned"] == 2
     assert {t["txid"] for t in overview["transactions"]} == {"a", "b"}
+
+
+def test_low_fee_rejected_when_full():
+    """If mempool full and new fee rate is lower, transaction is rejected."""
+    bc = DummyBlockchain(max_size=2)
+    high = DummyTx("high", "s1", fee=1.0, fee_rate=1.0)
+    mid = DummyTx("mid", "s2", fee=0.8, fee_rate=0.8)
+    low = DummyTx("low", "s3", fee=0.1, fee_rate=0.1)
+    bc.pending_transactions = [high, mid]
+    bc.seen_txids = {"high", "mid"}
+
+    assert bc.add_transaction(low) is False
+    assert len(bc.pending_transactions) == 2
+    assert bc._mempool_rejected_low_fee_total == 1
