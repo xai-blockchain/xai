@@ -1112,7 +1112,15 @@ class CrossChainVerifier:
     ) -> Decimal:
         normalized_recipient = self._normalize_address(recipient, coin_type)
         total = Decimal("0")
-        for output in tx_data.get("outputs", []):
+        outputs = tx_data.get("outputs") or []
+        if not outputs and tx_data.get("vout"):
+            # Fallback parse when raw vout data is provided without normalized outputs
+            outputs = self._parse_utxo_outputs(
+                tx_data,
+                coin_type,
+                value_is_base_units=self.oracle_endpoints.get(coin_type, {}).get("value_is_base_units", True),
+            )
+        for output in outputs:
             address = output.get("address")
             amount = output.get("amount")
             if address is None or amount is None:
