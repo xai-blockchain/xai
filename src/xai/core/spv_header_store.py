@@ -48,6 +48,7 @@ class SPVHeaderStore:
     def __init__(self):
         self.headers: Dict[str, Header] = {}
         self.best_tip: Optional[Header] = None
+        self.heights: Dict[int, str] = {}
 
     def add_header(self, header: Header) -> bool:
         """Add a header if it links to an existing chain (or is genesis)."""
@@ -63,6 +64,7 @@ class SPVHeaderStore:
             header.cumulative_work = header.work()
 
         self.headers[header.block_hash] = header
+        self.heights[header.height] = header.block_hash
         if not self.best_tip or header.cumulative_work > self.best_tip.cumulative_work:
             self.best_tip = header
         return True
@@ -72,3 +74,6 @@ class SPVHeaderStore:
 
     def get_header(self, block_hash: str) -> Optional[Header]:
         return self.headers.get(block_hash)
+
+    def has_height(self, height: int) -> bool:
+        return height in self.heights

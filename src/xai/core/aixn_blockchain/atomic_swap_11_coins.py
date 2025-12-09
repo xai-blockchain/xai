@@ -17,6 +17,8 @@ import threading
 import requests
 from eth_utils import keccak
 
+from xai.core.spv_header_ingestor import SPVHeaderIngestor
+
 
 class CoinType(Enum):
     """Supported coins for atomic swaps"""
@@ -664,6 +666,7 @@ class CrossChainVerifier:
         self.session = session or requests.Session()
         self.session.headers.update({"User-Agent": "xai-atomic-swap-verifier/1.0"})
         self.header_store = header_store
+        self.header_ingestor = SPVHeaderIngestor(self.header_store) if self.header_store else None
 
         # Providers must return deterministic JSON structures; tests patch _http_get_json
         self.oracle_endpoints: Dict[str, Dict[str, Any]] = {
@@ -878,6 +881,14 @@ class CrossChainVerifier:
         self._cache_result(cache_key, result)
         return True, result["message"], result["data"]
 
+    def ingest_headers(self, headers: List[Dict[str, Any]]) -> Tuple[int, List[str]]:
+        """
+        Ingest validated headers into the SPV header store for confirmation calculation.
+        """
+        if not self.header_ingestor:
+            return 0, []
+        return self.header_ingestor.ingest(headers)
+
     def _is_supported_coin(self, coin_type: str) -> bool:
         return coin_type in self.oracle_endpoints
 
@@ -902,6 +913,8 @@ class CrossChainVerifier:
             return None
         tip = getattr(self.header_store, "get_best_tip", lambda: None)()
         if not tip or getattr(tip, "height", None) is None:
+            return None
+        if hasattr(self.header_store, "has_height") and not self.header_store.has_height(block_height):
             return None
         if tip.height < block_height:
             return None

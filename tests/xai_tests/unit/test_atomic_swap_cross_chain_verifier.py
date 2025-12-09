@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional, Tuple
 import pytest
 
 from xai.core.aixn_blockchain.atomic_swap_11_coins import CrossChainVerifier
+from xai.core.spv_header_store import SPVHeaderStore, Header
 
 
 class FixtureVerifier(CrossChainVerifier):
@@ -218,12 +219,10 @@ def test_cached_result_returned():
 
 
 def test_header_store_overrides_confirmations(monkeypatch):
-    from xai.core.spv_header_store import SPVHeaderStore, Header
-
     store = SPVHeaderStore()
-    genesis = Header(height=0, block_hash="h0", prev_hash="", bits=1)
-    h1 = Header(height=100, block_hash="h1", prev_hash="h0", bits=2)
-    h2 = Header(height=110, block_hash="h2", prev_hash="h1", bits=2)
+    genesis = Header(height=0, block_hash="00" * 16, prev_hash="", bits=0x1f00ffff)
+    h1 = Header(height=100, block_hash="00" * 15 + "11", prev_hash=genesis.block_hash, bits=0x1f00ffff)
+    h2 = Header(height=110, block_hash="00" * 15 + "22", prev_hash=h1.block_hash, bits=0x1f00ffff)
     store.add_header(genesis)
     store.add_header(h1)
     store.add_header(h2)
@@ -251,3 +250,15 @@ def test_header_store_overrides_confirmations(monkeypatch):
     )
     assert valid is True
     assert data["confirmations"] >= 11  # from header store best tip
+
+
+def test_ingest_headers_validates_pow():
+    store = SPVHeaderStore()
+    verifier = CrossChainVerifier(header_store=store)
+    added, rejected = verifier.ingest_headers([
+        {"height": 0, "block_hash": "00" * 16, "prev_hash": "", "bits": 0x1f00ffff},
+        {"height": 1, "block_hash": "ff" * 16, "prev_hash": "missing", "bits": 0x1f00ffff},
+    ])
+    assert added == 1
+    assert rejected == ["ff" * 16]
+    assert store.get_best_tip().block_hash == "00" * 16
