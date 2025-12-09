@@ -412,6 +412,30 @@ class AtomicSwapHTLC:
             "supported_coins": ["BTC", "LTC", "DOGE", "BCH", "ZEC", "DASH"],
         }
 
+    @staticmethod
+    def build_utxo_redeem_script(secret_hash: str, recipient_pubkey: str, sender_pubkey: str, timelock: int) -> str:
+        """
+        Construct a standard P2WSH-compatible HTLC redeem script.
+
+        Returns a string representation suitable for hashing/encoding.
+        """
+        return (
+            "OP_IF "
+            f"OP_SHA256 {secret_hash} OP_EQUALVERIFY "
+            f"{recipient_pubkey} OP_CHECKSIG "
+            "OP_ELSE "
+            f"{timelock} OP_CHECKLOCKTIMEVERIFY OP_DROP "
+            f"{sender_pubkey} OP_CHECKSIG "
+            "OP_ENDIF"
+        )
+
+    @staticmethod
+    def witness_script_hash(redeem_script: str) -> str:
+        """
+        Return the SHA256 witness script hash (hex) for a redeem script.
+        """
+        return hashlib.sha256(redeem_script.encode("utf-8")).hexdigest()
+
     def _create_ethereum_htlc(
         self, secret_hash: str, timelock: int, recipient: str, amount: float
     ) -> Dict:
