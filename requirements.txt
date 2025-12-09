@@ -1,2 +1,4 @@
 -r src/xai/requirements.txt
 bech32==1.2.0
+web3>=6.11.1
+py-solc-x>=1.1.1
