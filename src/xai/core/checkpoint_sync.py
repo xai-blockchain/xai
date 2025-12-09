@@ -150,6 +150,12 @@ class CheckpointSyncManager:
         if not meta:
             return False
         payload = self.fetch_payload(meta)
+        # Fallback: use local checkpoint manager if metadata is local and no URL present
+        if not payload and meta.get("source") == "local" and self.checkpoint_manager:
+            try:
+                payload = self.checkpoint_manager.load_latest_checkpoint()
+            except Exception:
+                payload = None
         if not payload:
             return False
         return self.apply_payload(payload, self.blockchain)
