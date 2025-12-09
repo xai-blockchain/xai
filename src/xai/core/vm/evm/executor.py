@@ -1270,6 +1270,8 @@ class EVMPrecompiles:
         t0 = le_u64(data[196:204])
         t1 = le_u64(data[204:212])
         f = data[212]
+        if f not in (0, 1):
+            raise VMExecutionError("Invalid BLAKE2f flag")
 
         # Constants
         IV = [

@@ -46,3 +46,18 @@ def test_point_evaluation_precompile_rejects_non_canonical_field() -> None:
 
     with pytest.raises(VMExecutionError, match="non-canonical field elements"):
         EVMPrecompiles._point_evaluation(bytes(payload), gas=80_000)
+
+
+def test_point_evaluation_precompile_rejects_wrong_length() -> None:
+    """Input must be exactly 192 bytes."""
+    with pytest.raises(VMExecutionError, match="exactly 192 bytes"):
+        EVMPrecompiles._point_evaluation(b"\x00" * 191, gas=80_000)
+
+
+def test_point_evaluation_precompile_rejects_bad_commitment_hash() -> None:
+    """Mismatch between versioned hash and commitment triggers error."""
+    payload = bytearray(_build_valid_point_eval_payload())
+    # Flip bit in commitment portion
+    payload[100] ^= 0x01
+    with pytest.raises(VMExecutionError, match="Commitment/versioned hash mismatch"):
+        EVMPrecompiles._point_evaluation(bytes(payload), gas=80_000)

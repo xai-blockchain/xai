@@ -34,6 +34,14 @@ Before you begin, ensure you have the following installed:
 - **Storage**: 100GB+ SSD
 - **OS**: Linux (Ubuntu 22.04)
 
+## API Hardening Checklist
+
+- **CORS allowlist**: Set `API_ALLOWED_ORIGINS` (or `api.allowed_origins` in YAML) to explicit hosts; avoid `*` in production.
+- **Request size limits**: Configure `API_MAX_JSON_BYTES` / `max_json_bytes` to cap POST bodies (1MB default).
+- **Rate limits**: Tune `RATE_LIMIT_REQUESTS` / `RATE_LIMIT_WINDOW` and endpoint overrides in `SecurityConfig.ENDPOINT_LIMITS` to fit your environment.
+- **TLS**: Use a reverse proxy (e.g., Nginx) with HTTPS even on localhost for desktop/wallet flows that enforce secure cookies.
+- **IP/Port binding**: Restrict `host` to `127.0.0.1` for local dev unless you explicitly need remote access.
+
 ## Installation
 
 ### Step 1: Clone the Repository
@@ -189,6 +197,10 @@ api:
   cors_enabled: true
   rate_limit: 100
   api_key_required: false
+  allowed_origins:
+    - "http://localhost:3000"
+    - "http://127.0.0.1:3000"
+  max_json_bytes: 1048576  # 1MB body limit
 
 # Security
 security:

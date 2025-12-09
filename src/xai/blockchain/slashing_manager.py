@@ -28,7 +28,9 @@ class SlashingManager:
         "OFFLINE": 0.01,  # 1% of staked amount for prolonged downtime
         "EQUIVOCATION": 0.05,  # 5% for proposing conflicting blocks
         "INVALID_BLOCK_PROPOSAL": 0.02,  # 2% for proposing a block that violates consensus rules
+        "fraud_proven": 0.50,  # 50% slash for validated fraud proof
     }
+    OFFENSE_PENALTIES = MISBEHAVIOR_PENALTIES
 
     def __init__(self, db_path: Path, initial_validators: Optional[Dict[str, float]] = None):
         """
@@ -154,6 +156,20 @@ class SlashingManager:
         logger.info("No slashing applied for %s on %s (penalty is zero).", misbehavior_type, validator_id)
         return False
 
+    def report_malicious_behavior(self, validator_id: str, misbehavior_type: str, evidence: Any = None) -> bool:
+        """
+        Backwards-compatible alias to report misbehavior without a reporter identifier.
+
+        Args:
+            validator_id: Validator being reported
+            misbehavior_type: Type of offense
+            evidence: Optional evidence payload
+
+        Returns:
+            True if slashing applied, False otherwise.
+        """
+        return self.report_misbehavior("system", validator_id, misbehavior_type, evidence)
+
     def get_validator_status(self, validator_id: str) -> Optional[Dict[str, Any]]:
         """Returns the current status of a validator from the database."""
         return self.storage.get(get_validator_key(validator_id))
@@ -161,4 +177,3 @@ class SlashingManager:
     def close(self):
         """Closes the underlying storage connection."""
         self.storage.close()
-

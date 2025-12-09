@@ -73,7 +73,7 @@ class MockTSS(TSSInterface):
         # Here, we just generate individual key pairs for each participant.
         participant_key_shares = []
         for i in range(num_participants):
-            private_key = ec.generate_private_key(ec.SECP256k1(), default_backend())
+            private_key = ec.generate_private_key(ec.SECP256K1(), default_backend())
             public_key = private_key.public_key()
 
             priv_hex = private_key.private_bytes(

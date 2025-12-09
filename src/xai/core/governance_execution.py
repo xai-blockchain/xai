@@ -697,7 +697,7 @@ class GovernanceExecutionEngine:
             snapshot: Snapshot created by snapshot() method
         """
         import copy
-        from xai.core.governance import GovernanceState
+        from xai.core.governance_transactions import GovernanceState
 
         # Restore governance state
         gov_state_data = snapshot.get("governance_state")

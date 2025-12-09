@@ -16,7 +16,7 @@ from enum import Enum
 
 from cryptography.hazmat.primitives.asymmetric import ec, rsa, ed25519
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.backends import default_backend
 from cryptography.exceptions import InvalidSignature
@@ -175,7 +175,7 @@ class HardwareSecurityModule:
         if salt is None:
             salt = self._hsm_salt
 
-        kdf = PBKDF2(
+        kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=salt,
@@ -380,6 +380,33 @@ class HardwareSecurityModule:
             )
             raise
 
+    def verify_signature(self, key_id: str, message: bytes, signature: bytes) -> bool:
+        """
+        Verify a signature against the stored public key.
+
+        Args:
+            key_id: Key identifier
+            message: Message bytes
+            signature: Signature bytes
+
+        Returns:
+            True if signature valid, False otherwise
+        """
+        if key_id not in self.key_metadata or key_id not in self.encrypted_keys:
+            raise ValueError("Key not found.")
+
+        public_pem = self.key_metadata[key_id].public_key_pem.encode()
+        public_key = serialization.load_pem_public_key(public_pem, backend=default_backend())
+        try:
+            if isinstance(public_key, ec.EllipticCurvePublicKey):
+                public_key.verify(signature, message, ec.ECDSA(hashes.SHA256()))
+            elif hasattr(public_key, "verify"):  # RSA/Ed25519
+                public_key.verify(signature, message)
+            else:  # pragma: no cover - defensive fallback
+                raise ValueError("Unsupported public key type for verification")
+            return True
+        except InvalidSignature:
+            return False
     def rotate_key(self, old_key_id: str, user_id: str = "system") -> str:
         """
         Rotate a key by generating a new one and deactivating the old.

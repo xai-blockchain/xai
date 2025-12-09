@@ -272,11 +272,11 @@ class TestTransactionOrderingEdgeCases:
         """Test ordering transactions with zero fee"""
         wallet = Wallet()
 
-        tx1 = Transaction(wallet.address, "addr1", 10.0, 0.0, public_key=wallet.public_key)
+        tx1 = Transaction(wallet.address, wallet.address, 10.0, 0.0, public_key=wallet.public_key)
         tx1.timestamp = 1000.0
         tx1.txid = "aaa"
 
-        tx2 = Transaction(wallet.address, "addr2", 10.0, 0.0, public_key=wallet.public_key)
+        tx2 = Transaction(wallet.address, wallet.address, 10.0, 0.0, public_key=wallet.public_key)
         tx2.timestamp = 2000.0
         tx2.txid = "bbb"
 
@@ -289,11 +289,11 @@ class TestTransactionOrderingEdgeCases:
         """Test ordering when only hash differs"""
         wallet = Wallet()
 
-        tx1 = Transaction(wallet.address, "addr1", 10.0, 0.1, public_key=wallet.public_key)
+        tx1 = Transaction(wallet.address, wallet.address, 10.0, 0.1, public_key=wallet.public_key)
         tx1.timestamp = 1000.0
         tx1.txid = "aaa"
 
-        tx2 = Transaction(wallet.address, "addr1", 10.0, 0.1, public_key=wallet.public_key)
+        tx2 = Transaction(wallet.address, wallet.address, 10.0, 0.1, public_key=wallet.public_key)
         tx2.timestamp = 1000.0
         tx2.txid = "zzz"
 
@@ -320,7 +320,7 @@ class TestTransactionOrderingEdgeCases:
         coinbase = Transaction("COINBASE", wallet.address, 12.0)
         coinbase.txid = coinbase.calculate_hash()
 
-        tx1 = Transaction(wallet.address, "addr1", 10.0, 0.5, public_key=wallet.public_key)
+        tx1 = Transaction(wallet.address, wallet.address, 10.0, 0.5, public_key=wallet.public_key)
         tx1.txid = tx1.calculate_hash()
 
         # Should validate correctly with just 2 transactions
@@ -337,7 +337,7 @@ class TestTransactionOrderingEdgeCases:
 
         # Add many transactions with decreasing fees
         for i in range(100):
-            tx = Transaction(wallet.address, f"addr{i}", 10.0, 1.0 - (i * 0.001), public_key=wallet.public_key)
+            tx = Transaction(wallet.address, wallet.address, 10.0, 1.0 - (i * 0.001), public_key=wallet.public_key)
             tx.txid = tx.calculate_hash()
             transactions.append(tx)
 

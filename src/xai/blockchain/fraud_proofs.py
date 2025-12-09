@@ -159,7 +159,9 @@ class FraudProofManager:
                 proof.challenged_validator_address,
             )
             self.slashing_manager.report_malicious_behavior(
-                proof.challenged_validator_address, "fraud_proven"  # A new offense type for fraud
+                proof.challenged_validator_address,
+                "fraud_proven",  # A new offense type for fraud
+                evidence=proof.proof_data,
             )
             # Optionally reward challenger here
             return True
@@ -170,4 +172,3 @@ class FraudProofManager:
 
     def _current_time(self) -> int:
         return int(self._time_provider())
-

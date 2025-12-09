@@ -909,6 +909,146 @@ paths:
         '400':
           description: Invalid request
 
+  # ==================== ADDITIONAL CORE ENDPOINTS ====================
+  /mempool/stats:
+    get:
+      tags: [Mempool]
+      summary: Get mempool statistics and fee pressure
+      operationId: getMempoolStats
+      responses:
+        '200':
+          description: Mempool statistics retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pending:
+                    type: integer
+                  pressure:
+                    type: string
+                  p50_fee:
+                    type: number
+                  p95_fee:
+                    type: number
+
+  /address/{address}/nonce:
+    get:
+      tags: [Accounts]
+      summary: Get the confirmed/next nonce for an address
+      operationId: getAddressNonce
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Nonce information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  confirmed_nonce:
+                    type: integer
+                  next_nonce:
+                    type: integer
+        '404':
+          description: Address not found
+
+  /block/{hash}:
+    get:
+      tags: [Blocks]
+      summary: Get a block by hash
+      operationId: getBlockByHash
+      parameters:
+        - in: path
+          name: hash
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Block retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Block'
+        '404':
+          description: Block not found
+
+  /contracts/{address}/abi:
+    get:
+      tags: [Contracts]
+      summary: Get stored ABI for a contract address
+      operationId: getContractAbi
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ABI metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  address:
+                    type: string
+                  abi:
+                    type: array
+                    items:
+                      type: object
+                  verified:
+                    type: boolean
+        '404':
+          description: ABI not found
+
+  /contracts/{address}/events:
+    get:
+      tags: [Contracts]
+      summary: Get contract events with pagination
+      operationId: getContractEvents
+      parameters:
+        - in: path
+          name: address
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 100
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: Events list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  address:
+                    type: string
+                  events:
+                    type: array
+                    items:
+                      type: object
+                  total:
+                    type: integer
+        '404':
+          description: Contract not found
+
 components:
   schemas:
     # ==================== WALLET SCHEMAS ====================

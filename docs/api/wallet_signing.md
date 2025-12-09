@@ -57,3 +57,10 @@ Requests outside the acceptable time window return `stale_timestamp` (or `future
 - Monitor `/send` rejections for `stale_timestamp` or `txid_mismatch`; they indicate client bugs or clock drift.
 
 Following these rules ensures every signing surface meets the standards professional validators and auditors expect.
+
+## UX Guidance for Signers
+
+- Always show the full payload hash (SHA-256) before signing; never sign unseen data.
+- Require the user to type at least the first 8 hex characters of the hash as an explicit acknowledgement.
+- On hardware wallets or mobile bridges, render the hash on-device and collect the same prefix acknowledgement.
+- Log the acknowledged prefix alongside the txid for audit trails; do not log private keys or full signatures.

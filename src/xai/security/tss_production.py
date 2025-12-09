@@ -361,7 +361,11 @@ class ProductionTSS:
             message_hash = hashlib.sha256(message).digest()
 
             # Verify signature
-            public_key.verify(signature, message_hash, ec.ECDSA(hashes.SHA256()))
+            public_key.verify(
+                signature,
+                message_hash,
+                ec.ECDSA(utils.Prehashed(hashes.SHA256()))
+            )
             return True
         except Exception as e:
             # Signature verification failed
