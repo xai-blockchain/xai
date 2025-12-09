@@ -21,6 +21,7 @@ from web3 import Web3
 
 from xai.core.refund_sweep_manager import RefundSweepManager
 from xai.core.htlc_p2wsh import build_refund_witness
+from xai.core.aixn_blockchain.atomic_swap_11_coins import CrossChainVerifier
 
 
 RPC_URL = os.getenv("XAI_BTC_RPC_URL", "http://127.0.0.1:18443")
@@ -87,11 +88,43 @@ def load_swaps(path: str) -> List[Dict[str, Any]]:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
+def filter_refundable_swaps(
+    swaps: List[Dict[str, Any]],
+    verifier: CrossChainVerifier,
+    *,
+    min_confirmations: int = 3,
+    safety_margin_seconds: int = 1800,
+    now: float | None = None,
+) -> List[Dict[str, Any]]:
+    """
+    Apply timelock + confirmation filtering prior to sweeping refunds.
+    Each swap is expected to carry: funding_txid, coin, timelock, sender_address/utxo.
+    """
+    current = now if now is not None else time.time()
+    eligible: List[Dict[str, Any]] = []
+    for swap in swaps:
+        timelock = swap.get("timelock")
+        txid = swap.get("funding_txid") or swap.get("txid")
+        coin = swap.get("coin", "BTC")
+        if timelock is None or not txid:
+            continue
+        if current < timelock + safety_margin_seconds:
+            continue
+        ok, conf = verifier.verify_minimum_confirmations(coin, txid, min_confirmations=min_confirmations)
+        if not ok:
+            continue
+        enriched = dict(swap)
+        enriched["confirmations"] = conf
+        eligible.append(enriched)
+    return eligible
+
 
 def main() -> int:
     swaps_path = os.getenv("XAI_SWAPS_FILE", "swaps.json")
     swaps = load_swaps(swaps_path)
     manager = RefundSweepManager()
+    verifier = CrossChainVerifier()
+    swaps = filter_refundable_swaps(swaps, verifier)
     sweep_utxo(swaps, manager)
     sweep_eth(swaps, manager)
     return 0
