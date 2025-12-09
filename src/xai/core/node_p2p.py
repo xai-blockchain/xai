@@ -780,6 +780,12 @@ class P2PNetworkManager:
             elif message_type == "checkpoint":
                 self.peer_features[peer_id] = self.peer_features.get(peer_id, {})
                 self.peer_features[peer_id]["checkpoint"] = payload
+            elif message_type == "checkpoint_request":
+                await self._handle_checkpoint_request(websocket, peer_id, payload)
+            elif message_type == "checkpoint_payload":
+                # Peers can cache advertised payload URLs for downstream sync manager
+                self.peer_features[peer_id] = self.peer_features.get(peer_id, {})
+                self.peer_features[peer_id]["checkpoint_payload"] = payload
             elif message_type == "inv":
                 await self._handle_inventory_announcement(websocket, peer_id, payload)
             elif message_type == "getdata":
@@ -863,6 +869,39 @@ class P2PNetworkManager:
                 websocket,
                 peer_id,
                 {"type": "block", "payload": block.to_dict()},
+            )
+
+    async def _handle_checkpoint_request(
+        self,
+        websocket: Optional[WebSocketServerProtocol],
+        peer_id: str,
+        payload: Optional[Dict[str, Any]],
+    ) -> None:
+        """
+        Serve checkpoint payload metadata/URL to peers requesting partial sync.
+        """
+        if not websocket:
+            return
+        payload = payload or {}
+        want_payload = bool(payload.get("want_payload"))
+        cm = getattr(self.blockchain, "checkpoint_manager", None)
+        if not cm or not hasattr(cm, "export_checkpoint_payload"):
+            return
+        try:
+            height = payload.get("height") or getattr(cm, "latest_checkpoint_height", None)
+            exported = cm.export_checkpoint_payload(height=height, include_data=want_payload)
+            if not exported:
+                return
+            await self._send_signed_message(
+                websocket,
+                peer_id,
+                {"type": "checkpoint_payload", "payload": exported},
+            )
+        except Exception as exc:
+            logger.debug(
+                "Failed to serve checkpoint payload: %s",
+                exc,
+                extra={"event": "p2p.checkpoint_payload_failed", "peer": peer_id},
             )
 
     async def _send_signed_message(
