@@ -88,7 +88,10 @@ class CheckpointSyncManager:
         chosen = self.choose_newer_metadata(p2p_meta, local_meta)
         if chosen:
             try:
-                return CheckpointMetadata.from_dict(chosen).__dict__
+                meta_obj = CheckpointMetadata.from_dict(chosen)
+                # Preserve auxiliary fields like URL
+                enriched = {**chosen, **meta_obj.__dict__}
+                return enriched
             except (KeyError, ValueError, TypeError):
                 return chosen
         return None
@@ -132,6 +135,18 @@ class CheckpointSyncManager:
             applier(payload)
             return True
         return False
+
+    def fetch_validate_apply(self) -> bool:
+        """
+        End-to-end helper: pick best checkpoint metadata, fetch payload, validate, and apply.
+        """
+        meta = self.get_best_checkpoint_metadata()
+        if not meta:
+            return False
+        payload = self.fetch_payload(meta)
+        if not payload:
+            return False
+        return self.apply_payload(payload, self.blockchain)
 
     @staticmethod
     def load_payload_from_file(path: str) -> Optional[CheckpointPayload]:

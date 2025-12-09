@@ -21,6 +21,8 @@ class CheckpointPayload:
 
     def verify_integrity(self) -> bool:
         """Verify state hash against serialized data."""
-        serialized = str(self.data).encode("utf-8")
+        import json
+
+        serialized = json.dumps(self.data, sort_keys=True).encode("utf-8")
         digest = hashlib.sha256(serialized).hexdigest()
         return digest == self.state_hash
