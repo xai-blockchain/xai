@@ -96,11 +96,18 @@ def _build_tx_params(
         "chainId": w3.eth.chain_id,
     }
     if max_fee_per_gas is None or max_priority_fee_per_gas is None:
-        base.update(w3.eth._get_priority_fee(gas_price=None))  # type: ignore[attr-defined]
-    if max_fee_per_gas is not None:
-        base["maxFeePerGas"] = max_fee_per_gas
-    if max_priority_fee_per_gas is not None:
-        base["maxPriorityFeePerGas"] = max_priority_fee_per_gas
+        # Prefer EIP-1559 fee fields; fallback to gas_price if priority API absent.
+        latest_block = w3.eth.get_block("latest")
+        base_fee = latest_block.get("baseFeePerGas") or w3.eth.gas_price
+        try:
+            priority_fee = int(getattr(w3.eth, "max_priority_fee"))
+        except Exception:
+            priority_fee = int(base_fee // 10)  # conservative fallback
+        max_priority_fee_per_gas = max_priority_fee_per_gas or priority_fee
+        # Choose a ceiling that is comfortably above base+priority to avoid underpriced txs.
+        max_fee_per_gas = max_fee_per_gas or (base_fee * 2 + max_priority_fee_per_gas)
+    base["maxFeePerGas"] = max_fee_per_gas
+    base["maxPriorityFeePerGas"] = max_priority_fee_per_gas
     if gas is not None:
         base["gas"] = gas
     return base
