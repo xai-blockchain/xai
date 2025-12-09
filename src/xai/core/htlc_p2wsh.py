@@ -32,8 +32,11 @@ def _encode_push(data_hex: str) -> str:
 
 def _encode_timelock(timelock: int) -> str:
     # Minimal encoding little-endian
-    hexstr = timelock.to_bytes((timelock.bit_length() + 7) // 8 or 1, "little").hex()
-    return _encode_push(hexstr)
+    raw = timelock.to_bytes((timelock.bit_length() + 7) // 8 or 1, "little")
+    # Ensure highest bit not set; if so, append 0x00 for minimal encoding
+    if raw[-1] & 0x80:
+        raw += b"\x00"
+    return _encode_push(raw.hex())
 
 
 def _pubkey_push(pubkey_hex: str) -> str:
