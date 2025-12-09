@@ -47,21 +47,11 @@ def rpc(method: str, params=None):
 
 
 def main() -> int:
-    # Ensure wallet exists
-    try:
-        requests.post(
-            f"{RPC_URL}/wallet/{RPC_WALLET}",
-            auth=(RPC_USER, RPC_PASS),
-            json={"jsonrpc": "1.0", "id": "load", "method": "loadwallet", "params": [RPC_WALLET]},
-            timeout=5,
-        )
-    except Exception:
-        pass
-    # Create wallet if missing
+    # Ensure wallet exists (legacy descriptor=False to allow dumpprivkey/importaddress)
     requests.post(
         RPC_URL,
         auth=(RPC_USER, RPC_PASS),
-        json={"jsonrpc": "1.0", "id": "create", "method": "createwallet", "params": [RPC_WALLET]},
+        json={"jsonrpc": "1.0", "id": "create", "method": "createwallet", "params": [RPC_WALLET, False, False, "", False, False]},
         timeout=5,
     )
     # Fund wallet if empty
@@ -83,42 +73,54 @@ def main() -> int:
         timelock=timelock,
         recipient_pubkey=recipient_info["pubkey"],
         sender_pubkey=sender_info["pubkey"],
+        hrp="bcrt",
     )
     print("P2WSH address:", contract["p2wsh_address"])
+    # watch HTLC address
+    rpc("importaddress", [contract["p2wsh_address"], "htlc", False, True])
 
     # Fund HTLC
     txid = rpc("sendtoaddress", [contract["p2wsh_address"], 0.5])
     rpc("generatetoaddress", [1, sender_addr])  # mine 1 block to confirm
     print("Funded txid:", txid)
 
-    # Build spending transaction
-    utxos = rpc("listunspent", [1, 9999999, [contract["p2wsh_address"]]])
-    if not utxos:
-        raise RuntimeError("No UTXO found for HTLC")
-    utxo = utxos[0]
+    # Decode tx to find vout
+    decoded = rpc("getrawtransaction", [txid, True])
+    vout = None
+    amount = 0
+    for out in decoded["vout"]:
+        if out.get("scriptPubKey", {}).get("hex") == contract["script_pubkey"]:
+            vout = out["n"]
+            amount = out["value"]
+            script_pub = out["scriptPubKey"]["hex"]
+            break
+    if vout is None:
+        raise RuntimeError("HTLC output not found")
+
+    recipient_priv = rpc("dumpprivkey", [recipient_addr])
 
     raw = rpc(
         "createrawtransaction",
         [
-            [{"txid": utxo["txid"], "vout": utxo["vout"], "sequence": 0}],
-            {recipient_addr: utxo["amount"] - 0.0001},
+            [{"txid": txid, "vout": vout, "sequence": 0}],
+            {recipient_addr: amount - 0.0001},
         ],
         0,
         True,
     )
 
     signed = rpc(
-        "signrawtransactionwithwallet",
+        "signrawtransactionwithkey",
         [
             raw,
+            [recipient_priv],
             [
                 {
-                    "txid": utxo["txid"],
-                    "vout": utxo["vout"],
-                    "redeemScript": contract["redeem_script_hex"],
+                    "txid": txid,
+                    "vout": vout,
+                    "scriptPubKey": script_pub,
+                    "amount": amount,
                     "witnessScript": contract["redeem_script_hex"],
-                    "scriptPubKey": utxo["scriptPubKey"],
-                    "amount": utxo["amount"],
                 }
             ],
         ],

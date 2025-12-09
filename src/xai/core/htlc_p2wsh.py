@@ -43,16 +43,23 @@ def _pubkey_push(pubkey_hex: str) -> str:
     return _encode_push(pubkey_hex)
 
 
-def build_utxo_contract(secret_hash_hex: str, timelock: int, recipient_pubkey: str, sender_pubkey: str) -> Dict[str, str]:
+def build_utxo_contract(
+    secret_hash_hex: str,
+    timelock: int,
+    recipient_pubkey: str,
+    sender_pubkey: str,
+    *,
+    hrp: str = "bc",
+) -> Dict[str, str]:
     """
     Build canonical HTLC redeem script and derived P2WSH address.
     Script (hex):
     OP_IF
-        OP_SHA256 <secret_hash> OP_EQUALVERIFY
-        <recipient_pubkey> OP_CHECKSIG
+    OP_SHA256 <secret_hash> OP_EQUALVERIFY
+    <recipient_pubkey> OP_CHECKSIG
     OP_ELSE
-        <timelock> OP_CHECKLOCKTIMEVERIFY OP_DROP
-        <sender_pubkey> OP_CHECKSIG
+    <timelock> OP_CHECKLOCKTIMEVERIFY OP_DROP
+    <sender_pubkey> OP_CHECKSIG
     OP_ENDIF
     """
     # Build script in hex
@@ -74,11 +81,12 @@ def build_utxo_contract(secret_hash_hex: str, timelock: int, recipient_pubkey: s
     redeem_script_hex = "".join(parts)
     redeem_script_bytes = bytes.fromhex(redeem_script_hex)
     witness_program = hashlib.sha256(redeem_script_bytes).digest()
-    address = redeem_script_to_p2wsh_address(redeem_script_bytes)
+    address = redeem_script_to_p2wsh_address(redeem_script_bytes, hrp=hrp)
     return {
         "redeem_script_hex": redeem_script_hex,
         "p2wsh_address": address,
         "witness_program": witness_program.hex(),
+        "script_pubkey": f"0020{witness_program.hex()}",
     }
 
 
