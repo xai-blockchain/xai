@@ -242,6 +242,11 @@ class SwapStateMachine:
                 if not self.is_terminal_state(swap_id)
             }
 
+    def iter_swaps(self) -> List[Tuple[str, Dict]]:
+        """Return list of (swap_id, swap_data) for all swaps."""
+        with self.lock:
+            return list(self.swaps.items())
+
     def check_timeouts(self) -> List[str]:
         """
         Check for swaps that have exceeded their timelock and should be refunded
@@ -1305,6 +1310,37 @@ class SwapRefundPlanner:
             enriched = dict(swap)
             enriched["confirmations"] = confirmations
             refundable.append(enriched)
+        return refundable
+
+
+class SwapRecoveryService:
+    """
+    High-level recovery orchestrator that surfaces refundable swaps using the planner.
+    """
+
+    def __init__(self, state_machine: SwapStateMachine, planner: SwapRefundPlanner):
+        self.state_machine = state_machine
+        self.planner = planner
+
+    def find_refundable_swaps(self) -> List[Dict[str, Any]]:
+        """Return refundable swaps enriched with confirmations."""
+        candidates: List[Dict[str, Any]] = []
+        for swap_id, swap in self.state_machine.iter_swaps():
+            data = swap.get("data", {}) if isinstance(swap, dict) else {}
+            try:
+                candidates.append(
+                    {
+                        "swap_id": swap_id,
+                        "coin": data.get("coin"),
+                        "funding_txid": data.get("funding_txid"),
+                        "timelock": data.get("timelock"),
+                        "min_confirmations": data.get("min_confirmations", 1),
+                        "state": swap.get("state") if isinstance(swap.get("state"), SwapState) else swap.get("state"),
+                    }
+                )
+            except Exception:
+                continue
+        refundable = self.planner.plan_refunds(candidates)
         return refundable
 
 
