@@ -7,6 +7,7 @@ Tracks headers, cumulative work, and best tip selection to support SPV verificat
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import json
 from typing import Dict, Optional
 
 
@@ -77,3 +78,45 @@ class SPVHeaderStore:
 
     def has_height(self, height: int) -> bool:
         return height in self.heights
+
+    def save(self, path: str) -> None:
+        """Persist headers to disk."""
+        payload = {
+            "headers": [
+                {
+                    "height": h.height,
+                    "block_hash": h.block_hash,
+                    "prev_hash": h.prev_hash,
+                    "bits": h.bits,
+                    "cumulative_work": h.cumulative_work,
+                }
+                for h in self.headers.values()
+            ],
+            "best_tip": self.best_tip.block_hash if self.best_tip else None,
+        }
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, sort_keys=True)
+
+    @classmethod
+    def load(cls, path: str) -> "SPVHeaderStore":
+        """Load headers from disk."""
+        store = cls()
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            for h in data.get("headers", []):
+                header = Header(
+                    height=int(h["height"]),
+                    block_hash=str(h["block_hash"]),
+                    prev_hash=str(h["prev_hash"]),
+                    bits=int(h["bits"]),
+                    cumulative_work=int(h.get("cumulative_work", 0)),
+                )
+                # Skip PoW validation on load; assume trusted file
+                store.headers[header.block_hash] = header
+                store.heights[header.height] = header.block_hash
+            best_hash = data.get("best_tip")
+            store.best_tip = store.headers.get(best_hash) if best_hash else None
+        except (FileNotFoundError, json.JSONDecodeError, KeyError, ValueError, TypeError):
+            return cls()
+        return store
