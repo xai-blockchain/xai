@@ -160,6 +160,42 @@ class CheckpointSyncManager:
             return False
         return self.apply_payload(payload, self.blockchain)
 
+    def request_checkpoint_from_peers(self) -> Optional[CheckpointPayload]:
+        """
+        Ask P2P manager to request checkpoint payloads and return the first valid payload.
+        """
+        if not self.p2p_manager or not hasattr(self.p2p_manager, "broadcast"):
+            return None
+        # Broadcast a checkpoint request
+        try:
+            coro = self.p2p_manager.broadcast({"type": "checkpoint_request", "payload": {"want_payload": True}})
+            if coro:
+                import asyncio
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(coro)
+                else:
+                    loop.run_until_complete(coro)
+        except Exception:
+            return None
+
+        # Inspect cached peer features for received payload hints
+        features = getattr(self.p2p_manager, "peer_features", {}) or {}
+        for info in features.values():
+            payload_data = info.get("checkpoint_payload") if isinstance(info, dict) else None
+            if not payload_data:
+                continue
+            try:
+                return CheckpointPayload(
+                    height=int(payload_data["height"]),
+                    block_hash=str(payload_data["block_hash"]),
+                    state_hash=str(payload_data["state_hash"]),
+                    data=payload_data.get("data", {}),
+                )
+            except (KeyError, ValueError, TypeError):
+                continue
+        return None
+
     def _apply_to_blockchain(self, payload: CheckpointPayload) -> bool:
         """
         Apply checkpoint payload directly to blockchain components when supported.
