@@ -64,6 +64,11 @@ def main() -> int:
         json={"jsonrpc": "1.0", "id": "create", "method": "createwallet", "params": [RPC_WALLET]},
         timeout=5,
     )
+    # Fund wallet if empty
+    bal = rpc("getbalance")
+    if bal < 1:
+        fund_addr = rpc("getnewaddress")
+        rpc("generatetoaddress", [101, fund_addr])
     # Generate recipient/sender keys
     sender_addr = rpc("getnewaddress")
     recipient_addr = rpc("getnewaddress")
