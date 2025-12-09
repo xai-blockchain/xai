@@ -16,6 +16,7 @@ from typing import Any, Dict, Optional
 import requests
 
 from .checkpoint_payload import CheckpointPayload
+from xai.network.peer_manager import PeerReputation
 
 @dataclass
 class CheckpointMetadata:
@@ -43,6 +44,7 @@ class CheckpointSyncManager:
         self.blockchain = blockchain
         self.p2p_manager = p2p_manager
         self.checkpoint_manager = getattr(blockchain, "checkpoint_manager", None)
+        self.required_quorum = int(getattr(getattr(blockchain, "config", None), "CHECKPOINT_QUORUM", 3))
 
     def _local_checkpoint_metadata(self) -> Optional[Dict[str, Any]]:
         """Return latest local checkpoint metadata if available."""
@@ -179,22 +181,44 @@ class CheckpointSyncManager:
         except Exception:
             return None
 
-        # Inspect cached peer features for received payload hints
+        # Inspect cached peer features for received payload hints with quorum logic
         features = getattr(self.p2p_manager, "peer_features", {}) or {}
-        for info in features.values():
+        candidates: Dict[str, Dict[str, Any]] = {}
+        for peer_id, info in features.items():
             payload_data = info.get("checkpoint_payload") if isinstance(info, dict) else None
             if not payload_data:
                 continue
             try:
-                return CheckpointPayload(
-                    height=int(payload_data["height"]),
-                    block_hash=str(payload_data["block_hash"]),
-                    state_hash=str(payload_data["state_hash"]),
-                    data=payload_data.get("data", {}),
-                )
+                height = int(payload_data["height"])
+                block_hash = str(payload_data["block_hash"])
+                state_hash = str(payload_data["state_hash"])
+                candidates.setdefault(block_hash, {"count": 0, "payload": payload_data})
+                candidates[block_hash]["count"] += 1
+                candidates[block_hash]["height"] = height
+                candidates[block_hash]["state_hash"] = state_hash
             except (KeyError, ValueError, TypeError):
                 continue
-        return None
+
+        # Choose the highest-height candidate that meets quorum
+        quorum_candidates = [
+            data for data in candidates.values() if data.get("count", 0) >= self.required_quorum
+        ]
+        if not quorum_candidates:
+            return None
+        chosen = max(quorum_candidates, key=lambda c: c.get("height", -1))
+        payload_data = chosen["payload"]
+        try:
+            payload = CheckpointPayload(
+                height=int(payload_data["height"]),
+                block_hash=str(payload_data["block_hash"]),
+                state_hash=str(payload_data["state_hash"]),
+                data=payload_data.get("data", {}),
+            )
+        except (KeyError, ValueError, TypeError):
+            return None
+        if not payload.verify_integrity():
+            return None
+        return payload
 
     def _apply_to_blockchain(self, payload: CheckpointPayload) -> bool:
         """
