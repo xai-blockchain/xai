@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
+from .checkpoint_payload import CheckpointPayload
 
 @dataclass
 class CheckpointMetadata:
@@ -101,6 +102,11 @@ class CheckpointSyncManager:
         if height is not None:
             return cm.load_checkpoint(height)
         return cm.load_latest_checkpoint()
+
+    @staticmethod
+    def validate_payload(payload: CheckpointPayload) -> bool:
+        """Validate payload integrity before application."""
+        return payload.verify_integrity()
 
     @staticmethod
     def choose_newer_metadata(*candidates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
