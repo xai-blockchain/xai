@@ -26,6 +26,7 @@ def test_checkpoint_signature_honors_trusted_signer():
         "state_hash": "beef",
         "data": {},
         "pubkey": pub_hex,
+        "work": 100,
     }
     payload["signature"] = _sign_payload(sk, payload)
 

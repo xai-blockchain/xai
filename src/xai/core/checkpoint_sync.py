@@ -216,6 +216,8 @@ class CheckpointSyncManager:
             return None
         if not self._validate_payload_signature(payload_data):
             return None
+        if not self._validate_work(payload_data):
+            return None
         return payload
 
     def _build_payload(self, payload_data: Dict[str, Any]) -> Optional[CheckpointPayload]:
@@ -264,6 +266,25 @@ class CheckpointSyncManager:
         }
         blob = json.dumps(material, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(blob).digest()
+
+    def _validate_work(self, payload_data: Dict[str, Any]) -> bool:
+        """
+        Validate that advertised cumulative work meets a minimum threshold and is non-decreasing.
+        """
+        advertised_work = payload_data.get("work") or payload_data.get("cumulative_work")
+        if advertised_work is None:
+            return True  # tolerate missing for now
+        try:
+            work_val = int(advertised_work)
+        except (TypeError, ValueError):
+            return False
+        if work_val <= 0:
+            return False
+        last_height = getattr(self.checkpoint_manager, "latest_checkpoint_height", None)
+        last_work = getattr(self.checkpoint_manager, "latest_checkpoint_work", None)
+        if last_height is not None and last_work is not None and work_val < last_work:
+            return False
+        return True
 
     def _apply_to_blockchain(self, payload: CheckpointPayload) -> bool:
         """
