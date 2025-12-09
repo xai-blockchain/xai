@@ -22,6 +22,25 @@ class Header:
         # Simplified placeholder work metric (higher bits => harder)
         return max(1, self.bits)
 
+    @staticmethod
+    def compact_to_target(bits: int) -> int:
+        """Convert Bitcoin-style compact bits to target integer."""
+        exponent = bits >> 24
+        mantissa = bits & 0xFFFFFF
+        if exponent <= 3:
+            target = mantissa >> (8 * (3 - exponent))
+        else:
+            target = mantissa << (8 * (exponent - 3))
+        return target
+
+    def is_valid_pow(self) -> bool:
+        target = self.compact_to_target(self.bits)
+        try:
+            h = int(self.block_hash, 16)
+        except ValueError:
+            return False
+        return h < target
+
 
 class SPVHeaderStore:
     """Minimal header store to track best chain by cumulative work."""
@@ -32,6 +51,9 @@ class SPVHeaderStore:
 
     def add_header(self, header: Header) -> bool:
         """Add a header if it links to an existing chain (or is genesis)."""
+        if not header.is_valid_pow():
+            return False
+
         if header.height > 0:
             parent = self.headers.get(header.prev_hash)
             if not parent:
