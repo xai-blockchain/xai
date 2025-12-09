@@ -9,6 +9,7 @@ candidate to accelerate sync without full chain download.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from typing import Any, Dict, Optional
 
 from .checkpoint_payload import CheckpointPayload
@@ -128,6 +129,23 @@ class CheckpointSyncManager:
             applier(payload)
             return True
         return False
+
+    @staticmethod
+    def load_payload_from_file(path: str) -> Optional[CheckpointPayload]:
+        """
+        Load a checkpoint payload from a JSON file.
+        """
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return CheckpointPayload(
+                height=int(data["height"]),
+                block_hash=str(data["block_hash"]),
+                state_hash=str(data["state_hash"]),
+                data=data.get("data", {}),
+            )
+        except (FileNotFoundError, KeyError, ValueError, TypeError, json.JSONDecodeError):
+            return None
 
 
     @staticmethod
