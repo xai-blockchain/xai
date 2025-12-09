@@ -981,31 +981,43 @@ class P2PNetworkManager:
             asyncio.run(coro)
 
     def _get_checkpoint_metadata(self) -> Optional[Dict[str, Any]]:
-        """Return latest checkpoint metadata for partial sync."""
+        """Return highest checkpoint metadata from peers or local store."""
+        candidates: list[Dict[str, Any]] = []
+
+        # Peer-advertised checkpoints
+        for info in self.peer_features.values():
+            ckpt = info.get("checkpoint") if isinstance(info, dict) else None
+            if isinstance(ckpt, dict) and "height" in ckpt and "block_hash" in ckpt:
+                candidates.append({**ckpt, "source": "peer"})
+
+        # Local checkpoint manager
         cm = getattr(self.blockchain, "checkpoint_manager", None)
-        if not cm:
-            return None
-        checkpoint = cm.load_latest_checkpoint()
-        if not checkpoint:
-            height = getattr(cm, "latest_checkpoint_height", None)
-            if height is None:
-                return None
+        if cm:
             try:
-                checkpoint = cm.load_checkpoint(height)
+                checkpoint = cm.load_latest_checkpoint()
+                if not checkpoint:
+                    height = getattr(cm, "latest_checkpoint_height", None)
+                    if height is not None and hasattr(cm, "load_checkpoint"):
+                        checkpoint = cm.load_checkpoint(height)
+                if checkpoint:
+                    candidates.append(
+                        {
+                            "height": getattr(checkpoint, "height", None),
+                            "block_hash": getattr(checkpoint, "block_hash", None),
+                            "timestamp": getattr(checkpoint, "timestamp", None),
+                            "source": "local",
+                        }
+                    )
             except Exception as e:
                 logger.debug(
                     "Failed to load checkpoint for sync status",
-                    height=height,
+                    height=getattr(cm, "latest_checkpoint_height", None),
                     error=str(e)
                 )
-                return None
-        if not checkpoint:
+
+        if not candidates:
             return None
-        return {
-            "height": getattr(checkpoint, "height", None),
-            "block_hash": getattr(checkpoint, "block_hash", None),
-            "timestamp": getattr(checkpoint, "timestamp", None),
-        }
+        return max(candidates, key=lambda c: c.get("height", -1))
 
     def _derive_payload_fingerprint(self, payload: Any, candidate_fields: Tuple[str, ...]) -> Optional[str]:
         """Return a stable fingerprint for deduplication."""
