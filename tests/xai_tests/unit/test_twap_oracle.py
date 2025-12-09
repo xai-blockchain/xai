@@ -34,3 +34,15 @@ def test_invalid_inputs():
         oracle.record_price(-1)
     with pytest.raises(ValueError):
         oracle.record_price(10, timestamp=-1)
+
+
+def test_price_spike_has_bounded_effect():
+    """Short-lived spike should have limited impact on TWAP."""
+    oracle = TWAPOracle(window_size_seconds=10)
+    oracle.record_price(100, timestamp=1)
+    oracle.record_price(100, timestamp=6)
+    # Manipulation attempt: brief spike near window end
+    oracle.record_price(1000, timestamp=9)
+    twap = oracle.get_twap(current_timestamp=11)
+    # Spike should be diluted over the window (~280 in this setup)
+    assert 200 < twap < 400
