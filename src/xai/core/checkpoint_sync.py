@@ -14,6 +14,8 @@ import os
 from typing import Any, Dict, Optional
 
 import requests
+from ecdsa import SECP256k1, VerifyingKey, BadSignatureError
+import hashlib
 
 from .checkpoint_payload import CheckpointPayload
 
@@ -44,6 +46,9 @@ class CheckpointSyncManager:
         self.p2p_manager = p2p_manager
         self.checkpoint_manager = getattr(blockchain, "checkpoint_manager", None)
         self.required_quorum = int(getattr(getattr(blockchain, "config", None), "CHECKPOINT_QUORUM", 3))
+        self.trusted_pubkeys = set(
+            getattr(getattr(blockchain, "config", None), "TRUSTED_CHECKPOINT_PUBKEYS", []) or []
+        )
 
     def _local_checkpoint_metadata(self) -> Optional[Dict[str, Any]]:
         """Return latest local checkpoint metadata if available."""
@@ -206,6 +211,14 @@ class CheckpointSyncManager:
             return None
         chosen = max(quorum_candidates, key=lambda c: c.get("height", -1))
         payload_data = chosen["payload"]
+        payload = self._build_payload(payload_data)
+        if not payload:
+            return None
+        if not self._validate_payload_signature(payload_data):
+            return None
+        return payload
+
+    def _build_payload(self, payload_data: Dict[str, Any]) -> Optional[CheckpointPayload]:
         try:
             payload = CheckpointPayload(
                 height=int(payload_data["height"]),
@@ -218,6 +231,39 @@ class CheckpointSyncManager:
         if not payload.verify_integrity():
             return None
         return payload
+
+    def _validate_payload_signature(self, payload_data: Dict[str, Any]) -> bool:
+        """
+        Validate optional signature using trusted checkpoint signers.
+        If no trusted pubkeys are configured, accept unsigned payloads (test/dev).
+        """
+        if not self.trusted_pubkeys:
+            return True
+        signature_hex = payload_data.get("signature")
+        pubkey_hex = payload_data.get("pubkey")
+        if not signature_hex or not pubkey_hex or pubkey_hex not in self.trusted_pubkeys:
+            return False
+        try:
+            digest = self._checkpoint_digest(payload_data)
+            vk = VerifyingKey.from_string(bytes.fromhex(pubkey_hex), curve=SECP256k1)
+            vk.verify_digest(bytes.fromhex(signature_hex), digest)
+            return True
+        except (BadSignatureError, ValueError, TypeError):
+            return False
+
+    @staticmethod
+    def _checkpoint_digest(payload_data: Dict[str, Any]) -> bytes:
+        """
+        Compute deterministic digest of critical checkpoint fields for signing.
+        """
+        import json
+        material = {
+            "height": int(payload_data["height"]),
+            "block_hash": str(payload_data["block_hash"]),
+            "state_hash": str(payload_data["state_hash"]),
+        }
+        blob = json.dumps(material, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return hashlib.sha256(blob).digest()
 
     def _apply_to_blockchain(self, payload: CheckpointPayload) -> bool:
         """
