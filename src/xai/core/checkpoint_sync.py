@@ -49,12 +49,15 @@ class CheckpointSyncManager:
         cm = self.checkpoint_manager
         if not cm:
             return None
+        if not hasattr(cm, "load_latest_checkpoint"):
+            return None
         checkpoint = cm.load_latest_checkpoint()
         if not checkpoint:
             height = getattr(cm, "latest_checkpoint_height", None)
             if height is None:
                 return None
-            checkpoint = cm.load_checkpoint(height)
+            if hasattr(cm, "load_checkpoint"):
+                checkpoint = cm.load_checkpoint(height)
         if not checkpoint:
             return None
         return {
@@ -128,6 +131,9 @@ class CheckpointSyncManager:
         """
         if not self.validate_payload(payload):
             return False
+        # Prefer direct blockchain application if supported
+        if self._apply_to_blockchain(payload):
+            return True
         if hasattr(applier, "apply_checkpoint"):
             applier.apply_checkpoint(payload)
             return True
@@ -147,6 +153,29 @@ class CheckpointSyncManager:
         if not payload:
             return False
         return self.apply_payload(payload, self.blockchain)
+
+    def _apply_to_blockchain(self, payload: CheckpointPayload) -> bool:
+        """
+        Apply checkpoint payload directly to blockchain components when supported.
+
+        Supports restoring UTXO snapshot and updating checkpoint metadata.
+        """
+        bc = getattr(self, "blockchain", None)
+        if not bc:
+            return False
+
+        applied = False
+        utxo_snapshot = payload.data.get("utxo_snapshot")
+        if utxo_snapshot and hasattr(bc, "utxo_manager"):
+            bc.utxo_manager.restore(utxo_snapshot)
+            applied = True
+
+        cm = getattr(bc, "checkpoint_manager", None)
+        if cm and payload.height is not None:
+            cm.latest_checkpoint_height = payload.height
+            applied = True
+
+        return applied
 
     @staticmethod
     def load_payload_from_file(path: str) -> Optional[CheckpointPayload]:
