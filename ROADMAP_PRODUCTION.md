@@ -246,6 +246,7 @@ This roadmap targets production readiness with security-first posture, robust co
 - [ ] Implement real SPV verification with blockchain API calls.
 - [ ] Add fee calculation for atomic swap transactions.
 - [ ] Implement automatic recovery for failed claims.
+- [ ] Ship deployable artifacts and scripts for HTLCs (BTC P2WSH bech32 + Ethereum ABI/bytecode) with automated refund execution and documented CLI/automation flows.
 
 ### Margin & Liquidation
 
@@ -386,6 +387,7 @@ This roadmap targets production readiness with security-first posture, robust co
 - [ ] Add seed phrase corruption recovery tests.
 - [ ] Add concurrent transaction signing tests.
 - [ ] Add hardware wallet failure mode tests.
+- [ ] Add regtest/Hardhat smoke tests for HTLC fund/claim/refund and checkpoint fetch/apply with SPV confirmations.
 
 ### Performance Tests
 
