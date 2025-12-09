@@ -10,13 +10,15 @@ from typing import Optional
 import bech32
 
 
-def redeem_script_to_p2wsh_address(redeem_script: str, hrp: str = "bc") -> Optional[str]:
+def redeem_script_to_p2wsh_address(redeem_script: bytes | str, hrp: str = "bc") -> Optional[str]:
     """
     Convert a redeem script string to a P2WSH bech32 address.
     """
-    if not redeem_script:
+    if redeem_script is None or redeem_script == b"" or redeem_script == "":
         return None
-    script_hash = hashlib.sha256(redeem_script.encode("utf-8")).digest()
+    if isinstance(redeem_script, str):
+        redeem_script = bytes.fromhex(redeem_script)
+    script_hash = hashlib.sha256(redeem_script).digest()
     # Witness version 0, program is 32 bytes
     data = [0] + list(bech32.convertbits(script_hash, 8, 5))
     return bech32.bech32_encode(hrp, data)

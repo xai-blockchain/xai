@@ -79,7 +79,7 @@ def main() -> int:
     timelock = int(time.time()) + 600
 
     contract = build_utxo_contract(
-        secret_hash=secret,
+        secret_hash_hex=secret,
         timelock=timelock,
         recipient_pubkey=recipient_info["pubkey"],
         sender_pubkey=sender_info["pubkey"],
@@ -100,15 +100,29 @@ def main() -> int:
     raw = rpc(
         "createrawtransaction",
         [
-            [{"txid": utxo["txid"], "vout": utxo["vout"]}],
+            [{"txid": utxo["txid"], "vout": utxo["vout"], "sequence": 0}],
             {recipient_addr: utxo["amount"] - 0.0001},
         ],
+        0,
+        True,
     )
 
-    # Add witness data manually
-    witness = build_claim_witness(secret_hex=secret, recipient_sig_hex="", redeem_script=contract["redeem_script"])
-    # For simplicity, let bitcoind sign via signrawtransactionwithwallet
-    signed = rpc("signrawtransactionwithwallet", [raw, [{"txid": utxo["txid"], "vout": utxo["vout"], "redeemScript": contract["redeem_script"], "scriptPubKey": utxo["scriptPubKey"], "amount": utxo["amount"]}]])
+    signed = rpc(
+        "signrawtransactionwithwallet",
+        [
+            raw,
+            [
+                {
+                    "txid": utxo["txid"],
+                    "vout": utxo["vout"],
+                    "redeemScript": contract["redeem_script_hex"],
+                    "witnessScript": contract["redeem_script_hex"],
+                    "scriptPubKey": utxo["scriptPubKey"],
+                    "amount": utxo["amount"],
+                }
+            ],
+        ],
+    )
     final_tx = signed["hex"]
 
     txid_claim = rpc("sendrawtransaction", [final_tx])
