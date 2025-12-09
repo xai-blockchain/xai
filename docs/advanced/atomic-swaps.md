@@ -60,3 +60,4 @@ Use `CrossChainVerifier.calculate_atomic_swap_fee(amount, fee_rate_per_byte, tx_
 - Integrate real SPV proof ingestion and light-client headers for UTXO chains.
 - Automate refund broadcasting with replace-by-fee (RBF) bumping when mempools are congested.
 - Expand fee oracle sources and include dynamic `tx_size_bytes` per chain.
+- Provide deployable artifacts and scripts (see `htlc-deployment-plan.md`) for P2WSH address derivation, Solidity ABI/bytecode, and claim/refund invocation.
