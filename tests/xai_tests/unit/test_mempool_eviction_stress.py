@@ -6,8 +6,6 @@ from __future__ import annotations
 
 import threading
 import time
-from types import SimpleNamespace
-
 import pytest
 
 from xai.core.blockchain_components.mempool_mixin import BlockchainMempoolMixin
@@ -167,3 +165,20 @@ def test_sender_cap_enforced():
     assert bc.add_transaction(tx3) is False
     assert bc._mempool_rejected_sender_cap_total == 1
     assert bc._sender_pending_count["spam"] == 2
+
+
+def test_invalid_sender_ban_and_expiry():
+    """Repeated invalid submissions trigger ban and expire after window."""
+    bc = DummyBlockchain()
+    sender = "mal"
+    now = 100.0
+
+    bc._record_invalid_sender_attempt(sender, now)
+    bc._record_invalid_sender_attempt(sender, now + 1)
+    assert bc._is_sender_banned(sender, now + 2) is False
+
+    bc._record_invalid_sender_attempt(sender, now + 2)
+    assert bc._is_sender_banned(sender, now + 3) is True
+
+    # After ban duration, sender is cleared
+    assert bc._is_sender_banned(sender, now + bc._mempool_invalid_ban_seconds + 4) is False
