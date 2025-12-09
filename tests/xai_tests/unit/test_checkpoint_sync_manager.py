@@ -78,3 +78,4 @@ def test_best_checkpoint_prefers_higher_height():
     chosen = mgr.get_best_checkpoint_metadata()
     assert chosen["height"] == 15
     assert chosen["block_hash"] == "peer"
+    assert chosen["source"] in ("p2p", "peer")

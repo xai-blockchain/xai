@@ -8,7 +8,27 @@ candidate to accelerate sync without full chain download.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Dict, Optional
+
+
+@dataclass
+class CheckpointMetadata:
+    """Simple typed container for checkpoint metadata."""
+
+    height: int
+    block_hash: str
+    timestamp: Optional[float] = None
+    source: str = "unknown"
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "CheckpointMetadata":
+        return cls(
+            height=int(data["height"]),
+            block_hash=str(data["block_hash"]),
+            timestamp=data.get("timestamp"),
+            source=data.get("source", "unknown"),
+        )
 
 
 class CheckpointSyncManager:
@@ -60,7 +80,13 @@ class CheckpointSyncManager:
         """
         p2p_meta = self._p2p_checkpoint_metadata()
         local_meta = self._local_checkpoint_metadata()
-        return self.choose_newer_metadata(p2p_meta, local_meta)
+        chosen = self.choose_newer_metadata(p2p_meta, local_meta)
+        if chosen:
+            try:
+                return CheckpointMetadata.from_dict(chosen).__dict__
+            except (KeyError, ValueError, TypeError):
+                return chosen
+        return None
 
     def apply_local_checkpoint(self, height: Optional[int] = None) -> Optional[Any]:
         """
