@@ -262,3 +262,30 @@ def test_ingest_headers_validates_pow():
     assert added == 1
     assert rejected == ["ff" * 16]
     assert store.get_best_tip().block_hash == "00" * 16
+
+
+def test_verify_minimum_confirmations_uses_spv_store():
+    store = SPVHeaderStore()
+    prev_hash = ""
+    for height in range(0, 131):
+        block_hash = f"{height:064x}"
+        header = Header(height=height, block_hash=block_hash, prev_hash=prev_hash, bits=0x1f00ffff)
+        assert store.add_header(header)
+        prev_hash = block_hash
+
+    tx_hash = "f" * 64
+    fixtures = {
+        ("https://blockstream.info/api/tx/" + tx_hash, None): {
+            "txid": tx_hash,
+            "status": {"block_height": 100},
+            "vout": [{"scriptpubkey_address": "bc1qdummy", "value": 50000000}],
+            "confirmations": 1,
+        },
+        ("https://blockstream.info/api/blocks/tip/height", None): 101,
+    }
+    verifier = FixtureVerifier(fixtures)
+    verifier.header_store = store
+
+    has_conf, actual = verifier.verify_minimum_confirmations("BTC", tx_hash, min_confirmations=6)
+    assert has_conf is True
+    assert actual >= 31  # from header store tip: (130 - 100 + 1)

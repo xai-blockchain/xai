@@ -1,9 +1,8 @@
 """
 SPV header ingestion helper.
 
-Provides a minimal ingest pipeline that validates linkage and stores headers
-via SPVHeaderStore. Proof-of-work validation is intentionally stubbed for
-future integration.
+Provides an ingest pipeline that validates linkage and proof-of-work before
+storing headers via SPVHeaderStore.
 """
 
 from __future__ import annotations
@@ -39,11 +38,6 @@ class SPVHeaderIngestor:
                 )
             except (KeyError, ValueError, TypeError):
                 rejected.append(str(h.get("block_hash", "unknown")))
-                continue
-
-            # Placeholder PoW check: ensure bits is positive
-            if header.bits <= 0:
-                rejected.append(header.block_hash)
                 continue
 
             if self.store.add_header(header):

@@ -1178,19 +1178,17 @@ class CrossChainVerifier:
         Returns:
             tuple: (has_confirmations, actual_confirmations)
         """
-        # Production: Query actual blockchain
-        # For now, simulate
-        cache_key = f"{coin_type}:{tx_hash}"
-
-        with self.lock:
-            if cache_key in self.verified_transactions:
-                confirmations = self.verified_transactions[cache_key].get("data", {}).get(
-                    "confirmations", 0
-                )
-                return confirmations >= min_confirmations, confirmations
-
-        # Not verified yet
-        return False, 0
+        # Reuse the full verification path to obtain validated confirmation counts.
+        valid, _msg, data = self.verify_transaction_on_chain(
+            coin_type,
+            tx_hash,
+            expected_amount=Decimal("0.00000001"),  # minimal positive sentinel
+            recipient="",  # recipient ignored in confirmation-only check
+            min_confirmations=min_confirmations,
+            amount_tolerance=Decimal("1000000"),  # bypass amount comparison for this path
+        )
+        confirmations = data.get("confirmations", 0) if data else 0
+        return valid, confirmations
 
     def create_spv_proof(
         self, coin_type: str, tx_hash: str, block_hash: str
