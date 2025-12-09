@@ -59,6 +59,7 @@ from xai.network.peer_manager import PeerManager
 from xai.core.security_middleware import setup_security_middleware, SecurityConfig
 from xai.core.request_validator_middleware import setup_request_validation
 from xai.core.node_identity import load_or_create_identity
+from xai.core.partial_sync import PartialSyncCoordinator
 
 
 class CORSPolicyManager:
@@ -423,6 +424,7 @@ class BlockchainNode:
         self._register_security_sinks()
         self.consensus_manager = ConsensusManager(blockchain=self.blockchain)
         self.validator = SecurityValidator()
+        self.partial_sync_coordinator = PartialSyncCoordinator(self.blockchain, p2p_manager=None)  # p2p injected later
 
         # Peer-to-peer networking
         self.peer_manager = PeerManager(
@@ -443,6 +445,8 @@ class BlockchainNode:
             host=self.host,
             port=kwargs.get("p2p_port", 8765),
         )
+        # Provide P2P to partial sync after creation
+        self.partial_sync_coordinator.p2p_manager = self.p2p_manager
         # Provide identity to P2P manager
         setattr(self.p2p_manager, "node_identity", self.identity)
 
@@ -1131,6 +1135,14 @@ class BlockchainNode:
 
         # Start P2P manager
         await self.p2p_manager.start()
+
+        # Attempt partial sync bootstrap when chain is empty (or forced via env)
+        force_partial = os.getenv("XAI_FORCE_PARTIAL_SYNC", "").lower() in {"1", "true", "yes"}
+        if getattr(Config, "PARTIAL_SYNC_ENABLED", True) and (len(self.blockchain.chain) == 0 or force_partial):
+            if self.partial_sync_coordinator.bootstrap_if_empty(force=force_partial):
+                logger.info("Partial sync applied checkpoint successfully", extra={"event": "node.partial_sync_applied"})
+            else:
+                logger.info("Partial sync skipped or unavailable", extra={"event": "node.partial_sync_skipped"})
 
         # Start auto-mining by default
         self.start_mining()
