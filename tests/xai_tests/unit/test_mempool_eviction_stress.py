@@ -182,3 +182,18 @@ def test_invalid_sender_ban_and_expiry():
 
     # After ban duration, sender is cleared
     assert bc._is_sender_banned(sender, now + bc._mempool_invalid_ban_seconds + 4) is False
+
+
+def test_prune_expired_resets_counters():
+    """Expired mempool entries are removed and sender counters rebuilt."""
+    bc = DummyBlockchain()
+    old_tx = DummyTx("old", "alice", fee=0.1, timestamp=0)
+    fresh_tx = DummyTx("fresh", "bob", fee=0.2, timestamp=time.time())
+    bc.pending_transactions = [old_tx, fresh_tx]
+    bc._sender_pending_count = {"alice": 1, "bob": 1}
+    removed = bc._prune_expired_mempool(current_time=time.time())
+    assert removed == 1
+    assert len(bc.pending_transactions) == 1
+    assert bc.pending_transactions[0].txid == "fresh"
+    assert bc._sender_pending_count == {"bob": 1}
+    assert bc._mempool_expired_total == 1
