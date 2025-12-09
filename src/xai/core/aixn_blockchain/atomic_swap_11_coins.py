@@ -654,12 +654,13 @@ class CrossChainVerifier:
     DEFAULT_TIMEOUT = 8.0
     CACHE_TTL_SECONDS = 300
 
-    def __init__(self, session: Optional[requests.Session] = None):
+    def __init__(self, session: Optional[requests.Session] = None, header_store: Optional[Any] = None):
         """Initialize cross-chain verifier"""
         self.verified_transactions: Dict[str, Dict] = {}
         self.lock = threading.RLock()
         self.session = session or requests.Session()
         self.session.headers.update({"User-Agent": "xai-atomic-swap-verifier/1.0"})
+        self.header_store = header_store
 
         # Providers must return deterministic JSON structures; tests patch _http_get_json
         self.oracle_endpoints: Dict[str, Dict[str, Any]] = {
@@ -830,6 +831,11 @@ class CrossChainVerifier:
             return False, result["message"], None
 
         confirmations = tx_data.get("confirmations", 0)
+        if self.header_store and tx_data.get("block_height") is not None:
+            header_confirmations = self._confirmations_from_header_store(tx_data["block_height"])
+            if header_confirmations is not None and header_confirmations > confirmations:
+                confirmations = header_confirmations
+        tx_data["confirmations"] = confirmations
         if confirmations < min_confirmations:
             result = {
                 "valid": False,
@@ -884,6 +890,19 @@ class CrossChainVerifier:
             return True
         except ValueError:
             return False
+
+    def _confirmations_from_header_store(self, block_height: int) -> Optional[int]:
+        """
+        Derive confirmations using validated headers when available.
+        """
+        if not self.header_store:
+            return None
+        tip = getattr(self.header_store, "get_best_tip", lambda: None)()
+        if not tip or getattr(tip, "height", None) is None:
+            return None
+        if tip.height < block_height:
+            return None
+        return (tip.height - block_height) + 1
 
     def _cache_result(self, cache_key: str, result: Dict[str, Any]) -> None:
         with self.lock:

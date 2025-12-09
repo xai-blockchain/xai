@@ -215,3 +215,39 @@ def test_cached_result_returned():
     )
     assert valid2 is True
     assert data2 == data
+
+
+def test_header_store_overrides_confirmations(monkeypatch):
+    from xai.core.spv_header_store import SPVHeaderStore, Header
+
+    store = SPVHeaderStore()
+    genesis = Header(height=0, block_hash="h0", prev_hash="", bits=1)
+    h1 = Header(height=100, block_hash="h1", prev_hash="h0", bits=2)
+    h2 = Header(height=110, block_hash="h2", prev_hash="h1", bits=2)
+    store.add_header(genesis)
+    store.add_header(h1)
+    store.add_header(h2)
+
+    tx_hash = "a" * 64
+    recipient = "bc1qrecipient0000000000000000000000000000"
+    fixtures = {
+        ("https://blockstream.info/api/tx/" + tx_hash, None): {
+            "txid": tx_hash,
+            "status": {"block_height": 100},
+            "vout": [{"scriptpubkey_address": recipient, "value": 100000000}],
+            "confirmations": 1,
+        },
+        ("https://blockstream.info/api/blocks/tip/height", None): 101,
+    }
+    verifier = FixtureVerifier(fixtures)
+    verifier.header_store = store
+
+    valid, message, data = verifier.verify_transaction_on_chain(
+        "BTC",
+        tx_hash,
+        expected_amount=Decimal("1"),
+        recipient=recipient,
+        min_confirmations=5,
+    )
+    assert valid is True
+    assert data["confirmations"] >= 11  # from header store best tip
