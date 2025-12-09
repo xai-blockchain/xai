@@ -8,7 +8,7 @@ import hashlib
 import json
 import os
 import time
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_UP
 from typing import Any, Dict, Optional, Tuple, List
 from enum import Enum
 import secrets
@@ -669,6 +669,45 @@ class CrossChainVerifier:
                 "api_key_env": "XAI_ETHERSCAN_API_KEY",
             },
         }
+
+    @staticmethod
+    def calculate_atomic_swap_fee(
+        amount: Decimal | float | str,
+        fee_rate_per_byte: Decimal | float | str,
+        *,
+        tx_size_bytes: int = 300,
+        safety_buffer_bps: int = 15,
+        min_fee: Decimal = Decimal("0.0001"),
+        max_fee: Decimal = Decimal("0.25"),
+    ) -> Decimal:
+        """
+        Calculate a conservative fee for HTLC funding/claim transactions.
+
+        The calculation combines a network fee estimate (fee rate * tx size)
+        with a safety buffer (basis points on amount) and clamps the result
+        between sensible minimum/maximum bounds to avoid dust rejection or
+        runaway fee selection during congestion.
+        """
+        try:
+            amount_dec = Decimal(str(amount))
+            rate_dec = Decimal(str(fee_rate_per_byte))
+        except (InvalidOperation, ValueError) as exc:
+            raise ValueError("Invalid amount or fee rate") from exc
+
+        if amount_dec <= 0 or rate_dec <= 0:
+            raise ValueError("Amount and fee rate must be positive")
+
+        network_fee = (rate_dec * Decimal(tx_size_bytes)).quantize(Decimal("0.00000001"), rounding=ROUND_UP)
+        safety_fee = (amount_dec * Decimal(safety_buffer_bps) / Decimal(10000)).quantize(
+            Decimal("0.00000001"), rounding=ROUND_UP
+        )
+        total_fee = network_fee + safety_fee
+
+        if total_fee < min_fee:
+            total_fee = min_fee
+        if total_fee > max_fee:
+            total_fee = max_fee
+        return total_fee
 
     def verify_spv_proof(
         self, coin_type: str, tx_hash: str, merkle_proof: List[str], block_header: Dict
