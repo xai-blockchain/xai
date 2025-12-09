@@ -29,11 +29,12 @@ from xai.core.htlc_p2wsh import build_utxo_contract, build_claim_witness
 RPC_URL = "http://127.0.0.1:18443"
 RPC_USER = "user"
 RPC_PASS = "pass"
+RPC_WALLET = "regtest"
 
 
 def rpc(method: str, params=None):
     resp = requests.post(
-        RPC_URL,
+        f"{RPC_URL}/wallet/{RPC_WALLET}",
         auth=(RPC_USER, RPC_PASS),
         json={"jsonrpc": "1.0", "id": "htlc", "method": method, "params": params or []},
         timeout=10,
@@ -46,6 +47,23 @@ def rpc(method: str, params=None):
 
 
 def main() -> int:
+    # Ensure wallet exists
+    try:
+        requests.post(
+            f"{RPC_URL}/wallet/{RPC_WALLET}",
+            auth=(RPC_USER, RPC_PASS),
+            json={"jsonrpc": "1.0", "id": "load", "method": "loadwallet", "params": [RPC_WALLET]},
+            timeout=5,
+        )
+    except Exception:
+        pass
+    # Create wallet if missing
+    requests.post(
+        RPC_URL,
+        auth=(RPC_USER, RPC_PASS),
+        json={"jsonrpc": "1.0", "id": "create", "method": "createwallet", "params": [RPC_WALLET]},
+        timeout=5,
+    )
     # Generate recipient/sender keys
     sender_addr = rpc("getnewaddress")
     recipient_addr = rpc("getnewaddress")
