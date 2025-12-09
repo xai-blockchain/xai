@@ -153,3 +153,17 @@ def test_rbf_rejects_lower_fee_same_nonce():
     result = bc._handle_rbf_replacement(replacement)
     assert result is False
     assert bc.pending_transactions[0].txid == "tx1"
+
+
+def test_sender_cap_enforced():
+    """Per-sender pending cap rejects excessive in-flight transactions."""
+    bc = DummyBlockchain(max_size=10, max_per_sender=2)
+    tx1 = DummyTx("t1", "spam", fee=0.2)
+    tx2 = DummyTx("t2", "spam", fee=0.3)
+    tx3 = DummyTx("t3", "spam", fee=0.4)
+
+    assert bc.add_transaction(tx1) is True
+    assert bc.add_transaction(tx2) is True
+    assert bc.add_transaction(tx3) is False
+    assert bc._mempool_rejected_sender_cap_total == 1
+    assert bc._sender_pending_count["spam"] == 2
