@@ -28,3 +28,19 @@ def test_load_payload_from_file(tmp_path):
 def test_load_payload_from_file_handles_missing(tmp_path):
     missing = tmp_path / "missing.json"
     assert CheckpointSyncManager.load_payload_from_file(str(missing)) is None
+
+
+def test_fetch_payload_from_file(tmp_path):
+    payload = {
+        "height": 5,
+        "block_hash": "hash5",
+        "state_hash": "deadbeef",
+        "data": {"utxo": "root"},
+    }
+    path = tmp_path / "cp.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    mgr = CheckpointSyncManager(blockchain=None)
+    loaded = mgr.fetch_payload({"url": str(path)})
+    assert loaded is not None
+    assert loaded.block_hash == "hash5"

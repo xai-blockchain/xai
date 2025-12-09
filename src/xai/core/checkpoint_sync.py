@@ -10,7 +10,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import os
 from typing import Any, Dict, Optional
+
+import requests
 
 from .checkpoint_payload import CheckpointPayload
 
@@ -146,6 +149,40 @@ class CheckpointSyncManager:
             )
         except (FileNotFoundError, KeyError, ValueError, TypeError, json.JSONDecodeError):
             return None
+
+    def fetch_payload(self, meta: Dict[str, Any]) -> Optional[CheckpointPayload]:
+        """
+        Fetch a checkpoint payload using metadata hints.
+
+        Supports:
+        - Local file path via `meta["url"]` pointing to a file.
+        - HTTP(S) URL fetch with JSON payload.
+        """
+        url = meta.get("url")
+        if not url:
+            return None
+
+        # Local file path
+        if os.path.exists(url):
+            payload = self.load_payload_from_file(url)
+            return payload
+
+        # HTTP(S)
+        if url.startswith("http://") or url.startswith("https://"):
+            try:
+                resp = requests.get(url, timeout=5)
+                resp.raise_for_status()
+                data = resp.json()
+                return CheckpointPayload(
+                    height=int(data["height"]),
+                    block_hash=str(data["block_hash"]),
+                    state_hash=str(data["state_hash"]),
+                    data=data.get("data", {}),
+                )
+            except (requests.RequestException, KeyError, ValueError, TypeError, json.JSONDecodeError):
+                return None
+
+        return None
 
 
     @staticmethod
