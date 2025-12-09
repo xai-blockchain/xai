@@ -238,3 +238,15 @@ def test_low_fee_rejected_when_full():
     assert bc.add_transaction(low) is False
     assert len(bc.pending_transactions) == 2
     assert bc._mempool_rejected_low_fee_total == 1
+
+
+def test_duplicate_txid_rejected():
+    """Duplicate txid is rejected even if other fields differ."""
+    bc = DummyBlockchain()
+    original = DummyTx("dup", "alice", fee=0.2)
+    bc.pending_transactions.append(original)
+    bc.seen_txids.add("dup")
+
+    duplicate = DummyTx("dup", "alice", fee=0.5)
+    assert bc.add_transaction(duplicate) is False
+    assert len(bc.pending_transactions) == 1
