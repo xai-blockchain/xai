@@ -323,6 +323,16 @@ class CheckpointSyncManager:
             "timestamp": raw.get("timestamp"),
         }
         self._provenance_log.append(entry)
+        try:
+            import logging
+
+            logging.getLogger(__name__).info(
+                "Checkpoint accepted",
+                extra={"event": "checkpoint.accepted", "checkpoint": entry},
+            )
+        except Exception:
+            # best-effort logging; ignore failures
+            pass
 
     def get_provenance(self) -> list[dict]:
         """Return checkpoint provenance log."""
