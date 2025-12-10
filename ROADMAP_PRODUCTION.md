@@ -105,6 +105,7 @@ This roadmap targets production readiness with security-first posture, robust co
 - [x] Store contract state in EVM storage, not Python dictionaries. (Executor/state adapters partially handle; further integration pending.)
 - [x] Implement proxy DELEGATECALL forwarding for upgradeable contracts. ✅ Added delegatecall harness and proxy forwarding directive; tests passing.
 - [x] Add receive() hooks for safe token transfers.
+- [x] HTLC cross-chain parity wired to SHA-256 preimage with BTC/ETH smokes passing (regtest + Hardhat).
 
 ---
 
