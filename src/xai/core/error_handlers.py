@@ -11,6 +11,7 @@ Specialized error handling mechanisms:
 
 import time
 import logging
+from abc import ABC, abstractmethod
 from typing import Callable, Optional, Tuple, Any, Dict, List
 from enum import Enum
 from collections import deque
@@ -210,7 +211,7 @@ class RetryStrategy:
         return False, None, f"Failed after {self.max_retries + 1} attempts: {last_error}"
 
 
-class ErrorHandler:
+class ErrorHandler(ABC):
     """
     Base class for specific error handlers.
 
@@ -230,6 +231,7 @@ class ErrorHandler:
         self.logger: logging.Logger = logging.getLogger(f"handler.{name}")
         self.logger.setLevel(logging.INFO)
 
+    @abstractmethod
     def can_handle(self, error: Exception, context: str) -> bool:
         """
         Check if this handler can handle the error.
@@ -241,8 +243,8 @@ class ErrorHandler:
         Returns:
             True if handler can handle this error
         """
-        raise NotImplementedError("Subclasses must implement can_handle()")
 
+    @abstractmethod
     def handle(self, error: Exception, context: str, blockchain: Any) -> Tuple[bool, Optional[str]]:
         """
         Handle the error.
@@ -255,7 +257,7 @@ class ErrorHandler:
         Returns:
             Tuple of (handled_successfully, error_message)
         """
-        raise NotImplementedError("Subclasses must implement handle()")
+        ...
 
 
 class NetworkErrorHandler(ErrorHandler):

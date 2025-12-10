@@ -1107,20 +1107,35 @@ class ProposalImpactAnalyzer:
         ).hexdigest()[:16]
 
         # Component analyses
-        risk_assessment = self._assess_risks(proposal)
-        community_impact = self._predict_community_impact(proposal, historical_data)
         technical_analysis = self._analyze_technical_changes(proposal)
         financial_impact = self._analyze_financial_impact(proposal, historical_data)
         security_assessment = self._assess_security_implications(proposal)
+        community_impact = self._predict_community_impact(proposal, historical_data)
+        risk_assessment = self._assess_risks(
+            proposal,
+            technical_analysis,
+            security_assessment,
+            financial_impact,
+            community_impact,
+        )
 
         # Generate recommendations
         recommendations = self._generate_recommendations(
-            proposal, risk_assessment, community_impact
+            proposal,
+            risk_assessment,
+            community_impact,
+            technical_analysis,
+            security_assessment,
+            financial_impact,
         )
 
         # Calculate overall score (0-100)
         overall_score = self._calculate_overall_score(
-            risk_assessment, community_impact, technical_analysis, security_assessment
+            risk_assessment,
+            community_impact,
+            technical_analysis,
+            security_assessment,
+            financial_impact,
         )
 
         analysis = {
@@ -1143,52 +1158,105 @@ class ProposalImpactAnalyzer:
 
         return analysis
 
-    def _assess_risks(self, proposal: Dict) -> Dict:
-        """Assess risks associated with the proposal"""
-        risks = {
-            "technical_risk": 0.0,
-            "security_risk": 0.0,
-            "financial_risk": 0.0,
-            "adoption_risk": 0.0,
-            "overall_risk_score": 0.0,
-            "risk_factors": [],
-            "mitigation_strategies": [],
-        }
+    def _assess_risks(
+        self,
+        proposal: Dict,
+        technical_analysis: Dict,
+        security_assessment: Dict,
+        financial_impact: Dict,
+        community_impact: Dict,
+    ) -> Dict:
+        """Assess proposal risks using holistic signal aggregation."""
+        description = str(proposal.get("description", "")).lower()
+        tags = self._extract_tags(proposal)
+        modules = proposal.get("modules") or proposal.get("components") or []
+        files_to_modify = proposal.get("files_to_modify", [])
+        change_surface = (
+            len(modules) if isinstance(modules, (list, tuple, set)) else 0
+        ) + (len(files_to_modify) if isinstance(files_to_modify, (list, tuple, set)) else 0)
+        estimated_minutes = max(float(proposal.get("estimated_minutes", 0)), 1.0)
 
-        # Analyze proposal type
-        prop_type = proposal.get("proposal_type", "unknown")
+        risk_factors: List[str] = []
+        mitigation_strategies: List[str] = []
 
-        # Technical risk
-        if "breaking_change" in str(proposal.get("description", "")).lower():
-            risks["technical_risk"] = 0.7
-            risks["risk_factors"].append("Breaking changes to existing functionality")
-            risks["mitigation_strategies"].append("Implement deprecation period and migration guide")
+        def _add_unique(target: List[str], item: str) -> None:
+            if item not in target:
+                target.append(item)
 
-        # Security risk
-        if any(
-            keyword in str(proposal.get("description", "")).lower()
-            for keyword in ["security", "authentication", "encryption", "private"]
-        ):
-            risks["security_risk"] = 0.6
-            risks["risk_factors"].append("Security-sensitive changes")
-            risks["mitigation_strategies"].append("Require security audit before deployment")
+        technical_risk = 0.2 + 0.05 * math.log1p(estimated_minutes)
+        technical_risk += 0.02 * min(change_surface, 15)
+        technical_risk += 0.25 * technical_analysis.get("complexity_score", 0.0)
+        if technical_analysis.get("breaking_changes"):
+            technical_risk += 0.18
+            _add_unique(risk_factors, "Breaking changes require coordinated rollouts")
+            _add_unique(mitigation_strategies, "Publish migration tooling and run staggered rollout")
+        if "consensus" in tags or "p2p" in tags:
+            technical_risk += 0.12
+            _add_unique(risk_factors, "Consensus/p2p mechanics being modified")
+            _add_unique(mitigation_strategies, "Run deterministic network simulations prior to mainnet")
+        if proposal.get("requires_data_migration") or "database" in description:
+            technical_risk += 0.1
+            _add_unique(risk_factors, "State migrations could corrupt chain data")
+            _add_unique(mitigation_strategies, "Capture pre/post migration snapshots with validation")
+        if proposal.get("introduces_new_crypto"):
+            technical_risk += 0.08
+            _add_unique(risk_factors, "Novel cryptography path requires peer review")
+            _add_unique(mitigation_strategies, "Validate crypto primitives with test vectors")
+        technical_risk = self._clamp(technical_risk)
 
-        # Financial risk
-        estimated_cost = proposal.get("estimated_minutes", 0) * 0.001  # Rough estimate
-        if estimated_cost > 100:
-            risks["financial_risk"] = min(estimated_cost / 1000, 1.0)
-            risks["risk_factors"].append(f"High implementation cost: ${estimated_cost:.2f}")
-            risks["mitigation_strategies"].append("Phase implementation to spread costs")
+        security_risk = 1.0 - security_assessment.get("security_score", 1.0)
+        if proposal.get("requires_external_audit"):
+            security_risk = min(0.95, security_risk + 0.15)
+            _add_unique(risk_factors, "Proposal already marked as requiring external audit")
+        if proposal.get("introduces_new_ai_policy"):
+            security_risk = min(0.95, security_risk + 0.08)
+            _add_unique(risk_factors, "AI policy change could bypass safety guardrails")
+            _add_unique(mitigation_strategies, "Run independent AI policy review and staged rollout")
 
-        # Calculate overall risk
-        risks["overall_risk_score"] = (
-            risks["technical_risk"] * 0.3
-            + risks["security_risk"] * 0.4
-            + risks["financial_risk"] * 0.2
-            + risks["adoption_risk"] * 0.1
+        budget_cap = float(proposal.get("budget_cap_usd") or 400000.0)
+        implementation_cost = float(financial_impact.get("implementation_cost_usd", 0.0))
+        cost_ratio = financial_impact.get("cost_benefit_ratio", 0.0)
+        financial_risk = self._clamp(
+            0.15
+            + 0.4 * (implementation_cost / max(budget_cap, 1.0))
+            + (0.2 if cost_ratio < 1.0 else 0.0)
+        )
+        if implementation_cost > budget_cap:
+            _add_unique(risk_factors, "Implementation cost exceeds configured budget")
+            _add_unique(mitigation_strategies, "Secure staged funding approvals before build")
+        if cost_ratio < 1.0:
+            _add_unique(risk_factors, "ROI below breakeven threshold")
+            _add_unique(mitigation_strategies, "Trim scope or identify incremental revenue offsets")
+
+        adoption_risk = 0.15
+        if proposal.get("breaking_changes") or "breaking" in description:
+            adoption_risk += 0.2
+            _add_unique(risk_factors, "User-facing breaking changes risk churn")
+        if proposal.get("requires_user_action") or proposal.get("forces_migration"):
+            adoption_risk += 0.15
+            _add_unique(risk_factors, "Requires mandatory client/user action")
+            _add_unique(mitigation_strategies, "Provide beta channel and scripted upgrade helpers")
+        community_sentiment = community_impact.get("adoption_likelihood", 0.5)
+        adoption_risk += max(0.0, 0.6 - community_sentiment) * 0.5
+        adoption_risk = self._clamp(adoption_risk)
+
+        overall_risk = (
+            technical_risk * 0.35
+            + security_risk * 0.3
+            + financial_risk * 0.2
+            + adoption_risk * 0.15
         )
 
-        return risks
+        return {
+            "technical_risk": round(technical_risk, 3),
+            "security_risk": round(security_risk, 3),
+            "financial_risk": round(financial_risk, 3),
+            "adoption_risk": round(adoption_risk, 3),
+            "overall_risk_score": round(self._clamp(overall_risk), 3),
+            "risk_factors": risk_factors or ["No critical risks flagged"],
+            "mitigation_strategies": mitigation_strategies
+            or ["Maintain heightened monitoring during rollout"],
+        }
 
     def _predict_community_impact(
         self, proposal: Dict, historical_data: Optional[Dict] = None
@@ -1589,31 +1657,48 @@ class ProposalImpactAnalyzer:
         }
 
     def _generate_recommendations(
-        self, proposal: Dict, risk_assessment: Dict, community_impact: Dict
+        self,
+        proposal: Dict,
+        risk_assessment: Dict,
+        community_impact: Dict,
+        technical_analysis: Dict,
+        security_assessment: Dict,
+        financial_impact: Dict,
     ) -> List[str]:
-        """Generate actionable recommendations"""
-        recommendations = []
+        """Generate actionable recommendations anchored to the detected risks."""
+        tags = self._extract_tags(proposal)
+        recommendations: List[str] = []
 
-        # Risk-based recommendations
-        if risk_assessment["overall_risk_score"] > 0.7:
-            recommendations.append(
-                "RECOMMEND: Phase implementation in smaller, incremental releases"
-            )
-            recommendations.append("RECOMMEND: Conduct thorough security audit")
+        def _add(msg: str) -> None:
+            if msg not in recommendations:
+                recommendations.append(msg)
 
-        if risk_assessment["security_risk"] > 0.5:
-            recommendations.append(
-                "RECOMMEND: Engage external security auditors before deployment"
-            )
+        if (
+            risk_assessment["technical_risk"] >= 0.6
+            or technical_analysis.get("complexity_score", 0.0) >= 0.6
+        ):
+            _add("RECOMMEND: Stage rollout behind feature flags and canary deploys")
+        if technical_analysis.get("breaking_changes"):
+            _add("RECOMMEND: Publish migration guides and automated upgrade tooling")
+        if "consensus" in tags or "p2p" in tags:
+            _add("RECOMMEND: Run multi-region testnets with deterministic replay coverage")
 
-        # Community-based recommendations
-        if community_impact["adoption_likelihood"] < 0.5:
-            recommendations.append("RECOMMEND: Improve user communication and documentation")
-            recommendations.append("RECOMMEND: Conduct user testing before full rollout")
+        if security_assessment.get("requires_audit") or risk_assessment["security_risk"] >= 0.5:
+            _add("RECOMMEND: Commission independent security audit and threat modeling")
+        if proposal.get("handles_keys") or "wallet" in tags:
+            _add("RECOMMEND: Enforce hardware-backed key isolation before enabling globally")
 
-        # Always add best practices
-        recommendations.append("RECOMMEND: Establish clear rollback procedures")
-        recommendations.append("RECOMMEND: Monitor metrics closely post-deployment")
+        if risk_assessment["adoption_risk"] >= 0.5 or community_impact["adoption_likelihood"] <= 0.55:
+            _add("RECOMMEND: Run community beta with opt-in migrations before hard cutover")
+            _add("RECOMMEND: Ship comms plan with FAQs and explicit rollback paths")
+
+        if financial_impact.get("cost_benefit_ratio", 0) < 1.0:
+            _add("RECOMMEND: Re-scope deliverables or secure offsetting revenue to justify budget")
+        if financial_impact.get("implementation_cost_usd", 0.0) > 500000:
+            _add("RECOMMEND: Define phased budget checkpoints tied to measurable milestones")
+
+        _add("RECOMMEND: Establish clear rollback procedures")
+        _add("RECOMMEND: Monitor risk telemetry and public metrics post-deployment")
 
         return recommendations
 
@@ -1623,6 +1708,7 @@ class ProposalImpactAnalyzer:
         community_impact: Dict,
         technical_analysis: Dict,
         security_assessment: Dict,
+        financial_impact: Dict,
     ) -> float:
         """Calculate overall proposal score (0-100)"""
         # Invert risk (low risk = high score)
@@ -1637,12 +1723,20 @@ class ProposalImpactAnalyzer:
         # Security score
         security_score = security_assessment["security_score"] * 100
 
+        # Financial score rewards strong ROI and short breakeven periods
+        roi_ratio = financial_impact.get("cost_benefit_ratio", 0.0)
+        roi_score = self._clamp(min(max(roi_ratio, 0.0), 3.0) / 3.0)
+        break_even = max(1, int(financial_impact.get("break_even_period_months", 1)))
+        break_even_score = self._clamp(1.0 - min(break_even / 36.0, 1.0))
+        financial_score = (roi_score * 0.65 + break_even_score * 0.35) * 100
+
         # Weighted average
         overall = (
-            risk_score * 0.3
-            + community_score * 0.25
-            + technical_score * 0.25
-            + security_score * 0.20
+            risk_score * 0.25
+            + community_score * 0.2
+            + technical_score * 0.2
+            + security_score * 0.2
+            + financial_score * 0.15
         )
 
         return round(overall, 2)

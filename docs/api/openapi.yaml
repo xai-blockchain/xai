@@ -1,73 +1,66 @@
 openapi: 3.0.3
 info:
   title: XAI Blockchain API
-  description: |
-    Comprehensive REST API for the XAI blockchain platform.
-    
-    ## Features
-    - Wallet management and transaction handling
-    - Blockchain querying and synchronization
-    - Mining operations and rewards
-    - Governance and voting mechanisms
-    - Real-time updates via WebSocket
-    - Rate limiting and authentication
-    
-    ## Authentication
-    All endpoints require either:
-    1. API Key in `X-API-Key` header
-    2. JWT Bearer token in `Authorization` header
-    
-    ## Base URL
-    Production: `https://api.xai-blockchain.io`
-    Testnet: `https://testnet-api.xai-blockchain.io`
-    Local: `http://localhost:5000`
-    
-  version: "1.0.0"
+  version: 1.1.0
+  description: 'Production REST API for the XAI blockchain node.
+
+
+    All endpoints require authenticated transport in production. Use the summaries
+    and schemas in this document to integrate wallets, explorers, trading engines,
+    and operational tooling.'
   contact:
     name: XAI Support
     url: https://xai-blockchain.io
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
-
 servers:
-  - url: http://localhost:5000
-    description: Local Development
-  - url: https://testnet-api.xai-blockchain.io
-    description: Testnet
-  - url: https://api.xai-blockchain.io
-    description: Production
-
+- url: http://localhost:5000
+  description: Local development
+- url: https://testnet-api.xai-blockchain.io
+  description: Testnet
+- url: https://api.xai-blockchain.io
+  description: Production
 tags:
-  - name: Health & Info
-    description: Node health and information endpoints
-  - name: Wallet
-    description: Wallet creation, management, and balance operations
-  - name: Transactions
-    description: Transaction creation, broadcasting, and status
-  - name: Blockchain
-    description: Blockchain querying and synchronization
-  - name: Mining
-    description: Mining operations and reward management
-  - name: Governance
-    description: Voting and governance mechanisms
-  - name: Trading
-    description: Wallet trading and peer-to-peer operations
-  - name: WebSocket
-    description: Real-time event streams
-
+- name: Core
+  description: Node metadata, health, and statistics
+- name: Mempool
+  description: Transaction mempool inspection
+- name: Blockchain
+  description: Blocks, transactions, and state queries
+- name: Contracts
+  description: Smart-contract execution and metadata
+- name: Wallet
+  description: Balance, history, faucet, and nonce helpers
+- name: Mining
+  description: Mining orchestration and performance
+- name: P2P
+  description: Peer management and sync
+- name: Algo
+  description: AI-assisted fee estimation and fraud checks
+- name: Recovery
+  description: Social recovery and guardian coordination
+- name: Gamification
+  description: Airdrops, streaks, treasure hunts, and refunds
+- name: Mining Bonus
+  description: XP, achievements, referrals, and leaderboards
+- name: Exchange
+  description: Order book, settlements, and fiat ramps
+- name: Crypto Deposits
+  description: BTC/ETH/USDT deposit helpers
+- name: Admin
+  description: Operational controls, API keys, and spending limits
 paths:
-  # ==================== HEALTH & INFO ====================
   /:
     get:
       tags:
-        - Health & Info
-      summary: Get node information
-      description: Returns basic information about the blockchain node
-      operationId: getNodeInfo
+      - Core
+      summary: Get node overview
+      description: Returns status metadata, build information, and discovered API
+        endpoints.
       responses:
         '200':
-          description: Node information retrieved successfully
+          description: Request succeeded
           content:
             application/json:
               schema:
@@ -78,28 +71,43 @@ paths:
                     example: online
                   node:
                     type: string
-                    example: XAI Full Node
+                    example: AXN Full Node
                   version:
                     type: string
-                    example: "1.0.0"
-                  network:
-                    type: string
-                    example: mainnet
+                    example: 1.0.0
+                  algorithmic_features:
+                    type: boolean
                   endpoints:
                     type: array
                     items:
                       type: string
-
+                required:
+                - status
+                - node
+                - version
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
   /health:
     get:
       tags:
-        - Health & Info
-      summary: Health check endpoint
-      description: Used for monitoring node health status
-      operationId: healthCheck
+      - Core
+      summary: Health check
+      description: Operational readiness probe with blockchain, storage, and peer
+        diagnostics.
       responses:
         '200':
-          description: Node is healthy
+          description: Request succeeded
           content:
             application/json:
               schema:
@@ -107,1362 +115,4644 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: ok
-                  uptime_seconds:
-                    type: integer
-                  peers_connected:
-                    type: integer
-                  sync_status:
+                    example: healthy
+                  timestamp:
+                    type: number
+                    format: float
+                  blockchain:
+                    type: object
+                  services:
+                    type: object
+                  network:
+                    type: object
+                  backlog:
+                    type: object
+                  error:
                     type: string
-                    enum: [synced, syncing, out_of_sync]
-                  last_block:
-                    type: integer
+                required:
+                - status
+                - timestamp
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '503':
-          description: Node is unhealthy
-
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /checkpoint/provenance:
+    get:
+      tags:
+      - Core
+      summary: List checkpoint provenance
+      description: Surfaces the latest deterministic checkpoints used for accelerated
+        sync.
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  provenance:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /metrics:
+    get:
+      tags:
+      - Core
+      summary: Prometheus metrics
+      description: Raw text exposition compatible with Prometheus scrapers.
+      responses:
+        '200':
+          description: Metrics stream
+          content:
+            text/plain:
+              schema:
+                type: string
+        '500':
+          description: Exporter failure
+          content:
+            text/plain:
+              schema:
+                type: string
+      security: []
   /stats:
     get:
       tags:
-        - Health & Info
-      summary: Get blockchain statistics
-      description: Returns current blockchain statistics and metrics
-      operationId: getStats
+      - Core
+      summary: Node statistics
+      description: Returns chain height, peer count, mining status, and uptime metrics.
       responses:
         '200':
-          description: Statistics retrieved successfully
+          description: Request succeeded
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BlockchainStats'
-
-  # ==================== WALLET ENDPOINTS ====================
-  /wallet/create:
-    post:
-      tags:
-        - Wallet
-      summary: Create a new wallet
-      description: Creates a new wallet with a unique address and keypair
-      operationId: createWallet
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  description: Optional wallet name
-                wallet_type:
-                  type: string
-                  enum: [standard, embedded, hardware]
-                  default: standard
-      responses:
-        '201':
-          description: Wallet created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/WalletResponse'
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  stats:
+                    type: object
+                required:
+                - success
         '400':
-          $ref: '#/components/responses/BadRequest'
-        '429':
-          $ref: '#/components/responses/RateLimitExceeded'
-
-  /wallet/{address}:
-    get:
-      tags:
-        - Wallet
-      summary: Get wallet information
-      description: Retrieves wallet details and balance information
-      operationId: getWallet
-      parameters:
-        - name: address
-          in: path
-          required: true
-          description: Wallet address
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Wallet information retrieved
+          description: Error response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WalletDetail'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /wallet/{address}/balance:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /mempool:
     get:
       tags:
-        - Wallet
-      summary: Get wallet balance
-      description: Returns the current balance of a wallet
-      operationId: getBalance
+      - Mempool
+      summary: Get mempool snapshot
+      description: Lists pending transactions and queue sizing metadata.
       parameters:
-        - name: address
-          in: path
-          required: true
-          schema:
-            type: string
+      - $ref: '#/components/parameters/LimitParam'
       responses:
         '200':
-          description: Balance retrieved successfully
+          description: Request succeeded
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  address:
-                    type: string
-                  balance:
-                    type: string
-                    description: Balance in smallest unit (wei)
-                  locked_balance:
-                    type: string
-                  available_balance:
-                    type: string
-                  nonce:
+                  success:
+                    type: boolean
+                    default: true
+                  limit:
                     type: integer
-
-  /wallet/{address}/transactions:
+                  mempool:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /mempool/stats:
     get:
       tags:
-        - Wallet
-      summary: Get wallet transaction history
-      description: Returns transaction history for a wallet
-      operationId: getWalletTransactions
+      - Mempool
+      summary: Get mempool pressure indicators
+      description: Returns congestion, fee percentiles, and pressure heuristics.
       parameters:
-        - name: address
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 50
-            maximum: 100
-        - name: offset
-          in: query
-          schema:
-            type: integer
-            default: 0
+      - $ref: '#/components/parameters/LimitParam'
       responses:
         '200':
-          description: Transactions retrieved
+          description: Request succeeded
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  transactions:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Transaction'
+                  success:
+                    type: boolean
+                    default: true
+                  timestamp:
+                    type: number
+                  fees:
+                    type: object
+                  pressure:
+                    type: object
+                  transactions_returned:
+                    type: integer
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /blocks:
+    get:
+      tags:
+      - Blockchain
+      summary: List blocks
+      description: Returns the latest blocks with pagination.
+      parameters:
+      - $ref: '#/components/parameters/LimitParam'
+      - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
                   total:
                     type: integer
                   limit:
                     type: integer
                   offset:
                     type: integer
-
-  /wallet/embedded/create:
-    post:
-      tags:
-        - Wallet
-      summary: Create an embedded wallet
-      description: Creates a wallet embedded within an application
-      operationId: createEmbeddedWallet
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                app_id:
-                  type: string
-                user_id:
-                  type: string
-                metadata:
-                  type: object
-              required: [app_id, user_id]
-      responses:
-        '201':
-          description: Embedded wallet created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EmbeddedWalletResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-
-  /wallet/embedded/login:
-    post:
-      tags:
-        - Wallet
-      summary: Login to embedded wallet
-      description: Authenticates and retrieves session for embedded wallet
-      operationId: loginEmbeddedWallet
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                wallet_id:
-                  type: string
-                password:
-                  type: string
-              required: [wallet_id, password]
-      responses:
-        '200':
-          description: Login successful
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  session_token:
-                    type: string
-                  wallet_id:
-                    type: string
-                  expires_in:
-                    type: integer
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  # ==================== TRANSACTION ENDPOINTS ====================
-  /transaction/send:
-    post:
-      tags:
-        - Transactions
-      summary: Send a transaction
-      description: Creates and broadcasts a transaction to the network
-      operationId: sendTransaction
-      security:
-        - api_key: []
-        - bearer_auth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TransactionRequest'
-      responses:
-        '202':
-          description: Transaction accepted and queued for broadcasting
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TransactionResponse'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/RateLimitExceeded'
-
-  /transaction/{hash}:
-    get:
-      tags:
-        - Transactions
-      summary: Get transaction details
-      description: Retrieves details of a specific transaction
-      operationId: getTransaction
-      parameters:
-        - name: hash
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Transaction details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TransactionDetail'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /transaction/{hash}/status:
-    get:
-      tags:
-        - Transactions
-      summary: Get transaction status
-      description: Returns the current status of a transaction
-      operationId: getTransactionStatus
-      parameters:
-        - name: hash
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Transaction status
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  hash:
-                    type: string
-                  status:
-                    type: string
-                    enum: [pending, confirmed, failed]
-                  confirmations:
-                    type: integer
-                  block_number:
-                    type: integer
-
-  /transaction/estimate-fee:
-    post:
-      tags:
-        - Transactions
-      summary: Estimate transaction fee
-      description: Estimates the fee for a transaction
-      operationId: estimateFee
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                from:
-                  type: string
-                to:
-                  type: string
-                amount:
-                  type: string
-                data:
-                  type: string
-      responses:
-        '200':
-          description: Fee estimate
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  gas_limit:
-                    type: string
-                  gas_price:
-                    type: string
-                  estimated_fee:
-                    type: string
-
-  # ==================== BLOCKCHAIN ENDPOINTS ====================
-  /blockchain/blocks:
-    get:
-      tags:
-        - Blockchain
-      summary: List recent blocks
-      description: Returns a list of recent blocks
-      operationId: listBlocks
-      parameters:
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 20
-            maximum: 100
-        - name: offset
-          in: query
-          schema:
-            type: integer
-            default: 0
-      responses:
-        '200':
-          description: Blocks retrieved
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
                   blocks:
                     type: array
                     items:
                       $ref: '#/components/schemas/Block'
-                  total:
-                    type: integer
-
-  /blockchain/blocks/{block_number}:
-    get:
-      tags:
-        - Blockchain
-      summary: Get block details
-      description: Retrieves details of a specific block
-      operationId: getBlock
-      parameters:
-        - name: block_number
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: Block details
+                required:
+                - success
+        '400':
+          description: Error response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BlockDetail'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /blockchain/blocks/{block_number}/transactions:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /blocks/{index}:
     get:
       tags:
-        - Blockchain
-      summary: Get block transactions
-      description: Returns all transactions in a block
-      operationId: getBlockTransactions
+      - Blockchain
+      summary: Get block by index
+      description: Fetch a block using its height/index with cache-friendly headers.
       parameters:
-        - name: block_number
-          in: path
-          required: true
-          schema:
-            type: integer
+      - $ref: '#/components/parameters/BlockIndexParam'
       responses:
         '200':
-          description: Block transactions
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Block'
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /block/{block_hash}:
+    get:
+      tags:
+      - Blockchain
+      summary: Get block by hash
+      description: Fetch a block using its canonical hash.
+      parameters:
+      - $ref: '#/components/parameters/BlockHashParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Block'
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /block/receive:
+    post:
+      tags:
+      - Blockchain
+      summary: Accept peer block
+      description: Receives a block envelope signed by a peer and attempts to add
+        it to the chain.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PeerBlockInput'
+      responses:
+        '200':
+          description: Request succeeded
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  block_number:
+                  success:
+                    type: boolean
+                    default: true
+                  height:
+                    type: integer
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /transactions:
+    get:
+      tags:
+      - Blockchain
+      summary: List pending transactions
+      description: Returns the mempool contents in deterministic order.
+      parameters:
+      - $ref: '#/components/parameters/LimitParam'
+      - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  count:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
                     type: integer
                   transactions:
                     type: array
                     items:
                       $ref: '#/components/schemas/Transaction'
-
-  /blockchain/sync:
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /transaction/{txid}:
     get:
       tags:
-        - Blockchain
-      summary: Get sync status
-      description: Returns blockchain synchronization status
-      operationId: getSyncStatus
+      - Blockchain
+      summary: Get transaction by ID
+      description: Searches confirmed blocks and the mempool for the provided transaction
+        ID.
+      parameters:
+      - $ref: '#/components/parameters/TransactionIdParam'
       responses:
         '200':
-          description: Sync status
+          description: Request succeeded
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  syncing:
+                  success:
                     type: boolean
-                  current_block:
+                    default: true
+                  found:
+                    type: boolean
+                  block:
                     type: integer
-                  highest_block:
+                  confirmations:
                     type: integer
-                  starting_block:
-                    type: integer
-
-  # ==================== MINING ENDPOINTS ====================
-  /mining/start:
-    post:
-      tags:
-        - Mining
-      summary: Start mining
-      description: Starts the mining process on this node
-      operationId: startMining
-      security:
-        - api_key: []
-        - bearer_auth: []
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                threads:
-                  type: integer
-                  default: 1
-                  minimum: 1
-                  maximum: 16
-      responses:
-        '200':
-          description: Mining started
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: mining_started
-                  threads:
-                    type: integer
-                  difficulty:
-                    type: string
-
-  /mining/stop:
-    post:
-      tags:
-        - Mining
-      summary: Stop mining
-      description: Stops the mining process
-      operationId: stopMining
-      security:
-        - api_key: []
-        - bearer_auth: []
-      responses:
-        '200':
-          description: Mining stopped
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: mining_stopped
-
-  /mining/status:
-    get:
-      tags:
-        - Mining
-      summary: Get mining status
-      description: Returns current mining status and statistics
-      operationId: getMiningStatus
-      responses:
-        '200':
-          description: Mining status
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/MiningStatus'
-
-  /mining/rewards:
-    get:
-      tags:
-        - Mining
-      summary: Get mining rewards
-      description: Returns earned mining rewards
-      operationId: getMiningRewards
-      parameters:
-        - name: address
-          in: query
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Mining rewards
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  address:
-                    type: string
-                  total_rewards:
-                    type: string
-                  pending_rewards:
-                    type: string
-                  claimed_rewards:
-                    type: string
-
-  # ==================== GOVERNANCE ENDPOINTS ====================
-  /governance/proposals:
-    get:
-      tags:
-        - Governance
-      summary: List governance proposals
-      description: Returns list of governance proposals
-      operationId: listProposals
-      parameters:
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [active, passed, failed, pending]
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 20
-      responses:
-        '200':
-          description: Proposals retrieved
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  proposals:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Proposal'
-                  total:
-                    type: integer
-
-    post:
-      tags:
-        - Governance
-      summary: Create a proposal
-      description: Creates a new governance proposal
-      operationId: createProposal
-      security:
-        - api_key: []
-        - bearer_auth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProposalRequest'
-      responses:
-        '201':
-          description: Proposal created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Proposal'
+                  transaction:
+                    $ref: '#/components/schemas/Transaction'
+                required:
+                - success
         '400':
-          $ref: '#/components/responses/BadRequest'
-
-  /governance/proposals/{proposal_id}:
-    get:
-      tags:
-        - Governance
-      summary: Get proposal details
-      description: Returns detailed information about a proposal
-      operationId: getProposal
-      parameters:
-        - name: proposal_id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: Proposal details
+          description: Error response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProposalDetail'
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
-          $ref: '#/components/responses/NotFound'
-
-  /governance/proposals/{proposal_id}/vote:
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /send:
     post:
       tags:
-        - Governance
-      summary: Vote on a proposal
-      description: Casts a vote on a governance proposal
-      operationId: voteOnProposal
-      security:
-        - api_key: []
-        - bearer_auth: []
-      parameters:
-        - name: proposal_id
-          in: path
-          required: true
-          schema:
-            type: integer
+      - Blockchain
+      summary: Broadcast transaction
+      description: Validates, enqueues, and broadcasts a signed transaction.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                voter:
-                  type: string
-                choice:
-                  type: string
-                  enum: [yes, no, abstain]
-              required: [voter, choice]
+              $ref: '#/components/schemas/NodeTransactionInput'
       responses:
         '200':
-          description: Vote recorded
+          description: Request succeeded
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  proposal_id:
-                    type: integer
-                  voter:
+                  success:
+                    type: boolean
+                    default: true
+                  txid:
                     type: string
-                  choice:
-                    type: string
-
-  # ==================== TRADING ENDPOINTS ====================
-  /wallet-trades/register:
-    post:
-      tags:
-        - Trading
-      summary: Register trade session
-      description: Creates a WalletConnect-style trade session
-      operationId: registerTradeSession
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                wallet_address:
-                  type: string
-                peer_id:
-                  type: string
-      responses:
-        '201':
-          description: Session registered
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  session_id:
-                    type: string
-                  wallet_address:
-                    type: string
-                  expires_at:
-                    type: string
-                    format: date-time
-
-  /wallet-trades/orders:
-    get:
-      tags:
-        - Trading
-      summary: List trade orders
-      description: Returns active trade orders
-      operationId: listTradeOrders
-      responses:
-        '200':
-          description: Trade orders
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/TradeOrder'
-
-    post:
-      tags:
-        - Trading
-      summary: Create trade order
-      description: Creates a new trade order
-      operationId: createTradeOrder
-      security:
-        - api_key: []
-        - bearer_auth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TradeOrderRequest'
-      responses:
-        '201':
-          description: Trade order created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TradeOrder'
-
-  # ==================== WEBSOCKET ====================
-  /ws:
-    get:
-      tags:
-        - WebSocket
-      summary: WebSocket connection endpoint
-      description: |
-        Establishes WebSocket connection for real-time events.
-        
-        ## Events
-        - `block`: New block mined
-        - `transaction`: New transaction
-        - `balance_change`: Wallet balance changed
-        - `proposal_update`: Governance proposal update
-        - `price_update`: Price data update
-        
-        ## Example Message
-        ```json
-        {
-          "type": "block",
-          "data": {
-            "number": 12345,
-            "hash": "0x...",
-            "timestamp": 1234567890
-          }
-        }
-        ```
-      operationId: connectWebSocket
-      responses:
-        '101':
-          description: WebSocket connection established
+                required:
+                - success
         '400':
-          description: Invalid request
-
-  # ==================== ADDITIONAL CORE ENDPOINTS ====================
-  /mempool/stats:
-    get:
-      tags: [Mempool]
-      summary: Get mempool statistics and fee pressure
-      operationId: getMempoolStats
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /transaction/receive:
+    post:
+      tags:
+      - Blockchain
+      summary: Accept peer transaction
+      description: Receives a signed peer transaction envelope and attempts to add
+        it to the mempool.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PeerTransactionInput'
       responses:
         '200':
-          description: Mempool statistics retrieved
+          description: Request succeeded
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  pending:
-                    type: integer
-                  pressure:
+                  success:
+                    type: boolean
+                    default: true
+                  txid:
                     type: string
-                  p50_fee:
-                    type: number
-                  p95_fee:
-                    type: number
-
-  /address/{address}/nonce:
-    get:
-      tags: [Accounts]
-      summary: Get the confirmed/next nonce for an address
-      operationId: getAddressNonce
-      parameters:
-        - in: path
-          name: address
-          required: true
-          schema:
-            type: string
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /contracts/deploy:
+    post:
+      tags:
+      - Contracts
+      summary: Deploy smart contract
+      description: Queues a contract deployment transaction and returns the derived
+        address.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContractDeployInput'
       responses:
         '200':
-          description: Nonce information
+          description: Request succeeded
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  confirmed_nonce:
-                    type: integer
-                  next_nonce:
-                    type: integer
-        '404':
-          description: Address not found
-
-  /block/{hash}:
-    get:
-      tags: [Blocks]
-      summary: Get a block by hash
-      operationId: getBlockByHash
-      parameters:
-        - in: path
-          name: hash
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Block retrieved
+                  success:
+                    type: boolean
+                    default: true
+                  txid:
+                    type: string
+                  contract_address:
+                    type: string
+                required:
+                - success
+        '400':
+          description: Error response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Block'
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /contracts/call:
+    post:
+      tags:
+      - Contracts
+      summary: Execute smart contract call
+      description: Queues a call transaction against an existing contract.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContractCallInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  txid:
+                    type: string
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /contracts/{address}/state:
+    get:
+      tags:
+      - Contracts
+      summary: Read contract state
+      description: Retrieves the stored state for a contract build.
+      parameters:
+      - $ref: '#/components/parameters/ContractAddressParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  contract_address:
+                    type: string
+                  state:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Block not found
-
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /contracts/{address}/abi:
     get:
-      tags: [Contracts]
-      summary: Get stored ABI for a contract address
-      operationId: getContractAbi
+      tags:
+      - Contracts
+      summary: Get contract ABI
+      description: Returns the ABI metadata registered for the contract.
       parameters:
-        - in: path
-          name: address
-          required: true
-          schema:
-            type: string
+      - $ref: '#/components/parameters/ContractAddressParam'
       responses:
         '200':
-          description: ABI metadata
+          description: Request succeeded
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  address:
+                  success:
+                    type: boolean
+                    default: true
+                  contract_address:
                     type: string
                   abi:
                     type: array
-                    items:
-                      type: object
-                  verified:
-                    type: boolean
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: ABI not found
-
-  /contracts/{address}/events:
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /contracts/{address}/interfaces:
     get:
-      tags: [Contracts]
-      summary: Get contract events with pagination
-      operationId: getContractEvents
+      tags:
+      - Contracts
+      summary: Detect supported interfaces
+      description: Runs ERC-165 probes and reports supported receiver interfaces.
       parameters:
-        - in: path
-          name: address
-          required: true
-          schema:
-            type: string
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            default: 100
-        - in: query
-          name: page
-          schema:
-            type: integer
-            default: 1
+      - $ref: '#/components/parameters/ContractAddressParam'
       responses:
         '200':
-          description: Events list
+          description: Request succeeded
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  address:
+                  success:
+                    type: boolean
+                    default: true
+                  contract_address:
+                    type: string
+                  interfaces:
+                    type: object
+                  metadata:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /contracts/{address}/events:
+    get:
+      tags:
+      - Contracts
+      summary: List contract events
+      description: Returns indexed events emitted by the contract.
+      parameters:
+      - $ref: '#/components/parameters/ContractAddressParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  contract_address:
                     type: string
                   events:
                     type: array
                     items:
                       type: object
+                  count:
+                    type: integer
                   total:
                     type: integer
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /contracts/governance/status:
+    get:
+      tags:
+      - Contracts
+      summary: Smart-contract feature status
+      description: Reports governance flags plus runtime readiness for the VM.
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  feature_name:
+                    type: string
+                  config_enabled:
+                    type: boolean
+                  governance_enabled:
+                    type: boolean
+                  contract_manager_ready:
+                    type: boolean
+                  contracts_tracked:
+                    type: integer
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /contracts/governance/feature:
+    post:
+      tags:
+      - Contracts
+      summary: Toggle smart-contract execution
+      description: Administrative endpoint that executes a governance instruction
+        to enable or disable the VM.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContractFeatureToggleInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  proposal_id:
+                    type: string
+                  governance_result:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /balance/{address}:
+    get:
+      tags:
+      - Wallet
+      summary: Get balance
+      description: Returns the spendable balance for an address.
+      parameters:
+      - $ref: '#/components/parameters/AddressPathParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  address:
+                    type: string
+                  balance:
+                    type: number
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /address/{address}/nonce:
+    get:
+      tags:
+      - Wallet
+      summary: Get address nonce
+      description: Reports the confirmed and next nonce for transaction construction.
+      parameters:
+      - $ref: '#/components/parameters/AddressPathParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  address:
+                    type: string
+                  confirmed_nonce:
+                    type: integer
+                  next_nonce:
+                    type: integer
+                  pending_nonce:
+                    type: integer
+                    nullable: true
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /history/{address}:
+    get:
+      tags:
+      - Wallet
+      summary: Get address history
+      description: Transaction history window for an address.
+      parameters:
+      - $ref: '#/components/parameters/AddressPathParam'
+      - $ref: '#/components/parameters/LimitParam'
+      - $ref: '#/components/parameters/OffsetParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  address:
+                    type: string
+                  transaction_count:
+                    type: integer
+                  transactions:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /faucet/claim:
+    post:
+      tags:
+      - Wallet
+      summary: Claim testnet faucet
+      description: Queues a faucet transfer on test networks.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FaucetClaimInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  amount:
+                    type: number
+                  txid:
+                    type: string
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /mine:
+    post:
+      tags:
+      - Mining
+      summary: Mine pending transactions
+      description: Forces immediate mining and broadcasts the resulting block.
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  block:
+                    $ref: '#/components/schemas/Block'
+                  reward:
+                    type: number
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auto-mine/start:
+    post:
+      tags:
+      - Mining
+      summary: Start auto mining
+      description: Turns on background mining threads.
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  message:
+                    type: string
+                    example: Auto-mining started
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auto-mine/stop:
+    post:
+      tags:
+      - Mining
+      summary: Stop auto mining
+      description: Terminates background mining threads.
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  message:
+                    type: string
+                    example: Auto-mining stopped
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /peers:
+    get:
+      tags:
+      - P2P
+      summary: List peers
+      description: Shows connected peers and optional verbose metadata.
+      parameters:
+      - $ref: '#/components/parameters/VerboseParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  count:
+                    type: integer
+                  peers:
+                    type: array
+                    items:
+                      type: string
+                  verbose:
+                    type: boolean
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /peers/add:
+    post:
+      tags:
+      - P2P
+      summary: Add peer
+      description: Registers a peer URL and attempts to connect.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PeerAddInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  message:
+                    type: string
+                    example: Peer added
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /sync:
+    post:
+      tags:
+      - P2P
+      summary: Synchronize with network
+      description: Triggers the sync coordinator to fetch blocks from peers.
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  synced:
+                    type: boolean
+                  chain_length:
+                    type: integer
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /algo/fee-estimate:
+    get:
+      tags:
+      - Algo
+      summary: Fee recommendation
+      description: Predicts recommended fee rates given mempool pressure and requested
+        priority.
+      parameters:
+      - name: priority
+        in: query
+        schema:
+          type: string
+          enum:
+          - slow
+          - normal
+          - priority
+        required: false
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  recommended:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /algo/fraud-check:
+    post:
+      tags:
+      - Algo
+      summary: Fraud analysis
+      description: Runs the AI-powered fraud detector on a transaction payload.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FraudCheckInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  analysis:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /algo/status:
+    get:
+      tags:
+      - Algo
+      summary: Algorithmic feature status
+      description: Reports enabled modules such as fee optimizer and fraud detector.
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  enabled:
+                    type: boolean
+                  features:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /recovery/setup:
+    post:
+      tags:
+      - Recovery
+      summary: Configure guardians
+      description: Registers guardians and the signature threshold for an address.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecoverySetupInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  result:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /recovery/request:
+    post:
+      tags:
+      - Recovery
+      summary: Initiate recovery
+      description: Guardian starts a recovery flow to move control to a new address.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecoveryRequestInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  result:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /recovery/vote:
+    post:
+      tags:
+      - Recovery
+      summary: Guardian vote
+      description: Guardian vote on an existing recovery request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecoveryVoteInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  result:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /recovery/cancel:
+    post:
+      tags:
+      - Recovery
+      summary: Cancel recovery
+      description: Owner cancels a pending recovery.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecoveryCancelInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  result:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /recovery/execute:
+    post:
+      tags:
+      - Recovery
+      summary: Execute recovery
+      description: Executes the approved recovery after the safety delay.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecoveryExecuteInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  result:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /recovery/status/{address}:
+    get:
+      tags:
+      - Recovery
+      summary: Recovery status
+      description: Returns active recovery status for an address.
+      parameters:
+      - $ref: '#/components/parameters/AddressPathParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  data:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /recovery/config/{address}:
+    get:
+      tags:
+      - Recovery
+      summary: Recovery config
+      description: Returns guardian configuration for an address.
+      parameters:
+      - $ref: '#/components/parameters/AddressPathParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  data:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /recovery/guardian/{address}:
+    get:
+      tags:
+      - Recovery
+      summary: Guardian duties
+      description: Lists guardian responsibilities for an address.
+      parameters:
+      - $ref: '#/components/parameters/AddressPathParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  data:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /recovery/requests:
+    get:
+      tags:
+      - Recovery
+      summary: List recovery requests
+      description: Lists pending recovery requests optionally filtered by status.
+      parameters:
+      - name: status
+        in: query
+        schema:
+          type: string
+        required: false
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  count:
+                    type: integer
+                  requests:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /recovery/stats:
+    get:
+      tags:
+      - Recovery
+      summary: Recovery statistics
+      description: Aggregate statistics for the guardian and recovery system.
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  stats:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /airdrop/winners:
+    get:
+      tags:
+      - Gamification
+      summary: List airdrop winners
+      description: Leaderboard of the most recent airdrop winners.
+      parameters:
+      - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  airdrops:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /airdrop/user/{address}:
+    get:
+      tags:
+      - Gamification
+      summary: Get user airdrops
+      description: Historical airdrop data for the provided address.
+      parameters:
+      - $ref: '#/components/parameters/AddressPathParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  address:
+                    type: string
+                  total_airdrops:
+                    type: integer
+                  history:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /mining/streaks:
+    get:
+      tags:
+      - Gamification
+      summary: Mining streak leaderboard
+      description: Returns the longest and most recent mining streaks.
+      parameters:
+      - $ref: '#/components/parameters/LimitParam'
+      - name: sort_by
+        in: query
+        schema:
+          type: string
+          default: current_streak
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  leaderboard:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /mining/streak/{address}:
+    get:
+      tags:
+      - Gamification
+      summary: Address mining streak
+      description: Returns streak statistics for a specific miner.
+      parameters:
+      - $ref: '#/components/parameters/AddressPathParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  address:
+                    type: string
+                  stats:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
-          description: Contract not found
-
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /treasure/active:
+    get:
+      tags:
+      - Gamification
+      summary: List active treasures
+      description: Returns all currently unclaimed treasure hunts.
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  count:
+                    type: integer
+                  treasures:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /treasure/create:
+    post:
+      tags:
+      - Gamification
+      summary: Create treasure hunt
+      description: Creates a new treasure hunt by locking a bounty behind a puzzle.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TreasureCreateInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  treasure_id:
+                    type: string
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /treasure/claim:
+    post:
+      tags:
+      - Gamification
+      summary: Claim treasure
+      description: Validates the puzzle solution and rewards the claimer.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TreasureClaimInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  amount:
+                    type: number
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /treasure/details/{treasure_id}:
+    get:
+      tags:
+      - Gamification
+      summary: Treasure details
+      description: Returns the metadata for a treasure hunt.
+      parameters:
+      - $ref: '#/components/parameters/TreasureIdParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  treasure:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /timecapsule/pending:
+    get:
+      tags:
+      - Gamification
+      summary: Pending time capsules
+      description: Lists time capsules that are still locked.
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  count:
+                    type: integer
+                  capsules:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /timecapsule/{address}:
+    get:
+      tags:
+      - Gamification
+      summary: Address time capsules
+      description: Returns sent and received time capsules for an address.
+      parameters:
+      - $ref: '#/components/parameters/AddressPathParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  address:
+                    type: string
+                  sent:
+                    type: array
+                  received:
+                    type: array
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /refunds/stats:
+    get:
+      tags:
+      - Gamification
+      summary: Refund statistics
+      description: Aggregated fee refund metrics.
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  stats:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /refunds/{address}:
+    get:
+      tags:
+      - Gamification
+      summary: Address refund history
+      description: Lists the refunds that an address has received.
+      parameters:
+      - $ref: '#/components/parameters/AddressPathParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  address:
+                    type: string
+                  history:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /mining/register:
+    post:
+      tags:
+      - Mining Bonus
+      summary: Register miner
+      description: Registers a miner for XP/bonus tracking.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MiningRegisterInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  result:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /mining/achievements/{address}:
+    get:
+      tags:
+      - Mining Bonus
+      summary: Get achievements
+      description: Returns unlocked achievements and progress for an address.
+      parameters:
+      - $ref: '#/components/parameters/AddressPathParam'
+      - name: blocks_mined
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+      - name: streak_days
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  achievements:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /mining/claim-bonus:
+    post:
+      tags:
+      - Mining Bonus
+      summary: Claim social bonus
+      description: Claims a configured mining bonus such as social campaigns.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MiningBonusClaimInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  result:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /mining/referral/create:
+    post:
+      tags:
+      - Mining Bonus
+      summary: Create referral code
+      description: Generates a referral code for a miner.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReferralCreateInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  result:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /mining/referral/use:
+    post:
+      tags:
+      - Mining Bonus
+      summary: Redeem referral code
+      description: Registers a new miner using an existing referral code.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReferralUseInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  result:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /mining/user-bonuses/{address}:
+    get:
+      tags:
+      - Mining Bonus
+      summary: List user bonuses
+      description: Returns all XP, streak, and referral bonuses tied to an address.
+      parameters:
+      - $ref: '#/components/parameters/AddressPathParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  bonuses:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /mining/leaderboard:
+    get:
+      tags:
+      - Mining Bonus
+      summary: Bonus leaderboard
+      description: Returns the top addresses ranked by configured bonus metrics.
+      parameters:
+      - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  leaderboard:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /mining/leaderboard/unified:
+    get:
+      tags:
+      - Mining Bonus
+      summary: Unified leaderboard
+      description: Aggregated leaderboard blending XP, streaks, and referrals.
+      parameters:
+      - $ref: '#/components/parameters/LimitParam'
+      - name: metric
+        in: query
+        schema:
+          type: string
+          default: composite
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  leaderboard:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /mining/stats:
+    get:
+      tags:
+      - Mining Bonus
+      summary: Mining bonus stats
+      description: System-wide statistics for the bonus engine.
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  stats:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /exchange/orders:
+    get:
+      tags:
+      - Exchange
+      summary: Order book snapshot
+      description: Returns the top of book for both sides.
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  buy_orders:
+                    type: array
+                    items:
+                      type: object
+                  sell_orders:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /exchange/place-order:
+    post:
+      tags:
+      - Exchange
+      summary: Place order
+      description: Creates a limit order and optionally matches immediately.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExchangeOrderInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  order:
+                    type: object
+                  matched:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /exchange/cancel-order:
+    post:
+      tags:
+      - Exchange
+      summary: Cancel order
+      description: Cancels an open order and unlocks funds.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExchangeCancelInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  message:
+                    type: string
+                    example: Order cancelled successfully
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /exchange/my-orders/{address}:
+    get:
+      tags:
+      - Exchange
+      summary: List user orders
+      description: Returns the order history for an address.
+      parameters:
+      - $ref: '#/components/parameters/AddressPathParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  orders:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /exchange/trades:
+    get:
+      tags:
+      - Exchange
+      summary: Recent trades
+      description: Returns recently executed trades.
+      parameters:
+      - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  trades:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /exchange/deposit:
+    post:
+      tags:
+      - Exchange
+      summary: Deposit funds
+      description: Credits an exchange wallet via manual or automated deposit.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExchangeTransferInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  result:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /exchange/withdraw:
+    post:
+      tags:
+      - Exchange
+      summary: Withdraw funds
+      description: Initiates a withdrawal from the exchange wallet.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExchangeTransferInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  result:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /exchange/balance/{address}:
+    get:
+      tags:
+      - Exchange
+      summary: All balances
+      description: Returns all currency balances (available and locked) for an address.
+      parameters:
+      - $ref: '#/components/parameters/AddressPathParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  balances:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /exchange/balance/{address}/{currency}:
+    get:
+      tags:
+      - Exchange
+      summary: Currency balance
+      description: Returns the balance for a single currency.
+      parameters:
+      - $ref: '#/components/parameters/AddressPathParam'
+      - $ref: '#/components/parameters/CurrencyParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  available:
+                    type: number
+                  locked:
+                    type: number
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /exchange/transactions/{address}:
+    get:
+      tags:
+      - Exchange
+      summary: Exchange transactions
+      description: Returns transfers and fills for an address.
+      parameters:
+      - $ref: '#/components/parameters/AddressPathParam'
+      - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  transactions:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /exchange/price-history:
+    get:
+      tags:
+      - Exchange
+      summary: Price history
+      description: Returns charting data for the requested timeframe.
+      parameters:
+      - name: timeframe
+        in: query
+        schema:
+          type: string
+          default: 24h
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  prices:
+                    type: array
+                  volumes:
+                    type: array
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /exchange/stats:
+    get:
+      tags:
+      - Exchange
+      summary: Exchange stats
+      description: Returns market statistics such as current price, volume, and open
+        interest.
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  stats:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /exchange/buy-with-card:
+    post:
+      tags:
+      - Exchange
+      summary: Buy AXN with card
+      description: Processes a credit/debit card payment and credits AXN.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExchangeCardPurchaseInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  payment:
+                    type: object
+                  deposit:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /exchange/payment-methods:
+    get:
+      tags:
+      - Exchange
+      summary: Supported payment methods
+      description: Lists enabled card/payment rails.
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  methods:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /exchange/calculate-purchase:
+    post:
+      tags:
+      - Exchange
+      summary: Estimate purchase amount
+      description: Returns the AXN amount and fees for a USD purchase.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PurchaseEstimateRequest'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  estimate:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /exchange/crypto/generate-address:
+    post:
+      tags:
+      - Crypto Deposits
+      summary: Generate deposit address
+      description: Creates a unique BTC/ETH/USDT deposit address for the user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CryptoDepositAddressInput'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  address:
+                    type: string
+                  currency:
+                    type: string
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /exchange/crypto/addresses/{address}:
+    get:
+      tags:
+      - Crypto Deposits
+      summary: List user deposit addresses
+      description: Returns the crypto deposit addresses issued to the user.
+      parameters:
+      - $ref: '#/components/parameters/AddressPathParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  addresses:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /exchange/crypto/pending-deposits:
+    get:
+      tags:
+      - Crypto Deposits
+      summary: Pending crypto deposits
+      description: Returns pending deposits optionally filtered by user.
+      parameters:
+      - name: user_address
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  pending_deposits:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /exchange/crypto/deposit-history/{address}:
+    get:
+      tags:
+      - Crypto Deposits
+      summary: Deposit history
+      description: Returns confirmed crypto deposits for the user.
+      parameters:
+      - $ref: '#/components/parameters/AddressPathParam'
+      - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  deposits:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /exchange/crypto/stats:
+    get:
+      tags:
+      - Crypto Deposits
+      summary: Crypto deposit stats
+      description: Returns aggregated metrics for the crypto deposit system.
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  stats:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security: []
+  /admin/api-keys:
+    get:
+      tags:
+      - Admin
+      summary: List API keys
+      description: Returns metadata about issued API keys.
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  keys:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags:
+      - Admin
+      summary: Create API key
+      description: Issues an API key with user or admin scope.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiKeyCreateRequest'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  api_key:
+                    type: string
+                  key_id:
+                    type: string
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/api-keys/{key_id}:
+    delete:
+      tags:
+      - Admin
+      summary: Revoke API key
+      description: Revokes an API key by ID.
+      parameters:
+      - name: key_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  revoked:
+                    type: boolean
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/api-key-events:
+    get:
+      tags:
+      - Admin
+      summary: API key events
+      description: Returns recent API key audit events.
+      parameters:
+      - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  events:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/withdrawals/telemetry:
+    get:
+      tags:
+      - Admin
+      summary: Withdrawal telemetry
+      description: Returns live withdrawal metrics for ops teams.
+      parameters:
+      - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  recent_withdrawals:
+                    type: array
+                    items:
+                      type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/withdrawals/status:
+    get:
+      tags:
+      - Admin
+      summary: Withdrawal status snapshot
+      description: Returns withdrawals grouped by status plus queue depth.
+      parameters:
+      - $ref: '#/components/parameters/LimitParam'
+      - name: status
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  withdrawals:
+                    type: object
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /admin/spend-limit:
+    post:
+      tags:
+      - Admin
+      summary: Set spending limit
+      description: Sets the per-address daily spending limit enforced by the API.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SpendLimitRequest'
+      responses:
+        '200':
+          description: Request succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    default: true
+                  address:
+                    type: string
+                  limit:
+                    type: number
+                required:
+                - success
+        '400':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Error response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
-  schemas:
-    # ==================== WALLET SCHEMAS ====================
-    WalletResponse:
-      type: object
-      properties:
-        address:
-          type: string
-          example: "0x1234567890abcdef"
-        private_key:
-          type: string
-          description: Only returned at wallet creation
-          example: "0xabcdef1234567890"
-        public_key:
-          type: string
-          example: "0x..."
-        created_at:
-          type: string
-          format: date-time
-        wallet_type:
-          type: string
-          enum: [standard, embedded, hardware]
-
-    WalletDetail:
-      type: object
-      properties:
-        address:
-          type: string
-        balance:
-          type: string
-        locked_balance:
-          type: string
-        available_balance:
-          type: string
-        nonce:
-          type: integer
-        created_at:
-          type: string
-          format: date-time
-        last_activity:
-          type: string
-          format: date-time
-        transaction_count:
-          type: integer
-
-    EmbeddedWalletResponse:
-      type: object
-      properties:
-        wallet_id:
-          type: string
-        app_id:
-          type: string
-        user_id:
-          type: string
-        address:
-          type: string
-        session_token:
-          type: string
-        expires_in:
-          type: integer
-
-    # ==================== TRANSACTION SCHEMAS ====================
-    TransactionRequest:
-      type: object
-      required:
-        - from
-        - to
-        - amount
-      properties:
-        from:
-          type: string
-          description: Sender address
-        to:
-          type: string
-          description: Recipient address
-        amount:
-          type: string
-          description: Amount in smallest unit
-        data:
-          type: string
-          description: Optional transaction data
-        gas_limit:
-          type: string
-          description: Gas limit for transaction
-        gas_price:
-          type: string
-          description: Gas price per unit
-        nonce:
-          type: integer
-          description: Transaction nonce
-        signature:
-          type: string
-          description: Signed transaction data
-
-    TransactionResponse:
-      type: object
-      properties:
-        hash:
-          type: string
-          description: Transaction hash
-        status:
-          type: string
-          enum: [pending, confirmed, failed]
-        from:
-          type: string
-        to:
-          type: string
-        amount:
-          type: string
-        gas_used:
-          type: string
-        timestamp:
-          type: string
-          format: date-time
-
-    TransactionDetail:
-      type: object
-      properties:
-        hash:
-          type: string
-        status:
-          type: string
-        from:
-          type: string
-        to:
-          type: string
-        amount:
-          type: string
-        fee:
-          type: string
-        data:
-          type: string
-        block_number:
-          type: integer
-        block_hash:
-          type: string
-        timestamp:
-          type: string
-          format: date-time
-        confirmations:
-          type: integer
-
-    Transaction:
-      type: object
-      properties:
-        hash:
-          type: string
-        from:
-          type: string
-        to:
-          type: string
-        amount:
-          type: string
-        timestamp:
-          type: string
-          format: date-time
-
-    # ==================== BLOCKCHAIN SCHEMAS ====================
-    Block:
-      type: object
-      properties:
-        number:
-          type: integer
-        hash:
-          type: string
-        parent_hash:
-          type: string
-        timestamp:
-          type: integer
-        transactions:
-          type: integer
-          description: Number of transactions in block
-        miner:
-          type: string
-
-    BlockDetail:
-      type: object
-      properties:
-        number:
-          type: integer
-        hash:
-          type: string
-        parent_hash:
-          type: string
-        timestamp:
-          type: integer
-        difficulty:
-          type: string
-        miner:
-          type: string
-        transactions:
-          type: array
-          items:
-            type: string
-        transaction_count:
-          type: integer
-        gas_used:
-          type: string
-        gas_limit:
-          type: string
-
-    BlockchainStats:
-      type: object
-      properties:
-        total_blocks:
-          type: integer
-        total_transactions:
-          type: integer
-        total_accounts:
-          type: integer
-        difficulty:
-          type: string
-        hashrate:
-          type: string
-        average_block_time:
-          type: number
-        total_supply:
-          type: string
-
-    # ==================== MINING SCHEMAS ====================
-    MiningStatus:
-      type: object
-      properties:
-        mining:
-          type: boolean
-        threads:
-          type: integer
-        hashrate:
-          type: string
-        blocks_found:
-          type: integer
-        current_difficulty:
-          type: string
-        uptime:
-          type: integer
-
-    # ==================== GOVERNANCE SCHEMAS ====================
-    Proposal:
-      type: object
-      properties:
-        id:
-          type: integer
-        title:
-          type: string
-        description:
-          type: string
-        status:
-          type: string
-          enum: [pending, active, passed, failed]
-        creator:
-          type: string
-        created_at:
-          type: string
-          format: date-time
-        voting_ends_at:
-          type: string
-          format: date-time
-        votes_for:
-          type: integer
-        votes_against:
-          type: integer
-
-    ProposalRequest:
-      type: object
-      required:
-        - title
-        - description
-        - proposer
-      properties:
-        title:
-          type: string
-        description:
-          type: string
-        proposer:
-          type: string
-        duration:
-          type: integer
-          description: Voting duration in seconds
-        metadata:
-          type: object
-
-    ProposalDetail:
-      type: object
-      properties:
-        id:
-          type: integer
-        title:
-          type: string
-        description:
-          type: string
-        status:
-          type: string
-        creator:
-          type: string
-        created_at:
-          type: string
-          format: date-time
-        voting_starts_at:
-          type: string
-          format: date-time
-        voting_ends_at:
-          type: string
-          format: date-time
-        votes_for:
-          type: integer
-        votes_against:
-          type: integer
-        votes_abstain:
-          type: integer
-        votes:
-          type: array
-          items:
-            type: object
-            properties:
-              voter:
-                type: string
-              choice:
-                type: string
-              timestamp:
-                type: string
-
-    # ==================== TRADING SCHEMAS ====================
-    TradeOrder:
-      type: object
-      properties:
-        id:
-          type: string
-        from_address:
-          type: string
-        to_address:
-          type: string
-        from_amount:
-          type: string
-        to_amount:
-          type: string
-        status:
-          type: string
-        created_at:
-          type: string
-          format: date-time
-
-    TradeOrderRequest:
-      type: object
-      required:
-        - from_address
-        - to_address
-        - from_amount
-        - to_amount
-      properties:
-        from_address:
-          type: string
-        to_address:
-          type: string
-        from_amount:
-          type: string
-        to_amount:
-          type: string
-        timeout:
-          type: integer
-
-  responses:
-    BadRequest:
-      description: Bad Request
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-
-    Unauthorized:
-      description: Unauthorized
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-
-    NotFound:
-      description: Not Found
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-
-    RateLimitExceeded:
-      description: Rate Limit Exceeded
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-
+  parameters:
+    LimitParam:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 50
+      description: Maximum number of records to return.
+    OffsetParam:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      description: Pagination offset.
+    VerboseParam:
+      name: verbose
+      in: query
+      required: false
+      schema:
+        type: boolean
+        default: false
+      description: When true include detailed peer metadata.
+    AddressPathParam:
+      name: address
+      in: path
+      required: true
+      schema:
+        type: string
+    BlockIndexParam:
+      name: index
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 0
+    BlockHashParam:
+      name: block_hash
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: ^[0-9a-fA-Fx]+$
+    ContractAddressParam:
+      name: address
+      in: path
+      required: true
+      schema:
+        type: string
+    TransactionIdParam:
+      name: txid
+      in: path
+      required: true
+      schema:
+        type: string
+    TreasureIdParam:
+      name: treasure_id
+      in: path
+      required: true
+      schema:
+        type: string
+    CurrencyParam:
+      name: currency
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
     ErrorResponse:
       type: object
       properties:
-        code:
-          type: integer
-        message:
-          type: string
+        success:
+          type: boolean
+          default: false
         error:
           type: string
-        timestamp:
+        code:
           type: string
-          format: date-time
-
+    Transaction:
+      type: object
+      properties:
+        txid:
+          type: string
+        sender:
+          type: string
+        recipient:
+          type: string
+        amount:
+          type: number
+        fee:
+          type: number
+        nonce:
+          type: integer
+        timestamp:
+          type: number
+    Block:
+      type: object
+      properties:
+        index:
+          type: integer
+        timestamp:
+          type: number
+        previous_hash:
+          type: string
+        hash:
+          type: string
+        merkle_root:
+          type: string
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Transaction'
+    NodeTransactionInput:
+      type: object
+      required:
+      - sender
+      - recipient
+      - amount
+      - fee
+      - public_key
+      - nonce
+      - timestamp
+      - signature
+      properties:
+        sender:
+          type: string
+        recipient:
+          type: string
+        amount:
+          type: number
+        fee:
+          type: number
+        public_key:
+          type: string
+        nonce:
+          type: integer
+        timestamp:
+          type: number
+        signature:
+          type: string
+        txid:
+          type: string
+        metadata:
+          type: object
+    PeerTransactionInput:
+      type: object
+      required:
+      - sender
+      - recipient
+      - amount
+      - public_key
+      - signature
+      - nonce
+      properties:
+        sender:
+          type: string
+        recipient:
+          type: string
+        amount:
+          type: number
+        fee:
+          type: number
+        public_key:
+          type: string
+        tx_type:
+          type: string
+        nonce:
+          type: integer
+        inputs:
+          type: array
+          items:
+            type: object
+        outputs:
+          type: array
+          items:
+            type: object
+        timestamp:
+          type: number
+        signature:
+          type: string
+        txid:
+          type: string
+        metadata:
+          type: object
+    PeerBlockInput:
+      type: object
+      required:
+      - header
+      - transactions
+      properties:
+        header:
+          type: object
+        transactions:
+          type: array
+          items:
+            type: object
+    ContractDeployInput:
+      type: object
+      required:
+      - sender
+      - bytecode
+      - gas_limit
+      - public_key
+      - signature
+      properties:
+        sender:
+          type: string
+        bytecode:
+          type: string
+        gas_limit:
+          type: integer
+        value:
+          type: number
+        fee:
+          type: number
+        public_key:
+          type: string
+        nonce:
+          type: integer
+        signature:
+          type: string
+        metadata:
+          type: object
+    ContractCallInput:
+      type: object
+      required:
+      - sender
+      - contract_address
+      - gas_limit
+      - public_key
+      - signature
+      properties:
+        sender:
+          type: string
+        contract_address:
+          type: string
+        payload:
+          type: object
+        data:
+          type: string
+        gas_limit:
+          type: integer
+        value:
+          type: number
+        fee:
+          type: number
+        public_key:
+          type: string
+        nonce:
+          type: integer
+        signature:
+          type: string
+        metadata:
+          type: object
+    ContractFeatureToggleInput:
+      type: object
+      required:
+      - enabled
+      properties:
+        enabled:
+          type: boolean
+        reason:
+          type: string
+    FaucetClaimInput:
+      type: object
+      required:
+      - address
+      properties:
+        address:
+          type: string
+    PeerAddInput:
+      type: object
+      required:
+      - url
+      properties:
+        url:
+          type: string
+    FraudCheckInput:
+      type: object
+      required:
+      - payload
+      properties:
+        payload:
+          type: object
+    RecoverySetupInput:
+      type: object
+      required:
+      - owner_address
+      - guardians
+      - threshold
+      - signature
+      properties:
+        owner_address:
+          type: string
+        guardians:
+          type: array
+          items:
+            type: string
+        threshold:
+          type: integer
+        signature:
+          type: string
+    RecoveryRequestInput:
+      type: object
+      required:
+      - owner_address
+      - new_address
+      - guardian_address
+      - signature
+      properties:
+        owner_address:
+          type: string
+        new_address:
+          type: string
+        guardian_address:
+          type: string
+        signature:
+          type: string
+    RecoveryVoteInput:
+      type: object
+      required:
+      - request_id
+      - guardian_address
+      - signature
+      properties:
+        request_id:
+          type: string
+        guardian_address:
+          type: string
+        signature:
+          type: string
+    RecoveryCancelInput:
+      type: object
+      required:
+      - request_id
+      - owner_address
+      - signature
+      properties:
+        request_id:
+          type: string
+        owner_address:
+          type: string
+        signature:
+          type: string
+    RecoveryExecuteInput:
+      type: object
+      required:
+      - request_id
+      - executor_address
+      properties:
+        request_id:
+          type: string
+        executor_address:
+          type: string
+    TreasureCreateInput:
+      type: object
+      required:
+      - creator
+      - amount
+      - puzzle_type
+      - puzzle_data
+      properties:
+        creator:
+          type: string
+        amount:
+          type: number
+        puzzle_type:
+          type: string
+        puzzle_data:
+          type: object
+        hint:
+          type: string
+    TreasureClaimInput:
+      type: object
+      required:
+      - treasure_id
+      - claimer
+      - solution
+      properties:
+        treasure_id:
+          type: string
+        claimer:
+          type: string
+        solution:
+          type: string
+    MiningRegisterInput:
+      type: object
+      required:
+      - address
+      properties:
+        address:
+          type: string
+    MiningBonusClaimInput:
+      type: object
+      required:
+      - address
+      - bonus_type
+      properties:
+        address:
+          type: string
+        bonus_type:
+          type: string
+    ReferralCreateInput:
+      type: object
+      required:
+      - address
+      properties:
+        address:
+          type: string
+    ReferralUseInput:
+      type: object
+      required:
+      - new_address
+      - referral_code
+      properties:
+        new_address:
+          type: string
+        referral_code:
+          type: string
+        metadata:
+          type: object
+    ExchangeOrderInput:
+      type: object
+      required:
+      - address
+      - order_type
+      - pair
+      - price
+      - amount
+      properties:
+        address:
+          type: string
+        order_type:
+          type: string
+        pair:
+          type: string
+        price:
+          type: number
+        amount:
+          type: number
+    ExchangeCancelInput:
+      type: object
+      required:
+      - order_id
+      properties:
+        order_id:
+          type: string
+    ExchangeTransferInput:
+      type: object
+      required:
+      - from_address
+      - to_address
+      - currency
+      - amount
+      properties:
+        from_address:
+          type: string
+        to_address:
+          type: string
+        currency:
+          type: string
+        amount:
+          type: number
+        destination:
+          type: string
+    ExchangeCardPurchaseInput:
+      type: object
+      required:
+      - from_address
+      - to_address
+      - usd_amount
+      - email
+      - card_id
+      - user_id
+      - payment_token
+      properties:
+        from_address:
+          type: string
+        to_address:
+          type: string
+        usd_amount:
+          type: number
+        email:
+          type: string
+        card_id:
+          type: string
+        user_id:
+          type: string
+        payment_token:
+          type: string
+    CryptoDepositAddressInput:
+      type: object
+      required:
+      - user_address
+      - currency
+      properties:
+        user_address:
+          type: string
+        currency:
+          type: string
+    ApiKeyCreateRequest:
+      type: object
+      properties:
+        label:
+          type: string
+        scope:
+          type: string
+          enum:
+          - user
+          - admin
+          default: user
+    SpendLimitRequest:
+      type: object
+      required:
+      - address
+      - limit
+      properties:
+        address:
+          type: string
+        limit:
+          type: number
+    PurchaseEstimateRequest:
+      type: object
+      required:
+      - usd_amount
+      properties:
+        usd_amount:
+          type: number
   securitySchemes:
     api_key:
       type: apiKey
       in: header
       name: X-API-Key
-
     bearer_auth:
       type: http
       scheme: bearer
       bearerFormat: JWT
-
 security:
-  - api_key: []
-  - bearer_auth: []
+- api_key: []
+- bearer_auth: []

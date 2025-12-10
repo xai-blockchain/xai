@@ -70,6 +70,10 @@ class SecurityConfig:
         "http://localhost:5000",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5000",
+        "https://127.0.0.1:3443",
+        "https://localhost:3443",
+        "https://127.0.0.1:5443",
+        "https://localhost:5443",
     ]
     CORS_METHODS: List[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     CORS_ALLOW_CREDENTIALS: bool = True

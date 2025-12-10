@@ -1,13 +1,21 @@
 const { app, BrowserWindow, Tray, Menu } = require('electron');
 const path = require('path');
+const https = require('https');
 const { spawn } = require('child_process');
 const fetch = require('node-fetch');
+const { registerWalletIPC } = require('./wallet-ipc');
+const { createSecureProxy } = require('./secure-local-proxy');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 const XAI_DIR = path.join(ROOT_DIR, 'xai');
-const DASHBOARD_URL = 'http://127.0.0.1:3000/dashboard';
-const MOBILE_URL = 'http://127.0.0.1:3000/mobile';
-const NODE_URL = 'http://127.0.0.1:5000';
+const DASHBOARD_HTTP_URL = 'http://127.0.0.1:3000/dashboard';
+const DASHBOARD_PROXY_PORT = 3443;
+const API_PROXY_PORT = 5443;
+const DASHBOARD_URL = `https://127.0.0.1:${DASHBOARD_PROXY_PORT}/dashboard`;
+const MOBILE_URL = `https://127.0.0.1:${DASHBOARD_PROXY_PORT}/mobile`;
+const NODE_URL = `https://127.0.0.1:${API_PROXY_PORT}`;
+
+app.commandLine.appendSwitch('enable-sandbox');
 
 const PYTHON_PATH = process.env.PYTHON_PATH || 'python';
 
@@ -18,8 +26,11 @@ let nodeProcess;
 let explorerProcess;
 let mainWindow;
 let tray;
+let walletSession;
+let dashboardProxy;
+let apiProxy;
 
-function spawnScript(script, args = []) {
+function spawnScript(script, args = [], extraEnv = {}) {
   const scriptPath = path.join(XAI_DIR, script);
   let command;
   let commandArgs;
@@ -40,7 +51,8 @@ function spawnScript(script, args = []) {
     cwd: XAI_DIR,
     env: {
       ...process.env,
-      PYTHONPATH: `${ROOT_DIR};${XAI_DIR}`
+      PYTHONPATH: `${ROOT_DIR};${XAI_DIR}`,
+      ...extraEnv
     }
   });
   proc.stdout.on('data', data => console.log(`[${script}] ${data.toString()}`));
@@ -48,11 +60,15 @@ function spawnScript(script, args = []) {
   return proc;
 }
 
-async function waitForServer(url, timeout = 40000) {
+async function waitForServer(url, timeout = 40000, allowSelfSigned = false) {
   const deadline = Date.now() + timeout;
+  const isHttps = url.startsWith('https://');
+  const agent = isHttps
+    ? new https.Agent({ rejectUnauthorized: !allowSelfSigned })
+    : undefined;
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(url, { method: 'GET' });
+      const res = await fetch(url, { method: 'GET', agent });
       if (res.ok) return true;
     } catch (err) {
       // ignore; keep retrying
@@ -72,7 +88,9 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true
     }
   });
   mainWindow.loadURL(DASHBOARD_URL);
@@ -100,9 +118,26 @@ function createTray() {
 }
 
 async function startProcesses() {
-  nodeProcess = spawnScript('run-python.ps1', ['core/node.py', '--miner', process.env.XAI_MINER_ADDRESS || 'XAI1miner000000000000000000000']);
-  explorerProcess = spawnScript('run-python.ps1', ['explorer.py']);
-  await waitForServer('http://127.0.0.1:3000/dashboard');
+  const allowedOrigins = JSON.stringify([
+    `https://127.0.0.1:${DASHBOARD_PROXY_PORT}`,
+    `https://localhost:${DASHBOARD_PROXY_PORT}`
+  ]);
+  const sharedEnv = {
+    XAI_PUBLIC_NODE_URL: NODE_URL,
+    XAI_PUBLIC_DASHBOARD_ORIGIN: DASHBOARD_URL,
+    XAI_API_ALLOWED_ORIGINS: allowedOrigins,
+    XAI_ENABLE_PROCESS_SANDBOX: '1',
+    XAI_SANDBOX_MAX_MEM_MB: process.env.XAI_SANDBOX_MAX_MEM_MB || '2048',
+    XAI_SANDBOX_MAX_CPU_SECONDS: process.env.XAI_SANDBOX_MAX_CPU_SECONDS || '7200',
+    XAI_SANDBOX_MAX_OPEN_FILES: process.env.XAI_SANDBOX_MAX_OPEN_FILES || '2048'
+  };
+
+  nodeProcess = spawnScript('run-python.ps1', ['core/node.py', '--miner', process.env.XAI_MINER_ADDRESS || 'XAI1miner000000000000000000000'], sharedEnv);
+  explorerProcess = spawnScript('run-python.ps1', ['explorer.py'], sharedEnv);
+  await waitForServer(DASHBOARD_HTTP_URL);
+  await startSecureProxies();
+  await waitForServer(DASHBOARD_URL, 30000, true);
+  await waitForServer(`${NODE_URL}/stats`, 30000, true);
 }
 
 function stopProcesses() {
@@ -113,8 +148,44 @@ function stopProcesses() {
   });
 }
 
+async function startSecureProxies() {
+  const certDir = path.join(app.getPath('userData'), 'certs');
+  dashboardProxy = createSecureProxy({
+    target: 'http://127.0.0.1:3000',
+    listenPort: DASHBOARD_PROXY_PORT,
+    certDir,
+    name: 'dashboard-proxy'
+  });
+  apiProxy = createSecureProxy({
+    target: 'http://127.0.0.1:5000',
+    listenPort: API_PROXY_PORT,
+    certDir,
+    name: 'api-proxy'
+  });
+
+  await dashboardProxy.listen();
+  await apiProxy.listen();
+}
+
+function stopProxies() {
+  if (dashboardProxy) {
+    dashboardProxy.close();
+    dashboardProxy = null;
+  }
+  if (apiProxy) {
+    apiProxy.close();
+    apiProxy = null;
+  }
+}
+
 app.whenReady().then(async () => {
   try {
+    walletSession = registerWalletIPC({
+      allowedOrigins: [
+        `https://127.0.0.1:${DASHBOARD_PROXY_PORT}`,
+        `https://localhost:${DASHBOARD_PROXY_PORT}`
+      ]
+    });
     await startProcesses();
     createWindow();
     createTray();
@@ -125,11 +196,13 @@ app.whenReady().then(async () => {
 });
 
 app.on('before-quit', () => {
+  stopProxies();
   stopProcesses();
 });
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
+    stopProxies();
     stopProcesses();
     app.quit();
   }

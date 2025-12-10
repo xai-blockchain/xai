@@ -12,6 +12,7 @@ This test file achieves 98%+ coverage of node_p2p.py by testing:
 
 import asyncio
 import time
+from typing import Any, Dict, List
 import pytest
 from unittest.mock import Mock, MagicMock, patch, AsyncMock
 import requests
@@ -420,6 +421,70 @@ class TestBlockchainSynchronization:
         result = p2p_manager.sync_with_network()
 
         assert result == False
+
+    def test_parallel_chunk_sync_adds_blocks(self, blockchain):
+        """Ensure chunked parallel sync stitches blocks from multiple peers."""
+        from xai.core.node_p2p import P2PNetworkManager
+
+        blockchain.chain = [Mock(index=0)]
+        blockchain.add_block = Mock(return_value=True)
+        blockchain.deserialize_block = Mock(side_effect=lambda payload: payload)
+
+        manager = P2PNetworkManager(blockchain)
+        manager.parallel_sync_chunk_size = 1
+        manager.parallel_sync_workers = 2
+        summaries = [
+            {"peer": "http://peer1:5000", "total": 4},
+            {"peer": "http://peer2:5000", "total": 4},
+        ]
+
+        def fake_chunk(_peer: str, start: int, end: int, _total: int) -> List[Dict[str, Any]]:
+            return [{"header": {"index": idx}} for idx in range(start, end)]
+
+        with patch.object(manager, "_download_block_chunk", side_effect=fake_chunk):
+            result = manager._parallel_chunk_sync(summaries, local_height=1)
+
+        assert result is True
+        assert blockchain.add_block.call_count == 3
+
+    def test_parallel_chunk_sync_missing_chunk_aborts(self, blockchain):
+        """Parallel sync should abort when a chunk cannot be downloaded."""
+        from xai.core.node_p2p import P2PNetworkManager
+
+        blockchain.chain = [Mock(index=0)]
+        blockchain.add_block = Mock(return_value=True)
+        blockchain.deserialize_block = Mock(side_effect=lambda payload: payload)
+
+        manager = P2PNetworkManager(blockchain)
+        manager.parallel_sync_chunk_size = 1
+        summaries = [{"peer": "http://peer1:5000", "total": 4}]
+
+        with patch.object(manager, "_download_block_chunk", return_value=None):
+            result = manager._parallel_chunk_sync(summaries, local_height=1)
+
+        assert result is False
+        blockchain.add_block.assert_not_called()
+
+    @patch('xai.core.node_p2p.asyncio.run', return_value=False)
+    def test_sync_with_network_invokes_partial_sync(self, mock_run, p2p_manager):
+        """Ensure partial checkpoint sync is attempted when peers advertise higher checkpoints."""
+        p2p_manager.partial_sync_enabled = True
+        fake_sync = Mock()
+        fake_sync.get_best_checkpoint_metadata.return_value = {
+            "height": len(p2p_manager.blockchain.chain) + 50,
+            "block_hash": "abc",
+            "source": "p2p",
+        }
+        fake_sync.fetch_validate_apply.return_value = True
+        p2p_manager.checkpoint_sync = fake_sync
+        p2p_manager.partial_sync_min_delta = 1
+        p2p_manager._http_sync = Mock(return_value=False)
+
+        result = p2p_manager.sync_with_network()
+
+        assert result is True
+        fake_sync.fetch_validate_apply.assert_called_once()
+        mock_run.assert_called_once()
 
 
 class TestNetworkErrorHandling:

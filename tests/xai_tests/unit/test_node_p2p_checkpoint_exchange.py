@@ -1,5 +1,6 @@
 import json
 import asyncio
+import time
 from unittest.mock import AsyncMock
 
 import pytest
@@ -46,6 +47,8 @@ async def test_get_checkpoint_returns_metadata():
     manager.connections[peer_id] = websocket
     manager.websocket_peer_ids[websocket] = peer_id
     manager._connection_last_seen[peer_id] = 0
+    manager._handshake_received[peer_id] = time.time()
+    manager._handshake_deadlines.pop(peer_id, None)
 
     payload = {"type": "get_checkpoint", "payload": None}
     signed = manager.peer_manager.encryption.create_signed_message({"type": "get_checkpoint", "payload": None})

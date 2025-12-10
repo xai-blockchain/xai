@@ -42,6 +42,7 @@ from xai.core.crypto_deposit_monitor import (
     CryptoDepositMonitor,
     create_deposit_source,
 )
+from xai.core.process_sandbox import maybe_enable_process_sandbox
 
 # Import refactored modules
 from xai.core.node_utils import (
@@ -604,7 +605,7 @@ class BlockchainNode:
 
         # Exchange features
         try:
-            from xai.core.exchange_wallet_manager import ExchangeWalletManager
+            from xai.core.exchange_wallet import ExchangeWalletManager
 
             self.exchange_wallet_manager = ExchangeWalletManager()
             self.blockchain.trade_manager.attach_exchange_manager(self.exchange_wallet_manager)
@@ -1138,7 +1139,12 @@ class BlockchainNode:
 
         # Attempt partial sync bootstrap when chain is empty (or forced via env)
         force_partial = os.getenv("XAI_FORCE_PARTIAL_SYNC", "").lower() in {"1", "true", "yes"}
-        if getattr(Config, "PARTIAL_SYNC_ENABLED", True) and (len(self.blockchain.chain) == 0 or force_partial):
+        if getattr(Config, "PARTIAL_SYNC_ENABLED", True) and getattr(Config, "P2P_PARTIAL_SYNC_ENABLED", True):
+            if self.p2p_manager.sync_with_network(force_partial=force_partial):
+                logger.info("Partial/pre-sync completed via P2P manager", extra={"event": "node.partial_sync_applied"})
+            else:
+                logger.info("Partial/pre-sync skipped or unavailable", extra={"event": "node.partial_sync_skipped"})
+        elif getattr(Config, "PARTIAL_SYNC_ENABLED", True) and (len(self.blockchain.chain) == 0 or force_partial):
             if self.partial_sync_coordinator.bootstrap_if_empty(force=force_partial):
                 logger.info("Partial sync applied checkpoint successfully", extra={"event": "node.partial_sync_applied"})
             else:
@@ -1209,6 +1215,7 @@ async def main_async() -> None:
 def main() -> None:
     """Command-line entry point for running a blockchain node."""
     try:
+        maybe_enable_process_sandbox(logger)
         asyncio.run(main_async())
     except KeyboardInterrupt:
         logger.info("Shutting down node...", extra={"event": "node.shutdown"})

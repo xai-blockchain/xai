@@ -23,6 +23,7 @@ XAI is a Python-based blockchain implementing a production-grade proof-of-work (
 - Governance modules (proposal manager, vote locker, quadratic voting)
 - Security middleware and structured metrics
 - Basic block explorer (Flask)
+- Wallet trade manager with advanced order types (TWAP scheduler, VWAP profiles, iceberg, trailing stop)
 
 ## Quick Start (< 5 Minutes)
 
@@ -105,9 +106,19 @@ XAI_RPC_PORT         # RPC port (default: 18546 testnet, 8546 mainnet)
 XAI_LOG_LEVEL        # DEBUG, INFO, WARNING, ERROR (default: INFO)
 XAI_DATA_DIR         # Blockchain data directory
 MINER_ADDRESS        # Address to receive mining rewards
+XAI_PARTIAL_SYNC_ENABLED         # Enable checkpoint/bootstrap flow (default: 1)
+XAI_P2P_PARTIAL_SYNC_ENABLED     # Allow P2P manager to run checkpoint sync (default: 1)
+XAI_P2P_PARTIAL_SYNC_MIN_DELTA   # Minimum height delta before checkpoint sync (default: 100)
+XAI_FORCE_PARTIAL_SYNC           # Force checkpoint bootstrap even if chain is non-empty
 ```
 
 See `src/xai/config/` for additional configuration options.
+
+### Checkpoint / Partial Sync
+
+- Nodes can bootstrap from signed checkpoints instead of downloading the full chain.
+- Configure the variables above plus `CHECKPOINT_QUORUM`, `CHECKPOINT_MIN_PEERS`, and `TRUSTED_CHECKPOINT_PUBKEYS` to enforce quorum/diversity.
+- Detailed deployment and operations guidance: `docs/deployment/partial-sync.md`.
 
 ## Performance Notes
 

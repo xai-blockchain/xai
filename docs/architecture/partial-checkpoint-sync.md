@@ -1,6 +1,10 @@
 # Partial / Checkpoint-Based Sync (Design Notes)
 
-This document outlines how XAI nodes should perform partial sync using checkpoints instead of downloading the full chain.
+This document outlines how XAI nodes perform partial sync using checkpoints instead of downloading the full chain. Implementation now lives in:
+
+- `src/xai/core/checkpoint_sync.py` (`CheckpointSyncManager`)
+- `src/xai/core/node_p2p.py` (`_attempt_partial_sync`, `sync_with_network`)
+- `docs/deployment/partial-sync.md` (operations guide)
 
 ## Goals
 - Bootstrap from a trusted checkpoint to reduce initial sync time.
@@ -26,7 +30,6 @@ This document outlines how XAI nodes should perform partial sync using checkpoin
    - Maintain audit log of accepted/rejected checkpoints.
 
 ## Open Items
-- Implement checkpoint download/apply RPC and persistence format for streamed state.
-- Add light-client header validation for checkpoint chain proofs.
-- Integrate checkpoint selection into sync manager to fall back to full sync on mismatch.
-- Add integration tests covering: divergent checkpoints, low-work checkpoints, replayed stale checkpoints, and successful partial sync.
+- Complete streamed snapshot download + chunked persistence for very large checkpoints (current implementation supports metadata + inline payloads/URLs).
+- Add light-client header validation for checkpoint chain proofs (ensure PoW targets and signatures are validated independently of payload).
+- Expand integration tests covering: divergent checkpoints, low-work checkpoints, replayed stale checkpoints, successful partial sync to tip, and forced rebootstrap scenarios.

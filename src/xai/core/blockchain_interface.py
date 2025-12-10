@@ -6,6 +6,7 @@ abstract views of blockchain data without directly importing the full
 Blockchain implementation.
 """
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Dict, Any, List, Optional
 import time
@@ -36,31 +37,31 @@ class BlockchainDataProvider:
             "mempool_size_bytes": self.mempool_size_bytes,
         }
 
-class GamificationBlockchainInterface:
+class GamificationBlockchainInterface(ABC):
     """
     Interface for blockchain methods needed by gamification managers.
     This helps to break cyclic dependencies by abstracting the Blockchain class.
     """
+    @abstractmethod
     def get_balance(self, address: str) -> float:
         """Get the balance of a given address."""
-        raise NotImplementedError
 
+    @abstractmethod
     def get_chain_length(self) -> int:
         """Get the current length of the blockchain."""
-        raise NotImplementedError
 
+    @abstractmethod
     def get_block_by_index(self, index: int) -> Optional[Any]:
         """Get a block by its index (returns a simplified view or header)."""
-        raise NotImplementedError
 
+    @abstractmethod
     def get_latest_block_hash(self) -> str:
         """Get the hash of the latest block."""
-        raise NotImplementedError
 
+    @abstractmethod
     def get_pending_transactions(self) -> List[Any]:
         """Get the list of pending transactions."""
-        raise NotImplementedError
     
+    @abstractmethod
     def add_transaction_to_mempool(self, transaction: Any) -> bool:
         """Add a transaction to the mempool."""
-        raise NotImplementedError

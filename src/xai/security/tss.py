@@ -32,7 +32,7 @@ class TSSInterface(ABC):
         number of shares can reconstruct the signing key or produce a signature.
         Returns a list of dictionaries, each containing a participant's key share info.
         """
-        raise NotImplementedError("Subclasses must implement generate_distributed_keys")
+        ...
 
     @abstractmethod
     def distributed_sign(self, message_hash: bytes, participant_key_shares: List[Dict]) -> str:
@@ -40,7 +40,7 @@ class TSSInterface(ABC):
         Collects partial signatures from participants and combines them to produce
         a final threshold signature.
         """
-        raise NotImplementedError("Subclasses must implement distributed_sign")
+        ...
 
     @abstractmethod
     def verify_threshold_signature(
@@ -49,7 +49,7 @@ class TSSInterface(ABC):
         """
         Verifies a threshold signature against a message hash and the combined public key.
         """
-        raise NotImplementedError("Subclasses must implement verify_threshold_signature")
+        ...
 
 
 class MockTSS(TSSInterface):

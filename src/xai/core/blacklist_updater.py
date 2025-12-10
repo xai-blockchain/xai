@@ -5,6 +5,7 @@ Year 1: PROMPTED (optional) - nodes reminded to update blacklists
 After 1 Year: Community vote decides if mandatory and frequency
 """
 
+from abc import ABC, abstractmethod
 import os
 import time
 import hashlib
@@ -26,7 +27,7 @@ BLACKLIST_HTTP_TIMEOUT = int(os.getenv("XAI_BLACKLIST_HTTP_TIMEOUT", "30"))
 COMMUNITY_VOTE_THRESHOLD = int(os.getenv("XAI_COMMUNITY_VOTE_THRESHOLD", "7"))
 
 
-class BlacklistSource:
+class BlacklistSource(ABC):
     """Base class for blacklist sources"""
 
     def __init__(self, name: str, url: str, update_frequency_hours: int):
@@ -41,9 +42,9 @@ class BlacklistSource:
         elapsed = time.time() - self.last_update
         return elapsed > (self.update_frequency * 3600)
 
+    @abstractmethod
     def fetch_addresses(self) -> Set[str]:
-        """Override in subclass - fetch from source"""
-        raise NotImplementedError
+        """Fetch and return addresses exposed by this source."""
 
     def update(self) -> Dict:
         """Update blacklist from source"""

@@ -14,6 +14,7 @@ from xai.exchange import (
     OrderType,
     OrderSide,
     OrderStatus,
+    OrderValidationError,
 )
 
 
@@ -834,9 +835,16 @@ class TestMatchingEngine:
         assert stop_order.is_filled()
         assert stop_order.triggered_at is not None
 
-    def test_match_limit_orders_exact(self):
+    def test_match_limit_orders_exact(self, prefund_exchange_accounts):
         """Test matching limit orders with exact amounts"""
         engine = MatchingEngine()
+        prefund_exchange_accounts(
+            engine,
+            {
+                "seller": {"AXN": 20},
+                "buyer": {"USD": 2000},
+            },
+        )
 
         # Place sell order first
         sell_order = engine.place_order(
@@ -865,9 +873,16 @@ class TestMatchingEngine:
         assert sell_order.filled == Decimal("10")
         assert len(engine.trade_history) == 1
 
-    def test_match_limit_orders_partial(self):
+    def test_match_limit_orders_partial(self, prefund_exchange_accounts):
         """Test matching limit orders with partial fill"""
         engine = MatchingEngine()
+        prefund_exchange_accounts(
+            engine,
+            {
+                "seller": {"AXN": 30},
+                "buyer": {"USD": 2000},
+            },
+        )
 
         # Place larger sell order
         sell_order = engine.place_order(
@@ -896,9 +911,18 @@ class TestMatchingEngine:
         assert sell_order.filled == Decimal("10")
         assert sell_order.remaining() == Decimal("10")
 
-    def test_match_limit_orders_multiple_matches(self):
+    def test_match_limit_orders_multiple_matches(self, prefund_exchange_accounts):
         """Test matching limit order against multiple orders"""
         engine = MatchingEngine()
+        prefund_exchange_accounts(
+            engine,
+            {
+                "seller1": {"AXN": 10},
+                "seller2": {"AXN": 10},
+                "seller3": {"AXN": 10},
+                "buyer": {"USD": 5000},
+            },
+        )
 
         # Place multiple sell orders
         engine.place_order(
@@ -998,9 +1022,17 @@ class TestMatchingEngine:
         assert sell_order.status == OrderStatus.PENDING
         assert len(engine.trade_history) == 0
 
-    def test_match_market_buy_order(self):
+    def test_match_market_buy_order(self, prefund_exchange_accounts):
         """Test matching market buy order"""
         engine = MatchingEngine()
+        prefund_exchange_accounts(
+            engine,
+            {
+                "seller1": {"AXN": 10},
+                "seller2": {"AXN": 10},
+                "buyer": {"USD": 5000},
+            },
+        )
 
         # Place sell orders
         engine.place_order(
@@ -1035,9 +1067,17 @@ class TestMatchingEngine:
         assert buy_order.status == OrderStatus.FILLED
         assert len(engine.trade_history) == 2
 
-    def test_match_market_sell_order(self):
+    def test_match_market_sell_order(self, prefund_exchange_accounts):
         """Test matching market sell order"""
         engine = MatchingEngine()
+        prefund_exchange_accounts(
+            engine,
+            {
+                "buyer1": {"USD": 2000},
+                "buyer2": {"USD": 2000},
+                "seller": {"AXN": 20},
+            },
+        )
 
         # Place buy orders
         engine.place_order(
@@ -1071,9 +1111,17 @@ class TestMatchingEngine:
         assert sell_order.filled == Decimal("8")
         assert sell_order.status == OrderStatus.FILLED
 
-    def test_market_order_halts_when_slippage_exceeded(self):
+    def test_market_order_halts_when_slippage_exceeded(self, prefund_exchange_accounts):
         """Slippage guardrails should stop further fills"""
         engine = MatchingEngine()
+        prefund_exchange_accounts(
+            engine,
+            {
+                "seller1": {"AXN": 10},
+                "seller2": {"AXN": 10},
+                "buyer": {"USD": 10000},
+            },
+        )
 
         # Provide deep liquidity but with wide second level
         engine.place_order(
@@ -1124,9 +1172,16 @@ class TestMatchingEngine:
         assert buy_order.status == OrderStatus.CANCELLED
         assert buy_order.filled == Decimal("0")
 
-    def test_market_order_partial_then_cancelled(self):
+    def test_market_order_partial_then_cancelled(self, prefund_exchange_accounts):
         """Test market order partially filled then cancelled"""
         engine = MatchingEngine()
+        prefund_exchange_accounts(
+            engine,
+            {
+                "seller": {"AXN": 20},
+                "buyer": {"USD": 5000},
+            },
+        )
 
         # Place small sell order
         engine.place_order(
@@ -1152,9 +1207,17 @@ class TestMatchingEngine:
         assert buy_order.filled == Decimal("5")
         assert buy_order.status == OrderStatus.CANCELLED
 
-    def test_execute_trade(self):
+    def test_execute_trade(self, prefund_exchange_accounts):
         """Test trade execution"""
         engine = MatchingEngine()
+        prefund_exchange_accounts(
+            engine,
+            {
+                "buyer": {"USD": 5000},
+                "seller": {"AXN": 20},
+                engine.fee_collector_address: {"USD": 0, "AXN": 0},
+            },
+        )
 
         buy_order = Order(
             id="buy1",
@@ -1207,9 +1270,17 @@ class TestMatchingEngine:
         assert len(book.buy_orders) == 0
         assert len(book.sell_orders) == 0
 
-    def test_execute_trade_partial_fill(self):
+    def test_execute_trade_partial_fill(self, prefund_exchange_accounts):
         """Test trade execution with partial fill"""
         engine = MatchingEngine()
+        prefund_exchange_accounts(
+            engine,
+            {
+                "buyer": {"USD": 5000},
+                "seller": {"AXN": 20},
+                engine.fee_collector_address: {"USD": 0, "AXN": 0},
+            },
+        )
 
         buy_order = Order(
             id="buy1",
@@ -1328,9 +1399,16 @@ class TestMatchingEngine:
         result = engine.cancel_order("nonexistent", "user1")
         assert result is False
 
-    def test_cancel_filled_order(self):
+    def test_cancel_filled_order(self, prefund_exchange_accounts):
         """Test cancelling already filled order"""
         engine = MatchingEngine()
+        prefund_exchange_accounts(
+            engine,
+            {
+                "seller": {"AXN": 20},
+                "buyer": {"USD": 5000},
+            },
+        )
 
         # Place and match orders
         engine.place_order(
@@ -1378,9 +1456,16 @@ class TestMatchingEngine:
 
         assert result is False
 
-    def test_cancel_partial_order(self):
+    def test_cancel_partial_order(self, prefund_exchange_accounts):
         """Test cancelling partially filled order"""
         engine = MatchingEngine()
+        prefund_exchange_accounts(
+            engine,
+            {
+                "seller": {"AXN": 30},
+                "buyer": {"USD": 5000},
+            },
+        )
 
         # Place larger sell order
         sell_order = engine.place_order(
@@ -1448,9 +1533,16 @@ class TestMatchingEngine:
         assert order1 in orders
         assert order2 in orders
 
-    def test_get_user_orders_filtered_by_status(self):
+    def test_get_user_orders_filtered_by_status(self, prefund_exchange_accounts):
         """Test getting user orders filtered by status"""
         engine = MatchingEngine()
+        prefund_exchange_accounts(
+            engine,
+            {
+                "user1": {"USD": 5000},
+                "seller": {"AXN": 500},
+            },
+        )
 
         # Place pending order (no match)
         pending_order = engine.place_order(
@@ -1496,12 +1588,19 @@ class TestMatchingEngine:
         orders = engine.get_user_orders("user1")
         assert len(orders) == 0
 
-    def test_get_recent_trades(self):
+    def test_get_recent_trades(self, prefund_exchange_accounts):
         """Test getting recent trades"""
         engine = MatchingEngine()
 
         # Create some trades
         for i in range(5):
+            prefund_exchange_accounts(
+                engine,
+                {
+                    f"seller{i}": {"AXN": 10},
+                    f"buyer{i}": {"USD": 2000},
+                },
+            )
             engine.place_order(
                 user_address=f"seller{i}",
                 pair="AXN/USD",
@@ -1522,12 +1621,19 @@ class TestMatchingEngine:
         trades = engine.get_recent_trades()
         assert len(trades) == 5
 
-    def test_get_recent_trades_filtered_by_pair(self):
+    def test_get_recent_trades_filtered_by_pair(self, prefund_exchange_accounts):
         """Test getting recent trades filtered by pair"""
         engine = MatchingEngine()
 
         # Create trades for different pairs
         for i in range(3):
+            prefund_exchange_accounts(
+                engine,
+                {
+                    f"seller{i}": {"AXN": 10},
+                    f"buyer{i}": {"USD": 2000},
+                },
+            )
             engine.place_order(
                 user_address=f"seller{i}",
                 pair="AXN/USD",
@@ -1546,8 +1652,15 @@ class TestMatchingEngine:
             )
 
         for i in range(2):
+            prefund_exchange_accounts(
+                engine,
+                {
+                    f"seller{i}_btc": {"BTC": Decimal("1")},
+                    f"buyer{i}_btc": {"USD": 100000},
+                },
+            )
             engine.place_order(
-                user_address=f"seller{i}",
+                user_address=f"seller{i}_btc",
                 pair="BTC/USD",
                 side="sell",
                 order_type="limit",
@@ -1555,7 +1668,7 @@ class TestMatchingEngine:
                 amount=0.1,
             )
             engine.place_order(
-                user_address=f"buyer{i}",
+                user_address=f"buyer{i}_btc",
                 pair="BTC/USD",
                 side="buy",
                 order_type="limit",
@@ -1573,12 +1686,19 @@ class TestMatchingEngine:
         assert len(btc_trades) == 2
         assert all(t.pair == "BTC/USD" for t in btc_trades)
 
-    def test_get_recent_trades_limit(self):
+    def test_get_recent_trades_limit(self, prefund_exchange_accounts):
         """Test getting recent trades with limit"""
         engine = MatchingEngine()
 
         # Create 30 trades
         for i in range(30):
+            prefund_exchange_accounts(
+                engine,
+                {
+                    f"seller{i}": {"AXN": 10},
+                    f"buyer{i}": {"USD": 2000},
+                },
+            )
             engine.place_order(
                 user_address=f"seller{i}",
                 pair="AXN/USD",
@@ -1599,7 +1719,7 @@ class TestMatchingEngine:
         trades = engine.get_recent_trades(limit=10)
         assert len(trades) == 10
 
-    def test_get_recent_trades_sorted_by_time(self):
+    def test_get_recent_trades_sorted_by_time(self, prefund_exchange_accounts):
         """Test trades returned in reverse chronological order"""
         engine = MatchingEngine()
 
@@ -1759,12 +1879,19 @@ class TestMatchingEngine:
         assert len(stats["pairs"]) == 0
         assert stats["pending_stop_orders"] == 0
 
-    def test_concurrent_orders_same_pair(self):
+    def test_concurrent_orders_same_pair(self, prefund_exchange_accounts):
         """Test handling concurrent orders on same pair"""
         engine = MatchingEngine()
 
         # Place multiple sell orders
         for i in range(5):
+            prefund_exchange_accounts(
+                engine,
+                {
+                    f"seller{i}": {"AXN": 10},
+                    f"buyer{i}": {"USD": 2000},
+                },
+            )
             engine.place_order(
                 user_address=f"seller{i}",
                 pair="AXN/USD",
@@ -1790,9 +1917,17 @@ class TestMatchingEngine:
         assert len(book.buy_orders) > 0
         assert len(book.sell_orders) > 0
 
-    def test_price_priority(self):
+    def test_price_priority(self, prefund_exchange_accounts):
         """Test price-time priority in matching"""
         engine = MatchingEngine()
+        prefund_exchange_accounts(
+            engine,
+            {
+                "seller1": {"AXN": 20},
+                "seller2": {"AXN": 20},
+                "buyer": {"USD": 5000},
+            },
+        )
 
         # Place sell orders at different prices
         order_high = engine.place_order(
@@ -1827,21 +1962,18 @@ class TestMatchingEngine:
         assert order_high.filled == Decimal("0")
 
     def test_zero_amount_order(self):
-        """Test handling zero amount order"""
+        """Zero amount orders should be rejected by validation"""
         engine = MatchingEngine()
 
-        order = engine.place_order(
-            user_address="user1",
-            pair="AXN/USD",
-            side="buy",
-            order_type="limit",
-            price=100.0,
-            amount=0.0,
-        )
-
-        # Should create order but with zero amount
-        assert order.amount == Decimal("0")
-        assert order.is_filled()
+        with pytest.raises(OrderValidationError):
+            engine.place_order(
+                user_address="user1",
+                pair="AXN/USD",
+                side="buy",
+                order_type="limit",
+                price=100.0,
+                amount=0.0,
+            )
 
     def test_very_large_order(self):
         """Test handling very large order amounts"""

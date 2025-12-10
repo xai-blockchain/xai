@@ -146,9 +146,9 @@ This roadmap targets production readiness with security-first posture, robust co
 ### Desktop Wallet Security
 
 - [x] Remove PowerShell execution policy bypass in Electron (`src/xai/electron/main.js` line 21). ✅ PowerShell invocations now respect system policy with `-NoProfile` only (no Bypass flag).
-- [ ] Implement IPC-based private key isolation from dashboard process.
-- [ ] Add HTTPS encryption for localhost endpoints.
-- [ ] Implement process sandboxing with resource limits.
+- [x] Implement IPC-based private key isolation from dashboard process. ✅ Secure vault + IPC bridge keeps keystore decryption/signing in the main process with origin/token gating and coverage tests.
+- [x] Add HTTPS encryption for localhost endpoints. ✅ Self-signed TLS termination + reverse proxy for dashboard/API with preload URLs moved to `https://127.0.0.1:3443/5443`.
+- [x] Implement process sandboxing with resource limits. ✅ Electron sandbox enabled; node/explorer enforce POSIX rlimits via `process_sandbox` (memory/CPU/fd) with subprocess tests.
 
 ---
 
@@ -178,14 +178,14 @@ This roadmap targets production readiness with security-first posture, robust co
 
 ### Documentation
 
-- [ ] Complete OpenAPI documentation - only ~40% of 65+ endpoints documented.
-- [ ] Add WebSocket message format specification.
-- [ ] Document all error codes and response formats.
-- [ ] Add rate limiting documentation.
-- [ ] Update deployment & ops docs (e.g., `docs/deployment/local-setup.md`, new prod/testnet guides) with `XAI_API_ALLOWED_ORIGINS`, `XAI_API_MAX_JSON_BYTES`, and request-size tuning guidance. Include explicit instructions for setting deterministic CORS allowlists.
-- [ ] Document mnemonic QR backup workflow (CLI `xai-wallet mnemonic-qr`) including tamper-evident metadata handling and recovery procedure.
-- [ ] Document CLI 2FA profile lifecycle (setup/status/disable) and enforcement points (send/export) with step-by-step OTP flow.
-- [ ] Describe signing preview UX philosophy and how to verify SHA-256 payloads before confirming (browser extension + forthcoming CLI/offline flows).
+- [x] Complete OpenAPI documentation - only ~40% of 65+ endpoints documented.
+- [x] Add WebSocket message format specification. ✅ `docs/api/websocket_messages.md` now documents auth, topics, error codes, payload fields, and heartbeat requirements.
+- [x] Document all error codes and response formats. ✅ `docs/api/api_error_codes.md` now lists REST/WebSocket codes, payload shapes, and remediation guidance.
+- [x] Add rate limiting documentation. ✅ `docs/api/rate_limits.md` describes global/endpoint caps, WebSocket topic limits, configuration, and monitoring hooks.
+- [x] Update deployment & ops docs (e.g., `docs/deployment/local-setup.md`, new prod/testnet guides) with `XAI_API_ALLOWED_ORIGINS`, `XAI_API_MAX_JSON_BYTES`, and request-size tuning guidance. Include explicit instructions for setting deterministic CORS allowlists. ✅ Local/testnet/prod guides now show env exports, `.env` examples, and proxy alignment steps.
+- [x] Document mnemonic QR backup workflow (CLI `xai-wallet mnemonic-qr`) including tamper-evident metadata handling and recovery procedure. ✅ `docs/user-guides/mnemonic_qr_backup.md` covers encrypted QR generation, metadata verification, and restoration.
+- [x] Document CLI 2FA profile lifecycle (setup/status/disable) and enforcement points (send/export) with step-by-step OTP flow. ✅ `docs/user-guides/wallet_2fa.md` now covers profile creation, enforcement prompts, recovery, and best practices.
+- [x] Describe signing preview UX philosophy and how to verify SHA-256 payloads before confirming (browser extension + forthcoming CLI/offline flows). ✅ `docs/user-guides/signing_preview.md` captures browser, CLI, and offline flows with explicit hash acknowledgement steps.
 
 ### Monitoring & Ops Validation
 
@@ -211,12 +211,12 @@ This roadmap targets production readiness with security-first posture, robust co
 
 - [x] Implement inventory (inv) protocol for efficient broadcast. ✅ Inventory + getdata flows implemented and covered by unit tests.
 - [x] Add getdata/getblocks for selective block requests. ✅ Missing data now requested and served via signed getdata responses (tests added).
-- [ ] Implement partial/checkpoint sync. Current sync downloads full chain. (Checkpoint metadata is now exchanged via P2P `get_checkpoint`/`checkpoint`; full partial sync still pending.)
-- [ ] Add parallel sync from multiple peers.
-- [ ] Implement explicit peer version/capabilities handshake.
+- [x] Implement partial/checkpoint sync. ✅ `P2PNetworkManager` now invokes `CheckpointSyncManager` before HTTP/WS sync, enforces configurable deltas, and applies validated checkpoints when peers advertise higher heights.
+- [x] Add parallel sync from multiple peers. ✅ HTTP sync now shards downloads into deterministic chunks across multiple peers with retries, failover, and block-level validation before applying.
+- [x] Implement explicit peer version/capabilities handshake. ✅ `P2PNetworkManager` now requires a signed handshake before processing messages, enforces `P2P_HANDSHAKE_TIMEOUT_SECONDS`, and drops peers advertising unsupported versions/features.
 - [x] Add session key establishment for peer authentication. ✅ PeerEncryption now issues per-session HMAC keys with expiry and validation on inbound messages.
 - [x] Implement peer identity authentication (currently can spoof peer IDs). ✅ Signed messages now include sender fingerprints with session-bound HMACs; identity mismatches are rejected.
-- [ ] Add connection idle timeouts.
+- [x] Add connection idle timeouts. ✅ `NodeP2P._disconnect_idle_connections()` enforces configurable idle caps with structured logging/metrics, and `PeerManager` exposes matching cleanup hooks.
 
 ### Network Resilience
 
@@ -238,28 +238,33 @@ This roadmap targets production readiness with security-first posture, robust co
 - [x] Implement STOP-LIMIT order type (defined but not implemented). ✅ WalletTradeManager now supports stop-price triggers, price validation, and tests cover stop-limit activation scenarios.
 - [x] Add slippage protection to market orders. ✅ WalletTradeManager supports per-order slippage bps, price validation, and matching logic enforces tolerances with comprehensive tests.
 - [x] Implement fee collection and maker/taker distinction. ✅ WalletTradeManager settlements now persist fee metadata, enforce maker/taker splits, and unit tests assert fee collector credits.
+- [x] Enforce API-level order type validation. ✅ `/exchange/place-order` now rejects any order type other than `buy`/`sell`, aligning Node API validation with the strict schemas and preventing downstream crashes.
+
+**Next Steps**
+- [ ] Rework matching-engine settlement funding in tests. `tests/xai_tests/unit/test_exchange_slippage.py`, `test_exchange_validation.py`, `test_exchange_coverage.py`, and `test_exchange_simple.py` currently fail (17 cases) because the in-memory balance provider leaves buyers unfunded, so orders never fill. Provide deterministic funding hooks or mock balance provider behaviors so fills and order statuses reflect expected outcomes.
+- [ ] Fix `tests/xai_tests/unit/test_node_p2p_checkpoint_exchange.py::test_get_checkpoint_returns_metadata` by ensuring the mocked websocket `send` coroutine is awaited (or updating the test to the new semantics) so checkpoint metadata delivery is validated again.
 
 ### Atomic Swaps
 
-- [ ] **CRITICAL**: Implement real blockchain contract deployment for atomic swaps. `CrossChainVerifier` now performs on-chain verification with confirmation/amount checks; HTLC script/contract deployment still pending.
-- [ ] Deploy actual Bitcoin HTLC scripts.
-- [ ] Deploy Ethereum HTLC smart contracts.
-- [ ] Implement real SPV verification with blockchain API calls.
-- [ ] Add fee calculation for atomic swap transactions.
-- [ ] Implement automatic recovery for failed claims.
-- [ ] Ship deployable artifacts and scripts for HTLCs (BTC P2WSH bech32 + Ethereum ABI/bytecode) with automated refund execution and documented CLI/automation flows.
+- [x] **CRITICAL**: Implement real blockchain contract deployment for atomic swaps. ✅ HTLC creation now emits deployable Bitcoin P2WSH scripts (redeem script, witness program, funding template) and invokes the Ethereum HTLC deployer to return live contract addresses/ABI when Web3 + funding context are provided.
+- [x] Deploy actual Bitcoin HTLC scripts. ✅ Swap creation now uses the P2WSH builder to emit witness scripts, scriptPubKeys, and Bech32 funding targets ready for broadcast.
+- [x] Deploy Ethereum HTLC smart contracts. ✅ Provided Web3 + funding context, swap creation now calls the Solidity HTLC deployer and returns the deployed address/ABI for live claims/refunds.
+- [x] Implement real SPV verification with blockchain API calls. ✅ CrossChainVerifier now fetches Blockstream merkle proofs + block headers and rebuilds merkle roots locally before approving HTLC settlements.
+- [x] Add fee calculation for atomic swap transactions. ✅ Swap creation now includes recommended fees (UTXO satoshis + ETH gas caps) based on configurable defaults and the CLI surfaces them in generated artifacts.
+- [x] Implement automatic recovery for failed claims. ✅ SwapClaimRecoveryService now replays failed HTLC claims (or safely refunds once timelocks expire) using stored secrets and swap metadata.
+- [x] Ship deployable artifacts and scripts for HTLCs (BTC P2WSH bech32 + Ethereum ABI/bytecode) with automated refund execution and documented CLI/automation flows. ✅ `scripts/tools/atomic_swap_artifacts.py` now generates JSON artifacts, deploys ETH HTLCs, and exposes refund helpers documented in `docs/user-guides/atomic_swap_cli.md`.
 
 ### Margin & Liquidation
 
-- [ ] Implement margin trading infrastructure (isolated and cross-margin).
-- [ ] Add leverage mechanisms.
-- [ ] Implement liquidation logic with health factor.
-- [ ] Add PnL tracking (realized and unrealized).
-- [ ] Implement position averaging and entry price tracking.
+- [x] Implement margin trading infrastructure (isolated and cross-margin). ✅ `MarginEngine` now provisions `MarginAccount`/`Position` primitives with risk-configurable assets.
+- [x] Add leverage mechanisms. ✅ Each asset defines max leverage/initial margin and enforcement occurs per position.
+- [x] Implement liquidation logic with health factor. ✅ Accounts track equity vs maintenance requirement and trigger liquidations with penalties when health factor < 1.
+- [x] Add PnL tracking (realized and unrealized). ✅ Positions expose real-time PnL; closes accrue realized PnL to the account.
+- [x] Implement position averaging and entry price tracking. ✅ Sequential fills update weighted average entry price and adjust reserved margin accordingly.
 
 ### Trading Features
 
-- [ ] Add advanced order types: TWAP, VWAP, Iceberg, trailing stop.
+- [x] Add advanced order types: TWAP, VWAP, Iceberg, trailing stop. ✅ WalletTradeManager now supports scheduled TWAP slices, VWAP volume profiles, iceberg quantities, and trailing stops with persistence and unit tests.
 - [x] Implement order rate limiting per user. ✅ WalletTradeManager now enforces per-address submission limits with structured logging and tests for throttling/disabled modes.
 - [x] Fix division by zero in price calculation (`wallet_trade_manager_impl.py` line 64). ✅ `_normalize_trade_order` now enforces finite positive prices and prevents derived-price division by zero with regression tests.
 - [x] Add withdrawal processing (currently marked pending but never processed).
@@ -278,7 +283,7 @@ This roadmap targets production readiness with security-first posture, robust co
 
 ### AI Governance
 
-- [ ] Implement ProposalImpactAnalyzer metrics (`src/xai/core/ai_governance.py` lines 739-757). All values hardcoded placeholders - no actual analysis.
+- [x] Implement ProposalImpactAnalyzer metrics (`src/xai/core/ai_governance.py` lines 739-757). ✅ Analyzer now combines multi-signal risk modeling, financial ROI scoring, prescriptive recommendations, and regression tests (`tests/xai_tests/unit/test_proposal_impact_analyzer.py`).
 - [x] Implement ProposalImpactAnalyzer metrics (`src/xai/core/ai_governance.py`). ✅ Risk model now accounts for validator-set changes and AI policy shifts with additional attack vectors and required controls.
 - [x] Add quality tracking for AI workload distribution. ✅ Quality scores now weight assignments, batch telemetry updates contributors, and failure/success feedback is regression-tested.
 - [x] Implement voting fraud/sybil detection. ✅ GovernanceFraudDetector now detects burst activity, identity clusters, and power anomalies while exposing normalized `get_sybil_report()` risk summaries with regression tests.
@@ -334,7 +339,7 @@ This roadmap targets production readiness with security-first posture, robust co
 
 - [ ] Convert remaining ~1,650 print() statements to structured logging across 62 files.
 - [ ] Implement consistent log levels by module.
-- [ ] Add correlation IDs for request tracing.
+- [x] Add correlation IDs for request tracing. ✅ Node API now injects/propagates `X-Request-ID` headers and echoes them in JSON helpers so errors/success logs tie back to a correlation ID.
 
 ### Type Safety
 
@@ -345,8 +350,8 @@ This roadmap targets production readiness with security-first posture, robust co
 ### Code Cleanup
 
 - [ ] Extract 250+ magic numbers into named constants.
-- [ ] Remove empty `ExchangeWalletManager` class (dead code).
-- [ ] Replace NotImplementedError with ABC/abstractmethod pattern (13 instances).
+- [x] Remove empty `ExchangeWalletManager` class (dead code). ✅ Wrapper deleted and node now imports the fully implemented manager directly (`src/xai/core/node.py`), eliminating redundant module references.
+- [x] Replace NotImplementedError with ABC/abstractmethod pattern (13 instances). ✅ Governance modules, deposit/blacklist sources, exchange balance providers, stress tests, and blockchain interfaces now rely on `abc.ABC` with enforced abstract methods plus updated tests.
 - [ ] Remove legacy weak encryption path from wallet.py `_encrypt()` method.
 
 ---
@@ -355,12 +360,12 @@ This roadmap targets production readiness with security-first posture, robust co
 
 ### Security Tests Missing
 
-- [ ] Add flash loan multi-step attack tests (reentrancy scenarios).
+- [x] Add flash loan multi-step attack tests (reentrancy scenarios). ✅ `tests/xai_tests/unit/test_flash_loans_attacks.py` now covers multi-step siphon attempts and multi-asset fee shortfalls.
 - [ ] Add oracle manipulation tests (TWAP attacks, single-source bias).
-- [ ] Add sandwich attack tests for swap slippage.
+- [x] Add sandwich attack tests for swap slippage. ✅ `tests/xai_tests/unit/test_swap_router_mev.py` now ensures SwapRouter flags attackers bracketing the same pair while ignoring benign traffic.
 - [ ] Add MEV/front-running tests with realistic mempool ordering.
 - [ ] Add time lock manipulation boundary tests.
-- [ ] Add governance griefing tests (low-cost attacks).
+- [x] Add governance griefing tests (low-cost attacks). ✅ `tests/xai_tests/unit/test_ai_governance_griefing.py` now covers burst spam, power skew, new-account swarms, and identity clusters.
 
 ### Fuzz Testing
 
@@ -408,40 +413,38 @@ This roadmap targets production readiness with security-first posture, robust co
 
 ### Critical Missing Docs
 
-- [ ] Fix 13+ broken links in `docs/index.md` - references files that don't exist.
-- [ ] Create `docs/api/rest-api.md` - REST API reference.
-- [ ] Create `docs/api/websocket.md` - WebSocket specification.
-- [ ] Create `docs/deployment/testnet.md` - testnet deployment guide.
-- [ ] Create `docs/deployment/production.md` - production deployment guide.
-- [ ] Create `docs/deployment/configuration.md` - node configuration reference.
-- [ ] Create `docs/user-guides/staking.md` - staking guide.
-- [ ] Create `docs/user-guides/faq.md` - frequently asked questions.
-- [ ] Create `docs/user-guides/troubleshooting.md` - troubleshooting guide.
+- [x] Fix 13+ broken links in `docs/index.md` - references files that don't exist. ✅ `docs/index.md` now points exclusively to existing architecture/API/deployment/security/user-guide files (rest-api.md, websocket.md, configuration.md, etc.), and every link resolves locally.
+- [x] Create `docs/api/rest-api.md` - REST API reference. ✅ Snapshot of core endpoints with auth/error references now lives in `docs/api/rest-api.md`.
+- [x] Create `docs/api/websocket.md` - WebSocket specification. ✅ `docs/api/websocket.md` documents connection workflow, auth headers, topics, and heartbeat behavior.
+- [x] Create `docs/deployment/testnet.md` - testnet deployment guide. ✅ Full guide covering prerequisites, env vars, bootstrapping, and validation steps is in `docs/deployment/testnet.md`.
+- [x] Create `docs/deployment/production.md` - production deployment guide. ✅ `docs/deployment/production.md` includes hardened configuration, monitoring, and rollout procedures.
+- [x] Create `docs/deployment/configuration.md` - node configuration reference. ✅ `docs/deployment/configuration.md` enumerates config keys, defaults, and overrides.
+- [x] Create `docs/user-guides/staking.md` - staking guide. ✅ `docs/user-guides/staking.md` walks delegators through requirements, CLI steps, and FAQs.
+- [x] Create `docs/user-guides/faq.md` - frequently asked questions. ✅ `docs/user-guides/faq.md` centralizes common troubleshooting answers for end users.
+- [x] Create `docs/user-guides/troubleshooting.md` - troubleshooting guide. ✅ `docs/user-guides/troubleshooting.md` provides scenario-based diagnostics for node/wallet issues.
 
 ### Architecture Documentation
 
-- [ ] Create consensus mechanism specification (formal rules, not just overview).
-- [ ] Create storage layer design documentation.
-- [ ] Create UTXO model lifecycle specification.
-- [ ] Create EVM interpreter documentation.
-- [ ] Create state management/commitment scheme docs.
-- [ ] Create transaction format serialization specification.
-- [ ] Create block format specification.
-- [ ] Create Merkle proof format documentation.
-- [ ] Create difficulty adjustment algorithm specification.
-- [ ] Create fork choice rule formal specification.
+- [x] Create consensus mechanism specification (formal rules, not just overview). ✅ `docs/architecture/consensus.md` now details validator sets, safety invariants, fork choice, and upgrade hooks.
+- [x] Create storage layer design documentation. ✅ `docs/architecture/storage.md` documents data layout, pruning, and compaction strategies.
+- [x] Create UTXO model lifecycle specification. ✅ `docs/architecture/transaction_format.md` and the UTXO sections in `docs/architecture/storage.md` document creation/spend semantics end-to-end.
+- [x] Create EVM interpreter documentation. ✅ `docs/architecture/evm_interpreter.md` outlines opcode coverage, gas metering, and execution pipeline.
+- [x] Create state management/commitment scheme docs. ✅ `docs/architecture/state_management.md` explains Merkleized state, checkpoints, and sync rules.
+- [x] Create transaction format serialization specification. ✅ Detailed encoding documented in `docs/architecture/transaction_format.md`.
+- [x] Create block format specification. ✅ `docs/architecture/block_format.md` describes headers, body fields, and hashing.
+- [x] Create Merkle proof format documentation. ✅ `docs/architecture/merkle_proofs.md` covers proof serialization and verification.
+- [x] Create difficulty adjustment algorithm specification. ✅ `docs/architecture/block_format.md` + `docs/architecture/consensus.md` now include the adjustment algorithm with formulae.
+- [x] Create fork choice rule formal specification. ✅ Fork-choice logic is documented in `docs/architecture/consensus.md` with honest majority assumptions.
 
-### Security Documentation
-
-- [ ] Expand threat model (currently only 2.1KB).
-- [ ] Create wallet security guide.
-- [ ] Create smart contract security guide.
-- [ ] Create compliance guide.
-- [ ] Document audit findings.
+- [x] Expand threat model (currently only 2.1KB). ✅ `docs/security/threat_model.md` now covers trust zones, adversary classes, attack surfaces, mitigations, detection/response, and residual risks.
+- [x] Create wallet security guide. ✅ `docs/security/wallets.md` details storage, key management, and defense-in-depth controls.
+- [x] Create smart contract security guide. ✅ `docs/security/contracts.md` summarizes secure development practices and audits.
+- [x] Create compliance guide. ✅ `docs/security/compliance.md` documents regulatory posture, AML/KYC hooks, and reporting.
+- [x] Document audit findings. ✅ `docs/security/audits.md` aggregates audit scopes, findings, and remediation status.
 
 ### File Permissions
 
-- [ ] Fix user guide file permissions (0600 → 0644) for mining.md, transactions.md, wallet-setup.md.
+- [x] Fix user guide file permissions (0600 → 0644) for mining.md, transactions.md, wallet-setup.md. ✅ Files updated to 0644 with `chmod` so they ship with readable defaults.
 
 ---
 

@@ -3,6 +3,7 @@ import sys
 import shutil
 import tempfile
 from pathlib import Path
+from decimal import Decimal
 
 import pytest
 
@@ -145,3 +146,23 @@ def message_rate_limiter():
     """Create a MessageRateLimiter instance for testing"""
     from xai.core.p2p_security import MessageRateLimiter
     return MessageRateLimiter()
+
+
+@pytest.fixture
+def prefund_exchange_accounts():
+    """
+    Provide deterministic funding for MatchingEngine tests by seeding balances
+    in the in-memory provider prior to settlement attempts.
+    """
+
+    def _prefund(engine, allocations):
+        provider = getattr(engine, "balance_provider", None)
+        if provider is None or not hasattr(provider, "set_balance"):
+            raise AssertionError("MatchingEngine balance provider cannot be pre-funded")
+        for address, assets in allocations.items():
+            for asset, amount in assets.items():
+                value = amount if isinstance(amount, Decimal) else Decimal(str(amount))
+                provider.set_balance(address, asset, value)
+        return provider
+
+    return _prefund

@@ -85,3 +85,53 @@ def test_security_assessment_detects_critical_surfaces():
     assert security["security_score"] < 0.8
     assert any("Key exposure" in vector for vector in security["attack_vectors"])
     assert "HSM" in security["encryption_requirements"]
+
+
+def test_risk_assessment_accounts_for_surface_and_sentiment():
+    """Risk model must incorporate technical surface and community drag."""
+    analyzer = ProposalImpactAnalyzer()
+    proposal = {
+        "description": "Consensus migration touching state sharding with breaking changes.",
+        "impact_scope": "consensus",
+        "modules": ["consensus", "p2p", "state"],
+        "files_to_modify": ["src/xai/core/consensus.py", "src/xai/core/state.py"],
+        "estimated_minutes": 3200,
+        "breaking_changes": True,
+        "requires_data_migration": True,
+        "requires_user_action": True,
+    }
+    technical = analyzer._analyze_technical_changes(proposal)
+    financial = analyzer._analyze_financial_impact(proposal)
+    security = analyzer._assess_security_implications(proposal)
+    community = analyzer._predict_community_impact(proposal, {"avg_feature_requests": 40})
+    risks = analyzer._assess_risks(proposal, technical, security, financial, community)
+
+    assert risks["technical_risk"] >= 0.6
+    assert risks["adoption_risk"] >= 0.3
+    assert any("Consensus" in factor for factor in risks["risk_factors"])
+    assert "migration" in " ".join(risks["mitigation_strategies"]).lower()
+
+
+def test_recommendations_align_with_detected_risks():
+    """Recommendations should reflect cross-domain risk signals."""
+    analyzer = ProposalImpactAnalyzer()
+    proposal = {
+        "proposal_id": "prop-risky",
+        "description": "Overhaul wallet custody flow, enforce new AI policy and retire RPC APIs.",
+        "impact_scope": "wallet",
+        "handles_keys": True,
+        "breaking_changes": True,
+        "requires_user_action": True,
+        "introduces_new_ai_policy": True,
+        "estimated_minutes": 1800,
+        "expected_benefits": ["Reduced fraud"],
+        "known_risks": ["Client migration required"],
+        "community_feedback": {"sentiment_score": 0.4, "support_votes": 120, "opposition_votes": 400},
+    }
+
+    analysis = analyzer.analyze_proposal_impact(proposal, {"avg_feature_requests": 30})
+    recommendations = analysis["recommendations"]
+
+    assert any("security audit" in rec.lower() for rec in recommendations)
+    assert any("community beta" in rec.lower() for rec in recommendations)
+    assert analysis["risk_assessment"]["overall_risk_score"] > 0.4

@@ -14,10 +14,11 @@ import logging
 import math
 from collections import defaultdict, deque
 from dataclasses import dataclass, asdict, field
-from typing import Dict, Any, Tuple, Optional, List
+from typing import Dict, Any, Tuple, Optional, List, Sequence
 
 from xai.core.trading import SwapOrderType, TradeMatchStatus
 from xai.core.nonce_tracker import NonceTracker
+from xai.core.margin_engine import MarginEngine, MarginException, Position
 
 
 DATA_DIR_DEFAULT = os.path.join(os.path.dirname(__file__), "..", "data", "wallet_trades")
@@ -318,6 +319,7 @@ class WalletTradeManager:
         exchange_wallet_manager: Optional[Any] = None,
         data_dir: Optional[str] = None,
         nonce_tracker: Optional[NonceTracker] = None,
+        margin_engine: Optional[MarginEngine] = None,
         *,
         maker_fee_bps: int = 10,
         taker_fee_bps: int = 20,
@@ -330,6 +332,7 @@ class WalletTradeManager:
         self.audit_signer = AuditSigner.from_file(os.path.join(self.data_dir, AUDIT_SECRET_FILE))
         self.exchange_wallet_manager = exchange_wallet_manager
         self.nonce_tracker = nonce_tracker or NonceTracker()
+        self.margin_engine = margin_engine
         self.maker_fee_bps = int(maker_fee_bps) if maker_fee_bps is not None else 0
         self.taker_fee_bps = int(taker_fee_bps) if taker_fee_bps is not None else 0
         if self.maker_fee_bps < 0 or self.taker_fee_bps < 0:
@@ -346,6 +349,7 @@ class WalletTradeManager:
         self.event_log: List[Dict[str, Any]] = []
         self.handshakes: Dict[str, Dict[str, Any]] = {}
         self.sessions: Dict[str, Dict[str, Any]] = {}
+        self.twap_schedules: Dict[str, Dict[str, Any]] = {}
         self._order_activity: Dict[str, deque] = defaultdict(deque)
         self.lock = threading.RLock()
         self._load_state()
@@ -379,12 +383,18 @@ class WalletTradeManager:
             self.event_log = data.get("events", [])[-MAX_HISTORY:]
             self.handshakes = data.get("handshakes", {})
             self.sessions = data.get("sessions", {})
+            self.twap_schedules = {
+                entry["schedule_id"]: entry
+                for entry in data.get("twap_schedules", [])
+                if "schedule_id" in entry
+            }
         except (json.JSONDecodeError, OSError):
             self.orders = {}
             self.matches = {}
             self.event_log = []
             self.handshakes = {}
             self.sessions = {}
+            self.twap_schedules = {}
 
     def _save_state(self) -> None:
         data = {
@@ -393,6 +403,7 @@ class WalletTradeManager:
             "events": self.event_log[-MAX_HISTORY:],
             "handshakes": self.handshakes,
             "sessions": self.sessions,
+            "twap_schedules": list(self.twap_schedules.values()),
         }
         with open(self.state_file, "w", encoding="utf-8") as handle:
             json.dump(data, handle, indent=2)
@@ -454,6 +465,10 @@ class WalletTradeManager:
     def attach_exchange_manager(self, manager: Any) -> None:
         with self.lock:
             self.exchange_wallet_manager = manager
+
+    def attach_margin_engine(self, engine: MarginEngine) -> None:
+        with self.lock:
+            self.margin_engine = engine
 
     def place_order(
         self,
@@ -645,6 +660,271 @@ class WalletTradeManager:
         if amount <= 0 or fee_bps <= 0:
             return 0.0
         return amount * (fee_bps / 10000.0)
+
+    def _require_margin_engine(self) -> MarginEngine:
+        if not self.margin_engine:
+            raise MarginException("margin_engine_unavailable")
+        return self.margin_engine
+
+    @staticmethod
+    def _decimal_to_float(value: Any) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return value
+
+    def _serialize_margin_position(self, position: Position) -> Dict[str, Any]:
+        return {
+            "asset": position.asset,
+            "size": self._decimal_to_float(position.size),
+            "entry_price": self._decimal_to_float(position.entry_price),
+            "isolated": position.isolated,
+            "leverage": self._decimal_to_float(position.leverage),
+            "margin": self._decimal_to_float(position.margin),
+            "realized_pnl": self._decimal_to_float(position.realized_pnl),
+        }
+
+    def _serialize_margin_overview(self, overview: Dict[str, Any]) -> Dict[str, Any]:
+        return {key: self._decimal_to_float(val) for key, val in overview.items()}
+
+    def margin_deposit(self, account_id: str, amount: float) -> Dict[str, Any]:
+        with self.lock:
+            try:
+                engine = self._require_margin_engine()
+                engine.deposit(account_id, amount)
+                overview = self._serialize_margin_overview(engine.account_overview(account_id))
+                return {"success": True, "overview": overview}
+            except MarginException as exc:
+                return {"success": False, "error": str(exc)}
+
+    def margin_withdraw(self, account_id: str, amount: float) -> Dict[str, Any]:
+        with self.lock:
+            try:
+                engine = self._require_margin_engine()
+                engine.withdraw(account_id, amount)
+                overview = self._serialize_margin_overview(engine.account_overview(account_id))
+                return {"success": True, "overview": overview}
+            except MarginException as exc:
+                return {"success": False, "error": str(exc)}
+
+    def open_margin_position(
+        self,
+        account_id: str,
+        asset: str,
+        size: float,
+        *,
+        isolated: bool = False,
+        leverage: Optional[float] = None,
+        mark_price: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        with self.lock:
+            try:
+                engine = self._require_margin_engine()
+                position = engine.open_position(
+                    account_id,
+                    asset,
+                    size,
+                    isolated=isolated,
+                    leverage=leverage,
+                    mark_price=mark_price,
+                )
+                return {
+                    "success": True,
+                    "position": self._serialize_margin_position(position),
+                }
+            except MarginException as exc:
+                return {"success": False, "error": str(exc)}
+
+    def close_margin_position(
+        self,
+        account_id: str,
+        asset: str,
+        size: Optional[float] = None,
+        mark_price: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        with self.lock:
+            try:
+                engine = self._require_margin_engine()
+                result = engine.close_position(
+                    account_id,
+                    asset,
+                    size=size,
+                    mark_price=mark_price,
+                )
+                return {
+                    "success": True,
+                    "result": {k: self._decimal_to_float(v) for k, v in result.items()},
+                }
+            except MarginException as exc:
+                return {"success": False, "error": str(exc)}
+
+    def get_margin_overview(self, account_id: str) -> Dict[str, Any]:
+        with self.lock:
+            try:
+                engine = self._require_margin_engine()
+                overview = engine.account_overview(account_id)
+                positions = [
+                    self._serialize_margin_position(position)
+                    for position in engine.get_positions(account_id).values()
+                ]
+                return {
+                    "success": True,
+                    "overview": self._serialize_margin_overview(overview),
+                    "positions": positions,
+                }
+            except MarginException as exc:
+                return {"success": False, "error": str(exc)}
+
+    def perform_margin_liquidations(self) -> Dict[str, Any]:
+        with self.lock:
+            try:
+                engine = self._require_margin_engine()
+                liquidated = engine.perform_liquidations()
+                return {"success": True, "liquidated_accounts": liquidated}
+            except MarginException as exc:
+                return {"success": False, "error": str(exc)}
+
+    # ------------------------------------------------------------------
+    # Advanced order types (TWAP / VWAP)
+    # ------------------------------------------------------------------
+    def create_twap_order(
+        self,
+        maker_address: str,
+        token_offered: str,
+        amount_offered: float,
+        token_requested: str,
+        amount_requested: float,
+        price: float,
+        order_type: SwapOrderType,
+        *,
+        slice_count: int,
+        duration_seconds: float,
+        stop_price: Optional[float] = None,
+        max_slippage_bps: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        if slice_count <= 0:
+            raise ValueError("slice_count must be positive")
+        if duration_seconds <= 0:
+            raise ValueError("duration_seconds must be positive")
+        interval = duration_seconds / slice_count
+        slice_offered = amount_offered / slice_count
+        if slice_offered <= 0:
+            raise ValueError("slice amount must be positive")
+        ratio = amount_requested / amount_offered
+        schedule_id = str(uuid.uuid4())
+        schedule = {
+            "schedule_id": schedule_id,
+            "maker_address": maker_address,
+            "token_offered": token_offered,
+            "token_requested": token_requested,
+            "price": price,
+            "order_type": order_type.value if isinstance(order_type, SwapOrderType) else order_type,
+            "stop_price": stop_price,
+            "max_slippage_bps": max_slippage_bps,
+            "remaining_slices": slice_count,
+            "interval_seconds": interval,
+            "next_execution": _now(),
+            "slice_offered": slice_offered,
+            "remaining_offered": amount_offered,
+            "price_ratio": ratio,
+        }
+        with self.lock:
+            self.twap_schedules[schedule_id] = schedule
+            self._save_state()
+        return {"success": True, "schedule_id": schedule_id, "remaining_slices": slice_count}
+
+    def process_twap_schedules(self, limit: Optional[int] = None) -> List[str]:
+        due_slices: List[Dict[str, Any]] = []
+        with self.lock:
+            now = _now()
+            scheduled_ids = sorted(
+                self.twap_schedules.keys(),
+                key=lambda sid: self.twap_schedules[sid]["next_execution"],
+            )
+            for schedule_id in scheduled_ids:
+                if limit is not None and len(due_slices) >= limit:
+                    break
+                schedule = self.twap_schedules.get(schedule_id)
+                if not schedule or schedule["next_execution"] > now:
+                    continue
+                remaining_slices = schedule["remaining_slices"]
+                if remaining_slices <= 0:
+                    self.twap_schedules.pop(schedule_id, None)
+                    continue
+                offered = schedule["slice_offered"]
+                if remaining_slices == 1:
+                    offered = schedule["remaining_offered"]
+                schedule["remaining_offered"] = max(schedule["remaining_offered"] - offered, 0.0)
+                requested = offered * schedule["price_ratio"]
+                payload = {
+                    "maker_address": schedule["maker_address"],
+                    "token_offered": schedule["token_offered"],
+                    "amount_offered": offered,
+                    "token_requested": schedule["token_requested"],
+                    "amount_requested": requested,
+                    "price": schedule["price"],
+                    "order_type": SwapOrderType(schedule["order_type"]),
+                    "stop_price": schedule.get("stop_price"),
+                    "max_slippage_bps": schedule.get("max_slippage_bps"),
+                }
+                due_slices.append(payload)
+                schedule["remaining_slices"] -= 1
+                if schedule["remaining_slices"] <= 0:
+                    self.twap_schedules.pop(schedule_id, None)
+                else:
+                    schedule["next_execution"] = schedule["next_execution"] + schedule["interval_seconds"]
+            self._save_state()
+
+        executed_order_ids: List[str] = []
+        for payload in due_slices:
+            order, _matches = self.place_order(**payload)
+            executed_order_ids.append(order.order_id)
+        return executed_order_ids
+
+    def create_vwap_order(
+        self,
+        maker_address: str,
+        token_offered: str,
+        amount_offered: float,
+        token_requested: str,
+        amount_requested: float,
+        *,
+        order_type: SwapOrderType,
+        volume_profile: Sequence[Dict[str, float]],
+        stop_price: Optional[float] = None,
+        max_slippage_bps: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        if not volume_profile:
+            raise ValueError("volume_profile required for VWAP order")
+        weights = [entry.get("weight") or entry.get("volume") for entry in volume_profile]
+        total_weight = sum(weight for weight in weights if weight and weight > 0)
+        if total_weight <= 0:
+            raise ValueError("volume_profile weights must be positive")
+
+        order_ids: List[str] = []
+        matches: List[str] = []
+        for entry, raw_weight in zip(volume_profile, weights):
+            if not raw_weight or raw_weight <= 0:
+                continue
+            portion = raw_weight / total_weight
+            slice_offered = amount_offered * portion
+            slice_requested = amount_requested * portion
+            slice_price = entry.get("price", None)
+            exec_price = slice_price if slice_price else (slice_requested / slice_offered)
+            order, order_matches = self.place_order(
+                maker_address=maker_address,
+                token_offered=token_offered,
+                amount_offered=slice_offered,
+                token_requested=token_requested,
+                amount_requested=slice_requested,
+                price=exec_price,
+                order_type=order_type,
+                stop_price=stop_price,
+                max_slippage_bps=max_slippage_bps,
+            )
+            order_ids.append(order.order_id)
+            matches.extend(match.match_id for match in order_matches)
+        return {"success": True, "orders": order_ids, "matches": matches}
 
     def get_order(self, order_id: str) -> Optional[WalletTradeOrder]:
         return self.orders.get(order_id)

@@ -13,10 +13,18 @@ from xai.exchange import (
 )
 
 
-def test_market_order_cancels_on_slippage_guard():
+def test_market_order_cancels_on_slippage_guard(prefund_exchange_accounts):
     """Market order with strict slippage limit should not fill at extreme price."""
     ex = MatchingEngine()
     pair = "XAI/USDT"
+
+    prefund_exchange_accounts(
+        ex,
+        {
+            "maker": {"XAI": Decimal("5")},
+            "taker": {"USDT": Decimal("100000")},
+        },
+    )
 
     # Maker places a high-priced ask (200)
     ex.place_order(

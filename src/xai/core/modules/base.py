@@ -10,6 +10,7 @@ node.
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, Optional, Protocol
 
@@ -58,54 +59,67 @@ class ModuleLifecycle(Protocol):
         """Provide a safe rollback path if activation fails post-deploy."""
 
 
-class TransactionModule(ModuleLifecycle):
+class TransactionModule(ModuleLifecycle, ABC):
+    @abstractmethod
     def pre_validate(self, context: TransactionContext) -> None:
-        raise NotImplementedError
+        """Perform stateless validation before execution."""
 
+    @abstractmethod
     def apply(self, context: TransactionContext) -> None:
-        raise NotImplementedError
+        """Apply state changes after validation."""
 
 
-class BlockModule(ModuleLifecycle):
+class BlockModule(ModuleLifecycle, ABC):
+    @abstractmethod
     def pre_apply(self, context: BlockContext) -> None:
-        raise NotImplementedError
+        """Inspect a block before it mutates chain state."""
 
+    @abstractmethod
     def post_apply(self, context: BlockContext) -> None:
-        raise NotImplementedError
+        """Run hooks after a block has been committed."""
 
 
-class ConsensusModule(ModuleLifecycle):
+class ConsensusModule(ModuleLifecycle, ABC):
+    @abstractmethod
     def validate_block(self, context: BlockContext) -> None:
-        raise NotImplementedError
+        """Perform consensus checks on a block candidate."""
 
+    @abstractmethod
     def validate_transaction(self, context: TransactionContext) -> None:
-        raise NotImplementedError
+        """Validate transaction against consensus-specific rules."""
 
 
-class DataModule(ModuleLifecycle):
+class DataModule(ModuleLifecycle, ABC):
+    @abstractmethod
     def refresh(self, context: ModuleContext) -> None:
-        raise NotImplementedError
+        """Refresh cached state or external feeds."""
 
+    @abstractmethod
     def validate_feed(self, payload: Dict[str, Any]) -> bool:
-        raise NotImplementedError
+        """Validate an external data feed payload."""
 
 
-class ObserverModule(ModuleLifecycle):
+class ObserverModule(ModuleLifecycle, ABC):
+    @abstractmethod
     def publish(self, context: ModuleContext, payload: Dict[str, Any]) -> None:
-        raise NotImplementedError
+        """Publish telemetry or events downstream."""
 
 
-class InteropModule(ModuleLifecycle):
+class InteropModule(ModuleLifecycle, ABC):
+    @abstractmethod
     def verify_proof(self, payload: Dict[str, Any]) -> bool:
-        raise NotImplementedError
+        """Verify interoperability proof payloads."""
 
+    @abstractmethod
     def submit_fraud_evidence(self, payload: Dict[str, Any]) -> None:
-        raise NotImplementedError
+        """Submit fraud evidence back to governance."""
 
 
-class ServiceModule(ModuleLifecycle):
+class ServiceModule(ModuleLifecycle, ABC):
+    @abstractmethod
     def start(self) -> None:
-        raise NotImplementedError
+        """Start long-running service loops."""
 
+    @abstractmethod
     def stop(self) -> None:
-        raise NotImplementedError
+        """Stop long-running service loops."""

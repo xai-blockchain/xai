@@ -17,6 +17,9 @@ import threading
 import requests
 
 from xai.core.spv_header_ingestor import SPVHeaderIngestor
+from xai.core import htlc_deployer
+from xai.core import htlc_p2wsh
+from xai.core.config import Config
 
 
 class CoinType(Enum):
@@ -107,7 +110,7 @@ class SwapStateMachine:
         SwapState.CLAIMED: [],  # Terminal state
         SwapState.REFUNDED: [],  # Terminal state
         SwapState.EXPIRED: [],  # Terminal state
-        SwapState.FAILED: [],  # Terminal state
+        SwapState.FAILED: [SwapState.CLAIMED, SwapState.REFUNDED],  # Allow recovery
     }
 
     def __init__(self, storage_dir: str = "data/swaps"):
@@ -192,6 +195,9 @@ class SwapStateMachine:
             swap["state"] = new_state
             swap["updated_at"] = time.time()
 
+            if data:
+                swap.setdefault("data", {}).update(data)
+
             # Record in history
             history_entry = {
                 "state": new_state.value,
@@ -229,7 +235,6 @@ class SwapStateMachine:
             SwapState.CLAIMED,
             SwapState.REFUNDED,
             SwapState.EXPIRED,
-            SwapState.FAILED,
         ]
 
     def get_active_swaps(self) -> Dict[str, Dict]:
@@ -245,6 +250,16 @@ class SwapStateMachine:
         """Return list of (swap_id, swap_data) for all swaps."""
         with self.lock:
             return list(self.swaps.items())
+
+    def update_swap_data(self, swap_id: str, patch: Dict[str, Any]) -> bool:
+        """Merge additional metadata into stored swap data."""
+        with self.lock:
+            swap = self.swaps.get(swap_id)
+            if not swap:
+                return False
+            swap.setdefault("data", {}).update(patch)
+            self._persist_swap(swap_id)
+            return True
 
     def check_timeouts(self) -> List[str]:
         """
@@ -337,6 +352,7 @@ class AtomicSwapHTLC:
         counterparty_address: str,
         timelock_hours: int = 24,
         secret_bytes: Optional[bytes] = None,
+        deployment_config: Optional[Dict[str, Any]] = None,
     ) -> Dict:
         """
         Create a new atomic swap contract
@@ -360,17 +376,30 @@ class AtomicSwapHTLC:
         timelock = int(time.time()) + (timelock_hours * 3600)
 
         # Create contract based on protocol
+        deployment_config = deployment_config or {}
         if self.protocol == SwapProtocol.HTLC_UTXO:
             contract = self._create_utxo_htlc(
-                secret_hash, timelock, counterparty_address, other_coin_amount
+                secret_hash,
+                timelock,
+                counterparty_address,
+                other_coin_amount,
+                deployment_config,
             )
         elif self.protocol == SwapProtocol.HTLC_ETHEREUM:
             contract = self._create_ethereum_htlc(
-                secret_hash, timelock, counterparty_address, other_coin_amount
+                secret_hash,
+                timelock,
+                counterparty_address,
+                other_coin_amount,
+                deployment_config,
             )
         elif self.protocol == SwapProtocol.HTLC_MONERO:
             contract = self._create_monero_htlc(
-                secret_hash, timelock, counterparty_address, other_coin_amount
+                secret_hash,
+                timelock,
+                counterparty_address,
+                other_coin_amount,
+                deployment_config,
             )
 
         contract.update(
@@ -389,7 +418,12 @@ class AtomicSwapHTLC:
         return contract
 
     def _create_utxo_htlc(
-        self, secret_hash: str, timelock: int, recipient: str, amount: float
+        self,
+        secret_hash: str,
+        timelock: int,
+        recipient: str,
+        amount: float,
+        deployment_config: Optional[Dict[str, Any]] = None,
     ) -> Dict:
         """
         Create HTLC for UTXO-based coins
@@ -405,7 +439,7 @@ class AtomicSwapHTLC:
         OP_ENDIF
         """
 
-        return {
+        contract: Dict[str, Any] = {
             "contract_type": "HTLC_UTXO",
             "script_template": f"""
                 OP_IF
@@ -420,6 +454,55 @@ class AtomicSwapHTLC:
             "refund_method": f"Wait until {timelock} then claim refund",
             "supported_coins": ["BTC", "LTC", "DOGE", "BCH", "ZEC", "DASH"],
         }
+        contract["recommended_fee"] = self._recommended_utxo_fee(amount)
+        cfg = self._extract_protocol_config(deployment_config, "utxo")
+        if not cfg:
+            contract["deployment_ready"] = False
+            return contract
+
+        recipient_pubkey = cfg.get("recipient_pubkey") or cfg.get("counterparty_pubkey")
+        sender_pubkey = cfg.get("sender_pubkey")
+        hrp = cfg.get("hrp", cfg.get("network_hrp", "bc"))
+        missing: List[str] = []
+        if not recipient_pubkey:
+            missing.append("recipient_pubkey")
+        if not sender_pubkey:
+            missing.append("sender_pubkey")
+        if missing:
+            contract["deployment_ready"] = False
+            contract["deployment_missing_fields"] = missing
+            return contract
+
+        try:
+            script_payload = htlc_p2wsh.build_utxo_contract(
+                secret_hash_hex=secret_hash,
+                timelock=timelock,
+                recipient_pubkey=recipient_pubkey,
+                sender_pubkey=sender_pubkey,
+                hrp=hrp,
+            )
+            funding_sats = self._convert_to_base_units(amount, cfg.get("decimals", 8))
+            contract.update(
+                {
+                    "deployment_ready": True,
+                    "redeem_script_hex": script_payload["redeem_script_hex"],
+                    "witness_program": script_payload["witness_program"],
+                    "script_pubkey": script_payload["script_pubkey"],
+                    "p2wsh_address": script_payload["p2wsh_address"],
+                    "funding_amount_sats": funding_sats,
+                    "network": cfg.get("network", "bitcoin"),
+                    "funding_template": {
+                        "address": script_payload["p2wsh_address"],
+                        "amount_sats": funding_sats,
+                        "suggested_fee_sats": cfg.get("suggested_fee_sats"),
+                        "change_address": cfg.get("change_address"),
+                    },
+                }
+            )
+        except ValueError as exc:
+            contract["deployment_ready"] = False
+            contract["deployment_error"] = str(exc)
+        return contract
 
     @staticmethod
     def build_utxo_redeem_script(secret_hash: str, recipient_pubkey: str, sender_pubkey: str, timelock: int) -> str:
@@ -445,8 +528,40 @@ class AtomicSwapHTLC:
         """
         return hashlib.sha256(redeem_script.encode("utf-8")).hexdigest()
 
+    def _recommended_utxo_fee(self, amount: float) -> Dict[str, Any]:
+        fee_rate = Decimal(str(getattr(Config, "ATOMIC_SWAP_FEE_RATE", 0.0000005)))
+        tx_size = int(getattr(Config, "ATOMIC_SWAP_UTXO_TX_SIZE", 300))
+        fee = CrossChainVerifier.calculate_atomic_swap_fee(
+            amount,
+            fee_rate,
+            tx_size_bytes=tx_size,
+        )
+        return {
+            "total_fee": float(fee),
+            "unit": self.coin_type.name,
+            "fee_rate_per_byte": float(fee_rate),
+            "tx_size_bytes": tx_size,
+        }
+
+    def _recommended_eth_fee(self) -> Dict[str, Any]:
+        gas_limit = int(getattr(Config, "ATOMIC_SWAP_ETH_GAS_LIMIT", 200000))
+        max_fee_gwei = Decimal(str(getattr(Config, "ATOMIC_SWAP_ETH_MAX_FEE_GWEI", 60)))
+        priority_gwei = Decimal(str(getattr(Config, "ATOMIC_SWAP_ETH_PRIORITY_FEE_GWEI", 2)))
+        total_fee_eth = (max_fee_gwei * Decimal(gas_limit)) / Decimal("1000000000")
+        return {
+            "gas_limit": gas_limit,
+            "max_fee_per_gas_gwei": float(max_fee_gwei),
+            "priority_fee_gwei": float(priority_gwei),
+            "estimated_total_fee_eth": float(total_fee_eth),
+        }
+
     def _create_ethereum_htlc(
-        self, secret_hash: str, timelock: int, recipient: str, amount: float
+        self,
+        secret_hash: str,
+        timelock: int,
+        recipient: str,
+        amount: float,
+        deployment_config: Optional[Dict[str, Any]] = None,
     ) -> Dict:
         """
         Create HTLC for Ethereum-based tokens
@@ -478,7 +593,7 @@ class AtomicSwapHTLC:
         }}
         """
 
-        return {
+        contract: Dict[str, Any] = {
             "contract_type": "HTLC_ETHEREUM",
             "smart_contract": solidity_contract,
             "claim_method": "Call claim(secret) function",
@@ -486,9 +601,73 @@ class AtomicSwapHTLC:
             "supported_tokens": ["ETH", "USDT", "USDC", "DAI"],
             "gas_estimate": "~150,000 gas for claim, ~50,000 for refund",
         }
+        contract["recommended_gas"] = self._recommended_eth_fee()
+        cfg = self._extract_protocol_config(deployment_config, "ethereum")
+        if not cfg:
+            contract["deployment_ready"] = False
+            return contract
+
+        if not cfg.get("auto_deploy", True):
+            contract["deployment_ready"] = False
+            return contract
+
+        sender = cfg.get("sender") or cfg.get("funding_address")
+        web3_obj = cfg.get("web3")
+        if not sender or not web3_obj:
+            missing_fields = []
+            if not sender:
+                missing_fields.append("sender")
+            if not web3_obj:
+                missing_fields.append("web3")
+            contract["deployment_ready"] = False
+            contract["deployment_missing_fields"] = missing_fields
+            return contract
+
+        decimals = int(cfg.get("decimals", 18))
+        value_wei = cfg.get("value_wei")
+        try:
+            if value_wei is None:
+                value_wei = self._convert_to_base_units(amount, decimals)
+        except (ValueError, InvalidOperation) as exc:
+            contract["deployment_ready"] = False
+            contract["deployment_error"] = f"invalid_amount: {exc}"
+            return contract
+
+        try:
+            deployed_contract = htlc_deployer.deploy_htlc(
+                web3_obj,
+                secret_hash=secret_hash,
+                recipient=recipient,
+                timelock_unix=timelock,
+                value_wei=value_wei,
+                sender=sender,
+                gas=cfg.get("gas"),
+                max_fee_per_gas=cfg.get("max_fee_per_gas"),
+                max_priority_fee_per_gas=cfg.get("max_priority_fee_per_gas"),
+                solc_version=cfg.get("solc_version", "0.8.21"),
+            )
+        except Exception as exc:  # pragma: no cover - defensive network handling
+            contract["deployment_ready"] = False
+            contract["deployment_error"] = str(exc)
+            return contract
+
+        contract.update(
+            {
+                "deployment_ready": True,
+                "contract_address": getattr(deployed_contract, "address", None),
+                "chain_id": getattr(getattr(web3_obj, "eth", None), "chain_id", None),
+                "htlc_abi": getattr(deployed_contract, "abi", None),
+            }
+        )
+        return contract
 
     def _create_monero_htlc(
-        self, secret_hash: str, timelock: int, recipient: str, amount: float
+        self,
+        secret_hash: str,
+        timelock: int,
+        recipient: str,
+        amount: float,
+        deployment_config: Optional[Dict[str, Any]] = None,
     ) -> Dict:
         """
         Create HTLC for Monero (XMR)
@@ -509,7 +688,65 @@ class AtomicSwapHTLC:
             "supported_coins": ["XMR"],
             "complexity": "HIGH - Requires Monero daemon integration",
             "note": "Privacy-preserving atomic swaps using ring signatures",
+            "deployment_ready": False,
         }
+
+    @staticmethod
+    def _extract_protocol_config(config: Optional[Dict[str, Any]], key: str) -> Dict[str, Any]:
+        """Return protocol-specific deployment config if provided."""
+        if not isinstance(config, dict):
+            return {}
+        if key in config and isinstance(config[key], dict):
+            return config[key]
+        fallback_keys = {
+            "utxo": {"sender_pubkey", "recipient_pubkey", "counterparty_pubkey", "hrp", "network"},
+            "ethereum": {"web3", "sender", "funding_address", "value_wei"},
+            "monero": {"daemon_rpc", "view_key"},
+        }
+        expected = fallback_keys.get(key, set())
+        if expected and any(k in config for k in expected):
+            return config
+        return {}
+
+    @staticmethod
+    def _convert_to_base_units(amount: float, decimals: int) -> int:
+        """
+        Convert a human-readable amount into protocol base units (integer).
+        """
+        dec_value = Decimal(str(amount))
+        multiplier = Decimal(10) ** Decimal(decimals)
+        scaled = (dec_value * multiplier).quantize(Decimal("1"), rounding=ROUND_UP)
+        return int(scaled)
+
+    @staticmethod
+    def _reconstruct_merkle_root(tx_hash: str, merkle_proof: List[str], tx_index: int) -> str:
+        """
+        Reconstruct the merkle root from a transaction hash and sibling hashes.
+        All inputs/outputs are big-endian hex strings; internal hashing uses the
+        Bitcoin-style little-endian double-SHA256 concatenation.
+        """
+        if not isinstance(merkle_proof, list):
+            raise ValueError("merkle_proof must be a list of sibling hashes")
+
+        try:
+            current = bytes.fromhex(tx_hash)[::-1]
+        except ValueError as exc:
+            raise ValueError("invalid transaction hash") from exc
+
+        position = int(tx_index)
+        for sibling_hex in merkle_proof:
+            try:
+                sibling = bytes.fromhex(sibling_hex)[::-1]
+            except ValueError as exc:
+                raise ValueError("invalid sibling hash") from exc
+            if position & 1:
+                concat = sibling + current
+            else:
+                concat = current + sibling
+            current = hashlib.sha256(hashlib.sha256(concat).digest()).digest()
+            position >>= 1
+
+        return current[::-1].hex()
 
     def verify_swap_claim(
         self, secret: str, secret_hash: str, contract_data: Dict
@@ -678,6 +915,9 @@ class CrossChainVerifier:
                 "type": "utxo",
                 "tx_url": "https://blockstream.info/api/tx/{txid}",
                 "tip_url": "https://blockstream.info/api/blocks/tip/height",
+                "merkle_url": "https://blockstream.info/api/tx/{txid}/merkle-proof",
+                "block_hash_url": "https://blockstream.info/api/block-height/{height}",
+                "block_header_url": "https://blockstream.info/api/block/{block_hash}/header",
                 "value_is_base_units": True,
                 "decimals": 8,
             },
@@ -745,7 +985,12 @@ class CrossChainVerifier:
         return total_fee
 
     def verify_spv_proof(
-        self, coin_type: str, tx_hash: str, merkle_proof: List[str], block_header: Dict
+        self,
+        coin_type: str,
+        tx_hash: str,
+        merkle_proof: List[str],
+        block_header: Dict,
+        tx_index: int = 0,
     ) -> Tuple[bool, str]:
         """
         Verify a transaction using SPV (Simplified Payment Verification)
@@ -760,26 +1005,17 @@ class CrossChainVerifier:
             tuple: (is_valid, message)
         """
         try:
-            # Reconstruct merkle root from proof
-            current_hash = tx_hash
+            reconstructed = self._reconstruct_merkle_root(tx_hash, merkle_proof, tx_index)
+        except ValueError as exc:
+            return False, f"SPV verification error: {exc}"
 
-            for proof_hash in merkle_proof:
-                # Combine hashes (order matters for merkle trees)
-                combined = current_hash + proof_hash
-                current_hash = hashlib.sha256(
-                    hashlib.sha256(combined.encode()).digest()
-                ).hexdigest()
+        merkle_root = (block_header.get("merkle_root") or "").lower()
+        if not merkle_root:
+            return False, "SPV verification error: block header missing merkle_root"
 
-            # Verify against block header merkle root
-            merkle_root = block_header.get("merkle_root", "")
-
-            if current_hash == merkle_root:
-                return True, "SPV proof verified successfully"
-            else:
-                return False, "SPV proof verification failed: merkle root mismatch"
-
-        except Exception as e:
-            return False, f"SPV verification error: {str(e)}"
+        if reconstructed == merkle_root:
+            return True, "SPV proof verified successfully"
+        return False, "SPV proof verification failed: merkle root mismatch"
 
     def verify_transaction_on_chain(
         self,
@@ -885,6 +1121,51 @@ class CrossChainVerifier:
         self._cache_result(cache_key, result)
         return True, result["message"], result["data"]
 
+    def verify_transaction_spv(
+        self,
+        coin_type: str,
+        tx_hash: str,
+    ) -> Tuple[bool, str, Optional[Dict]]:
+        """
+        Fetch merkle proof + block header from external APIs and verify SPV inclusion.
+        """
+        normalized_coin = coin_type.upper()
+        provider = self.oracle_endpoints.get(normalized_coin)
+        if not provider or not provider.get("merkle_url"):
+            return False, f"SPV verification not supported for {coin_type}", None
+
+        try:
+            proof = self._fetch_merkle_proof(provider, tx_hash)
+        except Exception as exc:
+            return False, f"Failed to fetch merkle proof: {exc}", None
+        if not proof or not proof.get("hashes"):
+            return False, "Merkle proof unavailable", None
+
+        try:
+            block_header = self._fetch_block_header(
+                provider,
+                proof.get("block_height"),
+                proof.get("block_hash"),
+            )
+        except Exception as exc:
+            return False, f"Failed to fetch block header: {exc}", None
+
+        ok, message = self.verify_spv_proof(
+            normalized_coin,
+            tx_hash,
+            proof["hashes"],
+            block_header,
+            tx_index=proof.get("tx_index", 0),
+        )
+        if ok:
+            return True, message, {
+                "block_height": block_header.get("block_height"),
+                "block_hash": block_header.get("block_hash"),
+                "merkle_root": block_header.get("merkle_root"),
+                "tx_index": proof.get("tx_index", 0),
+            }
+        return False, message, None
+
     def ingest_headers(self, headers: List[Dict[str, Any]]) -> Tuple[int, List[str]]:
         """
         Ingest validated headers into the SPV header store for confirmation calculation.
@@ -930,6 +1211,60 @@ class CrossChainVerifier:
                 **result,
                 "timestamp": time.time(),
             }
+
+    def _fetch_merkle_proof(
+        self,
+        provider: Dict[str, Any],
+        tx_hash: str,
+    ) -> Optional[Dict[str, Any]]:
+        merkle_url = provider.get("merkle_url")
+        if not merkle_url:
+            return None
+        proof_json = self._http_get_json(
+            merkle_url.format(txid=tx_hash),
+            timeout=provider.get("timeout", self.DEFAULT_TIMEOUT),
+        )
+        merkle_hashes = proof_json.get("merkle") or proof_json.get("hashes")
+        if not isinstance(merkle_hashes, list):
+            return None
+        tx_index = proof_json.get("pos", proof_json.get("position", 0))
+        block_height = proof_json.get("block_height")
+        block_hash = proof_json.get("block_hash")
+        return {
+            "hashes": [str(h).strip() for h in merkle_hashes],
+            "tx_index": int(tx_index or 0),
+            "block_height": block_height,
+            "block_hash": block_hash,
+        }
+
+    def _fetch_block_header(
+        self,
+        provider: Dict[str, Any],
+        block_height: Optional[int],
+        block_hash: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        if block_hash:
+            normalized_hash = str(block_hash).strip()
+        else:
+            if block_height is None:
+                raise ValueError("block_height required to fetch block hash")
+            height_url = provider.get("block_hash_url")
+            if not height_url:
+                raise ValueError("Provider missing block_hash_url")
+            normalized_hash = self._http_get_text(
+                height_url.format(height=block_height),
+                timeout=provider.get("timeout", self.DEFAULT_TIMEOUT),
+            ).strip()
+        header_url = provider.get("block_header_url")
+        if not header_url:
+            raise ValueError("Provider missing block_header_url")
+        header_hex = self._http_get_text(
+            header_url.format(block_hash=normalized_hash),
+            timeout=provider.get("timeout", self.DEFAULT_TIMEOUT),
+        ).strip()
+        header = self._decode_block_header(header_hex, block_height)
+        header["block_hash"] = normalized_hash
+        return header
 
     def _fetch_transaction(
         self, provider: Dict[str, Any], coin_type: str, tx_hash: str
@@ -1047,6 +1382,13 @@ class CrossChainVerifier:
         response.raise_for_status()
         return response.json()
 
+    def _http_get_text(
+        self, url: str, params: Optional[Dict[str, Any]] = None, *, timeout: float = DEFAULT_TIMEOUT
+    ) -> str:
+        response = self.session.get(url, params=params, timeout=timeout)
+        response.raise_for_status()
+        return response.text
+
     @staticmethod
     def _extract_block_height(tx_json: Dict[str, Any]) -> Optional[int]:
         status = tx_json.get("status") or {}
@@ -1072,6 +1414,28 @@ class CrossChainVerifier:
             return int(confirmations)
         except (TypeError, ValueError):
             return None
+
+    @staticmethod
+    def _decode_block_header(header_hex: str, block_height: Optional[int]) -> Dict[str, Any]:
+        header_hex = header_hex.strip()
+        header_bytes = bytes.fromhex(header_hex)
+        if len(header_bytes) < 80:
+            raise ValueError("header too short")
+        version = int.from_bytes(header_bytes[0:4], "little")
+        prev_hash = header_bytes[4:36][::-1].hex()
+        merkle_root = header_bytes[36:68][::-1].hex()
+        timestamp = int.from_bytes(header_bytes[68:72], "little")
+        bits = int.from_bytes(header_bytes[72:76], "little")
+        nonce = int.from_bytes(header_bytes[76:80], "little")
+        return {
+            "version": version,
+            "previous_hash": prev_hash,
+            "merkle_root": merkle_root,
+            "timestamp": timestamp,
+            "bits": bits,
+            "nonce": nonce,
+            "block_height": block_height,
+        }
 
     @staticmethod
     def _extract_tip_height(tip_json: Any) -> Optional[int]:
@@ -1317,9 +1681,15 @@ class SwapRecoveryService:
     High-level recovery orchestrator that surfaces refundable swaps using the planner.
     """
 
-    def __init__(self, state_machine: SwapStateMachine, planner: SwapRefundPlanner):
+    def __init__(
+        self,
+        state_machine: SwapStateMachine,
+        planner: SwapRefundPlanner,
+        claim_service: Optional["SwapClaimRecoveryService"] = None,
+    ):
         self.state_machine = state_machine
         self.planner = planner
+        self.claim_service = claim_service
 
     def find_refundable_swaps(self) -> List[Dict[str, Any]]:
         """Return refundable swaps enriched with confirmations."""
@@ -1355,6 +1725,139 @@ class SwapRecoveryService:
             if ok:
                 transitioned.append(swap_id)
         return transitioned
+
+    def auto_recover_failed_claims(self) -> List[str]:
+        """Attempt automatic claim recovery when a claim previously failed."""
+        if not self.claim_service:
+            return []
+        return self.claim_service.recover_failed_claims()
+
+
+class SwapClaimRecoveryService:
+    """
+    Automatically attempt to recover swaps that failed during claim execution.
+    """
+
+    def __init__(self, state_machine: SwapStateMachine, max_attempts: int = 3, now_fn=time.time):
+        self.state_machine = state_machine
+        self.max_attempts = max_attempts
+        self._now = now_fn
+
+    def recover_failed_claims(self) -> List[str]:
+        """
+        Iterate through failed swaps and attempt to re-run the claim path or fall back to refunds.
+        Returns list of swap_ids that were auto-recovered (claimed or refunded).
+        """
+        recovered: List[str] = []
+        for swap_id, swap in self.state_machine.iter_swaps():
+            state = swap.get("state")
+            if state != SwapState.FAILED:
+                continue
+            payload = dict(swap.get("data", {}))
+            attempts = int(payload.get("auto_recovery_attempts", 0))
+            if attempts >= self.max_attempts:
+                continue
+            payload["auto_recovery_attempts"] = attempts + 1
+            if not self.state_machine.update_swap_data(swap_id, {"auto_recovery_attempts": attempts + 1}):
+                continue
+
+            # Timelock safety - if expired, skip directly to refund
+            if self._timelock_expired(payload):
+                ok, _ = self.state_machine.transition(
+                    swap_id,
+                    SwapState.REFUNDED,
+                    SwapEvent.REFUND,
+                    data={"recovery_reason": "timelock_expired"},
+                )
+                if ok:
+                    recovered.append(swap_id)
+                continue
+
+            secret = payload.get("secret")
+            secret_hash = payload.get("secret_hash")
+            if not secret or not secret_hash:
+                self.state_machine.update_swap_data(
+                    swap_id,
+                    {"last_recovery_error": "missing_secret"},
+                )
+                continue
+
+            htlc = self._create_htlc(payload)
+            if not htlc:
+                self.state_machine.update_swap_data(
+                    swap_id,
+                    {"last_recovery_error": "unsupported_coin"},
+                )
+                continue
+
+            valid, validation_msg = htlc.verify_swap_claim(secret, secret_hash, payload)
+            if not valid:
+                # If timelock expired between earlier check and verification, refund.
+                if "Timelock" in validation_msg:
+                    ok, _ = self.state_machine.transition(
+                        swap_id,
+                        SwapState.REFUNDED,
+                        SwapEvent.REFUND,
+                        data={"recovery_reason": "timelock_expired"},
+                    )
+                    if ok:
+                        recovered.append(swap_id)
+                else:
+                    errors = list(payload.get("recovery_errors", []))
+                    errors.append(validation_msg)
+                    self.state_machine.update_swap_data(
+                        swap_id,
+                        {
+                            "last_recovery_error": validation_msg,
+                            "recovery_errors": errors[-5:],
+                        },
+                    )
+                continue
+
+            success, claim_message, claim_tx = htlc.claim_swap(secret, payload)
+            if success:
+                patch = {
+                    "auto_recovered": True,
+                    "recovery_claim": claim_tx,
+                    "recovery_claim_message": claim_message,
+                    "recovery_claimed_at": self._now(),
+                    "last_recovery_error": None,
+                    "failure_reason": None,
+                }
+                ok, _ = self.state_machine.transition(swap_id, SwapState.CLAIMED, SwapEvent.CLAIM, data=patch)
+                if ok:
+                    recovered.append(swap_id)
+            else:
+                errors = list(payload.get("recovery_errors", []))
+                errors.append(claim_message)
+                self.state_machine.update_swap_data(
+                    swap_id,
+                    {
+                        "last_recovery_error": claim_message,
+                        "recovery_errors": errors[-5:],
+                    },
+                )
+        return recovered
+
+    def _timelock_expired(self, payload: Dict[str, Any]) -> bool:
+        timelock = payload.get("timelock")
+        if timelock is None:
+            return False
+        try:
+            return self._now() >= float(timelock)
+        except (TypeError, ValueError):
+            return False
+
+    @staticmethod
+    def _create_htlc(payload: Dict[str, Any]) -> Optional[AtomicSwapHTLC]:
+        symbol = (payload.get("other_coin") or payload.get("coin") or "").upper()
+        if not symbol:
+            return None
+        try:
+            coin = CoinType[symbol]
+        except KeyError:
+            return None
+        return AtomicSwapHTLC(coin)
 
 
 # Trading pair manager

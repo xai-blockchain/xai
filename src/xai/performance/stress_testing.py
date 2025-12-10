@@ -51,7 +51,10 @@ class StressTestResult:
         }
 
 
-class StressTest:
+from abc import ABC, abstractmethod
+
+
+class StressTest(ABC):
     """Base class for stress tests"""
 
     def __init__(self, name: str):
@@ -69,9 +72,9 @@ class StressTest:
         """Cleanup after test"""
         pass
 
+    @abstractmethod
     def run_operation(self) -> bool:
         """Single test operation - override in subclass"""
-        raise NotImplementedError
 
     def run(self, iterations: int, max_workers: int = 10) -> StressTestResult:
         """

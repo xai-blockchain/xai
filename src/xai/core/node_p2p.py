@@ -16,13 +16,14 @@ import threading
 import time
 from urllib.parse import urlparse
 from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import websockets
 from websockets.exceptions import ConnectionClosed, WebSocketException
 from websockets.server import WebSocketServerProtocol
 import json
 import hashlib
 import logging
-from typing import TYPE_CHECKING, Set, Optional, Dict, Any, Union, Tuple
+from typing import TYPE_CHECKING, Set, Optional, Dict, Any, Union, Tuple, List
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,7 @@ from xai.core.block_header import BlockHeader
 from xai.core.p2p_security import MessageRateLimiter, BandwidthLimiter, HEADER_VERSION, P2PSecurityConfig
 from xai.core.security_validation import SecurityEventRouter
 from xai.core.config import Config
+from xai.core.checkpoint_sync import CheckpointSyncManager
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Blockchain, Transaction, Block
@@ -122,13 +124,28 @@ class P2PNetworkManager:
         self._block_seen_ids: Set[str] = set()
         self._block_seen_queue: deque[Tuple[str, float]] = deque()
         self.idle_timeout_seconds = max(60, int(getattr(Config, "P2P_CONNECTION_IDLE_TIMEOUT_SECONDS", 900)))
+        self.handshake_timeout_seconds = max(1, int(getattr(Config, "P2P_HANDSHAKE_TIMEOUT_SECONDS", 15)))
         self._connection_last_seen: Dict[str, float] = {}
+        self._handshake_received: Dict[str, Optional[float]] = {}
+        self._handshake_deadlines: Dict[str, float] = {}
         self.peer_api_key = peer_api_key
         self._http_timeout = getattr(Config, "P2P_HTTP_TIMEOUT_SECONDS", 2)
+        self.parallel_sync_workers = max(1, int(getattr(Config, "P2P_PARALLEL_SYNC_WORKERS", 4)))
+        self.parallel_chunk_sync_enabled = bool(getattr(Config, "P2P_PARALLEL_SYNC_ENABLED", True))
+        page_limit = max(1, int(getattr(Config, "P2P_PARALLEL_SYNC_PAGE_LIMIT", 200)))
+        chunk_size = max(1, int(getattr(Config, "P2P_PARALLEL_SYNC_CHUNK_SIZE", page_limit)))
+        self.parallel_sync_page_limit = page_limit
+        self.parallel_sync_chunk_size = min(chunk_size, page_limit)
+        self.parallel_sync_retry_limit = max(1, int(getattr(Config, "P2P_PARALLEL_SYNC_RETRY", 2)))
         self._reset_window_seconds = int(getattr(Config, "P2P_RESET_STORM_WINDOW_SECONDS", 300))
         self._reset_threshold = max(1, int(getattr(Config, "P2P_RESET_STORM_THRESHOLD", 5)))
         self._reset_events: Dict[str, deque[float]] = defaultdict(deque)
         self.peer_features: Dict[str, Dict[str, Any]] = {}
+        self.partial_sync_min_delta = max(0, int(getattr(Config, "P2P_PARTIAL_SYNC_MIN_DELTA", 100)))
+        self.partial_sync_enabled = bool(getattr(Config, "P2P_PARTIAL_SYNC_ENABLED", True))
+        self.checkpoint_sync: Optional[CheckpointSyncManager] = (
+            CheckpointSyncManager(self.blockchain, p2p_manager=self) if self.partial_sync_enabled else None
+        )
 
     @staticmethod
     def _normalize_peer_uri(peer_uri: str) -> str:
@@ -357,7 +374,10 @@ class P2PNetworkManager:
         peer_id = self.peer_manager.connect_peer(remote_ip)
         self.connections[peer_id] = websocket
         self.websocket_peer_ids[websocket] = peer_id
-        self._connection_last_seen[peer_id] = time.time()
+        now = time.time()
+        self._connection_last_seen[peer_id] = now
+        self._handshake_received[peer_id] = None
+        self._handshake_deadlines[peer_id] = now + self.handshake_timeout_seconds
         await self._send_handshake(websocket, peer_id)
         logger.info(
             "Peer connected: %s",
@@ -377,12 +397,9 @@ class P2PNetworkManager:
                 extra={"event": "p2p.peer_connection_closed", "peer": peer_id},
             )
         finally:
-            if peer_id in self.connections:
-                conn = self.connections.pop(peer_id, None)
-                if conn:
-                    self.websocket_peer_ids.pop(conn, None)
-                self._connection_last_seen.pop(peer_id, None)
-                self.peer_manager.disconnect_peer(peer_id)
+            if peer_id in self.connections or self._handshake_received.get(peer_id) is not None:
+                conn = self.connections.get(peer_id)
+                self._disconnect_peer(peer_id, conn)
             logger.info(
                 "Peer disconnected: %s",
                 remote_ip,
@@ -452,7 +469,10 @@ class P2PNetworkManager:
                 peer_id = self.peer_manager.connect_peer(websocket.remote_address[0])
                 self.connections[peer_id] = websocket
                 self.websocket_peer_ids[websocket] = peer_id
-                self._connection_last_seen[peer_id] = time.time()
+                now = time.time()
+                self._connection_last_seen[peer_id] = now
+                self._handshake_received[peer_id] = None
+                self._handshake_deadlines[peer_id] = now + self.handshake_timeout_seconds
                 logger.info(
                     "Connected to peer: %s",
                     peer_uri,
@@ -494,6 +514,7 @@ class P2PNetworkManager:
                 extra={"event": "p2p.health_check"}
             )
             await self._disconnect_idle_connections()
+            await self._disconnect_stalled_handshakes()
 
     async def _broadcast_handshake_periodically(self) -> None:
         """Re-announce capabilities/version periodically to connected peers."""
@@ -540,15 +561,94 @@ class P2PNetworkManager:
                     exc,
                     extra={"event": "p2p.idle_disconnect_error", "peer": peer_id},
                 )
-            self.connections.pop(peer_id, None)
-            self.websocket_peer_ids.pop(conn, None)
-            self._connection_last_seen.pop(peer_id, None)
-            self.peer_manager.disconnect_peer(peer_id)
+            self._disconnect_peer(peer_id, conn)
             self._emit_security_event(
                 "p2p.idle_disconnect",
                 severity="INFO",
                 payload={"peer": peer_id, "idle_seconds": int(idle_duration)},
             )
+
+    async def _disconnect_stalled_handshakes(self) -> None:
+        """Drop peers that never complete the version/capabilities handshake."""
+        if self.handshake_timeout_seconds <= 0:
+            return
+        now = time.time()
+        for peer_id, deadline in list(self._handshake_deadlines.items()):
+            if self._handshake_received.get(peer_id) is not None:
+                continue
+            if now < deadline:
+                continue
+            conn = self.connections.get(peer_id)
+            if conn:
+                try:
+                    await conn.close()
+                except Exception as exc:  # pragma: no cover - defensive cleanup
+                    logger.debug(
+                        "Error closing stalled handshake connection for %s: %s",
+                        peer_id[:16],
+                        exc,
+                        extra={"event": "p2p.handshake_timeout_close_failed", "peer": peer_id},
+                    )
+            self._disconnect_peer(peer_id, conn)
+            logger.warning(
+                "Disconnecting peer %s due to handshake timeout (>%ss)",
+                peer_id[:16],
+                self.handshake_timeout_seconds,
+                extra={"event": "p2p.handshake_timeout", "peer": peer_id},
+            )
+            self._emit_security_event(
+                "p2p.handshake_timeout",
+                severity="WARNING",
+                payload={"peer": peer_id},
+            )
+
+    def _attempt_partial_sync(self, *, force: bool = False) -> bool:
+        """Fetch and apply a checkpoint payload before performing full sync."""
+        if not self.partial_sync_enabled or not self.checkpoint_sync:
+            return False
+        try:
+            metadata = self.checkpoint_sync.get_best_checkpoint_metadata()
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.debug(
+                "Partial sync metadata unavailable: %s",
+                exc,
+                extra={"event": "p2p.partial_sync_meta_failed"},
+            )
+            return False
+        if not metadata:
+            return False
+        remote_height = metadata.get("height")
+        if remote_height is None:
+            return False
+        local_height = len(self.blockchain.chain)
+        if not force:
+            delta = remote_height - local_height
+            if delta <= 0:
+                return False
+            if delta < self.partial_sync_min_delta:
+                return False
+        applied = False
+        try:
+            applied = bool(self.checkpoint_sync.fetch_validate_apply())
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning(
+                "Partial checkpoint sync failed: %s",
+                exc,
+                extra={"event": "p2p.partial_sync_failed", "height": remote_height},
+            )
+            return False
+        if applied:
+            logger.info(
+                "Partial checkpoint sync applied (height=%s, source=%s)",
+                remote_height,
+                metadata.get("source", "unknown"),
+                extra={
+                    "event": "p2p.partial_sync_applied",
+                    "height": remote_height,
+                    "source": metadata.get("source", "unknown"),
+                },
+            )
+        return applied
 
     def _disconnect_peer(self, peer_id: str, conn: Optional[Any]) -> None:
         """Centralized cleanup for peer disconnections without duplicating dict removals."""
@@ -557,6 +657,8 @@ class P2PNetworkManager:
         if conn:
             self.websocket_peer_ids.pop(conn, None)
         self._connection_last_seen.pop(peer_id, None)
+        self._handshake_received.pop(peer_id, None)
+        self._handshake_deadlines.pop(peer_id, None)
         try:
             self.peer_manager.disconnect_peer(peer_id)
         except Exception as exc:
@@ -647,12 +749,8 @@ class P2PNetworkManager:
                 extra={"event": "p2p.bandwidth_exceeded_in", "peer": peer_id}
             )
             await websocket.close()
-            if peer_id in self.connections:
-                conn = self.connections.pop(peer_id, None)
-                if conn:
-                    self.websocket_peer_ids.pop(conn, None)
-                self._connection_last_seen.pop(peer_id, None)
-                self.peer_manager.disconnect_peer(peer_id)
+            conn = self.connections.get(peer_id)
+            self._disconnect_peer(peer_id, conn)
             return
 
         if self.rate_limiter.is_rate_limited(peer_id):
@@ -713,8 +811,37 @@ class P2PNetworkManager:
             message_type = data.get("type")
             payload = data.get("payload")
 
+            handshake_ts = self._handshake_received.get(peer_id)
+            if (
+                websocket is not None
+                and message_type != "handshake"
+                and self.handshake_timeout_seconds > 0
+                and handshake_ts is None
+            ):
+                self._log_security_event(peer_id, "handshake_missing")
+                self._emit_security_event(
+                    "p2p.handshake_missing",
+                    severity="WARNING",
+                    payload={"peer": peer_id},
+                )
+                if websocket:
+                    try:
+                        await websocket.close()
+                    except Exception as exc:  # pragma: no cover - defensive
+                        logger.debug(
+                            "Error closing peer %s after missing handshake: %s",
+                            peer_id[:16],
+                            exc,
+                            extra={"event": "p2p.handshake_close_failed", "peer": peer_id},
+                        )
+                self._disconnect_peer(peer_id, websocket)
+                self.peer_manager.reputation.record_invalid_transaction(peer_id)
+                return
+
             if message_type == "handshake":
                 self.peer_features[peer_id] = payload or {}
+                self._handshake_received[peer_id] = time.time()
+                self._handshake_deadlines.pop(peer_id, None)
                 return
             if message_type == "transaction":
                 dedup_id = self._derive_payload_fingerprint(payload, ("txid", "hash", "id"))
@@ -1286,83 +1413,475 @@ class P2PNetworkManager:
                     continue
                 self._dispatch_async(self._quic_send_payload(host, payload))
 
+    def _fetch_peer_chain_summary(self, peer_uri: str) -> Optional[Dict[str, Any]]:
+        """Return quick height summary for a peer without downloading full chain."""
+        endpoint = f"{peer_uri.rstrip('/')}/blocks"
+        try:
+            response = requests.get(
+                endpoint,
+                params={"limit": 1, "offset": 0},
+                timeout=self._http_timeout,
+            )
+        except requests.RequestException as exc:
+            logger.debug(
+                "Failed to contact peer %s for summary: %s",
+                peer_uri,
+                exc,
+                extra={"event": "p2p.parallel_sync_summary_failed", "peer": peer_uri},
+            )
+            return None
+
+        if response.status_code != 200:
+            return None
+
+        try:
+            summary = response.json()
+        except (ValueError, json.JSONDecodeError) as exc:
+            logger.warning(
+                "Invalid summary payload from %s: %s",
+                peer_uri,
+                exc,
+                extra={"event": "p2p.parallel_sync_summary_invalid", "peer": peer_uri},
+            )
+            return None
+
+        total = summary.get("total")
+        try:
+            height = int(total)
+        except (TypeError, ValueError):
+            return None
+
+        latest_block = None
+        blocks_snapshot = summary.get("blocks")
+        if isinstance(blocks_snapshot, list) and blocks_snapshot:
+            latest_block = blocks_snapshot[0]
+
+        return {
+            "peer": peer_uri,
+            "total": max(0, height),
+            "latest_block": latest_block,
+        }
+
+    def _collect_peer_chain_summaries(self, peers: List[str]) -> List[Dict[str, Any]]:
+        """Collect summaries for every peer we are connected to."""
+        summaries: List[Dict[str, Any]] = []
+        for peer_uri in peers:
+            summary = self._fetch_peer_chain_summary(peer_uri)
+            if summary:
+                summaries.append(summary)
+        return summaries
+
+    def _should_parallel_sync(self, summaries: List[Dict[str, Any]], local_height: int) -> bool:
+        """Decide if we should attempt chunked parallel sync based on peer heights."""
+        if not self.parallel_chunk_sync_enabled or not summaries:
+            return False
+        for summary in summaries:
+            remote_total = summary.get("total", 0)
+            if remote_total > self.parallel_sync_page_limit:
+                return True
+            if remote_total - local_height > self.parallel_sync_chunk_size:
+                return True
+        return False
+
+    def _parallel_chunk_sync(self, peer_summaries: List[Dict[str, Any]], local_height: int) -> bool:
+        """Download blocks from multiple peers concurrently in deterministic chunks."""
+        if not peer_summaries:
+            return False
+
+        target_height = max(summary.get("total", 0) for summary in peer_summaries)
+        if target_height <= local_height:
+            return False
+
+        chunk_ranges: List[Tuple[int, int]] = []
+        cursor = local_height
+        chunk_size = self.parallel_sync_chunk_size or 1
+        while cursor < target_height:
+            chunk_end = min(cursor + chunk_size, target_height)
+            chunk_ranges.append((cursor, chunk_end))
+            cursor = chunk_end
+
+        if not chunk_ranges:
+            return False
+
+        worker_count = min(len(chunk_ranges), self.parallel_sync_workers)
+        chunk_results: Dict[Tuple[int, int], List[Dict[str, Any]]] = {}
+
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = {
+                executor.submit(
+                    self._download_chunk_with_failover,
+                    idx,
+                    chunk_range,
+                    peer_summaries,
+                ): chunk_range
+                for idx, chunk_range in enumerate(chunk_ranges)
+            }
+            for future in as_completed(futures):
+                chunk_range = futures[future]
+                try:
+                    chunk_blocks = future.result()
+                except Exception as exc:
+                    logger.warning(
+                        "Parallel chunk %s failed: %s",
+                        chunk_range,
+                        exc,
+                        extra={"event": "p2p.parallel_sync_chunk_failed", "chunk": chunk_range},
+                    )
+                    return False
+                if not chunk_blocks:
+                    logger.debug(
+                        "Parallel chunk missing blocks",
+                        extra={"event": "p2p.parallel_sync_chunk_missing", "chunk": chunk_range},
+                    )
+                    return False
+                chunk_results[chunk_range] = chunk_blocks
+
+        ordered_ranges = sorted(chunk_results.keys(), key=lambda rng: rng[0])
+        deserialized_blocks: List[Any] = []
+        expected_index = local_height
+        for chunk_range in ordered_ranges:
+            chunk_blocks = chunk_results[chunk_range]
+            chunk_blocks.sort(key=lambda payload: self._extract_block_index(payload) or -1)
+            for block_payload in chunk_blocks:
+                block_index = self._extract_block_index(block_payload)
+                if block_index is None:
+                    logger.debug(
+                        "Chunk block missing index, rejecting parallel sync",
+                        extra={"event": "p2p.parallel_sync_chunk_invalid"},
+                    )
+                    return False
+                if block_index < expected_index:
+                    continue
+                if block_index != expected_index:
+                    logger.warning(
+                        "Chunk sequence gap detected during parallel sync",
+                        extra={
+                            "event": "p2p.parallel_sync_gap",
+                            "expected_index": expected_index,
+                            "received_index": block_index,
+                        },
+                    )
+                    return False
+                block_obj = self._deserialize_block_payload(block_payload)
+                if block_obj is None:
+                    logger.debug(
+                        "Failed to deserialize chunk block %s",
+                        block_index,
+                        extra={"event": "p2p.parallel_sync_deserialize_failed"},
+                    )
+                    return False
+                deserialized_blocks.append(block_obj)
+                expected_index += 1
+
+        for block in deserialized_blocks:
+            if not self.blockchain.add_block(block):
+                logger.warning(
+                    "Parallel sync rejected block, aborting",
+                    extra={
+                        "event": "p2p.parallel_sync_block_rejected",
+                        "block_index": getattr(getattr(block, "header", None), "index", None),
+                    },
+                )
+                return False
+
+        return True
+
+    def _download_chunk_with_failover(
+        self,
+        chunk_number: int,
+        chunk_range: Tuple[int, int],
+        peer_summaries: List[Dict[str, Any]],
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Download a specific chunk, rotating peers on failure."""
+        if chunk_range[0] >= chunk_range[1]:
+            return None
+        if not peer_summaries:
+            return None
+        rotated = peer_summaries[chunk_number % len(peer_summaries) :] + peer_summaries[: chunk_number % len(peer_summaries)]
+        for attempt in range(self.parallel_sync_retry_limit):
+            ordering = rotated[attempt % len(rotated) :] + rotated[: attempt % len(rotated)]
+            for summary in ordering:
+                peer_total = summary.get("total", 0)
+                if peer_total < chunk_range[1]:
+                    continue
+                chunk = self._download_block_chunk(
+                    summary["peer"],
+                    chunk_range[0],
+                    chunk_range[1],
+                    peer_total,
+                )
+                if chunk:
+                    return chunk
+        return None
+
+    def _download_block_chunk(
+        self,
+        peer_uri: str,
+        start_height: int,
+        end_height: int,
+        remote_total: int,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Fetch a contiguous range of blocks from a peer."""
+        if start_height >= end_height:
+            return None
+        end_exclusive = min(end_height, remote_total)
+        if start_height >= end_exclusive:
+            return None
+        limit = min(self.parallel_sync_page_limit, end_exclusive - start_height)
+        offset = max(remote_total - end_exclusive, 0)
+        endpoint = f"{peer_uri.rstrip('/')}/blocks"
+        try:
+            response = requests.get(
+                endpoint,
+                params={"limit": limit, "offset": offset},
+                timeout=self._http_timeout,
+            )
+        except requests.RequestException as exc:
+            logger.debug(
+                "Chunk download error from %s: %s",
+                peer_uri,
+                exc,
+                extra={"event": "p2p.parallel_sync_chunk_download_failed", "peer": peer_uri},
+            )
+            return None
+        if response.status_code != 200:
+            return None
+        try:
+            payload = response.json()
+        except (ValueError, json.JSONDecodeError) as exc:
+            logger.warning(
+                "Chunk payload JSON error from %s: %s",
+                peer_uri,
+                exc,
+                extra={"event": "p2p.parallel_sync_chunk_json_error", "peer": peer_uri},
+            )
+            return None
+        blocks = payload.get("blocks")
+        if not isinstance(blocks, list):
+            return None
+        filtered: List[Dict[str, Any]] = []
+        for entry in blocks:
+            index = self._extract_block_index(entry)
+            if index is None:
+                continue
+            if index < start_height or index >= end_exclusive:
+                continue
+            filtered.append(entry)
+        filtered.sort(key=lambda payload: self._extract_block_index(payload) or -1)
+        expected_count = end_exclusive - start_height
+        if len(filtered) != expected_count:
+            logger.debug(
+                "Chunk download from %s incomplete (expected %d, got %d)",
+                peer_uri,
+                expected_count,
+                len(filtered),
+                extra={"event": "p2p.parallel_sync_chunk_incomplete", "peer": peer_uri},
+            )
+            return None
+        return filtered
+
+    @staticmethod
+    def _extract_block_index(block_payload: Any) -> Optional[int]:
+        """Return block index from a serialized block payload."""
+        if not isinstance(block_payload, dict):
+            return None
+        header = block_payload.get("header")
+        if isinstance(header, dict):
+            try:
+                return int(header.get("index"))
+            except (TypeError, ValueError):
+                return None
+        try:
+            return int(block_payload.get("index"))
+        except (TypeError, ValueError):
+            return None
+
+    def _deserialize_block_payload(self, block_payload: Dict[str, Any]) -> Optional[Any]:
+        """Deserialize a block payload using blockchain helper."""
+        deserializer = getattr(self.blockchain, "deserialize_block", None)
+        if not callable(deserializer):
+            try:
+                from xai.core.blockchain import Blockchain as BlockchainClass
+
+                deserializer = BlockchainClass.deserialize_block
+            except ImportError:
+                deserializer = None
+        if not callable(deserializer):
+            return None
+        try:
+            return deserializer(block_payload)
+        except Exception as exc:
+            logger.debug(
+                "Block deserialization failed: %s",
+                exc,
+                extra={"event": "p2p.parallel_sync_deserialize_exception"},
+            )
+            return None
+
     def _http_sync(self) -> bool:
         """HTTP-based synchronization for manually registered peers."""
-        for peer_uri in self._http_peers_snapshot():
+        peers = self._http_peers_snapshot()
+        if not peers:
+            return False
+
+        summaries = self._collect_peer_chain_summaries(peers)
+        if not summaries:
+            return False
+
+        local_height = len(getattr(self.blockchain, "chain", []))
+        ahead_summaries = [summary for summary in summaries if summary.get("total", 0) > local_height]
+        if not ahead_summaries:
+            return False
+
+        sequential_candidates = list(ahead_summaries)
+        if self._should_parallel_sync(ahead_summaries, local_height):
             try:
-                base_endpoint = f"{peer_uri.rstrip('/')}/blocks"
-                response = requests.get(base_endpoint, timeout=self._http_timeout)
-                if response.status_code != 200:
-                    continue
-                data = response.json()
-                remote_blocks = data.get("blocks") or []
-                remote_total = data.get("total", len(remote_blocks))
-                if remote_total > len(self.blockchain.chain):
-                    # Fetch full chain snapshot if remote height is greater
-                    response_full = requests.get(
-                        base_endpoint,
-                        params={"limit": remote_total, "offset": 0},
-                        timeout=self._http_timeout,
+                if self._parallel_chunk_sync(ahead_summaries, local_height):
+                    return True
+            except Exception as exc:
+                logger.warning(
+                    "Parallel sync encountered error: %s; falling back to sequential sync",
+                    exc,
+                    extra={"event": "p2p.parallel_sync_unhandled"},
+                )
+            sequential_candidates = [summary for summary in ahead_summaries if summary.get("total", 0) <= self.parallel_sync_page_limit]
+            if not sequential_candidates:
+                return False
+
+        worker_count = min(len(sequential_candidates), self.parallel_sync_workers)
+        if worker_count <= 1:
+            for summary in sequential_candidates:
+                peer_uri = summary["peer"]
+                remote_blocks = self._download_remote_blocks(peer_uri, summary)
+                if remote_blocks and self._apply_remote_chain(peer_uri, remote_blocks):
+                    return True
+            return False
+
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = {
+                executor.submit(self._download_remote_blocks, summary["peer"], summary): summary["peer"]
+                for summary in sequential_candidates
+            }
+            for future in as_completed(futures):
+                peer_uri = futures[future]
+                try:
+                    remote_blocks = future.result()
+                except Exception as exc:
+                    logger.debug(
+                        "Parallel sync failed for %s: %s",
+                        peer_uri,
+                        exc,
+                        extra={"event": "p2p.parallel_sync_download_failed"},
                     )
-                    if response_full.status_code != 200:
-                        continue
-                    remote_blocks = response_full.json().get("blocks") or []
-                    if not isinstance(remote_blocks, list):
-                        continue
-                    new_chain_headers: list[BlockHeader] = []
-                    valid_chain = True
-                    for block_data in remote_blocks:
-                        header_dict = None
-                        txs = []
-                        if isinstance(block_data, dict):
-                            header_dict = block_data.get("header") or block_data
-                            txs = block_data.get("transactions", [])
-                        if not header_dict:
-                            valid_chain = False
-                            break
-                        if txs is None:
-                            txs = []
-                        if not isinstance(txs, list):
-                            valid_chain = False
-                            break
-                        try:
-                            normalized_header = self._normalize_remote_header(header_dict)
-                            header = BlockHeader(
-                                index=normalized_header["index"],
-                                previous_hash=normalized_header["previous_hash"],
-                                timestamp=normalized_header["timestamp"],
-                                merkle_root=normalized_header["merkle_root"],
-                                nonce=normalized_header["nonce"],
-                                difficulty=normalized_header["difficulty"],
-                                miner_pubkey=normalized_header.get("miner_pubkey"),
-                                signature=normalized_header.get("signature"),
-                                version=normalized_header.get("version"),
-                            )
-                            if "hash" in normalized_header:
-                                header.hash = normalized_header["hash"]
-                            new_chain_headers.append(header)
-                        except (KeyError, TypeError, ValueError) as e:
-                            logger.debug(f"Invalid block header in chain from {peer_uri}: {e}")
-                            valid_chain = False
-                            break
-                    if valid_chain and self.blockchain.replace_chain(new_chain_headers):
+                    continue
+
+                if not remote_blocks:
+                    continue
+
+                if self._apply_remote_chain(peer_uri, remote_blocks):
+                    return True
+        return False
+
+    def _download_remote_blocks(
+        self,
+        peer_uri: str,
+        summary: Optional[Dict[str, Any]] = None,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Download remote blocks snapshot from peer, returning None if not ahead."""
+        base_endpoint = f"{peer_uri.rstrip('/')}/blocks"
+        if summary is None:
+            summary = self._fetch_peer_chain_summary(peer_uri)
+            if summary is None:
+                return None
+        try:
+            remote_total = int(summary.get("total", 0))
+        except (TypeError, ValueError):
+            return None
+        if remote_total > self.parallel_sync_page_limit:
+            return None
+        local_height = len(getattr(self.blockchain, "chain", []))
+        if remote_total <= local_height:
+            return None
+
+        try:
+            response_full = requests.get(
+                base_endpoint,
+                params={"limit": remote_total, "offset": 0},
+                timeout=self._http_timeout,
+            )
+        except requests.RequestException as exc:
+            logger.debug(
+                "Failed to fetch full chain from %s: %s",
+                peer_uri,
+                exc,
+                extra={"event": "p2p.parallel_sync_full_fetch_failed"},
+            )
+            return None
+
+        if response_full.status_code != 200:
+            return None
+
+        try:
+            remote_blocks = response_full.json().get("blocks") or []
+        except (ValueError, json.JSONDecodeError) as exc:
+            logger.warning(f"Invalid full chain payload from peer {peer_uri}: {exc}")
+            return None
+
+        if not isinstance(remote_blocks, list):
+            return None
+        return remote_blocks
+
+    def _apply_remote_chain(self, peer_uri: str, remote_blocks: List[Dict[str, Any]]) -> bool:
+        """Normalize remote chain and attempt to replace local state."""
+        new_chain_headers: List[BlockHeader] = []
+        valid_chain = True
+        for block_data in remote_blocks:
+            header_dict: Optional[Dict[str, Any]] = None
+            txs = []
+            if isinstance(block_data, dict):
+                header_dict = block_data.get("header") or block_data
+                txs = block_data.get("transactions", [])
+            if not header_dict:
+                valid_chain = False
+                break
+            if txs is None:
+                txs = []
+            if not isinstance(txs, list):
+                valid_chain = False
+                break
+            try:
+                normalized_header = self._normalize_remote_header(header_dict)
+                header = BlockHeader(
+                    index=normalized_header["index"],
+                    previous_hash=normalized_header["previous_hash"],
+                    timestamp=normalized_header["timestamp"],
+                    merkle_root=normalized_header["merkle_root"],
+                    nonce=normalized_header["nonce"],
+                    difficulty=normalized_header["difficulty"],
+                    miner_pubkey=normalized_header.get("miner_pubkey"),
+                    signature=normalized_header.get("signature"),
+                    version=normalized_header.get("version"),
+                )
+                if "hash" in normalized_header:
+                    header.hash = normalized_header["hash"]
+                new_chain_headers.append(header)
+            except (KeyError, TypeError, ValueError) as exc:
+                logger.debug(f"Invalid block header in chain from {peer_uri}: {exc}")
+                valid_chain = False
+                break
+
+        if valid_chain and new_chain_headers:
+            if self.blockchain.replace_chain(new_chain_headers):
+                return True
+        else:
+            deserializer = getattr(self.blockchain, "deserialize_chain", None)
+            if callable(deserializer):
+                try:
+                    deserialized = deserializer(remote_blocks)
+                    if deserialized and self.blockchain.replace_chain(deserialized):
                         return True
-                    if not valid_chain:
-                        deserializer = getattr(self.blockchain, "deserialize_chain", None)
-                        if callable(deserializer):
-                            try:
-                                deserialized = deserializer(remote_blocks)
-                                if deserialized and self.blockchain.replace_chain(deserialized):
-                                    return True
-                            except Exception as exc:
-                                logger.debug(f"deserialize_chain failed for peer {peer_uri}: {exc}")
-            except Exception as e:
-                logger.debug(f"Failed to sync with peer {peer_uri}: {e}")
-                continue
-            except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
-                # Invalid response format from peer - try next peer
-                logger.warning(f"Invalid chain data from peer {peer_uri}: {e}")
-                continue
+                except Exception as exc:
+                    logger.debug(f"deserialize_chain failed for peer {peer_uri}: {exc}")
         return False
 
     async def _ws_sync(self) -> bool:
@@ -1389,13 +1908,15 @@ class P2PNetworkManager:
             return True
         return False
 
-    def sync_with_network(self) -> bool:
-        """Synchronize blockchain with peers (HTTP first, then WebSocket)."""
+    def sync_with_network(self, force_partial: bool = False) -> bool:
+        """Synchronize blockchain with peers (checkpoint/HTTP/WebSocket)."""
+        partial_applied = self._attempt_partial_sync(force=force_partial)
         if self._http_sync():
             return True
         try:
-            return asyncio.run(self._ws_sync())
+            ws_synced = asyncio.run(self._ws_sync())
         except RuntimeError:
             # Already inside an event loop; schedule and return False to avoid blocking
             self._dispatch_async(self._ws_sync())
-            return False
+            ws_synced = False
+        return partial_applied or ws_synced

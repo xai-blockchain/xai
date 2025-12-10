@@ -8,6 +8,7 @@ error routing, and logging mechanisms.
 import pytest
 import time
 import logging
+from typing import Any, Optional, Tuple
 from unittest.mock import Mock, MagicMock, patch
 from xai.core.error_handlers import (
     CircuitState,
@@ -409,25 +410,26 @@ class TestRetryStrategy:
 class TestErrorHandler:
     """Test ErrorHandler base class"""
 
+    class _DummyHandler(ErrorHandler):
+        """Minimal concrete handler for exercising base behavior."""
+
+        def can_handle(self, error: Exception, context: str) -> bool:
+            return False
+
+        def handle(self, error: Exception, context: str, blockchain: Any) -> Tuple[bool, Optional[str]]:
+            return False, "unhandled"
+
     def test_cannot_instantiate_directly(self):
-        """Test ErrorHandler is abstract"""
-        handler = ErrorHandler("test_handler")
-        assert handler.name == "test_handler"
+        """Test ErrorHandler enforces abstract contract."""
+        with pytest.raises(TypeError):
+            ErrorHandler("test_handler")
+
+    def test_subclass_inherits_base_configuration(self):
+        """Concrete subclasses receive base initialization."""
+        handler = self._DummyHandler("dummy")
+        assert handler.name == "dummy"
         assert handler.handled_count == 0
-
-    def test_can_handle_not_implemented(self):
-        """Test can_handle raises NotImplementedError"""
-        handler = ErrorHandler("test")
-
-        with pytest.raises(NotImplementedError):
-            handler.can_handle(Exception("test"), "context")
-
-    def test_handle_not_implemented(self):
-        """Test handle raises NotImplementedError"""
-        handler = ErrorHandler("test")
-
-        with pytest.raises(NotImplementedError):
-            handler.handle(Exception("test"), "context", None)
+        assert handler.logger.name == "handler.dummy"
 
 
 class TestNetworkErrorHandler:

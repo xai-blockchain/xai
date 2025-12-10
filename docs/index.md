@@ -26,6 +26,7 @@ Guides for deploying and operating the blockchain network.
 - [Local Setup](deployment/local-setup.md) - Setting up a local development environment
 - [Testnet Deployment](deployment/testnet.md) - Deploying to testnet
 - [Production Deployment](deployment/production.md) - Production deployment guide
+- [Partial Sync & Checkpoints](deployment/partial-sync.md) - Configuring checkpoint-based bootstrap
 - [Node Configuration](deployment/configuration.md) - Node configuration options
 - [Monitoring & Logging](deployment/monitoring.md) - Operational monitoring
 

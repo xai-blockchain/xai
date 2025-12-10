@@ -9,6 +9,7 @@ import logging
 import os
 import threading
 import time
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -35,12 +36,12 @@ class DepositEvent:
         return self.currency.upper()
 
 
-class BaseDepositSource:
+class BaseDepositSource(ABC):
     """Interface for deposit sources."""
 
+    @abstractmethod
     def poll(self) -> List[DepositEvent]:
         """Return a list of new or updated deposit events."""
-        raise NotImplementedError
 
 
 class FileDepositSource(BaseDepositSource):

@@ -1,0 +1,7 @@
+{
+  "utxo_set.json": "29323fafd2b59efc91455a5fcf7573dc2370a593b4c7d8ecfc0cfef0dbc6dcd3",
+  "pending_transactions.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "contracts_state.json": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "contract_receipts.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "blocks/blocks_0.json": "1f9e1064449e75672295ed532d94431b5b4b84abb26f10453ef182162ec0f38a"
+}

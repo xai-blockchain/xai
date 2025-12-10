@@ -15,8 +15,11 @@ import pytest
 import json
 import time
 import os
+from types import SimpleNamespace
 from unittest.mock import Mock, MagicMock, patch, mock_open
 from flask import Flask
+
+from xai.core.config import Config
 
 
 class TestNodeAPISendTransactionErrorPaths:
@@ -50,8 +53,11 @@ class TestNodeAPISendTransactionErrorPaths:
             "sender": "addr1",
             "recipient": "addr2",
             "amount": 10.0,
+            "fee": 0.01,
             "public_key": "pubkey123",
-            "signature": "sig123"
+            "nonce": 1,
+            "timestamp": time.time(),
+            "signature": "sig123",
         }
 
         response = client.post('/send',
@@ -60,6 +66,70 @@ class TestNodeAPISendTransactionErrorPaths:
         assert response.status_code == 500
         data = response.get_json()
         assert 'error' in data
+
+
+class TestRequestIDMiddleware:
+    """Ensure correlation IDs are generated and honored."""
+
+    @pytest.fixture
+    def client(self, tmp_path):
+        node = Mock()
+        node.app = Flask(__name__)
+        node.blockchain = Mock()
+        node.blockchain.get_stats.return_value = {
+            "chain_height": 0,
+            "difficulty": 1,
+            "total_circulating_supply": 0,
+            "latest_block_hash": "0x0",
+            "pending_transactions_count": 0,
+            "orphan_blocks_count": 0,
+            "orphan_transactions_count": 0,
+        }
+        node.blockchain.storage = SimpleNamespace(data_dir=str(tmp_path))
+        from xai.core.node_api import NodeAPIRoutes
+
+        routes = NodeAPIRoutes(node)
+        routes.setup_routes()
+        node.app.config["TESTING"] = True
+        return node.app.test_client()
+
+    def test_response_contains_generated_request_id(self, client):
+        response = client.get("/health")
+        assert response.status_code in (200, 503)
+        header_value = response.headers.get("X-Request-ID")
+        assert header_value
+
+    def test_request_id_header_is_preserved(self, client):
+        req_id = "abc12345"
+        response = client.get("/health", headers={"X-Request-ID": req_id})
+        assert response.headers.get("X-Request-ID") == req_id
+
+
+class TestPayloadSizeLimits:
+    """Ensure oversized payloads are rejected before reaching route logic."""
+
+    @pytest.fixture
+    def client(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(Config, "API_MAX_JSON_BYTES", 32, raising=False)
+        monkeypatch.setattr(Config, "API_KEY_STORE_PATH", str(tmp_path / "api_keys.json"), raising=False)
+        node = Mock()
+        node.app = Flask(__name__)
+        node.blockchain = Mock()
+        from xai.core.node_api import NodeAPIRoutes
+
+        routes = NodeAPIRoutes(node)
+        routes.setup_routes()
+        node.app.config["TESTING"] = True
+        return node.app.test_client()
+
+    def test_large_payload_returns_413(self, client):
+        payload = "x" * 128
+        response = client.post("/send", data=payload, content_type="application/json")
+        assert response.status_code == 413
+        data = response.get_json()
+        assert data["code"] == "payload_too_large"
+        assert data["success"] is False
+        assert response.headers.get("X-Request-ID")
 
 
 class TestNodeAPIRecoveryErrorHandling:
@@ -89,7 +159,8 @@ class TestNodeAPIRecoveryErrorHandling:
         data = {
             "owner_address": "owner1",
             "guardians": ["g1", "g2"],
-            "threshold": 5
+            "threshold": 5,
+            "signature": "sig-owner",
         }
         response = client.post('/recovery/setup',
                               data=json.dumps(data),
@@ -105,14 +176,15 @@ class TestNodeAPIRecoveryErrorHandling:
         data = {
             "owner_address": "owner1",
             "guardians": ["g1", "g2"],
-            "threshold": 2
+            "threshold": 2,
+            "signature": "sig-owner",
         }
         response = client.post('/recovery/setup',
                               data=json.dumps(data),
                               content_type='application/json')
         assert response.status_code == 500
         result = response.get_json()
-        assert 'Server error' in result['error']
+        assert 'internal' in result['error'].lower()
 
     def test_request_recovery_value_error(self, client, mock_node):
         """Test POST /recovery/request - ValueError."""
@@ -121,7 +193,8 @@ class TestNodeAPIRecoveryErrorHandling:
         data = {
             "owner_address": "owner1",
             "new_address": "new1",
-            "guardian_address": "g1"
+            "guardian_address": "g1",
+            "signature": "sig-guardian",
         }
         response = client.post('/recovery/request',
                               data=json.dumps(data),
@@ -135,7 +208,8 @@ class TestNodeAPIRecoveryErrorHandling:
         data = {
             "owner_address": "owner1",
             "new_address": "new1",
-            "guardian_address": "g1"
+            "guardian_address": "g1",
+            "signature": "sig-guardian",
         }
         response = client.post('/recovery/request',
                               data=json.dumps(data),
@@ -148,7 +222,8 @@ class TestNodeAPIRecoveryErrorHandling:
 
         data = {
             "request_id": "req123",
-            "guardian_address": "g1"
+            "guardian_address": "g1",
+            "signature": "sig-guardian",
         }
         response = client.post('/recovery/vote',
                               data=json.dumps(data),
@@ -161,7 +236,8 @@ class TestNodeAPIRecoveryErrorHandling:
 
         data = {
             "request_id": "req123",
-            "guardian_address": "g1"
+            "guardian_address": "g1",
+            "signature": "sig-guardian",
         }
         response = client.post('/recovery/vote',
                               data=json.dumps(data),
@@ -181,7 +257,8 @@ class TestNodeAPIRecoveryErrorHandling:
 
         data = {
             "request_id": "req123",
-            "owner_address": "owner1"
+            "owner_address": "owner1",
+            "signature": "sig-owner",
         }
         response = client.post('/recovery/cancel',
                               data=json.dumps(data),
@@ -194,7 +271,8 @@ class TestNodeAPIRecoveryErrorHandling:
 
         data = {
             "request_id": "req123",
-            "owner_address": "owner1"
+            "owner_address": "owner1",
+            "signature": "sig-owner",
         }
         response = client.post('/recovery/cancel',
                               data=json.dumps(data),
@@ -208,13 +286,13 @@ class TestNodeAPIRecoveryErrorHandling:
                               content_type='application/json')
         assert response.status_code == 400
         data = response.get_json()
-        assert 'Missing request_id' in data['error']
+        assert 'Validation error' in data['error']
 
     def test_execute_recovery_value_error(self, client, mock_node):
         """Test POST /recovery/execute - ValueError."""
         mock_node.recovery_manager.execute_recovery.side_effect = ValueError("Not ready")
 
-        data = {"request_id": "req123"}
+        data = {"request_id": "req123", "executor_address": "exec1"}
         response = client.post('/recovery/execute',
                               data=json.dumps(data),
                               content_type='application/json')
@@ -224,7 +302,7 @@ class TestNodeAPIRecoveryErrorHandling:
         """Test POST /recovery/execute - exception."""
         mock_node.recovery_manager.execute_recovery.side_effect = Exception("Error")
 
-        data = {"request_id": "req123"}
+        data = {"request_id": "req123", "executor_address": "exec1"}
         response = client.post('/recovery/execute',
                               data=json.dumps(data),
                               content_type='application/json')
@@ -317,7 +395,7 @@ class TestNodeAPIGamificationErrorHandling:
             "creator": "creator1",
             "amount": 100.0,
             "puzzle_type": "riddle",
-            "puzzle_data": "What is..."
+            "puzzle_data": {"question": "What is..."},
         }
         response = client.post('/treasure/create',
                               data=json.dumps(data),
@@ -394,7 +472,7 @@ class TestNodeAPIMiningBonusErrorHandling:
                               content_type='application/json')
         assert response.status_code == 400
         data = response.get_json()
-        assert 'Missing address field' in data['error']
+        assert 'Validation error' in data['error']
 
     def test_register_miner_exception(self, client, mock_node):
         """Test POST /mining/register - exception."""
@@ -494,6 +572,8 @@ class TestNodeAPIExchangeErrorHandling:
         node.app = Flask(__name__)
         node.exchange_wallet_manager = Mock()
         node._match_orders = Mock(return_value=False)
+        node.blockchain = Mock()
+        node.blockchain.storage = SimpleNamespace(data_dir=os.getcwd())
         return node
 
     @pytest.fixture
@@ -536,7 +616,8 @@ class TestNodeAPIExchangeErrorHandling:
             "address": "user1",
             "order_type": "invalid",
             "price": 0.05,
-            "amount": 100
+            "amount": 100,
+            "pair": "AXN/USD",
         }
         response = client.post('/exchange/place-order',
                               data=json.dumps(data),
@@ -621,7 +702,8 @@ class TestNodeAPIExchangeErrorHandling:
             "address": "user1",
             "order_type": "buy",
             "price": 0.05,
-            "amount": 100
+            "amount": 100,
+            "pair": "AXN/USD",
         }
         response = client.post('/exchange/place-order',
                               data=json.dumps(data),
@@ -635,7 +717,7 @@ class TestNodeAPIExchangeErrorHandling:
                               content_type='application/json')
         assert response.status_code == 400
         data = response.get_json()
-        assert 'Missing order_id' in data['error']
+        assert 'Validation error' in data['error']
 
     @patch('xai.core.node_api.os.path.exists')
     def test_cancel_order_not_found_file(self, mock_exists, client):
@@ -717,7 +799,8 @@ class TestNodeAPIExchangeErrorHandling:
         mock_node.exchange_wallet_manager.deposit.side_effect = Exception("Error")
 
         data = {
-            "address": "user1",
+            "from_address": "wallet1",
+            "to_address": "exchange1",
             "currency": "AXN",
             "amount": 100
         }
@@ -738,7 +821,8 @@ class TestNodeAPIExchangeErrorHandling:
         mock_node.exchange_wallet_manager.withdraw.side_effect = Exception("Error")
 
         data = {
-            "address": "user1",
+            "from_address": "exchange1",
+            "to_address": "wallet1",
             "currency": "AXN",
             "amount": 50,
             "destination": "dest1"
@@ -819,9 +903,13 @@ class TestNodeAPIPaymentErrorHandling:
         mock_node.payment_processor.calculate_purchase.return_value = {"success": False, "error": "Amount too low"}
 
         data = {
-            "address": "user1",
+            "from_address": "user1",
+            "to_address": "exchange1",
             "usd_amount": 1,
-            "email": "user@blockchain.com"
+            "email": "user@blockchain.com",
+            "card_id": "card1",
+            "user_id": "cust1",
+            "payment_token": "tok_123",
         }
         response = client.post('/exchange/buy-with-card',
                               data=json.dumps(data),
@@ -834,9 +922,13 @@ class TestNodeAPIPaymentErrorHandling:
         mock_node.payment_processor.process_card_payment.return_value = {"success": False, "error": "Card declined"}
 
         data = {
-            "address": "user1",
+            "from_address": "user1",
+            "to_address": "exchange1",
             "usd_amount": 100,
-            "email": "user@blockchain.com"
+            "email": "user@blockchain.com",
+            "card_id": "card1",
+            "user_id": "cust1",
+            "payment_token": "tok_123",
         }
         response = client.post('/exchange/buy-with-card',
                               data=json.dumps(data),
@@ -848,9 +940,13 @@ class TestNodeAPIPaymentErrorHandling:
         mock_node.payment_processor.calculate_purchase.side_effect = Exception("Error")
 
         data = {
-            "address": "user1",
+            "from_address": "user1",
+            "to_address": "exchange1",
             "usd_amount": 100,
-            "email": "user@blockchain.com"
+            "email": "user@blockchain.com",
+            "card_id": "card1",
+            "user_id": "cust1",
+            "payment_token": "tok_123",
         }
         response = client.post('/exchange/buy-with-card',
                               data=json.dumps(data),

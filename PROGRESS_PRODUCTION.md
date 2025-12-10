@@ -11,7 +11,6 @@
 - Kind smoke test executed (2025-11-30) and returned `[OK] Monitoring overlay verification completed without critical failures` with the SIEM probe succeeding against the mock endpoint.
 - Local pytest sanity: `.venv` created, `pip install -e . && -r requirements.txt` applied, and `tests/xai_tests/unit/test_p2p_security_probes.py` passes (pytest 9.0.1).
 - Local Docker/Kind dev cluster (`k8s/kind/dev-cluster.yaml`) spins up a control-plane + worker pair for monitoring dry-runs; namespace `xai-blockchain` hosts the applied Alertmanager/Prometheus/Grafana configmaps.
-
 ## Completed Work This Cycle
 - Added Alertmanager route to SIEM for security/guardrail events and configured webhook receiver.
 - Ensured Grafana fast-mining panels reference the Prometheus datasource.
@@ -20,7 +19,6 @@
 - Added offline monitoring lint (`scripts/ci/lint_monitoring_assets.py`) to verify P2P/fast-mining signals and prometheus datasource wiring before rollout.
 - Provisioned the local Kind cluster (`kind-xai-monitoring-dev`), documented the workflow (`k8s/kind/README.md`), ran `./k8s/apply-monitoring-overlays.sh xai-blockchain` + `verify-monitoring-overlays.sh`, and updated the verifier to tolerate whitespace/escaped characters so the fast-mining + P2P checks pass cleanly.
 - Added `scripts/ci/kind_monitoring_smoke.sh` to automatically create the Kind cluster, apply overlays, publish a mock SIEM webhook ConfigMap, and run the verification (with SIEM probe) end-to-end.
-
 ## Outstanding / Next Up
 0) ✅ `python3 scripts/ci/lint_monitoring_assets.py` executed locally (2025-11-30) and the guard returned `[OK] Monitoring assets lint passed (Alertmanager/Prometheus/Grafana)`, so overlays contain the P2P/fast-mining signals before rollout.
 1) [BLOCKED] Run `./k8s/apply-monitoring-overlays.sh <namespace>` on staging/prod and confirm `/api/v2/alerts` + SIEM webhook logs show `config.fast_mining_*` and `p2p.*` alerts after triggering probes.

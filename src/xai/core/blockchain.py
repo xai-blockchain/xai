@@ -150,6 +150,61 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 # Do not block initialization if telemetry sink is unavailable
                 logger.debug(f"Security event dispatch unavailable during initialization: {e}")
 
+        self.logger = get_structured_logger()
+        self._init_storage(
+            data_dir=data_dir,
+            compact_on_startup=compact_on_startup,
+            checkpoint_interval=checkpoint_interval,
+            max_checkpoints=max_checkpoints,
+        )
+        self._init_consensus()
+        self._init_mining()
+
+        if not self._load_from_disk():
+            self.create_genesis_block()
+
+        self._init_governance()
+
+        # Rebuild address index if chain exists but index is empty
+        # This handles migration from old chains without index
+        if len(self.chain) > 0:
+            indexed_count = self.address_index.get_transaction_count("dummy_check")
+            # If index is empty but chain has blocks, rebuild it
+            if indexed_count == 0:
+                self.logger.info(
+                    "Address index is empty but chain exists - rebuilding index",
+                    chain_length=len(self.chain)
+                )
+                try:
+                    self.address_index.rebuild_from_chain(self)
+                except Exception as e:
+                    self.logger.error(
+                        "Failed to rebuild address index on startup",
+                        error=str(e)
+                    )
+                    # Continue without index - queries will fall back gracefully
+
+        # Initialize manager components for god class refactoring
+        # These managers encapsulate specific areas of blockchain functionality
+        from xai.core.mining_manager import MiningManager
+        from xai.core.validation_manager import ValidationManager
+        from xai.core.state_manager import StateManager
+        from xai.core.fork_manager import ForkManager
+
+        self.mining_manager = MiningManager(self)
+        self.validation_manager = ValidationManager(self)
+        self.state_manager = StateManager(self)
+        self.fork_manager = ForkManager(self)
+
+    def _init_storage(
+        self,
+        *,
+        data_dir: str,
+        compact_on_startup: bool,
+        checkpoint_interval: int,
+        max_checkpoints: int,
+    ) -> None:
+        """Initialize storage, disk-backed components, and supporting services."""
         if os.environ.get("PYTEST_CURRENT_TEST") and data_dir == "data":
             data_dir = tempfile.mkdtemp(prefix="xai_chain_test_")
         self.data_dir = data_dir
@@ -157,21 +212,15 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         if not self.storage.verify_integrity():
             raise Exception("Blockchain data integrity check failed. Data may be corrupted.")
 
-        self.chain: List[BlockHeader] = (
-            []
-        )  # This will be a cache of loaded block headers, not the full blocks
+        self.chain: List[BlockHeader] = []
         self.pending_transactions: List[Transaction] = []
-        self.orphan_transactions: List[Transaction] = []  # Transactions referencing unknown UTXOs
-        self._draft_transactions: List[Transaction] = []  # Locally constructed but not yet broadcast
-        self.difficulty = 4  # Initial difficulty
-        self.initial_block_reward = 12.0  # Per WHITEPAPER: Initial Block Reward is 12 XAI
-        self.halving_interval = 262800  # Per WHITEPAPER: Halving every 262,800 blocks
-        self.max_supply = 121_000_000.0  # Per WHITEPAPER: Maximum Supply is 121 million XAI
+        self.orphan_transactions: List[Transaction] = []
+        self._draft_transactions: List[Transaction] = []
+        self.trade_history: List[Dict[str, Any]] = []
+        self.trade_sessions: Dict[str, Dict[str, Any]] = {}
         self.transaction_fee_percent = 0.24
-        self.logger = get_structured_logger()
 
         # Write-Ahead Log for crash-safe chain reorganizations
-        # Must be initialized AFTER logger
         self.reorg_wal_path = os.path.join(data_dir, "reorg_wal.json")
         self._recover_from_incomplete_reorg()
         try:
@@ -179,6 +228,33 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         except (OSError, json.JSONDecodeError, ValueError) as exc:
             self.logger.warn(f"Failed to initialize node identity: {exc}")
             self.node_identity = {"private_key": "", "public_key": ""}
+
+        # Checkpoints and indexes
+        self.checkpoint_manager = CheckpointManager(
+            data_dir=data_dir,
+            checkpoint_interval=checkpoint_interval,
+            max_checkpoints=max_checkpoints,
+        )
+        address_index_path = os.path.join(data_dir, "address_index.db")
+        self.address_index = AddressTransactionIndex(address_index_path)
+
+        # Gamification + wallet managers
+        self.gamification_adapter = self._GamificationBlockchainAdapter(self)
+        self.airdrop_manager = AirdropManager(self.gamification_adapter, data_dir)
+        self.streak_tracker = StreakTracker(data_dir)
+        self.treasure_manager = TreasureHuntManager(self.gamification_adapter, data_dir)
+        self.fee_refund_calculator = FeeRefundCalculator(self.gamification_adapter, data_dir)
+        self.timecapsule_manager = TimeCapsuleManager(self.gamification_adapter, data_dir)
+        self.trade_manager = WalletTradeManager()
+
+        self.contracts: Dict[str, Dict[str, Any]] = {}
+        self.contract_receipts: List[Dict[str, Any]] = []
+        self.smart_contract_manager: SmartContractManager | None = None
+        self.governance_state: Optional[GovernanceState] = None
+        self.governance_executor: Optional[GovernanceExecutionEngine] = None
+
+    def _init_consensus(self) -> None:
+        """Load validator configuration and consensus security parameters."""
         self._finality_quorum_threshold = float(os.getenv("XAI_FINALITY_QUORUM", "0.67"))
         self._validator_set: List[ValidatorIdentity] = []
         try:
@@ -189,15 +265,17 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 error=str(exc),
             )
             self._validator_set = []
+
         self.slashing_manager: Optional[SlashingManager] = None
         if self._validator_set:
-            self.slashing_manager = self._initialize_slashing_manager(data_dir, self._validator_set)
+            self.slashing_manager = self._initialize_slashing_manager(self.data_dir, self._validator_set)
         else:
             self.logger.warn("Slashing manager disabled: no validator set available")
+
         self.finality_manager: Optional[FinalityManager] = None
         if self._validator_set:
             try:
-                self.finality_manager = self._initialize_finality_manager(data_dir, self._validator_set)
+                self.finality_manager = self._initialize_finality_manager(self.data_dir, self._validator_set)
             except FinalityConfigurationError as exc:
                 self.logger.error(
                     "Finality disabled due to configuration error",
@@ -206,96 +284,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 self.finality_manager = None
         else:
             self.logger.warn("Finality disabled: validator set unavailable")
-        # Thread safety locks
-        self._chain_lock = threading.RLock()  # Protects chain state from concurrent modifications
-        self._mempool_lock = threading.RLock()  # Protects mempool operations from TOCTOU races (re-entrant for nested calls)
-        # Mempool management
-        self.seen_txids: set[str] = set()
-        self._sender_pending_count: dict[str, int] = defaultdict(int)
-        self.max_reorg_depth = int(os.getenv("XAI_MAX_REORG_DEPTH", "100"))
-        self.max_orphan_blocks = int(os.getenv("XAI_MAX_ORPHAN_BLOCKS", "200"))
-        try:
-            from xai.core.config import API_MAX_JSON_BYTES  # ensure module import works
-            from xai.core.config import (
-                MEMPOOL_INVALID_BAN_SECONDS,
-                MEMPOOL_INVALID_TX_THRESHOLD,
-                MEMPOOL_INVALID_WINDOW_SECONDS,
-                MEMPOOL_MAX_SIZE,
-                MEMPOOL_MAX_PER_SENDER,
-                MEMPOOL_MIN_FEE_RATE,
-            )
-            self._mempool_max_size = int(MEMPOOL_MAX_SIZE)
-            self._mempool_max_per_sender = int(MEMPOOL_MAX_PER_SENDER)
-            self._mempool_max_age_seconds = int(os.getenv("XAI_MEMPOOL_MAX_AGE_SECONDS", "86400"))
-            self._mempool_min_fee_rate = float(MEMPOOL_MIN_FEE_RATE)
-            self._mempool_invalid_threshold = int(MEMPOOL_INVALID_TX_THRESHOLD)
-            self._mempool_invalid_ban_seconds = int(MEMPOOL_INVALID_BAN_SECONDS)
-            self._mempool_invalid_window_seconds = int(MEMPOOL_INVALID_WINDOW_SECONDS)
-        except Exception as e:
-            self.logger.warn(
-                f"Failed to load mempool config from environment, using defaults: {type(e).__name__}: {e}"
-            )
-            self._mempool_max_size = 10000
-            self._mempool_max_per_sender = 100
-            self._mempool_max_age_seconds = 86400  # 24 hours
-            self._mempool_min_fee_rate = 0.0000001
-            self._mempool_invalid_threshold = 3
-            self._mempool_invalid_ban_seconds = 900
-            self._mempool_invalid_window_seconds = 900
 
-        self._max_contract_abi_bytes = int(os.getenv("XAI_MAX_CONTRACT_ABI_BYTES", "262144"))
-
-        # Difficulty adjustment parameters
-        self.target_block_time = 120  # 2 minutes per block (from whitepaper)
-        self.difficulty_adjustment_interval = 2016  # Adjust every ~2.8 days
-        self.max_difficulty_change = 4  # Maximum 4x change per adjustment period
-        self.dynamic_difficulty_adjuster = DynamicDifficultyAdjustment(
-            target_block_time=self.target_block_time
-        )
-        self.utxo_manager = UTXOManager()
-        self.nonce_tracker = NonceTracker(data_dir=os.path.join(data_dir, "nonces"))
-
-        # Initialize checkpoint system
-        self.checkpoint_manager = CheckpointManager(
-            data_dir=data_dir,
-            checkpoint_interval=checkpoint_interval,
-            max_checkpoints=max_checkpoints,
-        )
-
-        # Initialize address transaction index for O(log n) history lookups
-        address_index_path = os.path.join(data_dir, "address_index.db")
-        self.address_index = AddressTransactionIndex(address_index_path)
-
-        # Initialize gamification features
-        self.gamification_adapter = self._GamificationBlockchainAdapter(self)
-        self.airdrop_manager = AirdropManager(self.gamification_adapter, data_dir)
-        self.streak_tracker = StreakTracker(data_dir) # StreakTracker does not need the blockchain adapter
-        self.treasure_manager = TreasureHuntManager(self.gamification_adapter, data_dir)
-        self.fee_refund_calculator = FeeRefundCalculator(self.gamification_adapter, data_dir)
-        self.timecapsule_manager = TimeCapsuleManager(self.gamification_adapter, data_dir)
-        self.trade_manager = WalletTradeManager()
-        self.trade_history: List[Dict[str, Any]] = []
-        self.trade_sessions: Dict[str, Dict[str, Any]] = {}
-        self.transaction_validator = TransactionValidator(
-            self, self.nonce_tracker, utxo_manager=self.utxo_manager
-        )
-
-        self.contracts: Dict[str, Dict[str, Any]] = {}
-        self.contract_receipts: List[Dict[str, Any]] = []
-        self.smart_contract_manager: SmartContractManager | None = None
-        self.governance_state: Optional[GovernanceState] = None
-        self.governance_executor: Optional[GovernanceExecutionEngine] = None
-
-        # For handling reorganizations - store orphan blocks temporarily
-        self.orphan_blocks: Dict[int, List[Block]] = {}
-        self._invalid_sender_tracker: Dict[str, Dict[str, float]] = {}
-        self._mempool_rejected_invalid_total = 0
-        self._mempool_rejected_banned_total = 0
-        self._mempool_rejected_low_fee_total = 0
-        self._mempool_rejected_sender_cap_total = 0
-        self._mempool_evicted_low_fee_total = 0
-        self._mempool_expired_total = 0
-        self._state_integrity_snapshots: list[Dict[str, Any]] = []
         self._default_block_header_version = int(getattr(Config, "BLOCK_HEADER_VERSION", 1))
         allowed_versions_cfg = getattr(Config, "BLOCK_HEADER_ALLOWED_VERSIONS", None)
         if not allowed_versions_cfg:
@@ -320,10 +309,81 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         )
         self._max_pow_target = int("f" * 64, 16)
         self._block_work_cache: Dict[str, int] = {}
+        self._median_time_span = int(
+            getattr(BlockchainSecurityConfig, "MEDIAN_TIME_SPAN", 11)
+        )
+        self._max_future_block_time = int(
+            getattr(BlockchainSecurityConfig, "MAX_FUTURE_BLOCK_TIME", 2 * 3600)
+        )
+        self._timestamp_drift_history: deque[Dict[str, float]] = deque(maxlen=256)
 
-        if not self._load_from_disk():
-            self.create_genesis_block()
+    def _init_mining(self) -> None:
+        """Configure mining, mempool, and transaction validation subsystems."""
+        self.difficulty = 4
+        self.initial_block_reward = 12.0
+        self.halving_interval = 262800
+        self.max_supply = 121_000_000.0
+        self._chain_lock = threading.RLock()
+        self._mempool_lock = threading.RLock()
+        self.seen_txids: set[str] = set()
+        self._sender_pending_count: dict[str, int] = defaultdict(int)
+        self.max_reorg_depth = int(os.getenv("XAI_MAX_REORG_DEPTH", "100"))
+        self.max_orphan_blocks = int(os.getenv("XAI_MAX_ORPHAN_BLOCKS", "200"))
 
+        try:
+            from xai.core.config import API_MAX_JSON_BYTES  # ensure module import works
+            from xai.core.config import (
+                MEMPOOL_INVALID_BAN_SECONDS,
+                MEMPOOL_INVALID_TX_THRESHOLD,
+                MEMPOOL_INVALID_WINDOW_SECONDS,
+                MEMPOOL_MAX_SIZE,
+                MEMPOOL_MAX_PER_SENDER,
+                MEMPOOL_MIN_FEE_RATE,
+            )
+            self._mempool_max_size = int(MEMPOOL_MAX_SIZE)
+            self._mempool_max_per_sender = int(MEMPOOL_MAX_PER_SENDER)
+            self._mempool_max_age_seconds = int(os.getenv("XAI_MEMPOOL_MAX_AGE_SECONDS", "86400"))
+            self._mempool_min_fee_rate = float(MEMPOOL_MIN_FEE_RATE)
+            self._mempool_invalid_threshold = int(MEMPOOL_INVALID_TX_THRESHOLD)
+            self._mempool_invalid_ban_seconds = int(MEMPOOL_INVALID_BAN_SECONDS)
+            self._mempool_invalid_window_seconds = int(MEMPOOL_INVALID_WINDOW_SECONDS)
+        except Exception as e:
+            self.logger.warn(
+                f"Failed to load mempool config from environment, using defaults: {type(e).__name__}: {e}"
+            )
+            self._mempool_max_size = 10000
+            self._mempool_max_per_sender = 100
+            self._mempool_max_age_seconds = 86400
+            self._mempool_min_fee_rate = 0.0000001
+            self._mempool_invalid_threshold = 3
+            self._mempool_invalid_ban_seconds = 900
+            self._mempool_invalid_window_seconds = 900
+
+        self._max_contract_abi_bytes = int(os.getenv("XAI_MAX_CONTRACT_ABI_BYTES", "262144"))
+        self.target_block_time = 120
+        self.difficulty_adjustment_interval = 2016
+        self.max_difficulty_change = 4
+        self.dynamic_difficulty_adjuster = DynamicDifficultyAdjustment(
+            target_block_time=self.target_block_time
+        )
+        self.utxo_manager = UTXOManager()
+        self.nonce_tracker = NonceTracker(data_dir=os.path.join(self.data_dir, "nonces"))
+        self.transaction_validator = TransactionValidator(
+            self, self.nonce_tracker, utxo_manager=self.utxo_manager
+        )
+
+        self.orphan_blocks: Dict[int, List[Block]] = {}
+        self._invalid_sender_tracker: Dict[str, Dict[str, float]] = {}
+        self._mempool_rejected_invalid_total = 0
+        self._mempool_rejected_banned_total = 0
+        self._mempool_rejected_low_fee_total = 0
+        self._mempool_rejected_sender_cap_total = 0
+        self._mempool_evicted_low_fee_total = 0
+        self._mempool_expired_total = 0
+        self._state_integrity_snapshots: list[Dict[str, Any]] = []
+
+    def _init_governance(self) -> None:
+        """Initialize governance state once the chain is loaded."""
         latest_block = self.chain[-1] if self.chain else None
         if latest_block is None:
             mining_start_time = time.time()
@@ -337,45 +397,6 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         self.governance_executor = GovernanceExecutionEngine(self)
         self._rebuild_governance_state_from_chain()
         self.sync_smart_contract_vm()
-
-        # Rebuild address index if chain exists but index is empty
-        # This handles migration from old chains without index
-        if len(self.chain) > 0:
-            indexed_count = self.address_index.get_transaction_count("dummy_check")
-            # If index is empty but chain has blocks, rebuild it
-            if indexed_count == 0:
-                self.logger.info(
-                    "Address index is empty but chain exists - rebuilding index",
-                    chain_length=len(self.chain)
-                )
-                try:
-                    self.address_index.rebuild_from_chain(self)
-                except Exception as e:
-                    self.logger.error(
-                        "Failed to rebuild address index on startup",
-                        error=str(e)
-                    )
-                    # Continue without index - queries will fall back gracefully
-
-        self._median_time_span = int(
-            getattr(BlockchainSecurityConfig, "MEDIAN_TIME_SPAN", 11)
-        )
-        self._max_future_block_time = int(
-            getattr(BlockchainSecurityConfig, "MAX_FUTURE_BLOCK_TIME", 2 * 3600)
-        )
-        self._timestamp_drift_history: deque[Dict[str, float]] = deque(maxlen=256)
-
-        # Initialize manager components for god class refactoring
-        # These managers encapsulate specific areas of blockchain functionality
-        from xai.core.mining_manager import MiningManager
-        from xai.core.validation_manager import ValidationManager
-        from xai.core.state_manager import StateManager
-        from xai.core.fork_manager import ForkManager
-
-        self.mining_manager = MiningManager(self)
-        self.validation_manager = ValidationManager(self)
-        self.state_manager = StateManager(self)
-        self.fork_manager = ForkManager(self)
 
     def _initialize_finality_manager(
         self,

@@ -5,7 +5,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder"
+    "dist": "electron-builder",
+    "test": "node --test test/*.test.js"
   },
   "build": {
     "appId": "ai.xai.desktop",
@@ -34,7 +35,11 @@
   "author": "XAI Team",
   "license": "MIT",
   "dependencies": {
+    "@noble/secp256k1": "^2.1.0",
+    "argon2": "^0.40.1",
+    "http-proxy": "^1.18.1",
     "electron": "^39.1.2",
+    "selfsigned": "^2.4.1",
     "node-fetch": "^3.3.2"
   },
   "devDependencies": {

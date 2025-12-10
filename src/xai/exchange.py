@@ -17,6 +17,7 @@ Security:
 - Structured logging for audit trail
 """
 
+from abc import ABC, abstractmethod
 import logging
 import time
 import uuid
@@ -282,29 +283,30 @@ class OrderBook:
         }
 
 
-class BalanceProvider:
+class BalanceProvider(ABC):
     """
     Interface for balance management.
 
     Implementations must provide atomic balance operations for settlement.
     """
 
+    @abstractmethod
     def get_balance(self, address: str, asset: str) -> Decimal:
         """Get balance for an address and asset."""
-        raise NotImplementedError
 
+    @abstractmethod
     def reserve_balance(self, address: str, asset: str, amount: Decimal) -> bool:
         """
         Reserve balance for a pending trade.
 
         Returns True if reservation succeeded, False if insufficient balance.
         """
-        raise NotImplementedError
 
+    @abstractmethod
     def release_reservation(self, address: str, asset: str, amount: Decimal) -> bool:
         """Release a previous reservation (on trade cancellation/rollback)."""
-        raise NotImplementedError
 
+    @abstractmethod
     def transfer(
         self,
         from_address: str,
@@ -319,11 +321,10 @@ class BalanceProvider:
 
         Returns transaction ID if successful, None if failed.
         """
-        raise NotImplementedError
 
+    @abstractmethod
     def verify_transfer(self, txid: str, *, timeout_seconds: int = 0) -> bool:
         """Verify that a transfer with the specified txid has been confirmed."""
-        raise NotImplementedError
 
 
 class InMemoryBalanceProvider(BalanceProvider):

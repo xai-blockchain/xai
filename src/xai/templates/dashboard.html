@@ -179,7 +179,7 @@
             <p>Graphically track your blocks, mining status, and QR-linked mobile control in one modern dashboard.</p>
             <div class="codex-links">
                 <a href="{{ url_for('index') }}">Explorer Home</a>
-                <a href="{{ node_url }}/metrics" target="_blank">Metrics</a>
+                <a href="{{ public_node_url }}/metrics" target="_blank">Metrics</a>
                 <a href="{{ url_for('mobile_view') }}">Mobile View</a>
             </div>
         </header>
@@ -260,9 +260,9 @@
         </section>
         <section class="basic-panel" id="basicPanel">
             <p>Command-line view for power users:</p>
-            <code>curl -X POST {{ node_url }}/transactions -H "Content-Type: application/json" -d '{...}'</code>
-            <code>curl -X POST {{ node_url }}/mine -H "Content-Type: application/json" -d '{"miner_address":"XAI1..."}'</code>
-            <code>curl {{ node_url }}/stats</code>
+            <code>curl -X POST {{ public_node_url }}/transactions -H "Content-Type: application/json" -d '{...}'</code>
+            <code>curl -X POST {{ public_node_url }}/mine -H "Content-Type: application/json" -d '{"miner_address":"XAI1..."}'</code>
+            <code>curl {{ public_node_url }}/stats</code>
         </section>
     </div>
     <script>

@@ -14,6 +14,7 @@ import hmac
 from functools import wraps
 from collections import defaultdict
 from threading import Lock
+from xai.core.process_sandbox import maybe_enable_process_sandbox
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
@@ -104,11 +105,15 @@ security_config.CORS_ORIGINS = [
     "http://localhost:5000",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5000",
+    "https://127.0.0.1:3443",
+    "https://localhost:3443",
 ]
 security_middleware = setup_security_middleware(app, config=security_config, enable_cors=True)
 
 # Node API endpoint
 NODE_URL = os.getenv("XAI_API_URL", "http://localhost:5000")
+PUBLIC_NODE_URL = os.getenv("XAI_PUBLIC_NODE_URL", NODE_URL)
+PUBLIC_DASHBOARD_ORIGIN = os.getenv("XAI_PUBLIC_DASHBOARD_ORIGIN", "http://127.0.0.1:3000")
 
 
 def format_timestamp(timestamp):
@@ -345,7 +350,10 @@ def dashboard():
     stats = get_node_stats() or {}
     recent_blocks = get_recent_blocks(6)
     return render_template(
-        "dashboard.html", stats=stats, recent_blocks=recent_blocks, node_url=NODE_URL
+        "dashboard.html",
+        stats=stats,
+        recent_blocks=recent_blocks,
+        public_node_url=PUBLIC_NODE_URL,
     )
 
 
@@ -378,10 +386,11 @@ def api_dashboard():
 def mobile_view():
     """Simplified mobile page for scanners and QR navigation"""
     stats = get_node_stats() or {}
-    return render_template("mobile.html", stats=stats, node_url=NODE_URL)
+    return render_template("mobile.html", stats=stats, public_node_url=PUBLIC_NODE_URL)
 
 
 if __name__ == "__main__":
+    maybe_enable_process_sandbox()
     port = int(os.getenv("EXPLORER_PORT", 8082))
     print("=" * 60)
     print("XAI BLOCK EXPLORER")

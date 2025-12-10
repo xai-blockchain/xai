@@ -37,3 +37,12 @@ This is a quick reference for common configuration knobs. Defaults are defined i
 ## Environment Variables
 
 Most config keys have environment overrides (e.g., `XAI_API_ALLOWED_ORIGINS`, `XAI_API_MAX_JSON_BYTES`, `XAI_SECRET_KEY`). Use env vars for secrets in production; do not hardcode keys in YAML.***
+ 
+### Partial Sync Controls
+
+- `XAI_PARTIAL_SYNC_ENABLED` (`PARTIAL_SYNC_ENABLED`): Enable/disable checkpoint bootstrap at the node level.
+- `XAI_P2P_PARTIAL_SYNC_ENABLED` (`P2P_PARTIAL_SYNC_ENABLED`): Allow the P2P manager to run checkpoint sync before HTTP/WS sync.
+- `XAI_P2P_PARTIAL_SYNC_MIN_DELTA` (`P2P_PARTIAL_SYNC_MIN_DELTA`): Minimum height delta (remote minus local) before attempting partial sync.
+- `XAI_FORCE_PARTIAL_SYNC`: Force a checkpoint bootstrap even if the local chain is non-empty (set to `1/true/yes` prior to restart).
+
+See `docs/deployment/partial-sync.md` for full guidance.

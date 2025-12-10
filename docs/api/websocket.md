@@ -1,6 +1,6 @@
 # WebSocket Specification
 
-The `/ws` endpoint delivers real-time events. Use this alongside `docs/api/websocket_messages.md`.
+The `/ws` endpoint delivers real-time events. Pair this overview with `docs/api/websocket_messages.md` for full message schemas, topics, and error codes.
 
 ## Connection
 

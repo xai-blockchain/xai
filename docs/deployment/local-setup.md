@@ -36,11 +36,33 @@ Before you begin, ensure you have the following installed:
 
 ## API Hardening Checklist
 
-- **CORS allowlist**: Set `API_ALLOWED_ORIGINS` (or `api.allowed_origins` in YAML) to explicit hosts; avoid `*` in production.
-- **Request size limits**: Configure `API_MAX_JSON_BYTES` / `max_json_bytes` to cap POST bodies (1MB default).
+- **CORS allowlist**: Set `XAI_API_ALLOWED_ORIGINS` (or `api.allowed_origins` in YAML) to explicit hosts; avoid `*` even in dev.
+- **Request size limits**: Configure `XAI_API_MAX_JSON_BYTES` / `max_json_bytes` to cap POST bodies (1MB default).
 - **Rate limits**: Tune `RATE_LIMIT_REQUESTS` / `RATE_LIMIT_WINDOW` and endpoint overrides in `SecurityConfig.ENDPOINT_LIMITS` to fit your environment.
 - **TLS**: Use a reverse proxy (e.g., Nginx) with HTTPS even on localhost for desktop/wallet flows that enforce secure cookies.
 - **IP/Port binding**: Restrict `host` to `127.0.0.1` for local dev unless you explicitly need remote access.
+
+### Deterministic CORS & Size Configuration
+
+Create a `.env` (git-ignored) with explicit origins and body caps so every developer runs the same policy:
+
+```bash
+cat <<'EOF' > .env
+XAI_API_ALLOWED_ORIGINS='["http://localhost:3000","http://127.0.0.1:3000"]'
+XAI_API_MAX_JSON_BYTES=1048576
+EOF
+```
+
+Then source it before running the node:
+
+```bash
+set -a
+source .env
+set +a
+python -m xai.core.node
+```
+
+`XAI_API_ALLOWED_ORIGINS` must be a deterministic JSON array (ordering matters for config diffs). Avoid trailing slashes or wildcard schemes. For temporary host access (e.g., a mobile device on LAN), add the exact origin and remove it once testing is complete. The `XAI_API_MAX_JSON_BYTES` limit should be kept small (≤1 MB) locally to catch oversized payloads before production.
 
 ## Installation
 

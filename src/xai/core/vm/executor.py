@@ -48,13 +48,13 @@ class BaseExecutor(Protocol):
     """
 
     def execute(self, message: ExecutionMessage) -> ExecutionResult:
-        raise NotImplementedError
+        ...
 
     def call_static(self, message: ExecutionMessage) -> ExecutionResult:
-        raise NotImplementedError
+        ...
 
     def estimate_gas(self, message: ExecutionMessage) -> int:
-        raise NotImplementedError
+        ...
 
 
 class DummyExecutor(BaseExecutor):
