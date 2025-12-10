@@ -50,6 +50,9 @@ class CheckpointSyncManager:
             getattr(getattr(blockchain, "config", None), "TRUSTED_CHECKPOINT_PUBKEYS", []) or []
         )
         self.min_peer_diversity = int(getattr(getattr(blockchain, "config", None), "CHECKPOINT_MIN_PEERS", 2))
+        self.rate_limit_seconds = int(getattr(getattr(blockchain, "config", None), "CHECKPOINT_REQUEST_RATE_SECONDS", 30))
+        self._last_request_ts: float = 0.0
+        self._provenance_log: list[dict] = []
 
     def _local_checkpoint_metadata(self) -> Optional[Dict[str, Any]]:
         """Return latest local checkpoint metadata if available."""
@@ -172,6 +175,7 @@ class CheckpointSyncManager:
             return False
         if not self._validate_work(payload.to_dict()):
             return False
+        self._log_provenance(payload, payload.to_dict(), source=meta.get("source") if meta else "unknown")
         return self.apply_payload(payload, self.blockchain)
 
     def request_checkpoint_from_peers(self) -> Optional[CheckpointPayload]:
@@ -180,6 +184,11 @@ class CheckpointSyncManager:
         """
         if not self.p2p_manager or not hasattr(self.p2p_manager, "broadcast"):
             return None
+        import time
+        now = time.time()
+        if now - self._last_request_ts < self.rate_limit_seconds:
+            return None
+        self._last_request_ts = now
         # Broadcast a checkpoint request
         try:
             coro = self.p2p_manager.broadcast({"type": "checkpoint_request", "payload": {"want_payload": True}})
@@ -236,6 +245,7 @@ class CheckpointSyncManager:
             return None
         if not self._validate_work(payload_data):
             return None
+        self._log_provenance(payload, payload_data, source="p2p")
         return payload
 
     def _build_payload(self, payload_data: Dict[str, Any]) -> Optional[CheckpointPayload]:
@@ -302,6 +312,17 @@ class CheckpointSyncManager:
         if last_work is not None and work_val < last_work:
             return False
         return True
+
+    def _log_provenance(self, payload: CheckpointPayload, raw: Dict[str, Any], source: str) -> None:
+        entry = {
+            "height": payload.height,
+            "block_hash": payload.block_hash,
+            "state_hash": payload.state_hash,
+            "source": source,
+            "work": raw.get("work"),
+            "timestamp": raw.get("timestamp"),
+        }
+        self._provenance_log.append(entry)
 
     def _apply_to_blockchain(self, payload: CheckpointPayload) -> bool:
         """
