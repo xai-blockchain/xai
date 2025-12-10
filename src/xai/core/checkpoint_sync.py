@@ -324,6 +324,10 @@ class CheckpointSyncManager:
         }
         self._provenance_log.append(entry)
 
+    def get_provenance(self) -> list[dict]:
+        """Return checkpoint provenance log."""
+        return list(self._provenance_log)
+
     def _apply_to_blockchain(self, payload: CheckpointPayload) -> bool:
         """
         Apply checkpoint payload directly to blockchain components when supported.
