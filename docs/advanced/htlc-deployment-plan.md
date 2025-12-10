@@ -35,6 +35,7 @@
   - Smokes available:
     - BTC regtest: `scripts/tools/htlc_regtest_smoke.py` (claim), `scripts/tools/htlc_regtest_refund_smoke.py` (refund).
     - ETH Hardhat/Anvil: `scripts/tools/htlc_hardhat_smoke.py` (claim + refund with evm_increaseTime).
+    - Latest Hardhat run (chainId 31337): claim HTLC `0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE`, claim tx `512f88e164342ae7c850982e94b73513ee6221220660d5ef2791baa70441070c`; refund HTLC `0x68B1D87F95878fE05B998F19b66F4baba5De1aed`, refund tx `4e6506e5cd6b8d4a6bf8a42156c6f02ddab63db95e4ead95df4dba8e7a5673ba`.
 
 ## Automation
 - Refund sweeper:
