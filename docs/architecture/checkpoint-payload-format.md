@@ -25,6 +25,8 @@ This document defines a simple JSON container for checkpoint payload exchange to
 2. Recompute `sha256(str(data).encode('utf-8'))` and compare to `state_hash`.
 3. Optionally verify metadata signature against a trusted key list.
 4. Ensure checkpoint height is not lower than the latest trusted checkpoint.
+5. Verify cumulative work is non-decreasing relative to last applied checkpoint.
+6. Require quorum/diversity if pulled from peers; log provenance (source, work, signature, timestamp).
 
 ## Application Steps
 - Restore UTXO/state from payload data.
