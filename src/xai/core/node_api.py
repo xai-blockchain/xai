@@ -978,6 +978,19 @@ class NodeAPIRoutes:
                 response["error"] = services.get("issues", ["degraded"])[0] if services.get("issues") else "degraded"
             return jsonify(response), http_status
 
+        @self.app.route("/checkpoint/provenance", methods=["GET"])
+        def checkpoint_provenance() -> Tuple[Dict[str, Any], int]:
+            """Expose recent checkpoint provenance for diagnostics."""
+            sync_coordinator = getattr(self.node, "partial_sync_coordinator", None)
+            sync_mgr = getattr(sync_coordinator, "sync_manager", None) if sync_coordinator else None
+            provenance = []
+            if sync_mgr and hasattr(sync_mgr, "get_provenance"):
+                try:
+                    provenance = sync_mgr.get_provenance()
+                except Exception as exc:
+                    logger.debug("Failed to read checkpoint provenance: %s", exc)
+            return jsonify({"provenance": provenance}), 200
+
         @self.app.route("/metrics", methods=["GET"])
         def prometheus_metrics() -> Tuple[str, int, Dict[str, str]]:
             """Prometheus metrics endpoint."""
