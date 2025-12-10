@@ -168,6 +168,10 @@ class CheckpointSyncManager:
             payload = self.request_checkpoint_from_peers()
         if not payload:
             return False
+        if not self._validate_payload_signature(payload.to_dict()):
+            return False
+        if not self._validate_work(payload.to_dict()):
+            return False
         return self.apply_payload(payload, self.blockchain)
 
     def request_checkpoint_from_peers(self) -> Optional[CheckpointPayload]:
@@ -294,9 +298,8 @@ class CheckpointSyncManager:
             return False
         if work_val <= 0:
             return False
-        last_height = getattr(self.checkpoint_manager, "latest_checkpoint_height", None)
         last_work = getattr(self.checkpoint_manager, "latest_checkpoint_work", None)
-        if last_height is not None and last_work is not None and work_val < last_work:
+        if last_work is not None and work_val < last_work:
             return False
         return True
 
@@ -336,6 +339,9 @@ class CheckpointSyncManager:
                 block_hash=str(data["block_hash"]),
                 state_hash=str(data["state_hash"]),
                 data=data.get("data", {}),
+                work=data.get("work"),
+                signature=data.get("signature"),
+                pubkey=data.get("pubkey"),
             )
         except (FileNotFoundError, KeyError, ValueError, TypeError, json.JSONDecodeError):
             return None
@@ -368,6 +374,9 @@ class CheckpointSyncManager:
                     block_hash=str(data["block_hash"]),
                     state_hash=str(data["state_hash"]),
                     data=data.get("data", {}),
+                    work=data.get("work"),
+                    signature=data.get("signature"),
+                    pubkey=data.get("pubkey"),
                 )
             except (requests.RequestException, KeyError, ValueError, TypeError, json.JSONDecodeError):
                 return None
