@@ -4,9 +4,9 @@ Hardhat HTLC smoke test.
 Prerequisites:
 - Hardhat node running at http://127.0.0.1:8545 with funded accounts.
 
-Flow:
-1. Compile/deploy AtomicSwapETH with a future timelock and 1 ETH value.
-2. Claim funds using generated secret before timelock.
+Flows:
+1. Happy path: deploy AtomicSwapETH with a future timelock and claim with the secret.
+2. Refund path: deploy with an expired timelock and exercise refund().
 
 Note: This script uses unlocked accounts provided by Hardhat; for production,
 integrate proper key management.
@@ -21,7 +21,7 @@ import hashlib
 from eth_utils import to_hex
 from web3 import Web3
 
-from xai.core.htlc_deployer import deploy_htlc, claim_htlc
+from xai.core.htlc_deployer import deploy_htlc, claim_htlc, refund_htlc
 
 
 def main() -> int:
@@ -36,18 +36,19 @@ def main() -> int:
 
     secret = secrets.token_bytes(32)
     secret_hash_sha256 = hashlib.sha256(secret).hexdigest()
-    timelock = int(time.time()) + 600
+    base_time = w3.eth.get_block("latest")["timestamp"]
+    timelock = int(base_time + 600)
 
-    print("Deploying HTLC...")
+    print("Deploying HTLC (claim path)...")
     contract = deploy_htlc(
         w3,
-        secret_hash_keccak=secret_hash_sha256,
+        secret_hash=secret_hash_sha256,
         recipient=recipient,
         timelock_unix=timelock,
         value_wei=w3.to_wei(1, "ether"),
         sender=sender,
     )
-    print(f"Contract deployed at {contract.address}")
+    print(f"Claim HTLC deployed at {contract.address}")
 
     print("Claiming HTLC...")
     result = claim_htlc(
@@ -57,6 +58,27 @@ def main() -> int:
         sender=recipient,
     )
     print("Claim result:", result)
+
+    print("Deploying HTLC (refund path)...")
+    future_timelock = int(w3.eth.get_block("latest")["timestamp"] + 60)
+    contract_refund = deploy_htlc(
+        w3,
+        secret_hash=secret_hash_sha256,
+        recipient=recipient,
+        timelock_unix=future_timelock,
+        value_wei=w3.to_wei(0.5, "ether"),
+        sender=sender,
+    )
+    print(f"Refund HTLC deployed at {contract_refund.address}")
+    print("Waiting for timelock to expire via evm_increaseTime...")
+    try:
+        w3.provider.make_request("evm_increaseTime", [120])  # type: ignore[attr-defined]
+        w3.provider.make_request("evm_mine", [])  # type: ignore[attr-defined]
+    except Exception as exc:
+        print("Failed to advance time on provider:", exc)
+        return 1
+    refund = refund_htlc(w3, contract_refund, sender=sender)
+    print("Refund result:", refund)
     return 0
 
 

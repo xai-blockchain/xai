@@ -21,7 +21,7 @@
   - ABI + bytecode (compile with solc 0.8.x).
   - Deployment script (Hardhat/Foundry) emitting contract address.
   - CLI snippet to call `claim`/`refund` with gas estimation and maxFeePerGas bumping.
-- Use Keccak hash for `secretHash` (already emitted by `AtomicSwapHTLC`).
+- Use SHA-256 for `secretHash` so the same preimage works across BTC and ETH HTLCs.
 
 ## Integration
 - Add Python helpers:
@@ -32,6 +32,9 @@
   - Redeem/refund script assembly (offline).
   - ABI encoding for claim/refund payloads.
   - Happy-path regtest/Hardhat flows (future integration suite).
+  - Smokes available:
+    - BTC regtest: `scripts/tools/htlc_regtest_smoke.py` (claim), `scripts/tools/htlc_regtest_refund_smoke.py` (refund).
+    - ETH Hardhat/Anvil: `scripts/tools/htlc_hardhat_smoke.py` (claim + refund with evm_increaseTime).
 
 ## Automation
 - Refund sweeper:
@@ -40,4 +43,3 @@
   - Bitcoin: RBF/CPFP bump if unconfirmed.
 - Logging/telemetry:
   - Emit swap_id, txid, attempts, fee levels.
-

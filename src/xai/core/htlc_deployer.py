@@ -115,7 +115,7 @@ def _build_tx_params(
 
 def deploy_htlc(
     w3: Web3,
-    secret_hash_keccak: str,
+    secret_hash: str,
     recipient: str,
     timelock_unix: int,
     *,
@@ -137,9 +137,7 @@ def deploy_htlc(
         max_fee_per_gas=max_fee_per_gas,
         max_priority_fee_per_gas=max_priority_fee_per_gas,
     )
-    construct_tx = contract.constructor(to_hex(hexstr=secret_hash_keccak), recipient, timelock_unix).build_transaction(
-        tx_params
-    )
+    construct_tx = contract.constructor(to_hex(hexstr=secret_hash), recipient, timelock_unix).build_transaction(tx_params)
     # Estimate gas if not provided
     if "gas" not in construct_tx:
         construct_tx["gas"] = w3.eth.estimate_gas(construct_tx)
