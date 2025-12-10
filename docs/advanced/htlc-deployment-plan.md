@@ -44,3 +44,10 @@
   - Bitcoin: RBF/CPFP bump if unconfirmed.
 - Logging/telemetry:
   - Emit swap_id, txid, attempts, fee levels.
+
+### Operational snippets
+- Start Anvil (Hardhat-compatible) for smokes: `docker run --rm -d -p 8545:8545 --name hardhat-node ghcr.io/foundry-rs/foundry:latest anvil`
+- Run ETH smoke: `source .venv/bin/activate && python scripts/tools/htlc_hardhat_smoke.py`
+- Run BTC regtest smokes against `bitcoind-regtest` (ports 18443/18444):
+  - Claim: `source .venv/bin/activate && python scripts/tools/htlc_regtest_smoke.py`
+  - Refund: `source .venv/bin/activate && python scripts/tools/htlc_regtest_refund_smoke.py`

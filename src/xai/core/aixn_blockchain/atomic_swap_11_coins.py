@@ -336,6 +336,7 @@ class AtomicSwapHTLC:
         other_coin_amount: float,
         counterparty_address: str,
         timelock_hours: int = 24,
+        secret_bytes: Optional[bytes] = None,
     ) -> Dict:
         """
         Create a new atomic swap contract
@@ -345,13 +346,14 @@ class AtomicSwapHTLC:
             other_coin_amount: Amount of other coin to receive
             counterparty_address: Address of trading partner
             timelock_hours: Hours until refund becomes available
+            secret_bytes: Optional externally supplied 32-byte secret for cross-chain parity
 
         Returns:
             dict: Swap contract details
         """
 
         # Generate secret for HTLC
-        secret = secrets.token_bytes(32)
+        secret = secret_bytes or secrets.token_bytes(32)
         secret_hash = hashlib.sha256(secret).hexdigest()
 
         # Calculate timelock (Unix timestamp)
