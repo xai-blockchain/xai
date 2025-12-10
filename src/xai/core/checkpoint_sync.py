@@ -330,6 +330,7 @@ class CheckpointSyncManager:
                 "Checkpoint accepted",
                 extra={"event": "checkpoint.accepted", "checkpoint": entry},
             )
+            self._record_metrics(entry)
         except Exception:
             # best-effort logging; ignore failures
             pass
@@ -337,6 +338,24 @@ class CheckpointSyncManager:
     def get_provenance(self) -> list[dict]:
         """Return checkpoint provenance log."""
         return list(self._provenance_log)
+
+    def _record_metrics(self, entry: dict) -> None:
+        try:
+            from xai.core.monitoring import MetricsCollector
+
+            collector = MetricsCollector.instance()
+            g_height = collector.get_metric("xai_checkpoint_height")
+            if g_height:
+                g_height.set(entry.get("height") or 0)
+            g_work = collector.get_metric("xai_checkpoint_work")
+            if g_work and entry.get("work") is not None:
+                g_work.set(entry["work"])
+            c_accepts = collector.get_metric("xai_checkpoint_accepted_total")
+            if c_accepts:
+                c_accepts.inc()
+        except Exception:
+            # metrics optional
+            return
 
     def _apply_to_blockchain(self, payload: CheckpointPayload) -> bool:
         """
