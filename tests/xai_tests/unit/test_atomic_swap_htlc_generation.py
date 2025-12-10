@@ -22,10 +22,18 @@ def test_eth_htlc_contains_hash_and_recipient():
     contract = htlc.create_swap_contract(axn_amount=1, other_coin_amount=0.2, counterparty_address="0xRecipient", timelock_hours=1)
     solidity = contract["smart_contract"]
     assert "AtomicSwapETH" in solidity
-    assert contract["secret_hash_keccak"] in solidity
+    assert contract["secret_hash"] in solidity
     assert "0xRecipient" in solidity
     # amount is embedded as ether literal
     assert str(0.2) in solidity
+
+
+def test_hash_parity_is_sha256_across_protocols():
+    """Expose a single canonical SHA-256 hash for both BTC and ETH legs."""
+    htlc_eth = AtomicSwapHTLC(CoinType.ETH)
+    contract = htlc_eth.create_swap_contract(axn_amount=1, other_coin_amount=0.2, counterparty_address="0xRecipient", timelock_hours=1)
+    assert "secret_hash" in contract
+    assert "secret_hash_keccak" not in contract
 
 
 def test_verify_swap_claim_checks_secret_and_timelock(monkeypatch):
