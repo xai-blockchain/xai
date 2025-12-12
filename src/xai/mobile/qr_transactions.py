@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import base64
+import binascii
 import logging
 from typing import Dict, Any, Optional
 from io import BytesIO
@@ -211,7 +212,7 @@ class TransactionQRGenerator:
         try:
             decoded = base64.b64decode(tx_data).decode()
             return json.loads(decoded)
-        except Exception as e:
+        except (binascii.Error, UnicodeDecodeError, json.JSONDecodeError) as e:
             # Direct JSON fallback
             logger.debug("Base64 decode failed, trying direct JSON: %s", e)
             return json.loads(tx_data)
@@ -307,7 +308,7 @@ class QRCodeValidator:
                     return False
 
             return True
-        except Exception as e:
+        except (ValueError, json.JSONDecodeError) as e:
             logger.debug("Payment link validation failed: %s", e)
             return False
 
@@ -342,7 +343,7 @@ class QRCodeValidator:
                 return False
 
             return True
-        except Exception as e:
+        except (ValueError, json.JSONDecodeError, binascii.Error, UnicodeDecodeError) as e:
             logger.debug("Transaction QR validation failed: %s", e)
             return False
 

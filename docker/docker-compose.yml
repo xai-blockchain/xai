@@ -1,0 +1,79 @@
+version: "3.8"
+
+networks:
+  xai-testnet:
+    external: true
+
+volumes:
+  xai-prometheus-data:
+  xai-grafana-data:
+  xai-node1-data:
+  xai-node2-data:
+  xai-node3-data:
+  xai-node4-data:
+
+services:
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: xai-prometheus
+    restart: unless-stopped
+    ports:
+      - "12090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - xai-prometheus-data:/prometheus
+    networks:
+      - xai-testnet
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: xai-grafana
+    restart: unless-stopped
+    ports:
+      - "12030:3000"
+    volumes:
+      - xai-grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=xai-admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - xai-testnet
+    depends_on:
+      - prometheus
+
+  # Placeholder for blockchain nodes - customize per chain type
+  # node1:
+  #   image: your-xai-node-image
+  #   container_name: xai-node1
+  #   ports:
+  #     - "12001:8545"  # RPC
+  #     - "12002:30303" # P2P
+  #     - "12003:8546"  # WS
+  #   volumes:
+  #     - xai-node1-data:/data
+  #   networks:
+  #     - xai-testnet
+
+  # Flask API Server
+  flask-api:
+    build:
+      context: ../flask-app
+      dockerfile: Dockerfile
+    container_name: xai-flask-api
+    restart: unless-stopped
+    ports:
+      - "12050:5000"
+    environment:
+      - FLASK_ENV=development
+      - NODE_RPC_URL=http://xai-node1:8545
+    volumes:
+      - ../flask-app:/app
+    networks:
+      - xai-testnet
+    depends_on:
+      - prometheus

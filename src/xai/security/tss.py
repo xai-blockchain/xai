@@ -90,7 +90,14 @@ class MockTSS(TSSInterface):
         # In a real TSS, the master public key is derived from the key shares.
         self._master_public_key = participant_key_shares[0]["public_key"]  # Simplified
 
-        print(f"MockTSS: Generated {num_participants} participant keys with threshold {threshold}.")
+        logger.info(
+            "Generated mock participant keys",
+            extra={
+                "event": "tss.mock_keys_generated",
+                "participants": num_participants,
+                "threshold": threshold,
+            },
+        )
         return participant_key_shares
 
     def distributed_sign(
@@ -150,68 +157,4 @@ class MockTSS(TSSInterface):
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
-    tss_instance = MockTSS()
-
-    # 1. Generate distributed keys for 5 participants, requiring 3 signatures
-    num_participants = 5
-    threshold = 3
-    participant_keys = tss_instance.generate_distributed_keys(num_participants, threshold)
-    master_pub_key = tss_instance._master_public_key  # Get the mock master public key
-
-    # 2. Message to be signed (e.g., a bridge transfer transaction hash)
-    message_data = {"transfer_id": "tx123", "amount": 100, "destination_chain": "Ethereum"}
-    message_hash = hashlib.sha256(json.dumps(message_data, sort_keys=True).encode()).digest()
-
-    # 3. Participants sign the message
-    collected_signatures = []
-    # Participant 1 signs
-    p1_priv_pem = bytes.fromhex(tss_instance._participants_keys["participant_1"][0])
-    p1_priv_key = serialization.load_pem_private_key(
-        p1_priv_pem, password=None, backend=default_backend()
-    )
-    p1_pub = tss_instance._participants_keys["participant_1"][1]
-    sig1 = p1_priv_key.sign(message_hash, ec.ECDSA(hashes.SHA256())).hex()
-    collected_signatures.append((sig1, p1_pub))
-
-    # Participant 2 signs
-    p2_priv_pem = bytes.fromhex(tss_instance._participants_keys["participant_2"][0])
-    p2_priv_key = serialization.load_pem_private_key(
-        p2_priv_pem, password=None, backend=default_backend()
-    )
-    p2_pub = tss_instance._participants_keys["participant_2"][1]
-    sig2 = p2_priv_key.sign(message_hash, ec.ECDSA(hashes.SHA256())).hex()
-    collected_signatures.append((sig2, p2_pub))
-
-    # Participant 3 signs
-    p3_priv_pem = bytes.fromhex(tss_instance._participants_keys["participant_3"][0])
-    p3_priv_key = serialization.load_pem_private_key(
-        p3_priv_pem, password=None, backend=default_backend()
-    )
-    p3_pub = tss_instance._participants_keys["participant_3"][1]
-    sig3 = p3_priv_key.sign(message_hash, ec.ECDSA(hashes.SHA256())).hex()
-    collected_signatures.append((sig3, p3_pub))
-
-    print(f"\nCollected {len(collected_signatures)} signatures.")
-
-    # 4. Combine signatures (simulated)
-    try:
-        threshold_signature = tss_instance.distributed_sign(
-            message_hash, collected_signatures, threshold
-        )
-        print(f"Threshold Signature (mock): {threshold_signature[:60]}...")
-
-        # 5. Verify the threshold signature
-        is_valid = tss_instance.verify_threshold_signature(
-            message_hash, threshold_signature, master_pub_key
-        )
-        print(f"Is Threshold Signature valid? {is_valid}")
-    except ValueError as e:
-        print(f"Error during distributed signing: {e}")
-
-    # Test with insufficient signatures
-    print("\n--- Testing with insufficient signatures (2 of 3) ---")
-    insufficient_signatures = collected_signatures[:2]
-    try:
-        tss_instance.distributed_sign(message_hash, insufficient_signatures, threshold)
-    except ValueError as e:
-        print(f"Error (expected): {e}")
+    raise SystemExit("MockTSS demo removed; use unit tests instead.")

@@ -65,8 +65,13 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
                 ),
                 200,
             )
-        except Exception as exc:
-            return routes._handle_exception(exc, "exchange_get_order_book")
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            return routes._error_response(
+                "Failed to load order book",
+                status=500,
+                code="order_book_error",
+                context={"error": str(exc)},
+            )
 
     @app.route("/exchange/place-order", methods=["POST"])
     @validate_request(routes.request_validator, ExchangeOrderInput)
@@ -167,7 +172,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
             )
         except ValueError as exc:
             return routes._error_response(str(exc), status=400, code="order_invalid")
-        except Exception as exc:
+        except (OSError, json.JSONDecodeError, RuntimeError) as exc:
             return routes._handle_exception(exc, "exchange_place_order")
 
     @app.route("/exchange/cancel-order", methods=["POST"])
@@ -214,7 +219,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
                 json.dump(all_orders, handle, indent=2)
 
             return routes._success_response({"message": "Order cancelled successfully"})
-        except Exception as exc:
+        except (OSError, json.JSONDecodeError, RuntimeError) as exc:
             return routes._handle_exception(exc, "exchange_cancel_order")
 
     @app.route("/exchange/my-orders/<address>", methods=["GET"])
@@ -238,7 +243,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
 
             user_orders.sort(key=lambda entry: entry.get("timestamp", 0), reverse=True)
             return jsonify({"success": True, "orders": user_orders}), 200
-        except Exception as exc:
+        except (OSError, json.JSONDecodeError, RuntimeError) as exc:
             return jsonify({"error": str(exc)}), 500
 
     @app.route("/exchange/trades", methods=["GET"])
@@ -255,7 +260,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
                 all_trades = json.load(handle)
             all_trades.sort(key=lambda entry: entry["timestamp"], reverse=True)
             return jsonify({"success": True, "trades": all_trades[:limit]}), 200
-        except Exception as exc:
+        except (RuntimeError, OSError, json.JSONDecodeError) as exc:
             return jsonify({"error": str(exc)}), 500
 
     # --- balance/transfer routes ---
@@ -285,7 +290,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
             return routes._success_response(result if isinstance(result, dict) else {"result": result})
         except ValueError as exc:
             return routes._error_response(str(exc), status=400, code="deposit_invalid")
-        except Exception as exc:
+        except (RuntimeError, OSError, json.JSONDecodeError) as exc:
             return routes._handle_exception(exc, "exchange_deposit")
 
     @app.route("/exchange/withdraw", methods=["POST"])
@@ -312,7 +317,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
             return routes._success_response(result if isinstance(result, dict) else {"result": result})
         except ValueError as exc:
             return routes._error_response(str(exc), status=400, code="withdraw_invalid")
-        except Exception as exc:
+        except (RuntimeError, OSError, json.JSONDecodeError) as exc:
             return routes._handle_exception(exc, "exchange_withdraw")
 
     @app.route("/exchange/balance/<address>", methods=["GET"])
@@ -322,7 +327,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
         try:
             balances = node.exchange_wallet_manager.get_all_balances(address)
             return jsonify({"success": True, "address": address, "balances": balances}), 200
-        except Exception as exc:
+        except (RuntimeError, OSError, json.JSONDecodeError, ValueError) as exc:
             return jsonify({"error": str(exc)}), 500
 
     @app.route("/exchange/balance/<address>/<currency>", methods=["GET"])
@@ -332,7 +337,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
         try:
             balance = node.exchange_wallet_manager.get_balance(address, currency)
             return jsonify({"success": True, "address": address, **balance}), 200
-        except Exception as exc:
+        except (RuntimeError, OSError, json.JSONDecodeError, ValueError) as exc:
             return jsonify({"error": str(exc)}), 500
 
     @app.route("/exchange/transactions/<address>", methods=["GET"])
@@ -343,7 +348,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
             limit = int(request.args.get("limit", 50))
             transactions = node.exchange_wallet_manager.get_transaction_history(address, limit)
             return jsonify({"success": True, "address": address, "transactions": transactions}), 200
-        except Exception as exc:
+        except (RuntimeError, OSError, json.JSONDecodeError, ValueError) as exc:
             return jsonify({"error": str(exc)}), 500
 
     # --- stats routes ---
@@ -384,7 +389,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
                 ),
                 200,
             )
-        except Exception as exc:
+        except (RuntimeError, OSError, json.JSONDecodeError, ValueError) as exc:
             return jsonify({"error": str(exc)}), 500
 
     @app.route("/exchange/stats", methods=["GET"])
@@ -422,7 +427,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
                     )
 
             return jsonify({"success": True, "stats": stats}), 200
-        except Exception as exc:
+        except (RuntimeError, OSError, json.JSONDecodeError, ValueError) as exc:
             return jsonify({"error": str(exc)}), 500
 
     # --- payment routes ---
@@ -474,7 +479,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
             )
         except ValueError as exc:
             return routes._error_response(str(exc), status=400, code="payment_invalid")
-        except Exception as exc:
+        except (RuntimeError, KeyError, TypeError) as exc:
             return routes._handle_exception(exc, "exchange_buy_with_card")
 
     @app.route("/exchange/payment-methods", methods=["GET"])
@@ -484,8 +489,8 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
         try:
             methods = node.payment_processor.get_supported_payment_methods()
             return jsonify({"success": True, "methods": methods}), 200
-        except Exception as exc:
-            return jsonify({"error": str(exc)}), 500
+        except (RuntimeError, ValueError, KeyError, TypeError) as exc:
+            return routes._handle_exception(exc, "exchange_payment_methods")
 
     @app.route("/exchange/calculate-purchase", methods=["POST"])
     def calculate_purchase() -> Tuple[Dict[str, Any], int]:
@@ -498,5 +503,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
         try:
             calc = node.payment_processor.calculate_purchase(data["usd_amount"])
             return jsonify(calc), 200
-        except Exception as exc:
-            return jsonify({"error": str(exc)}), 500
+        except ValueError as exc:
+            return routes._error_response(str(exc), status=400, code="payment_invalid")
+        except (RuntimeError, KeyError, TypeError) as exc:
+            return routes._handle_exception(exc, "exchange_calculate_purchase")

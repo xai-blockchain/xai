@@ -1,6 +1,9 @@
 import hashlib
+import logging
 import secrets
 from typing import List, Dict, Any, Tuple, Optional
+
+logger = logging.getLogger(__name__)
 
 # This is a highly simplified conceptual model of a Threshold Signature Scheme (TSS).
 # It does NOT implement the actual cryptographic primitives (e.g., elliptic curve math,
@@ -58,8 +61,15 @@ class ThresholdSignatureScheme:
         for i in range(self.n_participants):
             self.private_key_shares[i + 1] = shares[i]  # Participant IDs start from 1
 
-        print(f"Conceptual key shares generated for {self.n_participants} participants.")
-        print(f"Conceptual Public Key: {self.public_key}")
+        logger.info(
+            "Conceptual key shares generated",
+            extra={
+                "event": "threshold_signature.shares_generated",
+                "participants": self.n_participants,
+                "threshold": self.t_threshold,
+                "public_key": self.public_key,
+            },
+        )
 
     def sign_share(self, participant_id: int, message: str) -> Optional[int]:
         """
@@ -77,9 +87,6 @@ class ThresholdSignatureScheme:
         )  # Modulo a prime
 
         self.message_signatures.setdefault(message, {})[participant_id] = signature_share
-        # Use ASCII encoding to safely handle unicode characters in print statements
-        message_display = message.encode('ascii', 'backslashreplace').decode('ascii')
-        print(f"Participant {participant_id} signed message '{message_display}'.")
         return signature_share
 
     def combine_shares(self, message: str, signed_shares: Dict[int, int]) -> Optional[int]:
@@ -116,58 +123,16 @@ class ThresholdSignatureScheme:
                 f"Could not gather {self.t_threshold} valid shares for message '{message}'."
             )
 
-        # In this conceptual model, if we have enough valid shares, we consider it successful
-        # In a real TSS, the combined signature would be cryptographically verified against the public key
-        # Use ASCII encoding to safely handle unicode characters in print statements
-        message_display = message.encode('ascii', 'backslashreplace').decode('ascii')
-        print(
-            f"Conceptual signature for message '{message_display}' successfully combined and verified."
+        logger.info(
+            "Conceptual signature combined",
+            extra={
+                "event": "threshold_signature.signature_combined",
+                "participants_used": participants_used,
+                "message": message.encode("ascii", "backslashreplace").decode("ascii"),
+            },
         )
         return combined_signature
 
 
-# Example Usage (for testing purposes)
 if __name__ == "__main__":
-    n = 5  # Total participants
-    t = 3  # Threshold for signing
-
-    tss = ThresholdSignatureScheme(n, t)
-    tss.generate_key_shares()
-
-    message_to_sign = "Hello, XAI Blockchain!"
-
-    # Participants sign the message
-    participant_signatures = {}
-    for i in range(1, n + 1):
-        try:
-            sig_share = tss.sign_share(i, message_to_sign)
-            if sig_share is not None:
-                participant_signatures[i] = sig_share
-        except ValueError as e:
-            print(e)
-
-    print(f"\nCollected {len(participant_signatures)} signature shares.")
-
-    # Attempt to combine with fewer than 't' shares
-    print("\n--- Attempting to combine with fewer than 't' shares (expected to fail) ---")
-    try:
-        # Take only t-1 shares
-        insufficient_shares = {
-            k: participant_signatures[k] for k in list(participant_signatures.keys())[: t - 1]
-        }
-        tss.combine_shares(message_to_sign, insufficient_shares)
-    except ValueError as e:
-        print(f"Error (expected): {e}")
-
-    # Attempt to combine with 't' shares
-    print(f"\n--- Attempting to combine with {t} shares (expected to succeed) ---")
-    try:
-        # Take exactly t shares
-        sufficient_shares = {
-            k: participant_signatures[k] for k in list(participant_signatures.keys())[:t]
-        }
-        final_signature = tss.combine_shares(message_to_sign, sufficient_shares)
-        if final_signature:
-            print(f"Final Conceptual Signature: {final_signature}")
-    except ValueError as e:
-        print(f"Error: {e}")
+    raise SystemExit("ThresholdSignatureScheme demo removed; use unit tests instead.")

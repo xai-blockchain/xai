@@ -83,6 +83,64 @@ def test_blocked_destination_is_failed_and_refunded(wallet_manager: ExchangeWall
     assert balances["available"] == pytest.approx(10_000)
 
 
+def test_timelock_boundary_cannot_be_bypassed(wallet_manager: ExchangeWalletManager, tmp_path: Path) -> None:
+    """Amounts just below the threshold clear immediately; at the threshold they are deferred."""
+    _fund_wallet(wallet_manager, "user-boundary", 30_000)
+    threshold = 5_000
+    processor = WithdrawalProcessor(
+        wallet_manager,
+        data_dir=str(tmp_path / "processor-boundary"),
+        lock_amount_threshold=threshold,
+        lock_duration_seconds=600,
+    )
+
+    # Slightly under the threshold should execute immediately.
+    under = wallet_manager.withdraw("user-boundary", "XAI", threshold - 0.01, "custodial:ops")
+    now = under["transaction"]["timestamp"] + 5
+    stats_under = processor.process_queue(current_timestamp=now)
+    assert stats_under["completed"] == 1
+
+    # Exactly at the threshold must respect the timelock.
+    exact = wallet_manager.withdraw("user-boundary", "XAI", threshold, "custodial:cold")
+    stats_exact = processor.process_queue(current_timestamp=exact["transaction"]["timestamp"] + 30)
+    assert stats_exact["deferred"] == 1
+    pending = wallet_manager.get_pending_withdrawal(exact["transaction"]["id"])
+    assert pending is not None
+    assert pending.get("release_timestamp") is not None
+    assert pending["release_timestamp"] >= exact["transaction"]["timestamp"] + processor.lock_duration_seconds
+
+
+def test_timelock_duration_caps_multiplier(wallet_manager: ExchangeWalletManager, tmp_path: Path) -> None:
+    """Huge withdrawals cannot shrink the enforced release window below the 4x cap."""
+    _fund_wallet(wallet_manager, "user-cap", 200_000)
+    threshold = 10_000
+    lock_seconds = 900
+    processor = WithdrawalProcessor(
+        wallet_manager,
+        data_dir=str(tmp_path / "processor-cap"),
+        lock_amount_threshold=threshold,
+        lock_duration_seconds=lock_seconds,
+    )
+
+    result = wallet_manager.withdraw("user-cap", "XAI", threshold * 10, "custodial:vault")
+    created_at = result["transaction"]["timestamp"]
+    stats = processor.process_queue(current_timestamp=created_at + 60)
+    assert stats["deferred"] == 1
+
+    pending = wallet_manager.get_pending_withdrawal(result["transaction"]["id"])
+    assert pending is not None
+    expected_release = created_at + (lock_seconds * 4)
+    assert pending["release_timestamp"] == pytest.approx(expected_release, rel=0, abs=1e-6)
+
+    # Processing before release keeps it deferred.
+    stats_again = processor.process_queue(current_timestamp=expected_release - 1)
+    assert stats_again["deferred"] == 1
+
+    # After the capped window expires the withdrawal is processed.
+    stats_final = processor.process_queue(current_timestamp=expected_release + 1)
+    assert stats_final["completed"] == 1
+
+
 def test_exchange_wallet_status_helpers(wallet_manager: ExchangeWalletManager) -> None:
     """Helper APIs expose queue depth and status-filtered snapshots."""
     _fund_wallet(wallet_manager, "status-user", 5_000)

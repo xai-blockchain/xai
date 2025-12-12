@@ -568,7 +568,7 @@ class NodeAPIRoutes:
             
             return True, "ok", payload
 
-        except Exception as e:
+        except (ValueError, RuntimeError, KeyError) as e:
             self._log_event("peer_signature_failure", {"reason": "exception", "error": str(e)})
             return False, f"verification_error: {e}", None
 
@@ -612,7 +612,7 @@ class NodeAPIRoutes:
         if collector is None:
             try:
                 collector = MetricsCollector.instance()
-            except Exception as e:
+            except (RuntimeError, AttributeError) as e:
                 logger.debug(
                     "Metrics collector unavailable",
                     error=str(e)
@@ -634,7 +634,7 @@ class NodeAPIRoutes:
             from xai.core.advanced_rate_limiter import get_rate_limiter as get_advanced_rate_limiter
 
             return get_advanced_rate_limiter()
-        except Exception:
+        except (ImportError, RuntimeError, AttributeError):
             return None
 
     def _success_response(self, payload: Dict[str, Any], status: int = 200):
@@ -781,7 +781,7 @@ class NodeAPIRoutes:
                     calldata,
                     gas_limit=200_000,
                 )
-            except Exception as e:
+            except (ValueError, RuntimeError) as e:
                 logger.debug(
                     f"Failed to check interface support for {name}",
                     contract=contract_address,
@@ -896,14 +896,14 @@ class NodeAPIRoutes:
                         backlog["pending_transactions"] = stats.get("pending_transactions_count", 0)
                         backlog["orphan_blocks"] = stats.get("orphan_blocks_count", 0)
                         backlog["orphan_transactions"] = stats.get("orphan_transactions_count", 0)
-                    except Exception as exc:  # pragma: no cover - defensive
+                    except (ValueError, RuntimeError, KeyError) as exc:  # pragma: no cover - defensive
                         blockchain_summary = {"accessible": False, "error": str(exc)}
                         overall_status = "unhealthy"
                         http_status = 503
                 else:
                     blockchain_summary = {"accessible": False, "error": "Blockchain not initialized"}
                     degrade("blockchain_unavailable")
-            except Exception as exc:  # pragma: no cover - defensive
+            except (ValueError, RuntimeError, OSError) as exc:  # pragma: no cover - defensive
                 blockchain_summary = {"accessible": False, "error": str(exc)}
                 overall_status = "unhealthy"
                 http_status = 503
@@ -919,7 +919,7 @@ class NodeAPIRoutes:
                 with open(test_file, "w") as handle:
                     handle.write("ok")
                 os.remove(test_file)
-            except Exception as exc:
+            except (OSError, IOError) as exc:
                 storage_status = "degraded"
                 degrade("storage_unwritable")
                 services["storage_error"] = str(exc)
@@ -955,7 +955,7 @@ class NodeAPIRoutes:
                         if peer_count == 0:
                             degrade("no_connected_peers")
                     network["peers"] = peer_count
-                except Exception as exc:  # pragma: no cover - defensive
+                except (RuntimeError, ValueError) as exc:  # pragma: no cover - defensive
                     p2p_status = "degraded"
                     degrade("p2p_error")
                     services["p2p_error"] = str(exc)
@@ -993,7 +993,7 @@ class NodeAPIRoutes:
             if sync_mgr and hasattr(sync_mgr, "get_provenance"):
                 try:
                     provenance = sync_mgr.get_provenance()
-                except Exception as exc:
+                except (RuntimeError, ValueError) as exc:
                     logger.debug("Failed to read checkpoint provenance: %s", exc)
             return jsonify({"provenance": provenance}), 200
 
@@ -1003,7 +1003,7 @@ class NodeAPIRoutes:
             try:
                 metrics_output = self.node.metrics_collector.export_prometheus()
                 return metrics_output, 200, {"Content-Type": "text/plain; version=0.0.4"}
-            except Exception as e:
+            except (RuntimeError, AttributeError, ValueError) as e:
                 return f"# Error generating metrics: {e}\n", 500, {"Content-Type": "text/plain"}
 
         @self.app.route("/stats", methods=["GET"])
@@ -1260,7 +1260,7 @@ class NodeAPIRoutes:
             if callable(lookup):
                 try:
                     block_obj = lookup(block_hash)
-                except Exception as exc:
+                except (LookupError, ValueError, TypeError) as exc:
                     logger.debug("get_block_by_hash failed: %s", type(exc).__name__)
                     block_obj = None
 
@@ -1355,7 +1355,7 @@ class NodeAPIRoutes:
                 from xai.core.blockchain import Blockchain
 
                 block = Blockchain.deserialize_block(payload)
-            except Exception as exc:
+            except (ValueError, TypeError, KeyError) as exc:
                 return self._error_response(
                     f"Invalid block data: {exc}",
                     status=400,
@@ -1368,10 +1368,10 @@ class NodeAPIRoutes:
                 try:
                     from xai.core.monitoring import MetricsCollector
                     MetricsCollector.instance().record_p2p_message("received")
-                except Exception as e:
+                except (RuntimeError, ValueError) as e:
                     logger.debug("P2P metrics record failed: %s", type(e).__name__)
                 added = self.blockchain.add_block(block)
-            except Exception as exc:
+            except (RuntimeError, ValueError) as exc:
                 return self._handle_exception(exc, "receive_block")
 
             if added:

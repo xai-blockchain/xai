@@ -45,7 +45,7 @@ class APISecurityManager:
         self.rate_limiter = SimpleRateLimiter(Config.API_RATE_LIMIT, Config.API_RATE_WINDOW_SECONDS)
         self.max_json_bytes = Config.API_MAX_JSON_BYTES
 
-    def enforce_request(self):
+    def enforce_request(self) -> None:
         """Run validations before each request."""
         client_ip = request.headers.get("X-Forwarded-For") or request.remote_addr or "127.0.0.1"
         client_ip = client_ip.split(",")[0].strip()

@@ -86,7 +86,7 @@ def register_blueprints(
     }
 
     @app.before_request
-    def inject_api_context():
+    def inject_api_context() -> None:
         """Inject API context into Flask's g object for blueprint access."""
         g.api_context = api_context
 

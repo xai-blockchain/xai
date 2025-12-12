@@ -28,7 +28,7 @@ def register_blockchain_routes(routes: "NodeAPIRoutes") -> None:
         """Get all blocks with pagination."""
         try:
             limit, offset = routes._get_pagination_params(default_limit=10, max_limit=200)
-        except Exception as exc:
+        except (ValueError, RuntimeError) as exc:
             return routes._error_response(
                 str(exc),
                 status=400,
@@ -65,7 +65,7 @@ def register_blockchain_routes(routes: "NodeAPIRoutes") -> None:
         fallback_block = None
         try:
             fallback_block = chain[idx_int]
-        except Exception as exc:
+        except IndexError as exc:
             logger.debug("Block %d not in chain cache: %s", idx_int, type(exc).__name__)
             fallback_block = None
 
@@ -74,7 +74,7 @@ def register_blockchain_routes(routes: "NodeAPIRoutes") -> None:
         if callable(block_lookup):
             try:
                 block_obj = block_lookup(idx_int)
-            except Exception as exc:
+            except (LookupError, ValueError, TypeError) as exc:
                 logger.debug("get_block(%d) failed: %s", idx_int, type(exc).__name__)
                 block_obj = None
 
@@ -173,7 +173,7 @@ def register_blockchain_routes(routes: "NodeAPIRoutes") -> None:
 
         try:
             block = Blockchain.deserialize_block(payload)
-        except Exception as exc:
+        except (ValueError, TypeError, KeyError) as exc:
             return routes._error_response(
                 f"Invalid block data: {exc}",
                 status=400,
@@ -184,10 +184,10 @@ def register_blockchain_routes(routes: "NodeAPIRoutes") -> None:
         try:
             try:
                 MetricsCollector.instance().record_p2p_message("received")
-            except Exception as exc:  # pragma: no cover - metrics optional
+            except (RuntimeError, ValueError) as exc:  # pragma: no cover - metrics optional
                 logger.debug("P2P metrics record failed: %s", type(exc).__name__)
             added = blockchain.add_block(block)
-        except Exception as exc:
+        except (ValueError, RuntimeError) as exc:
             return routes._handle_exception(exc, "receive_block")
 
         if added:
@@ -231,7 +231,7 @@ def _lookup_block_by_hash(blockchain: Any, block_hash: str, normalized: str) -> 
     if callable(lookup):
         try:
             block_obj = lookup(block_hash)
-        except Exception as exc:
+        except (LookupError, ValueError, TypeError) as exc:
             logger.debug("get_block_by_hash failed: %s", type(exc).__name__)
             block_obj = None
 

@@ -124,9 +124,14 @@ class DatabaseMigrationManager:
             logger.info(f"Applied migration v{version}: {description}")
             return True
 
-        except Exception as e:
+        except sqlite3.DatabaseError as e:
             self.conn.rollback()
-            logger.error(f"Migration v{version} failed: {e}")
+            logger.error(
+                "Migration v%s failed: %s",
+                version,
+                e,
+                extra={"event": "explorer_backend.migration_failed", "version": version},
+            )
             return False
 
     def rollback_migration(self, version: int) -> bool:
@@ -155,9 +160,14 @@ class DatabaseMigrationManager:
             logger.info(f"Rolled back migration v{version}")
             return True
 
-        except Exception as e:
+        except sqlite3.DatabaseError as e:
             self.conn.rollback()
-            logger.error(f"Rollback v{version} failed: {e}")
+            logger.error(
+                "Rollback v%s failed: %s",
+                version,
+                e,
+                extra={"event": "explorer_backend.rollback_failed", "version": version},
+            )
             return False
 
     def get_migration_history(self) -> List[Dict]:
@@ -302,8 +312,12 @@ class ExplorerDatabase:
 
             self.conn.commit()
             logger.info("Database initialized successfully")
-        except Exception as e:
-            logger.error(f"Database initialization error: {e}")
+        except sqlite3.DatabaseError as e:
+            logger.error(
+                "Database initialization error: %s",
+                e,
+                extra={"event": "explorer_backend.db_init_failed"},
+            )
             raise
 
     def _apply_migrations(self) -> None:
@@ -322,8 +336,12 @@ class ExplorerDatabase:
                     migration["sql"],
                     migration["rollback"]
                 )
-        except Exception as e:
-            logger.error(f"Migration application error: {e}")
+        except (sqlite3.DatabaseError, RuntimeError) as e:
+            logger.error(
+                "Migration application error: %s",
+                e,
+                extra={"event": "explorer_backend.migration_apply_failed"},
+            )
 
     def add_search(self, query: str, search_type: str, result_found: bool, user_id: str = "anonymous") -> None:
         """Record search query"""
@@ -335,8 +353,12 @@ class ExplorerDatabase:
                     VALUES (?, ?, ?, ?, ?)
                 """, (query, search_type, user_id, time.time(), int(result_found)))
                 self.conn.commit()
-        except Exception as e:
-            logger.error(f"Error recording search: {e}")
+        except sqlite3.DatabaseError as e:
+            logger.error(
+                "Error recording search: %s",
+                e,
+                extra={"event": "explorer_backend.search_record_failed"},
+            )
 
     def get_recent_searches(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent searches"""
@@ -353,8 +375,12 @@ class ExplorerDatabase:
                     {"query": row[0], "type": row[1], "timestamp": row[2]}
                     for row in cursor.fetchall()
                 ]
-        except Exception as e:
-            logger.error(f"Error fetching recent searches: {e}")
+        except sqlite3.DatabaseError as e:
+            logger.error(
+                "Error fetching recent searches: %s",
+                e,
+                extra={"event": "explorer_backend.search_fetch_failed"},
+            )
             return []
 
     def add_address_label(self, label: AddressLabel) -> None:
@@ -367,8 +393,12 @@ class ExplorerDatabase:
                     VALUES (?, ?, ?, ?, ?)
                 """, (label.address, label.label, label.category, label.description, label.created_at))
                 self.conn.commit()
-        except Exception as e:
-            logger.error(f"Error adding label: {e}")
+        except sqlite3.DatabaseError as e:
+            logger.error(
+                "Error adding label: %s",
+                e,
+                extra={"event": "explorer_backend.label_add_failed"},
+            )
 
     def get_address_label(self, address: str) -> Optional[AddressLabel]:
         """Get address label"""
@@ -383,8 +413,12 @@ class ExplorerDatabase:
                 row = cursor.fetchone()
                 if row:
                     return AddressLabel(*row)
-        except Exception as e:
-            logger.error(f"Error fetching label: {e}")
+        except sqlite3.DatabaseError as e:
+            logger.error(
+                "Error fetching label: %s",
+                e,
+                extra={"event": "explorer_backend.label_fetch_failed"},
+            )
         return None
 
     def record_metric(self, metric_type: str, value: float, data: Optional[Dict] = None) -> None:
@@ -397,8 +431,12 @@ class ExplorerDatabase:
                     VALUES (?, ?, ?, ?)
                 """, (metric_type, time.time(), value, json.dumps(data) if data else None))
                 self.conn.commit()
-        except Exception as e:
-            logger.error(f"Error recording metric: {e}")
+        except sqlite3.DatabaseError as e:
+            logger.error(
+                "Error recording metric: %s",
+                e,
+                extra={"event": "explorer_backend.metric_record_failed"},
+            )
 
     def get_metrics(self, metric_type: str, hours: int = 24) -> List[Dict[str, Any]]:
         """Get metrics for time period"""
@@ -416,8 +454,12 @@ class ExplorerDatabase:
                     {"timestamp": row[0], "value": row[1], "data": json.loads(row[2]) if row[2] else None}
                     for row in cursor.fetchall()
                 ]
-        except Exception as e:
-            logger.error(f"Error fetching metrics: {e}")
+        except sqlite3.DatabaseError as e:
+            logger.error(
+                "Error fetching metrics: %s",
+                e,
+                extra={"event": "explorer_backend.metric_fetch_failed"},
+            )
             return []
 
     def set_cache(self, key: str, value: str, ttl: int = 300) -> None:
@@ -430,8 +472,12 @@ class ExplorerDatabase:
                     VALUES (?, ?, ?)
                 """, (key, value, time.time() + ttl))
                 self.conn.commit()
-        except Exception as e:
-            logger.error(f"Error setting cache: {e}")
+        except sqlite3.DatabaseError as e:
+            logger.error(
+                "Error setting cache: %s",
+                e,
+                extra={"event": "explorer_backend.cache_set_failed"},
+            )
 
     def get_cache(self, key: str) -> Optional[str]:
         """Get cache value"""
@@ -444,8 +490,12 @@ class ExplorerDatabase:
                 """, (key, time.time()))
                 row = cursor.fetchone()
                 return row[0] if row else None
-        except Exception as e:
-            logger.error(f"Error getting cache: {e}")
+        except sqlite3.DatabaseError as e:
+            logger.error(
+                "Error getting cache: %s",
+                e,
+                extra={"event": "explorer_backend.cache_get_failed"},
+            )
         return None
 
 
@@ -497,8 +547,19 @@ class AnalyticsEngine:
             self.db.set_cache(cache_key, json.dumps(result))
             self.db.record_metric("hashrate", estimated_hashrate)
             return result
-        except Exception as e:
-            logger.error(f"Error calculating hashrate: {e}")
+        except (TypeError, ValueError, KeyError) as e:
+            logger.error(
+                "Error calculating hashrate: %s",
+                e,
+                extra={"event": "explorer_backend.hashrate_calc_failed"},
+            )
+            return {"error": str(e)}
+        except requests.RequestException as e:
+            logger.error(
+                "Error fetching stats for hashrate: %s",
+                e,
+                extra={"event": "explorer_backend.hashrate_fetch_failed"},
+            )
             return {"error": str(e)}
 
     def get_transaction_volume(self, period: str = "24h") -> Dict[str, Any]:
@@ -545,8 +606,19 @@ class AnalyticsEngine:
             self.db.set_cache(cache_key, json.dumps(result))
             self.db.record_metric(f"tx_volume_{period}", tx_count, result)
             return result
-        except Exception as e:
-            logger.error(f"Error calculating transaction volume: {e}")
+        except (TypeError, ValueError, KeyError) as e:
+            logger.error(
+                "Error calculating transaction volume: %s",
+                e,
+                extra={"event": "explorer_backend.tx_volume_calc_failed"},
+            )
+            return {"error": str(e)}
+        except requests.RequestException as e:
+            logger.error(
+                "Error fetching blocks for tx volume: %s",
+                e,
+                extra={"event": "explorer_backend.tx_volume_fetch_failed"},
+            )
             return {"error": str(e)}
 
     def get_active_addresses(self) -> Dict[str, Any]:
@@ -579,8 +651,19 @@ class AnalyticsEngine:
             self.db.set_cache(cache_key, json.dumps(result))
             self.db.record_metric("active_addresses", len(addresses))
             return result
-        except Exception as e:
-            logger.error(f"Error calculating active addresses: {e}")
+        except (TypeError, ValueError, KeyError) as e:
+            logger.error(
+                "Error calculating active addresses: %s",
+                e,
+                extra={"event": "explorer_backend.active_addresses_calc_failed"},
+            )
+            return {"error": str(e)}
+        except requests.RequestException as e:
+            logger.error(
+                "Error fetching blocks for active addresses: %s",
+                e,
+                extra={"event": "explorer_backend.active_addresses_fetch_failed"},
+            )
             return {"error": str(e)}
 
     def get_average_block_time(self) -> Dict[str, Any]:
@@ -620,8 +703,19 @@ class AnalyticsEngine:
             self.db.set_cache(cache_key, json.dumps(result))
             self.db.record_metric("avg_block_time", avg_block_time)
             return result
-        except Exception as e:
-            logger.error(f"Error calculating average block time: {e}")
+        except (TypeError, ValueError, KeyError) as e:
+            logger.error(
+                "Error calculating average block time: %s",
+                e,
+                extra={"event": "explorer_backend.avg_block_time_calc_failed"},
+            )
+            return {"error": str(e)}
+        except requests.RequestException as e:
+            logger.error(
+                "Error fetching blocks for avg block time: %s",
+                e,
+                extra={"event": "explorer_backend.avg_block_time_fetch_failed"},
+            )
             return {"error": str(e)}
 
     def get_mempool_size(self) -> Dict[str, Any]:
@@ -656,8 +750,19 @@ class AnalyticsEngine:
             self.db.set_cache(cache_key, json.dumps(result))
             self.db.record_metric("mempool_size", pending_count, result)
             return result
-        except Exception as e:
-            logger.error(f"Error getting mempool size: {e}")
+        except requests.RequestException as e:
+            logger.error(
+                "Error getting mempool size from node: %s",
+                e,
+                extra={"event": "explorer_backend.mempool_fetch_failed"},
+            )
+            return {"error": str(e)}
+        except (TypeError, ValueError, KeyError) as e:
+            logger.error(
+                "Error parsing mempool response: %s",
+                e,
+                extra={"event": "explorer_backend.mempool_parse_failed"},
+            )
             return {"error": str(e)}
 
     def get_network_difficulty(self) -> Dict[str, Any]:
@@ -676,8 +781,19 @@ class AnalyticsEngine:
 
             self.db.record_metric("network_difficulty", difficulty)
             return result
-        except Exception as e:
-            logger.error(f"Error getting difficulty: {e}")
+        except (TypeError, ValueError, KeyError) as e:
+            logger.error(
+                "Error getting difficulty: %s",
+                e,
+                extra={"event": "explorer_backend.difficulty_parse_failed"},
+            )
+            return {"error": str(e)}
+        except requests.RequestException as e:
+            logger.error(
+                "Error fetching difficulty from node: %s",
+                e,
+                extra={"event": "explorer_backend.difficulty_fetch_failed"},
+            )
             return {"error": str(e)}
 
     def _fetch_stats(self) -> Optional[Dict[str, Any]]:
@@ -686,8 +802,19 @@ class AnalyticsEngine:
             response = requests.get(f"{self.node_url}/stats", timeout=5)
             response.raise_for_status()
             return response.json()
-        except Exception as e:
-            logger.error(f"Error fetching stats: {e}")
+        except requests.RequestException as e:
+            logger.error(
+                "Error fetching stats: %s",
+                e,
+                extra={"event": "explorer_backend.stats_fetch_failed"},
+            )
+            return None
+        except (ValueError, json.JSONDecodeError) as e:
+            logger.error(
+                "Error decoding stats JSON: %s",
+                e,
+                extra={"event": "explorer_backend.stats_decode_failed"},
+            )
             return None
 
     def _fetch_blocks(self, limit: int = 100, offset: int = 0) -> Optional[Dict[str, Any]]:
@@ -699,8 +826,19 @@ class AnalyticsEngine:
             )
             response.raise_for_status()
             return response.json()
-        except Exception as e:
-            logger.error(f"Error fetching blocks: {e}")
+        except requests.RequestException as e:
+            logger.error(
+                "Error fetching blocks: %s",
+                e,
+                extra={"event": "explorer_backend.blocks_fetch_failed"},
+            )
+            return None
+        except (ValueError, json.JSONDecodeError) as e:
+            logger.error(
+                "Error decoding blocks JSON: %s",
+                e,
+                extra={"event": "explorer_backend.blocks_decode_failed"},
+            )
             return None
 
 
@@ -742,8 +880,19 @@ class SearchEngine:
             self.db.add_search(query, search_type.value, found, user_id)
 
             result["found"] = found
-        except Exception as e:
-            logger.error(f"Search error: {e}")
+        except requests.RequestException as e:
+            logger.error(
+                "Search error (network): %s",
+                e,
+                extra={"event": "explorer_backend.search_network_failed"},
+            )
+            result["error"] = str(e)
+        except (ValueError, TypeError) as e:
+            logger.error(
+                "Search error (input/parse): %s",
+                e,
+                extra={"event": "explorer_backend.search_parse_failed"},
+            )
             result["error"] = str(e)
 
         return result
@@ -757,8 +906,12 @@ class SearchEngine:
                 if item["query"].startswith(prefix)
             ]
             return suggestions[:limit]
-        except Exception as e:
-            logger.error(f"Autocomplete error: {e}")
+        except (ValueError, TypeError) as e:
+            logger.error(
+                "Autocomplete error: %s",
+                e,
+                extra={"event": "explorer_backend.autocomplete_failed"},
+            )
             return []
 
     def get_recent_searches(self, limit: int = 10) -> List[Dict[str, Any]]:
@@ -787,8 +940,12 @@ class SearchEngine:
             response = requests.get(f"{self.node_url}/blocks/{height}", timeout=5)
             if response.status_code == 200:
                 return response.json()
-        except Exception as e:
-            logger.error(f"Block search error: {e}")
+        except requests.RequestException as e:
+            logger.error(
+                "Block search error: %s",
+                e,
+                extra={"event": "explorer_backend.search_block_failed"},
+            )
         return None
 
     def _search_block_hash(self, block_hash: str) -> Optional[Dict[str, Any]]:
@@ -800,8 +957,12 @@ class SearchEngine:
                 for block in blocks:
                     if block.get("hash") == block_hash or block.get("previous_hash") == block_hash:
                         return block
-        except Exception as e:
-            logger.error(f"Hash search error: {e}")
+        except requests.RequestException as e:
+            logger.error(
+                "Hash search error: %s",
+                e,
+                extra={"event": "explorer_backend.search_hash_failed"},
+            )
         return None
 
     def _search_transaction(self, txid: str) -> Optional[Dict[str, Any]]:
@@ -810,8 +971,12 @@ class SearchEngine:
             response = requests.get(f"{self.node_url}/transaction/{txid}", timeout=5)
             if response.status_code == 200:
                 return response.json()
-        except Exception as e:
-            logger.error(f"Transaction search error: {e}")
+        except requests.RequestException as e:
+            logger.error(
+                "Transaction search error: %s",
+                e,
+                extra={"event": "explorer_backend.search_tx_failed"},
+            )
         return None
 
     def _search_address(self, address: str) -> Optional[Dict[str, Any]]:
@@ -830,8 +995,12 @@ class SearchEngine:
                     "transactions": history_data.get("transactions", []),
                     "transaction_count": len(history_data.get("transactions", []))
                 }
-        except Exception as e:
-            logger.error(f"Address search error: {e}")
+        except requests.RequestException as e:
+            logger.error(
+                "Address search error: %s",
+                e,
+                extra={"event": "explorer_backend.search_address_failed"},
+            )
         return None
 
 
@@ -864,8 +1033,19 @@ class RichListManager:
                 self.db.record_metric("richlist_top_holder", rich_list[0]["balance"])
 
             return rich_list
-        except Exception as e:
-            logger.error(f"Rich list error: {e}")
+        except (TypeError, ValueError, KeyError) as e:
+            logger.error(
+                "Rich list error (calc): %s",
+                e,
+                extra={"event": "explorer_backend.richlist_calc_failed"},
+            )
+            return []
+        except requests.RequestException as e:
+            logger.error(
+                "Rich list error (fetch): %s",
+                e,
+                extra={"event": "explorer_backend.richlist_fetch_failed"},
+            )
             return []
 
     def _calculate_rich_list(self, limit: int) -> List[Dict[str, Any]]:
@@ -910,8 +1090,19 @@ class RichListManager:
                 })
 
             return rich_list
-        except Exception as e:
-            logger.error(f"Error calculating rich list: {e}")
+        except (TypeError, ValueError, KeyError, ZeroDivisionError) as e:
+            logger.error(
+                "Error calculating rich list: %s",
+                e,
+                extra={"event": "explorer_backend.richlist_calc_failed"},
+            )
+            return []
+        except requests.RequestException as e:
+            logger.error(
+                "Error fetching blocks for rich list: %s",
+                e,
+                extra={"event": "explorer_backend.richlist_fetch_failed"},
+            )
             return []
 
 
@@ -950,8 +1141,19 @@ class ExportManager:
                 )
 
             return "\n".join(csv_lines)
-        except Exception as e:
-            logger.error(f"Export error: {e}")
+        except (ValueError, KeyError, TypeError) as e:
+            logger.error(
+                "Export error (formatting): %s",
+                e,
+                extra={"event": "explorer_backend.export_format_failed"},
+            )
+            return None
+        except requests.RequestException as e:
+            logger.error(
+                "Export error (fetch): %s",
+                e,
+                extra={"event": "explorer_backend.export_fetch_failed"},
+            )
             return None
 
 
@@ -998,15 +1200,23 @@ class AddressLabelingManager:
                         self.db.add_address_label(label)
                         imported += 1
 
-                    except Exception as e:
-                        logger.error(f"Failed to import label: {e}")
+                    except (ValueError, KeyError) as e:
+                        logger.error(
+                            "Failed to import label: %s",
+                            e,
+                            extra={"event": "explorer_backend.label_import_failed"},
+                        )
                         errors += 1
 
             logger.info(f"CSV import complete: {imported} imported, {errors} errors")
             return imported, errors
 
-        except Exception as e:
-            logger.error(f"Failed to read CSV: {e}")
+        except (OSError, csv.Error, UnicodeDecodeError) as e:
+            logger.error(
+                "Failed to read CSV: %s",
+                e,
+                extra={"event": "explorer_backend.label_csv_read_failed"},
+            )
             return 0, 0
 
     def export_to_csv(self, csv_path: str) -> int:
@@ -1032,8 +1242,12 @@ class AddressLabelingManager:
             logger.info(f"Exported {len(labels)} labels to CSV")
             return len(labels)
 
-        except Exception as e:
-            logger.error(f"CSV export error: {e}")
+        except (OSError, csv.Error) as e:
+            logger.error(
+                "CSV export error: %s",
+                e,
+                extra={"event": "explorer_backend.label_csv_export_failed"},
+            )
             return 0
 
     def search_labels(self, query: str) -> List[AddressLabel]:
@@ -1103,8 +1317,18 @@ class MempoolMonitor:
                     # Store in database for long-term history
                     self._store_metrics(metrics)
 
-            except Exception as e:
-                logger.error(f"Mempool monitoring error: {e}")
+            except requests.RequestException as e:
+                logger.error(
+                    "Mempool monitoring error (network): %s",
+                    e,
+                    extra={"event": "explorer_backend.mempool_monitor_fetch_failed"},
+                )
+            except (TypeError, ValueError, KeyError) as e:
+                logger.error(
+                    "Mempool monitoring error (parse): %s",
+                    e,
+                    extra={"event": "explorer_backend.mempool_monitor_parse_failed"},
+                )
 
             time.sleep(10)  # Update every 10 seconds
 
@@ -1126,8 +1350,12 @@ class MempoolMonitor:
                     metrics["oldest_tx_age"]
                 ))
                 self.db.conn.commit()
-        except Exception as e:
-            logger.error(f"Failed to store mempool metrics: {e}")
+        except sqlite3.DatabaseError as e:
+            logger.error(
+                "Failed to store mempool metrics: %s",
+                e,
+                extra={"event": "explorer_backend.mempool_metrics_store_failed"},
+            )
 
     def get_mempool_metrics(self) -> Dict[str, Any]:
         """Get current mempool metrics"""
@@ -1161,8 +1389,27 @@ class MempoolMonitor:
                 "timestamp": time.time()
             }
 
-        except Exception as e:
-            logger.error(f"Failed to get mempool metrics: {e}")
+        except requests.RequestException as e:
+            logger.error(
+                "Failed to get mempool metrics (fetch): %s",
+                e,
+                extra={"event": "explorer_backend.mempool_metrics_fetch_failed"},
+            )
+            return {
+                "pending_count": 0,
+                "size_mb": 0,
+                "average_fee": 0,
+                "total_fees": 0,
+                "oldest_tx_age": 0,
+                "timestamp": time.time(),
+                "error": str(e)
+            }
+        except (TypeError, ValueError, KeyError, json.JSONDecodeError) as e:
+            logger.error(
+                "Failed to get mempool metrics (parse): %s",
+                e,
+                extra={"event": "explorer_backend.mempool_metrics_parse_failed"},
+            )
             return {
                 "pending_count": 0,
                 "size_mb": 0,
@@ -1208,8 +1455,12 @@ class MempoolMonitor:
                     ]
 
                     return db_data
-            except Exception as e:
-                logger.error(f"Failed to get mempool history from DB: {e}")
+            except sqlite3.DatabaseError as e:
+                logger.error(
+                    "Failed to get mempool history from DB: %s",
+                    e,
+                    extra={"event": "explorer_backend.mempool_history_db_failed"},
+                )
 
         return recent_data
 
@@ -1234,8 +1485,12 @@ class MempoolMonitor:
                 "data_points": len(history)
             }
 
-        except Exception as e:
-            logger.error(f"Failed to get mempool stats: {e}")
+        except (TypeError, ValueError, KeyError) as e:
+            logger.error(
+                "Failed to get mempool stats: %s",
+                e,
+                extra={"event": "explorer_backend.mempool_stats_calc_failed"},
+            )
             return {"error": str(e)}
 
     def stop(self):
@@ -1445,8 +1700,12 @@ def websocket_updates(ws):
             data = ws.receive()
             if data == "ping":
                 ws.send("pong")
-    except Exception as e:
-        logger.error(f"WebSocket error: {e}")
+    except (ConnectionResetError, OSError, RuntimeError) as e:
+        logger.error(
+            "WebSocket error: %s",
+            e,
+            extra={"event": "explorer_backend.websocket_error"},
+        )
     finally:
         with ws_lock:
             ws_clients.discard(ws)
@@ -1465,8 +1724,12 @@ def broadcast_update(update_type: str, data: Dict[str, Any]) -> None:
         for client in list(ws_clients):
             try:
                 client.send(message)
-            except Exception as e:
-                logger.error(f"Broadcast error: {e}")
+            except (ConnectionResetError, OSError, RuntimeError) as e:
+                logger.error(
+                    "Broadcast error: %s",
+                    e,
+                    extra={"event": "explorer_backend.broadcast_error"},
+                )
                 ws_clients.discard(client)
 
 
@@ -1512,7 +1775,7 @@ def import_labels():
             "imported": imported,
             "errors": errors
         })
-    except Exception as e:
+    except (OSError, csv.Error, UnicodeDecodeError) as e:
         if os.path.exists(csv_path):
             os.unlink(csv_path)
         return jsonify({"error": str(e)}), 500
@@ -1538,7 +1801,7 @@ def export_labels():
             "Content-Type": "text/csv",
             "Content-Disposition": "attachment; filename=address_labels.csv"
         }
-    except Exception as e:
+    except (OSError, csv.Error) as e:
         if os.path.exists(csv_path):
             os.unlink(csv_path)
         return jsonify({"error": str(e)}), 500

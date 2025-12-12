@@ -354,11 +354,21 @@ class Wallet:
             )
             return True
 
+        try:
+            source_wallet = Wallet.load_from_file(wallet_file, password, allow_legacy=True)
+        except Exception as exc:
+            logger.error(
+                "Failed to load legacy wallet for migration: %s",
+                type(exc).__name__,
+                extra={"event": "wallet.migration_load_failed", "wallet_file": os.path.basename(wallet_file)},
+            )
+            return False
+
         logger.warning(
             "SECURITY: Migrating wallet from weak to secure encryption",
             extra={
                 "event": "wallet.encryption_migration_start",
-                "address": self.address[:16] + "...",
+                "address": source_wallet.address[:16] + "...",
                 "wallet_file": os.path.basename(wallet_file)
             }
         )
@@ -378,20 +388,20 @@ class Wallet:
         try:
             # Re-save using secure encryption
             # save_to_file now uses _encrypt_payload by default
-            self.save_to_file(wallet_file, password)
+            source_wallet.save_to_file(wallet_file, password)
 
             # Verify migration by reloading
             test_wallet = Wallet.load_from_file(wallet_file, password)
 
             # Verify private keys match
-            if test_wallet.private_key != self.private_key:
+            if test_wallet.private_key != source_wallet.private_key:
                 raise ValueError("Migration verification failed: private key mismatch")
 
             logger.info(
                 "Wallet migration completed successfully",
                 extra={
                     "event": "wallet.encryption_migrated",
-                    "address": self.address[:16] + "...",
+                    "address": source_wallet.address[:16] + "...",
                     "backup_file": os.path.basename(backup_file)
                 }
             )
@@ -415,6 +425,35 @@ class Wallet:
                     extra={"event": "wallet.backup_restore_failed"}
                 )
             return False
+
+    def _encrypt(self, data: str, password: str) -> Dict[str, str]:
+        """
+        Encrypt an arbitrary string with AES-GCM using strong PBKDF2-derived keys.
+
+        This is a compatibility wrapper kept for tests that expect _encrypt/_decrypt
+        helpers while reusing the hardened payload format.
+        """
+        if data is None:
+            raise ValueError("Data must be provided for encryption")
+        return self._encrypt_payload(data, password)
+
+    def _decrypt(self, payload: Any, password: str) -> str:
+        """
+        Decrypt data produced by _encrypt/_encrypt_payload.
+
+        Accepts either a payload dictionary or its JSON string representation.
+        """
+        if isinstance(payload, str):
+            try:
+                payload_dict = json.loads(payload)
+            except json.JSONDecodeError as exc:
+                raise ValueError("Invalid encrypted payload format") from exc
+        elif isinstance(payload, dict):
+            payload_dict = payload
+        else:
+            raise ValueError("Unsupported payload type for decryption")
+
+        return self._decrypt_payload(payload_dict, password)
 
     def _encrypt_payload(self, data: str, password: str) -> Dict[str, str]:
         """
@@ -485,7 +524,12 @@ class Wallet:
             raise ValueError(f"Bad decrypt: {e}")
 
     @staticmethod
-    def load_from_file(filename: str, password: Optional[str] = None) -> "Wallet":
+    def load_from_file(
+        filename: str,
+        password: Optional[str] = None,
+        *,
+        allow_legacy: bool = False,
+    ) -> "Wallet":
         """Load wallet from file with HMAC integrity verification.
 
         Security:
@@ -497,6 +541,9 @@ class Wallet:
         Args:
             filename: Path to the wallet file
             password: Password for encrypted wallets
+            allow_legacy: Explicitly allow loading legacy weakly-encrypted wallets
+                (intended only for one-time migration). Defaults to False and will
+                fail closed when encountering legacy formats.
 
         Returns:
             Loaded Wallet instance
@@ -549,17 +596,20 @@ class Wallet:
             if "payload" in data:
                 wallet_json = Wallet._decrypt_payload_static(data["payload"], password)
             else:
-                # Legacy weak encryption detected - emit warning
+                if not allow_legacy:
+                    logger.error(
+                        "Refusing to load wallet with legacy weak encryption; migrate required",
+                        extra={
+                            "event": "wallet.legacy_encryption_blocked",
+                            "wallet_file": os.path.basename(filename),
+                            "action_required": "migrate_encryption",
+                        },
+                    )
+                    raise ValueError(
+                        "Wallet uses legacy weak encryption; migration required before loading. "
+                        "Call Wallet.migrate_wallet_encryption() or pass allow_legacy=True for one-time migration."
+                    )
                 wallet_json = Wallet._decrypt_static(data["data"], password)
-                logger.warning(
-                    "SECURITY: Wallet uses weak legacy encryption. "
-                    "Run wallet.migrate_wallet_encryption(filename, password) to upgrade.",
-                    extra={
-                        "event": "wallet.legacy_format_loaded",
-                        "wallet_file": os.path.basename(filename),
-                        "action_required": "migrate_encryption"
-                    }
-                )
             wallet_data = json.loads(wallet_json)
             logger.info(
                 "Decrypted wallet file successfully",

@@ -66,28 +66,20 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
                     context={"error": str(exc)},
                 )
 
-        try:
-            from xai.core.blockchain import Transaction
+        from xai.core.blockchain import Transaction
 
-            tx = Transaction(
-                sender=model.sender,
-                recipient=contract_address,
-                amount=model.value,
-                fee=model.fee,
-                public_key=model.public_key,
-                nonce=nonce,
-                tx_type="contract_deploy",
-                outputs=[{"address": contract_address, "amount": model.value}],
-            )
-            tx.metadata = metadata
-            tx.signature = model.signature
-        except Exception as exc:
-            return routes._error_response(
-                "Unable to build deployment transaction",
-                status=400,
-                code="contract_build_error",
-                context={"error": str(exc)},
-            )
+        tx = Transaction(
+            sender=model.sender,
+            recipient=contract_address,
+            amount=model.value,
+            fee=model.fee,
+            public_key=model.public_key,
+            nonce=nonce,
+            tx_type="contract_deploy",
+            outputs=[{"address": contract_address, "amount": model.value}],
+        )
+        tx.metadata = metadata
+        tx.signature = model.signature
 
         if not tx.verify_signature():
             return routes._error_response(
@@ -168,7 +160,7 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
             )
             tx.metadata = metadata
             tx.signature = model.signature
-        except Exception as exc:
+        except (ValueError, TypeError, AttributeError) as exc:
             return routes._error_response(
                 "Unable to build contract call",
                 status=400,
@@ -286,7 +278,7 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
     def contract_events(address: str) -> Tuple[Dict[str, Any], int]:
         try:
             limit, offset = routes._get_pagination_params(default_limit=50, max_limit=500)
-        except Exception as exc:
+        except ValueError as exc:
             return routes._error_response(
                 str(exc), status=400, code="invalid_pagination", event_type="contracts.invalid_paging"
             )
@@ -312,6 +304,7 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
 
     @app.route("/contracts/governance/status", methods=["GET"])
     def contract_feature_status() -> Tuple[Dict[str, Any], int]:
+        """Expose smart-contract feature enablement status across config/governance/manager."""
         executor = getattr(blockchain, "governance_executor", None)
         feature_enabled = bool(
             executor and executor.is_feature_enabled("smart_contracts")
@@ -370,7 +363,7 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
             execution_result = blockchain.governance_executor.execute_proposal(
                 proposal_id, proposal_data
             )
-        except Exception as exc:
+        except (RuntimeError, ValueError, KeyError) as exc:
             return routes._handle_exception(exc, "contract_feature_toggle")
 
         if not execution_result.get("success"):

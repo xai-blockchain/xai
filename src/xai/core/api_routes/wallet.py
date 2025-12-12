@@ -30,7 +30,7 @@ def register_wallet_routes(routes: "NodeAPIRoutes") -> None:
         try:
             confirmed = tracker.get_nonce(address)
             next_nonce = tracker.get_next_nonce(address)
-        except Exception as exc:
+        except (ValueError, RuntimeError) as exc:
             return routes._handle_exception(exc, "nonce_lookup")
 
         pending_nonce = next_nonce - 1 if next_nonce - 1 > confirmed else None
@@ -50,7 +50,7 @@ def register_wallet_routes(routes: "NodeAPIRoutes") -> None:
     def get_history(address: str) -> Dict[str, Any]:
         try:
             limit, offset = routes._get_pagination_params(default_limit=50, max_limit=500)
-        except Exception as exc:
+        except (ValueError, RuntimeError) as exc:
             return routes._error_response(
                 str(exc),
                 status=400,

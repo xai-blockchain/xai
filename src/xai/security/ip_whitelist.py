@@ -1,10 +1,12 @@
 import ipaddress
+import logging
 from functools import wraps
 from flask import request, abort
 import json
 import os
 
 IP_WHITELIST_CONFIG_FILE = "ip_whitelist.json"
+logger = logging.getLogger(__name__)
 
 
 class IPWhitelist:
@@ -36,12 +38,14 @@ class IPWhitelist:
         if network not in self.whitelisted_ips:
             self.whitelisted_ips.append(network)
             self._save_config()
+            logger.info("IP added to whitelist", extra={"event": "ip_whitelist.add", "network": str(network)})
 
     def remove_ip(self, ip_address_or_network):
         network = ipaddress.ip_network(ip_address_or_network, strict=False)
         if network in self.whitelisted_ips:
             self.whitelisted_ips.remove(network)
             self._save_config()
+            logger.info("IP removed from whitelist", extra={"event": "ip_whitelist.remove", "network": str(network)})
 
     def is_whitelisted(self, ip_address):
         try:
@@ -68,28 +72,4 @@ class IPWhitelist:
 
 
 # Example Usage (for testing purposes)
-if __name__ == "__main__":
-    # Create a dummy config directory for testing
-    os.makedirs("config", exist_ok=True)
-
-    whitelist_manager = IPWhitelist()
-    print(f"Initial Whitelist: {[str(ip) for ip in whitelist_manager.whitelisted_ips]}")
-
-    # Add some IPs
-    whitelist_manager.add_ip("127.0.0.1")
-    whitelist_manager.add_ip("192.168.1.0/24")
-    print(f"Whitelist after adding: {[str(ip) for ip in whitelist_manager.whitelisted_ips]}")
-
-    # Test IP addresses
-    print(f"Is '127.0.0.1' whitelisted? {whitelist_manager.is_whitelisted('127.0.0.1')}")
-    print(f"Is '192.168.1.50' whitelisted? {whitelist_manager.is_whitelisted('192.168.1.50')}")
-    print(f"Is '10.0.0.1' whitelisted? {whitelist_manager.is_whitelisted('10.0.0.1')}")
-
-    # Remove an IP
-    whitelist_manager.remove_ip("127.0.0.1")
-    print(f"Whitelist after removing: {[str(ip) for ip in whitelist_manager.whitelisted_ips]}")
-    print(f"Is '127.0.0.1' whitelisted? {whitelist_manager.is_whitelisted('127.0.0.1')}")
-
-    # Clean up dummy config file
-    os.remove(os.path.join("config", IP_WHITELIST_CONFIG_FILE))
-    os.rmdir("config")
+# Example usage is intentionally omitted in production modules.

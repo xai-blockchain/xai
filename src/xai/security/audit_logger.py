@@ -129,8 +129,12 @@ class AuditLogger:
 
             self.rotation_count += 1
 
-        except Exception as e:
-            self.logger.error(f"Error rotating audit log: {e}")
+        except (OSError, IOError, PermissionError, RuntimeError, ValueError) as exc:
+            self.logger.error(
+                "Error rotating audit log: %s",
+                exc,
+                extra={"event": "audit_logger.rotate_failed", "error": str(exc)},
+            )
 
         # Recreate log file handler
         file_handler = logging.FileHandler(self.log_file)
@@ -162,8 +166,13 @@ class AuditLogger:
             try:
                 os.remove(oldest_file)
                 self.logger.info(f"Removed old audit backup: {oldest_file}")
-            except Exception as e:
-                self.logger.error(f"Error removing old backup {oldest_file}: {e}")
+            except (OSError, PermissionError) as exc:
+                self.logger.error(
+                    "Error removing old backup %s: %s",
+                    oldest_file,
+                    exc,
+                    extra={"event": "audit_logger.cleanup_failed", "error": str(exc)},
+                )
 
     def get_rotation_stats(self) -> dict:
         """Get audit log rotation statistics"""
@@ -234,34 +243,5 @@ class AuditLogger:
         self.logger.info(json.dumps(log_entry))
 
 
-# Example Usage (for testing purposes)
 if __name__ == "__main__":
-    audit = AuditLogger()
-
-    # Log a successful login
-    audit.log_action(
-        user_id="admin_user_pubkey_hex",
-        action="login",
-        details={"ip_address": "192.168.1.100"},
-        outcome="SUCCESS",
-    )
-
-    # Log a failed administrative action
-    audit.log_action(
-        user_id="unauthorized_user",
-        action="write_node_config",
-        details={"config_param": "miner_address"},
-        outcome="FAILURE",
-        message="Insufficient permissions",
-    )
-
-    # Log a successful node configuration change
-    audit.log_action(
-        user_id="admin_user_pubkey_hex",
-        action="write_node_config",
-        details={"config_param": "rpc_port", "new_value": 18546},
-        outcome="SUCCESS",
-    )
-
-    print(f"Audit logs written to {AUDIT_LOG_FILE}")
-    # You can inspect the log file to see the JSON entries
+    raise SystemExit("AuditLogger demo removed; use unit tests instead.")

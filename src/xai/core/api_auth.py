@@ -135,12 +135,12 @@ class APIKeyStore:
             }
             severity = "WARNING" if event.get("action") == "revoke" else "INFO"
             log_security_event("api_key_audit", payload, severity=severity)
-        except Exception as e:
+        except (RuntimeError, ValueError, TypeError, KeyError) as exc:
             # Never let logging issues break key management, but log for debugging
             logger.debug(
                 "Security log emission failed: %s",
-                type(e).__name__,
-                extra={"event": "api_auth.emit_log_failed", "error": str(e)}
+                type(exc).__name__,
+                extra={"event": "api_auth.emit_log_failed", "error": str(exc)}
             )
             return
 
@@ -261,7 +261,7 @@ class APIAuthManager:
                 {"old_key_id": key_id, "new_key_id": new_id, "scope": scope, "label": label},
                 severity=severity,
             )
-        except Exception as e:
+        except (RuntimeError, ValueError, TypeError, KeyError) as e:
             logger.debug(
                 "Failed to log key rotation event: %s",
                 type(e).__name__,
@@ -505,7 +505,7 @@ class JWTAuthManager:
                 },
                 severity="WARNING",
             )
-        except Exception as e:
+        except (jwt.PyJWTError, ValueError, TypeError, KeyError) as e:
             # Log decode failure but still proceed with revocation
             logger.debug(
                 "Could not decode token for revocation logging: %s",

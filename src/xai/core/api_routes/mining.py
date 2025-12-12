@@ -44,7 +44,7 @@ def register_mining_routes(
                     status=429,
                     code="rate_limited",
                 )
-        except Exception as exc:
+        except (ImportError, AttributeError, RuntimeError) as exc:
             logger.error(
                 "Rate limiter unavailable for /mine: %s",
                 type(exc).__name__,
@@ -78,8 +78,8 @@ def register_mining_routes(
                 ),
                 200,
             )
-        except Exception as exc:
-            return jsonify({"error": str(exc)}), 500
+        except (ValueError, RuntimeError) as exc:
+            return routes._handle_exception(exc, "mine_block")
 
     @app.route("/auto-mine/start", methods=["POST"])
     def start_auto_mining() -> Dict[str, str]:

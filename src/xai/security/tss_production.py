@@ -9,22 +9,25 @@ Implements distributed threshold cryptography using:
 This replaces the MockTSS with a production-ready implementation.
 """
 
-from abc import ABC, abstractmethod
 import hashlib
-import json
 import logging
 import secrets
-from dataclasses import dataclass, asdict
-from typing import List, Tuple, Dict, Optional
+from dataclasses import dataclass
+from typing import List, Tuple
+
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 from cryptography.hazmat.primitives.serialization import (
     Encoding,
-    PublicFormat,
-    PrivateFormat,
     NoEncryption,
+    PrivateFormat,
+    PublicFormat,
 )
-from cryptography.hazmat.backends import default_backend
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -184,13 +187,12 @@ class ShamirSecretSharing:
             if len(test_shares) < 2:
                 return False
 
-            # If we have enough shares, reconstruct and verify
             if len(test_shares) >= 2:
                 secret1 = cls.reconstruct_secret(test_shares[:2])
                 secret2 = cls.reconstruct_secret(test_shares[:2])
                 return secret1 == secret2
-        except Exception as e:
-            logging.debug("TSS share verification failed: %s", e)
+        except ValueError as exc:
+            logging.debug("TSS share verification failed: %s", exc)
             return False
 
         return True
@@ -367,84 +369,11 @@ class ProductionTSS:
                 ec.ECDSA(utils.Prehashed(hashes.SHA256()))
             )
             return True
-        except Exception as e:
+        except (ValueError, InvalidSignature):
             # Signature verification failed
             return False
 
 
-# Example usage
 if __name__ == "__main__":
-    print("=== Production TSS Example ===\n")
-
-    # Initialize TSS
-    tss = ProductionTSS()
-
-    # Generate distributed keys for 5 participants with threshold of 3
-    num_participants = 5
-    threshold = 3
-
-    print(f"Generating distributed keys for {num_participants} participants with threshold {threshold}...")
-    key_shares, master_public_key = tss.generate_distributed_keys(num_participants, threshold)
-
-    print(f"Generated {len(key_shares)} key shares")
-    print(f"Master public key: {master_public_key.hex()[:64]}...")
-
-    # Message to sign
-    message = b"This is a test transaction for threshold signing"
-    print(f"\nMessage to sign: {message.decode()}")
-
-    # Participants 1, 2, 3 create partial signatures
-    print(f"\nCreating partial signatures from {threshold} participants...")
-    partial_sigs = []
-
-    for i in range(threshold):
-        key_share = key_shares[i]
-        print(f"  Participant {i+1} signing...")
-        r, s_partial = tss.create_partial_signature(key_share, message)
-        partial_sigs.append((i, key_share, (r, s_partial)))
-
-    # Combine partial signatures
-    print("\nCombining partial signatures...")
-    try:
-        combined_signature = tss.combine_partial_signatures(partial_sigs, threshold)
-        print(f"Combined signature: {combined_signature.hex()[:64]}...")
-
-        # Verify signature
-        print("\nVerifying threshold signature...")
-        is_valid = tss.verify_threshold_signature(master_public_key, message, combined_signature)
-        print(f"Signature valid: {is_valid}")
-
-    except Exception as e:
-        print(f"Error combining signatures: {e}")
-
-    # Test with insufficient signatures
-    print("\n=== Testing with insufficient signatures (2 of 3) ===")
-    try:
-        insufficient_sigs = partial_sigs[:2]
-        tss.combine_partial_signatures(insufficient_sigs, threshold)
-    except ValueError as e:
-        print(f"Error (expected): {e}")
-
-    print("\n=== Shamir's Secret Sharing Test ===\n")
-
-    # Test Shamir's Secret Sharing directly
-    sss = ShamirSecretSharing()
-    secret = 12345678901234567890
-
-    print(f"Original secret: {secret}")
-    print(f"Creating {num_participants} shares with threshold {threshold}...")
-
-    shares = sss.split_secret(secret, threshold, num_participants)
-    print(f"Generated {len(shares)} shares")
-
-    # Reconstruct with threshold shares
-    print(f"\nReconstructing secret from {threshold} shares...")
-    reconstructed = sss.reconstruct_secret(shares[:threshold])
-    print(f"Reconstructed secret: {reconstructed}")
-    print(f"Match: {reconstructed == secret}")
-
-    # Try with different threshold combination
-    print(f"\nReconstructing from shares 2, 4, 5...")
-    reconstructed2 = sss.reconstruct_secret([shares[1], shares[3], shares[4]])
-    print(f"Reconstructed secret: {reconstructed2}")
-    print(f"Match: {reconstructed2 == secret}")
+    logger.warning("Production TSS demo disabled; run unit tests instead.")
+    raise SystemExit("Production TSS demo removed; run unit tests instead.")

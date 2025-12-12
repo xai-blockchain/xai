@@ -1,11 +1,14 @@
-import os
+import logging
 import math
+import os
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 class CSPRNG:
     def __init__(self):
-        print("CSPRNG initialized. Relying on OS-provided cryptographic randomness (os.urandom).")
+        logger.info("CSPRNG initialized", extra={"event": "csprng.init"})
 
     def generate_bytes(self, num_bytes: int) -> bytes:
         """
@@ -55,42 +58,4 @@ class CSPRNG:
                 return min_val + random_int
 
 
-# Example Usage (for testing purposes)
-if __name__ == "__main__":
-    csprng = CSPRNG()
-
-    print("\n--- Generating Random Bytes ---")
-    random_bytes_16 = csprng.generate_bytes(16)
-    print(f"16 random bytes (hex): {random_bytes_16.hex()}")
-
-    random_bytes_32 = csprng.generate_bytes(32)
-    print(f"32 random bytes (hex): {random_bytes_32.hex()}")
-
-    print("\n--- Generating Random Integers ---")
-    random_int_small = csprng.generate_int(1, 10)
-    print(f"Random integer between 1 and 10: {random_int_small}")
-
-    random_int_large = csprng.generate_int(1000, 1000000)
-    print(f"Random integer between 1000 and 1,000,000: {random_int_large}")
-
-    random_int_private_key_range = csprng.generate_int(
-        1, 2**256 - 1
-    )  # Common range for private keys
-    print(
-        f"Random integer in private key range (first 100 chars): {str(random_int_private_key_range)[:100]}..."
-    )
-
-    # Test edge case: min_val == max_val
-    random_int_single = csprng.generate_int(50, 50)
-    print(f"Random integer between 50 and 50: {random_int_single}")
-
-    # Test with invalid input
-    try:
-        csprng.generate_bytes(0)
-    except ValueError as e:
-        print(f"\nError (expected): {e}")
-
-    try:
-        csprng.generate_int(10, 1)
-    except ValueError as e:
-        print(f"Error (expected): {e}")
+# Example usage is intentionally omitted in production modules.

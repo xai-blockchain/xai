@@ -12,6 +12,7 @@ import hashlib
 from cryptography.fernet import Fernet
 
 from xai.core.wallet import Wallet
+from xai.core.wallet_encryption import WalletEncryption
 
 
 class TestWalletMigration:
@@ -72,6 +73,65 @@ class TestWalletMigration:
             assert Wallet.needs_migration(old_file) is True
         finally:
             os.unlink(old_file)
+
+    def test_needs_migration_detects_corrupted_payload(self):
+        """Corrupted encrypted payloads must be flagged for migration."""
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as f:
+            corrupted = {
+                "encrypted": True,
+                "payload": {"ciphertext": "zzz", "nonce": "zzz", "salt": "zzz"},
+            }
+            json.dump(corrupted, f)
+            path = f.name
+
+        try:
+            assert Wallet.needs_migration(path) is True
+        finally:
+            os.unlink(path)
+
+    def test_needs_migration_rejects_missing_version_flag(self):
+        """v2 wallets missing version metadata should require migration."""
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as f:
+            data = {"data": {"address": "XAI123", "public_key": "pk"}}
+            json.dump(data, f)
+            path = f.name
+        try:
+            assert Wallet.needs_migration(path) is True
+        finally:
+            os.unlink(path)
+
+    def test_legacy_wallet_load_requires_allow_flag(self):
+        """Legacy encrypted wallets must be explicitly opted-in for loading."""
+        wallet = Wallet()
+        password = "TestPassword123"
+
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as f:
+            wallet_data = {
+                "private_key": wallet.private_key,
+                "public_key": wallet.public_key,
+                "address": wallet.address,
+            }
+            wallet_json = json.dumps(wallet_data)
+            key = base64.urlsafe_b64encode(hashlib.sha256(password.encode()).digest())
+            fernet = Fernet(key)
+            encrypted_data = fernet.encrypt(wallet_json.encode()).decode()
+
+            legacy_file_data = {
+                "encrypted": True,
+                "data": encrypted_data,
+            }
+            json.dump(legacy_file_data, f)
+            legacy_file = f.name
+
+        try:
+            with pytest.raises(ValueError):
+                Wallet.load_from_file(legacy_file, password)
+
+            legacy_loaded = Wallet.load_from_file(legacy_file, password, allow_legacy=True)
+            assert legacy_loaded.private_key == wallet.private_key
+        finally:
+            if os.path.exists(legacy_file):
+                os.unlink(legacy_file)
 
     def test_migrate_wallet_encryption_success(self):
         """Test successful wallet migration from legacy to secure encryption"""
@@ -188,9 +248,13 @@ class TestWalletMigration:
             legacy_file = f.name
 
         try:
-            # Load legacy wallet
-            with caplog.at_level("WARNING"):
-                loaded_wallet = Wallet.load_from_file(legacy_file, password)
+            with pytest.raises(ValueError):
+                Wallet.load_from_file(legacy_file, password)
+
+            caplog.clear()
+            # Explicitly allow legacy load for one-time migration
+            with caplog.at_level("CRITICAL"):
+                loaded_wallet = Wallet.load_from_file(legacy_file, password, allow_legacy=True)
 
             # Verify wallet loaded correctly
             assert loaded_wallet.private_key == wallet.private_key
@@ -270,14 +334,70 @@ class TestWalletMigration:
             legacy_file = f.name
 
         try:
-            # Should be able to load legacy wallet
-            loaded_wallet = Wallet.load_from_file(legacy_file, password)
+            # Should require explicit opt-in for legacy load
+            with pytest.raises(ValueError):
+                Wallet.load_from_file(legacy_file, password)
+
+            loaded_wallet = Wallet.load_from_file(legacy_file, password, allow_legacy=True)
 
             # Verify wallet data is correct
             assert loaded_wallet.private_key == wallet.private_key
             assert loaded_wallet.public_key == wallet.public_key
             assert loaded_wallet.address == wallet.address
 
+        finally:
+            if os.path.exists(legacy_file):
+                os.unlink(legacy_file)
+
+    def test_load_legacy_wallet_invalid_password(self):
+        """Legacy wallets should fail decryption with wrong password."""
+        wallet = Wallet()
+        password = "CorrectPassword123"
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as f:
+            wallet_data = {
+                "private_key": wallet.private_key,
+                "public_key": wallet.public_key,
+                "address": wallet.address,
+            }
+            wallet_json = json.dumps(wallet_data)
+            key = base64.urlsafe_b64encode(hashlib.sha256(password.encode()).digest())
+            encrypted_data = Fernet(key).encrypt(wallet_json.encode()).decode()
+
+            legacy_file_data = {"encrypted": True, "data": encrypted_data}
+            json.dump(legacy_file_data, f)
+            legacy_file = f.name
+
+        try:
+            with pytest.raises(Exception):
+                Wallet.load_from_file(legacy_file, "WrongPassword", allow_legacy=True)
+        finally:
+            if os.path.exists(legacy_file):
+                os.unlink(legacy_file)
+
+    def test_migration_rejects_corrupted_backup(self):
+        """Migration should detect corrupted legacy files and raise."""
+        wallet = Wallet()
+        password = "TestPassword123"
+
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as f:
+            # Write corrupted legacy file (truncated base64)
+            wallet_data = {
+                "private_key": wallet.private_key,
+                "public_key": wallet.public_key,
+                "address": wallet.address,
+            }
+            wallet_json = json.dumps(wallet_data)
+
+            key = base64.urlsafe_b64encode(hashlib.sha256(password.encode()).digest())
+            encrypted_data = Fernet(key).encrypt(wallet_json.encode()).decode()[:20]  # truncate
+
+            legacy_file_data = {"encrypted": True, "data": encrypted_data}
+            json.dump(legacy_file_data, f)
+            legacy_file = f.name
+
+        try:
+            wallet.migrate_wallet_encryption(legacy_file, password)
         finally:
             if os.path.exists(legacy_file):
                 os.unlink(legacy_file)

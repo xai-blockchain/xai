@@ -35,7 +35,9 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         try:
             result = node.bonus_manager.register_miner(model.address)
             return routes._success_response(result if isinstance(result, dict) else {"result": result})
-        except Exception as exc:
+        except ValueError as exc:
+            return routes._error_response(str(exc), status=400, code="mining_invalid")
+        except (RuntimeError, KeyError, TypeError) as exc:
             return routes._handle_exception(exc, "register_miner")
 
     @app.route("/mining/achievements/<address>", methods=["GET"])
@@ -46,8 +48,10 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         try:
             result = node.bonus_manager.check_achievements(address, blocks_mined, streak_days)
             return jsonify(result), 200
-        except Exception as exc:
-            return jsonify({"error": str(exc)}), 500
+        except ValueError as exc:
+            return routes._error_response(str(exc), status=400, code="mining_invalid")
+        except (RuntimeError, KeyError, TypeError) as exc:
+            return routes._handle_exception(exc, "get_achievements")
 
     @app.route("/mining/claim-bonus", methods=["POST"])
     @validate_request(routes.request_validator, MiningBonusClaimInput)
@@ -63,7 +67,9 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         try:
             result = node.bonus_manager.claim_bonus(model.address, model.bonus_type)
             return routes._success_response(result if isinstance(result, dict) else {"result": result})
-        except Exception as exc:
+        except ValueError as exc:
+            return routes._error_response(str(exc), status=400, code="mining_invalid")
+        except (RuntimeError, KeyError, TypeError) as exc:
             return routes._handle_exception(exc, "claim_bonus")
 
     @app.route("/mining/referral/create", methods=["POST"])
@@ -80,7 +86,9 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         try:
             result = node.bonus_manager.create_referral_code(model.address)
             return routes._success_response(result if isinstance(result, dict) else {"result": result})
-        except Exception as exc:
+        except ValueError as exc:
+            return routes._error_response(str(exc), status=400, code="referral_invalid")
+        except (RuntimeError, KeyError, TypeError) as exc:
             return routes._handle_exception(exc, "create_referral_code")
 
     @app.route("/mining/referral/use", methods=["POST"])
@@ -101,7 +109,9 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
                 metadata=getattr(model, "metadata", None),
             )
             return routes._success_response(result if isinstance(result, dict) else {"result": result})
-        except Exception as exc:
+        except ValueError as exc:
+            return routes._error_response(str(exc), status=400, code="referral_invalid")
+        except (RuntimeError, KeyError, TypeError) as exc:
             return routes._handle_exception(exc, "use_referral_code")
 
     @app.route("/mining/user-bonuses/<address>", methods=["GET"])
@@ -109,8 +119,10 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         try:
             result = node.bonus_manager.get_user_bonuses(address)
             return jsonify(result), 200
-        except Exception as exc:
-            return jsonify({"error": str(exc)}), 500
+        except ValueError as exc:
+            return routes._error_response(str(exc), status=400, code="mining_invalid")
+        except (RuntimeError, KeyError, TypeError) as exc:
+            return routes._handle_exception(exc, "get_user_bonuses")
 
     @app.route("/mining/leaderboard", methods=["GET"])
     def get_bonus_leaderboard() -> Tuple[Dict[str, Any], int]:
@@ -119,8 +131,10 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         try:
             leaderboard = node.bonus_manager.get_leaderboard(limit)
             return jsonify({"success": True, "limit": limit, "leaderboard": leaderboard}), 200
-        except Exception as exc:
-            return jsonify({"error": str(exc)}), 500
+        except ValueError as exc:
+            return routes._error_response(str(exc), status=400, code="mining_invalid")
+        except (RuntimeError, KeyError, TypeError) as exc:
+            return routes._handle_exception(exc, "get_bonus_leaderboard")
 
     @app.route("/mining/leaderboard/unified", methods=["GET"])
     def get_unified_leaderboard() -> Tuple[Dict[str, Any], int]:
@@ -132,13 +146,17 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
             return jsonify(
                 {"success": True, "limit": limit, "metric": metric, "leaderboard": leaderboard}
             ), 200
-        except Exception as exc:
-            return jsonify({"error": str(exc)}), 500
+        except ValueError as exc:
+            return routes._error_response(str(exc), status=400, code="mining_invalid")
+        except (RuntimeError, KeyError, TypeError) as exc:
+            return routes._handle_exception(exc, "get_unified_leaderboard")
 
     @app.route("/mining/stats", methods=["GET"])
     def get_mining_bonus_stats() -> Tuple[Dict[str, Any], int]:
         try:
             stats = node.bonus_manager.get_stats()
             return jsonify({"success": True, "stats": stats}), 200
-        except Exception as exc:
-            return jsonify({"error": str(exc)}), 500
+        except ValueError as exc:
+            return routes._error_response(str(exc), status=400, code="mining_invalid")
+        except (RuntimeError, KeyError, TypeError) as exc:
+            return routes._handle_exception(exc, "get_mining_bonus_stats")

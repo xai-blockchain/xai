@@ -36,6 +36,12 @@ from xai.wallet.offline_signing import sign_offline, signing_preview
 # Rich console for beautiful output
 console = Console()
 
+
+def _cli_fail(exc: Exception, exit_code: int = 1) -> None:
+    """Centralized CLI error handler for consistent messaging."""
+    console.print(f"[bold red]Error:[/] {exc}")
+    sys.exit(exit_code)
+
 # Default configuration
 DEFAULT_NODE_URL = "http://localhost:18545"
 DEFAULT_TIMEOUT = 30.0
@@ -188,8 +194,8 @@ def wallet_create(ctx: click.Context, save_keystore: bool, keystore_output: Opti
                 kdf=kdf
             )
             console.print(f"\n[bold green]✓[/] Encrypted keystore saved to: [cyan]{keystore_path}[/]")
-        except Exception as e:
-            console.print(f"[bold red]Error creating keystore:[/] {e}", style="red")
+        except (click.ClickException, ValueError, OSError) as exc:
+            _cli_fail(exc)
     else:
         console.print("\n[yellow]⚠[/] Private key not saved. Use --save-keystore to encrypt and save.")
 
@@ -225,9 +231,8 @@ def wallet_balance(ctx: click.Context, address: str):
         console.print(Panel(table, title="[bold green]Wallet Balance",
                            border_style="green"))
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
+        _cli_fail(exc)
 
 
 @wallet.command('history')
@@ -276,9 +281,8 @@ def wallet_history(ctx: click.Context, address: str, limit: int, offset: int):
         if len(transactions) == limit:
             console.print(f"\n[dim]Showing {limit} transactions. Use --limit and --offset for more.[/]")
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
+        _cli_fail(exc)
 
 
 @wallet.command('send')
@@ -348,9 +352,8 @@ def wallet_send(ctx: click.Context, sender: str, recipient: str, amount: float,
                 allow_env=False,
                 prompt="Enter sender's private key"
             )
-        except Exception as e:
-            console.print(f"[bold red]Error obtaining private key:[/] {e}")
-            sys.exit(1)
+        except (click.ClickException, ValueError, OSError) as exc:
+            _cli_fail(exc)
 
         signed_payload = sign_offline(base_tx, private_key, acknowledged_digest=ack.strip())
         submission_payload = {
@@ -380,9 +383,8 @@ def wallet_send(ctx: click.Context, sender: str, recipient: str, amount: float,
             console.print(f"\n[bold red]✗ Transaction failed:[/] {result.get('error', 'Unknown error')}")
             sys.exit(1)
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
+        _cli_fail(exc)
 
 
 @wallet.command('portfolio')
@@ -429,9 +431,8 @@ def wallet_portfolio(ctx: click.Context, address: str):
         console.print(Panel(balance_table, title=f"[bold green]Portfolio - {address[:20]}...",
                            border_style="green"))
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
+        _cli_fail(exc)
 
 
 # ============================================================================
@@ -470,9 +471,8 @@ def blockchain_info(ctx: click.Context):
         console.print(Panel(table, title="[bold green]Blockchain Information",
                            border_style="green"))
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
+        _cli_fail(exc)
 
 
 @blockchain.command('block')
@@ -518,9 +518,8 @@ def blockchain_block(ctx: click.Context, block_id: str):
             if len(transactions) > 10:
                 console.print(f"  [dim]... and {len(transactions) - 10} more[/]")
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
+        _cli_fail(exc)
 
 
 @blockchain.command('mempool')
@@ -566,9 +565,8 @@ def blockchain_mempool(ctx: click.Context):
         if len(transactions) > 20:
             console.print(f"\n[dim]Showing 20 of {len(transactions)} transactions[/]")
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
+        _cli_fail(exc)
 
 
 # ============================================================================
@@ -608,9 +606,8 @@ def mining_start(ctx: click.Context, address: str, threads: int, intensity: int)
             console.print(f"[bold red]✗ Failed to start mining:[/] {result.get('error', 'Unknown')}")
             sys.exit(1)
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
+        _cli_fail(exc)
 
 
 @mining.command('stop')
@@ -632,9 +629,8 @@ def mining_stop(ctx: click.Context):
         else:
             console.print(f"[bold red]✗ Failed to stop mining:[/] {result.get('error', 'Unknown')}")
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
+        _cli_fail(exc)
 
 
 @mining.command('status')
@@ -669,9 +665,8 @@ def mining_status(ctx: click.Context):
         console.print(Panel(table, title="[bold green]Mining Status",
                            border_style="green"))
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
+        _cli_fail(exc)
 
 
 @mining.command('stats')
@@ -712,9 +707,8 @@ def mining_stats(ctx: click.Context, address: str):
         console.print(Panel(table, title="[bold green]Mining Statistics",
                            border_style="green"))
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
+        _cli_fail(exc)
 
 
 # ============================================================================
@@ -754,9 +748,8 @@ def network_info(ctx: click.Context):
         console.print(Panel(table, title="[bold green]Network Information",
                            border_style="green"))
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
+        _cli_fail(exc)
 
 
 @network.command('peers')
@@ -806,9 +799,8 @@ def network_peers(ctx: click.Context):
 
         console.print(table)
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
+        _cli_fail(exc)
 
 
 # ============================================================================
@@ -833,9 +825,8 @@ def main():
     except KeyboardInterrupt:
         console.print("\n[yellow]Operation cancelled by user[/]")
         sys.exit(130)
-    except Exception as e:
-        console.print(f"\n[bold red]Unexpected error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
+        _cli_fail(exc)
 
 
 if __name__ == '__main__':

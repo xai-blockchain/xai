@@ -1,6 +1,9 @@
 import hashlib
+import logging
 import os
 from typing import Optional, Dict, Any, Tuple
+
+logger = logging.getLogger(__name__)
 
 # This is a highly simplified conceptual model of a Secure Enclave Manager.
 # It does NOT interact with actual hardware secure enclaves (e.g., Intel SGX, ARM TrustZone).
@@ -15,8 +18,9 @@ class SecureEnclaveManager:
             {}
         )  # {key_handle: (conceptual_private_key, conceptual_public_key)}
         self._key_handle_counter = 0
-        print(
-            f"Secure Enclave Manager initialized. Enclave available: {self._simulate_enclave_available}"
+        logger.info(
+            "Secure Enclave Manager initialized",
+            extra={"event": "secure_enclave.init", "available": self._simulate_enclave_available},
         )
 
     def _is_enclave_available(self) -> bool:
@@ -29,7 +33,7 @@ class SecureEnclaveManager:
         Returns a key handle, not the actual private key.
         """
         if not self._is_enclave_available():
-            print("Error: Secure enclave not available.")
+            logger.error("Secure enclave not available", extra={"event": "secure_enclave.unavailable"})
             return None
 
         self._key_handle_counter += 1
@@ -42,7 +46,10 @@ class SecureEnclaveManager:
 
         self._enclave_keys[key_handle] = (conceptual_private_key, conceptual_public_key)
 
-        print(f"Key pair conceptually generated inside enclave. Handle: {key_handle}")
+        logger.info(
+            "Key pair generated in enclave",
+            extra={"event": "secure_enclave.key_generated", "handle": key_handle},
+        )
         return key_handle
 
     def get_public_key_from_enclave(self, key_handle: str) -> Optional[bytes]:
@@ -50,12 +57,15 @@ class SecureEnclaveManager:
         Simulates retrieving the public key associated with a key handle from the enclave.
         """
         if not self._is_enclave_available():
-            print("Error: Secure enclave not available.")
+            logger.error("Secure enclave not available", extra={"event": "secure_enclave.unavailable"})
             return None
 
         key_pair = self._enclave_keys.get(key_handle)
         if key_pair is None:
-            print(f"Error: Key handle {key_handle} not found in enclave.")
+            logger.error(
+                "Key handle not found in enclave",
+                extra={"event": "secure_enclave.key_missing", "handle": key_handle},
+            )
             return None
 
         return key_pair[1]  # Return the conceptual public key
@@ -66,12 +76,15 @@ class SecureEnclaveManager:
         The private key never leaves the conceptual enclave.
         """
         if not self._is_enclave_available():
-            print("Error: Secure enclave not available.")
+            logger.error("Secure enclave not available", extra={"event": "secure_enclave.unavailable"})
             return None
 
         key_pair = self._enclave_keys.get(key_handle)
         if key_pair is None:
-            print(f"Error: Key handle {key_handle} not found in enclave.")
+            logger.error(
+                "Key handle not found in enclave",
+                extra={"event": "secure_enclave.key_missing", "handle": key_handle},
+            )
             return None
 
         conceptual_private_key = key_pair[0]
@@ -81,7 +94,10 @@ class SecureEnclaveManager:
         signature_input = conceptual_private_key + data_to_sign
         conceptual_signature = hashlib.sha256(signature_input).digest()
 
-        print(f"Data conceptually signed in enclave using handle {key_handle}.")
+        logger.info(
+            "Data signed in enclave",
+            extra={"event": "secure_enclave.signed", "handle": key_handle},
+        )
         return conceptual_signature
 
     def verify_signature(self, public_key: bytes, data_to_sign: bytes, signature: bytes) -> bool:
@@ -118,58 +134,16 @@ class SecureEnclaveManager:
         expected_signature = hashlib.sha256(expected_signature_input).digest()
 
         if signature == expected_signature:
-            print("Conceptual signature verified successfully.")
+            logger.info(
+                "Conceptual signature verified successfully",
+                extra={"event": "secure_enclave.verify_success", "handle": getattr(self, '_last_handle', None)},
+            )
             return True
-        else:
-            print("Conceptual signature verification failed.")
-            return False
+        logger.warning(
+            "Conceptual signature verification failed",
+            extra={"event": "secure_enclave.verify_failed", "handle": getattr(self, '_last_handle', None)},
+        )
+        return False
 
 
-# Example Usage (for testing purposes)
-if __name__ == "__main__":
-    enclave_manager = SecureEnclaveManager(simulate_enclave_available=True)
-
-    print("\n--- Generating Key in Enclave ---")
-    key_handle = enclave_manager.generate_key_in_enclave()
-    if key_handle:
-        print(f"Obtained key handle: {key_handle}")
-
-        conceptual_public_key = enclave_manager.get_public_key_from_enclave(key_handle)
-        if conceptual_public_key:
-            print(f"Conceptual Public Key: {conceptual_public_key.hex()}")
-
-            data_to_sign_1 = b"This is a message to be signed."
-            print(f"\n--- Signing Data 1 in Enclave ---")
-            signature_1 = enclave_manager.sign_data_in_enclave(key_handle, data_to_sign_1)
-            if signature_1:
-                print(f"Conceptual Signature 1: {signature_1.hex()}")
-
-                print(f"\n--- Verifying Signature 1 ---")
-                is_valid_1 = enclave_manager.verify_signature(
-                    conceptual_public_key, data_to_sign_1, signature_1
-                )
-                print(f"Signature 1 Valid: {is_valid_1}")
-
-                # Test with invalid data
-                data_to_sign_1_modified = b"This is a modified message to be signed."
-                is_valid_1_modified = enclave_manager.verify_signature(
-                    conceptual_public_key, data_to_sign_1_modified, signature_1
-                )
-                print(f"Signature 1 Valid with modified data: {is_valid_1_modified}")
-            else:
-                print("Signature generation failed.")
-        else:
-            print("Failed to retrieve conceptual public key.")
-
-    print("\n--- Simulating Enclave Unavailable ---")
-    unavailable_enclave_manager = SecureEnclaveManager(simulate_enclave_available=False)
-    unavailable_key_handle = unavailable_enclave_manager.generate_key_in_enclave()
-    if unavailable_key_handle is None:
-        print("As expected, key generation failed when enclave is unavailable.")
-
-    data_to_sign_2 = b"Another message."
-    unavailable_signature = unavailable_enclave_manager.sign_data_in_enclave(
-        "some_handle", data_to_sign_2
-    )
-    if unavailable_signature is None:
-        print("As expected, signing failed when enclave is unavailable.")
+# Example usage is intentionally omitted in production modules.

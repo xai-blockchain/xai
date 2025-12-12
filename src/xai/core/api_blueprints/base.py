@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def get_api_context():
+def get_api_context() -> Dict[str, Any]:
     """Get the API context containing node, blockchain, and other dependencies.
 
     The context is stored in Flask's g object during request setup.
@@ -29,37 +29,37 @@ def get_api_context():
     return g.get("api_context", {})
 
 
-def get_node():
+def get_node() -> Any:
     """Get the blockchain node instance from context."""
     ctx = get_api_context()
     return ctx.get("node")
 
 
-def get_blockchain():
+def get_blockchain() -> Any:
     """Get the blockchain instance from context."""
     ctx = get_api_context()
     return ctx.get("blockchain")
 
 
-def get_peer_manager():
+def get_peer_manager() -> Optional[Any]:
     """Get the peer manager instance from context."""
     ctx = get_api_context()
     return ctx.get("peer_manager")
 
 
-def get_api_auth():
+def get_api_auth() -> Optional[Any]:
     """Get the API auth manager from context."""
     ctx = get_api_context()
     return ctx.get("api_auth")
 
 
-def get_error_registry():
+def get_error_registry() -> Optional[Any]:
     """Get the error handler registry from context."""
     ctx = get_api_context()
     return ctx.get("error_registry")
 
 
-def get_spending_limits():
+def get_spending_limits() -> Optional[Any]:
     """Get the spending limits manager from context."""
     ctx = get_api_context()
     return ctx.get("spending_limits")
@@ -75,7 +75,7 @@ def log_event(
     log_security_event(event_type, {"details": sanitized}, severity=severity)
 
 
-def success_response(payload: Dict[str, Any], status: int = 200):
+def success_response(payload: Dict[str, Any], status: int = 200) -> Tuple[Any, int]:
     """Return a success payload with consistent structure."""
     body = {"success": True, **payload}
     return jsonify(body), status
@@ -87,7 +87,7 @@ def error_response(
     code: str = "bad_request",
     context: Optional[Dict[str, Any]] = None,
     event_type: str = "node_api_error",
-):
+) -> Tuple[Any, int]:
     """Return a sanitized error response and emit a security log."""
     severity = "ERROR" if status >= 500 else "WARNING"
     details = {"code": code, "status": status, **(context or {})}
@@ -95,7 +95,7 @@ def error_response(
     return jsonify({"success": False, "error": message, "code": code}), status
 
 
-def handle_exception(error: Exception, context_str: str, status: int = 500):
+def handle_exception(error: Exception, context_str: str, status: int = 500) -> Tuple[Any, int]:
     """Route unexpected exceptions with sanitized output."""
     error_registry = get_error_registry()
     blockchain = get_blockchain()
@@ -125,7 +125,7 @@ def format_timestamp(timestamp: Optional[float]) -> Optional[str]:
         return None
 
 
-def require_api_auth():
+def require_api_auth() -> Optional[Tuple[Any, int]]:
     """Check if API authentication is required and valid.
 
     Returns None if auth passes, or an error response tuple if it fails.
@@ -145,7 +145,7 @@ def require_api_auth():
     )
 
 
-def require_admin_auth():
+def require_admin_auth() -> Optional[Tuple[Any, int]]:
     """Check if admin authentication is required and valid.
 
     Returns None if auth passes, or an error response tuple if it fails.

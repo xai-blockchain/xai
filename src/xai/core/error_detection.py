@@ -182,6 +182,13 @@ class ErrorDetector:
             "context": context,
         }
 
+        if len(self.error_history) == self.error_history.maxlen:
+            removed = self.error_history.popleft()
+            if removed["type"] in self.error_patterns:
+                self.error_patterns[removed["type"]] -= 1
+                if self.error_patterns[removed["type"]] <= 0:
+                    del self.error_patterns[removed["type"]]
+
         self.error_history.append(error_entry)
         self.error_patterns[error_type] = self.error_patterns.get(error_type, 0) + 1
 
@@ -248,9 +255,14 @@ class CorruptionDetector:
                 is_valid, errors = check_func(blockchain)
                 if not is_valid:
                     issues.extend([f"[{check_name}] {err}" for err in errors])
-            except Exception as e:
+            except (ValueError, TypeError, RuntimeError) as e:
                 issues.append(f"[{check_name}] Check failed: {str(e)}")
-                self.logger.error(f"Corruption check {check_name} failed: {e}")
+                self.logger.error(
+                    "Corruption check %s failed: %s",
+                    check_name,
+                    e,
+                    extra={"event": "corruption_check_failed", "check": check_name},
+                )
 
         return len(issues) > 0, issues
 

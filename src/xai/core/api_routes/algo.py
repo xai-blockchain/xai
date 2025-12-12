@@ -44,7 +44,7 @@ def register_algo_routes(routes: "NodeAPIRoutes") -> None:
                     rate_value = rate_callable()
                     if isinstance(rate_value, (int, float)) and math.isfinite(rate_value) and rate_value > 0:
                         fee_rates.append(float(rate_value))
-                except Exception as exc:
+                except (ValueError, TypeError) as exc:
                     logger.debug(
                         "Failed to get fee rate from transaction",
                         extra={"error": str(exc), "event": "mempool.fee_rate_error"},
@@ -57,7 +57,7 @@ def register_algo_routes(routes: "NodeAPIRoutes") -> None:
                     if isinstance(size_value, (int, float)) and size_value > 0:
                         mempool_bytes += int(size_value)
                         size_samples += 1
-                except Exception as exc:
+                except (ValueError, TypeError) as exc:
                     logger.debug(
                         "Failed to get size from transaction",
                         extra={"error": str(exc), "event": "mempool.size_error"},

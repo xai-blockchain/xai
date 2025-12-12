@@ -457,3 +457,93 @@ def test_rbf_replacement_requires_opt_in_flag():
 
     assert mp._handle_rbf_replacement(replacement) is False
     assert mp.pending_transactions[0].txid == "orig"
+
+
+def test_rbf_replacement_sender_mismatch_rejected():
+    """Replacement from different sender must be rejected to block theft."""
+    now = time.time()
+    mp = DummyMempool(now)
+    original = _Tx(
+        sender="A",
+        txid="orig",
+        timestamp=now,
+        inputs=[{"txid": "u1", "vout": 0}],
+        fee=2,
+        rbf_enabled=True,
+    )
+    replacement = _Tx(
+        sender="B",
+        txid="repl",
+        timestamp=now,
+        inputs=[{"txid": "u1", "vout": 0}],
+        fee=3,
+        replaces_txid="orig",
+    )
+    mp.pending_transactions = [original]
+    mp.seen_txids = {"orig"}
+    mp._sender_pending_count["A"] = 1
+
+    assert mp._handle_rbf_replacement(replacement) is False
+    assert mp.pending_transactions[0].txid == "orig"
+
+
+def test_rbf_replacement_requires_higher_fee_rate():
+    """Replacement must pay strictly higher fee-per-byte."""
+    now = time.time()
+    mp = DummyMempool(now)
+    original = _Tx(
+        sender="A",
+        txid="orig",
+        timestamp=now,
+        inputs=[{"txid": "u1", "vout": 0}],
+        fee=2,
+        size_bytes=100,
+        rbf_enabled=True,
+    )
+    replacement = _Tx(
+        sender="A",
+        txid="repl",
+        timestamp=now,
+        inputs=[{"txid": "u1", "vout": 0}],
+        fee=2,  # same fee -> same rate
+        size_bytes=100,
+        replaces_txid="orig",
+    )
+    mp.pending_transactions = [original]
+    mp.seen_txids = {"orig"}
+    mp._sender_pending_count["A"] = 1
+
+    assert mp._handle_rbf_replacement(replacement) is False
+    assert mp.pending_transactions[0].txid == "orig"
+
+
+def test_rbf_replacement_successfully_updates_state():
+    """Valid replacement removes original and keeps sender counters accurate."""
+    now = time.time()
+    mp = DummyMempool(now)
+    original = _Tx(
+        sender="A",
+        txid="orig",
+        timestamp=now,
+        inputs=[{"txid": "u1", "vout": 0}],
+        fee=1,
+        size_bytes=100,
+        rbf_enabled=True,
+    )
+    replacement = _Tx(
+        sender="A",
+        txid="repl",
+        timestamp=now + 1,
+        inputs=[{"txid": "u1", "vout": 0}],
+        fee=2,
+        size_bytes=100,
+        replaces_txid="orig",
+    )
+    mp.pending_transactions = [original]
+    mp.seen_txids = {"orig"}
+    mp._sender_pending_count["A"] = 1
+
+    assert mp._handle_rbf_replacement(replacement) is True
+    assert mp.pending_transactions == []
+    assert "orig" not in mp.seen_txids
+    assert mp._sender_pending_count["A"] == 0

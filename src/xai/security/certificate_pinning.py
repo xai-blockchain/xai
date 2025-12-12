@@ -293,43 +293,4 @@ class CertificatePinner:
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
-    pinner = CertificatePinner()
-
-    # Simulate a real SPKI hash (e.g., from a server's public key)
-    # In a real scenario, you'd get this from the actual certificate.
-    # For demonstration, we'll use a dummy hash.
-    google_spki_hash = "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="  # Dummy hash
-    xai_api_spki_hash = "sha256/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB="  # Dummy hash
-
-    # Pin certificates for specific hosts
-    pinner.pin_certificate("api.example.com", google_spki_hash)
-    pinner.pin_certificate("xai.network", xai_api_spki_hash)
-    pinner.pin_certificate(
-        "xai.network", "sha256/CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC="
-    )  # Add another valid pin
-
-    print("\n--- Simulating Connections ---")
-
-    # Valid connection to api.example.com
-    print("\nAttempting connection to api.example.com with correct pin:")
-    is_valid_google = pinner.verify_connection("api.example.com", google_spki_hash)
-    print(f"Connection to api.example.com valid: {is_valid_google}")
-
-    # Invalid connection to api.example.com (wrong hash)
-    print("\nAttempting connection to api.example.com with incorrect pin:")
-    is_invalid_google = pinner.verify_connection(
-        "api.example.com", "sha256/DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD="
-    )
-    print(f"Connection to api.example.com valid: {is_invalid_google}")
-
-    # Valid connection to xai.network (matches one of multiple pins)
-    print("\nAttempting connection to xai.network with one of the correct pins:")
-    is_valid_xai = pinner.verify_connection("xai.network", xai_api_spki_hash)
-    print(f"Connection to xai.network valid: {is_valid_xai}")
-
-    # Connection to an unpinned host
-    print("\nAttempting connection to unpinned.host.com:")
-    is_unpinned = pinner.verify_connection(
-        "unpinned.host.com", "sha256/EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE="
-    )
-    print(f"Connection to unpinned.host.com valid: {is_unpinned}")
+    raise SystemExit("Certificate pinning demo removed; rely on tests.")

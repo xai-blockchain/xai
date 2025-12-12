@@ -11,6 +11,7 @@ import time
 import secrets
 import hashlib
 import hmac
+import logging
 from functools import wraps
 from collections import defaultdict
 from threading import Lock
@@ -18,6 +19,7 @@ from xai.core.process_sandbox import maybe_enable_process_sandbox
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
+logger = logging.getLogger(__name__)
 
 # Rate limiting configuration
 RATE_LIMIT_WINDOW = 60  # seconds
@@ -176,7 +178,28 @@ def health_check():
                 },
             }
         ), (200 if node_accessible else 503)
-    except Exception as e:
+    except requests.RequestException as e:
+        logger.warning(
+            "Health check degraded - node unreachable: %s",
+            e,
+            extra={"event": "explorer.health_check_failed"},
+        )
+        return (
+            jsonify(
+                {
+                    "status": "unhealthy",
+                    "error": str(e),
+                    "timestamp": time.time(),
+                    "services": {"web_interface": "running", "node_connection": "failed"},
+                }
+            ),
+            503,
+        )
+    except (ValueError, KeyError, TypeError) as e:
+        logger.exception(
+            "Health check encountered unexpected error",
+            extra={"event": "explorer.health_check_unexpected"},
+        )
         return (
             jsonify(
                 {

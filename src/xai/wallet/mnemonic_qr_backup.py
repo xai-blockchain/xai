@@ -102,6 +102,46 @@ class MnemonicQRBackupGenerator:
 
         return payload
 
+    def recover_mnemonic(self, payload: Dict[str, Any], passphrase: str = "") -> str:
+        """
+        Validate a payload produced by generate_bundle and return the mnemonic.
+
+        This defends against corrupted backups by verifying:
+            - Format/version identifiers
+            - Word count matches mnemonic content
+            - SHA-256 checksum (mnemonic [+ passphrase]) matches stored checksum
+
+        Args:
+            payload: Structured payload dict (decoded JSON from QR)
+            passphrase: Optional BIP-39 passphrase used during backup
+
+        Returns:
+            Normalized mnemonic phrase.
+
+        Raises:
+            ValueError: If the payload is malformed or checksum validation fails.
+        """
+        if payload.get("format") != self.FORMAT_NAME:
+            raise ValueError("Unsupported mnemonic backup format")
+        if payload.get("version") != self.FORMAT_VERSION:
+            raise ValueError("Unsupported mnemonic backup version")
+
+        mnemonic_phrase = payload.get("mnemonic", "")
+        normalized = self._validate_mnemonic(mnemonic_phrase)
+
+        expected_word_count = payload.get("word_count")
+        if expected_word_count is not None and expected_word_count != len(normalized.split()):
+            raise ValueError("Mnemonic word count mismatch")
+
+        checksum = payload.get("checksum")
+        if not checksum:
+            raise ValueError("Backup payload missing checksum")
+        computed_checksum = self._build_checksum(normalized, passphrase)
+        if checksum != computed_checksum:
+            raise ValueError("Mnemonic checksum mismatch")
+
+        return normalized
+
     def _generate_qr_image(self, data: str) -> qrcode.QRCode:
         qr = qrcode.QRCode(
             error_correction=ERROR_CORRECT_Q,

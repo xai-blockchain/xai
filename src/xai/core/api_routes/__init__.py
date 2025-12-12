@@ -19,6 +19,8 @@ from xai.core.api_routes.recovery import register_recovery_routes
 from xai.core.api_routes.gamification import register_gamification_routes
 from xai.core.api_routes.mining_bonus import register_mining_bonus_routes
 from xai.core.api_routes.exchange import register_exchange_routes
+from xai.core.api_routes.admin import register_admin_routes
+from xai.core.api_routes.crypto_deposits import register_crypto_deposit_routes
 
 __all__ = [
     "register_core_routes",
@@ -34,4 +36,6 @@ __all__ = [
     "register_gamification_routes",
     "register_mining_bonus_routes",
     "register_exchange_routes",
+    "register_admin_routes",
+    "register_crypto_deposit_routes",
 ]

@@ -1,7 +1,10 @@
+import logging
 from os import urandom
 import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class KeyRotationManager:
@@ -44,13 +47,21 @@ class KeyRotationManager:
                 "rotation_timestamp": self.last_rotation_timestamp,
                 "deactivation_timestamp": current_timestamp,
             }
-            print(f"Archived old key: {self.active_key_id}")
+            logger.info(
+                "Archived old key",
+                extra={"event": "key_rotation.archive", "key_id": self.active_key_id},
+            )
 
         self.active_key = new_key
         self.active_key_id = new_key_id
         self.last_rotation_timestamp = current_timestamp
-        print(
-            f"New active key generated: {self.active_key_id} at {datetime.fromtimestamp(current_timestamp)}"
+        logger.info(
+            "New active key generated",
+            extra={
+                "event": "key_rotation.new_key",
+                "key_id": self.active_key_id,
+                "timestamp": current_timestamp,
+            },
         )
 
     def rotate_key(self, force: bool = False):
@@ -63,14 +74,19 @@ class KeyRotationManager:
             or (current_timestamp - self.last_rotation_timestamp)
             >= (self.rotation_interval_days * 24 * 3600)
         ):
-            print(f"Initiating key rotation...")
+            logger.info("Initiating key rotation", extra={"event": "key_rotation.start"})
             self._generate_new_key()
         else:
             next_rotation_time = self.last_rotation_timestamp + (
                 self.rotation_interval_days * 24 * 3600
             )
-            print(
-                f"Key rotation not due yet. Next rotation scheduled for: {datetime.fromtimestamp(next_rotation_time)}"
+            logger.info(
+                "Key rotation not due yet",
+                extra={
+                    "event": "key_rotation.skipped",
+                    "next_rotation": next_rotation_time,
+                    "current": current_timestamp,
+                },
             )
 
     def get_active_key(self) -> bytes:
@@ -95,31 +111,4 @@ class KeyRotationManager:
 
 
 # Example Usage (for testing purposes)
-if __name__ == "__main__":
-    # Set a short rotation interval for demonstration
-    manager = KeyRotationManager(rotation_interval_days=1)  # Rotate every day
-
-    print(f"Initial active key ID: {manager.active_key_id}")
-    print(f"Last rotation: {datetime.fromtimestamp(manager.last_rotation_timestamp)}")
-
-    print("\n--- Attempting rotation before due ---")
-    manager.rotate_key()
-    print(f"Active key ID: {manager.active_key_id}")
-
-    print("\n--- Forcing rotation ---")
-    manager.rotate_key(force=True)
-    print(f"Active key ID: {manager.active_key_id}")
-    print(f"Historical keys: {manager.get_historical_keys()}")
-
-    # Simulate passage of time for automated rotation
-    print("\n--- Simulating time passage for automated rotation ---")
-    time.sleep(2)  # Simulate 2 days passing (since interval is 1 day)
-    manager.rotate_key()
-    print(f"Active key ID: {manager.active_key_id}")
-    print(f"Historical keys: {manager.get_historical_keys()}")
-
-    # Retrieve a historical key
-    first_key_id = list(manager.historical_keys.keys())[0]
-    retrieved_key = manager.get_key_by_id(first_key_id)
-    print(f"\nRetrieved historical key {first_key_id}: {retrieved_key}")
-    print(f"Current active key: {manager.get_active_key()}")
+# Example usage is intentionally omitted in production modules.

@@ -178,7 +178,7 @@ class Anthropic:
         except json.JSONDecodeError as e:
             raise APIError(f"Failed to parse API response: {e}")
 
-        except Exception as e:
+        except (TypeError, ValueError, OverflowError) as e:
             raise APIError(f"Unexpected error during API request: {e}")
 
     def completion(self, **kwargs: Any) -> Dict[str, Any]:

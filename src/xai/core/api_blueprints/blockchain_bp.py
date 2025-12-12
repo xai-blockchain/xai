@@ -75,7 +75,7 @@ def get_block(index: str) -> Tuple[Dict[str, Any], int]:
     fallback_block = None
     try:
         fallback_block = chain[idx_int]
-    except Exception as e:
+    except IndexError as e:
         logger.debug("Block %d not in chain cache: %s", idx_int, type(e).__name__)
         fallback_block = None
 
@@ -85,7 +85,7 @@ def get_block(index: str) -> Tuple[Dict[str, Any], int]:
     ):
         try:
             block_obj = blockchain.get_block(idx_int)
-        except Exception as e:
+        except (LookupError, TypeError, ValueError) as e:
             logger.debug("get_block(%d) failed: %s", idx_int, type(e).__name__)
             block_obj = None
 
@@ -154,7 +154,7 @@ def get_block_by_hash(block_hash: str) -> Tuple[Dict[str, Any], int]:
     if callable(lookup):
         try:
             block_obj = lookup(block_hash)
-        except Exception as exc:
+        except (LookupError, ValueError, TypeError) as exc:
             logger.debug("get_block_by_hash failed: %s", type(exc).__name__)
             block_obj = None
 
@@ -243,7 +243,7 @@ def receive_block() -> Tuple[Dict[str, Any], int]:
                 code="p2p_replay_attack",
             )
         peer_manager.record_nonce(sender_id, nonce, verified.get("timestamp"))
-    except Exception as e:
+    except (ValueError, RuntimeError) as e:
         return error_response(
             "Unauthorized P2P message",
             status=401,
@@ -269,7 +269,7 @@ def receive_block() -> Tuple[Dict[str, Any], int]:
     try:
         from xai.core.blockchain import Blockchain
         block = Blockchain.deserialize_block(payload)
-    except Exception as exc:
+    except (ValueError, TypeError, KeyError) as exc:
         return error_response(
             f"Invalid block data: {exc}",
             status=400,
@@ -282,10 +282,17 @@ def receive_block() -> Tuple[Dict[str, Any], int]:
         try:
             from xai.core.monitoring import MetricsCollector
             MetricsCollector.instance().record_p2p_message("received")
-        except Exception:
-            pass
+        except (ImportError, RuntimeError, ValueError) as exc:
+            logger.warning(
+                "Failed to record P2P metrics for received block: %s",
+                type(exc).__name__,
+                extra={
+                    "event": "api.metrics.record_failed",
+                    "reason": str(exc),
+                },
+            )
         added = blockchain.add_block(block)
-    except Exception as exc:
+    except (RuntimeError, ValueError) as exc:
         return handle_exception(exc, "receive_block")
 
     if added:
@@ -325,29 +332,33 @@ def get_transaction(txid: str) -> Tuple[Dict[str, Any], int]:
         return jsonify({"error": "Invalid transaction ID format"}), 400
 
     # Search in pending transactions
-    for tx in blockchain.pending_transactions:
+    for tx in getattr(blockchain, "pending_transactions", []):
         tx_hash = getattr(tx, "txid", None) or getattr(tx, "hash", None)
-        if tx_hash:
+        if not tx_hash:
+            continue
+        tx_norm = tx_hash.lower()
+        if tx_norm.startswith("0x"):
+            tx_norm = tx_norm[2:]
+        if tx_norm == normalized:
+            tx_payload = tx.to_dict() if hasattr(tx, "to_dict") else tx_hash
+            return jsonify({"transaction": tx_payload, "status": "pending"}), 200
+
+    # Search in confirmed blocks
+    for block in getattr(blockchain, "chain", []):
+        for tx in getattr(block, "transactions", []):
+            tx_hash = getattr(tx, "txid", None) or getattr(tx, "hash", None)
+            if not tx_hash:
+                continue
             tx_norm = tx_hash.lower()
             if tx_norm.startswith("0x"):
                 tx_norm = tx_norm[2:]
             if tx_norm == normalized:
-                return jsonify({"transaction": tx.to_dict(), "status": "pending"}), 200
-
-    # Search in confirmed blocks
-    for block in blockchain.chain:
-        for tx in block.transactions:
-            tx_hash = getattr(tx, "txid", None) or getattr(tx, "hash", None)
-            if tx_hash:
-                tx_norm = tx_hash.lower()
-                if tx_norm.startswith("0x"):
-                    tx_norm = tx_norm[2:]
-                if tx_norm == normalized:
-                    return jsonify({
-                        "transaction": tx.to_dict(),
-                        "status": "confirmed",
-                        "block_index": block.index,
-                        "block_hash": block.hash,
-                    }), 200
+                tx_payload = tx.to_dict() if hasattr(tx, "to_dict") else tx_hash
+                return jsonify({
+                    "transaction": tx_payload,
+                    "status": "confirmed",
+                    "block_index": getattr(block, "index", None),
+                    "block_hash": getattr(block, "hash", None),
+                }), 200
 
     return jsonify({"error": "Transaction not found"}), 404

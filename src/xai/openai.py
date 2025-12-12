@@ -142,7 +142,7 @@ class OpenAI:
                 response_body = e.read().decode('utf-8')
                 error_data = json.loads(response_body)
                 error_message = error_data.get("error", {}).get("message", str(e.reason))
-            except Exception as parse_err:
+            except (ValueError, json.JSONDecodeError, UnicodeDecodeError) as parse_err:
                 logger.debug("Failed to parse error response: %s", parse_err)
                 response_body = ""
                 error_message = str(e.reason)
@@ -210,7 +210,7 @@ class OpenAI:
         except json.JSONDecodeError as e:
             raise OpenAIError(f"Failed to parse API response: {e}")
 
-        except Exception as e:
+        except (TypeError, ValueError, OverflowError) as e:
             raise OpenAIError(f"Unexpected error during API request: {e}")
 
     def ChatCompletion(

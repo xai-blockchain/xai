@@ -16,11 +16,13 @@ class StubHardwareWallet:
 
     def __init__(self):
         self._address = "HWADDR"
+        self.call_count = 0
 
     def get_address(self):
         return self._address
 
     def sign_transaction(self, data: bytes) -> bytes:
+        self.call_count += 1
         return b"hw_signature"
 
 
@@ -63,3 +65,55 @@ def test_hardware_wallet_path(monkeypatch):
     wallet = Wallet()
     assert wallet.address == "HWADDR"
     assert wallet.sign_message("msg") == "68775f7369676e6174757265"  # hex of "hw_signature"
+
+
+def test_hardware_wallet_sign_failure_bubbles(monkeypatch):
+    """Hardware wallet signing failures propagate to callers for visibility."""
+    monkeypatch.setattr("xai.core.wallet.HARDWARE_WALLET_ENABLED", True)
+
+    class FailingWallet(StubHardwareWallet):
+        def sign_transaction(self, data: bytes) -> bytes:
+            raise RuntimeError("device locked")
+
+    monkeypatch.setattr("xai.core.wallet.get_default_hardware_wallet", lambda: FailingWallet())
+
+    wallet = Wallet()
+    with pytest.raises(RuntimeError, match="device locked"):
+        wallet.sign_message("important message")
+
+
+def test_concurrent_software_signing_thread_safe():
+    """Multiple threads can sign distinct payloads without clobbering shared state."""
+    wallet = Wallet()
+    messages = [f"message-{i}" for i in range(20)]
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(wallet.sign_message, msg) for msg in messages]
+    signatures = [future.result() for future in futures]
+
+    assert len(signatures) == len(messages)
+    for msg, sig in zip(messages, signatures):
+        assert wallet.verify_signature(msg, sig, wallet.public_key)
+
+
+def test_concurrent_hardware_signing_uses_device_once_per_call(monkeypatch):
+    """Hardware signing path remains deterministic across concurrent requests."""
+    monkeypatch.setattr("xai.core.wallet.HARDWARE_WALLET_ENABLED", True)
+    hardware = StubHardwareWallet()
+    monkeypatch.setattr("xai.core.wallet.get_default_hardware_wallet", lambda: hardware)
+
+    wallet = Wallet()
+    messages = [f"hw-msg-{i}" for i in range(10)]
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(wallet.sign_message, msg) for msg in messages]
+    signatures = [future.result() for future in futures]
+
+    assert len(signatures) == len(messages)
+    assert hardware.call_count == len(messages)
+    for sig in signatures:
+        assert sig == "68775f7369676e6174757265"

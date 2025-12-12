@@ -35,6 +35,11 @@ import requests
 
 console = Console()
 
+# Centralized CLI error handler for consistent messaging/exit codes
+def _handle_cli_error(exc: Exception, exit_code: int = 1) -> None:
+    console.print(f"[bold red]Error:[/] {exc}")
+    sys.exit(exit_code)
+
 
 class TaskType(str, Enum):
     """AI task types supported by the network"""
@@ -270,9 +275,8 @@ def submit_task(ctx: click.Context, task_type: str, description: str,
             console.print(f"[bold red]✗ Submission failed:[/] {result.get('error', 'Unknown')}")
             sys.exit(1)
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError) as exc:
+        _handle_cli_error(exc)
 
 
 @ai.command('query')
@@ -340,8 +344,8 @@ def query_task(ctx: click.Context, task_id: str, watch: bool):
 
             return status in ['completed', 'failed', 'cancelled']
 
-        except Exception as e:
-            console.print(f"[bold red]Error:[/] {e}")
+        except (click.ClickException, requests.RequestException, ValueError, KeyError) as exc:
+            console.print(f"[bold red]Error:[/] {exc}")
             return True
 
     if watch:
@@ -394,9 +398,8 @@ def cancel_task(ctx: click.Context, task_id: str):
             console.print(f"[bold red]✗ Failed:[/] {result.get('error', 'Unknown')}")
             sys.exit(1)
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError) as exc:
+        _handle_cli_error(exc)
 
 
 @ai.command('list')
@@ -472,9 +475,8 @@ def list_tasks(ctx: click.Context, status: Optional[str], limit: int):
 
         console.print(table)
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError) as exc:
+        _handle_cli_error(exc)
 
 
 @ai.command('providers')
@@ -560,9 +562,8 @@ def list_providers(ctx: click.Context, sort_by: str, min_reputation: Optional[in
         if len(providers) > 20:
             console.print(f"\n[dim]Showing 20 of {len(providers)} providers[/]")
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError) as exc:
+        _handle_cli_error(exc)
 
 
 @ai.command('provider-details')
@@ -617,9 +618,8 @@ def provider_details(ctx: click.Context, provider_id: str):
             for task_type in provider['supported_types']:
                 console.print(f"  • {task_type.upper()}")
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError) as exc:
+        _handle_cli_error(exc)
 
 
 @ai.command('earnings')
@@ -682,9 +682,8 @@ def provider_earnings(ctx: click.Context, provider_id: str, period: str):
                 percentage = (amount / earnings['total_earnings'] * 100) if earnings['total_earnings'] > 0 else 0
                 console.print(f"  {task_type.upper():20} {amount:.4f} XAI ({percentage:.1f}%)")
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError) as exc:
+        _handle_cli_error(exc)
 
 
 @ai.command('register-provider')
@@ -758,9 +757,8 @@ def register_provider(ctx: click.Context, wallet: str, models: str,
             console.print(f"[bold red]✗ Registration failed:[/] {result.get('error', 'Unknown')}")
             sys.exit(1)
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError) as exc:
+        _handle_cli_error(exc)
 
 
 @ai.command('marketplace')
@@ -814,9 +812,8 @@ def marketplace_stats(ctx: click.Context):
                 percentage = (count / total_tasks * 100) if total_tasks > 0 else 0
                 console.print(f"  {task_type.upper():20} - {count:,} tasks ({percentage:.1f}%)")
 
-    except Exception as e:
-        console.print(f"[bold red]Error:[/] {e}")
-        sys.exit(1)
+    except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
+        _handle_cli_error(exc)
 
 
 if __name__ == '__main__':

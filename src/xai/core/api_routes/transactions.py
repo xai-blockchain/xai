@@ -26,7 +26,7 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
         """Get pending transactions."""
         try:
             limit, offset = routes._get_pagination_params(default_limit=50, max_limit=500)
-        except Exception as exc:
+        except (ValueError, RuntimeError) as exc:
             return routes._error_response(
                 str(exc),
                 status=400,
@@ -57,7 +57,7 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
             fallback_block = None
             try:
                 fallback_block = chain[i]
-            except Exception as exc:
+            except IndexError as exc:
                 logger.debug("Block %d not in chain cache: %s", i, type(exc).__name__)
                 fallback_block = None
 
@@ -66,7 +66,7 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
             if callable(lookup):
                 try:
                     block = lookup(i)
-                except Exception as exc:
+                except (LookupError, ValueError, TypeError) as exc:
                     logger.debug("get_block(%d) failed: %s", i, type(exc).__name__)
                     block = None
             if block is None and fallback_block is not None:
@@ -108,10 +108,12 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
                         200,
                     )
 
-        for tx in blockchain.pending_transactions:
-            if tx.txid == txid:
+        for tx in getattr(blockchain, "pending_transactions", []):
+            tx_identifier = getattr(tx, "txid", None)
+            if tx_identifier == txid:
+                tx_payload = tx.to_dict() if hasattr(tx, "to_dict") else tx_identifier
                 return (
-                    jsonify({"found": True, "status": "pending", "transaction": tx.to_dict()}),
+                    jsonify({"found": True, "status": "pending", "transaction": tx_payload}),
                     200,
                 )
 
@@ -136,7 +138,7 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
                     status=429,
                     code="rate_limited",
                 )
-        except Exception as exc:
+        except (ImportError, AttributeError, RuntimeError) as exc:
             logger.error(
                 "Rate limiter unavailable for /send: %s",
                 type(exc).__name__,
@@ -236,7 +238,7 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
             if blockchain.add_transaction(tx):
                 try:
                     routes.spending_limits.record_spend(model.sender, float(model.amount))
-                except Exception as exc:
+                except (ValueError, RuntimeError) as exc:
                     logger.warning(
                         "Failed to record spending limit for transaction",
                         extra={"error": str(exc), "sender": model.sender, "event": "spending_limits.record_failed"},
@@ -255,7 +257,7 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
                 code="transaction_rejected",
                 context={"sender": model.sender, "recipient": model.recipient},
             )
-        except Exception as exc:
+        except (ValueError, RuntimeError) as exc:
             return routes._handle_exception(exc, "send_transaction")
 
     @app.route("/transaction/receive", methods=["POST"])
@@ -308,7 +310,7 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
             tx.txid = payload.get("txid") or tx.calculate_hash()
             if payload.get("metadata"):
                 tx.metadata = payload.get("metadata")
-        except Exception as exc:
+        except (ValueError, TypeError, KeyError) as exc:
             return routes._error_response(
                 "Invalid transaction data",
                 status=400,
@@ -319,10 +321,10 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
         try:
             try:
                 MetricsCollector.instance().record_p2p_message("received")
-            except Exception as exc:
+            except (RuntimeError, ValueError) as exc:
                 logger.debug("P2P metrics record failed: %s", type(exc).__name__)
             accepted = blockchain.add_transaction(tx)
-        except Exception as exc:
+        except (ValueError, RuntimeError) as exc:
             return routes._handle_exception(exc, "receive_transaction")
 
         if accepted:

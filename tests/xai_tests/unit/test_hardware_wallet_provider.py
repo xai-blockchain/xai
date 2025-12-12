@@ -1,5 +1,7 @@
 import os
+import sys
 import importlib
+import builtins
 import pytest
 
 
@@ -44,3 +46,51 @@ def test_hardware_wallet_disabled_returns_none():
         }
     )
     assert hw.get_default_hardware_wallet() is None
+
+
+def test_ledger_provider_missing_dependency(monkeypatch):
+    original_import = builtins.__import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name.startswith("ledgerblue"):
+            raise ImportError("ledgerblue missing")
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    sys.modules.pop("xai.core.hardware_wallet_ledger", None)
+
+    hw = reload_hw_module(
+        {
+            "XAI_HARDWARE_WALLET_ENABLED": "1",
+            "XAI_HARDWARE_WALLET_PROVIDER": "ledger",
+            "XAI_ALLOW_MOCK_HARDWARE_WALLET": "0",
+        }
+    )
+
+    with pytest.raises(ImportError) as exc:
+        hw.get_default_hardware_wallet()
+    assert "ledgerblue" in str(exc.value)
+
+
+def test_trezor_provider_missing_dependency(monkeypatch):
+    original_import = builtins.__import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name.startswith("trezorlib"):
+            raise ImportError("trezorlib missing")
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    sys.modules.pop("xai.core.hardware_wallet_trezor", None)
+
+    hw = reload_hw_module(
+        {
+            "XAI_HARDWARE_WALLET_ENABLED": "1",
+            "XAI_HARDWARE_WALLET_PROVIDER": "trezor",
+            "XAI_ALLOW_MOCK_HARDWARE_WALLET": "0",
+        }
+    )
+
+    with pytest.raises(ImportError) as exc:
+        hw.get_default_hardware_wallet()
+    assert "trezorlib" in str(exc.value)

@@ -47,7 +47,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
             return routes._success_response(result if isinstance(result, dict) else {"result": result})
         except ValueError as exc:
             return routes._error_response(str(exc), status=400, code="recovery_invalid")
-        except Exception as exc:
+        except (RuntimeError, TypeError, KeyError) as exc:
             return routes._handle_exception(exc, "recovery_setup")
 
     @app.route("/recovery/request", methods=["POST"])
@@ -71,7 +71,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
             return routes._success_response(result if isinstance(result, dict) else {"result": result})
         except ValueError as exc:
             return routes._error_response(str(exc), status=400, code="recovery_invalid")
-        except Exception as exc:
+        except (RuntimeError, TypeError, KeyError) as exc:
             return routes._handle_exception(exc, "recovery_request")
 
     @app.route("/recovery/vote", methods=["POST"])
@@ -93,7 +93,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
             return routes._success_response(result if isinstance(result, dict) else {"result": result})
         except ValueError as exc:
             return routes._error_response(str(exc), status=400, code="recovery_invalid")
-        except Exception as exc:
+        except (RuntimeError, TypeError, KeyError) as exc:
             return routes._handle_exception(exc, "recovery_vote")
 
     @app.route("/recovery/status/<address>", methods=["GET"])
@@ -101,8 +101,10 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
         try:
             status = node.recovery_manager.get_recovery_status(address)
             return jsonify({"success": True, "address": address, "status": status}), 200
-        except Exception as exc:
-            return jsonify({"error": str(exc)}), 500
+        except ValueError as exc:
+            return routes._error_response(str(exc), status=400, code="recovery_invalid")
+        except (RuntimeError, TypeError, KeyError) as exc:
+            return routes._handle_exception(exc, "recovery_get_status")
 
     @app.route("/recovery/cancel", methods=["POST"])
     @validate_request(routes.request_validator, RecoveryCancelInput)
@@ -123,7 +125,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
             return routes._success_response(result if isinstance(result, dict) else {"result": result})
         except ValueError as exc:
             return routes._error_response(str(exc), status=400, code="recovery_invalid")
-        except Exception as exc:
+        except (RuntimeError, TypeError, KeyError) as exc:
             return routes._handle_exception(exc, "recovery_cancel")
 
     @app.route("/recovery/execute", methods=["POST"])
@@ -143,7 +145,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
             return routes._success_response(result if isinstance(result, dict) else {"result": result})
         except ValueError as exc:
             return routes._error_response(str(exc), status=400, code="recovery_invalid")
-        except Exception as exc:
+        except (RuntimeError, TypeError, KeyError) as exc:
             return routes._handle_exception(exc, "recovery_execute")
 
     @app.route("/recovery/config/<address>", methods=["GET"])
@@ -156,16 +158,20 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
                 jsonify({"success": False, "message": "No recovery configuration found"}),
                 404,
             )
-        except Exception as exc:
-            return jsonify({"error": str(exc)}), 500
+        except ValueError as exc:
+            return routes._error_response(str(exc), status=400, code="recovery_invalid")
+        except (RuntimeError, TypeError, KeyError) as exc:
+            return routes._handle_exception(exc, "recovery_get_config")
 
     @app.route("/recovery/guardian/<address>", methods=["GET"])
     def get_guardian_duties(address: str) -> Tuple[Dict[str, Any], int]:
         try:
             duties = node.recovery_manager.get_guardian_duties(address)
             return jsonify({"success": True, "duties": duties}), 200
-        except Exception as exc:
-            return jsonify({"error": str(exc)}), 500
+        except ValueError as exc:
+            return routes._error_response(str(exc), status=400, code="recovery_invalid")
+        except (RuntimeError, TypeError, KeyError) as exc:
+            return routes._handle_exception(exc, "recovery_get_guardian_duties")
 
     @app.route("/recovery/requests", methods=["GET"])
     def get_recovery_requests() -> Tuple[Dict[str, Any], int]:
@@ -176,13 +182,17 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
                 jsonify({"success": True, "count": len(requests_list), "requests": requests_list}),
                 200,
             )
-        except Exception as exc:
-            return jsonify({"error": str(exc)}), 500
+        except ValueError as exc:
+            return routes._error_response(str(exc), status=400, code="recovery_invalid")
+        except (RuntimeError, TypeError, KeyError) as exc:
+            return routes._handle_exception(exc, "recovery_get_requests")
 
     @app.route("/recovery/stats", methods=["GET"])
     def get_recovery_stats() -> Tuple[Dict[str, Any], int]:
         try:
             stats = node.recovery_manager.get_stats()
             return jsonify({"success": True, "stats": stats}), 200
-        except Exception as exc:
-            return jsonify({"error": str(exc)}), 500
+        except ValueError as exc:
+            return routes._error_response(str(exc), status=400, code="recovery_invalid")
+        except (RuntimeError, TypeError, KeyError) as exc:
+            return routes._handle_exception(exc, "recovery_get_stats")

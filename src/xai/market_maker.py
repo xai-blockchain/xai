@@ -125,8 +125,11 @@ class MarketMaker:
                         placed_orders["buy"].append(result["order"])
                         placed_orders["total_usd_locked"] += level["total"]
 
-            except Exception as e:
-                logger.error("Failed to place buy order", error=str(e), level=level)
+            except requests.RequestException as e:
+                logger.error(
+                    "Failed to place buy order",
+                    extra={"error": str(e), "level": level, "event": "market_maker.place_buy_failed"},
+                )
 
         # Place sell orders
         for level in levels["sell_orders"]:
@@ -149,8 +152,11 @@ class MarketMaker:
                         placed_orders["sell"].append(result["order"])
                         placed_orders["total_axn_locked"] += level["amount"]
 
-            except Exception as e:
-                logger.error("Failed to place sell order", error=str(e), level=level)
+            except requests.RequestException as e:
+                logger.error(
+                    "Failed to place sell order",
+                    extra={"error": str(e), "level": level, "event": "market_maker.place_sell_failed"},
+                )
 
         return placed_orders
 
@@ -165,8 +171,11 @@ class MarketMaker:
                 result = response.json()
                 return result.get("orders", [])
 
-        except Exception as e:
-            logger.error("Failed to get orders", error=str(e))
+        except requests.RequestException as e:
+            logger.error(
+                "Failed to get orders",
+                extra={"error": str(e), "event": "market_maker.get_orders_failed"},
+            )
 
         return []
 
@@ -190,8 +199,13 @@ class MarketMaker:
                         if response.status_code == 200:
                             cancelled.append(order["id"])
 
-                    except Exception as e:
-                        logger.error("Failed to cancel order", order_id=order['id'], error=str(e))
+            except requests.RequestException as e:
+                logger.error(
+                    "Failed to cancel order",
+                    order_id=order["id"],
+                    error=str(e),
+                    extra={"event": "market_maker.cancel_order_failed"},
+                )
 
         return cancelled
 
@@ -241,8 +255,20 @@ class MarketMaker:
             while True:
                 try:
                     self.maintain_liquidity()
-                except Exception as e:
-                    logger.error("Error in maintenance cycle", error=str(e), exc_info=True)
+                except requests.RequestException as e:
+                    logger.error(
+                        "Network error in maintenance cycle",
+                        error=str(e),
+                        extra={"event": "market_maker.maintenance_network_error"},
+                        exc_info=True,
+                    )
+                except (ValueError, KeyError, TypeError) as e:
+                    logger.error(
+                        "State error in maintenance cycle",
+                        error=str(e),
+                        extra={"event": "market_maker.maintenance_state_error"},
+                        exc_info=True,
+                    )
 
                 logger.debug("Waiting for next cycle", interval_seconds=interval_seconds)
                 time.sleep(interval_seconds)

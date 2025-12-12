@@ -186,8 +186,13 @@ def get_from_node(endpoint: str, use_cache: bool = True) -> Optional[Dict[str, A
     except ValueError as e:
         logger.error(f"Invalid JSON response from {endpoint}: {e}")
         return None
-    except Exception as e:
-        logger.error(f"Unexpected error fetching {endpoint}: {e}")
+    except (RuntimeError, TypeError, KeyError, ValueError) as e:
+        logger.error(
+            "Unexpected error fetching %s: %s",
+            endpoint,
+            e,
+            exc_info=True,
+        )
         return None
 
 
@@ -218,8 +223,13 @@ def post_to_node(endpoint: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]
     except ValueError as e:
         logger.error(f"Invalid JSON response from {endpoint}: {e}")
         return None
-    except Exception as e:
-        logger.error(f"Unexpected error posting to {endpoint}: {e}")
+    except (RuntimeError, TypeError, KeyError, ValueError) as e:
+        logger.error(
+            "Unexpected error posting to %s: %s",
+            endpoint,
+            e,
+            exc_info=True,
+        )
         return None
 
 

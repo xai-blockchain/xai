@@ -14,6 +14,12 @@ import pytest
 import time
 from xai.core.defi.oracle import PriceOracle, PriceFeed, OracleStatus
 from xai.core.vm.exceptions import VMExecutionError
+from xai.blockchain.twap_oracle import TWAPOracle
+from xai.blockchain.oracle_manipulation_detection import OracleManipulationDetector
+from xai.security.circuit_breaker import CircuitBreaker, CircuitBreakerState
+from xai.blockchain.twap_oracle import TWAPOracle
+from xai.blockchain.oracle_manipulation_detection import OracleManipulationDetector
+from xai.security.circuit_breaker import CircuitBreaker, CircuitBreakerState
 
 
 class TestOracleManipulationProtection:
@@ -398,6 +404,33 @@ class TestOracleManipulationProtection:
             oracle.get_price("XAI/USD")
 
         assert "stale" in str(exc.value).lower()
+
+    def test_single_source_bias_trips_twap_detector(self):
+        """Even a single oracle feed deviating from TWAP should trip protection."""
+        twap = TWAPOracle(window_size_seconds=300)
+        for i in range(5):
+            twap.record_price(100.0, timestamp=100 + i * 30)
+
+        circuit = CircuitBreaker("oracle-detector", failure_threshold=1, recovery_timeout_seconds=60)
+        detector = OracleManipulationDetector(twap, circuit, deviation_threshold_percentage=5.0)
+
+        assert detector.check_for_manipulation({"DexA": 101.0}, current_timestamp=400) is False
+        assert circuit.state == CircuitBreakerState.CLOSED
+
+        assert detector.check_for_manipulation({"DexA": 112.0}, current_timestamp=400) is True
+        assert circuit.state == CircuitBreakerState.OPEN
+
+    def test_colluding_sources_detected_by_twap_guard(self):
+        """Multiple sources agreeing on a manipulated price still get blocked."""
+        twap = TWAPOracle(window_size_seconds=300)
+        for i in range(6):
+            twap.record_price(95.0 + i, timestamp=200 + i * 20)
+
+        circuit = CircuitBreaker("oracle-detector-collusion", failure_threshold=1, recovery_timeout_seconds=60)
+        detector = OracleManipulationDetector(twap, circuit, deviation_threshold_percentage=4.0)
+
+        colluding = {"SourceA": 120.0, "SourceB": 118.5}
+        assert detector.check_for_manipulation(colluding, current_timestamp=400) is True
 
     def test_circuit_breaker_blocks_all_updates(self):
         """Test that circuit breaker prevents all price updates."""

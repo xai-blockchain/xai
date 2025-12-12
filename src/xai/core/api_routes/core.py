@@ -80,17 +80,19 @@ def register_core_routes(
                     backlog["pending_transactions"] = stats.get("pending_transactions_count", 0)
                     backlog["orphan_blocks"] = stats.get("orphan_blocks_count", 0)
                     backlog["orphan_transactions"] = stats.get("orphan_transactions_count", 0)
-                except Exception as exc:  # pragma: no cover - defensive
+                except (RuntimeError, ValueError, KeyError, AttributeError) as exc:  # pragma: no cover - defensive
                     blockchain_summary = {"accessible": False, "error": str(exc)}
                     overall_status = "unhealthy"
                     http_status = 503
+                    logger.debug("Health check failed to pull blockchain stats", exc_info=True)
             else:
                 blockchain_summary = {"accessible": False, "error": "Blockchain not initialized"}
                 degrade("blockchain_unavailable")
-        except Exception as exc:  # pragma: no cover - defensive
+        except (RuntimeError, ValueError, AttributeError) as exc:  # pragma: no cover - defensive
             blockchain_summary = {"accessible": False, "error": str(exc)}
             overall_status = "unhealthy"
             http_status = 503
+            logger.debug("Health check encountered blockchain error", exc_info=True)
 
         # Storage check
         storage_status = "healthy"
@@ -103,10 +105,11 @@ def register_core_routes(
             with open(test_file, "w", encoding="utf-8") as handle:
                 handle.write("ok")
             os.remove(test_file)
-        except Exception as exc:
+        except (OSError, IOError, PermissionError, RuntimeError, ValueError) as exc:
             storage_status = "degraded"
             degrade("storage_unwritable")
             services["storage_error"] = str(exc)
+            logger.warning("Health check storage probe failed", exc_info=True)
         services["storage"] = storage_status
 
         # Network/P2P checks
@@ -133,10 +136,11 @@ def register_core_routes(
                     if peer_count == 0:
                         degrade("no_connected_peers")
                 network["peers"] = peer_count
-            except Exception as exc:  # pragma: no cover - defensive
+            except (RuntimeError, ValueError, AttributeError) as exc:  # pragma: no cover - defensive
                 p2p_status = "degraded"
                 degrade("p2p_error")
                 services["p2p_error"] = str(exc)
+                logger.debug("Health check P2P probe failed", exc_info=True)
         else:
             p2p_status = "unavailable"
             network["peers"] = 0
@@ -171,7 +175,7 @@ def register_core_routes(
         if sync_mgr and hasattr(sync_mgr, "get_provenance"):
             try:
                 provenance = sync_mgr.get_provenance()
-            except Exception as exc:
+            except (RuntimeError, ValueError, AttributeError) as exc:
                 logger.debug("Failed to read checkpoint provenance: %s", exc)
         return jsonify({"provenance": provenance}), 200
 
@@ -181,12 +185,13 @@ def register_core_routes(
         try:
             metrics_output = node.metrics_collector.export_prometheus()
             return metrics_output, 200, {"Content-Type": "text/plain; version=0.0.4"}
-        except Exception as exc:
+        except (RuntimeError, ValueError) as exc:
+            logger.error("Failed to generate Prometheus metrics", exc_info=True)
             return f"# Error generating metrics: {exc}\n", 500, {"Content-Type": "text/plain"}
 
     @app.route("/stats", methods=["GET"])
     def get_stats() -> Dict[str, Any]:
-        """Get blockchain statistics."""
+        """Get blockchain statistics with miner and uptime metadata."""
         stats = blockchain.get_stats()
         stats["miner_address"] = node.miner_address
         stats["peers"] = len(node.peers)
@@ -210,7 +215,7 @@ def register_core_routes(
                 jsonify({"success": False, "error": "Blockchain unavailable"}),
                 503,
             )
-        except Exception as exc:
+        except (RuntimeError, ValueError) as exc:
             return routes._handle_exception(exc, "mempool_overview")
 
     @app.route("/mempool/stats", methods=["GET"])
@@ -229,7 +234,7 @@ def register_core_routes(
                 jsonify({"success": False, "error": "Blockchain unavailable"}),
                 503,
             )
-        except Exception as exc:
+        except (RuntimeError, ValueError) as exc:
             return routes._handle_exception(exc, "mempool_stats")
 
         limits = overview.get("limits", {}) or {}

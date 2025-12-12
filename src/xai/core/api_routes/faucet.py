@@ -91,7 +91,7 @@ def register_faucet_routes(
 
         try:
             faucet_tx = routes.node.queue_faucet_transaction(address, amount)
-        except Exception as exc:
+        except (ValueError, RuntimeError) as exc:
             routes._record_faucet_metric(success=False)
             return routes._handle_exception(exc, "faucet_queue")
 

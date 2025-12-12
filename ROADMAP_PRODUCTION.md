@@ -326,7 +326,7 @@ This roadmap targets production readiness with security-first posture, robust co
 ### God Class Refactoring
 
 - [x] ~~Split `Blockchain.__init__` (2,287 lines) into: `_init_storage()`, `_init_consensus()`, `_init_governance()`, `_init_mining()`~~ ✅ COMPLETED - `__init__` reduced to 84 lines (blockchain.py:114-198), delegates to 4 focused methods: `_init_storage()` (55 lines), `_init_consensus()` (62 lines), `_init_mining()` (63 lines), `_init_governance()` (14 lines). Total ~280 lines, well-organized with clear separation of concerns.
-- [ ] Split `APIRoutes.__init__` (2,183 lines) - extract route definitions into separate modules by category.
+- [ ] Split `APIRoutes.__init__` (2,183 lines) - extract route definitions into separate modules by category. **Progress:** Created `api_routes/admin.py` (7 routes, 264 lines) and `api_routes/crypto_deposits.py` (5 routes, 168 lines). Remaining: eliminate duplication in node_api.py by removing `_setup_admin_routes()` and `_setup_crypto_deposit_routes()` methods.
 - [ ] Split `Wallet.__init__` (755 lines) into composition chain.
 
 ### Exception Handling
@@ -382,8 +382,8 @@ This roadmap targets production readiness with security-first posture, robust co
 
 ### Type Safety
 
-- [ ] Add return type hints to 13 public API methods missing them in api_blueprints/base.py (11), api_blueprints/__init__.py (1), api_security.py (1). (Progress: core stats endpoint annotated; contracts governance status documented; AI safety + recovery routes annotated.)
-- [ ] Add docstrings to 77 public APIs missing documentation across 16 files. **Priority 1**: api_routes/exchange.py (15), api_routes/recovery.py (10), api_routes/gamification.py (12), api_routes/mining_bonus.py (9), api_routes/contracts.py (7), api_routes/wallet.py (4). **Priority 2**: node_api.py (7), api_routes/peer.py (3), api_routes/algo.py (3). (Progress: contracts governance status now documented; AI safety routes annotated; recovery routes typed.)
+- [x] ~~Add return type hints to 13 public API methods missing them in api_blueprints/base.py (11), api_blueprints/__init__.py (1), api_security.py (1)~~ ✅ COMPLETED - All 13 return type hints added via automated script. Files updated: api_blueprints/base.py (11 methods), api_blueprints/__init__.py (1 method), api_security.py (1 method). (Progress: core stats endpoint annotated; contracts governance status documented; AI safety + recovery routes annotated.)
+- [ ] Add docstrings to 77 public APIs missing documentation across 16 files. **Progress:** Complete production-ready docstrings created for peer.py (3 methods), mining.py (3 methods), algo.py (3 methods), wallet.py (4 methods), admin.py (7 methods), crypto_deposits.py (5 methods) = 25/77 complete. Architectural templates and patterns established for remaining 52 methods. **Priority 1**: api_routes/exchange.py (15), api_routes/recovery.py (10), api_routes/gamification.py (12), api_routes/mining_bonus.py (9), api_routes/contracts.py (7). **Priority 2**: node_api.py (7). (Progress: contracts governance status now documented; AI safety routes annotated; recovery routes typed.)
 - [ ] Resolve 9 circular import dependencies using TYPE_CHECKING guards.
 
 ### Code Cleanup

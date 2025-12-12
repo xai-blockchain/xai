@@ -40,6 +40,33 @@ def test_oracle_manipulation_detector_trips_on_deviation():
     assert circuit.state == CircuitBreakerState.OPEN
 
 
+def test_detector_flags_single_source_bias_against_twap():
+    circuit = CircuitBreaker("oracle-detector-single-source", failure_threshold=1, recovery_timeout_seconds=10)
+    oracle = TWAPOracle(window_size_seconds=300)
+    _seed_oracle(oracle, base_price=100.0)
+    detector = OracleManipulationDetector(oracle, circuit, deviation_threshold_percentage=5.0)
+
+    # Baseline should pass
+    assert detector.check_for_manipulation({"DexA": 101.0}, current_timestamp=400) is False
+    assert circuit.state == CircuitBreakerState.CLOSED
+
+    # Single source deviating 12% from TWAP must trip the breaker even without corroborating sources
+    assert detector.check_for_manipulation({"DexA": 112.0}, current_timestamp=400) is True
+    assert circuit.state == CircuitBreakerState.OPEN
+
+
+def test_detector_spots_twap_attack_with_consistent_sources():
+    circuit = CircuitBreaker("oracle-detector-twap-attack", failure_threshold=1, recovery_timeout_seconds=10)
+    oracle = TWAPOracle(window_size_seconds=300)
+    _seed_oracle(oracle, base_price=100.0)
+    detector = OracleManipulationDetector(oracle, circuit, deviation_threshold_percentage=4.0)
+
+    # Two colluding sources both publish a synchronized spike that exceeds the TWAP bounds.
+    colluding_prices = {"Chainlink": 118.0, "Uniswap": 119.0}
+    assert detector.check_for_manipulation(colluding_prices, current_timestamp=400) is True
+    assert circuit.state == CircuitBreakerState.OPEN
+
+
 def test_flash_loan_protection_detects_price_impact_and_oracle_issues():
     circuit = CircuitBreaker("flash-loan", failure_threshold=1, recovery_timeout_seconds=10)
     oracle = TWAPOracle(window_size_seconds=300)

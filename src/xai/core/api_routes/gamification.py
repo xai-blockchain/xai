@@ -84,7 +84,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
                     "message": "Treasure hunt created successfully",
                 }
             )
-        except Exception as exc:
+        except (ValueError, RuntimeError) as exc:
             return routes._handle_exception(exc, "create_treasure")
 
     @app.route("/treasure/claim", methods=["POST"])
@@ -124,7 +124,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
                 code="invalid_solution",
             )
 
-        except Exception as exc:
+        except (ValueError, RuntimeError) as exc:
             return routes._handle_exception(exc, "claim_treasure")
 
     @app.route("/treasure/details/<treasure_id>", methods=["GET"])

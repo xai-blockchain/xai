@@ -566,7 +566,7 @@ class ZKP_Simulator:
     def __init__(self):
         """Initialize with production ZKP system."""
         self.zkp = ZeroKnowledgeProof()
-        print("WARNING: ZKP_Simulator is deprecated. Use ZeroKnowledgeProof instead.")
+        logger.warning("ZKP_Simulator is deprecated. Use ZeroKnowledgeProof instead.")
 
     def generate_proof(
         self,
@@ -622,92 +622,4 @@ class ZKP_Simulator:
 
 # Example usage and tests
 if __name__ == "__main__":
-    print("=" * 60)
-    print("Production Zero-Knowledge Proof System")
-    print("=" * 60)
-
-    zkp = ZeroKnowledgeProof()
-
-    # Test 1: Schnorr Protocol - Prove knowledge of private key
-    print("\n[TEST 1] Schnorr Protocol - Private Key Knowledge")
-    print("-" * 60)
-
-    private_key, public_key = zkp.schnorr_generate_keypair()
-    print(f"Generated key pair")
-    print(f"Public key: ({public_key[0]}, {public_key[1]})")
-
-    public_key_proof, schnorr_proof = zkp.prove_private_key_knowledge(private_key)
-    print(f"\nGenerated proof of private key knowledge")
-    print(f"Commitment: {schnorr_proof.commitment}")
-    print(f"Challenge: {schnorr_proof.challenge}")
-    print(f"Response: {schnorr_proof.response}")
-
-    is_valid = zkp.verify_private_key_knowledge(public_key_proof, schnorr_proof)
-    print(f"\nProof verification: {'PASSED' if is_valid else 'FAILED'}")
-
-    # Test with wrong public key (should fail)
-    _, wrong_public_key = zkp.schnorr_generate_keypair()
-    is_invalid = zkp.verify_private_key_knowledge(wrong_public_key, schnorr_proof)
-    print(f"Wrong key verification: {'FAILED (as expected)' if not is_invalid else 'UNEXPECTED PASS'}")
-
-    # Test 2: Pedersen Commitments
-    print("\n[TEST 2] Pedersen Commitments - Hiding Values")
-    print("-" * 60)
-
-    secret_value = 12345
-    commitment = zkp.pedersen_commit(secret_value)
-    print(f"Created commitment to value: {secret_value}")
-    print(f"Commitment point: ({commitment.commitment[0]}, {commitment.commitment[1]})")
-
-    is_valid = zkp.pedersen_verify_commitment(commitment, secret_value)
-    print(f"Commitment verification: {'PASSED' if is_valid else 'FAILED'}")
-
-    # Test with wrong value (should fail)
-    is_invalid = zkp.pedersen_verify_commitment(commitment, secret_value + 1)
-    print(f"Wrong value verification: {'FAILED (as expected)' if not is_invalid else 'UNEXPECTED PASS'}")
-
-    # Prove knowledge of committed value
-    knowledge_proof = zkp.pedersen_prove_knowledge(commitment, secret_value)
-    print(f"\nProof of knowledge created: {len(knowledge_proof)} fields")
-
-    # Test 3: Range Proofs
-    print("\n[TEST 3] Range Proofs - Transaction Amounts")
-    print("-" * 60)
-
-    transaction_amount = 500
-    max_balance = 1000
-
-    range_proof = zkp.prove_transaction_validity(transaction_amount, max_balance)
-    if range_proof:
-        print(f"Created range proof for amount in [0, {max_balance}]")
-        print(f"(Actual amount: {transaction_amount}, but verifier doesn't know this)")
-
-        is_valid = zkp.range_proof_verify(range_proof, transaction_amount)
-        print(f"Range proof verification: {'PASSED' if is_valid else 'FAILED'}")
-
-    # Test with out-of-range value (should fail to create)
-    invalid_proof = zkp.prove_transaction_validity(1500, max_balance)
-    print(f"Out-of-range proof creation: {'FAILED (as expected)' if invalid_proof is None else 'UNEXPECTED SUCCESS'}")
-
-    # Test 4: Set Membership Proofs
-    print("\n[TEST 4] Set Membership Proofs - Anonymous Authorization")
-    print("-" * 60)
-
-    authorized_users = [1001, 1002, 1003, 1004, 1005]
-    my_id = 1003
-
-    membership_proof = zkp.membership_proof_create(my_id, authorized_users)
-    if membership_proof:
-        print(f"Created membership proof for ID in set {authorized_users}")
-        print(f"(Actual ID: {my_id}, but verifier doesn't know which one)")
-
-        is_valid = zkp.membership_proof_verify(membership_proof, authorized_users)
-        print(f"Membership proof verification: {'PASSED' if is_valid else 'FAILED'}")
-
-    # Test with unauthorized user (should fail to create)
-    unauthorized_proof = zkp.membership_proof_create(9999, authorized_users)
-    print(f"Unauthorized user proof: {'FAILED (as expected)' if unauthorized_proof is None else 'UNEXPECTED SUCCESS'}")
-
-    print("\n" + "=" * 60)
-    print("All tests completed!")
-    print("=" * 60)
+    logger.warning("Zero-knowledge proof CLI demo is deprecated; use unit tests instead.")

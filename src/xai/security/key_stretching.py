@@ -1,8 +1,10 @@
 import hashlib
-import os
-from src.xai.security.csprng import CSPRNG
+import logging
 from typing import Tuple
 
+from src.xai.security.csprng import CSPRNG
+
+logger = logging.getLogger(__name__)
 
 class KeyStretchingManager:
     def __init__(self, salt_length_bytes: int = 16, iterations: int = 100000):
@@ -14,8 +16,13 @@ class KeyStretchingManager:
         self.salt_length_bytes = salt_length_bytes
         self.iterations = iterations
         self.csprng = CSPRNG()
-        print(
-            f"KeyStretchingManager initialized with salt length: {self.salt_length_bytes} bytes, iterations: {self.iterations}."
+        logger.info(
+            "KeyStretchingManager initialized",
+            extra={
+                "event": "key_stretching.init",
+                "salt_bytes": self.salt_length_bytes,
+                "iterations": self.iterations,
+            },
         )
 
     def _generate_salt(self) -> bytes:
@@ -70,31 +77,4 @@ class KeyStretchingManager:
         return computed_derived_key == stored_derived_key
 
 
-# Example Usage (for testing purposes)
-if __name__ == "__main__":
-    key_stretcher = KeyStretchingManager(salt_length_bytes=16, iterations=150000)
-
-    user_password = "mySecretPassword123!"
-
-    print("\n--- Deriving Key ---")
-    derived_key, salt, iterations = key_stretcher.derive_key(user_password)
-    print(f"Password: '{user_password}'")
-    print(f"Derived Key (hex): {derived_key.hex()}")
-    print(f"Salt (hex): {salt.hex()}")
-    print(f"Iterations: {iterations}")
-
-    print("\n--- Verifying Key ---")
-    # Correct verification
-    is_valid_1 = key_stretcher.verify_key(user_password, derived_key, salt, iterations)
-    print(f"Verify '{user_password}' (expected True): {is_valid_1}")
-
-    # Incorrect password
-    is_invalid_1 = key_stretcher.verify_key("wrong_password", derived_key, salt, iterations)
-    print(f"Verify 'wrong_password' (expected False): {is_invalid_1}")
-
-    # Different salt (even with same password, derived key will be different)
-    derived_key_2, salt_2, iterations_2 = key_stretcher.derive_key(user_password)
-    is_invalid_2 = key_stretcher.verify_key(
-        user_password, derived_key_2, salt, iterations
-    )  # Using wrong salt
-    print(f"Verify '{user_password}' with wrong salt (expected False): {is_invalid_2}")
+# Example usage is intentionally omitted in production modules.
