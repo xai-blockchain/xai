@@ -31,6 +31,40 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
     @app.route("/contracts/deploy", methods=["POST"])
     @validate_request(routes.request_validator, ContractDeployInput)
     def deploy_contract() -> Tuple[Dict[str, Any], int]:
+        """Deploy a smart contract to the blockchain (admin only).
+
+        Creates and broadcasts a contract deployment transaction. The contract
+        address is deterministically derived from sender address and nonce.
+
+        This endpoint requires API authentication and VM features enabled.
+
+        Request Body (ContractDeployInput):
+            {
+                "sender": "deployer address",
+                "bytecode": "hex-encoded contract bytecode",
+                "value": float (initial contract balance),
+                "fee": float (transaction fee),
+                "gas_limit": int,
+                "public_key": "sender public key",
+                "signature": "transaction signature",
+                "nonce": int (optional),
+                "metadata": {
+                    "abi": [] (optional contract ABI),
+                    ...
+                }
+            }
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains txid and derived contract_address
+                - http_status_code: 200 on success, 400/401/503 on error
+
+        Raises:
+            AuthenticationError: If API key is missing or invalid (401).
+            ServiceUnavailable: If VM feature is disabled (503).
+            ValidationError: If deployment data is invalid (400).
+            ValueError: If signature is invalid or ABI malformed (400).
+        """
         auth_error = routes._require_api_auth()
         if auth_error:
             return auth_error
@@ -109,6 +143,38 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
     @app.route("/contracts/call", methods=["POST"])
     @validate_request(routes.request_validator, ContractCallInput)
     def call_contract() -> Tuple[Dict[str, Any], int]:
+        """Call a deployed smart contract function (admin only).
+
+        Executes a contract function by creating a contract call transaction.
+        Can include payment (value) to payable contract functions.
+
+        This endpoint requires API authentication and VM features enabled.
+
+        Request Body (ContractCallInput):
+            {
+                "sender": "caller address",
+                "contract_address": "target contract address",
+                "value": float (amount to send),
+                "fee": float (transaction fee),
+                "gas_limit": int,
+                "payload": {} (JSON function call data) OR "data": "hex",
+                "public_key": "sender public key",
+                "signature": "transaction signature",
+                "nonce": int (optional),
+                "metadata": {} (optional)
+            }
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains txid and confirmation message
+                - http_status_code: 200 on success, 400/401/503 on error
+
+        Raises:
+            AuthenticationError: If API key is missing or invalid (401).
+            ServiceUnavailable: If VM feature is disabled (503).
+            ValidationError: If call data is invalid (400).
+            ValueError: If signature invalid or payload malformed (400).
+        """
         auth_error = routes._require_api_auth()
         if auth_error:
             return auth_error
@@ -189,6 +255,23 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
 
     @app.route("/contracts/<address>/state", methods=["GET"])
     def contract_state(address: str) -> Tuple[Dict[str, Any], int]:
+        """Get current state storage of a deployed contract.
+
+        Returns the contract's state variables and storage data.
+
+        Path Parameters:
+            address (str): The contract address
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains contract_address and state object
+                - http_status_code: 200 on success, 400/404/503 on error
+
+        Raises:
+            ValidationError: If address format is invalid (400).
+            NotFound: If contract doesn't exist (404).
+            ServiceUnavailable: If VM feature is disabled (503).
+        """
         if not blockchain.smart_contract_manager:
             return routes._error_response(
                 "Smart-contract VM feature is disabled",
@@ -210,6 +293,22 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
 
     @app.route("/contracts/<address>/abi", methods=["GET"])
     def contract_abi(address: str) -> Tuple[Dict[str, Any], int]:
+        """Get contract ABI (Application Binary Interface).
+
+        Returns the contract's ABI defining its functions, events, and data structures.
+
+        Path Parameters:
+            address (str): The contract address
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains contract_address and ABI data
+                - http_status_code: 200 on success, 400/404 on error
+
+        Raises:
+            ValidationError: If address format is invalid (400).
+            NotFound: If contract ABI not found (404).
+        """
         try:
             normalized = sanitizer.validate_address(address)
         except ValueError as exc:
@@ -227,6 +326,30 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
 
     @app.route("/contracts/<address>/interfaces", methods=["GET"])
     def contract_interfaces(address: str) -> Tuple[Dict[str, Any], int]:
+        """Detect supported ERC interfaces for a contract.
+
+        Probes contract for ERC-165 interface support and caches results.
+        Returns which standard interfaces (ERC-20, ERC-721, etc.) the contract implements.
+
+        Path Parameters:
+            address (str): The contract address
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains contract_address, interfaces list, and metadata
+                - http_status_code: 200 on success, 400/404/503 on error
+
+        Response includes:
+            - interfaces: List of supported ERC interface IDs
+            - metadata.cached: Whether result was from cache
+            - metadata.source: Detection method ("erc165_probe" or cache)
+            - metadata.detected_at: Timestamp of detection
+
+        Raises:
+            ValidationError: If address format is invalid (400).
+            NotFound: If contract doesn't exist (404).
+            ServiceUnavailable: If VM feature is disabled (503).
+        """
         try:
             normalized = sanitizer.validate_address(address)
         except ValueError as exc:
@@ -276,6 +399,33 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
 
     @app.route("/contracts/<address>/events", methods=["GET"])
     def contract_events(address: str) -> Tuple[Dict[str, Any], int]:
+        """Get contract events with pagination.
+
+        Returns events emitted by the contract during execution, with pagination support.
+
+        Path Parameters:
+            address (str): The contract address
+
+        Query Parameters:
+            limit (int, optional): Maximum events to return (default: 50, max: 500)
+            offset (int, optional): Number of events to skip (default: 0)
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains events array, counts, and pagination info
+                - http_status_code: 200 on success, 400 on error
+
+        Response includes:
+            - contract_address: The queried contract
+            - events: List of event objects
+            - count: Number of events in this response
+            - total: Total events for this contract
+            - limit: Applied limit
+            - offset: Applied offset
+
+        Raises:
+            ValidationError: If address or pagination params invalid (400).
+        """
         try:
             limit, offset = routes._get_pagination_params(default_limit=50, max_limit=500)
         except ValueError as exc:
@@ -327,6 +477,30 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
     @app.route("/contracts/governance/feature", methods=["POST"])
     @validate_request(routes.request_validator, ContractFeatureToggleInput)
     def contract_feature_toggle() -> Tuple[Dict[str, Any], int]:
+        """Enable or disable smart contract feature via governance (admin only).
+
+        Executes a governance proposal to enable/disable the smart contract VM feature.
+        Creates and immediately executes a feature activation proposal.
+
+        This endpoint requires admin authentication.
+
+        Request Body (ContractFeatureToggleInput):
+            {
+                "enabled": bool (true to enable, false to disable),
+                "reason": "optional explanation"
+            }
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains proposal_id and governance_result
+                - http_status_code: 200 on success, 400/403/500 on error
+
+        Raises:
+            AdminAuthError: If admin authentication fails (403).
+            ServiceError: If governance executor unavailable (500).
+            ValidationError: If toggle data is invalid (400).
+            GovernanceError: If proposal execution fails (400).
+        """
         if not blockchain.governance_executor:
             return routes._error_response(
                 "Governance execution engine unavailable",

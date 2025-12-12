@@ -14,11 +14,42 @@ def register_wallet_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/balance/<address>", methods=["GET"])
     def get_balance(address: str) -> Dict[str, Any]:
+        """Get balance for a blockchain address.
+
+        Retrieves the current balance for the specified address by summing
+        all transaction outputs minus inputs.
+
+        Path Parameters:
+            address (str): The blockchain address to query
+
+        Returns:
+            Dict containing:
+                - address (str): The queried address
+                - balance (float): Current balance in XAI tokens
+        """
         balance = blockchain.get_balance(address)
         return jsonify({"address": address, "balance": balance})
 
     @app.route("/address/<address>/nonce", methods=["GET"])
     def get_address_nonce(address: str) -> Tuple[Dict[str, Any], int]:
+        """Get nonce information for an address.
+
+        Returns confirmed nonce, next available nonce, and pending nonce for
+        the specified address. Used for transaction ordering and replay protection.
+
+        Path Parameters:
+            address (str): The blockchain address to query
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains confirmed_nonce, next_nonce, pending_nonce
+                - http_status_code: 200 on success, 503 if nonce tracker unavailable
+
+        Raises:
+            ServiceUnavailable: If nonce tracker is not available (503).
+            ValueError: If nonce lookup fails (500).
+            RuntimeError: If nonce tracker operation fails (500).
+        """
         tracker = getattr(blockchain, "nonce_tracker", None)
         if tracker is None:
             return routes._error_response(
@@ -48,6 +79,29 @@ def register_wallet_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/history/<address>", methods=["GET"])
     def get_history(address: str) -> Dict[str, Any]:
+        """Get transaction history for an address.
+
+        Returns paginated transaction history for the specified address,
+        including all transactions where the address is sender or recipient.
+
+        Path Parameters:
+            address (str): The blockchain address to query
+
+        Query Parameters:
+            limit (int, optional): Maximum transactions to return (default: 50, max: 500)
+            offset (int, optional): Number of transactions to skip (default: 0)
+
+        Returns:
+            Dict containing:
+                - address (str): The queried address
+                - transaction_count (int): Total number of transactions for this address
+                - limit (int): Applied limit
+                - offset (int): Applied offset
+                - transactions (list): List of transaction objects
+
+        Raises:
+            ValueError: If pagination parameters are invalid (400).
+        """
         try:
             limit, offset = routes._get_pagination_params(default_limit=50, max_limit=500)
         except (ValueError, RuntimeError) as exc:

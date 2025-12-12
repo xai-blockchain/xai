@@ -31,6 +31,24 @@ def register_mining_routes(
 
     @app.route("/mine", methods=["POST"])
     def mine_block() -> Tuple[Dict[str, Any], int]:
+        """Mine a single block with pending transactions.
+
+        Mines one block containing pending transactions and broadcasts it to the
+        network. Includes rate limiting to prevent mining abuse.
+
+        This endpoint requires API authentication.
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains mined block data, success flag, and reward
+                - http_status_code: 200 on success, 400/429/503 on error
+
+        Raises:
+            AuthenticationError: If API key is missing or invalid (401).
+            RateLimitError: If mining rate limit exceeded (429).
+            ValueError: If no pending transactions to mine (400).
+            RuntimeError: If rate limiter is unavailable (503).
+        """
         auth_error = routes._require_api_auth()
         if auth_error:
             return auth_error
@@ -83,6 +101,19 @@ def register_mining_routes(
 
     @app.route("/auto-mine/start", methods=["POST"])
     def start_auto_mining() -> Dict[str, str]:
+        """Start automatic continuous mining.
+
+        Enables auto-mining mode where the node continuously mines blocks
+        whenever pending transactions are available.
+
+        This endpoint requires API authentication.
+
+        Returns:
+            Dict containing status message indicating mining started or already active.
+
+        Raises:
+            AuthenticationError: If API key is missing or invalid (401).
+        """
         auth_error = routes._require_api_auth()
         if auth_error:
             return auth_error
@@ -94,6 +125,19 @@ def register_mining_routes(
 
     @app.route("/auto-mine/stop", methods=["POST"])
     def stop_auto_mining() -> Dict[str, str]:
+        """Stop automatic continuous mining.
+
+        Disables auto-mining mode, halting continuous block mining.
+        Does not affect manual mining via /mine endpoint.
+
+        This endpoint requires API authentication.
+
+        Returns:
+            Dict containing status message indicating mining stopped or wasn't active.
+
+        Raises:
+            AuthenticationError: If API key is missing or invalid (401).
+        """
         auth_error = routes._require_api_auth()
         if auth_error:
             return auth_error

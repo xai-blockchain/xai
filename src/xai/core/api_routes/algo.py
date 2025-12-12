@@ -24,6 +24,23 @@ def register_algo_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/algo/fee-estimate", methods=["GET"])
     def estimate_fee() -> Tuple[Dict[str, Any], int]:
+        """Estimate optimal transaction fee based on mempool state.
+
+        Uses statistical analysis of pending transactions to predict the optimal
+        fee for transaction inclusion based on desired priority level.
+
+        Query Parameters:
+            priority (str, optional): Fee priority level - "low", "normal", or "high"
+                                     (default: "normal")
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Fee recommendation with statistical analysis
+                - http_status_code: 200 on success, 503 if algo features disabled
+
+        Raises:
+            ServiceUnavailable: If algorithmic features are not enabled (503).
+        """
         fee_optimizer = getattr(node, "fee_optimizer", None)
         enabled = getattr(node_utils, "ALGO_FEATURES_ENABLED", ALGO_FEATURES_ENABLED) or ALGO_FEATURES_ENABLED
         if not (enabled and fee_optimizer):
@@ -79,6 +96,34 @@ def register_algo_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/algo/fraud-check", methods=["POST"])
     def check_fraud() -> Tuple[Dict[str, Any], int]:
+        """Analyze transaction for potential fraud patterns.
+
+        Uses machine learning and pattern detection to assess fraud risk for
+        a given transaction based on historical behavior and known patterns.
+
+        This endpoint requires API authentication.
+
+        Request Body (FraudCheckInput):
+            {
+                "payload": {
+                    "sender": "address",
+                    "recipient": "address",
+                    "amount": float,
+                    "timestamp": int,
+                    ...
+                }
+            }
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Fraud analysis with risk score and factors
+                - http_status_code: 200 on success, 400/503 on error
+
+        Raises:
+            AuthenticationError: If API key is missing or invalid (401).
+            ValidationError: If transaction payload is invalid (400).
+            ServiceUnavailable: If algorithmic features are not enabled (503).
+        """
         enabled = getattr(node_utils, "ALGO_FEATURES_ENABLED", ALGO_FEATURES_ENABLED) or ALGO_FEATURES_ENABLED
         fraud_detector = getattr(node, "fraud_detector", None)
         if not (enabled and fraud_detector):
@@ -103,6 +148,23 @@ def register_algo_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/algo/status", methods=["GET"])
     def algo_status() -> Dict[str, Any]:
+        """Get status of algorithmic features.
+
+        Returns information about which algorithmic features are enabled and active,
+        including fee optimization and fraud detection modules.
+
+        Returns:
+            Dict containing:
+                - enabled (bool): Whether algorithmic features are enabled
+                - features (list): List of active feature modules with their status
+                - warning (str, optional): Warning if modules not installed
+
+        Each feature in the list includes:
+            - name (str): Feature name
+            - description (str): Feature description
+            - status (str): Current status (e.g., "active")
+            - Additional feature-specific metrics
+        """
         fee_optimizer = getattr(node, "fee_optimizer", None)
         fraud_detector = getattr(node, "fraud_detector", None)
         enabled = getattr(node_utils, "ALGO_FEATURES_ENABLED", ALGO_FEATURES_ENABLED) or ALGO_FEATURES_ENABLED

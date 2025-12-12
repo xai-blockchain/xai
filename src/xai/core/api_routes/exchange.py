@@ -30,6 +30,26 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/exchange/orders", methods=["GET"])
     def get_order_book() -> Tuple[Dict[str, Any], int]:
+        """Get current exchange order book.
+
+        Returns top buy and sell orders from the exchange order book,
+        sorted by price (best prices first).
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains buy_orders, sell_orders, and counts
+                - http_status_code: 200 on success, 500/503 on error
+
+        Response includes:
+            - buy_orders: Top 20 buy orders (highest price first)
+            - sell_orders: Top 20 sell orders (lowest price first)
+            - total_buy_orders: Total open buy orders
+            - total_sell_orders: Total open sell orders
+
+        Raises:
+            ServiceUnavailable: If exchange module is disabled (503).
+            IOError: If order book file cannot be read (500).
+        """
         if not node.exchange_wallet_manager:
             return jsonify({"success": False, "error": "Exchange module disabled"}), 503
         try:
@@ -76,6 +96,33 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
     @app.route("/exchange/place-order", methods=["POST"])
     @validate_request(routes.request_validator, ExchangeOrderInput)
     def place_order() -> Tuple[Dict[str, Any], int]:
+        """Place a buy or sell order on the exchange (admin only).
+
+        Creates a limit order, locks required funds, and attempts to match
+        with existing orders. Unmatched portion remains in order book.
+
+        This endpoint requires API authentication.
+
+        Request Body (ExchangeOrderInput):
+            {
+                "address": "user address",
+                "order_type": "buy" | "sell",
+                "pair": "XAI/USD",
+                "price": float,
+                "amount": float
+            }
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains order details, matched orders, and updated balances
+                - http_status_code: 200 on success, 400/401/503 on error
+
+        Raises:
+            AuthenticationError: If API key is missing or invalid (401).
+            ServiceUnavailable: If exchange module is disabled (503).
+            ValidationError: If order data is invalid (400).
+            ValueError: If insufficient balance or funds lock fails (400/500).
+        """
         if not node.exchange_wallet_manager:
             return routes._error_response(
                 "Exchange module disabled", status=503, code="module_disabled"
@@ -178,6 +225,30 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
     @app.route("/exchange/cancel-order", methods=["POST"])
     @validate_request(routes.request_validator, ExchangeCancelInput)
     def cancel_order() -> Tuple[Dict[str, Any], int]:
+        """Cancel an open order and unlock funds (admin only).
+
+        Cancels an open order, removes it from the order book, and unlocks
+        the reserved funds back to the user's available balance.
+
+        This endpoint requires API authentication.
+
+        Request Body (ExchangeCancelInput):
+            {
+                "order_id": "order identifier",
+                "address": "user address"
+            }
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Cancellation confirmation
+                - http_status_code: 200 on success, 400/401/404/503 on error
+
+        Raises:
+            AuthenticationError: If API key is missing or invalid (401).
+            ServiceUnavailable: If exchange module is disabled (503).
+            NotFound: If order doesn't exist (404).
+            ValidationError: If user doesn't own the order (400).
+        """
         if not node.exchange_wallet_manager:
             return routes._error_response(
                 "Exchange module disabled", status=503, code="module_disabled"
@@ -224,6 +295,22 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/exchange/my-orders/<address>", methods=["GET"])
     def get_my_orders(address: str) -> Tuple[Dict[str, Any], int]:
+        """Get all orders for a specific user address.
+
+        Returns all orders (buy and sell, all statuses) for the specified address,
+        sorted by timestamp (newest first).
+
+        Path Parameters:
+            address (str): The user's blockchain address
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains success flag and orders list
+                - http_status_code: 200 on success, 500/503 on error
+
+        Raises:
+            ServiceUnavailable: If exchange module is disabled (503).
+        """
         if not node.exchange_wallet_manager:
             return jsonify({"success": False, "error": "Exchange module disabled"}), 503
         try:
@@ -248,6 +335,22 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/exchange/trades", methods=["GET"])
     def get_recent_trades() -> Tuple[Dict[str, Any], int]:
+        """Get recent executed trades.
+
+        Returns recent matched trades from the exchange, sorted by timestamp
+        (newest first).
+
+        Query Parameters:
+            limit (int, optional): Maximum trades to return (default: 50)
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains success flag and trades list
+                - http_status_code: 200 on success, 500/503 on error
+
+        Raises:
+            ServiceUnavailable: If exchange module is disabled (503).
+        """
         if not node.exchange_wallet_manager:
             return jsonify({"success": False, "error": "Exchange module disabled"}), 503
         limit = request.args.get("limit", default=50, type=int)
@@ -268,6 +371,32 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
     @app.route("/exchange/deposit", methods=["POST"])
     @validate_request(routes.request_validator, ExchangeTransferInput)
     def deposit_funds() -> Tuple[Dict[str, Any], int]:
+        """Deposit funds to exchange wallet (admin only).
+
+        Credits user's exchange balance with specified currency and amount.
+        Used for both manual deposits and automated deposit processing.
+
+        This endpoint requires API authentication.
+
+        Request Body (ExchangeTransferInput):
+            {
+                "to_address": "user address",
+                "currency": "XAI" | "USD" | etc,
+                "amount": float,
+                "deposit_type": "manual" | "credit_card" (optional),
+                "tx_hash": "transaction hash" (optional)
+            }
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Deposit confirmation
+                - http_status_code: 200 on success, 400/401/503 on error
+
+        Raises:
+            AuthenticationError: If API key is missing or invalid (401).
+            ServiceUnavailable: If exchange module is disabled (503).
+            ValidationError: If deposit data is invalid (400).
+        """
         if not node.exchange_wallet_manager:
             return routes._error_response(
                 "Exchange module disabled", status=503, code="module_disabled"
@@ -296,6 +425,31 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
     @app.route("/exchange/withdraw", methods=["POST"])
     @validate_request(routes.request_validator, ExchangeTransferInput)
     def withdraw_funds() -> Tuple[Dict[str, Any], int]:
+        """Withdraw funds from exchange wallet (admin only).
+
+        Debits user's exchange balance and initiates withdrawal to destination address.
+        Includes fraud checks and withdrawal limits.
+
+        This endpoint requires API authentication.
+
+        Request Body (ExchangeTransferInput):
+            {
+                "from_address": "user address",
+                "destination": "withdrawal destination address",
+                "currency": "XAI" | "USD" | etc,
+                "amount": float
+            }
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Withdrawal confirmation
+                - http_status_code: 200 on success, 400/401/503 on error
+
+        Raises:
+            AuthenticationError: If API key is missing or invalid (401).
+            ServiceUnavailable: If exchange module is disabled (503).
+            ValidationError: If withdrawal data is invalid or insufficient balance (400).
+        """
         if not node.exchange_wallet_manager:
             return routes._error_response(
                 "Exchange module disabled", status=503, code="module_disabled"
@@ -322,6 +476,25 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/exchange/balance/<address>", methods=["GET"])
     def get_user_balance(address: str) -> Tuple[Dict[str, Any], int]:
+        """Get all exchange balances for a user.
+
+        Returns all currency balances (available and locked) for the specified address.
+
+        Path Parameters:
+            address (str): The user's blockchain address
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains address and balances object
+                - http_status_code: 200 on success, 500/503 on error
+
+        Response balances include:
+            - available_balances: Currencies and amounts available for trading
+            - locked_balances: Currencies and amounts locked in open orders
+
+        Raises:
+            ServiceUnavailable: If exchange module is disabled (503).
+        """
         if not node.exchange_wallet_manager:
             return jsonify({"success": False, "error": "Exchange module disabled"}), 503
         try:
@@ -332,6 +505,22 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/exchange/balance/<address>/<currency>", methods=["GET"])
     def get_currency_balance(address: str, currency: str) -> Tuple[Dict[str, Any], int]:
+        """Get specific currency balance for a user.
+
+        Returns available and locked balance for a single currency.
+
+        Path Parameters:
+            address (str): The user's blockchain address
+            currency (str): The currency code (e.g., "XAI", "USD")
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains address, available, and locked amounts
+                - http_status_code: 200 on success, 500/503 on error
+
+        Raises:
+            ServiceUnavailable: If exchange module is disabled (503).
+        """
         if not node.exchange_wallet_manager:
             return jsonify({"success": False, "error": "Exchange module disabled"}), 503
         try:
@@ -342,6 +531,24 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/exchange/transactions/<address>", methods=["GET"])
     def get_transactions(address: str) -> Tuple[Dict[str, Any], int]:
+        """Get transaction history for a user's exchange wallet.
+
+        Returns deposit and withdrawal transaction history.
+
+        Path Parameters:
+            address (str): The user's blockchain address
+
+        Query Parameters:
+            limit (int, optional): Maximum transactions to return (default: 50)
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains address and transactions list
+                - http_status_code: 200 on success, 500/503 on error
+
+        Raises:
+            ServiceUnavailable: If exchange module is disabled (503).
+        """
         if not node.exchange_wallet_manager:
             return jsonify({"success": False, "error": "Exchange module disabled"}), 503
         try:
@@ -355,6 +562,22 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/exchange/price-history", methods=["GET"])
     def get_price_history() -> Tuple[Dict[str, Any], int]:
+        """Get historical price data for charting.
+
+        Returns price and volume data for the specified timeframe.
+
+        Query Parameters:
+            timeframe (str, optional): Time period - "1h", "24h", "7d", or "30d"
+                                      (default: "24h")
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains timeframe, prices, and volumes arrays
+                - http_status_code: 200 on success, 500/503 on error
+
+        Raises:
+            ServiceUnavailable: If exchange module is disabled (503).
+        """
         if not node.exchange_wallet_manager:
             return jsonify({"success": False, "error": "Exchange module disabled"}), 503
         timeframe = request.args.get("timeframe", default="24h", type=str)
@@ -394,6 +617,27 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/exchange/stats", methods=["GET"])
     def get_exchange_stats() -> Tuple[Dict[str, Any], int]:
+        """Get exchange statistics and market data.
+
+        Returns current market statistics including price, volume, and order counts.
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains stats object with market data
+                - http_status_code: 200 on success, 500/503 on error
+
+        Stats include:
+            - current_price: Latest trade price
+            - volume_24h: 24-hour trading volume
+            - change_24h: 24-hour price change percentage
+            - high_24h: 24-hour high price
+            - low_24h: 24-hour low price
+            - total_trades: Total number of trades
+            - active_orders: Count of open orders
+
+        Raises:
+            ServiceUnavailable: If exchange module is disabled (503).
+        """
         if not node.exchange_wallet_manager:
             return jsonify({"success": False, "error": "Exchange module disabled"}), 503
         try:
@@ -435,6 +679,35 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
     @app.route("/exchange/buy-with-card", methods=["POST"])
     @validate_request(routes.request_validator, ExchangeCardPurchaseInput)
     def buy_with_card() -> Tuple[Dict[str, Any], int]:
+        """Purchase tokens with credit card (admin only).
+
+        Processes credit card payment and deposits purchased tokens to user's
+        exchange wallet.
+
+        This endpoint requires API authentication.
+
+        Request Body (ExchangeCardPurchaseInput):
+            {
+                "from_address": "payer address",
+                "to_address": "recipient address",
+                "usd_amount": float,
+                "payment_token": "stripe token or card ID",
+                "email": "user email",
+                "card_id": "card identifier" (optional),
+                "user_id": "user identifier" (optional)
+            }
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains payment and deposit confirmations
+                - http_status_code: 200 on success, 400/401/503 on error
+
+        Raises:
+            AuthenticationError: If API key is missing or invalid (401).
+            ServiceUnavailable: If payment or exchange module is disabled (503).
+            ValidationError: If payment data is invalid (400).
+            PaymentError: If card processing fails (400).
+        """
         if not (node.payment_processor and node.exchange_wallet_manager):
             return routes._error_response(
                 "Payment module disabled", status=503, code="module_disabled"
@@ -484,6 +757,18 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/exchange/payment-methods", methods=["GET"])
     def get_payment_methods() -> Tuple[Dict[str, Any], int]:
+        """Get supported payment methods.
+
+        Returns list of available payment methods for purchasing tokens.
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains success flag and methods list
+                - http_status_code: 200 on success, 500/503 on error
+
+        Raises:
+            ServiceUnavailable: If payment module is disabled (503).
+        """
         if not node.payment_processor:
             return jsonify({"success": False, "error": "Payment module disabled"}), 503
         try:
@@ -494,6 +779,32 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/exchange/calculate-purchase", methods=["POST"])
     def calculate_purchase() -> Tuple[Dict[str, Any], int]:
+        """Calculate token purchase amount and fees.
+
+        Calculates how many tokens will be received for a USD amount,
+        including fees and exchange rate.
+
+        Request Body:
+            {
+                "usd_amount": float
+            }
+
+        Returns:
+            Tuple containing (response_dict, http_status_code) where:
+                - response_dict: Contains calculation breakdown
+                - http_status_code: 200 on success, 400/500/503 on error
+
+        Response includes:
+            - success: Calculation succeeded
+            - axn_amount: Tokens to be received
+            - usd_amount: USD amount input
+            - fee_amount: Processing fees
+            - exchange_rate: Current rate
+
+        Raises:
+            ServiceUnavailable: If payment module is disabled (503).
+            ValidationError: If usd_amount is missing or invalid (400).
+        """
         if not node.payment_processor:
             return jsonify({"success": False, "error": "Payment module disabled"}), 503
         data = request.get_json(silent=True) or {}
