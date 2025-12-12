@@ -2051,8 +2051,12 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             self.nonce_tracker.pending_nonces = nonce_snapshot[1]
             try:
                 self.nonce_tracker._save_nonces()
-            except Exception as e:
-                self.logger.debug(f"Failed to save nonces after chain validation restore: {type(e).__name__}")
+            except (DatabaseError, OSError, ValueError) as e:
+                self.logger.debug(
+                    "Failed to save nonces after chain validation restore",
+                    error_type=type(e).__name__,
+                    error=str(e),
+                )
 
     def _calculate_block_work(self, block_like: Union["Block", BlockHeader, Any]) -> int:
         """
@@ -2412,15 +2416,16 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                     fork_point=fork_point,
                     reindexed_blocks=len(materialized_chain) - start_block
                 )
-            except Exception as idx_err:
+            except (DatabaseError, StorageError, ValueError, RuntimeError) as idx_err:
                 self.logger.error(
                     "Failed to rebuild address index during reorg",
-                    error=str(idx_err)
+                    error=str(idx_err),
+                    error_type=type(idx_err).__name__,
                 )
                 # Don't fail the entire reorg - index can be rebuilt later
                 try:
                     self.address_index.rollback()
-                except Exception as rollback_err:
+                except (DatabaseError, StorageError, RuntimeError) as rollback_err:
                     self.logger.warning(
                         "Failed to rollback address index after reorg indexing failure",
                         error=str(rollback_err)
@@ -2451,7 +2456,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                                 "reason": "validation_failed",
                             }
                         )
-                except Exception as e:
+                except (ValidationError, ValueError, RuntimeError, KeyError) as e:
                     evicted_count += 1
                     self.logger.warning(
                         f"Evicting transaction {tx.txid} from mempool after chain reorganization - "
@@ -2512,10 +2517,12 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
             return True
 
-        except Exception as e:
+        except (ChainReorgError, ValidationError, StorageError, DatabaseError, RuntimeError, ValueError) as e:
             # ROLLBACK: Restore ALL state atomically
             self.logger.error(
-                f"Chain reorganization failed: {e}. Rolling back ALL state to previous snapshot.",
+                "Chain reorganization failed, rolling back ALL state to previous snapshot",
+                error=str(e),
+                error_type=type(e).__name__,
                 extra={
                     "event": "reorg.rollback",
                     "error": str(e),
