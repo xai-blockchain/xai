@@ -532,12 +532,13 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 misbehavior_type="DOUBLE_SIGNING",
                 evidence=normalized_evidence,
             )
-        except Exception as exc:
+        except (DatabaseError, ValueError, RuntimeError) as exc:
             self.logger.error(
                 "Failed to record slashing for finality violation",
                 validator=validator_address,
                 block_height=block_height,
                 error=str(exc),
+                error_type=type(exc).__name__,
             )
 
     @property
@@ -560,7 +561,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 return candidate  # already a full block
         try:
             return self.storage.load_block_from_disk(index)
-        except Exception as e:
+        except (StorageError, DatabaseError, OSError, KeyError) as e:
             self.logger.debug(f"Failed to load block {index} from disk: {type(e).__name__}: {e}")
             return None
 
@@ -758,12 +759,13 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                         block_tx_count=len(block_obj.transactions)
                     )
 
-            except Exception as e:
+            except (StorageError, DatabaseError, KeyError, IndexError, ValueError) as e:
                 self.logger.debug(
                     "Failed to load transaction from index",
                     block_index=block_index,
                     txid=txid,
-                    error=str(e)
+                    error=str(e),
+                    error_type=type(e).__name__,
                 )
                 continue
 
