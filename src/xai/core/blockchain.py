@@ -903,8 +903,12 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                       f"validated {len(self.chain) - checkpoint.height - 1} new blocks)")
                 return True
 
-            except Exception as e:
-                self.logger.error(f"Checkpoint recovery failed: {e}, falling back to full load")
+            except (StorageError, DatabaseError, ChainReorgError, ValidationError, OSError, ValueError) as e:
+                self.logger.error(
+                    "Checkpoint recovery failed, falling back to full load",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 return self._load_from_disk_full()
         else:
             # No checkpoint found, do full load
@@ -1102,7 +1106,13 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
         try:
             return self.governance_executor.execute_proposal(proposal_id, payload)
-        except Exception as exc:  # pragma: no cover - defensive logging
+        except (ValidationError, ValueError, RuntimeError, KeyError) as exc:  # pragma: no cover - defensive logging
+            self.logger.error(
+                "Governance proposal execution failed",
+                proposal_id=proposal_id,
+                error=str(exc),
+                error_type=type(exc).__name__,
+            )
             return {"success": False, "error": str(exc)}
 
     def derive_contract_address(self, sender: str, nonce: Optional[int]) -> str:
@@ -1666,8 +1676,13 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             if header.merkle_root != computed_merkle:
                 self.logger.warn("Block merkle root mismatch", block_hash=header.hash, block_merkle_root=header.merkle_root, computed_merkle_root=computed_merkle)
                 return False
-        except Exception as e:
-            self.logger.error("Error calculating merkle root", block_hash=header.hash, error=str(e))
+        except (ValueError, TypeError, AttributeError) as e:
+            self.logger.error(
+                "Error calculating merkle root",
+                block_hash=header.hash,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             return False
 
         # Verify block signature
@@ -1796,13 +1811,14 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 self._check_orphan_chains_for_reorg()
                 return False
 
-            except Exception as e:
+            except (ChainReorgError, ValidationError, StorageError, ValueError, RuntimeError) as e:
                 # If any exception occurs during fork handling, restore state
                 self.logger.error(
-                    f"Exception during fork handling: {e}. Rolling back to previous state.",
+                    "Exception during fork handling, rolling back to previous state",
                     block_index=header.index,
                     block_hash=header.hash,
-                    error=str(e)
+                    error=str(e),
+                    error_type=type(e).__name__,
                 )
                 self.chain = old_chain
                 self.utxo_manager.restore(utxo_snapshot)
