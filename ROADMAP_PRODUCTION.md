@@ -241,8 +241,8 @@ This roadmap targets production readiness with security-first posture, robust co
 - [x] Enforce API-level order type validation. ✅ `/exchange/place-order` now rejects any order type other than `buy`/`sell`, aligning Node API validation with the strict schemas and preventing downstream crashes.
 
 **Next Steps**
-- [ ] Rework matching-engine settlement funding in tests. `tests/xai_tests/unit/test_exchange_slippage.py`, `test_exchange_validation.py`, `test_exchange_coverage.py`, and `test_exchange_simple.py` currently fail (17 cases) because the in-memory balance provider leaves buyers unfunded, so orders never fill. Provide deterministic funding hooks or mock balance provider behaviors so fills and order statuses reflect expected outcomes.
-- [ ] Fix `tests/xai_tests/unit/test_node_p2p_checkpoint_exchange.py::test_get_checkpoint_returns_metadata` by ensuring the mocked websocket `send` coroutine is awaited (or updating the test to the new semantics) so checkpoint metadata delivery is validated again.
+- [x] Rework matching-engine settlement funding in tests. `tests/xai_tests/unit/test_exchange_slippage.py`, `test_exchange_validation.py`, `test_exchange_coverage.py`, and `test_exchange_simple.py` currently fail (17 cases) because the in-memory balance provider leaves buyers unfunded, so orders never fill. Provide deterministic funding hooks or mock balance provider behaviors so fills and order statuses reflect expected outcomes. ✅ Prefunding fixture now seeds deterministic balances via `prefund_exchange_accounts` (leveraging `InMemoryBalanceProvider.set_balance`), and all exchange suites pass (`pytest tests/xai_tests/unit/test_exchange_slippage.py test_exchange_validation.py test_exchange_coverage.py test_exchange_simple.py`).
+- [x] Fix `tests/xai_tests/unit/test_node_p2p_checkpoint_exchange.py::test_get_checkpoint_returns_metadata` by ensuring the mocked websocket `send` coroutine is awaited (or updating the test to the new semantics) so checkpoint metadata delivery is validated again. ✅ `_send_signed_message` awaits websocket sends and the regression test now passes (`pytest tests/xai_tests/unit/test_node_p2p_checkpoint_exchange.py::test_get_checkpoint_returns_metadata`).
 
 ### Atomic Swaps
 
@@ -325,26 +325,65 @@ This roadmap targets production readiness with security-first posture, robust co
 
 ### God Class Refactoring
 
-- [ ] Split `Blockchain.__init__` (2,287 lines) into: `_init_storage()`, `_init_consensus()`, `_init_governance()`, `_init_mining()`.
+- [x] ~~Split `Blockchain.__init__` (2,287 lines) into: `_init_storage()`, `_init_consensus()`, `_init_governance()`, `_init_mining()`~~ ✅ COMPLETED - `__init__` reduced to 84 lines (blockchain.py:114-198), delegates to 4 focused methods: `_init_storage()` (55 lines), `_init_consensus()` (62 lines), `_init_mining()` (63 lines), `_init_governance()` (14 lines). Total ~280 lines, well-organized with clear separation of concerns.
 - [ ] Split `APIRoutes.__init__` (2,183 lines) - extract route definitions into separate modules by category.
 - [ ] Split `Wallet.__init__` (755 lines) into composition chain.
 
 ### Exception Handling
 
-- [ ] Replace all 28+ bare `except Exception: pass` clauses with specific exception types.
+- [ ] Replace all 565 bare `except Exception:` and `except Exception as e:` handlers with specific exception types across 120+ files. **Critical priorities**: blockchain.py (24 instances), node_api.py (25), node_p2p.py (16), blockchain_persistence.py (14), security modules (ZK proofs, quantum crypto, HSM), transaction/mining operations, wallet/finance, DeFi/contracts. (Progress: blockchain API P2P metrics handler now logs and classifies monitoring failures instead of silently passing; QR parsing/validation uses typed exceptions; explorer health check logs typed node failures; explorer_backend network/parse/db failures now typed with structured logging across analytics/rich list/mempool/CSV; recovery API now routes unexpected errors through typed handlers; blockchain API block/tx lookups narrowed; error detection/corruption checks now typed; market maker network calls typed; transactions/faucet/wallet/algo/contracts/exchange/gamification/mining routes now use typed errors; continue inventory of remaining catch-alls.)
+- [ ] Exception narrowing progress update: explorer health check now catches explicit ValueError/KeyError/TypeError; block_explorer fetch/post paths log typed runtime/value errors; market_maker cancel/loop now handle requests/state exceptions explicitly; tmp_smoke raises upstream errors without broad catch-all.
+- [ ] Exception narrowing progress update 2: AI safety control API now validates JSON payloads, returns 400 on malformed data, and logs structured server errors instead of generic `except Exception`.
+- [ ] Exception narrowing progress update 3: CLI AI commands route errors through a centralized handler and catch Click/requests/value errors explicitly instead of blanket exceptions.
+- [ ] Exception narrowing progress update 4: Core API health/mempool endpoints now use typed exception handling with structured logging (blockchain stats, storage probe, P2P checks, provenance, metrics), reducing blanket catches.
+- [ ] Exception narrowing progress update 5: Recovery API status/config/duties/requests/stats endpoints now use ValueError handling for bad inputs and route other errors through structured `_handle_exception`.
+- [ ] Exception narrowing progress update 6: Contracts API now restricts contract-call construction errors to value/type/attr issues, pagination parsing to ValueError, and governance toggle failures to runtime/value/key errors (no blanket catches).
+- [ ] Exception narrowing progress update 7: API auth security logging now catches explicit runtime/value/type/key errors; JWT revocation logging narrowed to PyJWT/value/type/key errors.
+- [ ] Exception narrowing progress update 8: Exchange payment endpoints now catch value/runtime/type/key errors explicitly and route through `_handle_exception`, with payment calculation surfacing 400s for invalid input.
+- [ ] Exception narrowing progress update 9: Recovery setup/request/vote routes now catch runtime/type/key errors explicitly instead of blanket exceptions.
+- [ ] Exception narrowing progress update 10: Mining bonus/achievement/referral/leaderboard endpoints now return 400 on ValueError and route runtime/type/key errors through `_handle_exception` instead of blanket catches.
+- [ ] Exception narrowing progress update 11: Recovery cancel/execute/config/duties/requests/stats now catch runtime/type/key errors explicitly (no blanket exceptions).
+- [ ] Exception narrowing progress update 12: All recovery endpoints now avoid blanket exceptions (status handler narrowed to runtime/type/key).
+- [ ] Exception narrowing progress update 13: Enhanced CLI now routes errors through centralized `_cli_fail` and handles click/requests/value/key/type errors explicitly (no blanket exceptions on create/balance/history/send paths).
+- [ ] Exception narrowing progress update 14: Enhanced CLI mining/network paths now use `_cli_fail` with explicit error types; main entry wraps unexpected errors via centralized handler.
+- [ ] Exception narrowing progress update 15: AI CLI marketplace stats now use centralized handler for click/requests/value/key/type errors (no blanket exception).
+- [ ] Exception narrowing progress update 16: Audit logger rotation/cleanup now handles filesystem errors explicitly (no blanket exceptions), with structured logging.
+- [ ] Logging migration progress: Deprecated ZKP simulator now logs deprecation warning via logger instead of print.
+- [ ] Logging migration progress 2: Removed zero-knowledge proof demo prints; main now warns via logger (demo deprecated in favor of tests).
+- [ ] Exception narrowing progress update 17: TSS production module now narrows share verification and signature verification to specific errors; demo combine signatures catches ValueError only.
+- [ ] Logging migration progress 3: KeyStretchingManager now logs initialization instead of printing; removed inline demo block.
+- [ ] Logging migration progress 4: AddressFilter now uses structured logging for whitelist/blacklist decisions instead of prints.
+- [ ] Logging migration progress 5: KeyRotationManager now logs key lifecycle events and removed demo prints.
+- [ ] Logging migration progress 6: CSPRNG now logs initialization; demo code removed.
+- [ ] Logging migration progress 7: SecureEnclaveManager now uses structured logging for enclave events and demo prints removed.
+- [ ] Logging migration progress 8: QuantumResistantCryptoManager demo removed (main exits with guidance to use tests).
+- [ ] Logging migration progress 9: IPWhitelist now logs whitelist updates; demo removed.
+- [ ] Logging migration progress 10: TwoFactorAuth demo removed in favor of tests.
+- [ ] Logging migration progress 11: ThresholdSignatureScheme demo removed (no prints).
+- [ ] Logging migration progress 12: Production TSS demo removed; guidance to run unit tests.
+- [ ] Logging migration progress 13: MockTSS demo removed; generation logs use structured logger.
+- [ ] Logging migration progress 14: MPC DKG demo removed (main exits, rely on tests).
+- [ ] Logging migration progress 15: AddressFilter demo removed (tests only).
+- [ ] Logging migration progress 16: RBAC demo removed; structured logging in place.
+- [ ] Logging migration progress 17: Cleared stray demo remnants in KeyRotationManager (example fully removed).
+- [ ] Logging migration progress 18: Certificate pinning demo removed; rely on tests.
+- [ ] Logging migration progress 19: CSPRNG demo fully removed; production-only logic remains.
+- [ ] Logging migration progress 20: ThresholdSignatureScheme uses structured logging for share/signature events (no prints).
+- [ ] Logging migration progress 21: SaltedHashManager now logs initialization; demo removed.
+- [ ] Logging migration progress 22: AuditLogger demo remains removed; production TSS now uses structured logging for the main guard (no print-based demo, exits with guidance to run tests).
 - [ ] Add structured logging to all exception handlers.
 - [ ] Propagate signature verification errors - never silently continue.
 
 ### Logging Migration
 
-- [ ] Convert remaining ~1,650 print() statements to structured logging across 62 files.
+- [ ] Convert remaining 4,574 print() statements to structured logging across 227 files. **Phase 1 (Critical)**: ai_governance.py (98), test_governance_requirements.py (82), ai_trading_bot.py (73), blockchain_loader.py (71), chain_validator.py (59), wallet/cli.py (156). **Phase 2 (Important)**: Network security modules (11 files, 155 total), mining/consensus, financial modules. **Phase 3 (Standard)**: CLI/tools, scripts (67 files, 1,039 total), performance, test suites (258).
 - [ ] Implement consistent log levels by module.
 - [x] Add correlation IDs for request tracing. ✅ Node API now injects/propagates `X-Request-ID` headers and echoes them in JSON helpers so errors/success logs tie back to a correlation ID.
 
 ### Type Safety
 
-- [ ] Add return type hints to 69+ public API methods missing them.
-- [ ] Add docstrings to 45+ public APIs missing documentation.
+- [ ] Add return type hints to 13 public API methods missing them in api_blueprints/base.py (11), api_blueprints/__init__.py (1), api_security.py (1). (Progress: core stats endpoint annotated; contracts governance status documented; AI safety + recovery routes annotated.)
+- [ ] Add docstrings to 77 public APIs missing documentation across 16 files. **Priority 1**: api_routes/exchange.py (15), api_routes/recovery.py (10), api_routes/gamification.py (12), api_routes/mining_bonus.py (9), api_routes/contracts.py (7), api_routes/wallet.py (4). **Priority 2**: node_api.py (7), api_routes/peer.py (3), api_routes/algo.py (3). (Progress: contracts governance status now documented; AI safety routes annotated; recovery routes typed.)
 - [ ] Resolve 9 circular import dependencies using TYPE_CHECKING guards.
 
 ### Code Cleanup
@@ -352,7 +391,7 @@ This roadmap targets production readiness with security-first posture, robust co
 - [ ] Extract 250+ magic numbers into named constants.
 - [x] Remove empty `ExchangeWalletManager` class (dead code). ✅ Wrapper deleted and node now imports the fully implemented manager directly (`src/xai/core/node.py`), eliminating redundant module references.
 - [x] Replace NotImplementedError with ABC/abstractmethod pattern (13 instances). ✅ Governance modules, deposit/blacklist sources, exchange balance providers, stress tests, and blockchain interfaces now rely on `abc.ABC` with enforced abstract methods plus updated tests.
-- [ ] Remove legacy weak encryption path from wallet.py `_encrypt()` method.
+- [x] Remove legacy weak encryption path from wallet.py `_encrypt()` method. ✅ Legacy Fernet/unsalted path now blocked by default; only an explicit `allow_legacy=True` flag permits one-time migration loads, migration routine now rehydrates from legacy files, and secure AES-GCM wrappers replace the old helper.
 
 ---
 
@@ -361,19 +400,19 @@ This roadmap targets production readiness with security-first posture, robust co
 ### Security Tests Missing
 
 - [x] Add flash loan multi-step attack tests (reentrancy scenarios). ✅ `tests/xai_tests/unit/test_flash_loans_attacks.py` now covers multi-step siphon attempts and multi-asset fee shortfalls.
-- [ ] Add oracle manipulation tests (TWAP attacks, single-source bias).
+- [x] Add oracle manipulation tests (TWAP attacks, single-source bias). ✅ `tests/xai_tests/security/test_oracle_manipulation.py` now verifies TWAP detectors trip on both colluding feeds and lone deviating sources.
 - [x] Add sandwich attack tests for swap slippage. ✅ `tests/xai_tests/unit/test_swap_router_mev.py` now ensures SwapRouter flags attackers bracketing the same pair while ignoring benign traffic.
-- [ ] Add MEV/front-running tests with realistic mempool ordering.
-- [ ] Add time lock manipulation boundary tests.
+- [x] Add MEV/front-running tests with realistic mempool ordering. ✅ Coverage added in `tests/xai_tests/unit/test_mev_front_running_protection.py` for commit-reveal randomness, nonce gap detection, and mempool ordering validation.
+- [x] Add time lock manipulation boundary tests. ✅ `tests/xai_tests/unit/test_withdrawal_processor.py` now exercises threshold edges and enforced release windows for the withdrawal timelock controller.
 - [x] Add governance griefing tests (low-cost attacks). ✅ `tests/xai_tests/unit/test_ai_governance_griefing.py` now covers burst spam, power skew, new-account swarms, and identity clusters.
 
 ### Fuzz Testing
 
-- [ ] Add transaction parser fuzzing.
-- [ ] Add block header parsing fuzzing.
-- [ ] Add API request parsing fuzzing.
-- [ ] Add signature verification edge case fuzzing.
-- [ ] Add UTXO script validation fuzzing.
+- [x] Add transaction parser fuzzing. ✅ `tests/xai_tests/fuzz/test_transaction_parser_fuzz.py` fuzzes QR transaction payloads (base64 + JSON) and ensures random noise can’t crash the parser.
+- [x] Add block header parsing fuzzing. ✅ `tests/xai_tests/fuzz/test_block_header_fuzz.py` now fuzzes header roundtrips and canonical JSON invariants.
+- [x] Add API request parsing fuzzing. ✅ `tests/xai_tests/fuzz/test_api_request_parsing_fuzz.py` exercises the request validator with randomized payload sizes, content types, and nested JSON.
+- [x] Add signature verification edge case fuzzing. ✅ `tests/xai_tests/fuzz/test_signature_verification_fuzz.py` now fuzzes ECDSA signing/verification, including tampering and malformed input cases.
+- [x] Add UTXO script validation fuzzing. ✅ `tests/xai_tests/fuzz/test_utxo_script_fuzz.py` feeds randomized scripts/amounts through `UTXOManager` to ensure invalid data never crashes validation.
 
 ### Invariant Tests
 
@@ -386,13 +425,13 @@ This roadmap targets production readiness with security-first posture, robust co
 
 - [ ] Add malformed block header tests.
 - [ ] Add timestamp boundary condition tests.
-- [ ] Add nonce overflow/underflow tests.
+- [x] Add nonce overflow/underflow tests. ✅ `tests/xai_tests/unit/test_nonce_manager.py` now rejects zero/negative nonces and exercises extremely large values to ensure the tracker never overflows.
 - [ ] Add extreme difficulty adjustment tests.
 - [ ] Add mempool eviction order tests under full mempool.
-- [ ] Add conflicting RBF replacement tests.
-- [ ] Add seed phrase corruption recovery tests.
-- [ ] Add concurrent transaction signing tests.
-- [ ] Add hardware wallet failure mode tests.
+- [x] Add conflicting RBF replacement tests. ✅ `tests/xai_tests/unit/test_mempool_mixin.py` now covers sender mismatch, equal-fee replacements, and successful state updates for the RBF handler.
+- [x] Add seed phrase corruption recovery tests. ✅ `tests/xai_tests/unit/test_mnemonic_qr_backup.py` now ensures QR backups detect checksum and word-count tampering via `MnemonicQRBackupGenerator.recover_mnemonic()`.
+- [x] Add concurrent transaction signing tests. ✅ `tests/xai_tests/unit/test_wallet.py` now exercises thread-safe signing for both software and hardware wallet paths.
+- [x] Add hardware wallet failure mode tests. ✅ `tests/xai_tests/unit/test_hardware_wallet_provider.py` now asserts missing Ledger/Trezor dependencies raise clear errors, and `tests/xai_tests/unit/test_wallet.py` covers hardware signing failures bubbling to callers.
 - [ ] Add regtest/Hardhat smoke tests for HTLC fund/claim/refund and checkpoint fetch/apply with SPV confirmations.
 
 ### Performance Tests
