@@ -2768,11 +2768,12 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         """
         try:
             valid, error = BlockSizeValidator.validate_block_size(block)
-        except Exception as exc:
+        except (ValidationError, ValueError, AttributeError, TypeError) as exc:
             self.logger.error(
                 "Block size validation failed unexpectedly",
                 context=context,
                 error=str(exc),
+                error_type=type(exc).__name__,
             )
             return False
 
@@ -2866,21 +2867,23 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                     block.timestamp
                 )
             self.address_index.commit()
-        except Exception as e:
+        except (DatabaseError, StorageError, ValueError, RuntimeError) as e:
             self.logger.error(
                 "Failed to index block transactions",
                 block_index=block.index,
-                error=str(e)
+                error=str(e),
+                error_type=type(e).__name__,
             )
             # Don't fail block addition if indexing fails - index can be rebuilt
             # Rollback index to maintain consistency
             try:
                 self.address_index.rollback()
-            except Exception as rollback_err:
+            except (DatabaseError, StorageError, RuntimeError) as rollback_err:
                 self.logger.warning(
                     "Failed to rollback address index after block indexing failure",
                     block_index=block.index,
-                    error=str(rollback_err)
+                    error=str(rollback_err),
+                    error_type=type(rollback_err).__name__,
                 )
 
         # Save to disk
@@ -2942,19 +2945,21 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                                 orphan.timestamp
                             )
                         self.address_index.commit()
-                    except Exception as e:
+                    except (DatabaseError, StorageError, ValueError, RuntimeError) as e:
                         self.logger.error(
                             "Failed to index orphan block transactions",
                             block_index=orphan.index,
-                            error=str(e)
+                            error=str(e),
+                            error_type=type(e).__name__,
                         )
                         try:
                             self.address_index.rollback()
-                        except Exception as rollback_err:
+                        except (DatabaseError, StorageError, RuntimeError) as rollback_err:
                             self.logger.warning(
                                 "Failed to rollback address index after orphan block indexing failure",
                                 block_index=orphan.index,
-                                error=str(rollback_err)
+                                error=str(rollback_err),
+                                error_type=type(rollback_err).__name__,
                             )
 
                     # Save to disk
@@ -3764,10 +3769,12 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                     "fork_point": fork_point,
                 }
             )
-        except Exception as e:
+        except (OSError, IOError, ValueError) as e:
             self.logger.error(
-                f"WAL: Failed to write reorg entry: {e}",
-                extra={"event": "wal.write_failed", "error": str(e)}
+                "WAL: Failed to write reorg entry",
+                error=str(e),
+                error_type=type(e).__name__,
+                extra={"event": "wal.write_failed", "error": str(e)},
             )
 
         return wal_entry
@@ -3799,10 +3806,12 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 "WAL: Reorg committed and WAL cleared",
                 extra={"event": "wal.reorg_committed"}
             )
-        except Exception as e:
+        except (OSError, IOError, ValueError) as e:
             self.logger.error(
-                f"WAL: Failed to commit reorg: {e}",
-                extra={"event": "wal.commit_failed", "error": str(e)}
+                "WAL: Failed to commit reorg",
+                error=str(e),
+                error_type=type(e).__name__,
+                extra={"event": "wal.commit_failed", "error": str(e)},
             )
 
     def _rollback_reorg_wal(self, wal_entry: Dict[str, Any]) -> None:
@@ -3832,10 +3841,12 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 "WAL: Reorg rolled back and WAL cleared",
                 extra={"event": "wal.reorg_rolled_back"}
             )
-        except Exception as e:
+        except (OSError, IOError, ValueError) as e:
             self.logger.error(
-                f"WAL: Failed to record rollback: {e}",
-                extra={"event": "wal.rollback_failed", "error": str(e)}
+                "WAL: Failed to record rollback",
+                error=str(e),
+                error_type=type(e).__name__,
+                extra={"event": "wal.rollback_failed", "error": str(e)},
             )
 
     def _recover_from_incomplete_reorg(self) -> None:
@@ -3885,9 +3896,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 os.remove(self.reorg_wal_path)
                 self.logger.debug("WAL: Removed stale reorg entry")
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, KeyError) as e:
             self.logger.error(
-                f"WAL: Failed to recover from incomplete reorg: {e}. "
-                f"Manual intervention may be required.",
-                extra={"event": "wal.recovery_failed", "error": str(e)}
+                "WAL: Failed to recover from incomplete reorg - manual intervention may be required",
+                error=str(e),
+                error_type=type(e).__name__,
+                extra={"event": "wal.recovery_failed", "error": str(e)},
             )
