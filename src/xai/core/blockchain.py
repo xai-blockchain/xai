@@ -41,6 +41,16 @@ from xai.core.governance_transactions import GovernanceState, GovernanceTxType, 
 from xai.core.checkpoints import CheckpointManager
 from collections import defaultdict, deque
 from xai.core.structured_logger import StructuredLogger, get_structured_logger
+from xai.core.blockchain_exceptions import (
+    DatabaseError,
+    StorageError,
+    InitializationError,
+    ConfigurationError,
+    InvalidBlockError,
+    InvalidTransactionError,
+    ChainReorgError,
+    ValidationError as BlockchainValidationError,
+)
 from xai.core.block_header import BlockHeader, canonical_json
 from xai.core.blockchain_interface import BlockchainDataProvider, GamificationBlockchainInterface
 from xai.core.blockchain_security import BlockchainSecurityConfig, BlockSizeValidator
@@ -177,10 +187,11 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 )
                 try:
                     self.address_index.rebuild_from_chain(self)
-                except Exception as e:
+                except (DatabaseError, StorageError, ValueError, RuntimeError) as e:
                     self.logger.error(
                         "Failed to rebuild address index on startup",
-                        error=str(e)
+                        error=str(e),
+                        error_type=type(e).__name__,
                     )
                     # Continue without index - queries will fall back gracefully
 
@@ -347,7 +358,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             self._mempool_invalid_threshold = int(MEMPOOL_INVALID_TX_THRESHOLD)
             self._mempool_invalid_ban_seconds = int(MEMPOOL_INVALID_BAN_SECONDS)
             self._mempool_invalid_window_seconds = int(MEMPOOL_INVALID_WINDOW_SECONDS)
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError) as e:
             self.logger.warn(
                 f"Failed to load mempool config from environment, using defaults: {type(e).__name__}: {e}"
             )
@@ -421,10 +432,11 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 db_path=Path(os.path.join(data_dir, "slashing.db")),
                 initial_validators=stakes,
             )
-        except Exception as exc:
+        except (InitializationError, DatabaseError, OSError, ValueError) as exc:
             self.logger.error(
                 "Failed to initialize slashing manager",
                 error=str(exc),
+                error_type=type(exc).__name__,
             )
             return None
 
