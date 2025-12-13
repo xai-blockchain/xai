@@ -428,22 +428,13 @@ class Transaction:
         """Verify transaction signature.
 
         Returns:
-            bool: True if signature is valid
-
-        Raises:
-            MissingSignatureError: If signature or public_key is missing
-            InvalidSignatureError: If signature verification fails
-            SignatureCryptoError: If cryptographic operation fails
+            bool: True if signature is valid, False otherwise
         """
         if self.sender == "COINBASE":
             return True  # Coinbase transactions don't require signatures
 
         if not self.signature or not self.public_key:
-            txid_str = self.txid[:10] if self.txid else "unknown"
-            raise MissingSignatureError(
-                f"Transaction {txid_str}... is missing "
-                f"{'signature' if not self.signature else 'public key'}"
-            )
+            return False
 
         try:
             # Convert public key hex to bytes before hashing (matches wallet.py)
@@ -452,35 +443,24 @@ class Transaction:
             expected_address = f"XAI{pub_hash[:40]}"
 
             if expected_address != self.sender:
-                txid_str = self.txid[:10] if self.txid else "unknown"
-                logger.error(
+                logger.debug(
                     "Address mismatch in signature verification: expected=%s, got=%s",
                     expected_address[:16] + "...",
                     self.sender[:16] + "..." if self.sender else "<none>",
                     extra={"event": "tx.address_mismatch", "txid": self.txid}
                 )
-                raise InvalidSignatureError(
-                    f"Transaction {txid_str}...: Public key does not match sender address "
-                    f"(expected {expected_address[:16]}..., got {self.sender[:16] if self.sender else '<none>'}...)"
-                )
+                return False
 
             message = self.calculate_hash().encode()
             if not verify_signature_hex(self.public_key, message, self.signature):
-                txid_str = self.txid[:10] if self.txid else "unknown"
-                raise InvalidSignatureError(
-                    f"Transaction {txid_str}...: ECDSA signature verification failed"
-                )
+                return False
 
             # Signature is valid
             return True
 
-        except SignatureVerificationError:
-            # Re-raise our own exceptions unchanged
-            raise
         except (ValueError, TypeError, KeyError, AttributeError) as e:
             # Cryptographic operation failures
-            txid_str = self.txid[:10] if self.txid else "unknown"
-            logger.error(
+            logger.debug(
                 "Cryptographic error during signature verification: %s",
                 type(e).__name__,
                 extra={
@@ -489,9 +469,7 @@ class Transaction:
                     "txid": self.txid
                 }
             )
-            raise SignatureCryptoError(
-                f"Transaction {txid_str}...: Cryptographic operation failed: {type(e).__name__}: {e}"
-            ) from e
+            return False
 
     def get_size(self) -> int:
         """
