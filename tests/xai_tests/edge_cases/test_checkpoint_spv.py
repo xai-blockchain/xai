@@ -349,7 +349,7 @@ class TestSPVProofValidation:
         # Create checkpoint at this block
         checkpoint_mgr = CheckpointManager(bc.data_dir)
         checkpoint = checkpoint_mgr.create_checkpoint(
-            block, bc.utxo_manager, bc.total_supply
+            block, bc.utxo_manager, bc.get_total_supply()
         )
 
         try:
@@ -413,7 +413,7 @@ class TestSPVProofValidation:
         # Checkpoint before reorg
         checkpoint_mgr = CheckpointManager(bc.data_dir)
         pre_reorg_checkpoint = checkpoint_mgr.create_checkpoint(
-            main_tip, bc.utxo_manager, bc.total_supply
+            main_tip, bc.utxo_manager, bc.get_total_supply()
         )
 
         # After potential reorg, verify checkpoint
@@ -493,14 +493,18 @@ class TestSPVProofValidation:
         for _ in range(10):
             bc.mine_pending_transactions(miner.address)
 
-        checkpoint_mgr = CheckpointManager(bc)
-        checkpoint = checkpoint_mgr.create_checkpoint()
+        latest_block = bc.get_latest_block()
+        checkpoint_mgr = CheckpointManager(bc.data_dir)
+        checkpoint = checkpoint_mgr.create_checkpoint(
+            latest_block, bc.utxo_manager, bc.get_total_supply()
+        )
 
         # Checkpoint may include UTXO commitment for fast sync
         # Verify checkpoint structure (implementation-dependent)
-        assert 'block_height' in checkpoint
-        assert 'block_hash' in checkpoint
+        assert checkpoint is not None
+        assert checkpoint.height == latest_block.index
+        assert checkpoint.block_hash == latest_block.hash
 
-        # UTXO commitment is optional but useful for fast sync
-        if 'utxo_commitment' in checkpoint:
-            assert isinstance(checkpoint['utxo_commitment'], str)
+        # UTXO snapshot is included in checkpoint for fast sync
+        assert checkpoint.utxo_snapshot is not None
+        assert isinstance(checkpoint.utxo_snapshot, dict)
