@@ -12,6 +12,7 @@ This refactored version delegates most functionality to specialized modules:
 
 from __future__ import annotations
 from typing import Optional, Set, Any, Dict, List, Callable
+import asyncio
 import json
 import os
 import sys
@@ -476,10 +477,11 @@ class BlockchainNode:
 
         @self.app.after_request
         def after_request(response):
-            latency = time.time() - request.start_time
-            self.metrics_collector.get_metric("xai_api_endpoint_latency_seconds").observe(
-                latency, labels={"endpoint": request.path}
-            )
+            if hasattr(request, 'start_time'):
+                latency = time.time() - request.start_time
+                self.metrics_collector.get_metric("xai_api_endpoint_latency_seconds").observe(
+                    latency, labels={"endpoint": request.path}
+                )
             return response
 
         logger.info("Blockchain node initialized", extra={"event": "node.init_complete"})
