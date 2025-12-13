@@ -29,7 +29,7 @@ class TestBlockchainInitialization:
 
         assert len(bc.chain) == 1
         assert bc.chain[0].index == 0
-        assert bc.chain[0].previous_hash == "0"
+        assert bc.chain[0].previous_hash == "0" * 64
 
     def test_genesis_block_structure(self, tmp_path):
         """Test genesis block has correct structure"""

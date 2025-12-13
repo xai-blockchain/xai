@@ -157,6 +157,9 @@ class TestTimestampBoundaries:
 
         max_future = getattr(Config, 'MAX_FUTURE_BLOCK_TIME', 7200)
 
+        # Create a miner wallet to sign the block
+        miner = Wallet()
+
         # Create block just under the limit
         # Don't specify merkle_root - let Block calculate it from transactions
         header = BlockHeader(
@@ -165,10 +168,15 @@ class TestTimestampBoundaries:
             merkle_root=Block._calculate_merkle_root_static([]),  # Correct merkle root for empty tx list
             timestamp=time.time() + max_future - 10,  # 10 seconds before limit
             difficulty=4,
-            nonce=0
+            nonce=0,
+            miner_pubkey=miner.public_key
         )
         block = Block(header=header, transactions=[])
         block.mine_block()
+
+        # Sign the block after mining
+        from xai.core.crypto_utils import sign_message_hex
+        block.header.signature = sign_message_hex(miner.private_key, block.hash.encode())
 
         # Should be accepted
         assert bc.add_block(block)

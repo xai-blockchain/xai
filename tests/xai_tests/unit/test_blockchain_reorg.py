@@ -301,7 +301,7 @@ class TestBlockchainReorg:
         # Genesis should be unchanged
         assert bc.chain[0].hash == genesis_hash
         assert bc.chain[0].index == genesis_index
-        assert bc.chain[0].previous_hash == "0"
+        assert bc.chain[0].previous_hash == "0" * 64
 
     def test_reorg_rejects_oversized_blocks(self, tmp_path):
         """

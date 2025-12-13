@@ -27,8 +27,8 @@ class TestGenesisBlock:
         # Genesis block should be index 0
         assert genesis.index == 0
 
-        # Genesis block should have "0" as previous hash
-        assert genesis.previous_hash == "0"
+        # Genesis block should have all zeros as previous hash
+        assert genesis.previous_hash == "0" * 64
 
         # Genesis block should have a valid hash
         assert genesis.hash is not None
@@ -49,7 +49,7 @@ class TestGenesisBlock:
         assert genesis1.index == genesis2.index == 0
 
         # Genesis blocks should have same previous_hash
-        assert genesis1.previous_hash == genesis2.previous_hash == "0"
+        assert genesis1.previous_hash == genesis2.previous_hash == "0" * 64
 
     def test_genesis_block_has_no_transactions(self):
         """Verify genesis block contains no regular transactions."""
@@ -89,7 +89,7 @@ class TestGenesisBlock:
         assert "previous_hash" in genesis_dict
         assert "hash" in genesis_dict
         assert genesis_dict["index"] == 0
-        assert genesis_dict["previous_hash"] == "0"
+        assert genesis_dict["previous_hash"] == "0" * 64
 
 
 class TestBlockchainInitialization:

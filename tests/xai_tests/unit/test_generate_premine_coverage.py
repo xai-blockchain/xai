@@ -1159,7 +1159,7 @@ class TestEdgeCases:
 
         # Verify Block was called with previous_hash="0"
         call_args = mock_block.call_args
-        assert call_args[1]['previous_hash'] == "0"
+        assert call_args[1]['previous_hash'] == "0" * 64
 
     @patch('src.xai.generate_premine.Block')
     def test_genesis_block_index_zero(self, mock_block):

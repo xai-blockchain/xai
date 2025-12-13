@@ -70,7 +70,7 @@ class TestGenesisBlockLoading:
 
         genesis = bc.chain[0]
         assert genesis.index == 0
-        assert genesis.previous_hash == "0"
+        assert genesis.previous_hash == "0" * 64
         assert len(genesis.transactions) > 0
 
     def test_genesis_block_coinbase(self, tmp_path):

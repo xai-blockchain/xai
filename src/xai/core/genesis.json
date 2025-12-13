@@ -53,10 +53,10 @@
       "comment": "50% of original (36.3M of 121M total) - Reserved for mining rewards"
     }
   ],
-  "previous_hash": "0",
-  "nonce": 65813,
+  "previous_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "nonce": 100347,
   "difficulty": 4,
-  "hash": "0000a9027db198db8571e980d32d83516ae38810dd3882772e773bd617be0704",
+  "hash": "0000f5bbdeb367b9a5b6a137efa792758da15fd43e9f91c42dd19a62a11e1a88",
   "merkle_root": "14e115e4bec09374d58e39dd0ad67a26a37aa27c29405f368517e5f9527bc403",
   "comment": "Genesis allocates 60.5M XAI (50%), leaving 60.5M for mining rewards to reach 121M cap"
 }

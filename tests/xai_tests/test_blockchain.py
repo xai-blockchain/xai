@@ -38,7 +38,7 @@ class TestBlockchainCore:
         bc = Blockchain(data_dir=str(tmp_path))
         genesis = bc.chain[0]
 
-        assert genesis.previous_hash == "0", "Genesis previous hash should be 0"
+        assert genesis.previous_hash == "0" * 64, "Genesis previous hash should be all zeros"
         assert genesis.hash is not None, "Genesis hash should exist"
         assert len(genesis.transactions) > 0, "Genesis should have transactions"
 
