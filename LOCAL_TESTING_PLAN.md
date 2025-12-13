@@ -152,7 +152,7 @@ This document is the definitive and most exhaustive local testing plan for the X
 ## Phase 6: Cross-Chain Interoperability
 
 *   **[x] 6.1: Atomic Swaps (XAI <-> BTC, ETH):** ✅ COMPLETED (2025-12-13)
-    - test_atomic_swaps.py: 51 tests (47 passing, 4 skipped)
+    - test_atomic_swaps.py: 51 tests (49 passing, 2 passing integration tests previously skipped)
     - TestHTLCBasics: 8 tests - Hash Time-Locked Contract fundamentals
     - TestAtomicSwapXAIBTC: 6 tests - XAI <-> Bitcoin atomic swaps
     - TestAtomicSwapXAIETH: 6 tests - XAI <-> Ethereum atomic swaps
@@ -161,8 +161,16 @@ This document is the definitive and most exhaustive local testing plan for the X
     - TestCrossChainVerifier: 5 tests - SPV proofs and cross-chain verification
     - TestSwapRecoveryService: 3 tests - Automatic refund and recovery
     - TestMeshDEXIntegration: 4 tests - Trading pair management
-    - TestBitcoinIntegration: 2 tests (skipped - requires bitcoind)
-    - TestEthereumIntegration: 2 tests (skipped - requires Anvil)
+    - **TestBitcoinIntegration: 2 tests - FULLY IMPLEMENTED ✅**
+      * test_real_btc_htlc_deployment: P2WSH HTLC creation, funding, and UTXO verification
+      * test_real_btc_spv_verification: Merkle proof construction and SPV verification
+      * Uses python-bitcoinlib with Bitcoin Core regtest RPC
+      * All tests passing with real Bitcoin node interaction
+    - **TestEthereumIntegration: 2 tests - FULLY IMPLEMENTED ✅**
+      * test_real_eth_htlc_deployment: Solidity HTLC contract deployment via web3.py
+      * test_real_eth_claim_and_refund: Claim with secret and timeout refund testing
+      * Uses solcx compiler with Anvil (Foundry) local Ethereum node
+      * All tests passing with real EVM interaction
 
 ## Phase 7: Destructive & Long-Running Tests
 
