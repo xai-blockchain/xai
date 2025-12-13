@@ -300,8 +300,8 @@ class TestSponsoredTransactionProcessor:
             budget=1.0,
         )
         tx = Transaction(
-            sender="XAI1111",
-            recipient="XAI2222",
+            sender="XAI1111111111111111111111111111111111111111",
+            recipient="XAI2222222222222222222222222222222222222222",
             amount=1.0,
             fee=0.1,
             public_key=user_public,
@@ -321,8 +321,8 @@ class TestSponsoredTransactionProcessor:
             budget=10.0,
         )
         tx = Transaction(
-            sender="XAI1111",
-            recipient="XAI2222",
+            sender="XAI1111111111111111111111111111111111111111",
+            recipient="XAI2222222222222222222222222222222222222222",
             amount=1.0,
             fee=0.1,
             public_key=user_public,
