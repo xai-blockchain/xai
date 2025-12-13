@@ -40,6 +40,7 @@ import openai
 
 # Configure logging
 logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
 
 # SECURITY: List of known demo/placeholder API keys that should be rejected
 INVALID_DEMO_KEYS = [
@@ -209,13 +210,17 @@ class AITradingBot:
         self._price_noise_seed = secrets.token_bytes(16)
         self._market_lock = threading.RLock()
 
-        print(f"\n🤖 AI Trading Bot Initialized")
-        print(f"   User: {user_address}")
-        print(f"   AI: {ai_model}")
-        print(f"   Strategy: {strategy.value}")
-        print(f"   Max trade: {self.max_trade_amount} XAI")
-        print(f"   Stop loss: {self.stop_loss_percent}%")
-        print(f"   Take profit: {self.take_profit_percent}%")
+        logger.info(
+            "AI Trading Bot initialized",
+            extra={
+                "user": user_address,
+                "ai_model": ai_model,
+                "strategy": strategy.value,
+                "max_trade_amount": self.max_trade_amount,
+                "stop_loss_percent": self.stop_loss_percent,
+                "take_profit_percent": self.take_profit_percent,
+            },
+        )
 
     def _initialize_trading_pairs(self, pairs: List[str]) -> List[TradingPair]:
         """Initialize trading pairs from config"""
@@ -273,9 +278,14 @@ class AITradingBot:
         self.trading_thread = threading.Thread(target=self._trading_loop, daemon=True)
         self.trading_thread.start()
 
-        print(f"\n✅ Trading bot started for {self.user_address}")
-        print(f"   Monitoring {len(self.trading_pairs)} pairs")
-        print(f"   Using {self.strategy.value} strategy")
+        logger.info(
+            "Trading bot started",
+            extra={
+                "user": self.user_address,
+                "pairs_count": len(self.trading_pairs),
+                "strategy": self.strategy.value,
+            },
+        )
 
         return {
             "success": True,
@@ -295,11 +305,15 @@ class AITradingBot:
         if self.trading_thread:
             self.trading_thread.join(timeout=5)
 
-        print(f"\n🛑 Trading bot stopped for {self.user_address}")
-        print(f"   Final performance:")
-        print(f"   Total trades: {self.performance.total_trades}")
-        print(f"   Net profit: {self.performance.net_profit:.4f} XAI")
-        print(f"   ROI: {self.performance.roi:.2f}%")
+        logger.info(
+            "Trading bot stopped",
+            extra={
+                "user": self.user_address,
+                "total_trades": self.performance.total_trades,
+                "net_profit": self.performance.net_profit,
+                "roi": self.performance.roi,
+            },
+        )
 
         return {
             "success": True,
@@ -309,7 +323,7 @@ class AITradingBot:
 
     def _trading_loop(self):
         """Main trading loop (runs in background)"""
-        print(f"\n🔄 Trading loop started...")
+        logger.info("Trading loop started")
 
         while self.is_active:
             try:
@@ -339,10 +353,10 @@ class AITradingBot:
                 self.last_analysis_time = now
 
             except Exception as e:
-                print(f"❌ Trading loop error: {e}")
+                logger.error("Trading loop error", extra={"error": str(e)}, exc_info=True)
                 time.sleep(60)  # Wait 1 minute on error
 
-        print(f"🛑 Trading loop stopped")
+        logger.info("Trading loop stopped")
 
     def _update_market_data(self):
         """
@@ -452,7 +466,7 @@ class AITradingBot:
             }
 
         except (json.JSONDecodeError, KeyError) as e:
-            print(f"⚠️  Could not parse AI response: {e}")
+            logger.warning("Could not parse AI response", extra={"error": str(e)})
             return {
                 "action": TradeAction.HOLD,
                 "reasoning": "Could not parse AI recommendation",
@@ -555,11 +569,15 @@ Return JSON:
             self.performance.failed_trades += 1
             return
 
-        print(f"\n🔄 Executing {action.value.upper()} trade:")
-        print(f"   Pair: {pair.from_coin}/{pair.to_coin}")
-        print(f"   Amount: {amount} {pair.from_coin}")
-        print(f"   Rate: {pair.current_rate}")
-        print(f"   AI Reasoning: {analysis['reasoning']}")
+        logger.info(
+            f"Executing {action.value.upper()} trade",
+            extra={
+                "pair": f"{pair.from_coin}/{pair.to_coin}",
+                "amount": amount,
+                "rate": pair.current_rate,
+                "ai_reasoning": analysis["reasoning"],
+            },
+        )
 
         # Use Personal AI to execute atomic swap
         try:
@@ -612,15 +630,14 @@ Return JSON:
                 self.trade_history.append(trade)
                 self.performance.total_trades += 1
 
-                print(f"   ✅ Trade executed successfully")
-                print(f"   Trade ID: {trade.trade_id}")
+                logger.info("Trade executed successfully", extra={"trade_id": trade.trade_id})
 
             else:
-                print(f"   ❌ Trade failed: {swap_result.get('error')}")
+                logger.error("Trade failed", extra={"error": swap_result.get("error")})
                 self.performance.failed_trades += 1
 
         except Exception as e:
-            print(f"   ❌ Trade execution error: {e}")
+            logger.error("Trade execution error", extra={"error": str(e)}, exc_info=True)
             self.performance.failed_trades += 1
 
     def _check_risk_limits(self) -> bool:
@@ -631,14 +648,17 @@ Return JSON:
         today_trades = [t for t in self.trade_history if t.timestamp > today]
 
         if len(today_trades) >= self.max_daily_trades:
-            print(f"⚠️  Daily trade limit reached ({self.max_daily_trades})")
+            logger.warning("Daily trade limit reached", extra={"max_daily_trades": self.max_daily_trades})
             return False
 
         # Price freshness guard: refuse to trade on stale quotes
         staleness_cutoff = self.config.get("price_staleness_seconds", 900)
         for pair in self.trading_pairs:
             if pair.last_updated and (time.time() - pair.last_updated) > staleness_cutoff:
-                print(f"⚠️  Market data stale for {pair.from_coin}/{pair.to_coin}")
+                logger.warning(
+                    "Market data stale",
+                    extra={"pair": f"{pair.from_coin}/{pair.to_coin}", "staleness_cutoff": staleness_cutoff},
+                )
                 return False
 
         # Check stop-loss
@@ -646,7 +666,10 @@ Return JSON:
             divisor = self.max_trade_amount if self.max_trade_amount > 0 else 1
             loss_percent = abs(self.performance.net_profit) / divisor * 100
             if loss_percent >= self.stop_loss_percent:
-                print(f"🛑 STOP LOSS triggered! Loss: {loss_percent:.1f}%")
+                logger.warning(
+                    "STOP LOSS triggered",
+                    extra={"loss_percent": loss_percent, "stop_loss_percent": self.stop_loss_percent},
+                )
                 self.stop()
                 return False
 
@@ -821,9 +844,12 @@ Return JSON:
             "diversification_check": self.apply_portfolio_diversification(),
         }
 
-        print(
-            f"   Risk Metrics: RR={risk_log['risk_reward_ratio']}, "
-            f"Exposure={risk_log['exposure_check']['exposure_percent']:.1f}%"
+        logger.info(
+            "Risk metrics calculated",
+            extra={
+                "risk_reward_ratio": risk_log["risk_reward_ratio"],
+                "exposure_percent": risk_log["exposure_check"]["exposure_percent"],
+            },
         )
 
     def _call_user_ai(self, prompt: str) -> Dict:
@@ -918,87 +944,3 @@ STRATEGY_TEMPLATES = {
         "pairs": ["XAI/ADA", "XAI/BTC", "XAI/ETH"],
     },
 }
-
-
-# Example usage
-if __name__ == "__main__":
-    print("=" * 80)
-    print("XAI AI TRADING BOT - DEMONSTRATION")
-    print("=" * 80)
-
-    # Mock components
-    class MockBlockchain:
-        def get_balance(self, address):
-            return 1000.0
-
-    class MockPersonalAI:
-        def execute_atomic_swap_with_ai(self, **kwargs):
-            return {"success": True, "swap_transaction": {"fee": 0.15}}
-
-    blockchain = MockBlockchain()
-    personal_ai = MockPersonalAI()
-
-    # Create trading bot
-    print("\n📝 Creating AI Trading Bot...")
-    print("   Strategy: Balanced")
-    print("   User: XAI_Trader_1")
-
-    # Load API key from environment variable
-    import os
-    user_api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not user_api_key:
-        print("\n⚠️  ERROR: ANTHROPIC_API_KEY environment variable not set")
-        print("   Set your API key: export ANTHROPIC_API_KEY='your-key-here'")
-        print("   Get your API key from: https://console.anthropic.com/")
-        print("\n   Skipping bot creation demonstration.")
-        exit(1)
-
-    # SECURITY NOTE: API keys loaded from environment variables only
-    bot = AITradingBot(
-        user_address="XAI_Trader_1",
-        ai_provider="anthropic",
-        ai_model="claude-sonnet-4",
-        user_api_key=user_api_key,
-        strategy=TradingStrategy.BALANCED,
-        config=STRATEGY_TEMPLATES["balanced"],
-        blockchain=blockchain,
-        personal_ai=personal_ai,
-    )
-
-    print("\n✅ Trading bot created!")
-
-    print("\n📊 Bot Configuration:")
-    print(f"   Strategy: {bot.strategy.value}")
-    print(f"   Max trade: {bot.max_trade_amount} XAI")
-    print(f"   Stop loss: {bot.stop_loss_percent}%")
-    print(f"   Take profit: {bot.take_profit_percent}%")
-    print(f"   Max daily trades: {bot.max_daily_trades}")
-    print(f"   Analysis interval: {bot.analysis_interval} seconds")
-
-    print("\n🎮 Bot Controls:")
-    print("   bot.start()  - Start trading")
-    print("   bot.stop()   - Stop trading")
-    print("   bot.get_status() - Check status")
-
-    print("\n💡 How it works:")
-    print("   1. Bot monitors XAI/ADA market every 5 minutes")
-    print("   2. AI analyzes market and recommends BUY/SELL/HOLD")
-    print("   3. If BUY/SELL, executes atomic swap via Personal AI")
-    print("   4. Tracks performance and applies risk limits")
-    print("   5. Stops automatically if stop-loss triggered")
-
-    print("\n🔐 Security:")
-    print("   ✓ Uses Personal AI (cannot modify blockchain)")
-    print("   ✓ User's own API key (user pays AI costs)")
-    print("   ✓ Stop-loss protection")
-    print("   ✓ Daily trade limits")
-    print("   ✓ User can stop anytime")
-
-    print("\n💰 Revenue Model:")
-    print("   • User keeps 99% of profits")
-    print("   • Optional 1% to XAI development fund")
-    print("   • Sustainable funding mechanism")
-
-    print("\n" + "=" * 80)
-    print("AI TRADING BOT READY FOR DEPLOYMENT")
-    print("=" * 80)

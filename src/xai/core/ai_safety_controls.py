@@ -1046,9 +1046,15 @@ class AISafetyControls:
                 "message": f"{activator} cannot trigger emergency stop",
             }
 
-        print("\n" + "=" * 70)
-        print("!!! EMERGENCY STOP ACTIVATED !!!")
-        print("=" * 70)
+        logger.critical(
+            "EMERGENCY STOP ACTIVATED",
+            extra={
+                "event": "ai.emergency_stop.activated",
+                "reason": reason.value,
+                "details": details,
+                "activator": activator,
+            },
+        )
 
         with self.lock:
             self.emergency_stop_active: bool = True
@@ -1068,14 +1074,19 @@ class AISafetyControls:
         # Stop all trading bots
         trading_bot_result: Dict[str, Any] = self.stop_all_trading_bots(reason)
 
-        print(f"Reason: {reason.value}")
-        print(f"Details: {details}")
-        print(f"Activated by: {activator}")
-        print(f"Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"\nPersonal AI requests stopped: {len(self.personal_ai_requests)}")
-        print(f"Governance tasks paused: {len(self.governance_tasks)}")
-        print(f"Trading bots stopped: {trading_bot_result['stopped_count']}")
-        print("=" * 70)
+        logger.critical(
+            "Emergency stop complete",
+            extra={
+                "event": "ai.emergency_stop.complete",
+                "reason": reason.value,
+                "details": details,
+                "activator": activator,
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "personal_ai_stopped": len(self.personal_ai_requests),
+                "governance_tasks_paused": len(self.governance_tasks),
+                "trading_bots_stopped": trading_bot_result["stopped_count"],
+            },
+        )
 
         return {
             "success": True,
@@ -1111,13 +1122,14 @@ class AISafetyControls:
             self.emergency_stop_active: bool = False
             duration: float = time.time() - (self.emergency_stop_time or 0)
 
-        print("\n" + "=" * 70)
-        print("[OK] EMERGENCY STOP DEACTIVATED")
-        print("=" * 70)
-        print(f"Deactivated by: {deactivator}")
-        print(f"Duration: {duration:.2f} seconds")
-        print("AI operations can resume")
-        print("=" * 70)
+        logger.warning(
+            "Emergency stop deactivated - AI operations can resume",
+            extra={
+                "event": "ai.emergency_stop.deactivated",
+                "deactivator": deactivator,
+                "duration_seconds": duration,
+            },
+        )
 
         return {
             "success": True,
@@ -1685,11 +1697,15 @@ class AISafetyControls:
 
 # Example usage
 if __name__ == "__main__":
-    print("XAI AI Safety & Emergency Stop System")
-    print("=" * 50)
-    print("\nSafety Controls:")
-    print("1. Personal AI request cancellation (user-level)")
-    print("2. Trading bot emergency stop")
-    print("3. Governance AI task pause/abort")
-    print("4. Global AI emergency stop (all operations)")
-    print("\nPrinciple: Users have INSTANT control over AI")
+    import sys
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s", stream=sys.stdout)
+
+    logger.info("XAI AI Safety & Emergency Stop System")
+    logger.info("=" * 50)
+    logger.info("Safety Controls:")
+    logger.info("1. Personal AI request cancellation (user-level)")
+    logger.info("2. Trading bot emergency stop")
+    logger.info("3. Governance AI task pause/abort")
+    logger.info("4. Global AI emergency stop (all operations)")
+    logger.info("Principle: Users have INSTANT control over AI")

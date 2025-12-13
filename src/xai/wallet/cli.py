@@ -13,6 +13,7 @@ import getpass
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import sys
@@ -38,6 +39,9 @@ from xai.wallet.mnemonic_qr_backup import (
 )
 from xai.wallet.two_factor_profile import TwoFactorProfile, TwoFactorProfileStore
 from xai.security.two_factor_auth import TwoFactorAuthManager, TwoFactorSetup
+
+# Configure module logger
+logger = logging.getLogger(__name__)
 
 DEFAULT_API_URL = os.getenv("XAI_API_URL", "http://localhost:18545")
 DEFAULT_KEYSTORE_DIR = Path.home() / ".xai" / "keystores"
@@ -230,6 +234,7 @@ def get_private_key_secure(
 
             # Legacy unencrypted format
             else:
+                logger.warning("Loading from unencrypted keystore (legacy format)")
                 print("WARNING: Keystore is not encrypted!", file=sys.stderr)
                 private_key = keystore_data.get("private_key", "")
                 if not private_key:
@@ -247,6 +252,7 @@ def get_private_key_secure(
     if allow_env:
         env_key = os.environ.get("XAI_PRIVATE_KEY")
         if env_key:
+            logger.warning("Using private key from XAI_PRIVATE_KEY environment variable (not recommended)")
             print("=" * 70, file=sys.stderr)
             print("WARNING: Using private key from environment variable.", file=sys.stderr)
             print("This is NOT RECOMMENDED for production use!", file=sys.stderr)
@@ -312,6 +318,7 @@ def create_keystore(
         output_path = str(DEFAULT_KEYSTORE_DIR / f"{address[:16]}.keystore")
 
     # Get password with strong requirements
+    logger.debug("Creating new keystore for address: %s", address[:16])
     print("Create keystore password:", file=sys.stderr)
     print("Requirements: 12+ characters, uppercase, lowercase, digit, special char", file=sys.stderr)
     password = getpass.getpass("Password: ")
@@ -394,15 +401,18 @@ def _request_faucet(args: argparse.Namespace) -> int:
     endpoint = f"{args.base_url.rstrip('/')}/faucet/claim"
     payload = {"address": args.address}
 
+    logger.debug("Requesting faucet funds for address: %s", args.address)
     try:
         response = requests.post(endpoint, json=payload, timeout=args.timeout)
     except requests.RequestException as exc:
+        logger.error("Faucet request failed: %s", exc)
         print(f"Network error contacting faucet: {exc}", file=sys.stderr)
         return 2
 
     try:
         data = response.json()
     except ValueError:
+        logger.error("Invalid JSON response from faucet (status=%d)", response.status_code)
         print(
             f"Unexpected response ({response.status_code}): {response.text}",
             file=sys.stderr,
@@ -410,6 +420,7 @@ def _request_faucet(args: argparse.Namespace) -> int:
         return 3
 
     success = response.ok and data.get("success") is True
+    logger.info("Faucet request completed: success=%s", success)
     print(_format_response(data, args.json))
     return 0 if success else 1
 
@@ -422,9 +433,11 @@ def _generate_address(args: argparse.Namespace) -> int:
     with explicit confirmation to display the key.
     """
     wallet = Wallet()
+    logger.debug("Generated new wallet address: %s", wallet.address)
 
     # Deprecated --json flag warning
     if args.json:
+        logger.warning("User requested deprecated --json output for wallet generation")
         print("=" * 70, file=sys.stderr)
         print("WARNING: --json flag is DEPRECATED and INSECURE", file=sys.stderr)
         print("It outputs private keys in plaintext which can expose them.", file=sys.stderr)
@@ -435,9 +448,11 @@ def _generate_address(args: argparse.Namespace) -> int:
         # Still support it but require confirmation
         confirm = input("\nType 'SHOW JSON' to continue with insecure output: ")
         if confirm != "SHOW JSON":
+            logger.info("User cancelled insecure JSON output")
             print("Cancelled. Use --save-keystore for secure storage.", file=sys.stderr)
             return 1
 
+        logger.warning("User confirmed insecure JSON output - displaying private key")
         payload = {
             "success": True,
             "address": wallet.address,
@@ -450,6 +465,7 @@ def _generate_address(args: argparse.Namespace) -> int:
     # If user wants to save to encrypted keystore (RECOMMENDED)
     if args.save_keystore:
         try:
+            logger.info("Creating encrypted keystore for wallet: %s", wallet.address)
             keystore_path = create_keystore(
                 address=wallet.address,
                 private_key=wallet.private_key,
@@ -457,6 +473,7 @@ def _generate_address(args: argparse.Namespace) -> int:
                 output_path=args.keystore_output,
                 kdf=args.kdf
             )
+            logger.info("Keystore created successfully at: %s", keystore_path)
             print(f"Wallet generated successfully!")
             print(f"Address: {wallet.address}")
             print(f"Public Key: {wallet.public_key}")
@@ -464,11 +481,13 @@ def _generate_address(args: argparse.Namespace) -> int:
             print("Keep your password secure - it cannot be recovered!")
             return 0
         except Exception as e:
+            logger.error("Failed to create keystore: %s", e)
             print(f"Error creating keystore: {e}", file=sys.stderr)
             return 1
 
     # If user explicitly wants to see private key (DANGEROUS)
     if args.show_private_key:
+        logger.warning("User requested to display private key on screen")
         print("\n" + "=" * 70, file=sys.stderr)
         print("WARNING: You are about to display a private key!", file=sys.stderr)
         print("", file=sys.stderr)
@@ -482,10 +501,12 @@ def _generate_address(args: argparse.Namespace) -> int:
 
         confirm = input("\nType 'I UNDERSTAND THE RISKS' to continue: ")
         if confirm != "I UNDERSTAND THE RISKS":
+            logger.info("User cancelled private key display")
             print("Cancelled. Use --save-keystore for secure storage.", file=sys.stderr)
             return 1
 
         # User confirmed - show everything
+        logger.warning("User confirmed - displaying private key on screen")
         print(f"\nAddress:     {wallet.address}")
         print(f"Public Key:  {wallet.public_key}")
         print(f"Private Key: {wallet.private_key}")
@@ -509,6 +530,7 @@ def _check_balance(args: argparse.Namespace) -> int:
     """Handle the check-balance subcommand."""
     endpoint = f"{args.base_url.rstrip('/')}/balance/{args.address}"
 
+    logger.debug("Checking balance for address: %s", args.address)
     try:
         response = requests.get(endpoint, timeout=args.timeout)
         response.raise_for_status()
@@ -521,6 +543,7 @@ def _check_balance(args: argparse.Namespace) -> int:
             pending_in = data.get("pending_incoming", 0)
             pending_out = data.get("pending_outgoing", 0)
 
+            logger.info("Balance retrieved: %s XAI (pending_in=%s, pending_out=%s)", balance, pending_in, pending_out)
             print(f"Address: {args.address}")
             print(f"Balance: {balance} XAI")
             if pending_in > 0:
@@ -530,6 +553,7 @@ def _check_balance(args: argparse.Namespace) -> int:
 
         return 0
     except requests.RequestException as exc:
+        logger.error("Failed to check balance: %s", exc)
         print(f"Network error: {exc}", file=sys.stderr)
         return 2
 
@@ -544,17 +568,20 @@ def _send_transaction(args: argparse.Namespace) -> int:
         try:
             _require_two_factor(args.two_fa_profile, args.otp)
         except Exception as exc:
+            logger.error("2FA verification failed: %s", exc)
             print(f"2FA verification failed: {exc}", file=sys.stderr)
             return 1
 
     try:
         # Securely obtain private key
+        logger.debug("Obtaining private key for transaction")
         private_key = get_private_key_secure(
             keystore_path=args.keystore,
             allow_env=args.allow_env_key,
             prompt="Enter sender's private key"
         )
     except Exception as e:
+        logger.error("Failed to obtain private key: %s", e)
         print(f"Error obtaining private key: {e}", file=sys.stderr)
         return 1
 
@@ -568,6 +595,7 @@ def _send_transaction(args: argparse.Namespace) -> int:
         "fee": args.fee,
     }
 
+    logger.info("Sending transaction: %s -> %s (amount=%s, fee=%s)", args.sender, args.recipient, args.amount, args.fee)
     try:
         response = requests.post(endpoint, json=payload, timeout=args.timeout)
         response.raise_for_status()
@@ -580,16 +608,19 @@ def _send_transaction(args: argparse.Namespace) -> int:
             print(json.dumps(data, indent=2))
         else:
             if data.get("success"):
+                logger.info("Transaction sent successfully: txid=%s", data.get('txid', 'pending'))
                 print(f"Transaction sent successfully!")
                 print(f"TX ID: {data.get('txid', 'pending')}")
                 print(f"Amount: {args.amount} XAI")
                 print(f"Fee: {args.fee} XAI")
             else:
+                logger.error("Transaction failed: %s", data.get('error', 'Unknown error'))
                 print(f"Transaction failed: {data.get('error', 'Unknown error')}")
                 return 1
 
         return 0
     except requests.RequestException as exc:
+        logger.error("Transaction network error: %s", exc)
         print(f"Network error: {exc}", file=sys.stderr)
         return 2
     finally:
@@ -606,6 +637,7 @@ def _wallet_history(args: argparse.Namespace) -> int:
     endpoint = f"{args.base_url.rstrip('/')}/history/{args.address}"
     params = {"limit": args.limit, "offset": args.offset}
 
+    logger.debug("Fetching wallet history: address=%s, limit=%d, offset=%d", args.address, args.limit, args.offset)
     try:
         response = requests.get(endpoint, params=params, timeout=args.timeout)
         response.raise_for_status()
@@ -615,6 +647,7 @@ def _wallet_history(args: argparse.Namespace) -> int:
             print(json.dumps(data, indent=2))
         else:
             transactions = data.get("transactions", [])
+            logger.info("Retrieved %d transactions for %s", len(transactions), args.address)
             print(f"Transaction History for {args.address}")
             print(f"Total: {len(transactions)} transactions")
             print("-" * 80)
@@ -633,6 +666,7 @@ def _wallet_history(args: argparse.Namespace) -> int:
 
         return 0
     except requests.RequestException as exc:
+        logger.error("Failed to fetch wallet history: %s", exc)
         print(f"Network error: {exc}", file=sys.stderr)
         return 2
 
@@ -646,17 +680,20 @@ def _export_wallet(args: argparse.Namespace) -> int:
         try:
             _require_two_factor(args.two_fa_profile, args.otp)
         except Exception as exc:
+            logger.error("2FA verification failed for export: %s", exc)
             print(f"2FA verification failed: {exc}", file=sys.stderr)
             return 1
 
     try:
         # Securely obtain private key
+        logger.debug("Obtaining private key for wallet export")
         private_key = get_private_key_secure(
             keystore_path=args.keystore,
             allow_env=args.allow_env_key,
             prompt="Enter private key to export"
         )
     except Exception as e:
+        logger.error("Failed to obtain private key for export: %s", e)
         print(f"Error obtaining private key: {e}", file=sys.stderr)
         return 1
 

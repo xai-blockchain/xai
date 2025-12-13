@@ -55,13 +55,14 @@ class TestCheckpointProtection:
             self.blockchain.chain.append(block)
 
         # Create checkpoint at height 5
-        if hasattr(self.blockchain, 'checkpoint_manager'):
-            checkpoint_block = self.blockchain.chain[5]
-            self.blockchain.checkpoint_manager.create_checkpoint(
-                height=5,
-                block_hash=checkpoint_block.hash,
-                state_root="state_" + "0" * 57
-            )
+        # Checkpoint manager should always be available
+        assert hasattr(self.blockchain, 'checkpoint_manager'), "Checkpoint manager should be available"
+        checkpoint_block = self.blockchain.chain[5]
+        self.blockchain.checkpoint_manager.create_checkpoint(
+            height=5,
+            block_hash=checkpoint_block.hash,
+            state_root="state_" + "0" * 57
+        )
 
         # Create fork chain that diverges at block 3 (before checkpoint)
         fork_chain = self.blockchain.chain[:3].copy()
@@ -87,13 +88,14 @@ class TestCheckpointProtection:
             self.blockchain.chain.append(block)
 
         # Create checkpoint at height 5
-        if hasattr(self.blockchain, 'checkpoint_manager'):
-            checkpoint_block = self.blockchain.chain[5]
-            self.blockchain.checkpoint_manager.create_checkpoint(
-                height=5,
-                block_hash=checkpoint_block.hash,
-                state_root="state_" + "0" * 57
-            )
+        # Checkpoint manager should always be available
+        assert hasattr(self.blockchain, 'checkpoint_manager'), "Checkpoint manager should be available"
+        checkpoint_block = self.blockchain.chain[5]
+        self.blockchain.checkpoint_manager.create_checkpoint(
+            height=5,
+            block_hash=checkpoint_block.hash,
+            state_root="state_" + "0" * 57
+        )
 
         # Create fork chain that diverges at block 8 (after checkpoint)
         fork_chain = self.blockchain.chain[:8].copy()
@@ -117,13 +119,14 @@ class TestCheckpointProtection:
             self.blockchain.chain.append(block)
 
         # Create checkpoint at genesis (height 0)
-        if hasattr(self.blockchain, 'checkpoint_manager'):
-            genesis_block = self.blockchain.chain[0]
-            self.blockchain.checkpoint_manager.create_checkpoint(
-                height=0,
-                block_hash=genesis_block.hash,
-                state_root="genesis_state"
-            )
+        # Checkpoint manager should always be available
+        assert hasattr(self.blockchain, 'checkpoint_manager'), "Checkpoint manager should be available"
+        genesis_block = self.blockchain.chain[0]
+        self.blockchain.checkpoint_manager.create_checkpoint(
+            height=0,
+            block_hash=genesis_block.hash,
+            state_root="genesis_state"
+        )
 
         # Try to replace entire chain
         fork_chain = []
@@ -146,14 +149,15 @@ class TestCheckpointProtection:
             self.blockchain.chain.append(block)
 
         # Create multiple checkpoints
-        if hasattr(self.blockchain, 'checkpoint_manager'):
-            for checkpoint_height in [3, 7, 11]:
-                checkpoint_block = self.blockchain.chain[checkpoint_height]
-                self.blockchain.checkpoint_manager.create_checkpoint(
-                    height=checkpoint_height,
-                    block_hash=checkpoint_block.hash,
-                    state_root=f"state_{checkpoint_height}"
-                )
+        # Checkpoint manager should always be available
+        assert hasattr(self.blockchain, 'checkpoint_manager'), "Checkpoint manager should be available"
+        for checkpoint_height in [3, 7, 11]:
+            checkpoint_block = self.blockchain.chain[checkpoint_height]
+            self.blockchain.checkpoint_manager.create_checkpoint(
+                height=checkpoint_height,
+                block_hash=checkpoint_block.hash,
+                state_root=f"state_{checkpoint_height}"
+            )
 
         # Try fork before each checkpoint
         for fork_point in [2, 6, 10]:
@@ -175,13 +179,14 @@ class TestCheckpointProtection:
             self.blockchain.chain.append(block)
 
         # Create checkpoint with specific block hash
-        if hasattr(self.blockchain, 'checkpoint_manager'):
-            checkpoint_block = self.blockchain.chain[5]
-            self.blockchain.checkpoint_manager.create_checkpoint(
-                height=5,
-                block_hash=checkpoint_block.hash,
-                state_root="state_checkpoint"
-            )
+        # Checkpoint manager should always be available
+        assert hasattr(self.blockchain, 'checkpoint_manager'), "Checkpoint manager should be available"
+        checkpoint_block = self.blockchain.chain[5]
+        self.blockchain.checkpoint_manager.create_checkpoint(
+            height=5,
+            block_hash=checkpoint_block.hash,
+            state_root="state_checkpoint"
+        )
 
         # Create fork with different block at checkpoint height
         fork_chain = self.blockchain.chain[:5].copy()
@@ -222,8 +227,8 @@ class TestCheckpointProtection:
 
     def test_checkpoint_manager_max_checkpoints(self):
         """Task 200: Verify checkpoint manager respects max checkpoints limit"""
-        if not hasattr(self.blockchain, 'checkpoint_manager'):
-            pytest.skip("Checkpoint manager not available")
+        # Checkpoint manager should always be available
+        assert hasattr(self.blockchain, 'checkpoint_manager'), "Checkpoint manager should be available"
 
         # Build long chain
         for i in range(50):
@@ -256,14 +261,15 @@ class TestCheckpointProtection:
             self.blockchain.chain.append(block)
 
         # Checkpoints created every 5 blocks
-        if hasattr(self.blockchain, 'checkpoint_manager'):
-            for checkpoint_height in [5, 10, 15]:
-                checkpoint_block = self.blockchain.chain[checkpoint_height]
-                self.blockchain.checkpoint_manager.create_checkpoint(
-                    height=checkpoint_height,
-                    block_hash=checkpoint_block.hash,
-                    state_root=f"state_{checkpoint_height}"
-                )
+        # Checkpoint manager should always be available
+        assert hasattr(self.blockchain, 'checkpoint_manager'), "Checkpoint manager should be available"
+        for checkpoint_height in [5, 10, 15]:
+            checkpoint_block = self.blockchain.chain[checkpoint_height]
+            self.blockchain.checkpoint_manager.create_checkpoint(
+                height=checkpoint_height,
+                block_hash=checkpoint_block.hash,
+                state_root=f"state_{checkpoint_height}"
+            )
 
         # Attacker tries to reorg from block 3 (deep reorganization)
         attack_chain = self.blockchain.chain[:3].copy()
@@ -306,14 +312,15 @@ class TestCheckpointEdgeCases:
 
     def test_empty_chain_with_checkpoint(self):
         """Edge case: Checkpoint on empty chain"""
-        if hasattr(self.blockchain, 'checkpoint_manager'):
-            # Try to create checkpoint on empty chain
-            self.blockchain.checkpoint_manager.create_checkpoint(
-                height=0,
-                block_hash="fake_hash",
-                state_root="fake_state"
-            )
-            # Should handle gracefully
+        # Checkpoint manager should always be available
+        assert hasattr(self.blockchain, 'checkpoint_manager'), "Checkpoint manager should be available"
+        # Try to create checkpoint on empty chain
+        self.blockchain.checkpoint_manager.create_checkpoint(
+            height=0,
+            block_hash="fake_hash",
+            state_root="fake_state"
+        )
+        # Should handle gracefully
 
     def test_checkpoint_beyond_chain_length(self):
         """Edge case: Checkpoint at height beyond current chain"""
@@ -323,14 +330,15 @@ class TestCheckpointEdgeCases:
             block = self.create_test_block(i, prev_hash)
             self.blockchain.chain.append(block)
 
-        if hasattr(self.blockchain, 'checkpoint_manager'):
-            # Create checkpoint at height 10 (beyond current chain length 5)
-            self.blockchain.checkpoint_manager.create_checkpoint(
-                height=10,
-                block_hash="future_hash",
-                state_root="future_state"
-            )
-            # Should handle gracefully (might ignore or queue for later)
+        # Checkpoint manager should always be available
+        assert hasattr(self.blockchain, 'checkpoint_manager'), "Checkpoint manager should be available"
+        # Create checkpoint at height 10 (beyond current chain length 5)
+        self.blockchain.checkpoint_manager.create_checkpoint(
+            height=10,
+            block_hash="future_hash",
+            state_root="future_state"
+        )
+        # Should handle gracefully (might ignore or queue for later)
 
 
 if __name__ == "__main__":

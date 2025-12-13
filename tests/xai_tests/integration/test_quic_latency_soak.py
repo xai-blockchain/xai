@@ -39,9 +39,6 @@ except Exception:
 
 from xai.core.p2p_quic import QUICServer, quic_client_send, quic_client_send_with_timeout, QuicConfiguration  # type: ignore
 
-if QuicConfiguration is None:  # type: ignore
-    pytest.skip("aioquic not available", allow_module_level=True)
-
 
 def _free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:

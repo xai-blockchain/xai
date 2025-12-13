@@ -22,6 +22,37 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.exceptions import InvalidSignature
 
 
+# Security-specific exceptions
+class HSMError(Exception):
+    """Base exception for HSM operations"""
+    pass
+
+
+class HSMKeyGenerationError(HSMError):
+    """Raised when key generation fails"""
+    pass
+
+
+class HSMSigningError(HSMError):
+    """Raised when signing operation fails"""
+    pass
+
+
+class HSMKeyRotationError(HSMError):
+    """Raised when key rotation fails"""
+    pass
+
+
+class HSMStorageError(HSMError):
+    """Raised when storage operations fail"""
+    pass
+
+
+class HSMCryptographicError(HSMError):
+    """Raised when cryptographic operations fail"""
+    pass
+
+
 class KeyType(Enum):
     """Supported cryptographic key types"""
     SECP256K1 = "secp256k1"
@@ -298,15 +329,38 @@ class HardwareSecurityModule:
 
             return key_id
 
+        except (ValueError, TypeError) as e:
+            self._audit_log(
+                operation="generate_key",
+                key_id="N/A",
+                user_id=user_id,
+                success=False,
+                details={"error": str(e), "error_type": "validation"}
+            )
+            raise HSMKeyGenerationError(f"Invalid key parameters: {e}") from e
+        except OSError as e:
+            self._audit_log(
+                operation="generate_key",
+                key_id="N/A",
+                user_id=user_id,
+                success=False,
+                details={"error": str(e), "error_type": "storage"}
+            )
+            raise HSMStorageError(f"Failed to store key: {e}") from e
         except Exception as e:
             self._audit_log(
                 operation="generate_key",
                 key_id="N/A",
                 user_id=user_id,
                 success=False,
-                details={"error": str(e)}
+                details={"error": str(e), "error_type": "cryptographic"}
             )
-            raise
+            self.logger.error(
+                "Key generation failed",
+                exc_info=True,
+                extra={"event": "hsm.key_generation_failed", "user_id": user_id}
+            )
+            raise HSMCryptographicError(f"Key generation failed: {e}") from e
 
     def sign(self, key_id: str, message: bytes, user_id: str = "system") -> bytes:
         """
@@ -370,15 +424,47 @@ class HardwareSecurityModule:
 
             return signature
 
+        except ValueError as e:
+            self._audit_log(
+                operation="sign",
+                key_id=key_id,
+                user_id=user_id,
+                success=False,
+                details={"error": str(e), "error_type": "validation"}
+            )
+            raise HSMSigningError(f"Invalid signing parameters: {e}") from e
+        except InvalidSignature as e:
+            self._audit_log(
+                operation="sign",
+                key_id=key_id,
+                user_id=user_id,
+                success=False,
+                details={"error": str(e), "error_type": "signature"}
+            )
+            raise HSMCryptographicError(f"Signature operation failed: {e}") from e
+        except OSError as e:
+            self._audit_log(
+                operation="sign",
+                key_id=key_id,
+                user_id=user_id,
+                success=False,
+                details={"error": str(e), "error_type": "storage"}
+            )
+            raise HSMStorageError(f"Failed to access key storage: {e}") from e
         except Exception as e:
             self._audit_log(
                 operation="sign",
                 key_id=key_id,
                 user_id=user_id,
                 success=False,
-                details={"error": str(e)}
+                details={"error": str(e), "error_type": "cryptographic"}
             )
-            raise
+            self.logger.error(
+                "Signing operation failed",
+                exc_info=True,
+                extra={"event": "hsm.signing_failed", "key_id": key_id[:16], "user_id": user_id}
+            )
+            raise HSMSigningError(f"Signing operation failed: {e}") from e
 
     def verify_signature(self, key_id: str, message: bytes, signature: bytes) -> bool:
         """
@@ -449,15 +535,47 @@ class HardwareSecurityModule:
 
             return new_key_id
 
+        except ValueError as e:
+            self._audit_log(
+                operation="rotate_key",
+                key_id=old_key_id,
+                user_id=user_id,
+                success=False,
+                details={"error": str(e), "error_type": "validation"}
+            )
+            raise HSMKeyRotationError(f"Invalid key rotation parameters: {e}") from e
+        except HSMKeyGenerationError as e:
+            self._audit_log(
+                operation="rotate_key",
+                key_id=old_key_id,
+                user_id=user_id,
+                success=False,
+                details={"error": str(e), "error_type": "key_generation"}
+            )
+            raise HSMKeyRotationError(f"Key rotation failed during key generation: {e}") from e
+        except OSError as e:
+            self._audit_log(
+                operation="rotate_key",
+                key_id=old_key_id,
+                user_id=user_id,
+                success=False,
+                details={"error": str(e), "error_type": "storage"}
+            )
+            raise HSMStorageError(f"Failed to persist key rotation: {e}") from e
         except Exception as e:
             self._audit_log(
                 operation="rotate_key",
                 key_id=old_key_id,
                 user_id=user_id,
                 success=False,
-                details={"error": str(e)}
+                details={"error": str(e), "error_type": "unknown"}
             )
-            raise
+            self.logger.error(
+                "Key rotation failed",
+                exc_info=True,
+                extra={"event": "hsm.key_rotation_failed", "old_key_id": old_key_id[:16], "user_id": user_id}
+            )
+            raise HSMKeyRotationError(f"Key rotation failed: {e}") from e
 
     def get_public_key(self, key_id: str) -> str:
         """Get public key PEM for a given key ID"""
@@ -556,8 +674,30 @@ class HardwareSecurityModule:
 
             except InvalidSignature:
                 continue
+            except (ValueError, TypeError) as e:
+                logging.debug(
+                    "Invalid signature parameters for key %s: %s",
+                    key_id,
+                    e,
+                    extra={"event": "hsm.multisig_verify_invalid_params", "key_id": key_id[:16]}
+                )
+                continue
+            except OSError as e:
+                logging.warning(
+                    "Storage error during signature verification for key %s: %s",
+                    key_id,
+                    e,
+                    extra={"event": "hsm.multisig_verify_storage_error", "key_id": key_id[:16]}
+                )
+                continue
             except Exception as e:
-                logging.debug("Signature verification failed for key %s: %s", key_id, e)
+                logging.error(
+                    "Signature verification failed for key %s: %s",
+                    key_id,
+                    e,
+                    exc_info=True,
+                    extra={"event": "hsm.multisig_verify_failed", "key_id": key_id[:16]}
+                )
                 continue
 
         return valid_count >= threshold

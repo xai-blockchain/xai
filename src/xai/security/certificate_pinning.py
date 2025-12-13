@@ -16,6 +16,22 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 
+# Certificate pinning exceptions
+class CertificatePinningError(Exception):
+    """Base exception for certificate pinning operations"""
+    pass
+
+
+class CertificateFetchError(CertificatePinningError):
+    """Raised when certificate fetching fails"""
+    pass
+
+
+class CertificateValidationError(CertificatePinningError):
+    """Raised when certificate validation fails"""
+    pass
+
+
 @dataclass
 class Pin:
     """Certificate pin with metadata"""
@@ -198,8 +214,46 @@ class CertificatePinner:
             logger.info("Fetched and pinned certificate for '%s': %s...", hostname, spki_hash[:16])
             return spki_hash
 
+        except (socket.timeout, TimeoutError) as e:
+            logger.warning(
+                "Connection timeout while fetching certificate for '%s': %s",
+                hostname,
+                e,
+                extra={"event": "cert_pin.fetch_timeout", "hostname": hostname}
+            )
+            return None
+        except (socket.gaierror, socket.error, ConnectionError, OSError) as e:
+            logger.warning(
+                "Network error while fetching certificate for '%s': %s",
+                hostname,
+                e,
+                extra={"event": "cert_pin.fetch_network_error", "hostname": hostname}
+            )
+            return None
+        except ssl.SSLError as e:
+            logger.error(
+                "SSL error while fetching certificate for '%s': %s",
+                hostname,
+                e,
+                extra={"event": "cert_pin.fetch_ssl_error", "hostname": hostname}
+            )
+            return None
+        except ValueError as e:
+            logger.error(
+                "Invalid certificate data for '%s': %s",
+                hostname,
+                e,
+                extra={"event": "cert_pin.fetch_invalid_data", "hostname": hostname}
+            )
+            return None
         except Exception as e:
-            logger.error("Failed to fetch certificate for '%s': %s", hostname, e)
+            logger.error(
+                "Unexpected error fetching certificate for '%s': %s",
+                hostname,
+                e,
+                exc_info=True,
+                extra={"event": "cert_pin.fetch_unexpected_error", "hostname": hostname}
+            )
             return None
 
     def rotate_pins(

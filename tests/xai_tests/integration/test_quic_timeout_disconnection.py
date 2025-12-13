@@ -60,9 +60,6 @@ from xai.core.p2p_quic import (
     QuicDialTimeout,
 )
 
-if QuicConfiguration is None:
-    pytest.skip("aioquic not available", allow_module_level=True)
-
 
 def _free_port() -> int:
     """Find a free UDP port."""

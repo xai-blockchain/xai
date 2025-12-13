@@ -47,34 +47,98 @@ class Wallet:
         hardware_wallet: Optional[HardwareWallet] = None,
         hd_metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
-        self.hardware_wallet = hardware_wallet or (get_default_hardware_wallet() if HARDWARE_WALLET_ENABLED else None)
+        """Initialize wallet with cryptographic keys and optional hardware wallet support.
+
+        This method follows a composition chain pattern for clean initialization:
+        1. Initialize metadata (HD wallet derivation info)
+        2. Initialize hardware wallet if provided
+        3. Initialize cryptographic keys (hardware, existing, or new generation)
+
+        Args:
+            private_key: Optional existing private key (hex string)
+            hardware_wallet: Optional hardware wallet instance
+            hd_metadata: Optional HD wallet derivation metadata
+        """
+        # Composition chain: metadata -> hardware -> crypto
+        self._init_metadata(hd_metadata)
+        self._init_hardware(hardware_wallet)
+        self._init_crypto(private_key)
+
+    def _init_metadata(self, hd_metadata: Optional[Dict[str, Any]]) -> None:
+        """Initialize HD wallet metadata.
+
+        Args:
+            hd_metadata: Optional derivation metadata for HD wallets
+        """
         self._hd_metadata: Optional[Dict[str, Any]] = deepcopy(hd_metadata) if hd_metadata else None
 
+    def _init_hardware(self, hardware_wallet: Optional[HardwareWallet]) -> None:
+        """Initialize hardware wallet support.
+
+        Args:
+            hardware_wallet: Optional hardware wallet instance
+        """
+        self.hardware_wallet = hardware_wallet or (
+            get_default_hardware_wallet() if HARDWARE_WALLET_ENABLED else None
+        )
+
+    def _init_crypto(self, private_key: Optional[str]) -> None:
+        """Initialize cryptographic keys using hardware wallet, existing key, or new generation.
+
+        This method handles three initialization paths:
+        1. Hardware wallet: Fetch address from hardware device (no private key stored)
+        2. Existing key: Derive public key and address from provided private key
+        3. New wallet: Generate fresh keypair and derive address
+
+        Args:
+            private_key: Optional existing private key (hex string)
+        """
         if self.hardware_wallet:
-            self.private_key = ""
-            self.public_key = ""
-            self.address = self.hardware_wallet.get_address()
-            logger.info(
-                "Hardware wallet initialized",
-                extra={"event": "wallet.hw_init", "address": self.address[:16] + "..."}
-            )
+            self._init_crypto_hardware()
         elif private_key:
-            # Load existing wallet
-            self.private_key = private_key
-            self.public_key = self._derive_public_key(private_key)
-            self.address = self._generate_address(self.public_key)
-            logger.debug(
-                "Wallet restored from private key",
-                extra={"event": "wallet.restored", "address": self.address[:16] + "..."}
-            )
+            self._init_crypto_existing(private_key)
         else:
-            # Generate new wallet
-            self.private_key, self.public_key = self._generate_keypair()
-            self.address = self._generate_address(self.public_key)
-            logger.info(
-                "New wallet generated",
-                extra={"event": "wallet.created", "address": self.address[:16] + "..."}
-            )
+            self._init_crypto_new()
+
+    def _init_crypto_hardware(self) -> None:
+        """Initialize cryptographic state for hardware wallet.
+
+        Hardware wallets store private keys on the device. We set empty
+        strings for private/public keys and fetch the address from hardware.
+        """
+        self.private_key = ""
+        self.public_key = ""
+        self.address = self.hardware_wallet.get_address()
+        logger.info(
+            "Hardware wallet initialized",
+            extra={"event": "wallet.hw_init", "address": self.address[:16] + "..."}
+        )
+
+    def _init_crypto_existing(self, private_key: str) -> None:
+        """Initialize cryptographic state from existing private key.
+
+        Args:
+            private_key: Existing private key (hex string)
+        """
+        self.private_key = private_key
+        self.public_key = self._derive_public_key(private_key)
+        self.address = self._generate_address(self.public_key)
+        logger.debug(
+            "Wallet restored from private key",
+            extra={"event": "wallet.restored", "address": self.address[:16] + "..."}
+        )
+
+    def _init_crypto_new(self) -> None:
+        """Initialize cryptographic state by generating new keypair.
+
+        Uses cryptographically secure random number generation (secp256k1).
+        """
+        self.private_key, self.public_key = self._generate_keypair()
+        self.address = self._generate_address(self.public_key)
+        logger.info(
+            "New wallet generated",
+            extra={"event": "wallet.created", "address": self.address[:16] + "..."}
+        )
 
     def _generate_keypair(self) -> Tuple[str, str]:
         """
@@ -356,11 +420,16 @@ class Wallet:
 
         try:
             source_wallet = Wallet.load_from_file(wallet_file, password, allow_legacy=True)
-        except Exception as exc:
+        except (ValueError, FileNotFoundError, json.JSONDecodeError, KeyError) as exc:
             logger.error(
-                "Failed to load legacy wallet for migration: %s",
+                "Failed to load legacy wallet for migration: %s - %s",
                 type(exc).__name__,
-                extra={"event": "wallet.migration_load_failed", "wallet_file": os.path.basename(wallet_file)},
+                str(exc),
+                extra={
+                    "event": "wallet.migration_load_failed",
+                    "wallet_file": os.path.basename(wallet_file),
+                    "error_type": type(exc).__name__
+                },
             )
             return False
 
@@ -381,8 +450,17 @@ class Wallet:
                 "Created backup of wallet file",
                 extra={"event": "wallet.backup_created", "backup_file": os.path.basename(backup_file)}
             )
-        except Exception as e:
-            logger.error(f"Failed to create backup: {e}", extra={"event": "wallet.backup_failed"})
+        except (OSError, IOError, PermissionError) as e:
+            logger.error(
+                "Failed to create backup: %s - %s",
+                type(e).__name__,
+                str(e),
+                extra={
+                    "event": "wallet.backup_failed",
+                    "error_type": type(e).__name__,
+                    "wallet_file": os.path.basename(wallet_file)
+                }
+            )
             return False
 
         try:
@@ -407,10 +485,15 @@ class Wallet:
             )
             return True
 
-        except Exception as e:
+        except (ValueError, OSError, IOError, json.JSONDecodeError, KeyError) as e:
             logger.error(
-                f"Wallet migration failed: {e}",
-                extra={"event": "wallet.encryption_migration_failed"}
+                "Wallet migration failed: %s - %s",
+                type(e).__name__,
+                str(e),
+                extra={
+                    "event": "wallet.encryption_migration_failed",
+                    "error_type": type(e).__name__
+                }
             )
             # Restore from backup
             try:
@@ -419,10 +502,15 @@ class Wallet:
                     "Restored wallet from backup after failed migration",
                     extra={"event": "wallet.backup_restored"}
                 )
-            except Exception as restore_error:
+            except (OSError, IOError, PermissionError) as restore_error:
                 logger.critical(
-                    f"Failed to restore backup: {restore_error}",
-                    extra={"event": "wallet.backup_restore_failed"}
+                    "Failed to restore backup: %s - %s",
+                    type(restore_error).__name__,
+                    str(restore_error),
+                    extra={
+                        "event": "wallet.backup_restore_failed",
+                        "error_type": type(restore_error).__name__
+                    }
                 )
             return False
 
@@ -520,8 +608,12 @@ class Wallet:
             plaintext = aesgcm.decrypt(nonce, ciphertext, None)
 
             return plaintext.decode("utf-8")
-        except Exception as e:
-            raise ValueError(f"Bad decrypt: {e}")
+        except (KeyError, TypeError) as e:
+            raise ValueError(f"Invalid payload structure: missing or invalid field - {e}") from e
+        except (ValueError, UnicodeDecodeError) as e:
+            # ValueError from base64.b64decode or AESGCM.decrypt (wrong key/corrupted data)
+            # UnicodeDecodeError from plaintext.decode
+            raise ValueError(f"Decryption failed: invalid password or corrupted data - {e}") from e
 
     @staticmethod
     def load_from_file(
@@ -731,8 +823,12 @@ class Wallet:
             plaintext = aesgcm.decrypt(nonce, ciphertext, None)
 
             return plaintext.decode("utf-8")
-        except Exception as e:
-            raise ValueError(f"Bad decrypt: {e}")
+        except (KeyError, TypeError) as e:
+            raise ValueError(f"Invalid payload structure: missing or invalid field - {e}") from e
+        except (ValueError, UnicodeDecodeError) as e:
+            # ValueError from base64.b64decode or AESGCM.decrypt (wrong key/corrupted data)
+            # UnicodeDecodeError from plaintext.decode
+            raise ValueError(f"Decryption failed: invalid password or corrupted data - {e}") from e
 
     def to_dict(self) -> Dict[str, Any]:
         """Export public wallet data only (alias for to_public_dict)."""
@@ -867,11 +963,15 @@ class Wallet:
         try:
             mnemo = Mnemonic(language)
             return mnemo.check(mnemonic_phrase)
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError) as e:
             logger.warning(
-                "Mnemonic validation failed",
-                language=language,
-                error=str(e)
+                "Mnemonic validation failed: %s - %s",
+                type(e).__name__,
+                str(e),
+                extra={
+                    "language": language,
+                    "error_type": type(e).__name__
+                }
             )
             return False
 
@@ -1134,8 +1234,8 @@ class Wallet:
         import base58
         try:
             return base58.b58decode(string)
-        except Exception as e:
-            raise ValueError(f"Invalid base58 string: {e}")
+        except (ValueError, TypeError, AttributeError) as e:
+            raise ValueError(f"Invalid base58 string: {type(e).__name__} - {e}") from e
 
 
 class WalletManager:

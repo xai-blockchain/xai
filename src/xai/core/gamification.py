@@ -5,6 +5,7 @@ All features use $0 cost - pure Python with JSON file storage
 """
 
 import json
+import logging
 import time
 import secrets
 import hashlib
@@ -13,6 +14,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import os
 from xai.core.blockchain_interface import GamificationBlockchainInterface
+
+logger = logging.getLogger(__name__)
 
 
 # Cryptographically secure random number generation helpers
@@ -131,7 +134,10 @@ class AirdropManager:
                 with open(self.airdrop_file, "r") as f:
                     return json.load(f)
             except (json.JSONDecodeError, ValueError) as e:
-                print(f"Warning: Corrupted airdrop file, resetting: {e}")
+                logger.warning(
+                    "Corrupted airdrop file, resetting",
+                    extra={"event": "gamification.airdrop.file_corrupted", "error": str(e)},
+                )
                 # Backup corrupted file
                 backup_path = str(self.airdrop_file) + ".corrupted"
                 self.airdrop_file.rename(backup_path)
@@ -319,7 +325,10 @@ class AirdropManager:
         active_addresses = self.get_active_addresses(lookback_blocks=100)
 
         if not active_addresses:
-            print(f"No active addresses for airdrop at block {block_height}")
+            logger.info(
+                "No active addresses for airdrop",
+                extra={"event": "gamification.airdrop.no_addresses", "block_height": block_height},
+            )
             return None
 
         # Use block hash as seed for deterministic randomness
@@ -344,9 +353,14 @@ class AirdropManager:
         self.airdrop_history.append(airdrop_record)
         self._save_airdrop_history()
 
-        print(
-            f"[AIRDROP] Executed at block {block_height}: {len(winners)} winners, "
-            f"{sum(airdrop_amounts.values()):.2f} AXN distributed"
+        logger.info(
+            "Airdrop executed",
+            extra={
+                "event": "gamification.airdrop.executed",
+                "block_height": block_height,
+                "winners": len(winners),
+                "total_distributed": sum(airdrop_amounts.values()),
+            },
         )
 
         return airdrop_amounts
@@ -394,7 +408,10 @@ class StreakTracker:
                 with open(self.streak_file, "r") as f:
                     return json.load(f)
             except (json.JSONDecodeError, ValueError) as e:
-                print(f"Warning: Corrupted streak file, resetting: {e}")
+                logger.warning(
+                    "Corrupted streak file, resetting",
+                    extra={"event": "gamification.streak.file_corrupted", "error": str(e)},
+                )
                 # Backup corrupted file
                 backup_path = str(self.streak_file) + ".corrupted"
                 self.streak_file.rename(backup_path)
@@ -592,7 +609,14 @@ class TreasureHuntManager:
         self.treasures[treasure_id] = treasure
         self._save_treasures()
 
-        print(f"[TREASURE] Hunt created: {treasure_id} - {amount} AXN")
+        logger.info(
+            "Treasure hunt created",
+            extra={
+                "event": "gamification.treasure.created",
+                "treasure_id": treasure_id,
+                "amount": amount,
+            },
+        )
 
         return treasure_id
 
@@ -698,9 +722,14 @@ class TreasureHuntManager:
 
         self._save_treasures()
 
-        print(
-            f"[TREASURE] Claimed: {treasure_id} by {claimer_address[:10]}... "
-            f"({treasure['amount']} AXN)"
+        logger.info(
+            "Treasure claimed",
+            extra={
+                "event": "gamification.treasure.claimed",
+                "treasure_id": treasure_id,
+                "claimer": claimer_address,
+                "amount": treasure["amount"],
+            },
         )
 
         return True, treasure["amount"]
@@ -866,10 +895,15 @@ class FeeRefundCalculator:
             self.refund_history.append(refund_record)
             self._save_refunds()
 
-            print(
-                f"[REFUND] Processed for block {block.index}: "
-                f"{len(refunds)} addresses, {sum(refunds.values()):.4f} AXN refunded "
-                f"({int(refund_rate * 100)}% rate)"
+            logger.info(
+                "Fee refund processed",
+                extra={
+                    "event": "gamification.refund.processed",
+                    "block_index": block.index,
+                    "addresses_refunded": len(refunds),
+                    "total_refunded": sum(refunds.values()),
+                    "refund_rate_percent": int(refund_rate * 100),
+                },
             )
 
         return refunds
@@ -976,7 +1010,15 @@ class TimeCapsuleManager:
         self._save_capsules()
 
         unlock_date = datetime.fromtimestamp(unlock_timestamp).strftime("%Y-%m-%d %H:%M:%S")
-        print(f"[TIME CAPSULE] Created: {capsule_id} - {amount} AXN unlocks at {unlock_date}")
+        logger.info(
+            "Time capsule created",
+            extra={
+                "event": "gamification.capsule.created",
+                "capsule_id": capsule_id,
+                "amount": amount,
+                "unlock_date": unlock_date,
+            },
+        )
 
         return capsule_id
 
@@ -1005,7 +1047,10 @@ class TimeCapsuleManager:
             return False
 
         if capsule["unlock_at"] > time.time():
-            print(f"Capsule {capsule_id} not yet unlocked")
+            logger.info(
+                "Capsule not yet unlocked",
+                extra={"event": "gamification.capsule.not_ready", "capsule_id": capsule_id},
+            )
             return False
 
         capsule["status"] = "released"
@@ -1014,9 +1059,14 @@ class TimeCapsuleManager:
 
         self._save_capsules()
 
-        print(
-            f"[TIME CAPSULE] Released: {capsule_id} - {capsule['amount']} AXN "
-            f"to {capsule['recipient'][:10]}..."
+        logger.info(
+            "Time capsule released",
+            extra={
+                "event": "gamification.capsule.released",
+                "capsule_id": capsule_id,
+                "amount": capsule["amount"],
+                "recipient": capsule["recipient"],
+            },
         )
 
         return True
@@ -1064,7 +1114,14 @@ class TimeCapsuleManager:
                 })
 
             except Exception as e:
-                print(f"[ERROR] Failed to create unlock tx for {capsule['id']}: {e}")
+                logger.error(
+                    "Failed to create unlock transaction",
+                    extra={
+                        "event": "gamification.capsule.unlock_failed",
+                        "capsule_id": capsule["id"],
+                        "error": str(e),
+                    },
+                )
                 continue
 
         return created_txs
@@ -1146,29 +1203,33 @@ def initialize_gamification(blockchain_interface: GamificationBlockchainInterfac
 
 
 if __name__ == "__main__":
+    import sys
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s", stream=sys.stdout)
+
     # Test initialization
-    print("Testing AXN Gamification System...")
+    logger.info("Testing AXN Gamification System...")
     # This part needs a mock interface to run standalone now
     # managers = initialize_gamification()
 
-    print("\n[SUCCESS] All gamification features initialized:")
-    print("  - AirdropManager: Random airdrops every 100 blocks")
-    print("  - StreakTracker: Mining streak bonuses (up to 20%)")
-    print("  - TreasureHuntManager: Blockchain treasure hunts")
-    print("  - FeeRefundCalculator: Fee refunds during low congestion")
-    print("  - TimeCapsuleManager: Time-locked transactions")
+    logger.info("All gamification features initialized:")
+    logger.info("  - AirdropManager: Random airdrops every 100 blocks")
+    logger.info("  - StreakTracker: Mining streak bonuses (up to 20%)")
+    logger.info("  - TreasureHuntManager: Blockchain treasure hunts")
+    logger.info("  - FeeRefundCalculator: Fee refunds during low congestion")
+    logger.info("  - TimeCapsuleManager: Time-locked transactions")
 
     # Test airdrop selection
-    # print("\n[TEST] Testing airdrop selection...")
+    # logger.info("Testing airdrop selection...")
     # test_addresses = [f"AXN{i:040d}" for i in range(20)]
     # winners = managers["airdrop"].select_airdrop_winners(test_addresses, count=10, seed="test")
-    # print(f"  Selected {len(winners)} winners")
+    # logger.info(f"  Selected {len(winners)} winners")
 
     # Test streak bonus calculation
-    # print("\n[TEST] Testing streak bonus...")
+    # logger.info("Testing streak bonus...")
     # test_miner = "XAI" + "1" * 40
     # managers["streak"].update_miner_streak(test_miner, time.time())
     # bonus = managers["streak"].get_streak_bonus(test_miner)
-    # print(f"  Streak bonus: {bonus * 100:.1f}%")
+    # logger.info(f"  Streak bonus: {bonus * 100:.1f}%")
 
-    print("\n[SUCCESS] Gamification system tests passed (structure only)!")
+    logger.info("Gamification system tests passed (structure only)!")

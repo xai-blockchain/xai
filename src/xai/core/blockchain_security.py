@@ -211,7 +211,7 @@ class SupplyValidator:
         return True
 
     def validate_total_supply(
-        self, blockchain: Union[Blockchain, float]
+        self, blockchain: Union['Blockchain', float]
     ) -> Tuple[bool, Union[float, str]]:
         """
         Calculate and validate total supply
@@ -320,7 +320,7 @@ class MempoolManager:
         self.current_bytes = 0
 
     def can_add_transaction(
-        self, tx: Transaction, pending_transactions: List[Transaction]
+        self, tx: 'Transaction', pending_transactions: List['Transaction']
     ) -> Tuple[bool, Optional[str]]:
         """
         Check if transaction can be added to mempool
@@ -344,12 +344,12 @@ class MempoolManager:
 
         return True, None
 
-    def add_transaction(self, tx: Transaction) -> None:
+    def add_transaction(self, tx: 'Transaction') -> None:
         """Track transaction addition"""
         tx_size = len(json.dumps(tx.to_dict()).encode())
         self.current_bytes += tx_size
 
-    def remove_transaction(self, tx: Transaction) -> None:
+    def remove_transaction(self, tx: 'Transaction') -> None:
         """Track transaction removal"""
         tx_size = len(json.dumps(tx.to_dict()).encode())
         self.current_bytes = max(0, self.current_bytes - tx_size)
@@ -365,7 +365,7 @@ class BlockSizeValidator:
     """
 
     @staticmethod
-    def validate_transaction_size(tx: Transaction) -> Tuple[bool, Optional[str]]:
+    def validate_transaction_size(tx: 'Transaction') -> Tuple[bool, Optional[str]]:
         """
         Validate single transaction size
 
@@ -387,7 +387,7 @@ class BlockSizeValidator:
         return True, None
 
     @staticmethod
-    def validate_block_size(block: Block) -> Tuple[bool, Optional[str]]:
+    def validate_block_size(block: 'Block') -> Tuple[bool, Optional[str]]:
         """
         Validate block size
 
@@ -436,7 +436,7 @@ class ResourceLimiter:
     def __init__(self) -> None:
         self.max_mempool_size = BlockchainSecurityConfig.MAX_MEMPOOL_SIZE
 
-    def validate_transaction_size(self, tx: Transaction) -> Tuple[bool, Optional[str]]:
+    def validate_transaction_size(self, tx: 'Transaction') -> Tuple[bool, Optional[str]]:
         """Validate transaction payload size."""
         try:
             return BlockSizeValidator.validate_transaction_size(tx)
@@ -452,7 +452,7 @@ class ResourceLimiter:
                 return False, "Resource limiter: transaction too large"
             return True, None
 
-    def validate_block_size(self, block: Block) -> Tuple[bool, Optional[str]]:
+    def validate_block_size(self, block: 'Block') -> Tuple[bool, Optional[str]]:
         """Validate block size using existing validator."""
         return BlockSizeValidator.validate_block_size(block)
 
@@ -500,7 +500,7 @@ class MedianTimePast:
     def __init__(self, span: int = BlockchainSecurityConfig.MEDIAN_TIME_SPAN) -> None:
         self.span = span
 
-    def get_median_time_past(self, blockchain: Blockchain) -> float:
+    def get_median_time_past(self, blockchain: 'Blockchain') -> float:
         """
         Calculate median time of last N blocks
 
@@ -528,7 +528,7 @@ class MedianTimePast:
             return timestamps[mid]
 
     def validate_block_timestamp(
-        self, block: Block, blockchain: Blockchain
+        self, block: 'Block', blockchain: 'Blockchain'
     ) -> Tuple[bool, Optional[str]]:
         """
         Validate block timestamp using median-time-past
@@ -564,7 +564,7 @@ class TimeValidator:
         self.median_time_span = BlockchainSecurityConfig.MEDIAN_TIME_SPAN
         self.max_future_block_time = BlockchainSecurityConfig.MAX_FUTURE_BLOCK_TIME
 
-    def calculate_median_time_past(self, chain: List[Block]) -> float:
+    def calculate_median_time_past(self, chain: List['Block']) -> float:
         timestamps = [
             block.timestamp
             for block in chain[-self.median_time_span :]
@@ -580,7 +580,7 @@ class TimeValidator:
             return (timestamps[mid - 1] + timestamps[mid]) / 2
         return timestamps[mid]
 
-    def validate_block_time(self, block: Block, chain: List[Block]) -> Tuple[bool, Optional[str]]:
+    def validate_block_time(self, block: 'Block', chain: List['Block']) -> Tuple[bool, Optional[str]]:
         median_time = self.calculate_median_time_past(chain)
         current_time = time.time()
 
@@ -649,7 +649,7 @@ class BlockchainSecurityManager:
     Unified security management for blockchain
     """
 
-    def __init__(self, blockchain: Blockchain) -> None:
+    def __init__(self, blockchain: 'Blockchain') -> None:
         self.blockchain = blockchain
         self.reorg_protection = ReorganizationProtection()
         self.supply_validator = SupplyValidator()
@@ -660,7 +660,7 @@ class BlockchainSecurityManager:
         self.median_time_past = MedianTimePast()
         self.emergency_timelock = EmergencyGovernanceTimelock()
 
-    def validate_new_transaction(self, tx: Transaction) -> Tuple[bool, Optional[str]]:
+    def validate_new_transaction(self, tx: 'Transaction') -> Tuple[bool, Optional[str]]:
         """
         Comprehensive transaction validation
 
@@ -699,7 +699,7 @@ class BlockchainSecurityManager:
 
         return True, None
 
-    def validate_new_block(self, block: Block) -> Tuple[bool, Optional[str]]:
+    def validate_new_block(self, block: 'Block') -> Tuple[bool, Optional[str]]:
         """
         Comprehensive block validation
 
