@@ -4,7 +4,7 @@ XAI Blockchain - XAI Token Metrics
 Provides real-time and historical data on XAI token supply, distribution, and other key metrics.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import time
 from collections import defaultdict
 from xai.core.structured_logger import StructuredLogger, get_structured_logger
