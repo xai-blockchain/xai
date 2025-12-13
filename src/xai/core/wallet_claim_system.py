@@ -10,6 +10,7 @@ import json
 import os
 import time
 import hashlib
+from typing import Optional
 from xai.core.wallet import Wallet
 
 
