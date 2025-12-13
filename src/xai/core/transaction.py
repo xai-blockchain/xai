@@ -424,8 +424,11 @@ class Transaction:
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             raise ValueError(f"Failed to sign transaction: {e}")
 
-    def verify_signature(self) -> None:
+    def verify_signature(self) -> bool:
         """Verify transaction signature.
+
+        Returns:
+            bool: True if signature is valid
 
         Raises:
             MissingSignatureError: If signature or public_key is missing
@@ -433,7 +436,7 @@ class Transaction:
             SignatureCryptoError: If cryptographic operation fails
         """
         if self.sender == "COINBASE":
-            return  # Coinbase transactions don't require signatures
+            return True  # Coinbase transactions don't require signatures
 
         if not self.signature or not self.public_key:
             txid_str = self.txid[:10] if self.txid else "unknown"
@@ -467,6 +470,9 @@ class Transaction:
                 raise InvalidSignatureError(
                     f"Transaction {txid_str}...: ECDSA signature verification failed"
                 )
+
+            # Signature is valid
+            return True
 
         except SignatureVerificationError:
             # Re-raise our own exceptions unchanged
