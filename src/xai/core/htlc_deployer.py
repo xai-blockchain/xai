@@ -101,7 +101,12 @@ def _build_tx_params(
         base_fee = latest_block.get("baseFeePerGas") or w3.eth.gas_price
         try:
             priority_fee = int(getattr(w3.eth, "max_priority_fee"))
-        except Exception:
+        except (AttributeError, TypeError, ValueError) as e:
+            import logging
+            logging.getLogger(__name__).debug(
+                "Failed to get max_priority_fee, using fallback",
+                extra={"error_type": type(e).__name__, "error": str(e)}
+            )
             priority_fee = int(base_fee // 10)  # conservative fallback
         max_priority_fee_per_gas = max_priority_fee_per_gas or priority_fee
         # Choose a ceiling that is comfortably above base+priority to avoid underpriced txs.

@@ -10,24 +10,35 @@ Verifies that the blockchain enforces:
 
 import sys
 import os
+import logging
 
 sys.path.insert(0, os.path.dirname(__file__))
 
 from blockchain import Blockchain
+from xai.core.logging_config import setup_logging
 
-print("=" * 70)
-print("XAI GOVERNANCE REQUIREMENTS - ENFORCEMENT TEST")
-print("=" * 70)
+# Setup structured logging for governance testing
+logger = setup_logging(
+    name="xai.governance.test",
+    level="INFO",
+    enable_console=True,
+    enable_file=False
+)
+
+logger.info("=" * 70)
+logger.info("XAI GOVERNANCE REQUIREMENTS - ENFORCEMENT TEST")
+logger.info("=" * 70)
 
 # Create blockchain
 blockchain = Blockchain()
-print(f"\nBlockchain initialized")
-print(f"Genesis timestamp: {blockchain.get_latest_block().timestamp}")
+logger.info("Blockchain initialized",
+    genesis_timestamp=blockchain.get_latest_block().timestamp)
 
 # TEST 1: Proposal should FAIL with too few voters
-print("\n" + "=" * 70)
-print("TEST 1: TOO FEW VOTERS (should FAIL)")
-print("-" * 70)
+logger.info("")
+logger.info("=" * 70)
+logger.info("TEST 1: TOO FEW VOTERS (should FAIL)")
+logger.info("-" * 70)
 
 result = blockchain.submit_governance_proposal(
     submitter="alice_address",
@@ -37,31 +48,33 @@ result = blockchain.submit_governance_proposal(
     proposal_data={"estimated_minutes": 300},
 )
 proposal_id_fail = result["proposal_id"]
-print(f"Proposal submitted: {proposal_id_fail}")
+logger.info("Proposal submitted", proposal_id=proposal_id_fail)
 
 # Only 5 voters (need 250+)
-print("\nCasting only 5 votes (need 250+)...")
+logger.info("Casting only 5 votes (need 250+)...")
 for i in range(5):
     blockchain.cast_governance_vote(
         voter=f"voter_{i}_address", proposal_id=proposal_id_fail, vote="yes", voting_power=30.0
     )
 
 # Try to execute (should FAIL)
-print("\nAttempting to execute with only 5 voters...")
+logger.info("Attempting to execute with only 5 voters...")
 result = blockchain.execute_proposal(
     proposal_id=proposal_id_fail, execution_data={"executed_at": 1699999999}
 )
 
-print(f"Execution success: {result['success']}")
+logger.info("Execution result", success=result['success'])
 if not result["success"]:
-    print(f"ERROR: {result['error']}")
-    print(f"REASON: {result['reason']}")
-    print("[PASS] CORRECTLY REJECTED due to insufficient voters")
+    logger.warning("Proposal execution failed (expected)",
+        error=result['error'],
+        reason=result['reason'])
+    logger.info("[PASS] CORRECTLY REJECTED due to insufficient voters")
 
 # TEST 2: Proposal should SUCCEED with 500+ voters
-print("\n" + "=" * 70)
-print("TEST 2: SUFFICIENT VOTERS (should SUCCEED)")
-print("-" * 70)
+logger.info("")
+logger.info("=" * 70)
+logger.info("TEST 2: SUFFICIENT VOTERS (should SUCCEED)")
+logger.info("-" * 70)
 
 result = blockchain.submit_governance_proposal(
     submitter="bob_address",
@@ -71,10 +84,10 @@ result = blockchain.submit_governance_proposal(
     proposal_data={"estimated_minutes": 400},
 )
 proposal_id_success = result["proposal_id"]
-print(f"Proposal submitted: {proposal_id_success}")
+logger.info("Proposal submitted", proposal_id=proposal_id_success)
 
 # 500 voters (EXACTLY the required minimum)
-print("\nCasting 500 votes (requirement: 500 MINIMUM, NO DECAY)...")
+logger.info("Casting 500 votes (requirement: 500 MINIMUM, NO DECAY)...")
 for i in range(500):
     blockchain.cast_governance_vote(
         voter=f"success_voter_{i}_address",
@@ -82,31 +95,33 @@ for i in range(500):
         vote="yes",
         voting_power=30.0,
     )
-print("[OK] 500 voters cast")
+logger.info("[OK] 500 voters cast")
 
 # Check proposal status
 proposal_state = blockchain.get_governance_proposal(proposal_id_success)
-print(f"Status after voting: {proposal_state['status']}")
+logger.info("Status after voting", status=proposal_state['status'])
 
 # TEST 3: Code review requirement
-print("\n" + "=" * 70)
-print("TEST 3: CODE REVIEW REQUIREMENT (need 250+ reviewers)")
-print("-" * 70)
+logger.info("")
+logger.info("=" * 70)
+logger.info("TEST 3: CODE REVIEW REQUIREMENT (need 250+ reviewers)")
+logger.info("-" * 70)
 
 # Try to execute without code reviews (should FAIL)
-print("Attempting to execute without code reviews...")
+logger.info("Attempting to execute without code reviews...")
 result = blockchain.execute_proposal(
     proposal_id=proposal_id_success, execution_data={"executed_at": 1699999999}
 )
 
-print(f"Execution success: {result['success']}")
+logger.info("Execution result", success=result['success'])
 if not result["success"]:
-    print(f"ERROR: {result['error']}")
-    print(f"REASON: {result['reason']}")
-    print("[OK] CORRECTLY REJECTED due to insufficient code reviews")
+    logger.warning("Proposal execution failed (expected)",
+        error=result['error'],
+        reason=result['reason'])
+    logger.info("[OK] CORRECTLY REJECTED due to insufficient code reviews")
 
 # Add 250 code reviews
-print("\nAdding 250 code reviewers...")
+logger.info("Adding 250 code reviewers...")
 for i in range(250):
     blockchain.submit_code_review(
         reviewer=f"reviewer_{i}_address",
@@ -115,76 +130,82 @@ for i in range(250):
         comments="Code looks good",
         voting_power=25.0,
     )
-print("[OK] 250 code reviews submitted")
+logger.info("[OK] 250 code reviews submitted")
 
 # TEST 4: Implementation approval requirement
-print("\n" + "=" * 70)
-print("TEST 4: IMPLEMENTATION APPROVAL (need 50% of original voters)")
-print("-" * 70)
+logger.info("")
+logger.info("=" * 70)
+logger.info("TEST 4: IMPLEMENTATION APPROVAL (need 50% of original voters)")
+logger.info("-" * 70)
 
 # Try to execute without implementation approval (should FAIL)
-print("Attempting to execute without implementation approval...")
+logger.info("Attempting to execute without implementation approval...")
 result = blockchain.execute_proposal(
     proposal_id=proposal_id_success, execution_data={"executed_at": 1699999999}
 )
 
-print(f"Execution success: {result['success']}")
+logger.info("Execution result", success=result['success'])
 if not result["success"]:
-    print(f"ERROR: {result['error']}")
-    print(f"REASON: {result['reason']}")
-    print(f"Details: {result['details']}")
-    print("[OK] CORRECTLY REJECTED due to insufficient implementation approval")
+    logger.warning("Proposal execution failed (expected)",
+        error=result['error'],
+        reason=result['reason'],
+        details=result.get('details'))
+    logger.info("[OK] CORRECTLY REJECTED due to insufficient implementation approval")
 
 # Add implementation votes from 50% of original voters (250 out of 500)
-print("\nAdding implementation votes from 250 original voters (50% of 500)...")
+logger.info("Adding implementation votes from 250 original voters (50% of 500)...")
 for i in range(250):
     blockchain.vote_implementation(
         voter=f"success_voter_{i}_address", proposal_id=proposal_id_success, approved=True
     )
-print("[OK] 250 original voters approved implementation (50%)")
+logger.info("[OK] 250 original voters approved implementation (50%)")
 
 # TEST 5: Now execution should SUCCEED
-print("\n" + "=" * 70)
-print("TEST 5: FULL EXECUTION (all requirements met)")
-print("-" * 70)
+logger.info("")
+logger.info("=" * 70)
+logger.info("TEST 5: FULL EXECUTION (all requirements met)")
+logger.info("-" * 70)
 
-print("All requirements now met:")
-print("  [OK] 500 voters (need 500 MINIMUM)")
-print("  [OK] 66%+ approval")
-print("  [OK] 250 code reviewers (need 250 MINIMUM)")
-print("  [OK] 250/500 original voters approved implementation (50%)")
+logger.info("All requirements now met:")
+logger.info("  [OK] 500 voters (need 500 MINIMUM)")
+logger.info("  [OK] 66%+ approval")
+logger.info("  [OK] 250 code reviewers (need 250 MINIMUM)")
+logger.info("  [OK] 250/500 original voters approved implementation (50%)")
 
-print("\nAttempting execution...")
+logger.info("Attempting execution...")
 result = blockchain.execute_proposal(
     proposal_id=proposal_id_success,
     execution_data={"executed_at": 1699999999, "code_deployed": True},
 )
 
-print(f"Execution success: {result['success']}")
+logger.info("Execution success", success=result['success'])
 if result["success"]:
-    print(f"Status: {result['status']}")
-    print(f"Execution txid: {result['execution_txid'][:32]}...")
-    print("\n[OK][OK][OK] EXECUTION SUCCEEDED - ALL REQUIREMENTS ENFORCED! [OK][OK][OK]")
+    logger.info("Execution completed",
+        status=result['status'],
+        execution_txid=result['execution_txid'][:32])
+    logger.info("[OK][OK][OK] EXECUTION SUCCEEDED - ALL REQUIREMENTS ENFORCED! [OK][OK][OK]")
 
-    print("\nValidation details:")
+    logger.info("Validation details:")
     validation = result["validation"]
-    print(
-        f"  Voting: {validation['voting']['voter_count']} voters, {validation['voting']['approval_percent']:.1f}% approval"
-    )
-    print(
-        f"  Reviews: {validation['reviews']['count']} reviewers, {validation['reviews']['approval_pct']:.1f}% approval"
-    )
-    print(
-        f"  Implementation: {validation['implementation']['yes_votes']}/{validation['implementation']['original_voters']} original voters"
-    )
+    logger.info("  Voting",
+        voter_count=validation['voting']['voter_count'],
+        approval_percent=f"{validation['voting']['approval_percent']:.1f}%")
+    logger.info("  Reviews",
+        reviewer_count=validation['reviews']['count'],
+        approval_pct=f"{validation['reviews']['approval_pct']:.1f}%")
+    logger.info("  Implementation",
+        yes_votes=validation['implementation']['yes_votes'],
+        original_voters=validation['implementation']['original_voters'])
 else:
-    print(f"FAILED: {result.get('error')}")
-    print(f"Reason: {result.get('reason')}")
+    logger.error("Execution failed",
+        error=result.get('error'),
+        reason=result.get('reason'))
 
 # TEST 6: Non-original voter cannot approve implementation
-print("\n" + "=" * 70)
-print("TEST 6: NON-ORIGINAL VOTER REJECTION")
-print("-" * 70)
+logger.info("")
+logger.info("=" * 70)
+logger.info("TEST 6: NON-ORIGINAL VOTER REJECTION")
+logger.info("-" * 70)
 
 # Submit another proposal
 result = blockchain.submit_governance_proposal(
@@ -203,26 +224,29 @@ for i in range(500):
     )
 
 # Try to have a non-original voter approve implementation
-print("Attempting implementation vote from non-original voter...")
+logger.info("Attempting implementation vote from non-original voter...")
 result = blockchain.vote_implementation(
     voter="random_voter_who_didnt_vote_yes", proposal_id=proposal_id_test, approved=True
 )
 
-print(f"Success: {result['success']}")
+logger.info("Vote result", success=result['success'])
 if not result["success"]:
-    print(f"ERROR: {result['error']}")
-    print(f"Message: {result['message']}")
-    print("[OK] CORRECTLY REJECTED non-original voter")
+    logger.warning("Non-original voter rejected (expected)",
+        error=result['error'],
+        message=result['message'])
+    logger.info("[OK] CORRECTLY REJECTED non-original voter")
 
-print("\n" + "=" * 70)
-print("ALL GOVERNANCE REQUIREMENTS ARE ENFORCED!")
-print("=" * 70)
-print("\nRequirements enforced on-chain:")
-print("  [OK] 500 MINIMUM VOTERS - FIXED, NO DECAY")
-print("  [OK] 66% approval threshold")
-print("  [OK] 250 MINIMUM CODE REVIEWERS - FIXED")
-print("  [OK] 50% of original voters must approve implementation")
-print("  [OK] Only original yes-voters can approve implementation")
-print("  [OK] All validations checked before execution")
-print("\nThis is a REAL blockchain with REAL governance rules!")
-print("=" * 70)
+logger.info("")
+logger.info("=" * 70)
+logger.info("ALL GOVERNANCE REQUIREMENTS ARE ENFORCED!")
+logger.info("=" * 70)
+logger.info("Requirements enforced on-chain:")
+logger.info("  [OK] 500 MINIMUM VOTERS - FIXED, NO DECAY")
+logger.info("  [OK] 66% approval threshold")
+logger.info("  [OK] 250 MINIMUM CODE REVIEWERS - FIXED")
+logger.info("  [OK] 50% of original voters must approve implementation")
+logger.info("  [OK] Only original yes-voters can approve implementation")
+logger.info("  [OK] All validations checked before execution")
+logger.info("")
+logger.info("This is a REAL blockchain with REAL governance rules!")
+logger.info("=" * 70)

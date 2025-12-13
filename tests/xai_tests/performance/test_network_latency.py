@@ -11,6 +11,8 @@ import pytest
 import asyncio
 import time
 import statistics
+import tempfile
+import ssl
 from typing import List, Dict, Any, Optional
 from unittest.mock import Mock, AsyncMock
 
@@ -24,6 +26,7 @@ QUIC_AVAILABLE = False
 QUICServer = None
 QuicConfiguration = None
 quic_client_send_with_timeout = None
+generate_ec_certificate = None
 
 try:
     from xai.core.p2p_quic import AIOQUIC_AVAILABLE
@@ -34,6 +37,37 @@ try:
             quic_client_send_with_timeout,
         )
         QUIC_AVAILABLE = True
+        # Try to import certificate generator
+        try:
+            from aioquic.crypto import generate_ec_certificate  # type: ignore
+        except Exception:
+            # Fallback: generate a self-signed EC cert with cryptography
+            from cryptography import x509  # type: ignore
+            from cryptography.hazmat.primitives import hashes, serialization  # type: ignore
+            from cryptography.hazmat.primitives.asymmetric import ec  # type: ignore
+            from cryptography.x509.oid import NameOID  # type: ignore
+            from datetime import datetime, timedelta
+
+            def generate_ec_certificate(common_name: str):
+                key = ec.generate_private_key(ec.SECP256R1())
+                subject = issuer = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
+                cert = (
+                    x509.CertificateBuilder()
+                    .subject_name(subject)
+                    .issuer_name(issuer)
+                    .public_key(key.public_key())
+                    .serial_number(x509.random_serial_number())
+                    .not_valid_before(datetime.utcnow())
+                    .not_valid_after(datetime.utcnow() + timedelta(days=1))
+                    .sign(key, hashes.SHA256())
+                )
+                cert_pem = cert.public_bytes(serialization.Encoding.PEM)
+                key_pem = key.private_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PrivateFormat.TraditionalOpenSSL,
+                    encryption_algorithm=serialization.NoEncryption(),
+                )
+                return cert_pem, key_pem
 except (ImportError, TypeError):
     pass
 
@@ -198,13 +232,23 @@ class TestQUICLatency:
         """
         print(f"\n=== QUIC Connection Establishment Latency ===")
 
+        # Generate certificates
+        host = "127.0.0.1"
+        cert_pem, key_pem = generate_ec_certificate(common_name=host)
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pem") as cert_file, \
+             tempfile.NamedTemporaryFile(delete=False, suffix=".pem") as key_file:
+            cert_file.write(cert_pem)
+            key_file.write(key_pem)
+            cert_path, key_path = cert_file.name, key_file.name
+
         # Create QUIC configuration
-        config = QuicConfiguration(is_client=False)
-        config.load_cert_chain("test_cert.pem", "test_key.pem")
+        config = QuicConfiguration(is_client=False, alpn_protocols=["xai-p2p"])
+        config.load_cert_chain(cert_path, key_path)
 
         # Create server
         server = QUICServer(
-            host="127.0.0.1",
+            host=host,
             port=14433,
             configuration=config,
             handler=lambda data: asyncio.sleep(0),
@@ -216,7 +260,8 @@ class TestQUICLatency:
             await server.start()
 
             # Measure connection establishment
-            client_config = QuicConfiguration(is_client=True)
+            client_config = QuicConfiguration(is_client=True, alpn_protocols=["xai-p2p"])
+            client_config.verify_mode = ssl.CERT_NONE
 
             for i in range(10):
                 start = time.perf_counter()
@@ -224,7 +269,7 @@ class TestQUICLatency:
                 try:
                     # Send minimal data to establish connection
                     await quic_client_send_with_timeout(
-                        "127.0.0.1",
+                        host,
                         14433,
                         b"ping",
                         client_config,
@@ -265,12 +310,22 @@ class TestQUICLatency:
             """Handler that records received messages."""
             received_messages.append(time.perf_counter())
 
+        # Generate certificates
+        host = "127.0.0.1"
+        cert_pem, key_pem = generate_ec_certificate(common_name=host)
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pem") as cert_file, \
+             tempfile.NamedTemporaryFile(delete=False, suffix=".pem") as key_file:
+            cert_file.write(cert_pem)
+            key_file.write(key_pem)
+            cert_path, key_path = cert_file.name, key_file.name
+
         # Create QUIC configuration
-        config = QuicConfiguration(is_client=False)
-        config.load_cert_chain("test_cert.pem", "test_key.pem")
+        config = QuicConfiguration(is_client=False, alpn_protocols=["xai-p2p"])
+        config.load_cert_chain(cert_path, key_path)
 
         server = QUICServer(
-            host="127.0.0.1",
+            host=host,
             port=14434,
             configuration=config,
             handler=handler,
@@ -281,7 +336,8 @@ class TestQUICLatency:
         try:
             await server.start()
 
-            client_config = QuicConfiguration(is_client=True)
+            client_config = QuicConfiguration(is_client=True, alpn_protocols=["xai-p2p"])
+            client_config.verify_mode = ssl.CERT_NONE
 
             # Send messages and measure latency
             for i in range(20):
@@ -290,7 +346,7 @@ class TestQUICLatency:
 
                 try:
                     await quic_client_send_with_timeout(
-                        "127.0.0.1",
+                        host,
                         14434,
                         message,
                         client_config,

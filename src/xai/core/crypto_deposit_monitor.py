@@ -475,8 +475,12 @@ class CryptoDepositMonitor:
         if self.metrics_collector:
             try:
                 self.metrics_collector.record_crypto_deposit_stats(snapshot)
-            except Exception:  # pragma: no cover - optional metrics hook
-                logger.debug("Metrics recorder for crypto deposits raised an exception", exc_info=True)
+            except (RuntimeError, ValueError, AttributeError, KeyError) as e:  # pragma: no cover - optional metrics hook
+                logger.debug(
+                    "Metrics recorder for crypto deposits raised an exception",
+                    extra={"error_type": type(e).__name__, "error": str(e)},
+                    exc_info=True
+                )
 
     def _handle_event(self, event: DepositEvent) -> str:
         metadata = event.metadata or {}

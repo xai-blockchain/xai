@@ -515,6 +515,7 @@ def _generate_address(args: argparse.Namespace) -> int:
         return 0
 
     # Default: Show address and public key only (SAFE)
+    logger.info("Wallet generated successfully (address only mode)", address=wallet.address)
     print("Wallet generated successfully!")
     print(f"Address:     {wallet.address}")
     print(f"Public Key:  {wallet.public_key}")

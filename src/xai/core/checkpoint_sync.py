@@ -164,7 +164,12 @@ class CheckpointSyncManager:
         if not payload and meta and meta.get("source") == "local" and self.checkpoint_manager:
             try:
                 payload = self.checkpoint_manager.load_latest_checkpoint()
-            except Exception:
+            except (OSError, IOError, ValueError, TypeError, KeyError, AttributeError) as e:
+                import logging
+                logging.getLogger(__name__).debug(
+                    "Failed to load local checkpoint",
+                    extra={"error_type": type(e).__name__, "error": str(e)}
+                )
                 payload = None
         # Fallback: request from peers if nothing was obtained
         if not payload:
@@ -199,7 +204,12 @@ class CheckpointSyncManager:
                     loop.create_task(coro)
                 else:
                     loop.run_until_complete(coro)
-        except Exception:
+        except (RuntimeError, AttributeError, ValueError) as e:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Failed to broadcast checkpoint request",
+                extra={"error_type": type(e).__name__, "error": str(e)}
+            )
             return None
 
         # Inspect cached peer features for received payload hints with quorum logic
@@ -331,9 +341,13 @@ class CheckpointSyncManager:
                 extra={"event": "checkpoint.accepted", "checkpoint": entry},
             )
             self._record_metrics(entry)
-        except Exception:
+        except (OSError, RuntimeError, ValueError) as e:
             # best-effort logging; ignore failures
-            pass
+            import logging
+            logging.getLogger(__name__).debug(
+                "Failed to log checkpoint acceptance",
+                extra={"error_type": type(e).__name__, "error": str(e)}
+            )
 
     def get_provenance(self) -> list[dict]:
         """Return checkpoint provenance log."""
@@ -353,8 +367,13 @@ class CheckpointSyncManager:
             c_accepts = collector.get_metric("xai_checkpoint_accepted_total")
             if c_accepts:
                 c_accepts.inc()
-        except Exception:
-            # metrics optional
+        except (ImportError, RuntimeError, ValueError, AttributeError, KeyError) as e:
+            # metrics optional - log but continue
+            import logging
+            logging.getLogger(__name__).debug(
+                "Failed to record checkpoint metrics",
+                extra={"error_type": type(e).__name__, "error": str(e)}
+            )
             return
 
     def _apply_to_blockchain(self, payload: CheckpointPayload) -> bool:

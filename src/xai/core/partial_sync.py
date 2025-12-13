@@ -29,7 +29,7 @@ class PartialSyncCoordinator:
             if hasattr(self.blockchain, attr):
                 try:
                     return int(getattr(self.blockchain, attr))
-                except Exception:
+                except (AttributeError, TypeError, ValueError):
                     continue
         getter_candidates = (
             "get_latest_height",
@@ -41,7 +41,7 @@ class PartialSyncCoordinator:
             if callable(fn):
                 try:
                     return int(fn())
-                except Exception:
+                except (AttributeError, TypeError, ValueError, RuntimeError):
                     continue
         return 0
 
