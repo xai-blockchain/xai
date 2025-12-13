@@ -574,7 +574,7 @@ class HardwareSecurityModule:
             )
             raise HSMKeyRotationError(f"Invalid key rotation parameters: {e}") from e
         except HSMKeyGenerationError as e:
-            logger.error(
+            self.logger.error(
                 "HSMKeyGenerationError in rotate_key",
                 error_type="HSMKeyGenerationError",
                 error=str(e),
@@ -589,7 +589,7 @@ class HardwareSecurityModule:
             )
             raise HSMKeyRotationError(f"Key rotation failed during key generation: {e}") from e
         except OSError as e:
-            logger.error(
+            self.logger.error(
                 "OSError in rotate_key",
                 error_type="OSError",
                 error=str(e),

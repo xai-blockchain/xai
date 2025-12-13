@@ -106,17 +106,18 @@ class BlockchainUnitTests:
     @staticmethod
     def test_balance_calculation():
         """Test balance calculation from UTXO set"""
-        blockchain = Blockchain(data_dir=str(tmp_path))
-        wallet = Wallet()
+        with tempfile.TemporaryDirectory() as tmp_path:
+            blockchain = Blockchain(data_dir=str(tmp_path))
+            wallet = Wallet()
 
-        blockchain.utxo_set[wallet.address] = [
-            {"txid": "tx1", "amount": 50.0, "spent": False},
-            {"txid": "tx2", "amount": 30.0, "spent": False},
-            {"txid": "tx3", "amount": 20.0, "spent": True},  # Spent
-        ]
+            blockchain.utxo_set[wallet.address] = [
+                {"txid": "tx1", "amount": 50.0, "spent": False},
+                {"txid": "tx2", "amount": 30.0, "spent": False},
+                {"txid": "tx3", "amount": 20.0, "spent": True},  # Spent
+            ]
 
-        balance = blockchain.get_balance(wallet.address)
-        assert balance == 80.0, f"Balance should be 80.0, got {balance}"
+            balance = blockchain.get_balance(wallet.address)
+            assert balance == 80.0, f"Balance should be 80.0, got {balance}"
         return True
 
 
