@@ -100,12 +100,8 @@ class TestTransactionValidator:
 
     def test_missing_required_fields(self, validator):
         """Test validation fails if a transaction is missing required fields."""
-        incomplete_tx = Transaction(
-            "sender", "recipient", 10.0
-        )  # Missing fee, public_key, nonce etc.
-        incomplete_tx.txid = (
-            incomplete_tx.calculate_hash()
-        )  # Manually set txid to avoid hash mismatch first
+        # Note: We use a Mock to simulate missing attributes
+        # Creating a real Transaction with invalid addresses would fail validation
 
         # Mock the Transaction class to simulate missing attributes
         mock_tx = Mock(spec=Transaction)
