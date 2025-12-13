@@ -14,9 +14,19 @@ import hashlib
 import os
 import time
 import shutil
+import logging
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 from threading import Lock
+
+from .blockchain_exceptions import (
+    DatabaseError,
+    StorageError,
+    CorruptedDataError,
+    ValidationError,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class BlockchainStorageConfig:
@@ -176,7 +186,13 @@ class BlockchainStorage:
                     f"Blockchain saved successfully (height: {block_height}, checksum: {checksum[:8]}...)",
                 )
 
-            except Exception as e:
+            except (DatabaseError, StorageError, OSError, IOError, PermissionError) as e:
+                logger.error(
+                    "Failed to save blockchain to disk",
+                    operation="save_to_disk",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 return False, f"Failed to save blockchain: {str(e)}"
 
     def load_from_disk(self) -> Tuple[bool, Optional[dict], str]:
@@ -222,10 +238,21 @@ class BlockchainStorage:
 
             except json.JSONDecodeError as e:
                 # Corrupted JSON - attempt recovery
+                logger.warning(
+                    "JSON decode error during blockchain load",
+                    error=str(e),
+                    error_type="JSONDecodeError",
+                )
                 print(f"WARNING: JSON decode error: {e}. Attempting recovery...")
                 return self._attempt_recovery()
 
-            except Exception as e:
+            except (DatabaseError, StorageError, CorruptedDataError, OSError, IOError) as e:
+                logger.error(
+                    "Failed to load blockchain from disk",
+                    operation="load_from_disk",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 return False, None, f"Failed to load blockchain: {str(e)}"
 
     def _create_backup(self) -> bool:
@@ -247,7 +274,13 @@ class BlockchainStorage:
 
             return True
 
-        except Exception as e:
+        except (OSError, IOError, PermissionError, shutil.Error) as e:
+            logger.warning(
+                "Failed to create blockchain backup",
+                operation="_create_backup",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             print(f"Warning: Failed to create backup: {e}")
             return False
 
@@ -268,7 +301,13 @@ class BlockchainStorage:
             for backup in backups[BlockchainStorageConfig.MAX_BACKUPS :]:
                 os.remove(backup)
 
-        except Exception as e:
+        except (OSError, IOError, PermissionError) as e:
+            logger.warning(
+                "Failed to cleanup old backups",
+                operation="_cleanup_old_backups",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             print(f"Warning: Failed to cleanup old backups: {e}")
 
     def _create_checkpoint(self, blockchain_data: dict, block_height: int):

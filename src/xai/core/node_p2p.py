@@ -49,6 +49,13 @@ from xai.core.p2p_security import MessageRateLimiter, BandwidthLimiter, HEADER_V
 from xai.core.security_validation import SecurityEventRouter
 from xai.core.config import Config
 from xai.core.checkpoint_sync import CheckpointSyncManager
+from xai.core.blockchain_exceptions import (
+    NetworkError,
+    PeerError,
+    ValidationError,
+    DatabaseError,
+    StorageError,
+)
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Blockchain, Transaction, Block
@@ -524,12 +531,16 @@ class P2PNetworkManager:
             for peer_id, conn in list(self.connections.items()):
                 try:
                     await self._send_handshake(conn, peer_id)
-                except Exception as exc:  # pragma: no cover - defensive logging
+                except (NetworkError, PeerError, ConnectionError, OSError, RuntimeError) as exc:  # pragma: no cover - defensive logging
                     logger.debug(
                         "Failed to send periodic handshake to %s: %s",
                         peer_id[:16],
                         exc,
-                        extra={"event": "p2p.handshake_send_failed", "peer": peer_id},
+                        extra={
+                            "event": "p2p.handshake_send_failed",
+                            "peer": peer_id,
+                            "error_type": type(exc).__name__,
+                        },
                     )
 
     async def _disconnect_idle_connections(self) -> None:
@@ -554,12 +565,16 @@ class P2PNetworkManager:
             )
             try:
                 await conn.close()
-            except Exception as exc:
+            except (NetworkError, ConnectionError, OSError, RuntimeError) as exc:
                 logger.debug(
                     "Error closing idle connection for %s: %s",
                     peer_id[:16],
                     exc,
-                    extra={"event": "p2p.idle_disconnect_error", "peer": peer_id},
+                    extra={
+                        "event": "p2p.idle_disconnect_error",
+                        "peer": peer_id,
+                        "error_type": type(exc).__name__,
+                    },
                 )
             self._disconnect_peer(peer_id, conn)
             self._emit_security_event(
@@ -582,12 +597,16 @@ class P2PNetworkManager:
             if conn:
                 try:
                     await conn.close()
-                except Exception as exc:  # pragma: no cover - defensive cleanup
+                except (NetworkError, ConnectionError, OSError, RuntimeError) as exc:  # pragma: no cover - defensive cleanup
                     logger.debug(
                         "Error closing stalled handshake connection for %s: %s",
                         peer_id[:16],
                         exc,
-                        extra={"event": "p2p.handshake_timeout_close_failed", "peer": peer_id},
+                        extra={
+                            "event": "p2p.handshake_timeout_close_failed",
+                            "peer": peer_id,
+                            "error_type": type(exc).__name__,
+                        },
                     )
             self._disconnect_peer(peer_id, conn)
             logger.warning(
@@ -608,11 +627,14 @@ class P2PNetworkManager:
             return False
         try:
             metadata = self.checkpoint_sync.get_best_checkpoint_metadata()
-        except Exception as exc:  # pragma: no cover - defensive logging
+        except (NetworkError, PeerError, StorageError, ValueError, RuntimeError) as exc:  # pragma: no cover - defensive logging
             logger.debug(
                 "Partial sync metadata unavailable: %s",
                 exc,
-                extra={"event": "p2p.partial_sync_meta_failed"},
+                extra={
+                    "event": "p2p.partial_sync_meta_failed",
+                    "error_type": type(exc).__name__,
+                },
             )
             return False
         if not metadata:
@@ -630,11 +652,15 @@ class P2PNetworkManager:
         applied = False
         try:
             applied = bool(self.checkpoint_sync.fetch_validate_apply())
-        except Exception as exc:  # pragma: no cover - defensive logging
+        except (NetworkError, PeerError, ValidationError, StorageError, ValueError, RuntimeError) as exc:  # pragma: no cover - defensive logging
             logger.warning(
                 "Partial checkpoint sync failed: %s",
                 exc,
-                extra={"event": "p2p.partial_sync_failed", "height": remote_height},
+                extra={
+                    "event": "p2p.partial_sync_failed",
+                    "height": remote_height,
+                    "error_type": type(exc).__name__,
+                },
             )
             return False
         if applied:

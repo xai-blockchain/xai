@@ -34,6 +34,15 @@ from xai.core.validation import validate_hex_string
 from xai.core.vm.evm.abi import keccak256
 from werkzeug.exceptions import RequestEntityTooLarge
 
+# Import typed exceptions
+from xai.core.blockchain_exceptions import (
+    DatabaseError,
+    StorageError,
+    ValidationError,
+    NetworkError,
+    ConfigurationError,
+)
+
 logger = logging.getLogger(__name__)
 
 ERC165_SELECTOR = keccak256(b"supportsInterface(bytes4)")[:4]
@@ -1034,7 +1043,12 @@ class NodeAPIRoutes:
                     jsonify({"success": False, "error": "Blockchain unavailable"}),
                     503,
                 )
-            except Exception as exc:
+            except (DatabaseError, StorageError, OSError, RuntimeError, ValueError) as exc:
+                logger.error(
+                    "Mempool overview failed",
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                )
                 return self._handle_exception(exc, "mempool_overview")
 
         @self.app.route("/mempool/stats", methods=["GET"])
@@ -1053,7 +1067,12 @@ class NodeAPIRoutes:
                     jsonify({"success": False, "error": "Blockchain unavailable"}),
                     503,
                 )
-            except Exception as exc:
+            except (DatabaseError, StorageError, OSError, RuntimeError, ValueError) as exc:
+                logger.error(
+                    "Mempool stats failed",
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                )
                 return self._handle_exception(exc, "mempool_stats")
 
             limits = overview.get("limits", {}) or {}
@@ -1176,8 +1195,13 @@ class NodeAPIRoutes:
             fallback_block = None
             try:
                 fallback_block = chain[idx_int]
-            except Exception as e:
-                logger.debug("Block %d not in chain cache: %s", idx_int, type(e).__name__)
+            except (IndexError, KeyError, TypeError, AttributeError) as e:
+                logger.debug(
+                    "Block not in chain cache",
+                    block_index=idx_int,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 fallback_block = None
 
             block_obj = None
@@ -1186,8 +1210,13 @@ class NodeAPIRoutes:
             ):
                 try:
                     block_obj = self.blockchain.get_block(idx_int)
-                except Exception as e:
-                    logger.debug("get_block(%d) failed: %s", idx_int, type(e).__name__)
+                except (DatabaseError, StorageError, ValidationError, KeyError, ValueError, TypeError) as e:
+                    logger.debug(
+                        "get_block failed",
+                        block_index=idx_int,
+                        error=str(e),
+                        error_type=type(e).__name__,
+                    )
                     block_obj = None
 
             if block_obj is None or (
