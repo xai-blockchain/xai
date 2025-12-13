@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 from typing import TYPE_CHECKING, Dict, Optional, Tuple
 
 from flask import request, jsonify
@@ -45,6 +49,12 @@ def register_faucet_routes(
         try:
             model = FaucetClaimInput.parse_obj(payload)
         except PydanticValidationError as exc:
+            logger.warning(
+                "PydanticValidationError in claim_faucet",
+                error_type="PydanticValidationError",
+                error=str(exc),
+                function="claim_faucet",
+            )
             routes._record_faucet_metric(success=False)
             return routes._error_response(
                 "Invalid faucet request",

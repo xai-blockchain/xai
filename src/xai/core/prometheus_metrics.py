@@ -18,6 +18,10 @@ import os
 from typing import Optional
 from pythonjsonlogger import jsonlogger
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class BlockchainMetrics:
     """
@@ -263,6 +267,12 @@ class BlockchainMetrics:
             print(f"[OK] Prometheus metrics server started on port {self.metrics_port}")
             print(f"  Metrics endpoint: http://localhost:{self.metrics_port}/metrics")
         except OSError as e:
+            logger.error(
+                "OSError in start_server",
+                error_type="OSError",
+                error=str(e),
+                function="start_server",
+            )
             print(f"[ERROR] Failed to start metrics server on port {self.metrics_port}: {e}")
             print(f"  Port may already be in use. Try a different port.")
 
@@ -287,7 +297,13 @@ class BlockchainMetrics:
             uptime = time.time() - self.start_time
             self.process_uptime_seconds.set(uptime)
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+            logger.error(
+                "Exception in update_system_metrics",
+                error_type="Exception",
+                error=str(e),
+                function="update_system_metrics",
+            )
             print(f"Warning: Failed to update system metrics: {e}")
 
     def set_node_info(self, version: str, network: str, node_id: str):
@@ -403,7 +419,13 @@ def time_function(metric_name: str):
                 duration = time.time() - start
                 # Record success
                 return result
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+                logger.error(
+                    "Exception in wrapper",
+                    error_type="Exception",
+                    error=str(e),
+                    function="wrapper",
+                )
                 duration = time.time() - start
                 # Record failure
                 raise

@@ -1322,7 +1322,7 @@ class SponsoredTransactionProcessor:
                 "Failed to authorize transaction: invalid sponsor key material",
                 sponsor=transaction.gas_sponsor,
             ) from exc
-        except Exception as exc:  # pragma: no cover - unexpected crypto failures
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:  # pragma: no cover - unexpected crypto failures
             logger.error(
                 "Unexpected error during sponsor authorization: %s",
                 type(exc).__name__,
@@ -1396,7 +1396,7 @@ class SponsoredTransactionProcessor:
                 "Malformed sponsor signature payload",
                 sponsor=transaction.gas_sponsor,
             ) from exc
-        except Exception as exc:  # pragma: no cover - unexpected crypto failures
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:  # pragma: no cover - unexpected crypto failures
             logger.error(
                 "Unexpected error verifying sponsor signature for %s: %s",
                 transaction.gas_sponsor[:16] + "...",
@@ -1502,6 +1502,12 @@ class SponsoredTransactionProcessor:
         try:
             signature_valid = self.verify_sponsor_signature(transaction)
         except SponsorSignatureVerificationError as exc:
+            logger.warning(
+                "SponsorSignatureVerificationError in validate_sponsored_transaction",
+                error_type="SponsorSignatureVerificationError",
+                error=str(exc),
+                function="validate_sponsored_transaction",
+            )
             return SponsorshipValidation(
                 result=SponsorshipResult.INVALID_SIGNATURE,
                 sponsor_address=transaction.gas_sponsor,

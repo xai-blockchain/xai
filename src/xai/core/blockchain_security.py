@@ -79,7 +79,7 @@ class ReorganizationProtection:
                 with open(self.checkpoint_file, "r") as f:
                     data = json.load(f)
                     self.checkpoints = {int(k): v for k, v in data.items()}
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 logger.warning(
                     "Failed to load checkpoints from disk, starting fresh",
                     checkpoint_file=self.checkpoint_file,
@@ -306,6 +306,12 @@ class OverflowProtection:
             )
             return True, "Amount is valid"
         except ValueError as e:
+            logger.warning(
+                "ValueError in validate_amount",
+                error_type="ValueError",
+                error=str(e),
+                function="validate_amount",
+            )
             return False, str(e)
 
 
@@ -413,7 +419,7 @@ class BlockSizeValidator:
         except AttributeError:
             block_json = json.dumps(block.to_dict())
             block_size = len(block_json.encode())
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.warning(
                 "Failed to calculate block size, assuming oversized",
                 block_index=getattr(block, 'index', 'unknown'),
@@ -440,7 +446,7 @@ class ResourceLimiter:
         """Validate transaction payload size."""
         try:
             return BlockSizeValidator.validate_transaction_size(tx)
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.debug(
                 "Failed to validate transaction size via BlockSizeValidator, using fallback",
                 tx_id=getattr(tx, 'txid', 'unknown'),

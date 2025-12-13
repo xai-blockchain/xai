@@ -426,7 +426,7 @@ class JWTAuthManager:
             )
             return False, None, f"Invalid token: {str(e)}"
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             # Unexpected error - log for investigation
             logger.error(
                 "Unexpected JWT validation error: %s",
@@ -538,7 +538,7 @@ class JWTAuthManager:
                 # Token is expired, can be removed
                 expired_tokens.add(token)
                 removed += 1
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 # Any other error (invalid token, decode error), keep in blacklist to be safe
                 logger.debug(
                     "Token cleanup check failed: %s - keeping in blacklist",

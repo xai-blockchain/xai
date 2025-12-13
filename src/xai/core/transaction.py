@@ -401,7 +401,7 @@ class Transaction:
             message = self.calculate_hash().encode()
             self.signature = sign_message_hex(private_key, message)
             self.txid = self.calculate_hash()
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             raise ValueError(f"Failed to sign transaction: {e}")
 
     def verify_signature(self) -> bool:
@@ -428,7 +428,7 @@ class Transaction:
 
             message = self.calculate_hash().encode()
             return verify_signature_hex(self.public_key, message, self.signature)
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.warning(
                 "Signature verification error: %s",
                 type(e).__name__,
@@ -443,7 +443,7 @@ class Transaction:
         try:
             serialized = canonical_json(self.to_dict())
             return len(serialized.encode('utf-8'))
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.debug(
                 "Failed to serialize transaction for size calculation, using estimate",
                 txid=self.txid,

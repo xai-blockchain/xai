@@ -427,7 +427,7 @@ class BlockIndex:
             try:
                 conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
                 conn.close()
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 logger.warning(
                     "Failed to checkpoint WAL on close",
                     extra={"event": "block_index.close_error", "error": str(e)}

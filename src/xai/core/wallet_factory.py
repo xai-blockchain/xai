@@ -172,7 +172,7 @@ class WalletFactory:
             wallet = self.wallet_manager.create_wallet(name, password)
             self.logger.info(f"New wallet '{name}' created successfully.", address=wallet.address)
             return wallet
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             self.logger.error(f"Failed to create new wallet '{name}': {e}", error=str(e))
             raise
 
@@ -197,7 +197,7 @@ class WalletFactory:
         except ValueError as e:
             self.logger.error(f"Failed to load wallet '{name}': {e}", error=str(e))
             raise
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             self.logger.error(
                 f"An unexpected error occurred while loading wallet '{name}': {e}",
                 error=str(e),

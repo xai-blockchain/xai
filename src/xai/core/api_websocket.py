@@ -251,7 +251,7 @@ class WebSocketAPIHandler:
             try:
                 ws.send(json.dumps({"error": error}))
                 ws.close()
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 logger.debug(f"Failed to send rejection to {ip_address}: {type(e).__name__}")
             return
 
@@ -288,7 +288,7 @@ class WebSocketAPIHandler:
                 data = json.loads(message)
                 self._handle_ws_message(client_id, ws, data)
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.error(f"WebSocket error for {client_id}: {e}")
 
         finally:
@@ -307,7 +307,7 @@ class WebSocketAPIHandler:
 
         try:
             allowed, reason = self.api_auth.authorize(request)
-        except Exception as exc:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
             logger.error(
                 "WebSocket authentication raised error: %s",
                 exc,
@@ -342,7 +342,7 @@ class WebSocketAPIHandler:
 
         try:
             ws.send(json.dumps({"error": message, "code": code}))
-        except Exception as exc:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
             logger.debug(
                 "Failed to send WebSocket error response: %s",
                 type(exc).__name__,
@@ -351,7 +351,7 @@ class WebSocketAPIHandler:
         finally:
             try:
                 ws.close()
-            except Exception as exc:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
                 logger.debug(
                     "Failed to close WebSocket after error: %s",
                     type(exc).__name__,
@@ -400,7 +400,7 @@ class WebSocketAPIHandler:
             if channel in self.ws_subscriptions.get(client_id, []):
                 try:
                     client["ws"].send(json.dumps(message))
-                except Exception as e:
+                except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                     logger.error(f"Failed to send to client {client_id}: {e}")
 
     def _cleanup_loop(self) -> None:
@@ -415,7 +415,7 @@ class WebSocketAPIHandler:
                     if client["id"] == client_id:
                         try:
                             client["ws"].close()
-                        except Exception as e:
+                        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                             logger.debug(f"Failed to close stale client {client_id}: {type(e).__name__}")
 
                         ip = client.get("ip", "unknown")

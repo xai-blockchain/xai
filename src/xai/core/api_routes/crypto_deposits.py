@@ -13,6 +13,10 @@ Integrates with the CryptoDepositManager for deposit tracking and confirmation.
 
 from __future__ import annotations
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 from typing import TYPE_CHECKING, Dict, Tuple, Optional, Any
 
 from flask import jsonify, request
@@ -72,8 +76,26 @@ def register_crypto_deposit_routes(routes: "NodeAPIRoutes") -> None:
             )
             return routes._success_response(result if isinstance(result, dict) else {"result": result})
         except ValueError as exc:
+            logger.warning(
+                "ValueError in generate_crypto_deposit_address",
+                error_type="ValueError",
+                error=str(exc),
+                function="generate_crypto_deposit_address",
+            )
             return routes._error_response(str(exc), status=400, code="deposit_invalid")
-        except Exception as exc:
+        except (OSError, IOError) as exc:
+            logger.error(
+                "Storage error generating deposit address: %s",
+                str(exc),
+                extra={
+                    "event": "api.deposit_storage_error",
+                    "user_address": model.user_address,
+                    "currency": model.currency,
+                },
+                exc_info=True,
+            )
+            return routes._error_response("Storage error", status=500, code="storage_error")
+        except RuntimeError as exc:
             return routes._handle_exception(exc, "crypto_generate_address")
 
     @app.route("/exchange/crypto/addresses/<address>", methods=["GET"])
@@ -96,7 +118,29 @@ def register_crypto_deposit_routes(routes: "NodeAPIRoutes") -> None:
         try:
             result = node.crypto_deposit_manager.get_user_deposit_addresses(address)
             return jsonify(result), 200
-        except Exception as e:
+        except (ValueError, KeyError) as e:
+            logger.error(
+                "Invalid deposit address lookup: %s",
+                str(e),
+                extra={"event": "api.deposit_address_invalid", "address": address},
+                exc_info=True,
+            )
+            return jsonify({"error": f"Invalid request: {e}"}), 400
+        except (OSError, IOError) as e:
+            logger.error(
+                "Storage error reading deposit addresses: %s",
+                str(e),
+                extra={"event": "api.deposit_address_storage_error", "address": address},
+                exc_info=True,
+            )
+            return jsonify({"error": "Storage error"}), 500
+        except RuntimeError as e:
+            logger.error(
+                "Runtime error reading deposit addresses: %s",
+                str(e),
+                extra={"event": "api.deposit_address_runtime_error", "address": address},
+                exc_info=True,
+            )
             return jsonify({"error": str(e)}), 500
 
     @app.route("/exchange/crypto/pending-deposits", methods=["GET"])
@@ -122,7 +166,29 @@ def register_crypto_deposit_routes(routes: "NodeAPIRoutes") -> None:
                 jsonify({"success": True, "pending_deposits": pending, "count": len(pending)}),
                 200,
             )
-        except Exception as e:
+        except (ValueError, KeyError) as e:
+            logger.error(
+                "Invalid pending deposits request: %s",
+                str(e),
+                extra={"event": "api.pending_deposits_invalid", "user_address": user_address},
+                exc_info=True,
+            )
+            return jsonify({"error": f"Invalid request: {e}"}), 400
+        except (OSError, IOError) as e:
+            logger.error(
+                "Storage error reading pending deposits: %s",
+                str(e),
+                extra={"event": "api.pending_deposits_storage_error"},
+                exc_info=True,
+            )
+            return jsonify({"error": "Storage error"}), 500
+        except RuntimeError as e:
+            logger.error(
+                "Runtime error reading pending deposits: %s",
+                str(e),
+                extra={"event": "api.pending_deposits_runtime_error"},
+                exc_info=True,
+            )
             return jsonify({"error": str(e)}), 500
 
     @app.route("/exchange/crypto/deposit-history/<address>", methods=["GET"])
@@ -158,7 +224,29 @@ def register_crypto_deposit_routes(routes: "NodeAPIRoutes") -> None:
                 ),
                 200,
             )
-        except Exception as e:
+        except (ValueError, TypeError) as e:
+            logger.error(
+                "Invalid deposit history request: %s",
+                str(e),
+                extra={"event": "api.deposit_history_invalid", "address": address},
+                exc_info=True,
+            )
+            return jsonify({"error": f"Invalid request: {e}"}), 400
+        except (OSError, IOError) as e:
+            logger.error(
+                "Storage error reading deposit history: %s",
+                str(e),
+                extra={"event": "api.deposit_history_storage_error", "address": address},
+                exc_info=True,
+            )
+            return jsonify({"error": "Storage error"}), 500
+        except RuntimeError as e:
+            logger.error(
+                "Runtime error reading deposit history: %s",
+                str(e),
+                extra={"event": "api.deposit_history_runtime_error", "address": address},
+                exc_info=True,
+            )
             return jsonify({"error": str(e)}), 500
 
     @app.route("/exchange/crypto/stats", methods=["GET"])
@@ -178,5 +266,27 @@ def register_crypto_deposit_routes(routes: "NodeAPIRoutes") -> None:
         try:
             stats = node.crypto_deposit_manager.get_stats()
             return jsonify({"success": True, "stats": stats}), 200
-        except Exception as e:
+        except (ValueError, KeyError) as e:
+            logger.error(
+                "Invalid deposit stats request: %s",
+                str(e),
+                extra={"event": "api.deposit_stats_invalid"},
+                exc_info=True,
+            )
+            return jsonify({"error": f"Invalid request: {e}"}), 400
+        except (OSError, IOError) as e:
+            logger.error(
+                "Storage error reading deposit stats: %s",
+                str(e),
+                extra={"event": "api.deposit_stats_storage_error"},
+                exc_info=True,
+            )
+            return jsonify({"error": "Storage error"}), 500
+        except RuntimeError as e:
+            logger.error(
+                "Runtime error reading deposit stats: %s",
+                str(e),
+                extra={"event": "api.deposit_stats_runtime_error"},
+                exc_info=True,
+            )
             return jsonify({"error": str(e)}), 500

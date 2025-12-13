@@ -106,6 +106,12 @@ class StressTest(ABC):
                     else:
                         failed += 1
                 except Exception as e:
+                    logger.error(
+                        "Exception in run",
+                        error_type="Exception",
+                        error=str(e),
+                        function="run",
+                    )
                     self.errors.append(str(e))
                     failed += 1
 
@@ -135,6 +141,12 @@ class StressTest(ABC):
             latency = time.time() - start
             return latency, success
         except Exception as e:
+            logger.warning(
+                "Exception in _timed_operation",
+                error_type="Exception",
+                error=str(e),
+                function="_timed_operation",
+            )
             latency = time.time() - start
             self.errors.append(str(e))
             return latency, False

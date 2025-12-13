@@ -13,6 +13,7 @@ callers can enforce strict policies (e.g., limiting unknown peers).
 from __future__ import annotations
 
 import ipaddress
+import json
 import logging
 import time
 from dataclasses import dataclass
@@ -157,18 +158,18 @@ class GeoIPResolver:
                 extra={
                     "event": "p2p.geoip.ipwhois_network_error",
                     "ip": ip_address,
-                    "error": type(exc).__name__,
+                    "error_type": type(exc).__name__,
                 },
             )
             return None
-        except Exception as exc:  # pragma: no cover - depends on env/network
-            logger.warning(
-                "Unexpected ipwhois lookup failure: %s",
+        except (ValueError, KeyError, TypeError) as exc:
+            logger.debug(
+                "Invalid response data from ipwhois: %s",
                 exc,
                 extra={
-                    "event": "p2p.geoip.ipwhois_failed",
+                    "event": "p2p.geoip.ipwhois_invalid_data",
                     "ip": ip_address,
-                    "error": type(exc).__name__,
+                    "error_type": type(exc).__name__,
                 },
             )
             return None
@@ -203,24 +204,25 @@ class GeoIPResolver:
                 },
             )
             return None
-        except (ValueError, KeyError) as exc:
+        except (ValueError, KeyError, TypeError) as exc:
             logger.warning(
                 "Invalid GeoIP HTTP response format: %s",
                 exc,
                 extra={
                     "event": "p2p.geoip.http_invalid_response",
                     "ip": ip_address,
+                    "error_type": type(exc).__name__,
                 },
             )
             return None
-        except Exception as exc:
+        except json.JSONDecodeError as exc:
             logger.warning(
-                "Unexpected GeoIP HTTP lookup failure: %s",
+                "Failed to parse GeoIP JSON response: %s",
                 exc,
                 extra={
-                    "event": "p2p.geoip.http_failed",
+                    "event": "p2p.geoip.http_json_error",
                     "ip": ip_address,
-                    "error": type(exc).__name__,
+                    "error_type": type(exc).__name__,
                 },
             )
             return None

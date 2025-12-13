@@ -181,7 +181,7 @@ class ForkManager:
 
                 return True
 
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 # Rollback using WAL
                 self.logger.error(
                     "Chain reorganization failed, rolling back",
@@ -446,7 +446,7 @@ class ForkManager:
         try:
             with open(self.blockchain.reorg_wal_path, 'w') as f:
                 json.dump(wal_entry, f, indent=2)
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             self.logger.error(f"Failed to write reorg WAL: {e}")
 
         return wal_entry
@@ -463,7 +463,7 @@ class ForkManager:
         try:
             with open(self.blockchain.reorg_wal_path, 'w') as f:
                 json.dump(wal_entry, f, indent=2)
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             self.logger.error(f"Failed to commit reorg WAL: {e}")
 
     def _rollback_reorg_wal(self, wal_entry: Dict[str, Any]) -> None:
@@ -483,5 +483,5 @@ class ForkManager:
         try:
             if os.path.exists(self.blockchain.reorg_wal_path):
                 os.remove(self.blockchain.reorg_wal_path)
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             self.logger.error(f"Failed to clear reorg WAL: {e}")

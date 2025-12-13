@@ -156,8 +156,8 @@ class JWTAuthManager:
             token = jwt.encode(token_dict, self.secret_key, algorithm=self.algorithm)
             security_logger.info(f"Token generated for user {user_id}")
             return token
-        except Exception as e:
-            security_logger.error(f"Error generating token: {str(e)}")
+        except (ValueError, TypeError, KeyError) as e:
+            security_logger.error(f"Error generating token: {str(e)}", extra={"error_type": type(e).__name__})
             raise
 
     def validate_token(self, token: str) -> Tuple[bool, Optional[Dict], Optional[str]]:
@@ -206,8 +206,8 @@ class JWTAuthManager:
         except jwt.InvalidTokenError as e:
             security_logger.warning(f"Invalid token: {str(e)}")
             return False, None, f"Invalid token: {str(e)}"
-        except Exception as e:
-            security_logger.error(f"Error validating token: {str(e)}")
+        except (ValueError, TypeError, KeyError, AttributeError) as e:
+            security_logger.error(f"Error validating token: {str(e)}", extra={"error_type": type(e).__name__})
             return False, None, "Token validation failed"
 
     def refresh_token(self, token: str) -> Tuple[bool, Optional[str], Optional[str]]:
@@ -264,8 +264,8 @@ class JWTAuthManager:
                 security_logger.info(f"Token revoked: {jti}")
                 return True
 
-        except Exception as e:
-            security_logger.error(f"Error revoking token: {str(e)}")
+        except (ValueError, KeyError, TypeError) as e:
+            security_logger.error(f"Error revoking token: {str(e)}", extra={"error_type": type(e).__name__})
 
         return False
 
@@ -396,8 +396,8 @@ class APIKeyManager:
 
             return False, None, "Invalid API key"
 
-        except Exception as e:
-            security_logger.error(f"Error validating API key: {str(e)}")
+        except (ValueError, KeyError, AttributeError, TypeError) as e:
+            security_logger.error(f"Error validating API key: {str(e)}", extra={"error_type": type(e).__name__})
             return False, None, "API key validation failed"
 
     def revoke_api_key(self, user_id: str, key_id: str) -> bool:

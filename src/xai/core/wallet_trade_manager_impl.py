@@ -695,6 +695,12 @@ class WalletTradeManager:
                 overview = self._serialize_margin_overview(engine.account_overview(account_id))
                 return {"success": True, "overview": overview}
             except MarginException as exc:
+                logger.warning(
+                    "MarginException in margin_deposit",
+                    error_type="MarginException",
+                    error=str(exc),
+                    function="margin_deposit",
+                )
                 return {"success": False, "error": str(exc)}
 
     def margin_withdraw(self, account_id: str, amount: float) -> Dict[str, Any]:
@@ -705,6 +711,12 @@ class WalletTradeManager:
                 overview = self._serialize_margin_overview(engine.account_overview(account_id))
                 return {"success": True, "overview": overview}
             except MarginException as exc:
+                logger.warning(
+                    "MarginException in margin_withdraw",
+                    error_type="MarginException",
+                    error=str(exc),
+                    function="margin_withdraw",
+                )
                 return {"success": False, "error": str(exc)}
 
     def open_margin_position(
@@ -733,6 +745,12 @@ class WalletTradeManager:
                     "position": self._serialize_margin_position(position),
                 }
             except MarginException as exc:
+                logger.warning(
+                    "MarginException in open_margin_position",
+                    error_type="MarginException",
+                    error=str(exc),
+                    function="open_margin_position",
+                )
                 return {"success": False, "error": str(exc)}
 
     def close_margin_position(
@@ -756,6 +774,12 @@ class WalletTradeManager:
                     "result": {k: self._decimal_to_float(v) for k, v in result.items()},
                 }
             except MarginException as exc:
+                logger.warning(
+                    "MarginException in close_margin_position",
+                    error_type="MarginException",
+                    error=str(exc),
+                    function="close_margin_position",
+                )
                 return {"success": False, "error": str(exc)}
 
     def get_margin_overview(self, account_id: str) -> Dict[str, Any]:
@@ -773,6 +797,12 @@ class WalletTradeManager:
                     "positions": positions,
                 }
             except MarginException as exc:
+                logger.warning(
+                    "MarginException in get_margin_overview",
+                    error_type="MarginException",
+                    error=str(exc),
+                    function="get_margin_overview",
+                )
                 return {"success": False, "error": str(exc)}
 
     def perform_margin_liquidations(self) -> Dict[str, Any]:
@@ -782,6 +812,12 @@ class WalletTradeManager:
                 liquidated = engine.perform_liquidations()
                 return {"success": True, "liquidated_accounts": liquidated}
             except MarginException as exc:
+                logger.warning(
+                    "MarginException in perform_margin_liquidations",
+                    error_type="MarginException",
+                    error=str(exc),
+                    function="perform_margin_liquidations",
+                )
                 return {"success": False, "error": str(exc)}
 
     # ------------------------------------------------------------------

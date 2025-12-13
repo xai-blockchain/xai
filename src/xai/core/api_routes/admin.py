@@ -83,6 +83,12 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
                 status=201
             )
         except ValueError as exc:
+            logger.warning(
+                "ValueError in create_api_key",
+                error_type="ValueError",
+                error=str(exc),
+                function="create_api_key",
+            )
             return routes._error_response(str(exc), status=500, code="admin_error")
 
     @app.route("/admin/api-keys/<key_id>", methods=["DELETE"])
@@ -97,6 +103,12 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
                 routes._log_event("api_key_revoked", {"key_id": key_id}, severity="WARNING")
                 return routes._success_response({"revoked": True})
         except ValueError as exc:
+            logger.warning(
+                "ValueError in delete_api_key",
+                error_type="ValueError",
+                error=str(exc),
+                function="delete_api_key",
+            )
             return routes._error_response(str(exc), status=500, code="admin_error")
 
         return routes._error_response("API key not found", status=404, code="not_found")
@@ -257,9 +269,36 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
 
         try:
             spending_limits.set_limit(address, limit)
+            routes._log_event(
+                "spend_limit_set",
+                {"address": address, "limit": limit},
+                severity="INFO",
+            )
             return routes._success_response(
                 {"address": address, "limit": limit},
                 status=201
             )
-        except Exception as exc:
+        except (OSError, IOError) as exc:
+            logger.error(
+                "Storage error setting spend limit: %s",
+                str(exc),
+                extra={
+                    "event": "api.spend_limit_storage_error",
+                    "address": address,
+                    "limit": limit,
+                },
+                exc_info=True,
+            )
+            return routes._error_response("Failed to persist spending limit", status=500, code="storage_error")
+        except RuntimeError as exc:
+            logger.error(
+                "Runtime error setting spend limit: %s",
+                str(exc),
+                extra={
+                    "event": "api.spend_limit_runtime_error",
+                    "address": address,
+                    "limit": limit,
+                },
+                exc_info=True,
+            )
             return routes._error_response(str(exc), status=500, code="admin_error")

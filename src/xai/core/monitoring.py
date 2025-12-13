@@ -698,7 +698,7 @@ class MetricsCollector:
                     self._update_blockchain_metrics()
                 self._check_alert_rules()
                 time.sleep(self.update_interval)
-            except Exception as exc:  # pragma: no cover - defensive
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:  # pragma: no cover - defensive
                 logger.error(
                     "Error in monitoring loop: %s",
                     exc,
@@ -726,7 +726,7 @@ class MetricsCollector:
             uptime = time.time() - self.start_time
             self.get_metric("xai_node_uptime_seconds").set(uptime)
 
-        except Exception as exc:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
             logger.error(
                 "Error updating system metrics: %s",
                 exc,
@@ -792,7 +792,7 @@ class MetricsCollector:
             # Total supply
             self.get_metric("xai_total_supply").set(stats["total_circulating_supply"])
 
-        except Exception as exc:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
             logger.error(
                 "Error updating blockchain metrics: %s",
                 exc,
@@ -1024,7 +1024,7 @@ class MetricsCollector:
             try:
                 if rule["condition"]():
                     self._fire_alert(rule["name"], rule["message"], rule["level"])
-            except Exception as exc:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
                 logger.error(
                     "Error checking alert rule %s: %s",
                     rule.get("name", "<unknown>"),

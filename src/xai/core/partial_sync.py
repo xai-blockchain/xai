@@ -60,6 +60,6 @@ class PartialSyncCoordinator:
             if applied:
                 logger.info("Partial sync applied checkpoint")
             return bool(applied)
-        except Exception as exc:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
             logger.warning("Partial sync failed: %s", exc, extra={"event": "partial_sync_failed"})
             return False

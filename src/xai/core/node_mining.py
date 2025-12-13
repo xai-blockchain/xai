@@ -9,6 +9,10 @@ Handles all mining-related functionality including:
 
 from __future__ import annotations
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 import time
 import threading
 from typing import TYPE_CHECKING, Optional
@@ -91,7 +95,13 @@ class MiningManager:
                         # Broadcast to peers if callback is set
                         if self.broadcast_callback:
                             self.broadcast_callback(block)
-                except Exception as e:
+                except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+                    logger.error(
+                        "Exception in _mine_continuously",
+                        error_type="Exception",
+                        error=str(e),
+                        function="_mine_continuously",
+                    )
                     print(f"❌ Mining error: {e}")
 
             time.sleep(1)  # Small delay between mining attempts

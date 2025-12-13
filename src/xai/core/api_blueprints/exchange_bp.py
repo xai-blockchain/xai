@@ -93,6 +93,12 @@ def get_order_book() -> Tuple[Dict[str, Any], int]:
         )
         return jsonify({"success": False, "error": "Storage error"}), 500
     except RuntimeError as exc:
+        logger.warning(
+            "RuntimeError in get_order_book",
+            error_type="RuntimeError",
+            error=str(exc),
+            function="get_order_book",
+        )
         return handle_exception(exc, "exchange_get_order_book")
 
 
@@ -124,6 +130,12 @@ def get_exchange_balance(address: str) -> Tuple[Dict[str, Any], int]:
         )
         return jsonify({"success": False, "error": "Storage error"}), 500
     except RuntimeError as exc:
+        logger.warning(
+            "RuntimeError in get_exchange_balance",
+            error_type="RuntimeError",
+            error=str(exc),
+            function="get_exchange_balance",
+        )
         return handle_exception(exc, "exchange_get_balance")
 
 
@@ -138,7 +150,29 @@ def get_exchange_balance_currency(address: str, currency: str) -> Tuple[Dict[str
     try:
         balance = node.exchange_wallet_manager.get_balance(address, currency)
         return jsonify({"success": True, "address": address, "currency": currency, "balance": balance}), 200
-    except Exception as exc:
+    except (ValueError, KeyError) as exc:
+        logger.error(
+            "Invalid currency balance request: %s",
+            str(exc),
+            extra={"event": "api.currency_balance_invalid_request", "address": address, "currency": currency},
+            exc_info=True,
+        )
+        return jsonify({"success": False, "error": f"Invalid request: {exc}"}), 400
+    except (OSError, IOError) as exc:
+        logger.error(
+            "Storage error reading currency balance: %s",
+            str(exc),
+            extra={"event": "api.currency_balance_storage_error", "address": address, "currency": currency},
+            exc_info=True,
+        )
+        return jsonify({"success": False, "error": "Storage error"}), 500
+    except RuntimeError as exc:
+        logger.warning(
+            "RuntimeError in get_exchange_balance_currency",
+            error_type="RuntimeError",
+            error=str(exc),
+            function="get_exchange_balance_currency",
+        )
         return handle_exception(exc, "exchange_get_balance_currency")
 
 
@@ -190,5 +224,27 @@ def get_exchange_stats() -> Tuple[Dict[str, Any], int]:
                 "total_volume": total_volume,
             }
         }), 200
-    except Exception as exc:
+    except (ValueError, KeyError, TypeError) as exc:
+        logger.error(
+            "Invalid exchange stats data: %s",
+            str(exc),
+            extra={"event": "api.exchange_stats_invalid_data"},
+            exc_info=True,
+        )
+        return jsonify({"success": False, "error": "Invalid exchange data"}), 500
+    except (OSError, IOError) as exc:
+        logger.error(
+            "Storage error reading exchange stats: %s",
+            str(exc),
+            extra={"event": "api.exchange_stats_storage_error"},
+            exc_info=True,
+        )
+        return jsonify({"success": False, "error": "Storage error"}), 500
+    except RuntimeError as exc:
+        logger.warning(
+            "RuntimeError in get_exchange_stats",
+            error_type="RuntimeError",
+            error=str(exc),
+            function="get_exchange_stats",
+        )
         return handle_exception(exc, "exchange_get_stats")

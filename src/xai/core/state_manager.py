@@ -152,12 +152,13 @@ class StateManager:
         """
         try:
             self.blockchain.address_index.index_block(block)
-        except Exception as e:
+        except (ValueError, KeyError, AttributeError, TypeError, RuntimeError, OSError, IOError) as e:
             # Don't fail block addition if indexing fails
             self.logger.warning(
                 "Failed to update address index for block",
                 index=block.index,
                 error=str(e),
+                error_type=type(e).__name__,
             )
 
     def _update_checkpoint(self, block: 'Block') -> None:
@@ -172,12 +173,13 @@ class StateManager:
                 block_height=block.index,
                 blockchain=self.blockchain,
             )
-        except Exception as e:
+        except (ValueError, KeyError, OSError, IOError, RuntimeError) as e:
             # Don't fail block addition if checkpointing fails
             self.logger.warning(
                 "Failed to create checkpoint",
                 block_height=block.index,
                 error=str(e),
+                error_type=type(e).__name__,
             )
 
     def process_orphan_transactions(self) -> None:
@@ -299,9 +301,9 @@ class StateManager:
                 self.blockchain._state_integrity_snapshots = \
                     self.blockchain._state_integrity_snapshots[-100:]
 
-        except Exception as e:
+        except (ValueError, KeyError, AttributeError, TypeError) as e:
             # Don't fail operations due to snapshot errors
-            self.logger.debug(f"Failed to record state snapshot: {e}")
+            self.logger.debug(f"Failed to record state snapshot: {e}", extra={"error_type": type(e).__name__})
 
     def compute_state_snapshot(self) -> Dict[str, Any]:
         """

@@ -50,7 +50,7 @@ class NonceTracker:
             try:
                 with open(self.nonce_file, "r") as f:
                     self.nonces = json.load(f)
-            except Exception as e:
+            except (ValueError, KeyError, OSError, IOError) as e:
                 logger.warning(
                     "Failed to load nonces from %s: %s - starting fresh",
                     self.nonce_file,
@@ -64,9 +64,8 @@ class NonceTracker:
         try:
             with open(self.nonce_file, "w") as f:
                 json.dump(self.nonces, f, indent=2)
-        except Exception as e:
-            logger.error(
-                "Failed to save nonces to %s: %s",
+        except (ValueError, KeyError, OSError, IOError) as e:
+            logger.error(                "Failed to save nonces to %s: %s",
                 self.nonce_file,
                 type(e).__name__,
                 extra={"event": "nonce.save_failed", "error": str(e)}

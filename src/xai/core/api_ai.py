@@ -135,7 +135,7 @@ class AIAPIHandler:
                 assistant_name=ctx.get("assistant_name"),
             )
             return self._personal_ai_response(result)
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.error(
                 "Personal AI atomic swap operation failed",
                 error_type=type(e).__name__,
@@ -362,6 +362,13 @@ class AIAPIHandler:
             if region:
                 self.node.validator.validate_string(region, "preferred_region", max_length=100)
         except ValidationError as ve:
+            logger.warning(
+                "Invalid region in node setup request",
+                error_type="ValidationError",
+                error=str(ve),
+                region=region,
+                function="personal_node_setup_handler",
+            )
             return (
                 jsonify({"success": False, "error": "INVALID_REGION", "message": str(ve)}),
                 400,
@@ -406,6 +413,13 @@ class AIAPIHandler:
         try:
             self.node.validator.validate_string(pool_name, "pool_name", max_length=120)
         except ValidationError as ve:
+            logger.warning(
+                "Invalid pool name in liquidity pool alert",
+                error_type="ValidationError",
+                error=str(ve),
+                pool_name=pool_name,
+                function="personal_liquidity_pool_alerts_handler",
+            )
             return (
                 jsonify({"success": False, "error": "INVALID_POOL_NAME", "message": str(ve)}),
                 400,
@@ -580,6 +594,13 @@ class AIAPIHandler:
         try:
             self.node.validator.validate_address(user_address)
         except ValidationError as ve:
+            logger.warning(
+                "Invalid user address in personal AI context",
+                error_type="ValidationError",
+                error=str(ve),
+                user_address=user_address,
+                function="_personal_ai_context",
+            )
             return {"success": False, "error": "INVALID_ADDRESS", "message": str(ve)}
 
         personal_ai = getattr(self.node, "personal_ai", None)

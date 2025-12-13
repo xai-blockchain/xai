@@ -252,22 +252,20 @@ class PeerConnectionPool:
                 }
             )
             raise PeerNetworkError(f"Network error connecting to {peer_uri}: {e}") from e
-        except Exception as e:
-            # Failed to create connection, decrement counter
+        except (ValueError, TypeError) as e:
+            # Invalid URI or configuration error
             async with self._lock:
                 self._active_connections[peer_uri] = max(0, self._active_connections[peer_uri] - 1)
             logger.error(
-                "Unexpected error creating pooled connection: %s",
+                "Invalid configuration for pooled connection: %s",
                 e,
-                exc_info=True,
                 extra={
-                    "event": "peer.pool.connection_failed",
+                    "event": "peer.pool.connection_config_error",
                     "peer_uri": peer_uri,
                     "error_type": type(e).__name__,
-                    "error_message": str(e),
                 }
             )
-            raise
+            raise PeerNetworkError(f"Invalid connection configuration: {e}") from e
 
     async def return_connection(
         self,
@@ -381,13 +379,13 @@ class PeerConnectionPool:
                 }
             )
             return False
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError) as e:
             self._total_health_check_failures += 1
             logger.debug(
-                "Connection health check unexpected error: %s",
+                "Connection health check data error: %s",
                 e,
                 extra={
-                    "event": "peer.pool.health_check_failed",
+                    "event": "peer.pool.health_check_data_error",
                     "error_type": type(e).__name__,
                     "failures": self._total_health_check_failures,
                 }
@@ -421,14 +419,13 @@ class PeerConnectionPool:
                     "error_type": type(e).__name__,
                 }
             )
-        except Exception as e:
+        except (ValueError, TypeError) as e:
             logger.debug(
-                "Unexpected error closing connection: %s",
+                "Invalid state during connection close: %s",
                 e,
                 extra={
-                    "event": "peer.pool.close_error",
+                    "event": "peer.pool.close_state_error",
                     "error_type": type(e).__name__,
-                    "error_message": str(e),
                 }
             )
 
@@ -458,16 +455,14 @@ class PeerConnectionPool:
                                 "error_type": type(e).__name__,
                             }
                         )
-                    except Exception as e:
-                        logger.error(
-                            "Unexpected error closing pooled connection: %s",
+                    except (ValueError, TypeError) as e:
+                        logger.warning(
+                            "Invalid state while closing pooled connection: %s",
                             e,
-                            exc_info=True,
                             extra={
-                                "event": "peer.pool.close_error",
+                                "event": "peer.pool.close_state_error",
                                 "peer_uri": peer_uri,
                                 "error_type": type(e).__name__,
-                                "error_message": str(e),
                             }
                         )
 
@@ -708,13 +703,12 @@ class PeerDiscovery:
                     e,
                     extra={"event": "peer.discovery.dns_error", "seed": seed, "error_type": type(e).__name__}
                 )
-            except Exception as e:
-                logger.error(
-                    "Unexpected DNS discovery failure for seed %s: %s",
+            except (ValueError, TypeError) as e:
+                logger.warning(
+                    "Invalid DNS configuration for seed %s: %s",
                     seed,
                     e,
-                    exc_info=True,
-                    extra={"event": "peer.discovery.dns_failed", "seed": seed}
+                    extra={"event": "peer.discovery.dns_config_error", "seed": seed, "error_type": type(e).__name__}
                 )
 
         with self.lock:
@@ -776,7 +770,7 @@ class PeerDiscovery:
                         "error_type": type(e).__name__,
                     }
                 )
-            except (ValueError, KeyError, json.JSONDecodeError) as e:
+            except (ValueError, KeyError, json.JSONDecodeError, TypeError) as e:
                 logger.warning(
                     "Invalid response from bootstrap node: %s",
                     e,
@@ -784,18 +778,6 @@ class PeerDiscovery:
                         "event": "peer.discovery.bootstrap_invalid_response",
                         "bootstrap_uri": bootstrap_uri,
                         "error_type": type(e).__name__,
-                    }
-                )
-            except Exception as e:
-                logger.error(
-                    "Unexpected error discovering peers from bootstrap node: %s",
-                    e,
-                    exc_info=True,
-                    extra={
-                        "event": "peer.discovery.bootstrap_failed",
-                        "bootstrap_uri": bootstrap_uri,
-                        "error_type": type(e).__name__,
-                        "error_message": str(e),
                     }
                 )
 
@@ -1015,12 +997,20 @@ class PeerEncryption:
                     f.write(serialized_bytes)
                 self.verifying_key = self.signing_key.pubkey
                 logger.info("Regenerated signing key at: %s", self.signing_key_file)
-            except Exception as inner_exc:
+            except OSError as inner_exc:
                 logger.critical(
-                    "Failed to regenerate signing key: %s",
+                    "Failed to write regenerated signing key to disk: %s",
                     inner_exc,
                     exc_info=True,
-                    extra={"event": "peer.signing_key_regeneration_failed"}
+                    extra={"event": "peer.signing_key_write_failed", "error_type": type(inner_exc).__name__}
+                )
+                raise
+            except (ValueError, TypeError) as inner_exc:
+                logger.critical(
+                    "Failed to serialize regenerated signing key: %s",
+                    inner_exc,
+                    exc_info=True,
+                    extra={"event": "peer.signing_key_serialization_failed", "error_type": type(inner_exc).__name__}
                 )
                 raise
         except (ValueError, TypeError) as e:
@@ -1040,21 +1030,30 @@ class PeerEncryption:
                     f.write(serialized_bytes)
                 self.verifying_key = self.signing_key.pubkey
                 logger.info("Regenerated signing key at: %s", self.signing_key_file)
-            except Exception as inner_exc:
+            except OSError as inner_exc:
                 logger.critical(
-                    "Failed to regenerate signing key: %s",
+                    "Failed to write regenerated signing key to disk: %s",
                     inner_exc,
                     exc_info=True,
-                    extra={"event": "peer.signing_key_regeneration_failed"}
+                    extra={"event": "peer.signing_key_write_failed", "error_type": type(inner_exc).__name__}
                 )
                 self.signing_key = None
                 self.verifying_key = None
-        except Exception as e:
+            except (ValueError, TypeError) as inner_exc:
+                logger.critical(
+                    "Failed to serialize regenerated signing key: %s",
+                    inner_exc,
+                    exc_info=True,
+                    extra={"event": "peer.signing_key_serialization_failed", "error_type": type(inner_exc).__name__}
+                )
+                self.signing_key = None
+                self.verifying_key = None
+        except OSError as e:
             logger.error(
-                "Unexpected error with signing key: %s",
+                "File I/O error with signing key: %s",
                 e,
                 exc_info=True,
-                extra={"event": "peer.signing_key_error", "key_file": self.signing_key_file}
+                extra={"event": "peer.signing_key_io_error", "key_file": self.signing_key_file, "error_type": type(e).__name__}
             )
             # Self-heal by regenerating a fresh key
             try:
@@ -1067,12 +1066,21 @@ class PeerEncryption:
                     f.write(serialized_bytes)
                 self.verifying_key = self.signing_key.pubkey
                 logger.info("Regenerated signing key at: %s", self.signing_key_file)
-            except Exception as inner_exc:
+            except OSError as inner_exc:
                 logger.critical(
-                    "Failed to regenerate signing key: %s",
+                    "Failed to write regenerated signing key to disk: %s",
                     inner_exc,
                     exc_info=True,
-                    extra={"event": "peer.signing_key_regeneration_failed"}
+                    extra={"event": "peer.signing_key_write_failed", "error_type": type(inner_exc).__name__}
+                )
+                self.signing_key = None
+                self.verifying_key = None
+            except (ValueError, TypeError) as inner_exc:
+                logger.critical(
+                    "Failed to serialize regenerated signing key: %s",
+                    inner_exc,
+                    exc_info=True,
+                    extra={"event": "peer.signing_key_serialization_failed", "error_type": type(inner_exc).__name__}
                 )
                 self.signing_key = None
                 self.verifying_key = None
@@ -1942,12 +1950,24 @@ if __name__ == "__main__":
         peer_trusted_2 = manager.connect_peer(trusted_node_ip)
         # peer_trusted_3 = manager.connect_peer(trusted_node_ip) # This would exceed max_connections_per_ip
     except ValueError as e:
+        logger.warning(
+            "ValueError in get_ssl_context",
+            error_type="ValueError",
+            error=str(e),
+            function="get_ssl_context",
+        )
         print(f"Error (expected): {e}")
 
     # Banned peer connection
     try:
         manager.connect_peer(malicious_ip)
     except ValueError as e:
+        logger.warning(
+            "ValueError in get_ssl_context",
+            error_type="ValueError",
+            error=str(e),
+            function="get_ssl_context",
+        )
         print(f"Error (expected): {e}")
 
     # Normal peer connections
@@ -1956,6 +1976,12 @@ if __name__ == "__main__":
         peer_normal_2 = manager.connect_peer(normal_ip_1)
         peer_normal_3 = manager.connect_peer(normal_ip_1)  # Should fail
     except ValueError as e:
+        logger.warning(
+            "ValueError in get_ssl_context",
+            error_type="ValueError",
+            error=str(e),
+            function="get_ssl_context",
+        )
         print(f"Error (expected): {e}")
 
     try:
@@ -1968,6 +1994,12 @@ if __name__ == "__main__":
     try:
         peer_normal_5 = manager.connect_peer(normal_ip_1)  # Should now be allowed
     except ValueError as e:
+        logger.warning(
+            "ValueError in get_ssl_context",
+            error_type="ValueError",
+            error=str(e),
+            function="get_ssl_context",
+        )
         print(f"Error: {e}")
 
     print("\n--- Unbanning and Connecting ---")
@@ -1975,6 +2007,12 @@ if __name__ == "__main__":
     try:
         manager.connect_peer(malicious_ip)
     except ValueError as e:
+        logger.warning(
+            "ValueError in get_ssl_context",
+            error_type="ValueError",
+            error=str(e),
+            function="get_ssl_context",
+        )
         print(f"Error: {e}")
 
 

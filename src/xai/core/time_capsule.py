@@ -133,7 +133,7 @@ class TimeCapsuleManager:
                 capsule = TimeCapsule.from_dict(capsule_data)
                 self.capsules[capsule.capsule_id] = capsule
             self.user_capsules = payload.get("users", {})
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.warning(
                 "Failed to load time capsules from disk, starting fresh",
                 storage_path=self.storage_path,

@@ -735,7 +735,13 @@ class ChainValidator:
             # Verify signature
             return verify_signature_hex(public_key, tx_hash.encode(), signature)
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+            logger.warning(
+                "Exception in _verify_transaction_signature",
+                error_type="Exception",
+                error=str(e),
+                function="_verify_transaction_signature",
+            )
             return False
 
     def _calculate_transaction_hash(self, tx: dict) -> str:

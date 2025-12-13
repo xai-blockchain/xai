@@ -14,6 +14,10 @@ from typing import Any, Dict, List, Optional, Tuple
 import secrets
 import threading
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 import requests
 
 from xai.core.spv_header_ingestor import SPVHeaderIngestor
@@ -303,6 +307,12 @@ class SwapStateMachine:
                 json.dump(serializable_swap, f, indent=2)
 
         except Exception as e:
+            logger.error(
+                "Exception in _persist_swap",
+                error_type="Exception",
+                error=str(e),
+                function="_persist_swap",
+            )
             print(f"Error persisting swap {swap_id}: {e}")
 
     def _load_swaps(self) -> None:
@@ -327,6 +337,12 @@ class SwapStateMachine:
                 self.swaps[swap_id] = swap_data
 
         except Exception as e:
+            logger.error(
+                "Exception in _load_swaps",
+                error_type="Exception",
+                error=str(e),
+                function="_load_swaps",
+            )
             print(f"Error loading swaps: {e}")
 
     def get_swap_history(self, swap_id: str) -> List[Dict]:
@@ -500,6 +516,12 @@ class AtomicSwapHTLC:
                 }
             )
         except ValueError as exc:
+            logger.warning(
+                "ValueError in _create_utxo_htlc",
+                error_type="ValueError",
+                error=str(exc),
+                function="_create_utxo_htlc",
+            )
             contract["deployment_ready"] = False
             contract["deployment_error"] = str(exc)
         return contract
@@ -647,6 +669,12 @@ class AtomicSwapHTLC:
                 solc_version=cfg.get("solc_version", "0.8.21"),
             )
         except Exception as exc:  # pragma: no cover - defensive network handling
+            logger.warning(
+                "Exception in _create_ethereum_htlc",
+                error_type="Exception",
+                error=str(exc),
+                function="_create_ethereum_htlc",
+            )
             contract["deployment_ready"] = False
             contract["deployment_error"] = str(exc)
             return contract
@@ -1007,6 +1035,12 @@ class CrossChainVerifier:
         try:
             reconstructed = self._reconstruct_merkle_root(tx_hash, merkle_proof, tx_index)
         except ValueError as exc:
+            logger.warning(
+                "ValueError in verify_spv_proof",
+                error_type="ValueError",
+                error=str(exc),
+                function="verify_spv_proof",
+            )
             return False, f"SPV verification error: {exc}"
 
         merkle_root = (block_header.get("merkle_root") or "").lower()
@@ -1069,6 +1103,12 @@ class CrossChainVerifier:
         try:
             tx_data = self._fetch_transaction(provider, normalized_coin, tx_hash)
         except Exception as exc:  # pragma: no cover - defensive logging
+            logger.warning(
+                "Exception in verify_transaction_on_chain",
+                error_type="Exception",
+                error=str(exc),
+                function="verify_transaction_on_chain",
+            )
             return False, f"Verification failed: {exc}", None
 
         if not tx_data:
@@ -1137,6 +1177,12 @@ class CrossChainVerifier:
         try:
             proof = self._fetch_merkle_proof(provider, tx_hash)
         except Exception as exc:
+            logger.warning(
+                "Exception in verify_transaction_spv",
+                error_type="Exception",
+                error=str(exc),
+                function="verify_transaction_spv",
+            )
             return False, f"Failed to fetch merkle proof: {exc}", None
         if not proof or not proof.get("hashes"):
             return False, "Merkle proof unavailable", None
@@ -1148,6 +1194,12 @@ class CrossChainVerifier:
                 proof.get("block_hash"),
             )
         except Exception as exc:
+            logger.warning(
+                "Exception in verify_transaction_spv",
+                error_type="Exception",
+                error=str(exc),
+                function="verify_transaction_spv",
+            )
             return False, f"Failed to fetch block header: {exc}", None
 
         ok, message = self.verify_spv_proof(

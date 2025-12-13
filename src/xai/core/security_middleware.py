@@ -816,7 +816,7 @@ class SecurityMiddleware:
                     "timeout": self.config.SESSION_TIMEOUT
                 }), 200
 
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 security_logger.error(f"Login error: {str(e)}")
                 return jsonify({"error": "Login failed"}), 500
 

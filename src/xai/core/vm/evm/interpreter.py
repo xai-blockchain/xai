@@ -7,6 +7,10 @@ all opcodes including arithmetic, stack, memory, storage, and control flow.
 
 from __future__ import annotations
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 import hashlib
 import time
 from typing import Optional, Callable, Dict, Set, TYPE_CHECKING
@@ -1483,6 +1487,12 @@ class EVMInterpreter:
             self.execute(child_call)
         except VMExecutionError as e:
             # Execution error - revert and return failure
+            logger.warning(
+                "VMExecutionError in _execute_subcall",
+                error_type="VMExecutionError",
+                error=str(e),
+                function="_execute_subcall",
+            )
             self.context.revert_to_snapshot(snapshot_id)
             self.context.pop_call()
             return False, b""

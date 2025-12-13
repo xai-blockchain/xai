@@ -48,12 +48,28 @@ def mine_block() -> Tuple[Dict[str, Any], int]:
                 status=429,
                 code="rate_limited",
             )
-    except Exception as exc:
+    except (ImportError, AttributeError) as exc:
         logger.error(
-            "Rate limiter unavailable for /mine: %s",
+            "Rate limiter module unavailable for /mine: %s",
             type(exc).__name__,
             extra={
-                "event": "api.rate_limiter_error",
+                "event": "api.rate_limiter_import_error",
+                "endpoint": "/mine",
+                "client": request.remote_addr or "unknown",
+            },
+            exc_info=True,
+        )
+        return error_response(
+            "Rate limiting unavailable. Please retry later.",
+            status=503,
+            code="rate_limiter_unavailable",
+        )
+    except RuntimeError as exc:
+        logger.error(
+            "Rate limiter runtime error for /mine: %s",
+            str(exc),
+            extra={
+                "event": "api.rate_limiter_runtime_error",
                 "endpoint": "/mine",
                 "client": request.remote_addr or "unknown",
             },
@@ -85,8 +101,29 @@ def mine_block() -> Tuple[Dict[str, Any], int]:
             ),
             200,
         )
-
-    except Exception as e:
+    except ValueError as e:
+        logger.error(
+            "Invalid mining request: %s",
+            str(e),
+            extra={"event": "api.mining_invalid_request", "miner": node.miner_address},
+            exc_info=True,
+        )
+        return jsonify({"error": f"Invalid mining request: {e}"}), 400
+    except (OSError, IOError) as e:
+        logger.error(
+            "Storage error during mining: %s",
+            str(e),
+            extra={"event": "api.mining_storage_error", "miner": node.miner_address},
+            exc_info=True,
+        )
+        return jsonify({"error": "Storage error during mining"}), 500
+    except RuntimeError as e:
+        logger.error(
+            "Runtime error during mining: %s",
+            str(e),
+            extra={"event": "api.mining_runtime_error", "miner": node.miner_address},
+            exc_info=True,
+        )
         return jsonify({"error": str(e)}), 500
 
 

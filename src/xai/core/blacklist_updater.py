@@ -14,6 +14,10 @@ from datetime import datetime
 from typing import Dict, List, Set
 import xml.etree.ElementTree as ET
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 import requests
 
 
@@ -67,7 +71,13 @@ class BlacklistSource(ABC):
                 "count": len(addresses),
                 "last_update": self.last_update,
             }
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+            logger.warning(
+                "Exception in update",
+                error_type="Exception",
+                error=str(e),
+                function="update",
+            )
             return {
                 "source": self.name,
                 "status": "failed",

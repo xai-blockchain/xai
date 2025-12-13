@@ -212,8 +212,12 @@ class BlockchainMempoolMixin:
         if not getattr(transaction, "txid", None):
             try:
                 transaction.txid = transaction.calculate_hash()
-            except Exception as e:
-                self.logger.warn(f"Transaction rejected: failed to calculate txid: {type(e).__name__}")
+            except (ValueError, TypeError, AttributeError, RuntimeError) as e:
+                # Hash calculation errors: value/type issues, missing attributes, runtime failures
+                self.logger.warn(
+                    "Transaction rejected: failed to calculate txid",
+                    extra={"error_type": type(e).__name__, "error": str(e)}
+                )
                 return False
 
         # CRITICAL SECTION: Acquire lock to ensure atomic validation and insertion

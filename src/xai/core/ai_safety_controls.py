@@ -878,7 +878,13 @@ class AISafetyControls:
                 try:
                     bot.stop()
                     stopped_count += 1
-                except Exception as e:
+                except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+                    logger.error(
+                        "Exception in stop_all_trading_bots",
+                        error_type="Exception",
+                        error=str(e),
+                        function="stop_all_trading_bots",
+                    )
                     errors.append(f"{user_address}: {e}")
 
             self.total_stops += stopped_count

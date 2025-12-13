@@ -266,6 +266,12 @@ if __name__ == "__main__":
         proposal_id_1 = manager.submit_proposal(proposer_good, "Increase block reward by 1%", 150.0)
         print(f"Submitted proposal ID: {proposal_id_1}")
     except ValueError as e:
+        logger.warning(
+            "ValueError in return_stake",
+            error_type="ValueError",
+            error=str(e),
+            function="return_stake",
+        )
         print(f"Error: {e}")
 
     print("\n--- Submitting Proposal with Insufficient Stake ---")
@@ -273,6 +279,12 @@ if __name__ == "__main__":
         proposal_id_2 = manager.submit_proposal(proposer_bad, "Change logo to a cat", 50.0)
         print(f"Submitted proposal ID: {proposal_id_2}")
     except ValueError as e:
+        logger.warning(
+            "ValueError in return_stake",
+            error_type="ValueError",
+            error=str(e),
+            function="return_stake",
+        )
         print(f"Error (expected): {e}")
 
     print("\n--- Getting Staked Amount ---")
@@ -280,6 +292,12 @@ if __name__ == "__main__":
         staked = manager.get_staked_amount(proposal_id_1)
         print(f"Staked amount for {proposal_id_1}: {staked:.2f}")
     except ValueError as e:
+        logger.warning(
+            "ValueError in return_stake",
+            error_type="ValueError",
+            error=str(e),
+            function="return_stake",
+        )
         print(f"Error: {e}")
 
     print("\n--- Simulating Slashing Stake ---")

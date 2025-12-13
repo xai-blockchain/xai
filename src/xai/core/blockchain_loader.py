@@ -258,7 +258,7 @@ class BlockchainLoader:
                     else:
                         logger.warning("Checkpoint validation failed")
 
-                except Exception as e:
+                except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                     logger.error("Failed to load checkpoint", extra={"error": str(e)}, exc_info=True)
                     continue
         else:
@@ -297,7 +297,7 @@ class BlockchainLoader:
 
             logger.info("Validation report saved", extra={"filename": os.path.basename(report_file)})
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.warning("Failed to save validation report", extra={"error": str(e)})
 
     def get_validation_report(self) -> Optional[ValidationReport]:

@@ -1159,6 +1159,12 @@ class NodeAPIRoutes:
             try:
                 limit, offset = self._get_pagination_params(default_limit=10, max_limit=200)
             except PaginationError as exc:
+                logger.warning(
+                    "PaginationError in get_blocks",
+                    error_type="PaginationError",
+                    error=str(exc),
+                    function="get_blocks",
+                )
                 return self._error_response(
                     str(exc),
                     status=400,
@@ -1600,6 +1606,11 @@ class NodeAPIRoutes:
                     }
                 )
             except ValueError as exc:
+                logger.warning(
+                    "ValueError occurred",
+                    error_type="ValueError",
+                    error=str(exc),
+                )
                 return self._error_response(str(exc), status=400, code="order_invalid")
             except (DatabaseError, StorageError, OSError, IOError, TypeError, KeyError, AttributeError) as exc:
                 logger.error(
@@ -1761,6 +1772,12 @@ class NodeAPIRoutes:
                 )
                 return self._success_response(result if isinstance(result, dict) else {"result": result})
             except ValueError as exc:
+                logger.warning(
+                    "ValueError in deposit_funds",
+                    error_type="ValueError",
+                    error=str(exc),
+                    function="deposit_funds",
+                )
                 return self._error_response(str(exc), status=400, code="deposit_invalid")
             except (DatabaseError, StorageError, OSError, IOError, TypeError, KeyError, AttributeError) as exc:
                 logger.error(
@@ -1796,6 +1813,12 @@ class NodeAPIRoutes:
                 )
                 return self._success_response(result if isinstance(result, dict) else {"result": result})
             except ValueError as exc:
+                logger.warning(
+                    "ValueError in withdraw_funds",
+                    error_type="ValueError",
+                    error=str(exc),
+                    function="withdraw_funds",
+                )
                 return self._error_response(str(exc), status=400, code="withdraw_invalid")
             except (DatabaseError, StorageError, OSError, IOError, TypeError, KeyError, AttributeError) as exc:
                 logger.error(
@@ -2022,6 +2045,12 @@ class NodeAPIRoutes:
                 )
 
             except ValueError as exc:
+                logger.warning(
+                    "ValueError in buy_with_card",
+                    error_type="ValueError",
+                    error=str(exc),
+                    function="buy_with_card",
+                )
                 return self._error_response(str(exc), status=400, code="payment_invalid")
             except (DatabaseError, StorageError, OSError, IOError, TypeError, KeyError, AttributeError) as exc:
                 logger.error(

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 from typing import TYPE_CHECKING, Dict, Tuple, Any
 
 from flask import jsonify
@@ -115,6 +119,12 @@ def register_wallet_routes(routes: "NodeAPIRoutes") -> None:
         try:
             window, total = blockchain.get_transaction_history_window(address, limit, offset)
         except ValueError as exc:
+            logger.warning(
+                "ValueError in get_history",
+                error_type="ValueError",
+                error=str(exc),
+                function="get_history",
+            )
             return routes._error_response(
                 str(exc),
                 status=400,

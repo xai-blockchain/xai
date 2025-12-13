@@ -8,6 +8,10 @@ and reduce per-transaction overhead.
 
 from __future__ import annotations
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 import time
 from typing import List, Dict, Any, Optional, Callable
 from dataclasses import dataclass
@@ -403,6 +407,12 @@ class BatchProcessor:
 
             return success
         except Exception as e:
+            logger.warning(
+                "Exception in process_batch",
+                error_type="Exception",
+                error=str(e),
+                function="process_batch",
+            )
             self.failed_count += len(batch.transactions)
             print(f"Batch processing error: {e}")
             return False

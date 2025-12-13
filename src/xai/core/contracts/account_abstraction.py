@@ -454,18 +454,20 @@ class SmartAccount:
             )
             raise MalformedSignatureError(f"Invalid signature format: {e}")
 
-        except Exception as e:
+        except (TypeError, AttributeError, KeyError, RuntimeError) as e:
             # Unexpected cryptographic error - fail fast, don't continue
+            # Covers: type issues, missing attributes, key access errors, crypto runtime failures
             logger.error(
                 "Signature validation error: cryptographic failure",
                 extra={
                     "event": "account.signature_validation_error",
                     "account": self.address[:16] if self.address else "unknown",
                     "error": str(e),
+                    "error_type": type(e).__name__,
                 },
                 exc_info=True
             )
-            raise SignatureError(f"Signature verification failed: {e}")
+            raise SignatureError(f"Signature verification failed: {e}") from e
 
     def _pay_prefund(self, amount: int) -> None:
         """Pay prefund to EntryPoint."""
@@ -712,7 +714,9 @@ class MultiSigAccount(SmartAccount):
                         f"Signature {i} verification failed for owner {owner[:16]}: {e}"
                     )
                     continue
-                except Exception as e:
+                except (TypeError, AttributeError, KeyError, RuntimeError) as e:
+                    # Unexpected error in signature verification: type issues, missing attributes,
+                    # key access errors, or cryptographic runtime failures
                     logger.error(
                         "Unexpected error verifying signature %s for owner %s: %s",
                         i,
@@ -723,6 +727,7 @@ class MultiSigAccount(SmartAccount):
                             "account": self.address[:16] if self.address else "unknown",
                             "signature_index": i,
                             "owner": owner[:16],
+                            "error_type": type(e).__name__,
                         },
                         exc_info=True,
                     )
@@ -1359,9 +1364,17 @@ class EntryPoint:
             success = True
             gas_used += op.call_gas_limit // 2  # Simplified gas accounting
 
-        except Exception as e:
+        except (VMExecutionError, SignatureError, ValueError, TypeError, AttributeError, KeyError) as e:
+            # Catch execution failures: VM errors, signature errors, value/type/attribute errors
             success = False
-            logger.warning(f"UserOp execution failed: {e}")
+            logger.warning(
+                "UserOp execution failed",
+                extra={
+                    "sender": op.sender[:16] if op.sender else "unknown",
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                }
+            )
 
         # 5. Paymaster post-op
         if paymaster_context:

@@ -197,7 +197,7 @@ class NetworkSecurityManager:
                     e,
                     extra={"event": "network_security.cert_invalid"}
                 )
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 security_logger.error(
                     "Unexpected error loading certificate: %s",
                     e,
@@ -222,7 +222,7 @@ class NetworkSecurityManager:
                     e,
                     extra={"event": "network_security.ca_cert_invalid"}
                 )
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 security_logger.error(
                     "Unexpected error loading CA certificate: %s",
                     e,

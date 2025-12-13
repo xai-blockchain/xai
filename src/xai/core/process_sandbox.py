@@ -2,6 +2,10 @@ import logging
 import os
 from typing import Dict, Tuple, Union, Any
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 def _get_logger(logger: Any) -> logging.Logger:
     if isinstance(logger, logging.Logger):
@@ -42,7 +46,13 @@ def apply_process_limits(
         new_soft, new_hard = _bounded(mem_bytes, hard)
         resource.setrlimit(resource.RLIMIT_AS, (new_soft, new_hard))
         limits["address_space_bytes"] = (new_soft, new_hard)
-    except Exception as exc:  # pragma: no cover - platform specific
+    except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:  # pragma: no cover - platform specific
+        logger.error(
+            "Exception in _bounded",
+            error_type="Exception",
+            error=str(exc),
+            function="_bounded",
+        )
         log.warning("Failed to set memory limit: %s", exc, extra={"event": "sandbox.mem_fail"})
 
     try:
@@ -51,7 +61,13 @@ def apply_process_limits(
         new_soft, new_hard = _bounded(cpu_target, hard)
         resource.setrlimit(resource.RLIMIT_CPU, (new_soft, new_hard))
         limits["cpu_seconds"] = (new_soft, new_hard)
-    except Exception as exc:  # pragma: no cover - platform specific
+    except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:  # pragma: no cover - platform specific
+        logger.error(
+            "Exception in _bounded",
+            error_type="Exception",
+            error=str(exc),
+            function="_bounded",
+        )
         log.warning("Failed to set CPU limit: %s", exc, extra={"event": "sandbox.cpu_fail"})
 
     try:
@@ -60,7 +76,13 @@ def apply_process_limits(
         new_soft, new_hard = _bounded(open_target, hard)
         resource.setrlimit(resource.RLIMIT_NOFILE, (new_soft, new_hard))
         limits["open_files"] = (new_soft, new_hard)
-    except Exception as exc:  # pragma: no cover - platform specific
+    except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:  # pragma: no cover - platform specific
+        logger.error(
+            "Exception in _bounded",
+            error_type="Exception",
+            error=str(exc),
+            function="_bounded",
+        )
         log.warning("Failed to set file descriptor limit: %s", exc, extra={"event": "sandbox.fd_fail"})
 
     log.info("Process sandbox limits applied", extra={"event": "sandbox.applied", "limits": limits})

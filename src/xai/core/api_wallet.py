@@ -257,7 +257,7 @@ class WalletAPIHandler:
         # Encrypt the keystore with user's password
         try:
             encrypted_keystore = wallet._encrypt_payload(json.dumps(wallet_data), password)
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.error(
                 f"Wallet encryption failed: {e}",
                 extra={"event": "wallet.encryption_failed"},
@@ -410,7 +410,7 @@ class WalletAPIHandler:
         except ValueError as e:
             logger.error(f"Signing failed with ValueError: {e}")
             return jsonify({"success": False, "error": str(e)}), 400
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.error(f"Unexpected error during signing: {e}", exc_info=True)
             return (
                 jsonify({"success": False, "error": "Internal signing error"}),
@@ -471,7 +471,7 @@ class WalletAPIHandler:
         except ValueError as e:
             logger.error(f"Public key derivation failed with ValueError: {e}")
             return jsonify({"success": False, "error": str(e)}), 400
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.error(f"Unexpected error during public key derivation: {e}", exc_info=True)
             return (
                 jsonify({"success": False, "error": "Internal derivation error"}),
@@ -502,6 +502,12 @@ class WalletAPIHandler:
         try:
             record = self.node.account_abstraction.create_embedded_wallet(alias, contact, secret)
         except ValueError as exc:
+            logger.warning(
+                "ValueError in create_embedded_wallet_handler",
+                error_type="ValueError",
+                error=str(exc),
+                function="create_embedded_wallet_handler",
+            )
             return (
                 jsonify({"success": False, "error": "ALIAS_EXISTS", "message": str(exc)}),
                 400,
@@ -644,6 +650,12 @@ class WalletAPIHandler:
         try:
             result = self.node.blockchain.submit_trade_order(order_data)
         except ValueError as exc:
+            logger.warning(
+                "ValueError in create_trade_order_handler",
+                error_type="ValueError",
+                error=str(exc),
+                function="create_trade_order_handler",
+            )
             return jsonify({"success": False, "error": str(exc)}), 400
 
         trade_orders_counter.inc()
@@ -882,5 +894,5 @@ class WalletAPIHandler:
                 )
                 self.trade_peers[host] = time.time()
                 logger.info(f"Gossiped trade event to {host}")
-            except Exception as exc:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
                 logger.warning(f"Trade gossip to {host} failed: {exc}")

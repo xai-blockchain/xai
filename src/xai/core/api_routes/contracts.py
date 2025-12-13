@@ -93,6 +93,12 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
             try:
                 metadata["abi"] = blockchain.normalize_contract_abi(metadata.get("abi"))
             except ValueError as exc:
+                logger.warning(
+                    "ValueError in deploy_contract",
+                    error_type="ValueError",
+                    error=str(exc),
+                    function="deploy_contract",
+                )
                 return routes._error_response(
                     "Invalid contract ABI",
                     status=400,
@@ -200,6 +206,12 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
                 else bytes.fromhex(model.data or "")
             )
         except ValueError as exc:
+            logger.warning(
+                "ValueError in call_contract",
+                error_type="ValueError",
+                error=str(exc),
+                function="call_contract",
+            )
             return routes._error_response(
                 "Contract payload serialization failed",
                 status=400,
@@ -281,6 +293,12 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
         try:
             normalized = sanitizer.validate_address(address)
         except ValueError as exc:
+            logger.warning(
+                "ValueError in contract_state",
+                error_type="ValueError",
+                error=str(exc),
+                function="contract_state",
+            )
             return routes._error_response(
                 str(exc), status=400, code="invalid_address", event_type="contracts.invalid_address"
             )
@@ -312,6 +330,12 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
         try:
             normalized = sanitizer.validate_address(address)
         except ValueError as exc:
+            logger.warning(
+                "ValueError in contract_abi",
+                error_type="ValueError",
+                error=str(exc),
+                function="contract_abi",
+            )
             return routes._error_response(
                 str(exc), status=400, code="invalid_address", event_type="contracts.invalid_address"
             )
@@ -353,6 +377,12 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
         try:
             normalized = sanitizer.validate_address(address)
         except ValueError as exc:
+            logger.warning(
+                "ValueError in contract_interfaces",
+                error_type="ValueError",
+                error=str(exc),
+                function="contract_interfaces",
+            )
             return routes._error_response(
                 str(exc), status=400, code="invalid_address", event_type="contracts.invalid_address"
             )
@@ -376,6 +406,12 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
             try:
                 interfaces = routes._detect_contract_interfaces(normalized)
             except RuntimeError as exc:
+                logger.warning(
+                    "RuntimeError in contract_interfaces",
+                    error_type="RuntimeError",
+                    error=str(exc),
+                    function="contract_interfaces",
+                )
                 return routes._error_response(
                     str(exc),
                     status=503,
@@ -429,6 +465,12 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
         try:
             limit, offset = routes._get_pagination_params(default_limit=50, max_limit=500)
         except ValueError as exc:
+            logger.warning(
+                "ValueError in contract_events",
+                error_type="ValueError",
+                error=str(exc),
+                function="contract_events",
+            )
             return routes._error_response(
                 str(exc), status=400, code="invalid_pagination", event_type="contracts.invalid_paging"
             )
@@ -436,6 +478,12 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
         try:
             normalized = sanitizer.validate_address(address)
         except ValueError as exc:
+            logger.warning(
+                "ValueError in contract_events",
+                error_type="ValueError",
+                error=str(exc),
+                function="contract_events",
+            )
             return routes._error_response(
                 str(exc), status=400, code="invalid_address", event_type="contracts.invalid_address"
             )

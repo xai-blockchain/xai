@@ -164,7 +164,7 @@ class FinalityManager:
                 if self._misbehavior_callback:
                     try:
                         self._misbehavior_callback(validator.address, header.index, proof or {})
-                    except Exception as exc:  # pragma: no cover - defensive logging
+                    except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:  # pragma: no cover - defensive logging
                         self.logger.error(
                             "Finality misbehavior callback failed",
                             validator=validator.address,
@@ -224,7 +224,7 @@ class FinalityManager:
         for entry in payload:
             try:
                 certificate = FinalityCertificate.from_dict(entry)
-            except Exception as exc:  # pragma: no cover - defensive
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:  # pragma: no cover - defensive
                 self.logger.error("Invalid certificate entry", error=str(exc))
                 continue
             self.certificates_by_hash[certificate.block_hash] = certificate

@@ -48,7 +48,7 @@ class SecurityEventRouter:
         for sink in list(cls._sinks):
             try:
                 sink(event_type, details, severity)
-            except Exception as exc:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
                 security_logger.debug(
                     "SecurityEventRouter sink failure: %s", exc, exc_info=True
                 )

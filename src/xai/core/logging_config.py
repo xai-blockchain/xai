@@ -161,7 +161,7 @@ def setup_logging(
             file_handler.setLevel(getattr(logging, level.upper()))
             file_handler.setFormatter(formatter)
             logger.addHandler(file_handler)
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.warning(f"Could not create file handler for {log_file}: {e}")
 
     return logger

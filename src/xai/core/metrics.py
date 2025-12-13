@@ -72,7 +72,13 @@ class StructuredLogger:
                 file_handler = logging.FileHandler(log_file)
                 file_handler.setFormatter(json_formatter)
                 self.logger.addHandler(file_handler)
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+                logger.error(
+                    "Exception in __init__",
+                    error_type="Exception",
+                    error=str(e),
+                    function="__init__",
+                )
                 print(f"Warning: Could not create file log handler: {e}")
 
     def log(
@@ -563,7 +569,7 @@ class BlockchainMetrics:
                         memory_percent=memory.percent,
                     )
 
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 self.logger.error("Failed to update system metrics", error=str(e))
 
     def set_node_info(self, version: str, network: str, node_id: str) -> None:

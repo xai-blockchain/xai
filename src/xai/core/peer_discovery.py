@@ -702,7 +702,7 @@ class PeerDiscoveryManager:
                 # Sleep for a bit
                 time.sleep(10)
 
-            except Exception as exc:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
                 logger.error(
                     "Peer discovery loop error: %s",
                     exc,

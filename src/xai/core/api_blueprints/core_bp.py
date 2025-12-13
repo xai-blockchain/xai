@@ -87,6 +87,12 @@ def health_check() -> Tuple[Dict[str, Any], int]:
                 overall_status = "unhealthy"
                 http_status = 503
             except RuntimeError as exc:
+                logger.error(
+                    "RuntimeError in degrade",
+                    error_type="RuntimeError",
+                    error=str(exc),
+                    function="degrade",
+                )
                 blockchain_summary = {"accessible": False, "error": f"Runtime error: {exc}"}
                 overall_status = "unhealthy"
                 http_status = 503
@@ -98,6 +104,12 @@ def health_check() -> Tuple[Dict[str, Any], int]:
         overall_status = "unhealthy"
         http_status = 503
     except RuntimeError as exc:
+        logger.error(
+            "RuntimeError in degrade",
+            error_type="RuntimeError",
+            error=str(exc),
+            function="degrade",
+        )
         blockchain_summary = {"accessible": False, "error": f"Runtime error: {exc}"}
         overall_status = "unhealthy"
         http_status = 503
@@ -156,6 +168,11 @@ def health_check() -> Tuple[Dict[str, Any], int]:
             degrade("p2p_error")
             services["p2p_error"] = f"Configuration error: {exc}"
         except RuntimeError as exc:
+            logger.error(
+                "RuntimeError occurred",
+                error_type="RuntimeError",
+                error=str(exc),
+            )
             p2p_status = "degraded"
             degrade("p2p_error")
             services["p2p_error"] = f"Runtime error: {exc}"
@@ -265,6 +282,12 @@ def get_mempool_overview() -> Tuple[Dict[str, Any], int]:
         )
         return jsonify({"success": False, "error": "Storage error"}), 500
     except RuntimeError as exc:
+        logger.warning(
+            "RuntimeError in get_mempool_overview",
+            error_type="RuntimeError",
+            error=str(exc),
+            function="get_mempool_overview",
+        )
         return handle_exception(exc, "mempool_overview")
 
 
@@ -302,6 +325,12 @@ def get_mempool_stats() -> Tuple[Dict[str, Any], int]:
         )
         return jsonify({"success": False, "error": "Storage error"}), 500
     except RuntimeError as exc:
+        logger.warning(
+            "RuntimeError in get_mempool_stats",
+            error_type="RuntimeError",
+            error=str(exc),
+            function="get_mempool_stats",
+        )
         return handle_exception(exc, "mempool_stats")
 
     limits = overview.get("limits", {}) or {}

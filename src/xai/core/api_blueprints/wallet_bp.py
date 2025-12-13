@@ -56,7 +56,29 @@ def get_address_nonce(address: str) -> Tuple[Dict[str, Any], int]:
     try:
         confirmed = tracker.get_nonce(address)
         next_nonce = tracker.get_next_nonce(address)
-    except Exception as exc:
+    except (ValueError, KeyError) as exc:
+        logger.error(
+            "Invalid nonce lookup request: %s",
+            str(exc),
+            extra={"event": "api.nonce_invalid_request", "address": address},
+            exc_info=True,
+        )
+        return error_response(f"Invalid nonce request: {exc}", status=400, code="invalid_request")
+    except (OSError, IOError) as exc:
+        logger.error(
+            "Storage error during nonce lookup: %s",
+            str(exc),
+            extra={"event": "api.nonce_storage_error", "address": address},
+            exc_info=True,
+        )
+        return error_response("Storage error", status=500, code="storage_error")
+    except RuntimeError as exc:
+        logger.warning(
+            "RuntimeError in get_address_nonce",
+            error_type="RuntimeError",
+            error=str(exc),
+            function="get_address_nonce",
+        )
         return handle_exception(exc, "nonce_lookup")
 
     pending_nonce = next_nonce - 1 if next_nonce - 1 > confirmed else None
@@ -80,6 +102,12 @@ def get_history(address: str) -> Dict[str, Any]:
     try:
         limit, offset = get_pagination_params(default_limit=50, max_limit=500)
     except PaginationError as exc:
+        logger.warning(
+            "PaginationError in get_history",
+            error_type="PaginationError",
+            error=str(exc),
+            function="get_history",
+        )
         return error_response(
             str(exc),
             status=400,
@@ -90,6 +118,12 @@ def get_history(address: str) -> Dict[str, Any]:
     try:
         window, total = blockchain.get_transaction_history_window(address, limit, offset)
     except ValueError as exc:
+        logger.warning(
+            "ValueError in get_history",
+            error_type="ValueError",
+            error=str(exc),
+            function="get_history",
+        )
         return error_response(
             str(exc),
             status=400,
@@ -149,6 +183,12 @@ def claim_faucet() -> Tuple[Dict[str, Any], int]:
     try:
         model = FaucetClaimInput.parse_obj(payload)
     except PydanticValidationError as exc:
+        logger.warning(
+            "PydanticValidationError in claim_faucet",
+            error_type="PydanticValidationError",
+            error=str(exc),
+            function="claim_faucet",
+        )
         _record_faucet_metric(success=False)
         return error_response(
             "Invalid faucet request",
@@ -192,7 +232,31 @@ def claim_faucet() -> Tuple[Dict[str, Any], int]:
 
     try:
         faucet_tx = node.queue_faucet_transaction(address, amount)
-    except Exception as exc:
+    except ValueError as exc:
+        _record_faucet_metric(success=False)
+        logger.error(
+            "Invalid faucet transaction: %s",
+            str(exc),
+            extra={"event": "api.faucet_invalid_transaction", "address": address, "amount": amount},
+            exc_info=True,
+        )
+        return error_response(f"Invalid transaction: {exc}", status=400, code="invalid_transaction")
+    except (OSError, IOError) as exc:
+        _record_faucet_metric(success=False)
+        logger.error(
+            "Storage error queuing faucet transaction: %s",
+            str(exc),
+            extra={"event": "api.faucet_storage_error", "address": address, "amount": amount},
+            exc_info=True,
+        )
+        return error_response("Storage error", status=500, code="storage_error")
+    except RuntimeError as exc:
+        logger.warning(
+            "RuntimeError in claim_faucet",
+            error_type="RuntimeError",
+            error=str(exc),
+            function="claim_faucet",
+        )
         _record_faucet_metric(success=False)
         return handle_exception(exc, "faucet_queue")
 

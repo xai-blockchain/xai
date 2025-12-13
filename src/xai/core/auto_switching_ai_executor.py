@@ -24,6 +24,10 @@ import anthropic
 import openai
 from google import generativeai as genai
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 # Import new AI providers
 try:
     from xai.core.additional_ai_providers import (
@@ -216,7 +220,13 @@ class AutoSwitchingAIExecutor:
 
             return result
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+            logger.warning(
+                "Exception in execute_long_task_with_auto_switch",
+                error_type=type(e).__name__,
+                error=str(e),
+                function="execute_long_task_with_auto_switch",
+            )
             task_state["status"] = TaskStatus.FAILED
             return {
                 "success": False,

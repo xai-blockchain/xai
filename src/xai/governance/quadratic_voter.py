@@ -249,6 +249,12 @@ if __name__ == "__main__":
         try:
             voter_manager.cast_votes(whale_address, 100)
         except ValueError as e:
+            logger.warning(
+                "ValueError in cast_votes",
+                error_type="ValueError",
+                error=str(e),
+                function="cast_votes",
+            )
             print(f"Error (expected): {e}")
 
     except ValueError as e:
@@ -274,6 +280,12 @@ if __name__ == "__main__":
         try:
             voter_manager.cast_votes(normal_user_address, 10)
         except ValueError as e:
+            logger.warning(
+                "ValueError in cast_votes",
+                error_type="ValueError",
+                error=str(e),
+                function="cast_votes",
+            )
             print(f"Error (expected): {e}")
 
     except ValueError as e:

@@ -147,7 +147,7 @@ class FraudDetector:
                         "reason": "invalid_signature",
                         "message": "Signature verification failed"
                     }
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 logger.error(f"Signature verification error for {identifier}: {e}")
                 return {
                     "verified": False,
@@ -495,7 +495,7 @@ def setup_wallet_claiming_api(app, node):
                     }
                 )
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             # Log premium wallet claim failure but continue to bonus/standard tiers
             logger.warning(
                 "Premium wallet claim failed for identifier=%s, falling back to bonus tier: %s",
@@ -520,7 +520,7 @@ def setup_wallet_claiming_api(app, node):
                     response["remaining_bonus"] = bonus_result["remaining_bonus"]
                 return jsonify(response)
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             # Log bonus wallet claim failure but continue to standard tier
             logger.warning(
                 "Bonus wallet claim failed for identifier=%s, falling back to standard tier: %s",
@@ -577,7 +577,7 @@ def setup_wallet_claiming_api(app, node):
 
                 return jsonify(response)
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             # Log standard wallet claim failure but continue to micro tier
             logger.warning(
                 "Standard wallet claim failed for identifier=%s, falling back to micro tier: %s",
@@ -611,7 +611,7 @@ def setup_wallet_claiming_api(app, node):
                     }
                 )
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             # Log micro wallet claim failure - all tiers exhausted
             logger.error(
                 "Micro wallet claim failed for identifier=%s, all tiers exhausted: %s",

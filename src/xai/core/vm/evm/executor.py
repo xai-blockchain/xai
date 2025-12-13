@@ -230,6 +230,12 @@ class EVMBytecodeExecutor(BaseExecutor):
         try:
             interpreter.execute(call)
         except VMExecutionError as e:
+            logger.warning(
+                "VMExecutionError in delegatecall",
+                error_type="VMExecutionError",
+                error=str(e),
+                function="delegatecall",
+            )
             return ExecutionResult(
                 success=False,
                 gas_used=gas_limit,
@@ -803,6 +809,12 @@ class EVMBytecodeExecutor(BaseExecutor):
                 erc721_receive_hook=erc721_hook,
             )
         except VMExecutionError as exc:
+            logger.warning(
+                "VMExecutionError in erc721_hook",
+                error_type="VMExecutionError",
+                error=str(exc),
+                function="erc721_hook",
+            )
             return ExecutionResult(
                 success=False,
                 gas_used=message.gas_limit,

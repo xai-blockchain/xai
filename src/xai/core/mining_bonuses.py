@@ -496,6 +496,12 @@ class MiningBonusManager:
             with open(filepath, "w") as f:
                 json.dump(data, f, indent=2)
         except IOError as e:
+            logger.error(
+                "IOError in _save_json",
+                error_type="IOError",
+                error=str(e),
+                function="_save_json",
+            )
             print(f"Error saving to {filepath}: {e}")
 
     def _now(self) -> datetime:

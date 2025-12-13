@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 from typing import TYPE_CHECKING, Dict, Tuple, Optional, Any
 
 from flask import jsonify, request
@@ -58,6 +62,12 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
             result = node.bonus_manager.register_miner(model.address)
             return routes._success_response(result if isinstance(result, dict) else {"result": result})
         except ValueError as exc:
+            logger.warning(
+                "ValueError in register_miner",
+                error_type="ValueError",
+                error=str(exc),
+                function="register_miner",
+            )
             return routes._error_response(str(exc), status=400, code="mining_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:
             return routes._handle_exception(exc, "register_miner")
@@ -91,6 +101,12 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
             result = node.bonus_manager.check_achievements(address, blocks_mined, streak_days)
             return jsonify(result), 200
         except ValueError as exc:
+            logger.warning(
+                "ValueError in get_achievements",
+                error_type="ValueError",
+                error=str(exc),
+                function="get_achievements",
+            )
             return routes._error_response(str(exc), status=400, code="mining_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:
             return routes._handle_exception(exc, "get_achievements")
@@ -133,6 +149,12 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
             result = node.bonus_manager.claim_bonus(model.address, model.bonus_type)
             return routes._success_response(result if isinstance(result, dict) else {"result": result})
         except ValueError as exc:
+            logger.warning(
+                "ValueError in claim_bonus",
+                error_type="ValueError",
+                error=str(exc),
+                function="claim_bonus",
+            )
             return routes._error_response(str(exc), status=400, code="mining_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:
             return routes._handle_exception(exc, "claim_bonus")
@@ -174,6 +196,12 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
             result = node.bonus_manager.create_referral_code(model.address)
             return routes._success_response(result if isinstance(result, dict) else {"result": result})
         except ValueError as exc:
+            logger.warning(
+                "ValueError in create_referral_code",
+                error_type="ValueError",
+                error=str(exc),
+                function="create_referral_code",
+            )
             return routes._error_response(str(exc), status=400, code="referral_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:
             return routes._handle_exception(exc, "create_referral_code")
@@ -221,6 +249,12 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
             )
             return routes._success_response(result if isinstance(result, dict) else {"result": result})
         except ValueError as exc:
+            logger.warning(
+                "ValueError in use_referral_code",
+                error_type="ValueError",
+                error=str(exc),
+                function="use_referral_code",
+            )
             return routes._error_response(str(exc), status=400, code="referral_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:
             return routes._handle_exception(exc, "use_referral_code")
@@ -247,6 +281,12 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
             result = node.bonus_manager.get_user_bonuses(address)
             return jsonify(result), 200
         except ValueError as exc:
+            logger.warning(
+                "ValueError in get_user_bonuses",
+                error_type="ValueError",
+                error=str(exc),
+                function="get_user_bonuses",
+            )
             return routes._error_response(str(exc), status=400, code="mining_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:
             return routes._handle_exception(exc, "get_user_bonuses")
@@ -274,6 +314,12 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
             leaderboard = node.bonus_manager.get_leaderboard(limit)
             return jsonify({"success": True, "limit": limit, "leaderboard": leaderboard}), 200
         except ValueError as exc:
+            logger.warning(
+                "ValueError in get_bonus_leaderboard",
+                error_type="ValueError",
+                error=str(exc),
+                function="get_bonus_leaderboard",
+            )
             return routes._error_response(str(exc), status=400, code="mining_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:
             return routes._handle_exception(exc, "get_bonus_leaderboard")
@@ -307,6 +353,12 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
                 {"success": True, "limit": limit, "metric": metric, "leaderboard": leaderboard}
             ), 200
         except ValueError as exc:
+            logger.warning(
+                "ValueError in get_unified_leaderboard",
+                error_type="ValueError",
+                error=str(exc),
+                function="get_unified_leaderboard",
+            )
             return routes._error_response(str(exc), status=400, code="mining_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:
             return routes._handle_exception(exc, "get_unified_leaderboard")
@@ -330,6 +382,12 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
             stats = node.bonus_manager.get_stats()
             return jsonify({"success": True, "stats": stats}), 200
         except ValueError as exc:
+            logger.warning(
+                "ValueError in get_mining_bonus_stats",
+                error_type="ValueError",
+                error=str(exc),
+                function="get_mining_bonus_stats",
+            )
             return routes._error_response(str(exc), status=400, code="mining_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:
             return routes._handle_exception(exc, "get_mining_bonus_stats")

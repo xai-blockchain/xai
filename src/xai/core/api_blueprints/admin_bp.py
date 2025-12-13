@@ -67,6 +67,12 @@ def create_api_key() -> Tuple[Dict[str, Any], int]:
             {"api_key": api_key, "key_id": key_id, "scope": scope}, status=201
         )
     except ValueError as exc:
+        logger.warning(
+            "ValueError in create_api_key",
+            error_type="ValueError",
+            error=str(exc),
+            function="create_api_key",
+        )
         return error_response(str(exc), status=500, code="admin_error")
 
 
@@ -85,6 +91,12 @@ def delete_api_key(key_id: str) -> Tuple[Dict[str, Any], int]:
             log_event("api_key_revoked", {"key_id": key_id}, severity="WARNING")
             return success_response({"revoked": True})
     except ValueError as exc:
+        logger.warning(
+            "ValueError in delete_api_key",
+            error_type="ValueError",
+            error=str(exc),
+            function="delete_api_key",
+        )
         return error_response(str(exc), status=500, code="admin_error")
 
     return error_response("API key not found", status=404, code="not_found")

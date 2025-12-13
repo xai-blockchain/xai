@@ -617,6 +617,12 @@ class Wallet:
             raise ValueError(f"Decryption failed: invalid password or corrupted data - {e}") from e
         except InvalidTag as e:
             # InvalidTag from AESGCM.decrypt (wrong password or tampered data)
+            logger.error(
+                "InvalidTag in _decrypt_payload",
+                error_type="InvalidTag",
+                error=str(e),
+                function="_decrypt_payload",
+            )
             raise ValueError(f"Decryption failed: invalid password or corrupted data - authentication failed") from e
 
     @staticmethod
@@ -836,6 +842,12 @@ class Wallet:
             raise ValueError(f"Decryption failed: invalid password or corrupted data - {e}") from e
         except InvalidTag as e:
             # InvalidTag from AESGCM.decrypt (wrong password or tampered data)
+            logger.error(
+                "InvalidTag in _decrypt_payload_static",
+                error_type="InvalidTag",
+                error=str(e),
+                function="_decrypt_payload_static",
+            )
             raise ValueError(f"Decryption failed: invalid password or corrupted data - authentication failed") from e
 
     def to_dict(self) -> Dict[str, Any]:

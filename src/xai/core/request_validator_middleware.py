@@ -182,7 +182,7 @@ class RequestValidator:
             error = f"Validation error: {e.json()}"
             security_logger.warning(f"Pydantic validation failed: {error}")
             return False, error, None
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             error = f"Validation error: {str(e)}"
             security_logger.warning(f"Unexpected validation error: {str(e)}")
             return False, error, None

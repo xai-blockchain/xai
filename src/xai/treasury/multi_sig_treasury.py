@@ -325,6 +325,12 @@ if __name__ == "__main__":
     try:
         treasury.execute_transaction("Eve", tx2_id)  # Should fail
     except ValueError as e:
+        logger.warning(
+            "ValueError in get_executed_transactions",
+            error_type="ValueError",
+            error=str(e),
+            function="get_executed_transactions",
+        )
         print(f"Error (expected): {e}")
 
     print("\n--- Scenario 3: Duplicate Approval ---")
@@ -338,6 +344,12 @@ if __name__ == "__main__":
             "Eve", "0xGrant", 600.0
         )  # Balance is 1000 - 200 - 300 = 500
     except ValueError as e:
+        logger.warning(
+            "ValueError in get_executed_transactions",
+            error_type="ValueError",
+            error=str(e),
+            function="get_executed_transactions",
+        )
         print(f"Error (expected): {e}")
 
     print(f"\nFinal Treasury Balance: {treasury.get_balance():.2f}")

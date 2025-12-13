@@ -425,7 +425,7 @@ class AddressTransactionIndex:
                     blocks=len(blockchain.chain),
                     transactions=indexed_txs
                 )
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 self.db.rollback()
                 self.logger.error("Failed to rebuild address index", error=str(e))
                 raise

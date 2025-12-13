@@ -249,7 +249,7 @@ class CheckpointManager:
                 logger.error(f"Failed to save checkpoint at height {block.index}")
                 return None
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.error(f"Error creating checkpoint at height {block.index}: {e}")
             return None
 
@@ -302,7 +302,7 @@ class CheckpointManager:
             logger.debug(f"Checkpoint saved atomically: {checkpoint_file}")
             return True
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.error(f"Error saving checkpoint atomically: {e}")
             # Cleanup temp file if it exists
             if os.path.exists(temp_file):
@@ -344,7 +344,7 @@ class CheckpointManager:
             logger.info(f"Loaded checkpoint at height {height}")
             return checkpoint
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.error(f"Error loading checkpoint at height {height}: {e}")
             return None
 
@@ -421,7 +421,7 @@ class CheckpointManager:
                         shutil.move(checkpoint_file, backup_file)
                         pruned_count += 1
                         logger.info(f"Pruned checkpoint at height {height} (moved to {backup_dir})")
-                except Exception as e:
+                except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                     logger.warning(f"Failed to prune checkpoint at height {height}: {e}")
 
         if pruned_count > 0:
@@ -506,7 +506,7 @@ class CheckpointManager:
                 self._load_latest_checkpoint_height()
 
             return True
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.error(f"Failed to delete checkpoint at height {height}: {e}")
             return False
 

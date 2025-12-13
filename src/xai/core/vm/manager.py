@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 import time
 from typing import Any, Dict, List, TYPE_CHECKING
 
@@ -45,6 +49,12 @@ class SmartContractManager:
         try:
             result = self.processor.process(tx, block)
         except VMExecutionError as exc:
+            logger.warning(
+                "VMExecutionError in process_transaction",
+                error_type="VMExecutionError",
+                error=str(exc),
+                function="process_transaction",
+            )
             result = ExecutionResult(
                 success=False,
                 gas_used=0,

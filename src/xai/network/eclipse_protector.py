@@ -2,6 +2,10 @@ import time
 from collections import defaultdict
 from typing import List, Dict, Any
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class EclipseProtector:
     def __init__(self, max_connections_per_ip: int = 3, min_diverse_peers: int = 5):
@@ -94,6 +98,12 @@ if __name__ == "__main__":
         protector.connect_peer(attacker_ip)
         protector.connect_peer(attacker_ip)  # Should fail
     except ValueError as e:
+        logger.warning(
+            "ValueError in check_for_eclipse_risk",
+            error_type="ValueError",
+            error=str(e),
+            function="check_for_eclipse_risk",
+        )
         print(f"Error (expected): {e}")
     protector.check_for_eclipse_risk()
 

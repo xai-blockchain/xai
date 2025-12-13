@@ -300,7 +300,7 @@ class StrictAIPoolManager:
                 return
             try:
                 callback()
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 logger.debug(
                     "Failed to record task metrics",
                     extra={"error": str(e), "event": "ai_pool.metrics_error"}
@@ -680,8 +680,14 @@ class StrictAIPoolManager:
                     "message": f"Provider {provider} not implemented",
                 }
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             # API call failed - don't charge tokens
+            logger.warning(
+                "Exception in _execute_with_strict_limits",
+                error_type="Exception",
+                error=str(e),
+                function="_execute_with_strict_limits",
+            )
             return {
                 "success": False,
                 "error": "API_CALL_FAILED",
@@ -803,7 +809,13 @@ class StrictAIPoolManager:
                 "estimated": True,
             }
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+            logger.warning(
+                "Exception in _call_google_with_limit",
+                error_type="Exception",
+                error=str(e),
+                function="_call_google_with_limit",
+            )
             return {"success": False, "error": str(e), "tokens_used": 0}
 
     def _deduct_tokens_from_keys(self, keys: List[DonatedAPIKey], total_tokens: int) -> None:
@@ -908,7 +920,7 @@ class StrictAIPoolManager:
             }
             with open(self._state_path, "w", encoding="utf-8") as f:
                 json.dump(state, f)
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             # Persistence failures must not break runtime
             logging.debug("AI pool state save failed: %s", e)
 
@@ -945,10 +957,10 @@ class StrictAIPoolManager:
                         tasks_completed=int(item.get("tasks_completed", 0)),
                     )
                     self.donated_keys[dk.key_id] = dk
-                except Exception as e:
+                except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                     logging.debug("Failed to load donated key: %s", e)
                     continue
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             # Ignore load errors and start fresh
             logging.debug("AI pool state load failed: %s", e)
             self.donated_keys = self.donated_keys or {}
@@ -1000,7 +1012,7 @@ class StrictAIPoolManager:
         """Safely fetch task metrics collector."""
         try:
             return get_ai_task_metrics()
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logging.debug("Failed to get AI task metrics: %s", e)
             return None
 

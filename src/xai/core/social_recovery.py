@@ -11,6 +11,10 @@ from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class SocialRecoveryManager:
     """Manage social recovery configurations and requests for AXN wallets"""
@@ -51,7 +55,13 @@ class SocialRecoveryManager:
                 with open(self.configs_file, "r") as f:
                     self.recovery_configs = json.load(f)
                 print(f"Loaded {len(self.recovery_configs)} recovery configurations")
-        except Exception as e:
+        except (OSError, IOError, ValueError, KeyError, json.JSONDecodeError) as e:
+            logger.error(
+                "Exception in _load_data",
+                error_type=type(e).__name__,
+                error=str(e),
+                function="_load_data",
+            )
             print(f"Error loading recovery configs: {e}")
             self.recovery_configs = {}
 
@@ -60,7 +70,13 @@ class SocialRecoveryManager:
                 with open(self.requests_file, "r") as f:
                     self.recovery_requests = json.load(f)
                 print(f"Loaded {len(self.recovery_requests)} recovery requests")
-        except Exception as e:
+        except (OSError, IOError, ValueError, KeyError, json.JSONDecodeError) as e:
+            logger.error(
+                "Exception in _load_data",
+                error_type=type(e).__name__,
+                error=str(e),
+                function="_load_data",
+            )
             print(f"Error loading recovery requests: {e}")
             self.recovery_requests = {}
 
@@ -69,7 +85,13 @@ class SocialRecoveryManager:
         try:
             with open(self.configs_file, "w") as f:
                 json.dump(self.recovery_configs, f, indent=2)
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError) as e:
+            logger.error(
+                "Exception in _save_configs",
+                error_type=type(e).__name__,
+                error=str(e),
+                function="_save_configs",
+            )
             print(f"Error saving recovery configs: {e}")
             raise
 
@@ -78,7 +100,13 @@ class SocialRecoveryManager:
         try:
             with open(self.requests_file, "w") as f:
                 json.dump(self.recovery_requests, f, indent=2)
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError) as e:
+            logger.error(
+                "Exception in _save_requests",
+                error_type=type(e).__name__,
+                error=str(e),
+                function="_save_requests",
+            )
             print(f"Error saving recovery requests: {e}")
             raise
 
@@ -658,6 +686,12 @@ if __name__ == "__main__":
         )
         print(f"[OK] Setup successful: {result['message']}")
     except ValueError as e:
+        logger.warning(
+            "ValueError in get_stats",
+            error_type="ValueError",
+            error=str(e),
+            function="get_stats",
+        )
         print(f"Error: {e}")
 
     print("\n2. Initiating recovery...")
@@ -668,6 +702,12 @@ if __name__ == "__main__":
         request_id = result["request_id"]
         print(f"[OK] Recovery initiated: {request_id}")
     except ValueError as e:
+        logger.warning(
+            "ValueError in get_stats",
+            error_type="ValueError",
+            error=str(e),
+            function="get_stats",
+        )
         print(f"Error: {e}")
 
     print("\n3. Second guardian voting...")
@@ -675,6 +715,12 @@ if __name__ == "__main__":
         result = manager.vote_recovery(request_id=request_id, guardian_address=guardian2)
         print(f"[OK] Vote recorded: {result['message']}")
     except ValueError as e:
+        logger.warning(
+            "ValueError in get_stats",
+            error_type="ValueError",
+            error=str(e),
+            function="get_stats",
+        )
         print(f"Error: {e}")
 
     print("\n4. Checking recovery status...")

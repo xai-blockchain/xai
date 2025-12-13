@@ -37,6 +37,12 @@ def get_blocks() -> Dict[str, Any]:
     try:
         limit, offset = get_pagination_params(default_limit=10, max_limit=200)
     except PaginationError as exc:
+        logger.warning(
+            "PaginationError in get_blocks",
+            error_type="PaginationError",
+            error=str(exc),
+            function="get_blocks",
+        )
         return error_response(
             str(exc),
             status=400,

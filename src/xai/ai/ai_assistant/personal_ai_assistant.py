@@ -216,6 +216,12 @@ class PersonalAIAssistant:
             try:
                 providers[key] = provider_cls()
             except Exception as exc:
+                logger.error(
+                    "Exception in _init_additional_providers",
+                    error_type="Exception",
+                    error=str(exc),
+                    function="_init_additional_providers",
+                )
                 print(f"Warning: failed to init {key} provider: {exc}")
         return providers
 
@@ -589,6 +595,12 @@ class PersonalAIAssistant:
                 "code": "provider_module_missing",
             }
         except Exception as exc:  # pragma: no cover - best-effort provider call
+            logger.warning(
+                "Exception in _call_ai_provider",
+                error_type="Exception",
+                error=str(exc),
+                function="_call_ai_provider",
+            )
             return {"success": False, "error": str(exc)}
 
         result = {"success": True, "text": text.strip() if isinstance(text, str) else str(text)}
@@ -630,6 +642,12 @@ class PersonalAIAssistant:
         try:
             result = provider_instance.call_with_limit(api_key, prompt, 800)
         except Exception as exc:
+            logger.warning(
+                "Exception in _call_additional_provider",
+                error_type="Exception",
+                error=str(exc),
+                function="_call_additional_provider",
+            )
             return {"success": False, "error": str(exc)}
 
         if not result.get("success"):

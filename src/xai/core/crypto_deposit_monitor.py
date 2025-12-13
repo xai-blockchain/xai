@@ -415,7 +415,7 @@ class CryptoDepositMonitor:
             start = time.time()
             try:
                 self._process_sources()
-            except Exception as exc:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
                 logger.error(
                     "Crypto deposit monitor iteration failed: %s",
                     exc,
@@ -435,7 +435,7 @@ class CryptoDepositMonitor:
         for currency, source in list(self.sources.items()):
             try:
                 events = source.poll()
-            except Exception as exc:  # pragma: no cover - defensive logging
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:  # pragma: no cover - defensive logging
                 errors += 1
                 logger.error(
                     "Deposit source poll failed (%s): %s",
@@ -447,7 +447,7 @@ class CryptoDepositMonitor:
             for event in events:
                 try:
                     status = self._handle_event(event)
-                except Exception as exc:  # pragma: no cover - defensive logging
+                except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:  # pragma: no cover - defensive logging
                     errors += 1
                     logger.exception(
                         "Failed to process deposit event",

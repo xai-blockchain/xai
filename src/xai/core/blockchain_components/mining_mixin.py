@@ -11,6 +11,13 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
+from xai.core.blockchain_exceptions import (
+    StorageError,
+    DatabaseError,
+    StateError,
+    ValidationError,
+)
+
 if TYPE_CHECKING:
     from xai.core.blockchain_components.block import Block
     from xai.core.block_header import BlockHeader
@@ -271,20 +278,28 @@ class BlockchainMiningMixin:
                         new_block.timestamp
                     )
                 self.address_index.commit()
-            except Exception as e:
+            except (StorageError, DatabaseError, ValueError, TypeError, AttributeError) as e:
+                # Index failures: storage errors, database errors, data validation errors
                 self.logger.error(
                     "Failed to index block transactions",
-                    block_index=new_block.index,
-                    error=str(e)
+                    extra={
+                        "block_index": new_block.index,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                    }
                 )
                 # Don't fail block addition if indexing fails - index can be rebuilt
                 try:
                     self.address_index.rollback()
-                except Exception as rollback_err:
+                except (StorageError, DatabaseError, AttributeError, RuntimeError) as rollback_err:
+                    # Rollback failures: storage/db errors, missing attributes, runtime issues
                     self.logger.warning(
                         "Failed to rollback address index after indexing failure",
-                        block_index=new_block.index,
-                        error=str(rollback_err)
+                        extra={
+                            "block_index": new_block.index,
+                            "error": str(rollback_err),
+                            "error_type": type(rollback_err).__name__,
+                        }
                     )
 
             # Clear pending transactions
@@ -332,13 +347,16 @@ class BlockchainMiningMixin:
 
             return new_block
 
-        except Exception as e:
+        except (StorageError, DatabaseError, StateError, ValidationError, ValueError, TypeError, OSError) as e:
             # Block persistence failed - rollback all state changes
+            # Covers: storage/db/state errors, validation failures, value/type errors, I/O errors
             self.logger.error(
                 "Block persistence failed, rolling back state changes",
-                block_index=new_block.index,
-                error=str(e),
-                error_type=type(e).__name__,
+                extra={
+                    "block_index": new_block.index,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                }
             )
 
             # Rollback UTXO state
@@ -380,27 +398,43 @@ class BlockchainMiningMixin:
         try:
             if self.airdrop_manager:
                 self.airdrop_manager.execute_airdrop(block.index, block.hash)
-        except Exception as exc:
-            self.logger.warn(f"Gamification airdrop processing failed: {exc}")
+        except (ValueError, TypeError, AttributeError, KeyError, RuntimeError) as exc:
+            # Gamification errors: value/type issues, missing attributes, key errors, runtime failures
+            self.logger.warn(
+                "Gamification airdrop processing failed",
+                extra={"error": str(exc), "error_type": type(exc).__name__}
+            )
 
         try:
             if self.fee_refund_calculator:
                 self.fee_refund_calculator.process_refunds(block)
-        except Exception as exc:
-            self.logger.warn(f"Gamification refund processing failed: {exc}")
+        except (ValueError, TypeError, AttributeError, KeyError, RuntimeError) as exc:
+            # Gamification errors: value/type issues, missing attributes, key errors, runtime failures
+            self.logger.warn(
+                "Gamification refund processing failed",
+                extra={"error": str(exc), "error_type": type(exc).__name__}
+            )
 
         try:
             if self.treasure_manager:
                 # Placeholder hook for future treasure processing
                 pass
-        except Exception as exc:
-            self.logger.warn(f"Gamification treasure processing failed: {exc}")
+        except (ValueError, TypeError, AttributeError, KeyError, RuntimeError) as exc:
+            # Gamification errors: value/type issues, missing attributes, key errors, runtime failures
+            self.logger.warn(
+                "Gamification treasure processing failed",
+                extra={"error": str(exc), "error_type": type(exc).__name__}
+            )
 
         try:
             if self.streak_tracker:
                 self.streak_tracker._save_streaks()
-        except Exception as exc:
-            self.logger.warn(f"Gamification streak persistence failed: {exc}")
+        except (StorageError, DatabaseError, OSError, RuntimeError) as exc:
+            # Streak persistence errors: storage/db/I/O/runtime failures
+            self.logger.warn(
+                "Gamification streak persistence failed",
+                extra={"error": str(exc), "error_type": type(exc).__name__}
+            )
 
     def mine_block(self, header: "BlockHeader") -> str:
         """Mine block with proof-of-work

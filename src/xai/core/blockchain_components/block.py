@@ -263,11 +263,15 @@ class Block:
             except AttributeError:
                 try:
                     tx_bytes += len(canonical_json(tx.to_dict()).encode("utf-8"))
-                except Exception as e:
+                except (ValueError, TypeError, AttributeError, KeyError) as e:
+                    # JSON/encoding errors: value/type issues, missing attributes, key errors
                     self.logger.warning(
                         "Failed to calculate transaction size, using 0",
-                        tx_type=type(tx).__name__,
-                        error=str(e),
+                        extra={
+                            "tx_type": type(tx).__name__,
+                            "error": str(e),
+                            "error_type": type(e).__name__,
+                        }
                     )
                     tx_bytes += 0
 

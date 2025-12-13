@@ -14,6 +14,10 @@ from flask import jsonify, request
 import functools
 import time
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 def integrate_recovery_with_blockchain(blockchain, node=None):
     """
@@ -76,7 +80,13 @@ def _wrap_blockchain_methods(blockchain, recovery_manager):
             # Add transaction
             return original_add_tx(transaction)
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+            logger.warning(
+                "Exception in wrapped_add_tx",
+                error_type="Exception",
+                error=str(e),
+                function="wrapped_add_tx",
+            )
             recovery_manager.handle_invalid_transaction(transaction)
             return False
 
@@ -377,7 +387,13 @@ class RecoveryEnabledBlockchain:
             # Add transaction
             return self.blockchain.add_transaction(transaction)
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+            logger.warning(
+                "Exception in _validate",
+                error_type="Exception",
+                error=str(e),
+                function="_validate",
+            )
             self.recovery_manager.handle_invalid_transaction(transaction)
             return False
 
@@ -484,7 +500,13 @@ class RecoveryScheduler:
                     self.recovery_manager.backup_manager.cleanup_old_backups(keep_count=24)
                     last_cleanup = current_time
 
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+                logger.error(
+                    "Exception in _run_scheduler",
+                    error_type="Exception",
+                    error=str(e),
+                    function="_run_scheduler",
+                )
                 print(f"Scheduler error: {e}")
 
             time.sleep(60)  # Check every minute

@@ -339,6 +339,11 @@ class HardwareSecurityModule:
             )
             raise HSMKeyGenerationError(f"Invalid key parameters: {e}") from e
         except OSError as e:
+            logger.error(
+                "OSError occurred",
+                error_type="OSError",
+                error=str(e),
+            )
             self._audit_log(
                 operation="generate_key",
                 key_id="N/A",
@@ -425,6 +430,12 @@ class HardwareSecurityModule:
             return signature
 
         except ValueError as e:
+            logger.debug(
+                "ValueError in sign",
+                error_type="ValueError",
+                error=str(e),
+                function="sign",
+            )
             self._audit_log(
                 operation="sign",
                 key_id=key_id,
@@ -434,6 +445,12 @@ class HardwareSecurityModule:
             )
             raise HSMSigningError(f"Invalid signing parameters: {e}") from e
         except InvalidSignature as e:
+            logger.error(
+                "InvalidSignature in sign",
+                error_type="InvalidSignature",
+                error=str(e),
+                function="sign",
+            )
             self._audit_log(
                 operation="sign",
                 key_id=key_id,
@@ -443,6 +460,12 @@ class HardwareSecurityModule:
             )
             raise HSMCryptographicError(f"Signature operation failed: {e}") from e
         except OSError as e:
+            logger.error(
+                "OSError in sign",
+                error_type="OSError",
+                error=str(e),
+                function="sign",
+            )
             self._audit_log(
                 operation="sign",
                 key_id=key_id,
@@ -536,6 +559,12 @@ class HardwareSecurityModule:
             return new_key_id
 
         except ValueError as e:
+            logger.debug(
+                "ValueError in rotate_key",
+                error_type="ValueError",
+                error=str(e),
+                function="rotate_key",
+            )
             self._audit_log(
                 operation="rotate_key",
                 key_id=old_key_id,
@@ -545,6 +574,12 @@ class HardwareSecurityModule:
             )
             raise HSMKeyRotationError(f"Invalid key rotation parameters: {e}") from e
         except HSMKeyGenerationError as e:
+            logger.error(
+                "HSMKeyGenerationError in rotate_key",
+                error_type="HSMKeyGenerationError",
+                error=str(e),
+                function="rotate_key",
+            )
             self._audit_log(
                 operation="rotate_key",
                 key_id=old_key_id,
@@ -554,6 +589,12 @@ class HardwareSecurityModule:
             )
             raise HSMKeyRotationError(f"Key rotation failed during key generation: {e}") from e
         except OSError as e:
+            logger.error(
+                "OSError in rotate_key",
+                error_type="OSError",
+                error=str(e),
+                function="rotate_key",
+            )
             self._audit_log(
                 operation="rotate_key",
                 key_id=old_key_id,

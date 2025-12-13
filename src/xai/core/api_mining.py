@@ -301,7 +301,7 @@ class MiningAPIHandler:
                 # Sleep based on intensity (lower = longer sleep)
                 time.sleep(max(1, 5 - intensity))
 
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 logger.error(f"Mining error for {miner_address}: {e}")
                 time.sleep(5)
 

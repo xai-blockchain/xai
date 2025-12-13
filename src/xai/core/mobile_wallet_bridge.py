@@ -56,12 +56,12 @@ class MobileWalletBridge:
         try:
             self.validator.validate_address(sender, "sender")
             self.validator.validate_address(recipient, "recipient")
-        except Exception as exc:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
             raise ValueError(str(exc))
 
         try:
             amount = self.validator.validate_amount(float(amount), "amount")
-        except Exception as exc:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
             raise ValueError(str(exc))
 
         if sender in self._active_drafts_for_sender(sender):
@@ -178,7 +178,7 @@ class MobileWalletBridge:
                     pending_tx_count=pending,
                     priority=priority,
                 )
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 logger.warning(
                     "Fee optimizer failed, using fallback calculation",
                     extra={

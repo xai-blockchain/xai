@@ -135,7 +135,7 @@ def example_blockchain_integration():
                     duration_ms=(time.time() - start_time) * 1000,
                 )
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             error = True
             status_code = 500
             logger.error(
@@ -353,7 +353,7 @@ class BlockchainNode:
 
                 return block
 
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 self.logger.error("Block mining failed", error=str(e))
                 raise
 
@@ -369,7 +369,7 @@ class BlockchainNode:
                                         peer_count=len(self.peers))
                 self.metrics.record_peer_connected(len(self.peers))
 
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 self.logger.error("Failed to add peer",
                                 peer_url=peer_url[:20] + '...',
                                 error=str(e))

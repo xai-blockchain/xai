@@ -17,6 +17,10 @@ from decimal import Decimal
 from collections import deque
 import logging
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 
 class ErrorSeverity(Enum):
     """Error severity levels for classification."""
@@ -362,7 +366,13 @@ class CorruptionDetector:
                         f"rebuilt={rebuilt_balance}, current={current_balance}"
                     )
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+            logger.error(
+                "Exception in _check_utxo_consistency",
+                error_type="Exception",
+                error=str(e),
+                function="_check_utxo_consistency",
+            )
             errors.append(f"UTXO check failed: {str(e)}")
 
         return len(errors) == 0, errors
@@ -391,7 +401,13 @@ class CorruptionDetector:
             if float(total_supply) > max_supply:
                 errors.append(f"Supply cap exceeded: {float(total_supply)} > {max_supply}")
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+            logger.error(
+                "Exception in _check_supply_validation",
+                error_type="Exception",
+                error=str(e),
+                function="_check_supply_validation",
+            )
             errors.append(f"Supply validation failed: {str(e)}")
 
         return len(errors) == 0, errors

@@ -1113,7 +1113,7 @@ class TimeCapsuleManager:
                     "transaction": tx
                 })
 
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 logger.error(
                     "Failed to create unlock transaction",
                     extra={

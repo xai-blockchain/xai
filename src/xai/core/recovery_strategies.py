@@ -96,7 +96,7 @@ class BlockchainBackup:
 
             self.logger.info(f"Backup loaded: {backup_path}")
             return True, backup_data, None
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             self.logger.error(f"Failed to load backup: {e}")
             return False, None, str(e)
 
@@ -125,7 +125,7 @@ class BlockchainBackup:
                             "size": os.path.getsize(filepath),
                         }
                     )
-                except Exception as e:
+                except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                     self.logger.warning(f"Could not read backup {filename}: {e}")
 
         # Sort by timestamp, newest first
@@ -151,7 +151,7 @@ class BlockchainBackup:
                 os.remove(backup["path"])
                 removed_count += 1
                 self.logger.info(f"Removed old backup: {backup['name']}")
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 self.logger.warning(f"Failed to remove backup {backup['name']}: {e}")
 
         return removed_count
@@ -257,7 +257,7 @@ class StateRecovery:
             self.logger.info(f"Backup applied successfully (chain height: {len(new_chain)})")
             return True, None
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             self.logger.error(f"Failed to apply backup: {e}")
             return False, str(e)
 
@@ -288,7 +288,7 @@ class StateRecovery:
             self.logger.info(f"Preserved {len(preserved_txs)} pending transactions")
             return True, None
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             self.logger.error(f"Failed to preserve transactions: {e}")
             return False, str(e)
 
@@ -335,7 +335,7 @@ class StateRecovery:
             self.logger.info(f"Restored {restored_count}/{len(preserved_txs)} pending transactions")
             return True, None
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             self.logger.error(f"Failed to restore transactions: {e}")
             return False, str(e)
 
@@ -416,7 +416,7 @@ class CorruptionRecovery:
 
             return False, "All backup restoration attempts failed"
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             self.logger.error(f"Corruption recovery failed: {e}")
             return False, str(e)
 
@@ -461,7 +461,7 @@ class NetworkPartitionRecovery:
                     self.logger.warning("Node does not support network sync")
                     return False, "Network sync not supported"
 
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 self.logger.warning(f"Reconnection attempt {attempt + 1} failed: {e}")
                 if attempt < max_attempts - 1:
                     time.sleep(retry_delay)
@@ -488,7 +488,7 @@ class NetworkPartitionRecovery:
             self.logger.info("Now operating in degraded mode")
             return True, None
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             self.logger.error(f"Failed to enter degraded mode: {e}")
             return False, str(e)
 
@@ -553,6 +553,6 @@ class GracefulShutdown:
             self.logger.info("Graceful shutdown complete")
             return True, None
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             self.logger.error(f"Error during shutdown: {e}")
             return False, str(e)

@@ -183,6 +183,12 @@ class GovernanceAPIHandler:
         try:
             self.node.validator.validate_address(address)
         except ValidationError as ve:
+            logger.warning(
+                "ValidationError in fiat_unlock_vote_handler",
+                error_type="ValidationError",
+                error=str(ve),
+                function="fiat_unlock_vote_handler",
+            )
             return (
                 jsonify({"success": False, "error": "INVALID_ADDRESS", "message": str(ve)}),
                 400,
@@ -191,6 +197,12 @@ class GovernanceAPIHandler:
         try:
             status = self.node.fiat_unlock_manager.cast_vote(address, bool(support), reason)
         except ValueError as ve:
+            logger.warning(
+                "ValueError in fiat_unlock_vote_handler",
+                error_type="ValueError",
+                error=str(ve),
+                function="fiat_unlock_vote_handler",
+            )
             return (
                 jsonify({"success": False, "error": "VOTING_NOT_OPEN", "message": str(ve)}),
                 400,

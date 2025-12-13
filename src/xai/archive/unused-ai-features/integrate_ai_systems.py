@@ -15,6 +15,10 @@ Run this to upgrade existing XAI node to full AI-powered system.
 import sys
 import os
 
+import logging
+logger = logging.getLogger(__name__)
+
+
 # Add paths
 from src.xai.core.config import Config
 
@@ -51,6 +55,11 @@ try:
 
     print("✅ Personal AI components loaded")
 except ImportError as e:
+    logger.warning(
+        "ImportError occurred",
+        error_type="ImportError",
+        error=str(e),
+    )
     print(f"❌ Error loading Personal AI: {e}")
     sys.exit(1)
 
@@ -60,6 +69,11 @@ try:
 
     print("✅ API extensions loaded")
 except ImportError as e:
+    logger.warning(
+        "ImportError occurred",
+        error_type="ImportError",
+        error=str(e),
+    )
     print(f"⚠️  Warning: API extensions not available: {e}")
     print("   Node will work but without WebSocket support")
 
@@ -69,6 +83,11 @@ try:
 
     print("✅ AI Trading Bot loaded")
 except ImportError as e:
+    logger.warning(
+        "ImportError occurred",
+        error_type="ImportError",
+        error=str(e),
+    )
     print(f"⚠️  Warning: AI Trading Bot not available yet: {e}")
     print("   Will be available after Part 2 of integration")
 
@@ -155,6 +174,12 @@ class IntegratedXAINode:
             self.safety_controls = AISafetyControls(self.blockchain)
             print("   ✅ Emergency stop system initialized")
         except Exception as e:
+            logger.error(
+                "Exception in __init__",
+                error_type="Exception",
+                error=str(e),
+                function="__init__",
+            )
             print(f"   ⚠️  AI Safety Controls initialization delayed: {e}")
             self.safety_controls = None
 
@@ -180,6 +205,11 @@ class IntegratedXAINode:
             print("   ✅ ✅ Personal AI API added")
             print("   ✅ WebSocket support added")
         except Exception as e:
+            logger.error(
+                "Exception occurred",
+                error_type="Exception",
+                error=str(e),
+            )
             print(f"   ⚠️  API extensions partially loaded: {e}")
             self.api_extensions = None
 
@@ -199,6 +229,11 @@ class IntegratedXAINode:
             print("   ✅ Lock XAI or other crypto until future date")
             print("   ✅ Cross-chain time-locks supported")
         except Exception as e:
+            logger.error(
+                "Exception occurred",
+                error_type="Exception",
+                error=str(e),
+            )
             print(f"   ⚠️  Time Capsule system not available: {e}")
 
         # 11. Add AI Safety Control API endpoints
@@ -213,6 +248,11 @@ class IntegratedXAINode:
             print("   ✅ Governance AI task pause/resume")
             print("   ✅ Global AI kill switch")
         except Exception as e:
+            logger.error(
+                "Exception occurred",
+                error_type="Exception",
+                error=str(e),
+            )
             print(f"   ⚠️  AI Safety Control API not available: {e}")
 
         print("\n" + "=" * 80)

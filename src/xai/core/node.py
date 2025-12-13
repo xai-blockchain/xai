@@ -253,7 +253,7 @@ class _SecurityWebhookForwarder:
                     headers=self.headers,
                 )
                 return
-            except Exception as exc:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
                 attempt += 1
                 if attempt >= self.max_retries:
                     logger.error(
@@ -279,7 +279,7 @@ class _SecurityWebhookForwarder:
                 data = self._fernet.encrypt(data)
             with open(self.queue_path, "wb") as handle:
                 handle.write(data)
-        except Exception as exc:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
             logger.warning(
                 "Failed to persist webhook queue: %s",
                 type(exc).__name__,
@@ -308,7 +308,7 @@ class _SecurityWebhookForwarder:
                 except Full:
                     self.dropped_events += 1
                     break
-        except Exception as exc:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
             logger.warning(
                 "Failed to load webhook queue: %s",
                 type(exc).__name__,
@@ -322,7 +322,7 @@ class _SecurityWebhookForwarder:
         key = raw_key.strip().encode("utf-8")
         try:
             return Fernet(key)
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.debug(
                 "Failed to create Fernet cipher from raw key, trying hex decode",
                 error=str(e)
@@ -330,7 +330,7 @@ class _SecurityWebhookForwarder:
             try:
                 hex_bytes = bytes.fromhex(raw_key.strip())
                 return Fernet(base64.urlsafe_b64encode(hex_bytes))
-            except Exception as exc:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
                 logger.error(
                     "Invalid webhook queue encryption key",
                     extra={"event": "security.webhook_queue_key_invalid"},
@@ -399,7 +399,7 @@ class BlockchainNode:
         try:
             data_dir = getattr(self.blockchain.storage, "data_dir", os.path.join(os.getcwd(), "data"))
             self.identity = load_or_create_identity(data_dir)
-        except Exception as exc:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
             logger.warning(
                 "Failed to initialize node identity: %s",
                 type(exc).__name__,
@@ -626,7 +626,7 @@ class BlockchainNode:
                 )
                 interval = int(processor_cfg.get("INTERVAL_SECONDS", 45) or 45)
                 self._start_withdrawal_worker(interval)
-            except Exception as exc:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
                 self.withdrawal_processor = None
                 logger.error(
                     "Failed to initialize withdrawal processor: %s",
@@ -675,7 +675,7 @@ class BlockchainNode:
                 storage_path=storage_dir,
             )
             logger.info("Embedded wallet manager initialized", extra={"event": "node.wallet_manager_init"})
-        except Exception as exc:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
             self.wallet_manager = None
             self.account_abstraction = None
             logger.debug("Embedded wallets disabled: %s", type(exc).__name__)
@@ -774,7 +774,7 @@ class BlockchainNode:
                             "details": {**stats, "queue_depth": queue_depth},
                         },
                     )
-            except Exception as exc:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
                 logger.error(
                     "Withdrawal processor cycle failed: %s",
                     type(exc).__name__,
@@ -899,7 +899,7 @@ class BlockchainNode:
 
                     # Broadcast to peers
                     self.broadcast_block(block)
-                except Exception as e:
+                except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                     logger.error(
                         "Mining error: %s",
                         type(e).__name__,
@@ -1091,7 +1091,7 @@ class BlockchainNode:
 
             return len(matched_trades) > 0
 
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.error(
                 "Error matching orders: %s",
                 type(e).__name__,

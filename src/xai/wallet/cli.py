@@ -484,8 +484,12 @@ def _generate_address(args: argparse.Namespace) -> int:
             print(f"\nEncrypted keystore saved to: {keystore_path}")
             print("Keep your password secure - it cannot be recovered!")
             return 0
-        except Exception as e:
-            logger.error("Failed to create keystore: %s", e)
+        except OSError as e:
+            logger.error("Failed to write keystore file: %s", e, extra={"error_type": type(e).__name__})
+            print(f"Error writing keystore file: {e}", file=sys.stderr)
+            return 1
+        except (ValueError, TypeError) as e:
+            logger.error("Invalid data for keystore creation: %s", e, extra={"error_type": type(e).__name__})
             print(f"Error creating keystore: {e}", file=sys.stderr)
             return 1
 
@@ -572,9 +576,13 @@ def _send_transaction(args: argparse.Namespace) -> int:
     if args.two_fa_profile:
         try:
             _require_two_factor(args.two_fa_profile, args.otp)
-        except Exception as exc:
-            logger.error("2FA verification failed: %s", exc)
+        except (ValueError, KeyError) as exc:
+            logger.error("2FA verification failed: %s", exc, extra={"error_type": type(exc).__name__})
             print(f"2FA verification failed: {exc}", file=sys.stderr)
+            return 1
+        except OSError as exc:
+            logger.error("2FA profile I/O error: %s", exc, extra={"error_type": type(exc).__name__})
+            print(f"2FA profile error: {exc}", file=sys.stderr)
             return 1
 
     try:
@@ -585,8 +593,8 @@ def _send_transaction(args: argparse.Namespace) -> int:
             allow_env=args.allow_env_key,
             prompt="Enter sender's private key"
         )
-    except Exception as e:
-        logger.error("Failed to obtain private key: %s", e)
+    except (ValueError, FileNotFoundError, OSError) as e:
+        logger.error("Failed to obtain private key: %s", e, extra={"error_type": type(e).__name__})
         print(f"Error obtaining private key: {e}", file=sys.stderr)
         return 1
 
@@ -684,9 +692,13 @@ def _export_wallet(args: argparse.Namespace) -> int:
     if args.two_fa_profile:
         try:
             _require_two_factor(args.two_fa_profile, args.otp)
-        except Exception as exc:
-            logger.error("2FA verification failed for export: %s", exc)
+        except (ValueError, KeyError) as exc:
+            logger.error("2FA verification failed for export: %s", exc, extra={"error_type": type(exc).__name__})
             print(f"2FA verification failed: {exc}", file=sys.stderr)
+            return 1
+        except OSError as exc:
+            logger.error("2FA profile I/O error for export: %s", exc, extra={"error_type": type(exc).__name__})
+            print(f"2FA profile error: {exc}", file=sys.stderr)
             return 1
 
     try:
@@ -697,8 +709,8 @@ def _export_wallet(args: argparse.Namespace) -> int:
             allow_env=args.allow_env_key,
             prompt="Enter private key to export"
         )
-    except Exception as e:
-        logger.error("Failed to obtain private key for export: %s", e)
+    except (ValueError, FileNotFoundError, OSError) as e:
+        logger.error("Failed to obtain private key for export: %s", e, extra={"error_type": type(e).__name__})
         print(f"Error obtaining private key: {e}", file=sys.stderr)
         return 1
 
@@ -808,14 +820,23 @@ def _export_wallet(args: argparse.Namespace) -> int:
         os.chmod(output_file, 0o600)
 
         return 0
-    except Exception as e:
-        logger.error("Wallet export failed: %s", e)
-        print(f"Export error: {e}", file=sys.stderr)
+    except OSError as e:
+        logger.error("Wallet export I/O error: %s", e, extra={"error_type": type(e).__name__})
+        print(f"Export I/O error: {e}", file=sys.stderr)
         # Clear sensitive data on error - NameError is expected if variables were never assigned
         try:
             del private_key, wallet_data
         except NameError:
             # One or more variables were never created due to early error - this is expected
+            pass
+        return 1
+    except (ValueError, TypeError) as e:
+        logger.error("Wallet export data error: %s", e, extra={"error_type": type(e).__name__})
+        print(f"Export data error: {e}", file=sys.stderr)
+        # Clear sensitive data on error
+        try:
+            del private_key, wallet_data
+        except NameError:
             pass
         return 1
 
@@ -895,9 +916,13 @@ def _import_wallet(args: argparse.Namespace) -> int:
         logger.error("Wallet file not found: %s", args.file)
         print(f"Error: File '{args.file}' not found", file=sys.stderr)
         return 1
-    except Exception as e:
-        logger.error("Wallet import failed: %s", e)
-        print(f"Import error: {e}", file=sys.stderr)
+    except OSError as e:
+        logger.error("Wallet import I/O error: %s", e, extra={"error_type": type(e).__name__})
+        print(f"Import I/O error: {e}", file=sys.stderr)
+        return 1
+    except (json.JSONDecodeError, ValueError, KeyError, TypeError) as e:
+        logger.error("Wallet import data error: %s", e, extra={"error_type": type(e).__name__})
+        print(f"Import data error: {e}", file=sys.stderr)
         return 1
 
 
@@ -932,8 +957,8 @@ def _mnemonic_qr_backup(args: argparse.Namespace) -> int:
     logger.debug("Generating mnemonic QR backup")
     try:
         mnemonic_phrase = _read_mnemonic_from_args(args)
-    except Exception as exc:
-        logger.error("Mnemonic input error: %s", exc)
+    except (ValueError, OSError) as exc:
+        logger.error("Mnemonic input error: %s", exc, extra={"error_type": type(exc).__name__})
         print(f"Mnemonic input error: {exc}", file=sys.stderr)
         return 1
 
@@ -960,9 +985,13 @@ def _mnemonic_qr_backup(args: argparse.Namespace) -> int:
             metadata=metadata or None,
         )
         logger.info("QR backup bundle generated successfully")
-    except Exception as exc:
-        logger.error("Failed to build QR backup: %s", exc)
+    except (ValueError, TypeError) as exc:
+        logger.error("Failed to build QR backup: %s", exc, extra={"error_type": type(exc).__name__})
         print(f"Failed to build QR backup: {exc}", file=sys.stderr)
+        return 1
+    except OSError as exc:
+        logger.error("QR backup I/O error: %s", exc, extra={"error_type": type(exc).__name__})
+        print(f"QR backup I/O error: {exc}", file=sys.stderr)
         return 1
     finally:
         # Best-effort scrubbing of sensitive strings

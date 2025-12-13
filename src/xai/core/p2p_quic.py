@@ -102,5 +102,5 @@ async def quic_client_send_with_timeout(
         raise QuicTransportError(f"QUIC network error: {exc}") from exc
     except (ValueError, TypeError) as exc:
         raise QuicTransportError(f"Invalid QUIC parameters: {exc}") from exc
-    except Exception as exc:
+    except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
         raise QuicTransportError(f"QUIC send failed: {exc}") from exc
