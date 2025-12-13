@@ -232,7 +232,7 @@ class TestWalletPersistence:
         original_wallet = Wallet()
         original_wallet.save_to_file(str(wallet_file), correct_password)
 
-        with pytest.raises(ValueError, match="Bad decrypt"):
+        with pytest.raises(ValueError, match="Decryption failed"):
             Wallet.load_from_file(str(wallet_file), wrong_password)
 
     def test_load_encrypted_wallet_no_password(self, tmp_path):
@@ -309,7 +309,7 @@ class TestWalletManager:
 
         manager.create_wallet(wallet_name, correct_password)
 
-        with pytest.raises(ValueError, match="Bad decrypt"):
+        with pytest.raises(ValueError, match="Decryption failed"):
             manager.load_wallet(wallet_name, wrong_password)
 
     def test_list_wallets(self, wallet_manager_cleanup):

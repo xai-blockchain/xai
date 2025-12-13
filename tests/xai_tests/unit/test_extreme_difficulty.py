@@ -386,7 +386,7 @@ class TestDifficultyTransitionsAcrossEpochs:
             assert diff <= bc.dynamic_difficulty_adjuster.max_difficulty
 
 
-class TestExtremeBlo ckTimeVariance:
+class TestExtremeBlockTimeVariance:
     """Test difficulty adjustment with extreme block time variance"""
 
     def test_alternating_fast_slow_blocks(self, tmp_path):
