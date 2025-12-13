@@ -170,7 +170,7 @@ class WalletTradeOrder:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "WalletTradeOrder":
-        return cls(
+        order = cls(
             order_id=data["order_id"],
             maker_address=data["maker_address"],
             token_offered=data["token_offered"],

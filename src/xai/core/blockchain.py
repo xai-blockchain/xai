@@ -130,6 +130,9 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         max_checkpoints: int = 10,
         compact_on_startup: bool = False,
     ) -> None:
+        # Initialize logger first so it's available throughout __init__
+        self.logger = get_structured_logger()
+
         is_pytest = bool(os.environ.get("PYTEST_CURRENT_TEST"))
         self.network_type = os.getenv("XAI_NETWORK", "testnet").lower()
         fast_mining_default = "1" if (is_pytest and self.network_type != "mainnet") else "0"
@@ -144,7 +147,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 )
             except (AttributeError, RuntimeError, TypeError) as e:
                 # Security event dispatch failed - log but don't block initialization
-                logger.warning(f"Failed to dispatch fast mining security event: {e}")
+                self.logger.warning(f"Failed to dispatch fast mining security event: {e}")
             raise ValueError("Fast mining is not allowed on mainnet; unset XAI_FAST_MINING or switch network.")
 
         if self.fast_mining_enabled:
@@ -160,9 +163,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 )
             except (AttributeError, RuntimeError, TypeError) as e:
                 # Do not block initialization if telemetry sink is unavailable
-                logger.debug(f"Security event dispatch unavailable during initialization: {e}")
-
-        self.logger = get_structured_logger()
+                self.logger.debug(f"Security event dispatch unavailable during initialization: {e}")
         self._init_storage(
             data_dir=data_dir,
             compact_on_startup=compact_on_startup,
@@ -3126,7 +3127,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             utxo_digest = self.utxo_manager.snapshot_digest()
         except (AttributeError, RuntimeError, ValueError) as e:
             # UTXO snapshot unavailable - log and mark as unavailable
-            logger.debug(f"UTXO snapshot digest unavailable: {e}")
+            self.logger.debug(f"UTXO snapshot digest unavailable: {e}")
             utxo_digest = "unavailable"
 
         return {
@@ -3608,7 +3609,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 "The order was not signed by the wallet owner."
             )
 
-        logger.info(
+        self.logger.info(
             "Trade order signature verified successfully",
             extra={
                 "event": "trade.order.signature_verified",
