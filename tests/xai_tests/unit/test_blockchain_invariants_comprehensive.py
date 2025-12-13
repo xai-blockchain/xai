@@ -418,7 +418,8 @@ class TestBalanceConservationWithFeesAndBurning:
         # Must be all hex characters after XAI prefix (64 chars total)
         burn_address = "XAI" + ("0" * 60) + "dea"  # 3 chars XAI + 63 hex = 66 is too long
         # Actually XAI is 3 chars, so we need 61 hex chars after it for 64 total
-        burn_address = "XAI0000000000000000000000000000000000000000000000000000000000dead"  # Explicit 64 char
+        # XAI addresses are 43 chars: "XAI" + 40 hex chars
+        burn_address = "XAI" + ("0" * 36) + "dead"  # 3 + 40 = 43 chars
 
         # Generate funds
         for i in range(5):

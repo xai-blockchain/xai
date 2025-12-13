@@ -418,10 +418,10 @@ This roadmap targets production readiness with security-first posture, robust co
 
 ### Invariant Tests
 
-- [ ] Add total supply preservation tests (including after reorg).
-- [ ] Add balance conservation tests (fees, burned coins).
-- [ ] Add state root correctness tests for light client verification.
-- [ ] Add transaction ordering invariant tests.
+- [x] Add total supply preservation tests (including after reorg). ✅ COMPLETED - `test_blockchain_invariants_comprehensive.py` with 6 comprehensive tests covering supply preservation during reorgs, deep reorgs, double-reward prevention, supply cap enforcement, chain validation consistency, and halving schedule verification.
+- [x] Add balance conservation tests (fees, burned coins). ✅ COMPLETED - 6 tests covering transaction conservation law, fee collection by miners, burned coin accounting, UTXO sum verification, no value creation in regular transactions, and change output preservation.
+- [x] Add state root correctness tests for light client verification. ✅ COMPLETED - 6 tests covering deterministic state roots, state modification detection, merkle root uniqueness, light client transaction inclusion verification, state transition uniqueness, and empty UTXO set determinism.
+- [x] Add transaction ordering invariant tests. ✅ COMPLETED - 6 tests covering nonce sequencing, nonce gap handling, double-spend prevention in mempool, fee priority ordering, coinbase transaction placement, and transaction order immutability after inclusion.
 
 ### Edge Case Tests
 
