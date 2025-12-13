@@ -366,6 +366,9 @@ class TestnetConfig:
     BLOCK_HEADER_VERSION = BLOCK_HEADER_VERSION
     BLOCK_HEADER_ALLOWED_VERSIONS = BLOCK_HEADER_ALLOWED_VERSIONS
 
+    # Allow chain reset on testnet for development
+    ALLOW_CHAIN_RESET = True
+
 # Mempool limits
 MEMPOOL_MAX_SIZE = int(os.getenv("XAI_MEMPOOL_MAX_SIZE", "10000"))
 MEMPOOL_MAX_PER_SENDER = int(os.getenv("XAI_MEMPOOL_MAX_PER_SENDER", "100"))
