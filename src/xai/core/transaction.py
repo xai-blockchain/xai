@@ -203,11 +203,12 @@ class Transaction:
         return validated
 
     @staticmethod
-    def _validate_outputs(outputs: Any) -> List[Dict[str, Any]]:
+    def _validate_outputs(outputs: Any, skip_address_validation: bool = False) -> List[Dict[str, Any]]:
         """Validate transaction outputs.
 
         Args:
             outputs: List of output destinations
+            skip_address_validation: Skip address validation (for coinbase transactions)
 
         Returns:
             Validated outputs list
@@ -241,7 +242,9 @@ class Transaction:
 
             # Validate output amount
             Transaction._validate_amount(out["amount"], f"Output {i} amount")
-            Transaction._validate_address(out["address"], f"Output {i} address", allow_empty=True)
+            # Skip address validation for coinbase transactions
+            if not skip_address_validation:
+                Transaction._validate_address(out["address"], f"Output {i} address", allow_empty=True)
             validated.append(out)
 
         return validated
@@ -317,7 +320,11 @@ class Transaction:
         """
         # Validate all inputs
         self.sender = self._validate_address(sender, "sender")
-        self.recipient = self._validate_address(recipient, "recipient", allow_empty=True)
+        # Coinbase transactions can have any recipient address (e.g., "miner_address")
+        if sender == "COINBASE":
+            self.recipient = recipient
+        else:
+            self.recipient = self._validate_address(recipient, "recipient", allow_empty=True)
         self.amount = self._validate_amount(amount, "amount")
         self.fee = self._validate_amount(fee, "fee")
 
@@ -358,7 +365,8 @@ class Transaction:
 
         # Validate inputs/outputs
         self.inputs = self._validate_inputs(inputs)
-        self.outputs = self._validate_outputs(outputs)
+        # Skip address validation for coinbase transaction outputs
+        self.outputs = self._validate_outputs(outputs, skip_address_validation=(sender == "COINBASE"))
         self.metadata = self._validate_metadata(metadata)
 
         # Set remaining fields

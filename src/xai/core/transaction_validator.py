@@ -130,7 +130,8 @@ class TransactionValidator:
             if transaction.sender != "COINBASE":
                 self.security_validator.validate_address(transaction.sender, "sender address")
             # Recipient can be None for some transaction types (e.g., burn)
-            if transaction.recipient:
+            # Skip recipient validation for coinbase transactions (can have any address)
+            if transaction.recipient and transaction.sender != "COINBASE":
                 self.security_validator.validate_address(transaction.recipient, "recipient address")
             # Skip amount validation for transaction types that allow zero amounts
             if transaction.tx_type not in ["governance_vote"]:
@@ -165,22 +166,9 @@ class TransactionValidator:
             if transaction.sender != "COINBASE" and not is_settlement_receipt:
                 if not transaction.signature:
                     raise ValidationError("Non-coinbase transaction must have a signature.")
-                try:
-                    transaction.verify_signature()
-                except Exception as e:
-                    # Import the exception types from transaction module
-                    from xai.core.transaction import (
-                        SignatureVerificationError,
-                        MissingSignatureError,
-                        InvalidSignatureError,
-                        SignatureCryptoError
-                    )
-                    if isinstance(e, SignatureVerificationError):
-                        # Detailed signature verification errors - preserve the message
-                        raise ValidationError(f"Signature verification failed: {e}") from e
-                    else:
-                        # Unexpected error during signature verification
-                        raise ValidationError(f"Unexpected error during signature verification: {type(e).__name__}: {e}") from e
+                # verify_signature() returns True/False
+                if not transaction.verify_signature():
+                    raise ValidationError("Signature verification failed")
 
             # 7. UTXO-based validation (for non-coinbase transactions)
             if transaction.tx_type != "coinbase" and not is_settlement_receipt:
