@@ -3,15 +3,13 @@ Edge case tests for checkpoint fetch/apply operations with SPV confirmations.
 
 Tests checkpoint synchronization and SPV (Simplified Payment Verification)
 proof validation for light client operations.
-
-NOTE: These tests are outdated and need to be rewritten to match the current
-CheckpointManager API which requires (block, utxo_manager, total_supply) parameters.
-The API changed significantly from the version these tests were written against.
 """
 
 import pytest
 import time
 import hashlib
+import os
+import json
 from typing import List, Tuple
 
 from xai.core.blockchain import Blockchain
@@ -20,7 +18,6 @@ from xai.core.checkpoints import CheckpointManager
 from xai.core.blockchain_components.block import Block
 
 
-@pytest.mark.skip(reason="Tests use outdated CheckpointManager API - need rewrite for current implementation")
 class TestCheckpointOperations:
     """Test checkpoint fetch and apply operations"""
 
@@ -35,15 +32,20 @@ class TestCheckpointOperations:
 
         checkpoint_mgr = CheckpointManager(data_dir=str(tmp_path))
 
-        # Create checkpoint
-        checkpoint = checkpoint_mgr.create_checkpoint()
+        # Get latest block
+        latest_block = bc.get_latest_block()
+
+        # Create checkpoint with required parameters
+        checkpoint = checkpoint_mgr.create_checkpoint(
+            latest_block, bc.utxo_manager, bc.get_total_supply()
+        )
 
         # Verify checkpoint structure
         assert checkpoint is not None
-        assert 'block_hash' in checkpoint
-        assert 'block_height' in checkpoint
-        assert 'timestamp' in checkpoint
-        assert checkpoint['block_height'] == len(bc.chain) - 1
+        assert checkpoint.block_hash == latest_block.hash
+        assert checkpoint.height == latest_block.index
+        assert checkpoint.timestamp == latest_block.timestamp
+        assert checkpoint.height == len(bc.chain) - 1
 
     def test_checkpoint_validation(self, tmp_path):
         """Test validating a checkpoint against blockchain state"""
@@ -54,11 +56,14 @@ class TestCheckpointOperations:
         for _ in range(5):
             bc.mine_pending_transactions(miner.address)
 
-        checkpoint_mgr = CheckpointManager(bc)
-        checkpoint = checkpoint_mgr.create_checkpoint()
+        checkpoint_mgr = CheckpointManager(data_dir=str(tmp_path))
+        latest_block = bc.get_latest_block()
+        checkpoint = checkpoint_mgr.create_checkpoint(
+            latest_block, bc.utxo_manager, bc.get_total_supply()
+        )
 
-        # Validate checkpoint
-        is_valid = checkpoint_mgr.validate_checkpoint(checkpoint)
+        # Validate checkpoint by verifying it at the height
+        is_valid = checkpoint_mgr.verify_checkpoint(checkpoint.height)
         assert is_valid
 
     def test_checkpoint_apply(self, tmp_path):
@@ -72,18 +77,23 @@ class TestCheckpointOperations:
             bc_source.mine_pending_transactions(miner.address)
 
         # Create checkpoint
-        checkpoint_mgr_source = CheckpointManager(bc_source)
-        checkpoint = checkpoint_mgr_source.create_checkpoint()
+        checkpoint_mgr_source = CheckpointManager(data_dir=str(tmp_path / "source"))
+        latest_block = bc_source.get_latest_block()
+        checkpoint = checkpoint_mgr_source.create_checkpoint(
+            latest_block, bc_source.utxo_manager, bc_source.get_total_supply()
+        )
 
         # Create destination blockchain (empty/genesis only)
         bc_dest = Blockchain(data_dir=str(tmp_path / "dest"))
-        checkpoint_mgr_dest = CheckpointManager(bc_dest)
+        checkpoint_mgr_dest = CheckpointManager(data_dir=str(tmp_path / "dest"))
 
-        # Apply checkpoint
-        result = checkpoint_mgr_dest.apply_checkpoint(checkpoint)
+        # Verify checkpoint was created successfully
+        assert checkpoint is not None
 
-        # Verify checkpoint was applied
-        assert isinstance(result, bool)
+        # Load the checkpoint from source and verify it exists
+        loaded_checkpoint = checkpoint_mgr_source.load_checkpoint(checkpoint.height)
+        assert loaded_checkpoint is not None
+        assert loaded_checkpoint.height == checkpoint.height
 
     def test_checkpoint_fetch_latest(self, tmp_path):
         """Test fetching latest checkpoint from network"""
@@ -94,21 +104,27 @@ class TestCheckpointOperations:
         for _ in range(15):
             bc.mine_pending_transactions(miner.address)
 
-        checkpoint_mgr = CheckpointManager(bc)
+        checkpoint_mgr = CheckpointManager(data_dir=str(tmp_path))
+
+        # Create a checkpoint first
+        latest_block = bc.get_latest_block()
+        checkpoint_mgr.create_checkpoint(
+            latest_block, bc.utxo_manager, bc.get_total_supply()
+        )
 
         # Get latest checkpoint
-        latest = checkpoint_mgr.get_latest_checkpoint()
+        latest = checkpoint_mgr.load_latest_checkpoint()
 
         # Verify it represents current state
         if latest:
-            assert latest['block_height'] <= len(bc.chain) - 1
+            assert latest.height <= len(bc.chain) - 1
 
     def test_checkpoint_incremental_sync(self, tmp_path):
         """Test incremental checkpoint synchronization"""
         bc = Blockchain(data_dir=str(tmp_path))
         miner = Wallet()
 
-        checkpoint_mgr = CheckpointManager(bc)
+        checkpoint_mgr = CheckpointManager(data_dir=str(tmp_path))
         checkpoints = []
 
         # Create checkpoints at intervals
@@ -118,12 +134,15 @@ class TestCheckpointOperations:
                 bc.mine_pending_transactions(miner.address)
 
             # Create checkpoint
-            cp = checkpoint_mgr.create_checkpoint()
+            latest_block = bc.get_latest_block()
+            cp = checkpoint_mgr.create_checkpoint(
+                latest_block, bc.utxo_manager, bc.get_total_supply()
+            )
             checkpoints.append(cp)
 
         # Verify we have sequential checkpoints
         for i in range(len(checkpoints) - 1):
-            assert checkpoints[i]['block_height'] < checkpoints[i+1]['block_height']
+            assert checkpoints[i].height < checkpoints[i+1].height
 
     def test_checkpoint_invalid_hash(self, tmp_path):
         """Test checkpoint validation with invalid hash"""
@@ -133,14 +152,31 @@ class TestCheckpointOperations:
         for _ in range(5):
             bc.mine_pending_transactions(miner.address)
 
-        checkpoint_mgr = CheckpointManager(bc)
-        checkpoint = checkpoint_mgr.create_checkpoint()
+        checkpoint_mgr = CheckpointManager(data_dir=str(tmp_path))
+        latest_block = bc.get_latest_block()
+        checkpoint = checkpoint_mgr.create_checkpoint(
+            latest_block, bc.utxo_manager, bc.get_total_supply()
+        )
 
-        # Corrupt the hash
-        checkpoint['block_hash'] = "0" * 64  # Invalid hash
+        # Save the checkpoint first
+        assert checkpoint is not None
 
-        # Validation should fail
-        is_valid = checkpoint_mgr.validate_checkpoint(checkpoint)
+        # Load and corrupt the checkpoint file
+        checkpoint_file = os.path.join(
+            checkpoint_mgr.checkpoints_dir, f"cp_{checkpoint.height}.json"
+        )
+
+        with open(checkpoint_file, "r") as f:
+            data = json.load(f)
+
+        # Corrupt the block hash
+        data['block_hash'] = "0" * 64
+
+        with open(checkpoint_file, "w") as f:
+            json.dump(data, f)
+
+        # Validation should fail because the checkpoint hash won't match
+        is_valid = checkpoint_mgr.verify_checkpoint(checkpoint.height)
         assert not is_valid
 
     def test_checkpoint_height_mismatch(self, tmp_path):
@@ -151,14 +187,31 @@ class TestCheckpointOperations:
         for _ in range(5):
             bc.mine_pending_transactions(miner.address)
 
-        checkpoint_mgr = CheckpointManager(bc)
-        checkpoint = checkpoint_mgr.create_checkpoint()
+        checkpoint_mgr = CheckpointManager(data_dir=str(tmp_path))
+        latest_block = bc.get_latest_block()
+        checkpoint = checkpoint_mgr.create_checkpoint(
+            latest_block, bc.utxo_manager, bc.get_total_supply()
+        )
+
+        # Save the checkpoint first
+        assert checkpoint is not None
+
+        # Load and corrupt the checkpoint file
+        checkpoint_file = os.path.join(
+            checkpoint_mgr.checkpoints_dir, f"cp_{checkpoint.height}.json"
+        )
+
+        with open(checkpoint_file, "r") as f:
+            data = json.load(f)
 
         # Corrupt the height
-        checkpoint['block_height'] = 9999
+        data['height'] = 9999
 
-        # Validation should fail
-        is_valid = checkpoint_mgr.validate_checkpoint(checkpoint)
+        with open(checkpoint_file, "w") as f:
+            json.dump(data, f)
+
+        # Validation should fail because the checkpoint hash won't match
+        is_valid = checkpoint_mgr.verify_checkpoint(checkpoint.height)
         assert not is_valid
 
     def test_checkpoint_future_timestamp(self, tmp_path):
@@ -169,16 +222,33 @@ class TestCheckpointOperations:
         for _ in range(5):
             bc.mine_pending_transactions(miner.address)
 
-        checkpoint_mgr = CheckpointManager(bc)
-        checkpoint = checkpoint_mgr.create_checkpoint()
+        checkpoint_mgr = CheckpointManager(data_dir=str(tmp_path))
+        latest_block = bc.get_latest_block()
+        checkpoint = checkpoint_mgr.create_checkpoint(
+            latest_block, bc.utxo_manager, bc.get_total_supply()
+        )
+
+        # Save the checkpoint first
+        assert checkpoint is not None
+
+        # Load and corrupt the checkpoint file
+        checkpoint_file = os.path.join(
+            checkpoint_mgr.checkpoints_dir, f"cp_{checkpoint.height}.json"
+        )
+
+        with open(checkpoint_file, "r") as f:
+            data = json.load(f)
 
         # Set timestamp to far future
-        checkpoint['timestamp'] = time.time() + 86400 * 365  # 1 year ahead
+        data['timestamp'] = time.time() + 86400 * 365  # 1 year ahead
 
-        # Should be rejected or flagged
-        is_valid = checkpoint_mgr.validate_checkpoint(checkpoint)
-        # Behavior depends on implementation - just verify it returns bool
-        assert isinstance(is_valid, bool)
+        with open(checkpoint_file, "w") as f:
+            json.dump(data, f)
+
+        # Validation should fail because the checkpoint hash won't match
+        # (timestamp is part of the hash calculation)
+        is_valid = checkpoint_mgr.verify_checkpoint(checkpoint.height)
+        assert not is_valid
 
 
 class TestSPVProofValidation:
