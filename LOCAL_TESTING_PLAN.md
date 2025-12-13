@@ -27,8 +27,16 @@ This document is the definitive and most exhaustive local testing plan for the X
 *   **[x] 1.4: API Endpoint Tests:** `pytest tests/api/` - ✅ COMPLETED (1 test skipped - requires running node) (2025-12-13)
     - test_openapi_contract.py: Skipped (requires API_BASE_URL environment variable pointing to running node)
     - Note: This test will be run in Phase 2 after node initialization
-*   **[ ] 1.5: Verify Crypto Primitives:** Write a test to verify the correctness of signature schemes and hash functions used in the project.
-*   **[ ] 1.6: Verify Encoding Primitives:** Write tests to verify the project's custom serialization/deserialization logic for all network messages and state objects.
+*   **[x] 1.5: Verify Crypto Primitives:** ✅ COMPLETED (19/19 tests passing - 100%) (2025-12-13)
+    - test_crypto_primitives.py: 19 tests covering SHA-256, ECDSA signatures, public key derivation, address generation, edge cases
+    - Verified NIST test vectors for SHA-256
+    - Tested signature generation, verification, and tampering detection
+    - Cross-validated with wallet functionality
+*   **[x] 1.6: Verify Encoding Primitives:** ✅ COMPLETED (20/20 tests passing - 100%) (2025-12-13)
+    - test_encoding_primitives.py: 20 tests covering canonical JSON, transaction/block serialization, UTXO encoding, network messages
+    - Verified canonical JSON determinism and key ordering for consensus
+    - Tested transaction and block serialization roundtrips
+    - Validated edge cases (zero amounts, large metadata, Unicode)
 
 ## Phase 2: Single-Node Lifecycle & Configuration
 
