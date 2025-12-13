@@ -1942,8 +1942,13 @@ class P2PNetworkManager:
                     deserialized = deserializer(remote_blocks)
                     if deserialized and self.blockchain.replace_chain(deserialized):
                         return True
-                except Exception as exc:
-                    logger.debug(f"deserialize_chain failed for peer {peer_uri}: {exc}")
+                except (ValidationError, ValueError, TypeError, KeyError, RuntimeError) as exc:
+                    logger.debug(
+                        "deserialize_chain failed for peer %s: %s",
+                        peer_uri,
+                        exc,
+                        extra={"error_type": type(exc).__name__},
+                    )
         return False
 
     async def _ws_sync(self) -> bool:
