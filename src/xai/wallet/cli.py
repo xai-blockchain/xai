@@ -991,6 +991,10 @@ def _mnemonic_qr_backup(args: argparse.Namespace) -> int:
     checksum = bundle.payload.get("checksum", "unknown")
     created_at = bundle.payload.get("created_at")
     word_count = bundle.payload.get("word_count")
+    logger.info("Mnemonic QR backup generated successfully",
+        word_count=word_count,
+        checksum=checksum[:16],
+        has_passphrase=bool(bip39_passphrase))
     print("Mnemonic QR backup generated successfully.")
     print(f"  Word count: {word_count}")
     if bip39_passphrase:

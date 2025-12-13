@@ -421,7 +421,8 @@ class TestBalanceConservationWithFeesAndBurning:
         """Burning coins must reduce circulating supply permanently"""
         bc = Blockchain(data_dir=str(tmp_path))
         wallet = Wallet()
-        burn_address = "0" * 64  # Burn address (unspendable)
+        # Burn address - valid XAI format but provably unspendable (no known private key)
+        burn_address = "XAI" + ("0" * 61)
 
         # Generate funds
         for i in range(5):
