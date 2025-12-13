@@ -175,6 +175,9 @@ class TestTransactionValidator:
         mock_nonce_tracker.get_next_nonce.return_value = (
             1  # Simulate expected nonce is 1, but tx.nonce is 0
         )
+        mock_nonce_tracker.get_nonce.return_value = (
+            1  # Ensure backward-compatible check doesn't allow it
+        )
         result = validator.validate_transaction(valid_transaction)
         assert result is False
         validator.logger.warn.assert_called_once()

@@ -104,12 +104,14 @@ class TransactionValidator:
 
             # Skip timestamp checks for coinbase transactions
             if transaction.sender != "COINBASE":
-                min_fee_rate = getattr(Config, "MEMPOOL_MIN_FEE_RATE", 0.0)
-                fee_rate = transaction.get_fee_rate()
-                if is_mempool_check and fee_rate < min_fee_rate:
-                    raise ValidationError(
-                        f"Fee rate too low for mempool admission ({fee_rate:.10f} < {min_fee_rate})"
-                    )
+                # Skip fee rate check for transaction types that don't require fees
+                if transaction.tx_type not in ["governance_vote"]:
+                    min_fee_rate = getattr(Config, "MEMPOOL_MIN_FEE_RATE", 0.0)
+                    fee_rate = transaction.get_fee_rate()
+                    if is_mempool_check and fee_rate < min_fee_rate:
+                        raise ValidationError(
+                            f"Fee rate too low for mempool admission ({fee_rate:.10f} < {min_fee_rate})"
+                        )
 
                 # Reject transactions that are too old (replay attack protection)
                 if tx_age > MAX_TRANSACTION_AGE_SECONDS:
