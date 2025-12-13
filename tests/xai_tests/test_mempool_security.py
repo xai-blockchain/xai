@@ -36,7 +36,7 @@ def test_mempool_ban_window_enforced():
         sender = Wallet()
         recipient = Wallet()
 
-        def utxo_stub(_txid, _vout):
+        def utxo_stub(_txid, _vout, exclude_pending=True):
             return {"amount": 2.0, "script_pubkey": f"P2PKH {sender.address}"}
 
         chain.utxo_manager.get_unspent_output = utxo_stub
