@@ -1,0 +1,58 @@
+version: '3.8'
+
+# Toxiproxy configuration for XAI blockchain chaos testing
+#
+# This setup provides a proxy layer between nodes to simulate various network conditions:
+# - Latency injection
+# - Bandwidth throttling
+# - Packet loss
+# - Connection timeouts
+# - Slow close
+#
+# Usage:
+#   1. Start toxiproxy: docker-compose -f docker-compose.toxiproxy.yml up -d
+#   2. Create proxies: toxiproxy-cli create xai-node-1 -l 0.0.0.0:12101 -u node-1:8545
+#   3. Add toxics: toxiproxy-cli toxic add xai-node-1 -t latency -a latency=1000
+#   4. List toxics: toxiproxy-cli inspect xai-node-1
+#   5. Remove toxic: toxiproxy-cli toxic remove xai-node-1 -n latency_downstream
+#
+# See scripts/chaos-scenarios.sh for predefined scenarios
+
+services:
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.10.0
+    container_name: xai-toxiproxy
+    ports:
+      # Toxiproxy API
+      - "12800:8474"
+      # Proxy ports for node RPC endpoints (12101-12110)
+      - "12101:12101"
+      - "12102:12102"
+      - "12103:12103"
+      - "12104:12104"
+      - "12105:12105"
+      # Proxy ports for node WS endpoints (12111-12120)
+      - "12111:12111"
+      - "12112:12112"
+      - "12113:12113"
+      - "12114:12114"
+      - "12115:12115"
+      # Proxy ports for node P2P (12121-12130)
+      - "12121:12121"
+      - "12122:12122"
+      - "12123:12123"
+      - "12124:12124"
+      - "12125:12125"
+    networks:
+      - xai-testnet
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8474/version"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  xai-testnet:
+    external: true
+    name: xai-testnet
