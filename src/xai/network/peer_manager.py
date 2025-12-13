@@ -1295,24 +1295,14 @@ class PeerEncryption:
                                 "ca_bundle": ca_bundle,
                             }
                         )
-                    except (ValueError, ssl.SSLError) as exc:
+                    except (ValueError, ssl.SSLError, TypeError) as exc:
                         logger.error(
                             "Invalid CA bundle for server: %s",
                             exc,
                             extra={
                                 "event": "peer.ca_bundle_invalid",
                                 "ca_bundle": ca_bundle,
-                            }
-                        )
-                    except Exception as exc:
-                        logger.error(
-                            "Unexpected error loading CA bundle for server: %s",
-                            exc,
-                            exc_info=True,
-                            extra={
-                                "event": "peer.ca_bundle_load_failed",
-                                "ca_bundle": ca_bundle,
-                                "error": str(exc)
+                                "error_type": type(exc).__name__,
                             }
                         )
         else:
@@ -1331,23 +1321,14 @@ class PeerEncryption:
                             "ca_bundle": ca_bundle,
                         }
                     )
-                except (ValueError, ssl.SSLError) as exc:
+                except (ValueError, ssl.SSLError, TypeError) as exc:
                     logger.error(
                         "Invalid CA bundle for client: %s",
                         exc,
                         extra={
                             "event": "peer.ca_bundle_invalid",
                             "ca_bundle": ca_bundle,
-                        }
-                    )
-                except Exception as exc:
-                    logger.error(
-                        "Unexpected error loading CA bundle for client: %s",
-                        exc,
-                        exc_info=True,
-                        extra={
-                            "event": "peer.ca_bundle_load_failed",
-                            "ca_bundle": ca_bundle,
+                            "error_type": type(exc).__name__,
                             "error": str(exc)
                         }
                     )
@@ -1427,8 +1408,11 @@ class PeerEncryption:
             if not der_cert:
                 return None
             return hashlib.sha256(der_cert).hexdigest()
-        except Exception as e:
-            logging.debug("Failed to get peer certificate fingerprint: %s", e)
+        except (AttributeError, ValueError, TypeError) as e:
+            logging.debug("Invalid SSL object or certificate data: %s", e)
+            return None
+        except (ssl.SSLError, OSError) as e:
+            logging.debug("SSL/network error getting peer certificate: %s", e)
             return None
 
     def verify_signed_message(self, signed_message_bytes: bytes) -> Optional[Dict[str, Any]]:
@@ -1643,14 +1627,24 @@ class PeerEncryption:
                     "file": self.trusted_peer_pubkeys_file
                 }
             )
-        except Exception as exc:
+        except OSError as exc:
             logger.error(
-                "Failed to reload trusted pubkeys",
+                "I/O error reloading trusted pubkeys",
                 extra={
-                    "event": "peer.trust_store_error",
+                    "event": "peer.trust_store_io_error",
                     "store_type": "pubkeys",
                     "error_type": type(exc).__name__,
                     "error_message": str(exc),
+                    "file": self.trusted_peer_pubkeys_file
+                }
+            )
+        except (ValueError, TypeError) as exc:
+            logger.error(
+                "Invalid data format in trusted pubkeys file",
+                extra={
+                    "event": "peer.trust_store_data_error",
+                    "store_type": "pubkeys",
+                    "error_type": type(exc).__name__,
                     "file": self.trusted_peer_pubkeys_file
                 }
             )
@@ -1680,14 +1674,24 @@ class PeerEncryption:
                     "file": self.trusted_cert_fps_file
                 }
             )
-        except Exception as exc:
+        except OSError as exc:
             logger.error(
-                "Failed to reload trusted cert fingerprints",
+                "I/O error reloading trusted cert fingerprints",
                 extra={
-                    "event": "peer.trust_store_error",
+                    "event": "peer.trust_store_io_error",
                     "store_type": "cert_fps",
                     "error_type": type(exc).__name__,
                     "error_message": str(exc),
+                    "file": self.trusted_cert_fps_file
+                }
+            )
+        except (ValueError, TypeError) as exc:
+            logger.error(
+                "Invalid data format in trusted cert fingerprints file",
+                extra={
+                    "event": "peer.trust_store_data_error",
+                    "store_type": "cert_fps",
+                    "error_type": type(exc).__name__,
                     "file": self.trusted_cert_fps_file
                 }
             )
@@ -2134,14 +2138,24 @@ class PeerManager:
                     "file": self.trusted_peer_pubkeys_file
                 }
             )
-        except Exception as exc:
+        except OSError as exc:
             logger.error(
-                "Failed to reload trusted pubkeys",
+                "I/O error reloading trusted pubkeys",
                 extra={
-                    "event": "peer.trust_store_error",
+                    "event": "peer.trust_store_io_error",
                     "store_type": "pubkeys",
                     "error_type": type(exc).__name__,
                     "error_message": str(exc),
+                    "file": self.trusted_peer_pubkeys_file
+                }
+            )
+        except (ValueError, TypeError) as exc:
+            logger.error(
+                "Invalid data format in trusted pubkeys file",
+                extra={
+                    "event": "peer.trust_store_data_error",
+                    "store_type": "pubkeys",
+                    "error_type": type(exc).__name__,
                     "file": self.trusted_peer_pubkeys_file
                 }
             )
@@ -2171,14 +2185,24 @@ class PeerManager:
                     "file": self.trusted_cert_fps_file
                 }
             )
-        except Exception as exc:
+        except OSError as exc:
             logger.error(
-                "Failed to reload trusted cert fingerprints",
+                "I/O error reloading trusted cert fingerprints",
                 extra={
-                    "event": "peer.trust_store_error",
+                    "event": "peer.trust_store_io_error",
                     "store_type": "cert_fps",
                     "error_type": type(exc).__name__,
                     "error_message": str(exc),
+                    "file": self.trusted_cert_fps_file
+                }
+            )
+        except (ValueError, TypeError) as exc:
+            logger.error(
+                "Invalid data format in trusted cert fingerprints file",
+                extra={
+                    "event": "peer.trust_store_data_error",
+                    "store_type": "cert_fps",
+                    "error_type": type(exc).__name__,
                     "file": self.trusted_cert_fps_file
                 }
             )
