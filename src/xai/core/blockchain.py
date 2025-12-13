@@ -1850,7 +1850,12 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             return False
 
         # Both are set, verify the signature
-        return verify_signature_hex(header.miner_pubkey, header.hash.encode(), header.signature)
+        try:
+            return verify_signature_hex(header.miner_pubkey, header.hash.encode(), header.signature)
+        except (ValueError, TypeError) as e:
+            # Malformed signature or public key (e.g., not valid hex)
+            self.logger.debug("Signature verification failed due to malformed data", error=str(e), error_type=type(e).__name__)
+            return False
 
     def calculate_merkle_root(self, transactions: List[Transaction]) -> str:
         """Calculate merkle root of transactions"""

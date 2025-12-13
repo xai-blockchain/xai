@@ -7,6 +7,7 @@ and handling of edge cases in block timestamp validation.
 
 import pytest
 import time
+import hashlib
 from xai.core.blockchain import Blockchain
 from xai.core.blockchain_components.block import Block
 from xai.core.block_header import BlockHeader
@@ -359,10 +360,13 @@ class TestTimestampBoundaries:
         latest = bc.get_latest_block()
 
         # Simulate small clock drift (1 second in the future)
+        # Calculate correct merkle root for empty transaction list
+        merkle_root = hashlib.sha256(b"").hexdigest()
+
         header = BlockHeader(
             index=latest.index + 1,
             previous_hash=latest.hash,
-            merkle_root="0" * 64,
+            merkle_root=merkle_root,
             timestamp=time.time() + 1,  # 1 second ahead
             difficulty=4,
             nonce=0
