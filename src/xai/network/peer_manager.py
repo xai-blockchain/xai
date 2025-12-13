@@ -2542,12 +2542,27 @@ class PeerManager:
     def _resolve_geo_metadata(self, ip_address: str) -> GeoIPMetadata:
         try:
             return self.geoip_resolver.lookup(ip_address)
-        except Exception as exc:
-            logger.error(
-                "GeoIP lookup failed for %s: %s",
+        except (ConnectionError, TimeoutError, OSError) as exc:
+            logger.warning(
+                "Network error during GeoIP lookup for %s: %s",
                 ip_address,
                 type(exc).__name__,
-                extra={"event": "peer.geoip.lookup_failed", "ip": ip_address},
+                extra={"event": "peer.geoip.network_error", "ip": ip_address, "error_type": type(exc).__name__},
+            )
+            return GeoIPMetadata(
+                ip=ip_address,
+                country="UNKNOWN",
+                country_name="Unknown",
+                asn="AS-UNKNOWN",
+                as_name="Unknown",
+                source="error",
+            )
+        except (ValueError, KeyError, TypeError) as exc:
+            logger.warning(
+                "Invalid GeoIP data for %s: %s",
+                ip_address,
+                type(exc).__name__,
+                extra={"event": "peer.geoip.data_error", "ip": ip_address, "error_type": type(exc).__name__},
             )
             return GeoIPMetadata(
                 ip=ip_address,
