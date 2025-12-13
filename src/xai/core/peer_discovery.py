@@ -22,6 +22,8 @@ from typing import List, Dict, Set, Optional, Tuple
 from collections import defaultdict
 from datetime import datetime
 
+from xai.core.config import Config
+
 logger = logging.getLogger(__name__)
 
 
