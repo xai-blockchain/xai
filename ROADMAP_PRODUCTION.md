@@ -425,16 +425,16 @@ This roadmap targets production readiness with security-first posture, robust co
 
 ### Edge Case Tests
 
-- [ ] Add malformed block header tests.
-- [ ] Add timestamp boundary condition tests.
+- [x] Add malformed block header tests. ✅ `tests/xai_tests/edge_cases/test_malformed_block_headers.py` now covers 30+ edge cases including negative/zero indexes, invalid hashes, malformed merkle roots, invalid signatures, unsupported versions, type coercion, null byte injection, and unicode handling.
+- [x] Add timestamp boundary condition tests. ✅ `tests/xai_tests/edge_cases/test_timestamp_boundaries.py` now covers 25+ edge cases including zero/negative timestamps, future boundaries, median-time-past validation, precision preservation, overflow handling, clock drift tolerance, and NaN/infinity rejection.
 - [x] Add nonce overflow/underflow tests. ✅ `tests/xai_tests/unit/test_nonce_manager.py` now rejects zero/negative nonces and exercises extremely large values to ensure the tracker never overflows.
-- [ ] Add extreme difficulty adjustment tests.
-- [ ] Add mempool eviction order tests under full mempool.
+- [x] Add extreme difficulty adjustment tests. ✅ `tests/xai_tests/edge_cases/test_extreme_difficulty_adjustment.py` now covers 25+ scenarios including identical timestamps, extremely fast/slow blocks, min/max boundary conditions, negative time deltas, oscillation prevention, zero time delta, max adjustment factor enforcement, and float-to-int rounding.
+- [x] Add mempool eviction order tests under full mempool. ✅ `tests/xai_tests/edge_cases/test_mempool_eviction_order.py` now covers 20+ scenarios including fee-based eviction, equal-fee handling, fee rate prioritization, RBF transactions, spam attacks, transaction chains, DoS prevention, statistics tracking, nonce gaps, and concurrent mining.
 - [x] Add conflicting RBF replacement tests. ✅ `tests/xai_tests/unit/test_mempool_mixin.py` now covers sender mismatch, equal-fee replacements, and successful state updates for the RBF handler.
 - [x] Add seed phrase corruption recovery tests. ✅ `tests/xai_tests/unit/test_mnemonic_qr_backup.py` now ensures QR backups detect checksum and word-count tampering via `MnemonicQRBackupGenerator.recover_mnemonic()`.
 - [x] Add concurrent transaction signing tests. ✅ `tests/xai_tests/unit/test_wallet.py` now exercises thread-safe signing for both software and hardware wallet paths.
 - [x] Add hardware wallet failure mode tests. ✅ `tests/xai_tests/unit/test_hardware_wallet_provider.py` now asserts missing Ledger/Trezor dependencies raise clear errors, and `tests/xai_tests/unit/test_wallet.py` covers hardware signing failures bubbling to callers.
-- [ ] Add regtest/Hardhat smoke tests for HTLC fund/claim/refund and checkpoint fetch/apply with SPV confirmations.
+- [x] Add regtest/Hardhat smoke tests for HTLC fund/claim/refund and checkpoint fetch/apply with SPV confirmations. ✅ `tests/xai_tests/edge_cases/test_htlc_smoke.py` covers HTLC compilation, funding, claiming, refunding with graceful skipping when nodes unavailable (25+ tests); `tests/xai_tests/edge_cases/test_checkpoint_spv.py` covers checkpoint creation/validation/apply, SPV merkle proofs, multi-confirmation verification, and UTXO commitments (20+ tests).
 
 ### Performance Tests
 
