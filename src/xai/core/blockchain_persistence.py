@@ -339,7 +339,14 @@ class BlockchainStorage:
 
             print(f"Checkpoint created at block {block_height}")
 
-        except Exception as e:
+        except (OSError, IOError, PermissionError) as e:
+            logger.warning(
+                "Failed to create checkpoint",
+                operation="_create_checkpoint",
+                block_height=block_height,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             print(f"Warning: Failed to create checkpoint: {e}")
 
     def _attempt_recovery(self) -> Tuple[bool, Optional[dict], str]:
@@ -420,13 +427,26 @@ class BlockchainStorage:
                         )
                         return blockchain_data
 
-                except Exception as e:
+                except (json.JSONDecodeError, CorruptedDataError, OSError, IOError, KeyError, ValueError) as e:
+                    logger.debug(
+                        "Backup file is invalid, trying next",
+                        operation="_recover_from_backup",
+                        backup_file=os.path.basename(backup_file),
+                        error=str(e),
+                        error_type=type(e).__name__,
+                    )
                     print(f"Backup {os.path.basename(backup_file)} is invalid: {e}")
                     continue
 
             return None
 
-        except Exception as e:
+        except (OSError, IOError, PermissionError) as e:
+            logger.error(
+                "Failed to recover from backups",
+                operation="_recover_from_backup",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             print(f"Failed to recover from backups: {e}")
             return None
 
@@ -476,7 +496,14 @@ class BlockchainStorage:
                         print(f"Recovered from checkpoint at block {height}")
                         return blockchain_data
 
-                except Exception as e:
+                except (json.JSONDecodeError, CorruptedDataError, OSError, IOError, KeyError, ValueError) as e:
+                    logger.debug(
+                        "Checkpoint file is invalid, trying next",
+                        operation="_recover_from_checkpoint",
+                        checkpoint_height=height,
+                        error=str(e),
+                        error_type=type(e).__name__,
+                    )
                     print(f"Checkpoint {height} is invalid: {e}")
                     continue
 

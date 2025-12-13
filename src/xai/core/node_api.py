@@ -1471,7 +1471,12 @@ class NodeAPIRoutes:
                     ),
                     200,
                 )
-            except Exception as exc:
+            except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, KeyError) as exc:
+                logger.error(
+                    "Exchange get order book failed",
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                )
                 return self._handle_exception(exc, "exchange_get_order_book")
 
         @self.app.route("/exchange/place-order", methods=["POST"])
@@ -1596,7 +1601,12 @@ class NodeAPIRoutes:
                 )
             except ValueError as exc:
                 return self._error_response(str(exc), status=400, code="order_invalid")
-            except Exception as exc:
+            except (DatabaseError, StorageError, OSError, IOError, TypeError, KeyError, AttributeError) as exc:
+                logger.error(
+                    "Exchange place order failed",
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                )
                 return self._handle_exception(exc, "exchange_place_order")
 
         @self.app.route("/exchange/cancel-order", methods=["POST"])
@@ -1646,7 +1656,12 @@ class NodeAPIRoutes:
 
                 return self._success_response({"message": "Order cancelled successfully"})
 
-            except Exception as exc:
+            except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, KeyError) as exc:
+                logger.error(
+                    "Exchange cancel order failed",
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                )
                 return self._handle_exception(exc, "exchange_cancel_order")
 
         @self.app.route("/exchange/my-orders/<address>", methods=["GET"])
