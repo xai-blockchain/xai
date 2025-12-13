@@ -21,8 +21,12 @@ This document is the definitive and most exhaustive local testing plan for the X
     - test_reorg_simulator.py: 2/2 passing ✅
     - test_wallet.py: 24/24 passing ✅
     - **All fixes committed**: config ALLOW_CHAIN_RESET, transaction coinbase addresses, validator signature checking, exception handling, test fixtures, governance vote fee exemption, nonce test scenario, account_abstraction address validation, mempool utxo_stub parameter, wallet logger extra parameter
-*   **[ ] 1.3: Integration Tests:** `pytest -m integration`
-*   **[ ] 1.4: API Endpoint Tests:** `pytest tests/api/`
+*   **[x] 1.3: Integration Tests:** `pytest -m integration` - ✅ COMPLETED (1/1 passing - 100%) (2025-12-13)
+    - test_security_webhook_forwarder.py: 1/1 passing ✅
+    - Installed missing dependency: flask-cors
+*   **[x] 1.4: API Endpoint Tests:** `pytest tests/api/` - ✅ COMPLETED (1 test skipped - requires running node) (2025-12-13)
+    - test_openapi_contract.py: Skipped (requires API_BASE_URL environment variable pointing to running node)
+    - Note: This test will be run in Phase 2 after node initialization
 *   **[ ] 1.5: Verify Crypto Primitives:** Write a test to verify the correctness of signature schemes and hash functions used in the project.
 *   **[ ] 1.6: Verify Encoding Primitives:** Write tests to verify the project's custom serialization/deserialization logic for all network messages and state objects.
 
