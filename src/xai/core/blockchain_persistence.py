@@ -692,7 +692,13 @@ class BlockchainStorage:
                 with open(self.metadata_file, "r") as f:
                     return json.load(f)
             return None
-        except Exception as e:
+        except (json.JSONDecodeError, OSError, IOError) as e:
+            logger.error(
+                "Failed to read metadata file",
+                operation="get_metadata",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             print(f"Failed to read metadata: {e}")
             return None
 
@@ -731,5 +737,11 @@ class BlockchainStorage:
                 f"Integrity verified (height: {block_height}, checksum: {expected_checksum[:8]}...)",
             )
 
-        except Exception as e:
+        except (json.JSONDecodeError, CorruptedDataError, OSError, IOError, KeyError, ValueError) as e:
+            logger.error(
+                "Blockchain integrity check failed",
+                operation="verify_integrity",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             return False, f"Integrity check failed: {str(e)}"

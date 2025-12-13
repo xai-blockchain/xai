@@ -1830,7 +1830,14 @@ class NodeAPIRoutes:
             try:
                 balance = self.node.exchange_wallet_manager.get_balance(address, currency)
                 return jsonify({"success": True, "address": address, **balance}), 200
-            except Exception as e:
+            except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, AttributeError) as e:
+                logger.error(
+                    "Get currency balance failed",
+                    address=address,
+                    currency=currency,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 return jsonify({"error": str(e)}), 500
 
         @self.app.route("/exchange/transactions/<address>", methods=["GET"])
@@ -1847,7 +1854,13 @@ class NodeAPIRoutes:
                     jsonify({"success": True, "address": address, "transactions": transactions}),
                     200,
                 )
-            except Exception as e:
+            except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, AttributeError) as e:
+                logger.error(
+                    "Get transactions failed",
+                    address=address,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 return jsonify({"error": str(e)}), 500
 
     def _setup_exchange_stats_routes(self) -> None:

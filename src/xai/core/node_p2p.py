@@ -1058,11 +1058,15 @@ class P2PNetworkManager:
                 peer_id,
                 {"type": "checkpoint_payload", "payload": exported},
             )
-        except Exception as exc:
+        except (StorageError, NetworkError, ValueError, RuntimeError, AttributeError) as exc:
             logger.debug(
                 "Failed to serve checkpoint payload: %s",
                 exc,
-                extra={"event": "p2p.checkpoint_payload_failed", "peer": peer_id},
+                extra={
+                    "event": "p2p.checkpoint_payload_failed",
+                    "peer": peer_id,
+                    "error_type": type(exc).__name__,
+                },
             )
 
     async def _send_signed_message(
@@ -1208,11 +1212,12 @@ class P2PNetworkManager:
                             "source": "local",
                         }
                     )
-            except Exception as e:
+            except (StorageError, DatabaseError, ValueError, RuntimeError, AttributeError) as e:
                 logger.debug(
                     "Failed to load checkpoint for sync status",
                     height=getattr(cm, "latest_checkpoint_height", None),
-                    error=str(e)
+                    error=str(e),
+                    error_type=type(e).__name__,
                 )
 
         if not candidates:
