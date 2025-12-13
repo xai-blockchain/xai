@@ -127,101 +127,105 @@ class BlockchainIntegrationTests:
     @staticmethod
     def test_full_transaction_flow():
         """Test complete transaction flow: create, sign, submit, mine"""
-        blockchain = Blockchain(data_dir=str(tmp_path))
-        wallet1 = Wallet()
-        wallet2 = Wallet()
+        with tempfile.TemporaryDirectory() as tmp_path:
+            blockchain = Blockchain(data_dir=str(tmp_path))
+            wallet1 = Wallet()
+            wallet2 = Wallet()
 
-        # Give wallet1 funds via genesis
-        blockchain.utxo_set[wallet1.address] = [
-            {"txid": "genesis", "amount": 1000.0, "spent": False}
-        ]
+            # Give wallet1 funds via genesis
+            blockchain.utxo_set[wallet1.address] = [
+                {"txid": "genesis", "amount": 1000.0, "spent": False}
+            ]
 
-        # Create and sign transaction
-        tx = Transaction(wallet1.address, wallet2.address, 100.0, 1.0, wallet1.public_key, nonce=0)
-        tx.sign_transaction(wallet1.private_key)
+            # Create and sign transaction
+            tx = Transaction(wallet1.address, wallet2.address, 100.0, 1.0, wallet1.public_key, nonce=0)
+            tx.sign_transaction(wallet1.private_key)
 
-        # Add to blockchain
-        success = blockchain.add_transaction(tx)
-        assert success, "Transaction should be added successfully"
+            # Add to blockchain
+            success = blockchain.add_transaction(tx)
+            assert success, "Transaction should be added successfully"
 
-        # Mine block
-        miner_wallet = Wallet()
-        block = blockchain.mine_pending_transactions(miner_wallet.address)
+            # Mine block
+            miner_wallet = Wallet()
+            block = blockchain.mine_pending_transactions(miner_wallet.address)
 
-        assert len(blockchain.chain) == 2, "Should have 2 blocks after mining"
-        assert (
-            blockchain.get_balance(wallet2.address) == 100.0
-        ), "Recipient should have received funds"
+            assert len(blockchain.chain) == 2, "Should have 2 blocks after mining"
+            assert (
+                blockchain.get_balance(wallet2.address) == 100.0
+            ), "Recipient should have received funds"
         return True
 
     @staticmethod
     def test_chain_validation():
         """Test blockchain validation"""
-        blockchain = Blockchain(data_dir=str(tmp_path))
-        wallet = Wallet()
+        with tempfile.TemporaryDirectory() as tmp_path:
+            blockchain = Blockchain(data_dir=str(tmp_path))
+            wallet = Wallet()
 
-        # Mine several blocks
-        for i in range(3):
-            blockchain.mine_pending_transactions(wallet.address)
+            # Mine several blocks
+            for i in range(3):
+                blockchain.mine_pending_transactions(wallet.address)
 
-        # Validate chain
-        assert blockchain.validate_chain(), "Chain should be valid"
+            # Validate chain
+            assert blockchain.validate_chain(), "Chain should be valid"
 
-        # Corrupt a block
-        blockchain.chain[1].transactions[0].amount = 999999.0
+            # Corrupt a block
+            blockchain.chain[1].transactions[0].amount = 999999.0
 
-        # Should detect corruption
-        assert not blockchain.validate_chain(), "Should detect corrupted chain"
+            # Should detect corruption
+            assert not blockchain.validate_chain(), "Should detect corrupted chain"
         return True
 
     @staticmethod
     def test_supply_cap_enforcement():
         """Test that supply cap is enforced"""
-        blockchain = Blockchain(data_dir=str(tmp_path))
-        wallet = Wallet()
+        with tempfile.TemporaryDirectory() as tmp_path:
+            blockchain = Blockchain(data_dir=str(tmp_path))
+            wallet = Wallet()
 
-        # Get current supply
-        initial_supply = blockchain.get_total_circulating_supply()
+            # Get current supply
+            initial_supply = blockchain.get_total_circulating_supply()
 
-        # Mine blocks
-        for i in range(5):
-            block = blockchain.mine_pending_transactions(wallet.address)
+            # Mine blocks
+            for i in range(5):
+                block = blockchain.mine_pending_transactions(wallet.address)
 
-        final_supply = blockchain.get_total_circulating_supply()
+            final_supply = blockchain.get_total_circulating_supply()
 
-        # Should not exceed max supply
-        assert final_supply <= blockchain.max_supply, "Supply should not exceed cap"
-        assert final_supply > initial_supply, "Supply should have increased"
+            # Should not exceed max supply
+            assert final_supply <= blockchain.max_supply, "Supply should not exceed cap"
+            assert final_supply > initial_supply, "Supply should have increased"
         return True
 
     @staticmethod
     def test_concurrent_transactions():
         """Test handling multiple pending transactions"""
-        blockchain = Blockchain(data_dir=str(tmp_path))
-        wallet1 = Wallet()
-        wallets = [Wallet() for _ in range(5)]
+        with tempfile.TemporaryDirectory() as tmp_path:
+            blockchain = Blockchain(data_dir=str(tmp_path))
+            wallet1 = Wallet()
+            wallets = [Wallet() for _ in range(5)]
 
-        # Give wallet1 funds split across multiple UTXOs so concurrent pending txs can be funded
-        blockchain.utxo_set[wallet1.address] = [
-            {"txid": f"genesis-{i}", "amount": 1000.0, "spent": False} for i in range(len(wallets))
-        ]
+            # Give wallet1 funds split across multiple UTXOs so concurrent pending txs can be funded
+            blockchain.utxo_set[wallet1.address] = [
+                {"txid": f"genesis-{i}", "amount": 1000.0, "spent": False} for i in range(len(wallets))
+            ]
 
-        # Create multiple transactions
-        for i, wallet in enumerate(wallets):
-            tx = Transaction(
-                wallet1.address, wallet.address, 100.0, 1.0, wallet1.public_key, nonce=i
-            )
-            tx.sign_transaction(wallet1.private_key)
-            blockchain.add_transaction(tx)
+            # Create multiple transactions
+            for i, wallet in enumerate(wallets):
+                tx = Transaction(
+                    wallet1.address, wallet.address, 100.0, 1.0, wallet1.public_key, nonce=i
+                )
+                tx.sign_transaction(wallet1.private_key)
+                blockchain.add_transaction(tx)
 
-        assert len(blockchain.pending_transactions) == 5, "Should have 5 pending transactions"
+            assert len(blockchain.pending_transactions) == 5, "Should have 5 pending transactions"
 
-        # Mine block
-        miner = Wallet()
-        block = blockchain.mine_pending_transactions(miner.address)
+            # Mine block
+            miner = Wallet()
+            block = blockchain.mine_pending_transactions(miner.address)
 
-        # All transactions should be in block
-        assert len(block.transactions) == 6, "Block should have coinbase + 5 transactions"
+            # All transactions should be in block
+            assert len(block.transactions) == 6, "Block should have coinbase + 5 transactions"
         return True
 
 
@@ -231,108 +235,113 @@ class SecurityTests:
     @staticmethod
     def test_double_spend_prevention():
         """Test prevention of double-spend attacks"""
-        blockchain = Blockchain(data_dir=str(tmp_path))
-        wallet1 = Wallet()
-        wallet2 = Wallet()
-        wallet3 = Wallet()
+        with tempfile.TemporaryDirectory() as tmp_path:
+            blockchain = Blockchain(data_dir=str(tmp_path))
+            wallet1 = Wallet()
+            wallet2 = Wallet()
+            wallet3 = Wallet()
 
-        # Give wallet1 100 XAI
-        blockchain.utxo_set[wallet1.address] = [
-            {"txid": "genesis", "amount": 100.0, "spent": False}
-        ]
+            # Give wallet1 100 XAI
+            blockchain.utxo_set[wallet1.address] = [
+                {"txid": "genesis", "amount": 100.0, "spent": False}
+            ]
 
-        # Try to spend same funds twice
-        tx1 = Transaction(wallet1.address, wallet2.address, 90.0, 1.0, wallet1.public_key, nonce=0)
-        tx1.sign_transaction(wallet1.private_key)
+            # Try to spend same funds twice
+            tx1 = Transaction(wallet1.address, wallet2.address, 90.0, 1.0, wallet1.public_key, nonce=0)
+            tx1.sign_transaction(wallet1.private_key)
 
-        tx2 = Transaction(wallet1.address, wallet3.address, 90.0, 1.0, wallet1.public_key, nonce=1)
-        tx2.sign_transaction(wallet1.private_key)
+            tx2 = Transaction(wallet1.address, wallet3.address, 90.0, 1.0, wallet1.public_key, nonce=1)
+            tx2.sign_transaction(wallet1.private_key)
 
-        # First transaction should succeed
-        assert blockchain.add_transaction(tx1), "First transaction should be accepted"
+            # First transaction should succeed
+            assert blockchain.add_transaction(tx1), "First transaction should be accepted"
 
-        # Second transaction should fail (insufficient balance)
-        assert not blockchain.add_transaction(tx2), "Second transaction should be rejected"
+            # Second transaction should fail (insufficient balance)
+            assert not blockchain.add_transaction(tx2), "Second transaction should be rejected"
         return True
 
     @staticmethod
     def test_invalid_signature_rejection():
         """Test rejection of transactions with invalid signatures"""
-        blockchain = Blockchain(data_dir=str(tmp_path))
-        wallet1 = Wallet()
-        wallet2 = Wallet()
+        with tempfile.TemporaryDirectory() as tmp_path:
+            blockchain = Blockchain(data_dir=str(tmp_path))
+            wallet1 = Wallet()
+            wallet2 = Wallet()
 
-        blockchain.utxo_set[wallet1.address] = [
-            {"txid": "genesis", "amount": 100.0, "spent": False}
-        ]
+            blockchain.utxo_set[wallet1.address] = [
+                {"txid": "genesis", "amount": 100.0, "spent": False}
+            ]
 
-        tx = Transaction(wallet1.address, wallet2.address, 50.0, 1.0, wallet1.public_key, nonce=0)
-        tx.sign_transaction(wallet1.private_key)
+            tx = Transaction(wallet1.address, wallet2.address, 50.0, 1.0, wallet1.public_key, nonce=0)
+            tx.sign_transaction(wallet1.private_key)
 
-        # Tamper with transaction after signing
-        tx.amount = 99.0
+            # Tamper with transaction after signing
+            tx.amount = 99.0
 
-        # Should be rejected
-        assert not blockchain.validate_transaction(tx), "Tampered transaction should be rejected"
+            # Should be rejected
+            assert not blockchain.validate_transaction(tx), "Tampered transaction should be rejected"
         return True
 
     @staticmethod
     def test_block_size_limits():
         """Test block size limit enforcement"""
-        blockchain = Blockchain(data_dir=str(tmp_path))
+        with tempfile.TemporaryDirectory() as tmp_path:
+            blockchain = Blockchain(data_dir=str(tmp_path))
 
-        # Create a large transaction (just under 100KB limit)
-        large_data = "X" * 99000
+            # Create a large transaction (just under 100KB limit)
+            large_data = "X" * 99000
 
-        # This should be within limits
-        # In real implementation, transaction size would be checked
-        # For now, just verify the security manager exists
-        assert hasattr(blockchain, "security_manager"), "Should have security manager"
-        assert blockchain.security_manager is not None, "Security manager should be initialized"
+            # This should be within limits
+            # In real implementation, transaction size would be checked
+            # For now, just verify the security manager exists
+            assert hasattr(blockchain, "security_manager"), "Should have security manager"
+            assert blockchain.security_manager is not None, "Security manager should be initialized"
         return True
 
     @staticmethod
     def test_dust_attack_prevention():
         """Test prevention of dust attacks"""
-        blockchain = Blockchain(data_dir=str(tmp_path))
-        wallet1 = Wallet()
-        wallet2 = Wallet()
+        with tempfile.TemporaryDirectory() as tmp_path:
+            blockchain = Blockchain(data_dir=str(tmp_path))
+            wallet1 = Wallet()
+            wallet2 = Wallet()
 
-        blockchain.utxo_set[wallet1.address] = [
-            {"txid": "genesis", "amount": 100.0, "spent": False}
-        ]
+            blockchain.utxo_set[wallet1.address] = [
+                {"txid": "genesis", "amount": 100.0, "spent": False}
+            ]
 
-        # Try to create dust transaction (below minimum)
-        tx = Transaction(
-            wallet1.address, wallet2.address, 0.000001, 0.0, wallet1.public_key, nonce=0
-        )
-        tx.sign_transaction(wallet1.private_key)
+            # Try to create dust transaction (below minimum)
+            tx = Transaction(
+                wallet1.address, wallet2.address, 0.000001, 0.0, wallet1.public_key, nonce=0
+            )
+            tx.sign_transaction(wallet1.private_key)
 
-        # Should be rejected by security manager
-        result = blockchain.security_manager.validate_new_transaction(tx)
-        assert not result[0], "Dust transaction should be rejected"
+            # Should be rejected by security manager
+            result = blockchain.security_manager.validate_new_transaction(tx)
+            assert not result[0], "Dust transaction should be rejected"
         return True
 
     @staticmethod
     def test_reorganization_depth_limit():
         """Test reorganization depth limit"""
-        blockchain = Blockchain(data_dir=str(tmp_path))
+        with tempfile.TemporaryDirectory() as tmp_path:
+            blockchain = Blockchain(data_dir=str(tmp_path))
 
-        # Test that reorg protection exists
-        assert hasattr(
-            blockchain.security_manager, "reorg_protection"
-        ), "Should have reorg protection"
+            # Test that reorg protection exists
+            assert hasattr(
+                blockchain.security_manager, "reorg_protection"
+            ), "Should have reorg protection"
 
-        # Simulate a chain taller than the configured limit to trigger rejection
-        max_depth = BlockchainSecurityConfig.MAX_REORG_DEPTH
-        current_height = max_depth + 10
-        fork_point = current_height - (max_depth + 1)
+            # Simulate a chain taller than the configured limit to trigger rejection
+            max_depth = BlockchainSecurityConfig.MAX_REORG_DEPTH
+            current_height = max_depth + 10
+            fork_point = current_height - (max_depth + 1)
 
-        valid, error = blockchain.security_manager.reorg_protection.validate_reorganization(
-            current_height, fork_point
-        )
-        assert not valid, "Deep reorganization should be rejected"
-        assert "too deep" in error.lower(), "Error should mention depth"
+            valid, error = blockchain.security_manager.reorg_protection.validate_reorganization(
+                current_height, fork_point
+            )
+            assert not valid, "Deep reorganization should be rejected"
+            assert "too deep" in error.lower(), "Error should mention depth"
         return True
 
 
@@ -342,89 +351,93 @@ class PerformanceTests:
     @staticmethod
     def test_mining_performance():
         """Test block mining performance"""
-        blockchain = Blockchain(data_dir=str(tmp_path))
-        wallet = Wallet()
+        with tempfile.TemporaryDirectory() as tmp_path:
+            blockchain = Blockchain(data_dir=str(tmp_path))
+            wallet = Wallet()
 
-        # Add some transactions
-        for i in range(10):
-            tx = Transaction("COINBASE", wallet.address, 1.0)
-            tx.txid = tx.calculate_hash()
-            blockchain.pending_transactions.append(tx)
+            # Add some transactions
+            for i in range(10):
+                tx = Transaction("COINBASE", wallet.address, 1.0)
+                tx.txid = tx.calculate_hash()
+                blockchain.pending_transactions.append(tx)
 
-        # Time mining
-        start = time.time()
-        block = blockchain.mine_pending_transactions(wallet.address)
-        duration = time.time() - start
+            # Time mining
+            start = time.time()
+            block = blockchain.mine_pending_transactions(wallet.address)
+            duration = time.time() - start
 
-        print(f"    Mining 10 transactions took {duration:.2f}s")
-        assert duration < 60, "Mining should complete within 60 seconds"
+            print(f"    Mining 10 transactions took {duration:.2f}s")
+            assert duration < 60, "Mining should complete within 60 seconds"
         return True
 
     @staticmethod
     def test_large_transaction_volume():
         """Test handling of large transaction volumes"""
-        blockchain = Blockchain(data_dir=str(tmp_path))
-        wallet = Wallet()
+        with tempfile.TemporaryDirectory() as tmp_path:
+            blockchain = Blockchain(data_dir=str(tmp_path))
+            wallet = Wallet()
 
-        blockchain.utxo_set[wallet.address] = [
-            {"txid": f"genesis-{i}", "amount": 2500.0, "spent": False} for i in range(50)
-        ]
+            blockchain.utxo_set[wallet.address] = [
+                {"txid": f"genesis-{i}", "amount": 2500.0, "spent": False} for i in range(50)
+            ]
 
-        # Add many transactions
-        recipients = [Wallet() for _ in range(50)]
-        start = time.time()
+            # Add many transactions
+            recipients = [Wallet() for _ in range(50)]
+            start = time.time()
 
-        for i, recipient in enumerate(recipients):
-            tx = Transaction(
-                wallet.address, recipient.address, 1.0, 0.01, wallet.public_key, nonce=i
-            )
-            tx.sign_transaction(wallet.private_key)
-            blockchain.add_transaction(tx)
+            for i, recipient in enumerate(recipients):
+                tx = Transaction(
+                    wallet.address, recipient.address, 1.0, 0.01, wallet.public_key, nonce=i
+                )
+                tx.sign_transaction(wallet.private_key)
+                blockchain.add_transaction(tx)
 
-        duration = time.time() - start
-        print(f"    Adding 50 transactions took {duration:.3f}s")
-        assert len(blockchain.pending_transactions) == 50, "Should have 50 pending transactions"
+            duration = time.time() - start
+            print(f"    Adding 50 transactions took {duration:.3f}s")
+            assert len(blockchain.pending_transactions) == 50, "Should have 50 pending transactions"
         return True
 
     @staticmethod
     def test_chain_validation_performance():
         """Test blockchain validation performance"""
-        blockchain = Blockchain(data_dir=str(tmp_path))
-        wallet = Wallet()
+        with tempfile.TemporaryDirectory() as tmp_path:
+            blockchain = Blockchain(data_dir=str(tmp_path))
+            wallet = Wallet()
 
-        # Create a longer chain
-        for i in range(10):
-            blockchain.mine_pending_transactions(wallet.address)
+            # Create a longer chain
+            for i in range(10):
+                blockchain.mine_pending_transactions(wallet.address)
 
-        # Time validation
-        start = time.time()
-        valid = blockchain.validate_chain()
-        duration = time.time() - start
+            # Time validation
+            start = time.time()
+            valid = blockchain.validate_chain()
+            duration = time.time() - start
 
-        print(f"    Validating {len(blockchain.chain)} blocks took {duration:.3f}s")
-        assert valid, "Chain should be valid"
-        assert duration < 10, "Validation should be fast"
+            print(f"    Validating {len(blockchain.chain)} blocks took {duration:.3f}s")
+            assert valid, "Chain should be valid"
+            assert duration < 10, "Validation should be fast"
         return True
 
     @staticmethod
     def test_balance_query_performance():
         """Test balance query performance with many UTXOs"""
-        blockchain = Blockchain(data_dir=str(tmp_path))
-        wallet = Wallet()
+        with tempfile.TemporaryDirectory() as tmp_path:
+            blockchain = Blockchain(data_dir=str(tmp_path))
+            wallet = Wallet()
 
-        # Create many UTXOs
-        blockchain.utxo_set[wallet.address] = [
-            {"txid": f"tx{i}", "amount": 1.0, "spent": False} for i in range(1000)
-        ]
+            # Create many UTXOs
+            blockchain.utxo_set[wallet.address] = [
+                {"txid": f"tx{i}", "amount": 1.0, "spent": False} for i in range(1000)
+            ]
 
-        # Time balance calculation
-        start = time.time()
-        balance = blockchain.get_balance(wallet.address)
-        duration = time.time() - start
+            # Time balance calculation
+            start = time.time()
+            balance = blockchain.get_balance(wallet.address)
+            duration = time.time() - start
 
-        print(f"    Balance query with 1000 UTXOs took {duration:.4f}s")
-        assert balance == 1000.0, "Balance should be 1000.0"
-        assert duration < 0.1, "Balance query should be fast"
+            print(f"    Balance query with 1000 UTXOs took {duration:.4f}s")
+            assert balance == 1000.0, "Balance should be 1000.0"
+            assert duration < 0.1, "Balance query should be fast"
         return True
 
 
