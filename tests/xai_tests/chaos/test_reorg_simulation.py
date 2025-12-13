@@ -6,17 +6,29 @@ from xai.core.blockchain import Blockchain, Block, BlockHeader, Transaction
 from xai.core.reorg_simulator import ReorgSimulator
 
 
-def _make_block(index: int, prev_hash: str, txs: list[Transaction]) -> Block:
+def _make_block(index: int, prev_hash: str, txs: list[Transaction], blockchain: Blockchain) -> Block:
+    # Calculate proper difficulty for this block
+    difficulty = blockchain.calculate_next_difficulty()
+
     header = BlockHeader(
         index=index,
         previous_hash=prev_hash,
         timestamp=time.time(),
-        difficulty=0,
+        difficulty=difficulty,
         merkle_root="",
         nonce=0,
         miner_pubkey="miner",
     )
-    header.hash = header.calculate_hash()
+
+    # Mine the block to get valid PoW
+    nonce = 0
+    while True:
+        header.nonce = nonce
+        header.hash = header.calculate_hash()
+        if header.hash.startswith("0" * difficulty):
+            break
+        nonce += 1
+
     return Block(header, txs)
 
 
@@ -31,7 +43,7 @@ def test_reorg_simulator_tracks_utxo_digest(fork_len, tmp_path):
     genesis = chain.chain[0] if chain.chain else None
     prev_hash = genesis.hash if genesis else "0"
     for i in range(1, 4):
-        blk = _make_block(i, prev_hash, [])
+        blk = _make_block(i, prev_hash, [], chain)
         chain._add_block_to_chain(blk)
         prev_hash = blk.hash
 
@@ -41,7 +53,7 @@ def test_reorg_simulator_tracks_utxo_digest(fork_len, tmp_path):
     fork_blocks = []
     fork_prev = chain.chain[1].hash
     for i in range(2, 2 + fork_len + 2):  # ensure fork is longer than main by at least 1
-        blk = _make_block(i, fork_prev, [])
+        blk = _make_block(i, fork_prev, [], chain)
         fork_blocks.append(blk)
         fork_prev = blk.hash
 
