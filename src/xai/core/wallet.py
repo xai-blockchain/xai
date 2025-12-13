@@ -618,10 +618,12 @@ class Wallet:
         except InvalidTag as e:
             # InvalidTag from AESGCM.decrypt (wrong password or tampered data)
             logger.error(
-                "InvalidTag in _decrypt_payload",
-                error_type="InvalidTag",
-                error=str(e),
-                function="_decrypt_payload",
+                "InvalidTag in _decrypt_payload: %s",
+                str(e),
+                extra={
+                    "error_type": "InvalidTag",
+                    "function": "_decrypt_payload"
+                }
             )
             raise ValueError(f"Decryption failed: invalid password or corrupted data - authentication failed") from e
 
@@ -843,10 +845,12 @@ class Wallet:
         except InvalidTag as e:
             # InvalidTag from AESGCM.decrypt (wrong password or tampered data)
             logger.error(
-                "InvalidTag in _decrypt_payload_static",
-                error_type="InvalidTag",
-                error=str(e),
-                function="_decrypt_payload_static",
+                "InvalidTag in _decrypt_payload_static: %s",
+                str(e),
+                extra={
+                    "error_type": "InvalidTag",
+                    "function": "_decrypt_payload_static"
+                }
             )
             raise ValueError(f"Decryption failed: invalid password or corrupted data - authentication failed") from e
 
