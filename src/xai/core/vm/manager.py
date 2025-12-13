@@ -91,9 +91,9 @@ class SmartContractManager:
                     source="deployment",
                 )
             except (ValueError, TypeError) as exc:  # pragma: no cover - defensive
-                logger = getattr(self.blockchain, "logger", None)
-                if logger:
-                    logger.warn(f"Failed to persist contract ABI: {exc}")
+                blockchain_logger = getattr(self.blockchain, "logger", None)
+                if blockchain_logger:
+                    blockchain_logger.warn(f"Failed to persist contract ABI: {exc}")
         return receipt
 
     def static_call(
@@ -140,9 +140,9 @@ class SmartContractManager:
         self.blockchain.contracts = copy.deepcopy(snapshot.get("contracts", {}))
         self.blockchain.contract_receipts = copy.deepcopy(snapshot.get("contract_receipts", []))
 
-        logger = getattr(self.blockchain, "logger", None)
-        if logger:
-            logger.info(
+        blockchain_logger = getattr(self.blockchain, "logger", None)
+        if blockchain_logger:
+            blockchain_logger.info(
                 "Contract state restored from snapshot",
                 extra={
                     "event": "contract.restore",
