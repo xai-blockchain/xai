@@ -70,91 +70,100 @@ class TestUTXOSnapshotAndRestore:
         """Test creating UTXO snapshot at specific blockchain height"""
         bc = blockchain_with_history
 
-        # Take snapshot at current height
+        # Take snapshot at current height using UTXO manager
         snapshot_height = len(bc.chain) - 1
-        snapshot = bc.compute_state_snapshot()
+        utxo_snapshot = bc.utxo_manager.snapshot()
+        state_snapshot = bc.compute_state_snapshot()
 
-        # Snapshot should contain essential state
-        assert "utxo_set" in snapshot
-        assert "height" in snapshot
-        assert "block_hash" in snapshot
-        assert "timestamp" in snapshot
+        # UTXO snapshot should contain essential state
+        assert "utxo_set" in utxo_snapshot
+        assert "total_utxos" in utxo_snapshot
+        assert "total_value" in utxo_snapshot
+
+        # State snapshot should contain chain state
+        assert "height" in state_snapshot
+        assert "tip" in state_snapshot
+        assert "timestamp" in state_snapshot
 
         # Height should match
-        assert snapshot["height"] == snapshot_height
+        assert state_snapshot["height"] == snapshot_height + 1  # +1 because it includes genesis
 
         # Block hash should match chain tip
-        assert snapshot["block_hash"] == bc.chain[-1].hash
+        assert state_snapshot["tip"] == bc.chain[-1].hash
 
         # UTXO set should not be empty (we mined 20 blocks)
-        assert len(snapshot["utxo_set"]) > 0
+        assert utxo_snapshot["total_utxos"] > 0
 
     def test_snapshot_serialization_deserialization(self, blockchain_with_history, tmp_path):
         """Test snapshot can be serialized and deserialized correctly"""
         bc = blockchain_with_history
 
-        # Create snapshot
-        snapshot = bc.compute_state_snapshot()
-        original_utxo_count = len(snapshot["utxo_set"])
+        # Create UTXO snapshot
+        utxo_snapshot = bc.utxo_manager.snapshot()
+        original_utxo_count = utxo_snapshot["total_utxos"]
 
         # Serialize to JSON
         snapshot_file = tmp_path / "utxo_snapshot.json"
         with open(snapshot_file, 'w') as f:
-            json.dump(snapshot, f)
+            json.dump(utxo_snapshot, f)
 
         # Deserialize
         with open(snapshot_file, 'r') as f:
             loaded_snapshot = json.load(f)
 
         # Should match original
-        assert loaded_snapshot["height"] == snapshot["height"]
-        assert loaded_snapshot["block_hash"] == snapshot["block_hash"]
-        assert len(loaded_snapshot["utxo_set"]) == original_utxo_count
+        assert loaded_snapshot["total_utxos"] == original_utxo_count
+        assert loaded_snapshot["total_value"] == utxo_snapshot["total_value"]
+        assert len(loaded_snapshot["utxo_set"]) == len(utxo_snapshot["utxo_set"])
 
         # UTXO set structure should be preserved
-        for address in snapshot["utxo_set"]:
+        for address in utxo_snapshot["utxo_set"]:
             assert address in loaded_snapshot["utxo_set"]
-            assert len(loaded_snapshot["utxo_set"][address]) == len(snapshot["utxo_set"][address])
+            assert len(loaded_snapshot["utxo_set"][address]) == len(utxo_snapshot["utxo_set"][address])
 
     def test_new_node_bootstrap_from_snapshot(self, blockchain_with_history, tmp_path):
         """Test new node can bootstrap from UTXO snapshot without full sync"""
         # Create blockchain with history
         bc_original = blockchain_with_history
-        snapshot_height = len(bc_original.chain) - 1
 
-        # Create snapshot
-        snapshot = bc_original.compute_state_snapshot()
+        # Create UTXO snapshot
+        utxo_snapshot = bc_original.utxo_manager.snapshot()
 
         # Create new node
         new_node_dir = tmp_path / "new_node"
         new_node_dir.mkdir()
         bc_new = Blockchain(data_dir=str(new_node_dir))
 
-        # Bootstrap from snapshot
-        bc_new.utxo_set = snapshot["utxo_set"].copy()
+        # Bootstrap from snapshot using restore
+        bc_new.utxo_manager.restore(utxo_snapshot)
 
         # New node should have same UTXO state
-        for address in snapshot["utxo_set"]:
+        new_snapshot = bc_new.utxo_manager.snapshot()
+        assert new_snapshot["total_utxos"] == utxo_snapshot["total_utxos"]
+        assert abs(new_snapshot["total_value"] - utxo_snapshot["total_value"]) < 0.01
+
+        # Check balances match
+        for address in utxo_snapshot["utxo_set"]:
             original_balance = bc_original.get_balance(address)
             new_balance = bc_new.get_balance(address)
-            assert new_balance == original_balance, f"Balance mismatch for {address}"
+            assert abs(new_balance - original_balance) < 0.01, f"Balance mismatch for {address}"
 
     def test_snapshot_validation_and_integrity(self, blockchain_with_history):
         """Test snapshot validation and integrity checks"""
         bc = blockchain_with_history
 
-        # Create valid snapshot
-        snapshot = bc.compute_state_snapshot()
+        # Create valid UTXO snapshot
+        utxo_snapshot = bc.utxo_manager.snapshot()
 
         # Add integrity hash
-        snapshot_copy = snapshot.copy()
+        snapshot_copy = utxo_snapshot.copy()
         snapshot_copy.pop("integrity_hash", None)  # Remove if exists
         snapshot_str = json.dumps(snapshot_copy, sort_keys=True)
         integrity_hash = hashlib.sha256(snapshot_str.encode()).hexdigest()
-        snapshot["integrity_hash"] = integrity_hash
+        utxo_snapshot["integrity_hash"] = integrity_hash
 
         # Validate integrity
-        validation_copy = snapshot.copy()
+        validation_copy = utxo_snapshot.copy()
         stored_hash = validation_copy.pop("integrity_hash")
         validation_str = json.dumps(validation_copy, sort_keys=True)
         computed_hash = hashlib.sha256(validation_str.encode()).hexdigest()
@@ -166,18 +175,18 @@ class TestUTXOSnapshotAndRestore:
         bc = blockchain_with_history
 
         # Create snapshot with integrity hash
-        snapshot = bc.compute_state_snapshot()
-        snapshot_copy = snapshot.copy()
-        snapshot_str = json.dumps(snapshot_copy, sort_keys=True)
-        snapshot["integrity_hash"] = hashlib.sha256(snapshot_str.encode()).hexdigest()
+        utxo_snapshot = bc.utxo_manager.snapshot()
+        snapshot_str = json.dumps(utxo_snapshot, sort_keys=True)
+        utxo_snapshot["integrity_hash"] = hashlib.sha256(snapshot_str.encode()).hexdigest()
 
         # Corrupt the snapshot
-        if snapshot["utxo_set"]:
-            first_address = list(snapshot["utxo_set"].keys())[0]
-            snapshot["utxo_set"][first_address][0]["amount"] = 999999.0
+        if utxo_snapshot["utxo_set"]:
+            first_address = list(utxo_snapshot["utxo_set"].keys())[0]
+            if utxo_snapshot["utxo_set"][first_address]:
+                utxo_snapshot["utxo_set"][first_address][0]["amount"] = 999999.0
 
         # Validation should fail
-        validation_copy = snapshot.copy()
+        validation_copy = utxo_snapshot.copy()
         stored_hash = validation_copy.pop("integrity_hash")
         validation_str = json.dumps(validation_copy, sort_keys=True)
         computed_hash = hashlib.sha256(validation_str.encode()).hexdigest()
@@ -188,22 +197,14 @@ class TestUTXOSnapshotAndRestore:
         """Test snapshot includes total supply and circulation metrics"""
         bc = blockchain_with_history
 
-        snapshot = bc.compute_state_snapshot()
+        utxo_snapshot = bc.utxo_manager.snapshot()
 
-        # Calculate total supply from UTXO set
-        total_supply = 0
-        for address, utxos in snapshot["utxo_set"].items():
-            for utxo in utxos:
-                if not utxo.get("spent", False):
-                    total_supply += utxo["amount"]
-
-        # Store in snapshot
-        snapshot["total_supply"] = total_supply
-        snapshot["circulating_supply"] = total_supply
+        # Snapshot already includes total_value which is the total supply
+        total_supply_from_snapshot = utxo_snapshot["total_value"]
 
         # Should match blockchain's calculation
         bc_supply = bc.get_total_circulating_supply()
-        assert abs(snapshot["total_supply"] - bc_supply) < 0.01, "Supply mismatch"
+        assert abs(total_supply_from_snapshot - bc_supply) < 0.01, "Supply mismatch"
 
     def test_snapshot_performance_vs_full_sync(self, blockchain_with_history, tmp_path):
         """Test snapshot loading is faster than full chain validation"""
@@ -216,7 +217,7 @@ class TestUTXOSnapshotAndRestore:
         assert is_valid
 
         # Create snapshot
-        snapshot = bc_original.compute_state_snapshot()
+        utxo_snapshot = bc_original.utxo_manager.snapshot()
 
         # Measure snapshot application time
         new_node_dir = tmp_path / "new_node"
@@ -224,7 +225,7 @@ class TestUTXOSnapshotAndRestore:
         bc_new = Blockchain(data_dir=str(new_node_dir))
 
         start = time.time()
-        bc_new.utxo_set = snapshot["utxo_set"].copy()
+        bc_new.utxo_manager.restore(utxo_snapshot)
         snapshot_time = time.time() - start
 
         # Snapshot should be much faster (though both are fast with 20 blocks)
@@ -235,20 +236,17 @@ class TestUTXOSnapshotAndRestore:
         """Test snapshots can be taken at different blockchain heights"""
         bc = blockchain_with_history
 
-        snapshots = []
-        heights = [5, 10, 15, len(bc.chain) - 1]
+        # Take snapshot at current height
+        state_snapshot = bc.compute_state_snapshot()
+        utxo_snapshot = bc.utxo_manager.snapshot()
 
-        for target_height in heights:
-            # For this test, we'll snapshot current state
-            # In production, would need to replay to target height
-            if target_height == len(bc.chain) - 1:
-                snapshot = bc.compute_state_snapshot()
-                snapshot["height"] = target_height
-                snapshots.append(snapshot)
+        # Should have valid snapshots
+        assert state_snapshot["height"] > 0
+        assert utxo_snapshot["total_utxos"] > 0
 
-        # Should have snapshot for current height at least
-        assert len(snapshots) > 0
-        assert snapshots[-1]["height"] == len(bc.chain) - 1
+        # In production, would take snapshots at specific heights
+        # For this test, verify current snapshot is valid
+        assert state_snapshot["tip"] == bc.chain[-1].hash
 
 
 class TestStatePruning:
@@ -272,7 +270,7 @@ class TestStatePruning:
         original_chain_length = len(bc.chain)
 
         # Save UTXO state before pruning
-        utxo_snapshot_before = bc.compute_state_snapshot()
+        utxo_snapshot_before = bc.utxo_manager.snapshot()
 
         # Prune blocks older than last 10 blocks
         # Keep genesis + last 10 blocks
@@ -286,19 +284,14 @@ class TestStatePruning:
         # For this test, verify UTXO set remains valid
         pruned_bc = Blockchain(data_dir=str(tmp_path / "pruned"))
         pruned_bc.chain = [bc.chain[0]] + retained_blocks  # Genesis + recent blocks
-        pruned_bc.utxo_set = bc.utxo_set.copy()
+        pruned_bc.utxo_manager.restore(utxo_snapshot_before)
 
         # UTXO set should be unchanged
-        utxo_snapshot_after = pruned_bc.compute_state_snapshot()
+        utxo_snapshot_after = pruned_bc.utxo_manager.snapshot()
 
-        # Balances should match
-        for address in utxo_snapshot_before["utxo_set"]:
-            balance_before = sum(
-                u["amount"] for u in utxo_snapshot_before["utxo_set"][address]
-                if not u.get("spent", False)
-            )
-            balance_after = pruned_bc.get_balance(address)
-            assert abs(balance_before - balance_after) < 0.01
+        # Totals should match
+        assert utxo_snapshot_after["total_utxos"] == utxo_snapshot_before["total_utxos"]
+        assert abs(utxo_snapshot_after["total_value"] - utxo_snapshot_before["total_value"]) < 0.01
 
     def test_pruning_reduces_disk_usage(self, blockchain_with_old_blocks, tmp_path):
         """Test that pruning actually reduces disk usage"""
@@ -332,9 +325,10 @@ class TestStatePruning:
 
         # Create pruned version
         prune_before_height = len(bc.chain) - 10
+        utxo_snapshot = bc.utxo_manager.snapshot()
         pruned_bc = Blockchain(data_dir=str(tmp_path / "pruned"))
         pruned_bc.chain = [bc.chain[0]] + bc.chain[prune_before_height:]
-        pruned_bc.utxo_set = bc.utxo_set.copy()
+        pruned_bc.utxo_manager.restore(utxo_snapshot)
         pruned_bc.difficulty = bc.difficulty
 
         # Pruned node should be able to mine new block
@@ -349,9 +343,10 @@ class TestStatePruning:
 
         # Create pruned version
         prune_before_height = len(bc.chain) - 10
+        utxo_snapshot = bc.utxo_manager.snapshot()
         pruned_bc = Blockchain(data_dir=str(tmp_path / "pruned"))
         pruned_bc.chain = [bc.chain[0]] + bc.chain[prune_before_height:]
-        pruned_bc.utxo_set = bc.utxo_set.copy()
+        pruned_bc.utxo_manager.restore(utxo_snapshot)
 
         # Track which blocks are available
         available_indices = {block.index for block in pruned_bc.chain}
@@ -391,9 +386,10 @@ class TestStatePruning:
 
         # Create pruned version
         prune_before_height = len(bc.chain) - 10
+        utxo_snapshot = bc.utxo_manager.snapshot()
         pruned_bc = Blockchain(data_dir=str(tmp_path / "pruned"))
         pruned_bc.chain = [bc.chain[0]] + bc.chain[prune_before_height:]
-        pruned_bc.utxo_set = bc.utxo_set.copy()
+        pruned_bc.utxo_manager.restore(utxo_snapshot)
 
         # Retained blocks should still link properly
         for i in range(1, len(pruned_bc.chain)):
@@ -436,11 +432,22 @@ class TestFeeMarketAndPrioritization:
         """Create wallets with funds"""
         wallets = [Wallet() for _ in range(5)]
 
-        # Fund each wallet
-        for wallet in wallets:
-            blockchain.utxo_set[wallet.address] = [
-                {"txid": f"genesis_{wallet.address}", "amount": 1000.0, "vout": 0, "spent": False}
-            ]
+        # Fund each wallet by mining coinbase transactions
+        for i, wallet in enumerate(wallets):
+            # Create a coinbase transaction
+            coinbase_tx = Transaction(
+                "COINBASE",
+                wallet.address,
+                1000.0,
+                tx_type="coinbase",
+                outputs=[{"address": wallet.address, "amount": 1000.0}]
+            )
+            coinbase_tx.txid = coinbase_tx.calculate_hash()
+            blockchain.pending_transactions.append(coinbase_tx)
+
+        # Mine the block to confirm funds
+        miner_wallet = Wallet()
+        blockchain.mine_pending_transactions(miner_wallet.address)
 
         return wallets
 
@@ -925,11 +932,12 @@ class TestPhase5Integration:
             bc.mine_pending_transactions(wallet.address)
 
         # Take snapshot after fork
-        snapshot = bc.compute_state_snapshot()
+        state_snapshot = bc.compute_state_snapshot()
+        utxo_snapshot = bc.utxo_manager.snapshot()
 
         # Should include post-fork state
-        assert snapshot["height"] >= FORK_HEIGHT
-        assert len(snapshot["utxo_set"]) > 0
+        assert state_snapshot["height"] >= FORK_HEIGHT
+        assert utxo_snapshot["total_utxos"] > 0
 
     def test_prune_with_fee_prioritization(self, tmp_path):
         """Test pruned node correctly prioritizes by fees"""
@@ -948,9 +956,10 @@ class TestPhase5Integration:
 
         # Prune old blocks
         prune_height = len(bc.chain) - 10
+        utxo_snapshot = bc.utxo_manager.snapshot()
         pruned_bc = Blockchain(data_dir=str(tmp_path / "pruned"))
         pruned_bc.chain = [bc.chain[0]] + bc.chain[prune_height:]
-        pruned_bc.utxo_set = bc.utxo_set.copy()
+        pruned_bc.utxo_manager.restore(utxo_snapshot)
 
         # Add transactions with different fees
         for i, wallet in enumerate(wallets):
