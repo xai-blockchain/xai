@@ -20,6 +20,17 @@ import socket
 security_logger = logging.getLogger('xai.security')
 
 
+# Network security exceptions
+class NetworkSecurityError(Exception):
+    """Base exception for network security operations"""
+    pass
+
+
+class CertificateLoadError(NetworkSecurityError):
+    """Raised when certificate loading fails"""
+    pass
+
+
 class CertificateConfig:
     """Configuration for SSL/TLS certificates"""
 
@@ -174,16 +185,50 @@ class NetworkSecurityManager:
                     self.cert_config.key_file,
                 )
                 security_logger.info("Server certificate loaded successfully")
+            except (OSError, IOError, PermissionError) as e:
+                security_logger.error(
+                    "File access error loading certificate: %s",
+                    e,
+                    extra={"event": "network_security.cert_file_error"}
+                )
+            except (ValueError, ssl.SSLError) as e:
+                security_logger.error(
+                    "Invalid certificate or key: %s",
+                    e,
+                    extra={"event": "network_security.cert_invalid"}
+                )
             except Exception as e:
-                security_logger.error(f"Failed to load certificate: {str(e)}")
+                security_logger.error(
+                    "Unexpected error loading certificate: %s",
+                    e,
+                    exc_info=True,
+                    extra={"event": "network_security.cert_load_failed"}
+                )
 
         # Load CA certificate if available
         if self.cert_config.ca_cert_file:
             try:
                 context.load_verify_locations(self.cert_config.ca_cert_file)
                 security_logger.info("CA certificate loaded successfully")
+            except (OSError, IOError, PermissionError) as e:
+                security_logger.error(
+                    "File access error loading CA certificate: %s",
+                    e,
+                    extra={"event": "network_security.ca_cert_file_error"}
+                )
+            except (ValueError, ssl.SSLError) as e:
+                security_logger.error(
+                    "Invalid CA certificate: %s",
+                    e,
+                    extra={"event": "network_security.ca_cert_invalid"}
+                )
             except Exception as e:
-                security_logger.error(f"Failed to load CA certificate: {str(e)}")
+                security_logger.error(
+                    "Unexpected error loading CA certificate: %s",
+                    e,
+                    exc_info=True,
+                    extra={"event": "network_security.ca_cert_load_failed"}
+                )
 
         return context
 

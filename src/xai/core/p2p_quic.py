@@ -36,6 +36,11 @@ class QuicDialTimeout(ConnectionError):
         self.timeout = timeout
 
 
+class QuicTransportError(ConnectionError):
+    """Raised when QUIC transport operations fail."""
+    pass
+
+
 class QUICServer:
     class _HandlerProtocol(QuicConnectionProtocol):  # type: ignore[misc]
         def __init__(self, *args: Any, handler: Callable[[bytes], Awaitable[None]], **kwargs: Any) -> None:
@@ -93,5 +98,9 @@ async def quic_client_send_with_timeout(
         await asyncio.wait_for(quic_client_send(host, port, data, configuration), timeout=timeout)
     except asyncio.TimeoutError as exc:
         raise QuicDialTimeout(timeout) from exc
+    except (OSError, ConnectionError) as exc:
+        raise QuicTransportError(f"QUIC network error: {exc}") from exc
+    except (ValueError, TypeError) as exc:
+        raise QuicTransportError(f"Invalid QUIC parameters: {exc}") from exc
     except Exception as exc:
-        raise ConnectionError(f"QUIC send failed: {exc}") from exc
+        raise QuicTransportError(f"QUIC send failed: {exc}") from exc
