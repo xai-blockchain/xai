@@ -1226,9 +1226,21 @@ class PeerEncryption:
 
             return True
 
+        except (ValueError, TypeError, AttributeError) as e:
+            logger.warning(
+                "Invalid certificate data: %s",
+                e,
+                extra={
+                    "event": "peer.cert_validation_invalid_data",
+                    "error_type": type(e).__name__,
+                }
+            )
+            return False
         except Exception as e:
             logger.error(
-                "Failed to validate peer certificate",
+                "Unexpected error validating peer certificate: %s",
+                e,
+                exc_info=True,
                 extra={
                     "event": "peer.cert_validation_error",
                     "error_type": type(e).__name__,
@@ -1268,9 +1280,29 @@ class PeerEncryption:
                 if ca_bundle:
                     try:
                         context.load_verify_locations(cafile=ca_bundle)
+                    except (OSError, IOError, PermissionError) as exc:
+                        logger.error(
+                            "File access error loading CA bundle for server: %s",
+                            exc,
+                            extra={
+                                "event": "peer.ca_bundle_file_error",
+                                "ca_bundle": ca_bundle,
+                            }
+                        )
+                    except (ValueError, ssl.SSLError) as exc:
+                        logger.error(
+                            "Invalid CA bundle for server: %s",
+                            exc,
+                            extra={
+                                "event": "peer.ca_bundle_invalid",
+                                "ca_bundle": ca_bundle,
+                            }
+                        )
                     except Exception as exc:
                         logger.error(
-                            "Failed to load CA bundle for server",
+                            "Unexpected error loading CA bundle for server: %s",
+                            exc,
+                            exc_info=True,
                             extra={
                                 "event": "peer.ca_bundle_load_failed",
                                 "ca_bundle": ca_bundle,
@@ -1284,9 +1316,29 @@ class PeerEncryption:
             if ca_bundle:
                 try:
                     context.load_verify_locations(cafile=ca_bundle)
+                except (OSError, IOError, PermissionError) as exc:
+                    logger.error(
+                        "File access error loading CA bundle for client: %s",
+                        exc,
+                        extra={
+                            "event": "peer.ca_bundle_file_error",
+                            "ca_bundle": ca_bundle,
+                        }
+                    )
+                except (ValueError, ssl.SSLError) as exc:
+                    logger.error(
+                        "Invalid CA bundle for client: %s",
+                        exc,
+                        extra={
+                            "event": "peer.ca_bundle_invalid",
+                            "ca_bundle": ca_bundle,
+                        }
+                    )
                 except Exception as exc:
                     logger.error(
-                        "Failed to load CA bundle for client",
+                        "Unexpected error loading CA bundle for client: %s",
+                        exc,
+                        exc_info=True,
                         extra={
                             "event": "peer.ca_bundle_load_failed",
                             "ca_bundle": ca_bundle,

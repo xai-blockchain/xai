@@ -760,59 +760,59 @@ class ChainValidator:
         return hashlib.sha256(tx_string.encode()).hexdigest()
 
     def _print_validation_summary(self):
-        """Print validation summary"""
-        print(f"\n{'='*70}")
-        print(f"VALIDATION SUMMARY")
-        print(f"{'='*70}")
-        print(f"Status: {'✓ PASSED' if self.report.success else '✗ FAILED'}")
-        print(f"Validation Time: {self.report.validation_time:.2f} seconds")
-        print(f"Total Blocks: {self.report.total_blocks:,}")
-        print(f"Total Transactions: {self.report.total_transactions:,}")
-        print(f"Total Supply: {self.report.total_supply:,.2f} XAI")
-        print(f"UTXO Addresses: {self.report.utxo_count:,}")
-        print(f"\nValidation Checks:")
-        print(f"  Genesis Block:        {'✓' if self.report.genesis_valid else '✗'}")
-        print(f"  Chain Integrity:      {'✓' if self.report.chain_integrity else '✗'}")
-        print(f"  Proof-of-Work:        {'✓' if self.report.pow_valid else '✗'}")
-        print(f"  Transaction Signatures: {'✓' if self.report.signatures_valid else '✗'}")
-        print(f"  Balance Consistency:  {'✓' if self.report.balances_consistent else '✗'}")
-        print(f"  Supply Cap:           {'✓' if self.report.supply_cap_valid else '✗'}")
-        print(f"  Merkle Roots:         {'✓' if self.report.merkle_roots_valid else '✗'}")
+        """Log validation summary"""
+        status = "PASSED" if self.report.success else "FAILED"
+        log_func = logger.info if self.report.success else logger.error
 
-        # Print issues
+        log_func(
+            f"VALIDATION SUMMARY - {status}",
+            extra={
+                "status": status,
+                "validation_time": self.report.validation_time,
+                "total_blocks": self.report.total_blocks,
+                "total_transactions": self.report.total_transactions,
+                "total_supply": self.report.total_supply,
+                "utxo_count": self.report.utxo_count,
+                "genesis_valid": self.report.genesis_valid,
+                "chain_integrity": self.report.chain_integrity,
+                "pow_valid": self.report.pow_valid,
+                "signatures_valid": self.report.signatures_valid,
+                "balances_consistent": self.report.balances_consistent,
+                "supply_cap_valid": self.report.supply_cap_valid,
+                "merkle_roots_valid": self.report.merkle_roots_valid,
+            },
+        )
+
+        # Log issues
         critical = self.report.get_critical_issues()
         errors = self.report.get_error_issues()
         warnings = self.report.get_warning_issues()
 
         if critical or errors or warnings:
-            print(f"\nIssues Found:")
-            print(f"  Critical: {len(critical)}")
-            print(f"  Errors:   {len(errors)}")
-            print(f"  Warnings: {len(warnings)}")
+            logger.warning(
+                "Issues found during validation",
+                extra={
+                    "critical_count": len(critical),
+                    "error_count": len(errors),
+                    "warning_count": len(warnings),
+                },
+            )
 
-            # Print first few critical issues
+            # Log first few critical issues
             if critical:
-                print(f"\nCritical Issues:")
                 for issue in critical[:5]:
-                    block_str = (
-                        f"Block {issue.block_index}" if issue.block_index is not None else "Chain"
-                    )
-                    print(f"  - [{block_str}] {issue.description}")
+                    block_str = f"Block {issue.block_index}" if issue.block_index is not None else "Chain"
+                    logger.error(f"Critical issue [{block_str}]: {issue.description}")
                 if len(critical) > 5:
-                    print(f"  ... and {len(critical) - 5} more")
+                    logger.error(f"... and {len(critical) - 5} more critical issues")
 
-            # Print first few errors
+            # Log first few errors
             if errors:
-                print(f"\nErrors:")
                 for issue in errors[:5]:
-                    block_str = (
-                        f"Block {issue.block_index}" if issue.block_index is not None else "Chain"
-                    )
-                    print(f"  - [{block_str}] {issue.description}")
+                    block_str = f"Block {issue.block_index}" if issue.block_index is not None else "Chain"
+                    logger.error(f"Error [{block_str}]: {issue.description}")
                 if len(errors) > 5:
-                    print(f"  ... and {len(errors) - 5} more")
-
-        print(f"{'='*70}\n")
+                    logger.error(f"... and {len(errors) - 5} more errors")
 
 
 def validate_blockchain_on_startup(

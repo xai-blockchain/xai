@@ -586,6 +586,7 @@ class Wallet:
         from cryptography.hazmat.primitives import hashes
         from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
         from cryptography.hazmat.backends import default_backend
+        from cryptography.exceptions import InvalidTag
 
         try:
             # Decode components
@@ -611,9 +612,12 @@ class Wallet:
         except (KeyError, TypeError) as e:
             raise ValueError(f"Invalid payload structure: missing or invalid field - {e}") from e
         except (ValueError, UnicodeDecodeError) as e:
-            # ValueError from base64.b64decode or AESGCM.decrypt (wrong key/corrupted data)
+            # ValueError from base64.b64decode
             # UnicodeDecodeError from plaintext.decode
             raise ValueError(f"Decryption failed: invalid password or corrupted data - {e}") from e
+        except InvalidTag as e:
+            # InvalidTag from AESGCM.decrypt (wrong password or tampered data)
+            raise ValueError(f"Decryption failed: invalid password or corrupted data - authentication failed") from e
 
     @staticmethod
     def load_from_file(
@@ -801,6 +805,7 @@ class Wallet:
         from cryptography.hazmat.primitives import hashes
         from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
         from cryptography.hazmat.backends import default_backend
+        from cryptography.exceptions import InvalidTag
 
         try:
             # Decode components
@@ -826,9 +831,12 @@ class Wallet:
         except (KeyError, TypeError) as e:
             raise ValueError(f"Invalid payload structure: missing or invalid field - {e}") from e
         except (ValueError, UnicodeDecodeError) as e:
-            # ValueError from base64.b64decode or AESGCM.decrypt (wrong key/corrupted data)
+            # ValueError from base64.b64decode
             # UnicodeDecodeError from plaintext.decode
             raise ValueError(f"Decryption failed: invalid password or corrupted data - {e}") from e
+        except InvalidTag as e:
+            # InvalidTag from AESGCM.decrypt (wrong password or tampered data)
+            raise ValueError(f"Decryption failed: invalid password or corrupted data - authentication failed") from e
 
     def to_dict(self) -> Dict[str, Any]:
         """Export public wallet data only (alias for to_public_dict)."""
