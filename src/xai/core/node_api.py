@@ -1910,7 +1910,13 @@ class NodeAPIRoutes:
                     200,
                 )
 
-            except Exception as e:
+            except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, KeyError) as e:
+                logger.error(
+                    "Get price history failed",
+                    timeframe=timeframe,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 return jsonify({"error": str(e)}), 500
 
         @self.app.route("/exchange/stats", methods=["GET"])
@@ -1954,7 +1960,12 @@ class NodeAPIRoutes:
 
                 return jsonify({"success": True, "stats": stats}), 200
 
-            except Exception as e:
+            except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, KeyError) as e:
+                logger.error(
+                    "Get exchange stats failed",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 return jsonify({"error": str(e)}), 500
 
     def _setup_exchange_payment_routes(self) -> None:
