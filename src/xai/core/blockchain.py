@@ -1933,7 +1933,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             blocks.append(block)
 
         genesis_header = blocks[0].header
-        if genesis_header.index != 0 or genesis_header.previous_hash != "0":
+        if genesis_header.index != 0 or genesis_header.previous_hash != "0" * 64:
             self.logger.warn("Chain validation failed: invalid genesis linkage")
             return False
         if expected_genesis_hash and genesis_header.hash != expected_genesis_hash:
