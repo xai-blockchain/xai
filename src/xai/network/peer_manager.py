@@ -1244,15 +1244,13 @@ class PeerEncryption:
                 }
             )
             return False
-        except Exception as e:
+        except OSError as e:
             logger.error(
-                "Unexpected error validating peer certificate: %s",
+                "I/O error accessing certificate: %s",
                 e,
-                exc_info=True,
                 extra={
-                    "event": "peer.cert_validation_error",
+                    "event": "peer.cert_validation_io_error",
                     "error_type": type(e).__name__,
-                    "error_message": str(e)
                 }
             )
             return False
