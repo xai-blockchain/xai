@@ -15,10 +15,13 @@ This validator detects corruption and provides detailed diagnostics.
 import hashlib
 import json
 import time
+import logging
 from typing import Dict, List, Tuple, Optional, Set
 from dataclasses import dataclass, field
 from datetime import datetime
 from xai.core.crypto_utils import verify_signature_hex
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -172,13 +175,13 @@ class ChainValidator:
             success=False, total_blocks=len(chain), total_transactions=0, validation_time=0.0
         )
 
-        if self.verbose:
-            print(f"\n{'='*70}")
-            print(f"XAI BLOCKCHAIN VALIDATION")
-            print(f"{'='*70}")
-            print(f"Total blocks to validate: {len(chain)}")
-            print(f"Starting validation at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            print(f"{'='*70}\n")
+        logger.info(
+            "XAI Blockchain Validation starting",
+            extra={
+                "total_blocks": len(chain),
+                "start_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            },
+        )
 
         # Validate chain exists
         if not chain or len(chain) == 0:
@@ -189,41 +192,34 @@ class ChainValidator:
             return self.report
 
         # Step 1: Validate genesis block
-        if self.verbose:
-            print("[1/7] Validating genesis block...")
+        logger.info("[1/7] Validating genesis block")
         self.report.genesis_valid = self._validate_genesis_block(chain[0], expected_genesis_hash)
 
         # Step 2: Validate chain integrity (hashes, previous_hash links)
-        if self.verbose:
-            print("[2/7] Validating chain integrity (block hashes)...")
+        logger.info("[2/7] Validating chain integrity (block hashes)")
         self.report.chain_integrity = self._validate_chain_integrity(chain)
 
         # Step 3: Validate proof-of-work for all blocks
-        if self.verbose:
-            print("[3/7] Validating proof-of-work...")
+        logger.info("[3/7] Validating proof-of-work")
         self.report.pow_valid = self._validate_proof_of_work(chain)
 
         # Step 4: Validate all transaction signatures
-        if self.verbose:
-            print("[4/7] Validating transaction signatures...")
+        logger.info("[4/7] Validating transaction signatures")
         self.report.signatures_valid = self._validate_transaction_signatures(chain)
 
         # Step 5: Rebuild UTXO set and validate balances
-        if self.verbose:
-            print("[5/7] Rebuilding UTXO set and validating balances...")
+        logger.info("[5/7] Rebuilding UTXO set and validating balances")
         utxo_set, total_supply = self._rebuild_utxo_set(chain)
         self.report.utxo_count = len(utxo_set)
         self.report.total_supply = total_supply
         self.report.balances_consistent = self._validate_balance_consistency(chain, utxo_set)
 
         # Step 6: Validate supply cap
-        if self.verbose:
-            print(f"[6/7] Validating supply cap ({self.max_supply:,.0f} XAI)...")
+        logger.info("[6/7] Validating supply cap", extra={"max_supply": self.max_supply})
         self.report.supply_cap_valid = self._validate_supply_cap(total_supply)
 
         # Step 7: Validate merkle roots
-        if self.verbose:
-            print("[7/7] Validating merkle roots...")
+        logger.info("[7/7] Validating merkle roots")
         self.report.merkle_roots_valid = self._validate_merkle_roots(chain)
 
         # Count total transactions
@@ -308,8 +304,8 @@ class ChainValidator:
             )
             valid = False
 
-        if self.verbose and valid:
-            print(f"  ✓ Genesis block valid (hash: {genesis_block.get('hash', '')[:16]}...)")
+        if valid:
+            logger.info("Genesis block valid", extra={"hash_prefix": genesis_block.get("hash", "")[:16]})
 
         return valid
 
@@ -366,11 +362,11 @@ class ChainValidator:
                 valid = False
 
             # Progress indicator
-            if self.verbose and i % 1000 == 0:
-                print(f"  Validated {i}/{len(chain)} blocks...")
+            if i % 1000 == 0:
+                logger.debug("Validation progress", extra={"validated": i, "total": len(chain)})
 
-        if self.verbose and valid:
-            print(f"  ✓ Chain integrity verified ({len(chain)} blocks)")
+        if valid:
+            logger.info("Chain integrity verified", extra={"block_count": len(chain)})
 
         return valid
 
@@ -402,11 +398,11 @@ class ChainValidator:
                 valid = False
 
             # Progress indicator
-            if self.verbose and i % 1000 == 0 and i > 0:
-                print(f"  Validated PoW for {i}/{len(chain)} blocks...")
+            if i % 1000 == 0 and i > 0:
+                logger.debug("PoW validation progress", extra={"validated": i, "total": len(chain)})
 
-        if self.verbose and valid:
-            print(f"  ✓ Proof-of-work verified for all blocks")
+        if valid:
+            logger.info("Proof-of-work verified for all blocks")
 
         return valid
 
@@ -467,13 +463,14 @@ class ChainValidator:
                     valid = False
 
             # Progress indicator
-            if self.verbose and i % 1000 == 0 and i > 0:
-                print(
-                    f"  Validated signatures for {tx_count} transactions in {i}/{len(chain)} blocks..."
+            if i % 1000 == 0 and i > 0:
+                logger.debug(
+                    "Signature validation progress",
+                    extra={"tx_count": tx_count, "validated_blocks": i, "total_blocks": len(chain)},
                 )
 
-        if self.verbose and valid:
-            print(f"  ✓ All {tx_count} transaction signatures verified")
+        if valid:
+            logger.info("All transaction signatures verified", extra={"tx_count": tx_count})
 
         return valid
 
@@ -527,15 +524,16 @@ class ChainValidator:
                                 remaining = 0
 
             # Progress indicator
-            if self.verbose and i % 1000 == 0 and i > 0:
-                print(
-                    f"  Rebuilt UTXO set for {i}/{len(chain)} blocks (supply: {total_supply:,.2f} XAI)..."
+            if i % 1000 == 0 and i > 0:
+                logger.debug(
+                    "UTXO rebuild progress",
+                    extra={"validated_blocks": i, "total_blocks": len(chain), "supply": total_supply},
                 )
 
-        if self.verbose:
-            print(
-                f"  ✓ UTXO set rebuilt: {len(utxo_set)} addresses, {total_supply:,.2f} XAI total supply"
-            )
+        logger.info(
+            "UTXO set rebuilt",
+            extra={"address_count": len(utxo_set), "total_supply": total_supply},
+        )
 
         return utxo_set, total_supply
 
@@ -568,8 +566,8 @@ class ChainValidator:
                 )
                 valid = False
 
-        if self.verbose and valid:
-            print(f"  ✓ Balance consistency verified (no negative balances)")
+        if valid:
+            logger.info("Balance consistency verified (no negative balances)")
 
         return valid
 
@@ -600,13 +598,20 @@ class ChainValidator:
             )
             valid = False
 
-        if self.verbose:
-            if valid:
-                print(
-                    f"  ✓ Supply cap verified: {total_supply:,.2f} / {self.max_supply:,.0f} XAI ({(total_supply/self.max_supply)*100:.2f}%)"
-                )
-            else:
-                print(f"  ✗ Supply cap EXCEEDED: {total_supply:,.2f} / {self.max_supply:,.0f} XAI")
+        if valid:
+            logger.info(
+                "Supply cap verified",
+                extra={
+                    "total_supply": total_supply,
+                    "max_supply": self.max_supply,
+                    "percent": (total_supply / self.max_supply) * 100,
+                },
+            )
+        else:
+            logger.error(
+                "Supply cap EXCEEDED",
+                extra={"total_supply": total_supply, "max_supply": self.max_supply},
+            )
 
         return valid
 
@@ -640,11 +645,11 @@ class ChainValidator:
                 valid = False
 
             # Progress indicator
-            if self.verbose and i % 1000 == 0 and i > 0:
-                print(f"  Validated merkle roots for {i}/{len(chain)} blocks...")
+            if i % 1000 == 0 and i > 0:
+                logger.debug("Merkle root validation progress", extra={"validated": i, "total": len(chain)})
 
-        if self.verbose and valid:
-            print(f"  ✓ All merkle roots verified")
+        if valid:
+            logger.info("All merkle roots verified")
 
         return valid
 
@@ -836,37 +841,3 @@ def validate_blockchain_on_startup(
 
     return report.success, report
 
-
-# Example usage and testing
-if __name__ == "__main__":
-    import sys
-    import os
-
-    from xai.core.blockchain_persistence import BlockchainStorage
-
-    print("XAI Chain Validator - Test Mode\n")
-
-    # Try to load blockchain from disk
-    storage = BlockchainStorage()
-    success, blockchain_data, message = storage.load_from_disk()
-
-    if success:
-        print(f"Loaded blockchain: {message}\n")
-
-        # Validate the chain
-        is_valid, report = validate_blockchain_on_startup(
-            blockchain_data, max_supply=121000000.0, verbose=True
-        )
-
-        # Save report to file
-        report_file = os.path.join(storage.data_dir, "validation_report.json")
-        with open(report_file, "w") as f:
-            json.dump(report.to_dict(), f, indent=2)
-
-        print(f"\nValidation report saved to: {report_file}")
-
-        # Exit with appropriate code
-        sys.exit(0 if is_valid else 1)
-    else:
-        print(f"Failed to load blockchain: {message}")
-        sys.exit(1)

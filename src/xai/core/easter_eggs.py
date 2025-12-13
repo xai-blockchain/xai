@@ -12,6 +12,26 @@ from typing import Dict, List, Optional
 import secrets
 from xai.core.wallet_encryption import WalletEncryption
 from xai.core.wallet import Wallet
+from xai.core.constants import (
+    LUCKY_BLOCK_PROBABILITY,
+    LUCKY_BLOCK_NORMAL_REWARD,
+    LUCKY_BLOCK_BONUS_REWARD,
+    TREASURE_WALLET_COUNT,
+    TREASURE_WALLET_BALANCE,
+    TREASURE_TOTAL_VALUE,
+    TREASURE_MIN_BLOCK,
+    TREASURE_MAX_BLOCK,
+    AIRDROP_90_DAY_AMOUNT,
+    AIRDROP_90_DAY_RECIPIENTS,
+    AIRDROP_180_DAY_AMOUNT,
+    AIRDROP_180_DAY_RECIPIENTS,
+    AIRDROP_365_DAY_AMOUNT,
+    AIRDROP_365_DAY_RECIPIENTS,
+    SECONDS_PER_DAY,
+    BLOCK_TIME_TARGET_SECONDS,
+    TEST_BLOCKS_FOR_STATS,
+    GENESIS_TIMESTAMP,
+)
 
 
 class LuckyBlockSystem:
@@ -46,8 +66,8 @@ class LuckyBlockSystem:
         # Convert to number
         hash_number = int(block_hash[:8], 16)
 
-        # 1% chance (1 in 100)
-        return hash_number % 100 == 0
+        # 1% chance (1 in LUCKY_BLOCK_PROBABILITY)
+        return hash_number % LUCKY_BLOCK_PROBABILITY == 0
 
     def get_block_reward(self, block_height: int, base_reward: float) -> float:
         """
@@ -92,10 +112,10 @@ class HiddenTreasureWallets:
 
     def __init__(self):
         self.treasure_wallets = []
-        self.total_treasure = 100000  # 100 wallets × 1000 XAI
+        self.total_treasure = TREASURE_TOTAL_VALUE
 
     def generate_treasure_wallets(
-        self, count: int = 100, password: str = "treasure-secret"
+        self, count: int = TREASURE_WALLET_COUNT, password: str = "treasure-secret"
     ) -> List[Dict]:
         """
         Generate hidden treasure wallets
@@ -118,10 +138,10 @@ class HiddenTreasureWallets:
                 "address": wallet.address,
                 "public_key": wallet.public_key,
                 "private_key": wallet.private_key,
-                "balance": 1000.0,
+                "balance": TREASURE_WALLET_BALANCE,
                 "discovered": False,
                 "discovery_clue": self._generate_clue(i, wallet.address),
-                "hidden_in_block": sr.randint(100, 10000),  # Clue hidden in random block
+                "hidden_in_block": sr.randint(TREASURE_MIN_BLOCK, TREASURE_MAX_BLOCK),
             }
 
             wallets.append(wallet_data)
@@ -130,7 +150,7 @@ class HiddenTreasureWallets:
                 print(f"  Generated {i + 1}/{count} treasure wallets...")
 
         print(f"Done: {count} treasure wallets generated")
-        print(f"  Total treasure: {count * 1000:,} XAI")
+        print(f"  Total treasure: {count * TREASURE_WALLET_BALANCE:,.0f} XAI")
 
         self.treasure_wallets = wallets
         return wallets
@@ -144,12 +164,12 @@ class HiddenTreasureWallets:
             f"Seek the block where {address[:8]} whispers",
             f"Between the echoes of transactions, {address[8:16]} awaits",
             f"In the shadow of the merkle tree, look for {address[-8:]}",
-            f"The {index + 1}th secret sleeps in block {sr.randint(100, 10000)}",
+            f"The {index + 1}th secret sleeps in block {sr.randint(TREASURE_MIN_BLOCK, TREASURE_MAX_BLOCK)}",
             f"Hash the genesis timestamp thrice, add {index}, find truth",
             f"Where the sine wave peaks, {address[:12]} reveals itself",
             f"Count the lucky blocks, multiply by {index + 1}, seek there",
             f"The price floor knows: {address[4:12]} is the key",
-            f"In block {sr.randint(100, 10000)}, fortune favors the clever",
+            f"In block {sr.randint(TREASURE_MIN_BLOCK, TREASURE_MAX_BLOCK)}, fortune favors the clever",
             f"When the node count reaches {(index + 1) * 10}, the door opens",
         ]
 
@@ -230,50 +250,50 @@ class AirdropClueSystem:
 
         from datetime import datetime
 
-        days_until = (timestamp - time.time()) / 86400
+        days_until = (timestamp - time.time()) / SECONDS_PER_DAY
 
         clues = []
 
         # Clue 1: Very cryptic (appears 30 days before)
-        clue1_time = timestamp - (30 * 86400)
+        clue1_time = timestamp - (30 * SECONDS_PER_DAY)
         clues.append(
             {
                 "timestamp": clue1_time,
-                "block_number": int((clue1_time - self.genesis_timestamp) / 120),
+                "block_number": int((clue1_time - self.genesis_timestamp) / BLOCK_TIME_TARGET_SECONDS),
                 "message": f"When the moon completes {int(days_until)} cycles, fortune smiles upon {recipient_count} souls",
                 "type": "PROPHECY",
             }
         )
 
         # Clue 2: Less cryptic (appears 14 days before)
-        clue2_time = timestamp - (14 * 86400)
+        clue2_time = timestamp - (14 * SECONDS_PER_DAY)
         clues.append(
             {
                 "timestamp": clue2_time,
-                "block_number": int((clue2_time - self.genesis_timestamp) / 120),
+                "block_number": int((clue2_time - self.genesis_timestamp) / BLOCK_TIME_TARGET_SECONDS),
                 "message": f"The heavens shall rain {amount:,.0f} coins upon the worthy",
                 "type": "OMEN",
             }
         )
 
         # Clue 3: Specific date hint (appears 7 days before)
-        clue3_time = timestamp - (7 * 86400)
+        clue3_time = timestamp - (7 * SECONDS_PER_DAY)
         airdrop_date = datetime.fromtimestamp(timestamp).strftime("%B %d")
         clues.append(
             {
                 "timestamp": clue3_time,
-                "block_number": int((clue3_time - self.genesis_timestamp) / 120),
+                "block_number": int((clue3_time - self.genesis_timestamp) / BLOCK_TIME_TARGET_SECONDS),
                 "message": f"Mark your calendars: {airdrop_date} brings revelation",
                 "type": "WARNING",
             }
         )
 
         # Clue 4: Very specific (appears 24 hours before)
-        clue4_time = timestamp - 86400
+        clue4_time = timestamp - SECONDS_PER_DAY
         clues.append(
             {
                 "timestamp": clue4_time,
-                "block_number": int((clue4_time - self.genesis_timestamp) / 120),
+                "block_number": int((clue4_time - self.genesis_timestamp) / BLOCK_TIME_TARGET_SECONDS),
                 "message": f"In {24} hours, {recipient_count} addresses shall be chosen. Are you prepared?",
                 "type": "ANNOUNCEMENT",
             }
@@ -307,7 +327,7 @@ class AirdropClueSystem:
         upcoming = [
             {
                 "id": a["id"],
-                "days_until": (a["timestamp"] - current_time) / 86400,
+                "days_until": (a["timestamp"] - current_time) / SECONDS_PER_DAY,
                 "amount": a["amount"],
                 "recipient_count": a["recipient_count"],
                 "status": a["status"],
@@ -342,64 +362,64 @@ class EasterEggManager:
         print("=" * 70)
 
         # Generate treasure wallets
-        treasures = self.treasure_wallets.generate_treasure_wallets(100)
+        treasures = self.treasure_wallets.generate_treasure_wallets(TREASURE_WALLET_COUNT)
 
         # Schedule some example airdrops
         print("\nScheduling mystery airdrops...")
 
         # Airdrop 1: 3 months after genesis
         self.airdrops.schedule_airdrop(
-            timestamp=self.genesis_timestamp + (90 * 86400),
-            amount=50000,
-            recipient_count=100,
+            timestamp=self.genesis_timestamp + (90 * SECONDS_PER_DAY),
+            amount=AIRDROP_90_DAY_AMOUNT,
+            recipient_count=AIRDROP_90_DAY_RECIPIENTS,
             criteria="Random selection from active nodes",
         )
 
         # Airdrop 2: 6 months after genesis
         self.airdrops.schedule_airdrop(
-            timestamp=self.genesis_timestamp + (180 * 86400),
-            amount=100000,
-            recipient_count=500,
+            timestamp=self.genesis_timestamp + (180 * SECONDS_PER_DAY),
+            amount=AIRDROP_180_DAY_AMOUNT,
+            recipient_count=AIRDROP_180_DAY_RECIPIENTS,
             criteria="Top 500 node operators by uptime",
         )
 
         # Airdrop 3: 1 year after genesis
         self.airdrops.schedule_airdrop(
-            timestamp=self.genesis_timestamp + (365 * 86400),
-            amount=200000,
-            recipient_count=1000,
+            timestamp=self.genesis_timestamp + (365 * SECONDS_PER_DAY),
+            amount=AIRDROP_365_DAY_AMOUNT,
+            recipient_count=AIRDROP_365_DAY_RECIPIENTS,
             criteria="Diamond hands (held for 365 days)",
         )
 
         print("Done: 3 mystery airdrops scheduled")
 
         # Lucky block stats
-        lucky_stats = self.lucky_blocks.get_stats(10000)
+        lucky_stats = self.lucky_blocks.get_stats(TEST_BLOCKS_FOR_STATS)
 
         print("\n" + "=" * 70)
         print("EASTER EGG SUMMARY")
         print("=" * 70)
         print(f"\nLucky Blocks (2x Reward):")
-        print(f"  First 10,000 blocks will have ~{lucky_stats['lucky_blocks']} lucky blocks")
+        print(f"  First {TEST_BLOCKS_FOR_STATS:,} blocks will have ~{lucky_stats['lucky_blocks']} lucky blocks")
         print(f"  Next 5 lucky blocks: {lucky_stats['next_lucky_blocks'][:5]}")
 
         print(f"\nHidden Treasure Wallets:")
-        print(f"  Count: 100 wallets")
-        print(f"  Balance each: 1,000 XAI")
-        print(f"  Total treasure: 100,000 XAI")
-        print(f"  Clues hidden in blocks: 100-10,000")
+        print(f"  Count: {TREASURE_WALLET_COUNT} wallets")
+        print(f"  Balance each: {TREASURE_WALLET_BALANCE:,.0f} XAI")
+        print(f"  Total treasure: {TREASURE_TOTAL_VALUE:,.0f} XAI")
+        print(f"  Clues hidden in blocks: {TREASURE_MIN_BLOCK}-{TREASURE_MAX_BLOCK:,}")
 
         print(f"\nMystery Airdrops:")
         print(f"  Scheduled: 3 airdrops")
-        print(f"  Total value: 350,000 XAI")
+        print(f"  Total value: {AIRDROP_90_DAY_AMOUNT + AIRDROP_180_DAY_AMOUNT + AIRDROP_365_DAY_AMOUNT:,.0f} XAI")
         print(f"  Cryptic clues will appear before each drop")
 
         return {
             "lucky_blocks": lucky_stats,
             "treasure_wallets": len(treasures),
-            "treasure_total": 100000,
+            "treasure_total": TREASURE_TOTAL_VALUE,
             "scheduled_airdrops": len(self.airdrops.scheduled_airdrops),
-            "airdrop_total": 350000,
+            "airdrop_total": AIRDROP_90_DAY_AMOUNT + AIRDROP_180_DAY_AMOUNT + AIRDROP_365_DAY_AMOUNT,
         }
 
     def get_block_easter_eggs(self, block_number: int) -> Dict:
@@ -424,10 +444,8 @@ if __name__ == "__main__":
     print("XAI EASTER EGG SYSTEM")
     print("=" * 70)
 
-    GENESIS_TIME = 1704067200
-
-    # Initialize easter eggs
-    easter_eggs = EasterEggManager(GENESIS_TIME)
+    # Initialize easter eggs (use constant from constants.py)
+    easter_eggs = EasterEggManager(int(GENESIS_TIMESTAMP))
     summary = easter_eggs.initialize_easter_eggs()
 
     # Test lucky blocks
@@ -441,8 +459,8 @@ if __name__ == "__main__":
     # Test block rewards
     print("\nBlock Reward Examples:")
     for block in [1, 42, 100, 237, 500]:
-        reward = easter_eggs.lucky_blocks.get_block_reward(block, 60)
-        status = "LUCKY! 🎰" if reward == 120 else "normal"
+        reward = easter_eggs.lucky_blocks.get_block_reward(block, LUCKY_BLOCK_NORMAL_REWARD)
+        status = "LUCKY! 🎰" if reward == LUCKY_BLOCK_BONUS_REWARD else "normal"
         print(f"  Block {block}: {reward} XAI ({status})")
 
     # Show upcoming airdrops

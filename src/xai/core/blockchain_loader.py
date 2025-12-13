@@ -8,12 +8,15 @@ Provides automatic recovery options if validation fails.
 import os
 import sys
 import json
+import logging
 from typing import Tuple, Optional
 from datetime import datetime
 
 
 from xai.core.blockchain_persistence import BlockchainStorage
 from xai.core.chain_validator import validate_blockchain_on_startup, ValidationReport
+
+logger = logging.getLogger(__name__)
 
 
 class BlockchainLoader:
@@ -64,31 +67,27 @@ class BlockchainLoader:
         Returns:
             tuple: (success: bool, blockchain_data: dict or None, message: str)
         """
-        if verbose:
-            print(f"\n{'='*70}")
-            print(f"XAI BLOCKCHAIN LOADER")
-            print(f"{'='*70}")
-            print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            print(f"Data Directory: {self.storage.data_dir}")
-            print(f"{'='*70}\n")
+        logger.info(
+            "XAI Blockchain Loader starting",
+            extra={
+                "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "data_directory": self.storage.data_dir,
+            },
+        )
 
         # Step 1: Load blockchain from disk
-        if verbose:
-            print("Loading blockchain from disk...")
+        logger.info("Loading blockchain from disk")
 
         success, blockchain_data, message = self.storage.load_from_disk()
 
         if not success:
-            if verbose:
-                print(f"✗ Failed to load blockchain: {message}")
+            logger.error("Failed to load blockchain", extra={"error": message})
             return False, None, f"Load failed: {message}"
 
-        if verbose:
-            print(f"✓ {message}")
+        logger.info("Blockchain loaded from disk", extra={"message": message})
 
         # Step 2: Validate the chain
-        if verbose:
-            print("\nValidating blockchain integrity...")
+        logger.info("Validating blockchain integrity")
 
         is_valid, self.validation_report = validate_blockchain_on_startup(
             blockchain_data,
@@ -99,10 +98,7 @@ class BlockchainLoader:
 
         # Step 3: Handle validation results
         if is_valid:
-            if verbose:
-                print(f"\n{'='*70}")
-                print(f"✓ BLOCKCHAIN LOADED AND VALIDATED SUCCESSFULLY")
-                print(f"{'='*70}\n")
+            logger.info("Blockchain loaded and validated successfully")
 
             # Save validation report
             self._save_validation_report(self.validation_report, "validation_success")
@@ -111,14 +107,14 @@ class BlockchainLoader:
 
         else:
             # Validation failed - try recovery
-            if verbose:
-                print(f"\n{'='*70}")
-                print(f"✗ VALIDATION FAILED")
-                print(f"{'='*70}")
-                print(f"Critical Issues: {len(self.validation_report.get_critical_issues())}")
-                print(f"Errors: {len(self.validation_report.get_error_issues())}")
-                print(f"Warnings: {len(self.validation_report.get_warning_issues())}")
-                print(f"{'='*70}\n")
+            logger.error(
+                "Validation failed",
+                extra={
+                    "critical_issues": len(self.validation_report.get_critical_issues()),
+                    "errors": len(self.validation_report.get_error_issues()),
+                    "warnings": len(self.validation_report.get_warning_issues()),
+                },
+            )
 
             # Save failed validation report
             self._save_validation_report(self.validation_report, "validation_failed")
@@ -136,24 +132,26 @@ class BlockchainLoader:
         Returns:
             tuple: (success: bool, blockchain_data: dict or None, message: str)
         """
-        if verbose:
-            print("\nAttempting blockchain recovery...\n")
+        logger.info("Attempting blockchain recovery")
 
         # Try backups first
-        if verbose:
-            print("Checking available backups...")
+        logger.info("Checking available backups")
 
         backups = self.storage.list_backups()
 
         if backups:
-            if verbose:
-                print(f"Found {len(backups)} backup(s)")
+            logger.info("Found backups", extra={"backup_count": len(backups)})
 
             for i, backup in enumerate(backups, 1):
-                if verbose:
-                    print(f"\nTrying backup {i}/{len(backups)}: {backup['filename']}")
-                    print(f"  Block Height: {backup['block_height']}")
-                    print(f"  Timestamp: {backup['timestamp']}")
+                logger.info(
+                    "Trying backup",
+                    extra={
+                        "backup_number": f"{i}/{len(backups)}",
+                        "filename": backup["filename"],
+                        "block_height": backup["block_height"],
+                        "timestamp": backup["timestamp"],
+                    },
+                )
 
                 # Try to restore from this backup
                 success, blockchain_data, message = self.storage.restore_from_backup(
@@ -161,13 +159,11 @@ class BlockchainLoader:
                 )
 
                 if not success:
-                    if verbose:
-                        print(f"  ✗ Failed to restore: {message}")
+                    logger.warning("Failed to restore backup", extra={"error": message})
                     continue
 
                 # Validate the restored backup
-                if verbose:
-                    print(f"  Validating restored backup...")
+                logger.info("Validating restored backup")
 
                 is_valid, report = validate_blockchain_on_startup(
                     blockchain_data,
@@ -177,14 +173,13 @@ class BlockchainLoader:
                 )
 
                 if is_valid:
-                    if verbose:
-                        print(f"  ✓ Backup validated successfully!")
-                        print(f"\n{'='*70}")
-                        print(f"✓ RECOVERY SUCCESSFUL FROM BACKUP")
-                        print(f"{'='*70}")
-                        print(f"Restored from: {backup['filename']}")
-                        print(f"Block Height: {backup['block_height']}")
-                        print(f"{'='*70}\n")
+                    logger.info(
+                        "Recovery successful from backup",
+                        extra={
+                            "filename": backup["filename"],
+                            "block_height": backup["block_height"],
+                        },
+                    )
 
                     # Save the recovered blockchain
                     self.storage.save_to_disk(blockchain_data, create_backup=False)
@@ -194,27 +189,28 @@ class BlockchainLoader:
 
                     return True, blockchain_data, f"Recovered from backup: {backup['filename']}"
                 else:
-                    if verbose:
-                        print(f"  ✗ Backup validation failed")
+                    logger.warning("Backup validation failed")
         else:
-            if verbose:
-                print("No backups found")
+            logger.info("No backups found")
 
         # Try checkpoints
-        if verbose:
-            print("\nChecking available checkpoints...")
+        logger.info("Checking available checkpoints")
 
         checkpoints = self.storage.list_checkpoints()
 
         if checkpoints:
-            if verbose:
-                print(f"Found {len(checkpoints)} checkpoint(s)")
+            logger.info("Found checkpoints", extra={"checkpoint_count": len(checkpoints)})
 
             for i, checkpoint in enumerate(checkpoints, 1):
-                if verbose:
-                    print(f"\nTrying checkpoint {i}/{len(checkpoints)}: {checkpoint['filename']}")
-                    print(f"  Block Height: {checkpoint['block_height']}")
-                    print(f"  Timestamp: {checkpoint['timestamp']}")
+                logger.info(
+                    "Trying checkpoint",
+                    extra={
+                        "checkpoint_number": f"{i}/{len(checkpoints)}",
+                        "filename": checkpoint["filename"],
+                        "block_height": checkpoint["block_height"],
+                        "timestamp": checkpoint["timestamp"],
+                    },
+                )
 
                 # Load checkpoint file manually
                 checkpoint_path = os.path.join(self.storage.checkpoint_dir, checkpoint["filename"])
@@ -226,13 +222,11 @@ class BlockchainLoader:
                     blockchain_data = checkpoint_data.get("blockchain")
 
                     if not blockchain_data:
-                        if verbose:
-                            print(f"  ✗ Invalid checkpoint format")
+                        logger.warning("Invalid checkpoint format")
                         continue
 
                     # Validate the checkpoint
-                    if verbose:
-                        print(f"  Validating checkpoint...")
+                    logger.info("Validating checkpoint")
 
                     is_valid, report = validate_blockchain_on_startup(
                         blockchain_data,
@@ -242,14 +236,13 @@ class BlockchainLoader:
                     )
 
                     if is_valid:
-                        if verbose:
-                            print(f"  ✓ Checkpoint validated successfully!")
-                            print(f"\n{'='*70}")
-                            print(f"✓ RECOVERY SUCCESSFUL FROM CHECKPOINT")
-                            print(f"{'='*70}")
-                            print(f"Restored from: {checkpoint['filename']}")
-                            print(f"Block Height: {checkpoint['block_height']}")
-                            print(f"{'='*70}\n")
+                        logger.info(
+                            "Recovery successful from checkpoint",
+                            extra={
+                                "filename": checkpoint["filename"],
+                                "block_height": checkpoint["block_height"],
+                            },
+                        )
 
                         # Save the recovered blockchain
                         self.storage.save_to_disk(blockchain_data, create_backup=False)
@@ -263,28 +256,25 @@ class BlockchainLoader:
                             f"Recovered from checkpoint: {checkpoint['filename']}",
                         )
                     else:
-                        if verbose:
-                            print(f"  ✗ Checkpoint validation failed")
+                        logger.warning("Checkpoint validation failed")
 
                 except Exception as e:
-                    if verbose:
-                        print(f"  ✗ Failed to load checkpoint: {str(e)}")
+                    logger.error("Failed to load checkpoint", extra={"error": str(e)}, exc_info=True)
                     continue
         else:
-            if verbose:
-                print("No checkpoints found")
+            logger.info("No checkpoints found")
 
         # All recovery attempts failed
-        if verbose:
-            print(f"\n{'='*70}")
-            print(f"✗ RECOVERY FAILED")
-            print(f"{'='*70}")
-            print("All recovery attempts exhausted.")
-            print("\nRecommended actions:")
-            print("1. Resync blockchain from network peers")
-            print("2. Contact network administrators")
-            print("3. Check for hardware/disk issues")
-            print(f"{'='*70}\n")
+        logger.error(
+            "Recovery failed - all recovery attempts exhausted",
+            extra={
+                "recommended_actions": [
+                    "Resync blockchain from network peers",
+                    "Contact network administrators",
+                    "Check for hardware/disk issues",
+                ]
+            },
+        )
 
         return False, None, "Recovery failed - all backups and checkpoints invalid or unavailable"
 
@@ -305,10 +295,10 @@ class BlockchainLoader:
             with open(report_file, "w") as f:
                 json.dump(report.to_dict(), f, indent=2)
 
-            print(f"Validation report saved: {os.path.basename(report_file)}")
+            logger.info("Validation report saved", extra={"filename": os.path.basename(report_file)})
 
         except Exception as e:
-            print(f"Warning: Failed to save validation report: {e}")
+            logger.warning("Failed to save validation report", extra={"error": str(e)})
 
     def get_validation_report(self) -> Optional[ValidationReport]:
         """
@@ -346,22 +336,3 @@ def load_blockchain_with_validation(
 
     return loader.load_and_validate(verbose=verbose)
 
-
-# Example usage
-if __name__ == "__main__":
-    print("XAI Blockchain Loader - Test Mode\n")
-
-    # Load and validate blockchain
-    success, blockchain_data, message = load_blockchain_with_validation(
-        max_supply=121000000.0, verbose=True
-    )
-
-    if success:
-        print(f"\n✓ SUCCESS: {message}")
-        print(f"Blockchain ready to use!")
-        print(f"Total blocks: {len(blockchain_data.get('chain', []))}")
-        sys.exit(0)
-    else:
-        print(f"\n✗ FAILURE: {message}")
-        print(f"Blockchain not available")
-        sys.exit(1)

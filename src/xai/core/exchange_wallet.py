@@ -10,6 +10,14 @@ import threading
 from decimal import Decimal
 from typing import Dict, List, Optional, Any, Iterable
 import hashlib
+from xai.core.constants import (
+    MIN_WITHDRAWAL_USD,
+    MIN_WITHDRAWAL_XAI,
+    MIN_WITHDRAWAL_BTC,
+    MIN_WITHDRAWAL_ETH,
+    MIN_WITHDRAWAL_USDT,
+    MAX_TRANSACTION_HISTORY_SIZE,
+)
 
 
 class ExchangeWallet:
@@ -183,7 +191,13 @@ class ExchangeWalletManager:
         compliance_metadata: Optional[Dict[str, Any]] = None,
     ) -> dict:
         """Withdraw funds from user's exchange wallet"""
-        min_withdrawals = {"USD": 10.0, "AXN": 100.0, "BTC": 0.001, "ETH": 0.01, "USDT": 10.0}
+        min_withdrawals = {
+            "USD": MIN_WITHDRAWAL_USD,
+            "AXN": MIN_WITHDRAWAL_XAI,
+            "BTC": MIN_WITHDRAWAL_BTC,
+            "ETH": MIN_WITHDRAWAL_ETH,
+            "USDT": MIN_WITHDRAWAL_USDT,
+        }
         if amount < min_withdrawals.get(currency, 0):
             return {
                 "success": False,
@@ -417,7 +431,7 @@ class ExchangeWalletManager:
 
             tx_file = os.path.join(self.data_dir, "transactions.json")
             with open(tx_file, "w", encoding="utf-8") as handle:
-                json.dump(self.transactions[-10000:], handle, indent=2)
+                json.dump(self.transactions[-MAX_TRANSACTION_HISTORY_SIZE:], handle, indent=2)
 
     def load_wallets(self):
         """Load wallets from disk"""

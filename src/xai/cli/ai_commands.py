@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sys
 import json
+import logging
 import time
 import hashlib
 from typing import Optional, Dict, Any, List
@@ -33,10 +34,14 @@ except ImportError:
 
 import requests
 
+# Configure module logger
+logger = logging.getLogger(__name__)
+
 console = Console()
 
 # Centralized CLI error handler for consistent messaging/exit codes
 def _handle_cli_error(exc: Exception, exit_code: int = 1) -> None:
+    logger.error("CLI error: %s", exc, exc_info=True)
     console.print(f"[bold red]Error:[/] {exc}")
     sys.exit(exit_code)
 
@@ -80,11 +85,14 @@ class AIComputeClient:
     def _request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
         """Make HTTP request to AI compute endpoint"""
         url = f"{self.node_url}/ai/{endpoint.lstrip('/')}"
+        logger.debug("AI compute request: %s %s", method, url)
         try:
             response = requests.request(method, url, timeout=self.timeout, **kwargs)
             response.raise_for_status()
+            logger.debug("AI compute response: status=%d", response.status_code)
             return response.json()
         except requests.exceptions.RequestException as e:
+            logger.error("AI compute network error: %s", e)
             raise click.ClickException(f"AI compute network error: {e}")
 
     def submit_task(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -258,6 +266,7 @@ def submit_task(ctx: click.Context, task_type: str, description: str,
     }
 
     try:
+        logger.info("Submitting AI task: type=%s, priority=%s, wallet=%s", task_type, priority, wallet[:16])
         with console.status("[bold cyan]Submitting to AI compute network..."):
             result = client.submit_task(task_data)
 
@@ -267,11 +276,13 @@ def submit_task(ctx: click.Context, task_type: str, description: str,
 
         if result.get('success'):
             task_id = result.get('task_id')
+            logger.info("AI task submitted successfully: task_id=%s", task_id)
             console.print(f"\n[bold green]✓ Task submitted successfully![/]")
             console.print(f"Task ID: [cyan]{task_id}[/]")
             console.print(f"Status: [yellow]{result.get('status', 'PENDING').upper()}[/]")
             console.print(f"\nTrack progress: [bold]xai ai query {task_id}[/]")
         else:
+            logger.error("AI task submission failed: %s", result.get('error', 'Unknown'))
             console.print(f"[bold red]✗ Submission failed:[/] {result.get('error', 'Unknown')}")
             sys.exit(1)
 
@@ -305,6 +316,7 @@ def query_task(ctx: click.Context, task_id: str, watch: bool):
 
             task = data.get('task', {})
             status = task.get('status', 'unknown')
+            logger.debug("Task %s status: %s", task_id, status)
 
             # Status table
             table = Table(show_header=False, box=box.ROUNDED)
@@ -383,6 +395,7 @@ def cancel_task(ctx: click.Context, task_id: str):
         return
 
     try:
+        logger.info("Cancelling AI task: %s", task_id)
         with console.status("[bold cyan]Cancelling task..."):
             result = client.cancel_task(task_id)
 
@@ -391,10 +404,12 @@ def cancel_task(ctx: click.Context, task_id: str):
             return
 
         if result.get('success'):
+            logger.info("AI task cancelled: %s, refund=%s", task_id, result.get('refund_amount', 0))
             console.print(f"[bold green]✓ Task cancelled[/]")
             if result.get('refund_amount'):
                 console.print(f"Refund: {result['refund_amount']:.6f} XAI")
         else:
+            logger.error("Task cancellation failed: %s", result.get('error', 'Unknown'))
             console.print(f"[bold red]✗ Failed:[/] {result.get('error', 'Unknown')}")
             sys.exit(1)
 
@@ -740,6 +755,7 @@ def register_provider(ctx: click.Context, wallet: str, models: str,
     }
 
     try:
+        logger.info("Registering AI provider: wallet=%s, models=%s", wallet[:16], models_list)
         with console.status("[bold cyan]Registering provider..."):
             result = client.register_provider(provider_data)
 
@@ -749,11 +765,13 @@ def register_provider(ctx: click.Context, wallet: str, models: str,
 
         if result.get('success'):
             provider_id = result.get('provider_id')
+            logger.info("Provider registered successfully: provider_id=%s", provider_id)
             console.print(f"\n[bold green]✓ Provider registered successfully![/]")
             console.print(f"Provider ID: [cyan]{provider_id}[/]")
             console.print(f"Status: [yellow]{result.get('status', 'PENDING_VERIFICATION').upper()}[/]")
             console.print(f"\nYour provider will be verified and activated within 24 hours.")
         else:
+            logger.error("Provider registration failed: %s", result.get('error', 'Unknown'))
             console.print(f"[bold red]✗ Registration failed:[/] {result.get('error', 'Unknown')}")
             sys.exit(1)
 

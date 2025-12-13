@@ -21,6 +21,27 @@ import gmpy2
 logger = logging.getLogger(__name__)
 
 
+# Zero-knowledge proof exceptions
+class ZKPError(Exception):
+    """Base exception for zero-knowledge proof operations"""
+    pass
+
+
+class ZKPVerificationError(ZKPError):
+    """Raised when proof verification fails"""
+    pass
+
+
+class ZKPInvalidProofError(ZKPError):
+    """Raised when proof structure is invalid"""
+    pass
+
+
+class ZKPCryptographicError(ZKPError):
+    """Raised when cryptographic operations fail"""
+    pass
+
+
 @dataclass
 class SchnorrProof:
     """Schnorr zero-knowledge proof of discrete logarithm knowledge."""
@@ -198,10 +219,26 @@ class ZeroKnowledgeProof:
 
             return challenge_expected == proof.challenge
 
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError) as e:
             logger.debug(
-                "Schnorr proof verification failed",
-                error=str(e)
+                "Invalid Schnorr proof structure: %s",
+                e,
+                extra={"event": "zkp.schnorr_verify_invalid_proof"}
+            )
+            return False
+        except (ArithmeticError, ZeroDivisionError) as e:
+            logger.warning(
+                "Cryptographic computation error in Schnorr verification: %s",
+                e,
+                extra={"event": "zkp.schnorr_verify_computation_error"}
+            )
+            return False
+        except Exception as e:
+            logger.error(
+                "Unexpected error in Schnorr proof verification: %s",
+                e,
+                exc_info=True,
+                extra={"event": "zkp.schnorr_verify_unexpected_error"}
             )
             return False
 
@@ -396,10 +433,26 @@ class ZeroKnowledgeProof:
 
             return C_expected == proof.commitment
 
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError, KeyError) as e:
             logger.debug(
-                "Range proof verification failed",
-                error=str(e)
+                "Invalid range proof structure: %s",
+                e,
+                extra={"event": "zkp.range_verify_invalid_proof"}
+            )
+            return False
+        except (ArithmeticError, ZeroDivisionError) as e:
+            logger.warning(
+                "Cryptographic computation error in range verification: %s",
+                e,
+                extra={"event": "zkp.range_verify_computation_error"}
+            )
+            return False
+        except Exception as e:
+            logger.error(
+                "Unexpected error in range proof verification: %s",
+                e,
+                exc_info=True,
+                extra={"event": "zkp.range_verify_unexpected_error"}
             )
             return False
 
@@ -483,10 +536,26 @@ class ZeroKnowledgeProof:
 
             return ring_hash == proof.proof_data['ring_hash']
 
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError, KeyError) as e:
             logger.debug(
-                "Membership proof verification failed",
-                error=str(e)
+                "Invalid membership proof structure: %s",
+                e,
+                extra={"event": "zkp.membership_verify_invalid_proof"}
+            )
+            return False
+        except (ArithmeticError, ZeroDivisionError) as e:
+            logger.warning(
+                "Cryptographic computation error in membership verification: %s",
+                e,
+                extra={"event": "zkp.membership_verify_computation_error"}
+            )
+            return False
+        except Exception as e:
+            logger.error(
+                "Unexpected error in membership proof verification: %s",
+                e,
+                exc_info=True,
+                extra={"event": "zkp.membership_verify_unexpected_error"}
             )
             return False
 
@@ -612,10 +681,26 @@ class ZKP_Simulator:
                 proof,
                 public_statement
             )
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError) as e:
             logger.debug(
-                "Privacy-preserving identity verification failed",
-                error=str(e)
+                "Invalid proof format in identity verification: %s",
+                e,
+                extra={"event": "zkp.identity_verify_invalid_format"}
+            )
+            return False
+        except (ArithmeticError, ZeroDivisionError) as e:
+            logger.warning(
+                "Cryptographic computation error in identity verification: %s",
+                e,
+                extra={"event": "zkp.identity_verify_computation_error"}
+            )
+            return False
+        except Exception as e:
+            logger.error(
+                "Privacy-preserving identity verification failed: %s",
+                e,
+                exc_info=True,
+                extra={"event": "zkp.identity_verify_unexpected_error"}
             )
             return False
 

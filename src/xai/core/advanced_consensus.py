@@ -150,7 +150,7 @@ class OrphanBlockPool:
         self.orphan_timestamps = {}  # block_hash -> timestamp
         self.orphan_timeout = max_orphan_age
 
-    def add_orphan(self, block: Block, parent_hash: Optional[str] = None) -> bool:
+    def add_orphan(self, block: 'Block', parent_hash: Optional[str] = None) -> bool:
         """
         Add orphan block to pool
 
@@ -542,7 +542,7 @@ class FinalityTracker:
         """Check if block has hard finality"""
         return block_index in self.finalized_blocks
 
-    def get_finality_stats(self, blockchain: Blockchain) -> Dict[str, Any]:
+    def get_finality_stats(self, blockchain: 'Blockchain') -> Dict[str, Any]:
         """Get overall finality statistics"""
         chain_height = len(blockchain.chain)
 
@@ -620,7 +620,7 @@ class DynamicDifficultyAdjustment:
             last_ts = ts
         return sanitized
 
-    def calculate_new_difficulty(self, blockchain: Blockchain) -> int:
+    def calculate_new_difficulty(self, blockchain: 'Blockchain') -> int:
         """
         Calculate new difficulty based on recent block times
 
@@ -668,7 +668,7 @@ class DynamicDifficultyAdjustment:
 
         return new_difficulty
 
-    def should_adjust_difficulty(self, blockchain: Blockchain) -> bool:
+    def should_adjust_difficulty(self, blockchain: 'Blockchain') -> bool:
         """
         Check if difficulty should be adjusted
 
@@ -684,7 +684,7 @@ class DynamicDifficultyAdjustment:
         # After mining adjustment_window blocks, chain_length = adjustment_window + 1
         return chain_length > 1 and (chain_length - 1) % self.adjustment_window == 0
 
-    def get_difficulty_stats(self, blockchain: Blockchain) -> Dict[str, Any]:
+    def get_difficulty_stats(self, blockchain: 'Blockchain') -> Dict[str, Any]:
         """
         Get difficulty adjustment statistics
 
@@ -759,7 +759,7 @@ class AdvancedConsensusManager:
     Unified manager for advanced consensus features
     """
 
-    def __init__(self, blockchain: Blockchain) -> None:
+    def __init__(self, blockchain: 'Blockchain') -> None:
         """
         Initialize advanced consensus manager
 
@@ -773,7 +773,7 @@ class AdvancedConsensusManager:
         self.finality_tracker = FinalityTracker()
         self.difficulty_adjuster = DynamicDifficultyAdjustment()
 
-    def process_new_block(self, block: Block, from_peer: Optional[str] = None) -> Tuple[bool, str]:
+    def process_new_block(self, block: 'Block', from_peer: Optional[str] = None) -> Tuple[bool, str]:
         """
         Process newly received block with orphan handling
 

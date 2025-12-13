@@ -1092,12 +1092,17 @@ class SwapRouter:
                 sig_hex
             )
 
-        except Exception as e:
+        except (ValueError, TypeError, AttributeError, KeyError) as e:
             # Any cryptographic error means invalid signature
             logger.debug(
-                "Limit order signature verification failed",
-                address=address,
-                error=str(e)
+                "Limit order signature verification failed: %s - %s",
+                type(e).__name__,
+                str(e),
+                extra={
+                    "address": address[:10] if address else "unknown",
+                    "error_type": type(e).__name__,
+                    "event": "swap_router.signature_verification_failed"
+                }
             )
             return False
 

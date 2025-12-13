@@ -214,11 +214,15 @@ class TestBalanceConservation:
             )
 
             if tx and tx.inputs and tx.outputs:
-                # Calculate sum of inputs
-                input_sum = sum(
-                    bc.utxo_manager.get_utxo_amount(inp['txid'], inp['vout'])
-                    for inp in tx.inputs
-                )
+                # Calculate sum of inputs by looking up each UTXO
+                input_sum = 0.0
+                for inp in tx.inputs:
+                    # Find the UTXO in the sender's UTXO set
+                    utxos = bc.utxo_manager.get_utxos_for_address(wallet1.address, exclude_pending=False)
+                    for utxo in utxos:
+                        if utxo['txid'] == inp['txid'] and utxo['vout'] == inp['vout']:
+                            input_sum += utxo['amount']
+                            break
 
                 # Calculate sum of outputs
                 output_sum = sum(out['amount'] for out in tx.outputs)
@@ -606,9 +610,11 @@ class TestInvariantEdgeCases:
         expected_increase = bc.get_block_reward(block.index)
         actual_increase = supply_after - supply_before
 
-        # Allow small tolerance for floating point
-        assert abs(actual_increase - expected_increase) < 0.00001, \
-            f"Empty block changed supply unexpectedly: {actual_increase} vs {expected_increase}"
+        # Allow for streak bonuses (up to 5% extra) and small floating point tolerance
+        assert actual_increase >= expected_increase, \
+            f"Supply increased less than expected: {actual_increase} < {expected_increase}"
+        assert actual_increase <= expected_increase * 1.05 + 0.00001, \
+            f"Empty block changed supply too much: {actual_increase} vs {expected_increase} (expected max {expected_increase * 1.05})"
 
     def test_maximum_size_transaction_preserves_conservation(self, tmp_path):
         """Very large transactions should still preserve balance conservation"""

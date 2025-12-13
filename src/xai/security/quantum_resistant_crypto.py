@@ -21,6 +21,28 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
+
+# Post-quantum cryptography exceptions
+class PQCError(Exception):
+    """Base exception for post-quantum cryptography operations"""
+    pass
+
+
+class PQCSignatureError(PQCError):
+    """Raised when signature operations fail"""
+    pass
+
+
+class PQCVerificationError(PQCError):
+    """Raised when verification fails"""
+    pass
+
+
+class PQCKeyError(PQCError):
+    """Raised when key operations fail"""
+    pass
+
+
 # NIST PQC algorithms via pqcrypto library
 import pqcrypto.sign.ml_dsa_65 as ml_dsa_65
 import pqcrypto.sign.ml_dsa_87 as ml_dsa_87
@@ -268,12 +290,27 @@ class QuantumResistantCryptoManager:
             # Returns True if valid, False if invalid
             result = algo_impl.verify(public_key, message, signature)
             return result
+        except (ValueError, TypeError) as e:
+            logger.debug(
+                "Invalid post-quantum signature parameters: %s",
+                e,
+                extra={"event": "pqc.verify_invalid_params", "algorithm": algorithm.value}
+            )
+            return False
+        except (AttributeError, KeyError) as e:
+            logger.warning(
+                "Post-quantum algorithm access error: %s",
+                e,
+                extra={"event": "pqc.verify_algo_error", "algorithm": algorithm.value}
+            )
+            return False
         except Exception as e:
             # Catch any unexpected errors (e.g., malformed keys, wrong sizes)
-            logger.debug(
-                "Post-quantum signature verification error",
-                algorithm=algorithm.value,
-                error=str(e)
+            logger.error(
+                "Unexpected post-quantum signature verification error: %s",
+                e,
+                exc_info=True,
+                extra={"event": "pqc.verify_unexpected_error", "algorithm": algorithm.value}
             )
             return False
 
@@ -481,10 +518,18 @@ class QuantumResistantCryptoManager:
                 ec.ECDSA(hashes.SHA256())
             )
             results["classical"] = True
-        except Exception as e:
+        except (ValueError, TypeError) as e:
             logger.debug(
-                "Classical ECDSA signature verification failed in hybrid scheme",
-                error=str(e)
+                "Invalid classical signature parameters in hybrid scheme: %s",
+                e,
+                extra={"event": "pqc.hybrid_classical_invalid_params"}
+            )
+            results["classical"] = False
+        except Exception as e:
+            logger.warning(
+                "Classical ECDSA signature verification failed in hybrid scheme: %s",
+                e,
+                extra={"event": "pqc.hybrid_classical_verify_failed"}
             )
             results["classical"] = False
 

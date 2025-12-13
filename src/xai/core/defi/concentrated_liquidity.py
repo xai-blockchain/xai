@@ -1127,13 +1127,18 @@ class ConcentratedLiquidityPool:
 
             return max(0, amount_out), price_impact
 
-        except Exception as e:
+        except (ValueError, TypeError, ZeroDivisionError, OverflowError, ArithmeticError) as e:
             logger.warning(
-                "Failed to calculate swap quote",
-                pool_id=self.pool_id,
-                zero_for_one=zero_for_one,
-                amount_in=amount_in,
-                error=str(e)
+                "Failed to calculate swap quote: %s - %s",
+                type(e).__name__,
+                str(e),
+                extra={
+                    "pool_id": self.pool_id,
+                    "zero_for_one": zero_for_one,
+                    "amount_in": amount_in,
+                    "error_type": type(e).__name__,
+                    "event": "concentrated_liquidity.quote_failed"
+                }
             )
             return 0, 0
 

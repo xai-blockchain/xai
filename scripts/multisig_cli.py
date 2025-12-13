@@ -1,7 +1,11 @@
 import argparse
 import json
+import logging
 import os
 from src.xai.wallet.multisig_wallet import MultiSigWallet
+
+# Configure module logger
+logger = logging.getLogger(__name__)
 
 # Directory to store wallet data (private keys, public keys, multisig configs)
 WALLET_DATA_DIR = "multisig_data"
@@ -14,6 +18,7 @@ def save_key_pair(private_key_hex, public_key_hex, name):
         f.write(private_key_hex)
     with open(os.path.join(WALLET_DATA_DIR, f"{name}_pub.txt"), "w") as f:
         f.write(public_key_hex)
+    logger.info("Key pair for %s saved to %s/", name, WALLET_DATA_DIR)
     print(f"Key pair for {name} saved to {WALLET_DATA_DIR}/")
 
 
@@ -23,8 +28,10 @@ def load_key_pair(name):
             private_key_hex = f.read().strip()
         with open(os.path.join(WALLET_DATA_DIR, f"{name}_pub.txt"), "r") as f:
             public_key_hex = f.read().strip()
+        logger.debug("Loaded key pair for %s", name)
         return private_key_hex, public_key_hex
     except FileNotFoundError:
+        logger.error("Key pair for %s not found in %s/", name, WALLET_DATA_DIR)
         print(f"Key pair for {name} not found in {WALLET_DATA_DIR}/")
         return None, None
 
@@ -39,6 +46,7 @@ def save_multisig_config(multisig_wallet):
         os.path.join(WALLET_DATA_DIR, f"multisig_{multisig_wallet.multisig_address}.json"), "w"
     ) as f:
         json.dump(config, f, indent=4)
+    logger.info("Multisig wallet config saved: address=%s", multisig_wallet.multisig_address)
     print(
         f"Multisig wallet config saved to {WALLET_DATA_DIR}/multisig_{multisig_wallet.multisig_address}.json"
     )
@@ -48,8 +56,10 @@ def load_multisig_config(address):
     try:
         with open(os.path.join(WALLET_DATA_DIR, f"multisig_{address}.json"), "r") as f:
             config = json.load(f)
+        logger.debug("Loaded multisig config for address: %s", address)
         return MultiSigWallet(config["required_signatures"], config["public_keys"])
     except FileNotFoundError:
+        logger.error("Multisig wallet config for address %s not found", address)
         print(f"Multisig wallet config for address {address} not found.")
         return None
 
@@ -57,14 +67,18 @@ def load_multisig_config(address):
 def save_transaction(transaction, filename):
     with open(os.path.join(WALLET_DATA_DIR, filename), "w") as f:
         json.dump(transaction, f, indent=4)
+    logger.info("Transaction saved to %s/%s", WALLET_DATA_DIR, filename)
     print(f"Transaction saved to {WALLET_DATA_DIR}/{filename}")
 
 
 def load_transaction(filename):
     try:
         with open(os.path.join(WALLET_DATA_DIR, filename), "r") as f:
-            return json.load(f)
+            result = json.load(f)
+        logger.debug("Loaded transaction from %s", filename)
+        return result
     except FileNotFoundError:
+        logger.error("Transaction file %s not found in %s/", filename, WALLET_DATA_DIR)
         print(f"Transaction file {filename} not found in {WALLET_DATA_DIR}/")
         return None
 

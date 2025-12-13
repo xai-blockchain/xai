@@ -139,9 +139,32 @@ class GeoIPResolver:
                 as_name=result.get("asn_description") or "Unknown ASN",
                 source="ipwhois",
             )
-        except Exception as exc:  # pragma: no cover - depends on env/network
+        except (ValueError, KeyError, AttributeError) as exc:
             logger.debug(
-                "ipwhois lookup failed",
+                "Invalid ipwhois data structure: %s",
+                exc,
+                extra={
+                    "event": "p2p.geoip.ipwhois_invalid_data",
+                    "ip": ip_address,
+                    "error": type(exc).__name__,
+                },
+            )
+            return None
+        except (ConnectionError, TimeoutError, OSError) as exc:
+            logger.debug(
+                "Network error during ipwhois lookup: %s",
+                exc,
+                extra={
+                    "event": "p2p.geoip.ipwhois_network_error",
+                    "ip": ip_address,
+                    "error": type(exc).__name__,
+                },
+            )
+            return None
+        except Exception as exc:  # pragma: no cover - depends on env/network
+            logger.warning(
+                "Unexpected ipwhois lookup failure: %s",
+                exc,
                 extra={
                     "event": "p2p.geoip.ipwhois_failed",
                     "ip": ip_address,
@@ -158,9 +181,42 @@ class GeoIPResolver:
             response = requests.get(url, timeout=self.timeout)
             response.raise_for_status()
             data = response.json()
+        except requests.Timeout as exc:
+            logger.debug(
+                "GeoIP HTTP lookup timeout: %s",
+                exc,
+                extra={
+                    "event": "p2p.geoip.http_timeout",
+                    "ip": ip_address,
+                    "url": url,
+                },
+            )
+            return None
+        except requests.RequestException as exc:
+            logger.debug(
+                "GeoIP HTTP request failed: %s",
+                exc,
+                extra={
+                    "event": "p2p.geoip.http_request_failed",
+                    "ip": ip_address,
+                    "error": type(exc).__name__,
+                },
+            )
+            return None
+        except (ValueError, KeyError) as exc:
+            logger.warning(
+                "Invalid GeoIP HTTP response format: %s",
+                exc,
+                extra={
+                    "event": "p2p.geoip.http_invalid_response",
+                    "ip": ip_address,
+                },
+            )
+            return None
         except Exception as exc:
             logger.warning(
-                "GeoIP HTTP lookup failed",
+                "Unexpected GeoIP HTTP lookup failure: %s",
+                exc,
                 extra={
                     "event": "p2p.geoip.http_failed",
                     "ip": ip_address,

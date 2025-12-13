@@ -18,6 +18,15 @@ from collections import deque
 from threading import RLock
 
 from xai.core.crypto_utils import sign_message_hex, verify_signature_hex
+from xai.core.constants import (
+    P2P_MAX_MESSAGE_SIZE_BYTES,
+    P2P_MAX_MESSAGES_PER_SECOND,
+    P2P_INITIAL_REPUTATION,
+    P2P_MIN_REPUTATION,
+    P2P_MAX_REPUTATION,
+    P2P_BAN_DURATION_SECONDS,
+    SECONDS_5_MINUTES,
+)
 
 
 HEADER_VERSION = "X-Node-Version"
@@ -36,14 +45,14 @@ class P2PSecurityConfig:
     MAX_CONNECTIONS_PER_IP = 3
     MIN_PEER_DIVERSITY = 3  # distinct /16 prefixes
 
-    MAX_MESSAGE_SIZE = 2 * 1024 * 1024  # 2MB
-    MAX_MESSAGES_PER_SECOND = 100
+    MAX_MESSAGE_SIZE = P2P_MAX_MESSAGE_SIZE_BYTES
+    MAX_MESSAGES_PER_SECOND = P2P_MAX_MESSAGES_PER_SECOND
 
-    INITIAL_REPUTATION = 100.0
-    MIN_REPUTATION = 0.0
-    MAX_REPUTATION = 200.0
+    INITIAL_REPUTATION = P2P_INITIAL_REPUTATION
+    MIN_REPUTATION = P2P_MIN_REPUTATION
+    MAX_REPUTATION = P2P_MAX_REPUTATION
     BAN_THRESHOLD = 10.0
-    BAN_DURATION = 86400  # 24h
+    BAN_DURATION = P2P_BAN_DURATION_SECONDS
 
     REWARD_GOOD = 5.0
     PENALTY_MINOR = 5.0
@@ -86,7 +95,7 @@ def sign_headers(
     }
 
 
-def verify_headers(headers: Dict[str, str], body_bytes: bytes, *, max_skew_seconds: int = 300) -> Tuple[bool, str]:
+def verify_headers(headers: Dict[str, str], body_bytes: bytes, *, max_skew_seconds: int = SECONDS_5_MINUTES) -> Tuple[bool, str]:
     version = headers.get(HEADER_VERSION, "")
     if version and version not in P2PSecurityConfig.SUPPORTED_VERSIONS:
         return False, "unsupported_protocol_version"

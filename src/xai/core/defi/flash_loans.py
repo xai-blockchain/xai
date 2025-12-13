@@ -327,14 +327,25 @@ class FlashLoanProvider:
 
                     return True
 
-                except Exception as e:
+                except (ValueError, TypeError, KeyError, AttributeError, RuntimeError, VMExecutionError) as e:
                     # Revert state on failure (restore pool balances)
+                    logger.error(
+                        "Flash loan callback execution failed: %s - %s",
+                        type(e).__name__,
+                        str(e),
+                        extra={
+                            "loan_id": loan_id,
+                            "borrower": borrower[:10],
+                            "error_type": type(e).__name__,
+                            "event": "flash_loan.callback_failed"
+                        }
+                    )
                     for i, asset in enumerate(assets):
                         self.liquidity_pools[asset] = (
                             self.liquidity_pools.get(asset, 0) + amounts[i]
                         )
                     loan.status = "defaulted"
-                    raise VMExecutionError(f"Flash loan failed: {e}")
+                    raise VMExecutionError(f"Flash loan failed: {type(e).__name__} - {e}") from e
 
                 finally:
                     # Clean up active loan tracking

@@ -710,26 +710,33 @@ def _export_wallet(args: argparse.Namespace) -> int:
     try:
         if args.encrypt:
             # Get password from user
+            logger.debug("Encrypting wallet export for address: %s", args.address)
             password = getpass.getpass("Enter encryption password: ")
             password_confirm = getpass.getpass("Confirm password: ")
 
             if password != password_confirm:
+                logger.error("Password mismatch during wallet export")
                 print("Passwords do not match!", file=sys.stderr)
                 return 1
 
             if len(password) < 12:
+                logger.error("Weak password rejected (too short)")
                 print("Password must be at least 12 characters!", file=sys.stderr)
                 return 1
             if not any(char.isupper() for char in password):
+                logger.error("Weak password rejected (no uppercase)")
                 print("Password must contain at least one uppercase letter!", file=sys.stderr)
                 return 1
             if not any(char.islower() for char in password):
+                logger.error("Weak password rejected (no lowercase)")
                 print("Password must contain at least one lowercase letter!", file=sys.stderr)
                 return 1
             if not any(char.isdigit() for char in password):
+                logger.error("Weak password rejected (no digit)")
                 print("Password must contain at least one digit!", file=sys.stderr)
                 return 1
             if not any(char in "!@#$%^&*()_+-=[]{}|;':\",./<>?`~" for char in password):
+                logger.error("Weak password rejected (no special character)")
                 print("Password must contain at least one special character!", file=sys.stderr)
                 return 1
 
@@ -755,11 +762,13 @@ def _export_wallet(args: argparse.Namespace) -> int:
             # Clear sensitive data
             del password, password_confirm, private_key, wallet_data
 
+            logger.info("Wallet exported (encrypted) to: %s", output_file)
             print(f"Wallet exported (encrypted with AES-256-GCM) to {output_file}")
             print(f"Encryption: AES-256-GCM with {args.kdf.upper()}")
             print("Keep your password secure - it cannot be recovered!")
         else:
             # Unencrypted export - require explicit confirmation
+            logger.warning("User attempting unencrypted wallet export")
             print("\n" + "=" * 70, file=sys.stderr)
             print("WARNING: You are about to export UNENCRYPTED wallet!", file=sys.stderr)
             print("", file=sys.stderr)
@@ -772,10 +781,12 @@ def _export_wallet(args: argparse.Namespace) -> int:
 
             confirm = input("\nType 'EXPORT UNENCRYPTED' to continue: ")
             if confirm != "EXPORT UNENCRYPTED":
+                logger.info("User cancelled unencrypted export")
                 print("Cancelled. Use --encrypt for secure export.", file=sys.stderr)
                 del private_key, wallet_data
                 return 1
 
+            logger.warning("User confirmed unencrypted export - writing plaintext wallet")
             output_file = args.output or f"wallet_{args.address[:8]}.json"
             with open(output_file, "w", encoding="utf-8") as f:
                 json.dump(wallet_data, f, indent=2)
@@ -783,6 +794,7 @@ def _export_wallet(args: argparse.Namespace) -> int:
             # Clear sensitive data
             del private_key, wallet_data
 
+            logger.info("Wallet exported (unencrypted) to: %s", output_file)
             print(f"Wallet exported to {output_file}")
             print("WARNING: File is NOT encrypted. Keep it secure!")
             print("Recommendation: Use --encrypt flag for production wallets")
@@ -792,6 +804,7 @@ def _export_wallet(args: argparse.Namespace) -> int:
 
         return 0
     except Exception as e:
+        logger.error("Wallet export failed: %s", e)
         print(f"Export error: {e}", file=sys.stderr)
         # Clear sensitive data on error - NameError is expected if variables were never assigned
         try:
@@ -804,6 +817,7 @@ def _export_wallet(args: argparse.Namespace) -> int:
 
 def _import_wallet(args: argparse.Namespace) -> int:
     """Handle the import-wallet subcommand."""
+    logger.debug("Importing wallet from file: %s", args.file)
     try:
         with open(args.file, "r", encoding="utf-8") as f:
             content = f.read()
@@ -812,12 +826,14 @@ def _import_wallet(args: argparse.Namespace) -> int:
         try:
             file_data = json.loads(content)
         except json.JSONDecodeError:
+            logger.error("Invalid wallet file format (not valid JSON)")
             print("Error: Invalid wallet file format", file=sys.stderr)
             return 1
 
         # Check if file is encrypted (version 2.0 format)
         if file_data.get("version") == "2.0" and "encrypted_data" in file_data:
             # Encrypted wallet - need password
+            logger.debug("Encrypted wallet detected, requesting decryption password")
             password = getpass.getpass("Enter decryption password: ")
 
             try:
@@ -839,16 +855,19 @@ def _import_wallet(args: argparse.Namespace) -> int:
                 )
                 wallet_data = decrypt_wallet_data(decryption_data)
 
+                logger.info("Wallet imported successfully (encrypted, address=%s)", wallet_data.get('address'))
                 print("Wallet imported successfully (decrypted and verified)")
                 print(f"Algorithm: {file_data.get('algorithm', 'AES-256-GCM')}")
                 print(f"KDF: {kdf.upper()}")
 
             except ValueError as e:
+                logger.error("Wallet decryption failed: %s", e)
                 print(f"Decryption failed: {e}", file=sys.stderr)
                 print("Possible reasons: wrong password, corrupted file, or tampered data", file=sys.stderr)
                 return 1
         else:
             # Unencrypted wallet (legacy format)
+            logger.warning("Importing unencrypted wallet (legacy format)")
             wallet_data = file_data
             print("Wallet imported (UNENCRYPTED)")
             print("WARNING: This wallet file was not encrypted!")
@@ -868,9 +887,11 @@ def _import_wallet(args: argparse.Namespace) -> int:
 
         return 0
     except FileNotFoundError:
+        logger.error("Wallet file not found: %s", args.file)
         print(f"Error: File '{args.file}' not found", file=sys.stderr)
         return 1
     except Exception as e:
+        logger.error("Wallet import failed: %s", e)
         print(f"Import error: {e}", file=sys.stderr)
         return 1
 
@@ -903,9 +924,11 @@ def _read_mnemonic_from_args(args: argparse.Namespace) -> str:
 
 def _mnemonic_qr_backup(args: argparse.Namespace) -> int:
     """Generate QR code backups for a mnemonic phrase."""
+    logger.debug("Generating mnemonic QR backup")
     try:
         mnemonic_phrase = _read_mnemonic_from_args(args)
     except Exception as exc:
+        logger.error("Mnemonic input error: %s", exc)
         print(f"Mnemonic input error: {exc}", file=sys.stderr)
         return 1
 
@@ -914,6 +937,7 @@ def _mnemonic_qr_backup(args: argparse.Namespace) -> int:
     try:
         generator = MnemonicQRBackupGenerator()
     except QRCodeUnavailableError as exc:  # pragma: no cover - dependency guard
+        logger.error("QR code generator unavailable: %s", exc)
         print(str(exc), file=sys.stderr)
         return 1
 
@@ -930,7 +954,9 @@ def _mnemonic_qr_backup(args: argparse.Namespace) -> int:
             include_passphrase=args.include_passphrase,
             metadata=metadata or None,
         )
+        logger.info("QR backup bundle generated successfully")
     except Exception as exc:
+        logger.error("Failed to build QR backup: %s", exc)
         print(f"Failed to build QR backup: {exc}", file=sys.stderr)
         return 1
     finally:
@@ -942,12 +968,14 @@ def _mnemonic_qr_backup(args: argparse.Namespace) -> int:
         with open(args.output, "wb") as handle:
             handle.write(png_bytes)
         os.chmod(args.output, 0o600)
+        logger.info("QR backup image written to: %s", args.output)
         print(f"QR backup image written to: {args.output}")
 
     if args.payload_output:
         with open(args.payload_output, "w", encoding="utf-8") as handle:
             json.dump(bundle.payload, handle, indent=2, sort_keys=True)
         os.chmod(args.payload_output, 0o600)
+        logger.info("QR payload saved to: %s", args.payload_output)
         print(f"Structured payload saved to: {args.payload_output}")
 
     if args.show_base64 or not args.output:
@@ -981,13 +1009,16 @@ def _setup_two_factor(args: argparse.Namespace) -> int:
     """Provision a TOTP secret for the provided profile label."""
     label = args.label.strip()
     if not label:
+        logger.error("2FA setup attempted with empty label")
         print("Label is required for 2FA setup.", file=sys.stderr)
         return 1
 
     if TWO_FACTOR_STORE.exists(label) and not args.force:
+        logger.warning("2FA profile '%s' already exists (use --force to overwrite)", label)
         print(f"2FA profile '{label}' already exists. Use --force to overwrite.", file=sys.stderr)
         return 1
 
+    logger.info("Setting up 2FA for profile: %s", label)
     manager = TwoFactorAuthManager()
     setup = manager.setup_2fa(label, user_email=args.user_email)
     hashed_codes = manager.hash_backup_codes(setup.backup_codes)
@@ -1001,6 +1032,7 @@ def _setup_two_factor(args: argparse.Namespace) -> int:
     )
 
     TWO_FACTOR_STORE.save(profile)
+    logger.info("2FA profile '%s' created successfully", label)
 
     print("\n2FA Enabled Successfully")
     print(f"Profile Label: {label}")
@@ -1012,6 +1044,7 @@ def _setup_two_factor(args: argparse.Namespace) -> int:
 
     if args.qr_output:
         if qrcode is None:
+            logger.warning("QR code generation requested but qrcode library not available")
             print("QR generation unavailable (missing qrcode dependency).", file=sys.stderr)
         else:
             qr = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_Q, box_size=8, border=4)
@@ -1020,6 +1053,7 @@ def _setup_two_factor(args: argparse.Namespace) -> int:
             img = qr.make_image(fill_color="black", back_color="white")
             img.save(args.qr_output)
             os.chmod(args.qr_output, 0o600)
+            logger.info("2FA QR code saved to: %s", args.qr_output)
             print(f"\nQR code (PNG) saved to {args.qr_output}")
 
     return 0
@@ -1028,13 +1062,16 @@ def _setup_two_factor(args: argparse.Namespace) -> int:
 def _two_factor_status(args: argparse.Namespace) -> int:
     """Show metadata about a 2FA profile."""
     label = args.label.strip()
+    logger.debug("Checking status for 2FA profile: %s", label)
     try:
         profile = TWO_FACTOR_STORE.load(label)
     except FileNotFoundError:
+        logger.error("2FA profile '%s' not found", label)
         print(f"2FA profile '{label}' not found.", file=sys.stderr)
         return 1
 
     created_ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(profile.created_at))
+    logger.debug("2FA profile info: label=%s, backup_codes=%d", label, len(profile.backup_codes))
     print(f"Profile: {label}")
     print(f"Issuer: {profile.issuer}")
     print(f"Created: {created_ts}")
@@ -1048,30 +1085,38 @@ def _two_factor_disable(args: argparse.Namespace) -> int:
     """Delete a 2FA profile."""
     label = args.label.strip()
     if not TWO_FACTOR_STORE.exists(label):
+        logger.error("Cannot disable - 2FA profile '%s' not found", label)
         print(f"2FA profile '{label}' not found.", file=sys.stderr)
         return 1
 
+    logger.warning("User attempting to disable 2FA profile: %s", label)
     confirm = input(f"Type 'DISABLE {label}' to remove this 2FA profile: ")
     if confirm != f"DISABLE {label}":
+        logger.info("User cancelled 2FA disable operation")
         print("Operation cancelled.")
         return 1
 
     TWO_FACTOR_STORE.delete(label)
+    logger.info("2FA profile '%s' removed", label)
     print(f"2FA profile '{label}' removed.")
     return 0
 
 
 def _require_two_factor(profile_label: str, otp: Optional[str] = None) -> None:
     """Prompt for and verify a 2FA code."""
+    logger.debug("2FA verification required for profile: %s", profile_label)
     manager = TwoFactorAuthManager()
     code = otp or getpass.getpass("Enter 2FA code (or backup code): ").strip()
     if not code:
+        logger.error("2FA code not provided")
         raise ValueError("2FA code required")
 
     success, message = TWO_FACTOR_STORE.verify_code(profile_label, code, manager=manager)
     if not success:
+        logger.error("2FA verification failed for profile: %s", profile_label)
         raise ValueError("Invalid 2FA or backup code provided.")
 
+    logger.info("2FA verification successful for profile: %s", profile_label)
     print(f"2FA verification successful ({message}).")
 
 

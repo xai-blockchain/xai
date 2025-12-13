@@ -9,6 +9,7 @@ import time
 import base64
 import hashlib
 from typing import Dict, List, Optional
+from xai.core.constants import SECONDS_PER_DAY, GENESIS_TIMESTAMP
 
 
 class TimeLockRelease:
@@ -60,7 +61,7 @@ class TimeLockRelease:
             "is_active": self.is_active(),
             "code_hash": self.code_hash,
             "days_until_activation": (
-                (self.activation_timestamp - time.time()) / 86400 if not self.is_active() else 0
+                (self.activation_timestamp - time.time()) / SECONDS_PER_DAY if not self.is_active() else 0
             ),
         }
 
@@ -135,7 +136,7 @@ def create_genesis_software_releases() -> List[Dict]:
         release_1 = TimeLockRelease(
             component="simple_swap_gui",
             code=encoded_gui,
-            activation_timestamp=1704067200 + (90 * 86400),  # Genesis + 90 days
+            activation_timestamp=int(GENESIS_TIMESTAMP) + (90 * SECONDS_PER_DAY),
             version="1.0.0",
             description="Simple swap GUI for atomic swaps",
         )
@@ -146,7 +147,7 @@ def create_genesis_software_releases() -> List[Dict]:
     release_2 = TimeLockRelease(
         component="advanced_trading",
         code=base64.b64encode(b"# Advanced trading tools TBD").decode(),
-        activation_timestamp=1704067200 + (180 * 86400),  # Genesis + 180 days
+        activation_timestamp=int(GENESIS_TIMESTAMP) + (180 * SECONDS_PER_DAY),
         version="1.0.0",
         description="Advanced trading and analytics tools",
     )
@@ -156,7 +157,7 @@ def create_genesis_software_releases() -> List[Dict]:
     release_3 = TimeLockRelease(
         component="mobile_wallet",
         code=base64.b64encode(b"# Mobile wallet code TBD").decode(),
-        activation_timestamp=1704067200 + (270 * 86400),  # Genesis + 270 days
+        activation_timestamp=int(GENESIS_TIMESTAMP) + (270 * SECONDS_PER_DAY),
         version="1.0.0",
         description="Mobile wallet application",
     )

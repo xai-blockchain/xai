@@ -32,6 +32,33 @@ except ImportError as e:
 
 logger = logging.getLogger(__name__)
 
+
+# Peer management exceptions
+class PeerError(Exception):
+    """Base exception for peer management operations"""
+    pass
+
+
+class PeerConnectionError(PeerError):
+    """Raised when peer connection fails"""
+    pass
+
+
+class PeerCommunicationError(PeerError):
+    """Raised when peer communication fails"""
+    pass
+
+
+class PeerValidationError(PeerError):
+    """Raised when peer data validation fails"""
+    pass
+
+
+class PeerNetworkError(PeerError):
+    """Raised when network operations fail"""
+    pass
+
+
 # Error message for missing cryptography library
 CRYPTO_INSTALL_MSG = """
 ========================================
@@ -199,12 +226,40 @@ class PeerConnectionPool:
                 }
             )
             return conn
+        except (asyncio.TimeoutError, TimeoutError) as e:
+            # Failed to create connection, decrement counter
+            async with self._lock:
+                self._active_connections[peer_uri] = max(0, self._active_connections[peer_uri] - 1)
+            logger.warning(
+                "Connection timeout creating pooled connection: %s",
+                e,
+                extra={
+                    "event": "peer.pool.connection_timeout",
+                    "peer_uri": peer_uri,
+                }
+            )
+            raise PeerConnectionError(f"Connection timeout to {peer_uri}") from e
+        except (ConnectionError, OSError) as e:
+            async with self._lock:
+                self._active_connections[peer_uri] = max(0, self._active_connections[peer_uri] - 1)
+            logger.warning(
+                "Network error creating pooled connection: %s",
+                e,
+                extra={
+                    "event": "peer.pool.connection_network_error",
+                    "peer_uri": peer_uri,
+                    "error_type": type(e).__name__,
+                }
+            )
+            raise PeerNetworkError(f"Network error connecting to {peer_uri}: {e}") from e
         except Exception as e:
             # Failed to create connection, decrement counter
             async with self._lock:
                 self._active_connections[peer_uri] = max(0, self._active_connections[peer_uri] - 1)
             logger.error(
-                "Failed to create pooled connection",
+                "Unexpected error creating pooled connection: %s",
+                e,
+                exc_info=True,
                 extra={
                     "event": "peer.pool.connection_failed",
                     "peer_uri": peer_uri,
@@ -304,10 +359,33 @@ class PeerConnectionPool:
                 }
             )
             return False
+        except (asyncio.TimeoutError, TimeoutError) as e:
+            self._total_health_check_failures += 1
+            logger.debug(
+                "Connection health check timeout: %s",
+                e,
+                extra={
+                    "event": "peer.pool.health_check_timeout",
+                    "failures": self._total_health_check_failures,
+                }
+            )
+            return False
+        except (ConnectionError, OSError) as e:
+            self._total_health_check_failures += 1
+            logger.debug(
+                "Connection health check network error: %s",
+                e,
+                extra={
+                    "event": "peer.pool.health_check_network_error",
+                    "failures": self._total_health_check_failures,
+                }
+            )
+            return False
         except Exception as e:
             self._total_health_check_failures += 1
             logger.debug(
-                "Connection health check failed",
+                "Connection health check unexpected error: %s",
+                e,
                 extra={
                     "event": "peer.pool.health_check_failed",
                     "error_type": type(e).__name__,
@@ -326,9 +404,27 @@ class PeerConnectionPool:
         try:
             if not conn.closed:
                 await conn.close()
+        except (asyncio.TimeoutError, TimeoutError) as e:
+            logger.debug(
+                "Timeout closing connection: %s",
+                e,
+                extra={
+                    "event": "peer.pool.close_timeout",
+                }
+            )
+        except (ConnectionError, OSError, AttributeError) as e:
+            logger.debug(
+                "Error closing connection: %s",
+                e,
+                extra={
+                    "event": "peer.pool.close_error",
+                    "error_type": type(e).__name__,
+                }
+            )
         except Exception as e:
             logger.debug(
-                "Error closing connection",
+                "Unexpected error closing connection: %s",
+                e,
                 extra={
                     "event": "peer.pool.close_error",
                     "error_type": type(e).__name__,
@@ -352,9 +448,21 @@ class PeerConnectionPool:
                         await self._close_connection(conn)
                     except asyncio.QueueEmpty:
                         break
+                    except (ConnectionError, OSError, AttributeError) as e:
+                        logger.warning(
+                            "Error closing pooled connection: %s",
+                            e,
+                            extra={
+                                "event": "peer.pool.close_pooled_error",
+                                "peer_uri": peer_uri,
+                                "error_type": type(e).__name__,
+                            }
+                        )
                     except Exception as e:
                         logger.error(
-                            "Error closing pooled connection",
+                            "Unexpected error closing pooled connection: %s",
+                            e,
+                            exc_info=True,
                             extra={
                                 "event": "peer.pool.close_error",
                                 "peer_uri": peer_uri,
@@ -586,8 +694,28 @@ class PeerDiscovery:
                     discovered.append(f"{rdata.address}:8333")
             except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
                 continue
+            except (dns.resolver.Timeout, TimeoutError) as e:
+                logger.debug(
+                    "DNS discovery timeout for seed %s: %s",
+                    seed,
+                    e,
+                    extra={"event": "peer.discovery.dns_timeout", "seed": seed}
+                )
+            except (dns.resolver.YXDOMAIN, dns.exception.DNSException) as e:
+                logger.warning(
+                    "DNS error for seed %s: %s",
+                    seed,
+                    e,
+                    extra={"event": "peer.discovery.dns_error", "seed": seed, "error_type": type(e).__name__}
+                )
             except Exception as e:
-                print(f"DNS discovery failed for seed {seed}: {e}")
+                logger.error(
+                    "Unexpected DNS discovery failure for seed %s: %s",
+                    seed,
+                    e,
+                    exc_info=True,
+                    extra={"event": "peer.discovery.dns_failed", "seed": seed}
+                )
 
         with self.lock:
             for addr in discovered:
@@ -638,9 +766,31 @@ class PeerDiscovery:
                         "bootstrap_uri": bootstrap_uri,
                     }
                 )
-            except Exception as e:
+            except (ConnectionError, OSError) as e:
                 logger.warning(
-                    "Failed to discover peers from bootstrap node",
+                    "Network error discovering peers from bootstrap node: %s",
+                    e,
+                    extra={
+                        "event": "peer.discovery.bootstrap_network_error",
+                        "bootstrap_uri": bootstrap_uri,
+                        "error_type": type(e).__name__,
+                    }
+                )
+            except (ValueError, KeyError, json.JSONDecodeError) as e:
+                logger.warning(
+                    "Invalid response from bootstrap node: %s",
+                    e,
+                    extra={
+                        "event": "peer.discovery.bootstrap_invalid_response",
+                        "bootstrap_uri": bootstrap_uri,
+                        "error_type": type(e).__name__,
+                    }
+                )
+            except Exception as e:
+                logger.error(
+                    "Unexpected error discovering peers from bootstrap node: %s",
+                    e,
+                    exc_info=True,
                     extra={
                         "event": "peer.discovery.bootstrap_failed",
                         "bootstrap_uri": bootstrap_uri,
@@ -848,8 +998,37 @@ class PeerEncryption:
                 print(f"Generated new signing key: {self.signing_key_file}")
 
             self.verifying_key = self.signing_key.pubkey
-        except Exception as e:
-            print(f"Error generating/loading signing key: {e}")
+        except (OSError, IOError, PermissionError) as e:
+            logger.error(
+                "File system error with signing key: %s",
+                e,
+                extra={"event": "peer.signing_key_file_error", "key_file": self.signing_key_file}
+            )
+            # Self-heal by regenerating a fresh key when file access fails
+            try:
+                self.signing_key = secp256k1.PrivateKey(os.urandom(32))
+                serialized = self.signing_key.serialize()
+                serialized_bytes = (
+                    bytes.fromhex(serialized) if isinstance(serialized, str) else serialized
+                )
+                with open(self.signing_key_file, "wb") as f:
+                    f.write(serialized_bytes)
+                self.verifying_key = self.signing_key.pubkey
+                logger.info("Regenerated signing key at: %s", self.signing_key_file)
+            except Exception as inner_exc:
+                logger.critical(
+                    "Failed to regenerate signing key: %s",
+                    inner_exc,
+                    exc_info=True,
+                    extra={"event": "peer.signing_key_regeneration_failed"}
+                )
+                raise
+        except (ValueError, TypeError) as e:
+            logger.error(
+                "Invalid signing key data: %s",
+                e,
+                extra={"event": "peer.signing_key_invalid", "key_file": self.signing_key_file}
+            )
             # Self-heal by regenerating a fresh key when deserialization fails
             try:
                 self.signing_key = secp256k1.PrivateKey(os.urandom(32))
@@ -860,9 +1039,41 @@ class PeerEncryption:
                 with open(self.signing_key_file, "wb") as f:
                     f.write(serialized_bytes)
                 self.verifying_key = self.signing_key.pubkey
-                print(f"Regenerated signing key at: {self.signing_key_file}")
+                logger.info("Regenerated signing key at: %s", self.signing_key_file)
             except Exception as inner_exc:
-                print(f"Failed to regenerate signing key: {inner_exc}")
+                logger.critical(
+                    "Failed to regenerate signing key: %s",
+                    inner_exc,
+                    exc_info=True,
+                    extra={"event": "peer.signing_key_regeneration_failed"}
+                )
+                self.signing_key = None
+                self.verifying_key = None
+        except Exception as e:
+            logger.error(
+                "Unexpected error with signing key: %s",
+                e,
+                exc_info=True,
+                extra={"event": "peer.signing_key_error", "key_file": self.signing_key_file}
+            )
+            # Self-heal by regenerating a fresh key
+            try:
+                self.signing_key = secp256k1.PrivateKey(os.urandom(32))
+                serialized = self.signing_key.serialize()
+                serialized_bytes = (
+                    bytes.fromhex(serialized) if isinstance(serialized, str) else serialized
+                )
+                with open(self.signing_key_file, "wb") as f:
+                    f.write(serialized_bytes)
+                self.verifying_key = self.signing_key.pubkey
+                logger.info("Regenerated signing key at: %s", self.signing_key_file)
+            except Exception as inner_exc:
+                logger.critical(
+                    "Failed to regenerate signing key: %s",
+                    inner_exc,
+                    exc_info=True,
+                    extra={"event": "peer.signing_key_regeneration_failed"}
+                )
                 self.signing_key = None
                 self.verifying_key = None
 

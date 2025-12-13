@@ -352,8 +352,17 @@ class AITradingBot:
 
                 self.last_analysis_time = now
 
-            except Exception as e:
-                logger.error("Trading loop error", extra={"error": str(e)}, exc_info=True)
+            except (ValueError, TypeError, KeyError, AttributeError, RuntimeError) as e:
+                logger.error(
+                    "Trading loop error: %s - %s",
+                    type(e).__name__,
+                    str(e),
+                    extra={
+                        "error_type": type(e).__name__,
+                        "error": str(e)
+                    },
+                    exc_info=True
+                )
                 time.sleep(60)  # Wait 1 minute on error
 
         logger.info("Trading loop stopped")
@@ -374,8 +383,17 @@ class AITradingBot:
                 if self._market_data_provider:
                     try:
                         rate = self._market_data_provider(pair_key)
-                    except Exception as exc:  # pragma: no cover - defensive
-                        logging.warning("Market data provider failed", extra={"pair": pair_key, "error": str(exc)})
+                    except (ValueError, TypeError, KeyError, ConnectionError, TimeoutError) as exc:  # pragma: no cover - defensive
+                        logging.warning(
+                            "Market data provider failed: %s - %s",
+                            type(exc).__name__,
+                            str(exc),
+                            extra={
+                                "pair": pair_key,
+                                "error_type": type(exc).__name__,
+                                "error": str(exc)
+                            }
+                        )
 
                 if rate is None:
                     base_rate = float(self.config.get("base_rates", {}).get(pair_key, 4.5))
@@ -636,8 +654,18 @@ Return JSON:
                 logger.error("Trade failed", extra={"error": swap_result.get("error")})
                 self.performance.failed_trades += 1
 
-        except Exception as e:
-            logger.error("Trade execution error", extra={"error": str(e)}, exc_info=True)
+        except (ValueError, TypeError, KeyError, AttributeError, InvalidOperation) as e:
+            logger.error(
+                "Trade execution error: %s - %s",
+                type(e).__name__,
+                str(e),
+                extra={
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                    "pair": f"{pair.from_coin}/{pair.to_coin}"
+                },
+                exc_info=True
+            )
             self.performance.failed_trades += 1
 
     def _check_risk_limits(self) -> bool:
@@ -881,8 +909,18 @@ Return JSON:
             else:
                 return {"success": False, "error": f"Provider {self.ai_provider} not supported"}
 
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        except (ValueError, TypeError, KeyError, AttributeError, ConnectionError, TimeoutError) as e:
+            logger.error(
+                "AI provider call failed: %s - %s",
+                type(e).__name__,
+                str(e),
+                extra={
+                    "error_type": type(e).__name__,
+                    "provider": self.ai_provider,
+                    "model": self.ai_model
+                }
+            )
+            return {"success": False, "error": f"{type(e).__name__}: {str(e)}"}
 
     def _get_performance_summary(self) -> Dict:
         """Get performance summary"""

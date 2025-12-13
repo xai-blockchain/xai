@@ -570,8 +570,17 @@ class CircuitBreakerRegistry:
         for name, callback in self.pause_callbacks.items():
             try:
                 callback(True)
-            except Exception as e:
-                logger.error(f"Pause callback {name} failed: {e}")
+            except (TypeError, ValueError, RuntimeError, AttributeError, KeyError) as e:
+                logger.error(
+                    "Pause callback failed: %s - %s",
+                    type(e).__name__,
+                    str(e),
+                    extra={
+                        "callback_name": name,
+                        "error_type": type(e).__name__,
+                        "event": "circuit_breaker.callback_error"
+                    }
+                )
 
         self._log_action(caller, "emergency_pause", {"duration": duration})
 
@@ -597,8 +606,17 @@ class CircuitBreakerRegistry:
         for name, callback in self.pause_callbacks.items():
             try:
                 callback(False)
-            except Exception as e:
-                logger.error(f"Unpause callback {name} failed: {e}")
+            except (TypeError, ValueError, RuntimeError, AttributeError, KeyError) as e:
+                logger.error(
+                    "Unpause callback failed: %s - %s",
+                    type(e).__name__,
+                    str(e),
+                    extra={
+                        "callback_name": name,
+                        "error_type": type(e).__name__,
+                        "event": "circuit_breaker.callback_error"
+                    }
+                )
 
         self._log_action(caller, "unpause", {})
 
@@ -782,8 +800,17 @@ class CircuitBreakerRegistry:
         for name, callback in self.pause_callbacks.items():
             try:
                 callback(True)
-            except Exception as e:
-                logger.error(f"Pause callback {name} failed: {e}")
+            except (TypeError, ValueError, RuntimeError, AttributeError, KeyError) as e:
+                logger.error(
+                    "Pause callback failed: %s - %s",
+                    type(e).__name__,
+                    str(e),
+                    extra={
+                        "callback_name": name,
+                        "error_type": type(e).__name__,
+                        "event": "circuit_breaker.callback_error"
+                    }
+                )
 
         self._log_action(request.address, "emergency_pause_secure", {"duration": duration})
 
@@ -835,8 +862,17 @@ class CircuitBreakerRegistry:
         for name, callback in self.pause_callbacks.items():
             try:
                 callback(False)
-            except Exception as e:
-                logger.error(f"Unpause callback {name} failed: {e}")
+            except (TypeError, ValueError, RuntimeError, AttributeError, KeyError) as e:
+                logger.error(
+                    "Unpause callback failed: %s - %s",
+                    type(e).__name__,
+                    str(e),
+                    extra={
+                        "callback_name": name,
+                        "error_type": type(e).__name__,
+                        "event": "circuit_breaker.callback_error"
+                    }
+                )
 
         self._log_action(request.address, "unpause_secure", {})
 

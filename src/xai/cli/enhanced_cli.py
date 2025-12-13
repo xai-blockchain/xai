@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sys
 import json
+import logging
 import time
 from typing import Optional, Dict, Any, List
 from pathlib import Path
@@ -33,12 +34,16 @@ except ImportError:
 import requests
 from xai.wallet.offline_signing import sign_offline, signing_preview
 
+# Configure module logger
+logger = logging.getLogger(__name__)
+
 # Rich console for beautiful output
 console = Console()
 
 
 def _cli_fail(exc: Exception, exit_code: int = 1) -> None:
     """Centralized CLI error handler for consistent messaging."""
+    logger.error("CLI error: %s", exc, exc_info=True)
     console.print(f"[bold red]Error:[/] {exc}")
     sys.exit(exit_code)
 
@@ -57,11 +62,14 @@ class XAIClient:
     def _request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
         """Make HTTP request to node"""
         url = f"{self.node_url}/{endpoint.lstrip('/')}"
+        logger.debug("Node request: %s %s", method, url)
         try:
             response = requests.request(method, url, timeout=self.timeout, **kwargs)
             response.raise_for_status()
+            logger.debug("Node response: status=%d", response.status_code)
             return response.json()
         except requests.exceptions.RequestException as e:
+            logger.error("Node communication error: %s", e)
             raise click.ClickException(f"Node communication error: {e}")
 
     def get_balance(self, address: str) -> Dict[str, Any]:
