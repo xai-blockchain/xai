@@ -1171,19 +1171,446 @@ class TestBitcoinIntegration:
         pass
 
 
-@requires_anvil
 class TestEthereumIntegration:
     """
     Integration tests requiring actual Anvil/Ethereum node
-    These are skipped in unit test runs
+    Runs against local Anvil on port 8546
     """
 
-    def test_real_eth_contract_deployment(self):
-        """Test actual Ethereum HTLC contract deployment"""
-        # Would deploy real Solidity contract to local Anvil
-        pass
+    @pytest.fixture(scope="class")
+    def anvil_process(self):
+        """Start Anvil node for testing on port 8546"""
+        import subprocess
+        import socket
 
-    def test_real_eth_claim_and_refund(self):
-        """Test actual claim and refund on Ethereum"""
-        # Would interact with real smart contract
-        pass
+        # Try ports 8546, 8547, 8548 in order
+        for port in [8546, 8547, 8548]:
+            # Check if port is available
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                if s.connect_ex(('127.0.0.1', port)) != 0:
+                    # Port is available
+                    break
+        else:
+            pytest.skip("No available port found for Anvil (tried 8546-8548)")
+
+        # Start Anvil
+        proc = subprocess.Popen(
+            ['anvil', '--port', str(port), '--accounts', '2', '--balance', '10000'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+
+        # Wait for Anvil to start
+        time.sleep(2)
+
+        yield {'process': proc, 'port': port}
+
+        # Cleanup
+        proc.terminate()
+        proc.wait(timeout=5)
+
+    @pytest.fixture
+    def web3_client(self, anvil_process):
+        """Create web3 client connected to Anvil"""
+        from web3 import Web3
+
+        port = anvil_process['port']
+        w3 = Web3(Web3.HTTPProvider(f'http://127.0.0.1:{port}'))
+
+        # Verify connection
+        assert w3.is_connected(), f"Failed to connect to Anvil on port {port}"
+
+        return w3
+
+    @pytest.fixture
+    def accounts(self, web3_client):
+        """Get test accounts from Anvil"""
+        accts = web3_client.eth.accounts
+        return {
+            'alice': accts[0],
+            'bob': accts[1]
+        }
+
+    @pytest.fixture
+    def htlc_contract_source(self):
+        """Solidity HTLC contract source code"""
+        return """
+        // SPDX-License-Identifier: MIT
+        pragma solidity ^0.8.0;
+
+        contract AtomicSwapHTLC {
+            bytes32 public secretHash;
+            address payable public recipient;
+            address payable public sender;
+            uint256 public timelock;
+            bool public claimed;
+            bool public refunded;
+
+            event Claimed(bytes32 secret);
+            event Refunded();
+
+            constructor(
+                bytes32 _secretHash,
+                address payable _recipient,
+                uint256 _timelock
+            ) payable {
+                require(msg.value > 0, "Must send ETH");
+                require(_timelock > block.timestamp, "Timelock must be in future");
+
+                secretHash = _secretHash;
+                recipient = _recipient;
+                sender = payable(msg.sender);
+                timelock = _timelock;
+                claimed = false;
+                refunded = false;
+            }
+
+            function claim(bytes32 _secret) external {
+                require(!claimed, "Already claimed");
+                require(!refunded, "Already refunded");
+                require(block.timestamp < timelock, "Timelock expired");
+                require(sha256(abi.encodePacked(_secret)) == secretHash, "Invalid secret");
+                require(msg.sender == recipient, "Only recipient can claim");
+
+                claimed = true;
+                emit Claimed(_secret);
+                recipient.transfer(address(this).balance);
+            }
+
+            function refund() external {
+                require(!claimed, "Already claimed");
+                require(!refunded, "Already refunded");
+                require(block.timestamp >= timelock, "Timelock not expired");
+                require(msg.sender == sender, "Only sender can refund");
+
+                refunded = true;
+                emit Refunded();
+                sender.transfer(address(this).balance);
+            }
+
+            function getBalance() external view returns (uint256) {
+                return address(this).balance;
+            }
+        }
+        """
+
+    @pytest.fixture
+    def compiled_contract(self, htlc_contract_source):
+        """Compile the HTLC contract"""
+        from solcx import compile_source, install_solc, set_solc_version
+
+        # Install and set solc version
+        try:
+            install_solc('0.8.28', show_progress=False)
+        except Exception:
+            pass  # May already be installed
+
+        set_solc_version('0.8.28')
+
+        # Compile contract
+        compiled = compile_source(
+            htlc_contract_source,
+            output_values=['abi', 'bin']
+        )
+
+        contract_id, contract_interface = compiled.popitem()
+        return contract_interface
+
+    def test_real_eth_contract_deployment(self, web3_client, accounts, compiled_contract):
+        """
+        Test actual Ethereum HTLC contract deployment to Anvil
+
+        Tests:
+        1. Contract deployment with valid parameters
+        2. Contract receives ETH on deployment
+        3. Contract state is correctly initialized
+        4. Secret hash is stored correctly
+        """
+        # Generate secret and hash
+        secret = secrets.token_bytes(32)
+        secret_hash = hashlib.sha256(secret).digest()
+
+        # Setup contract
+        Contract = web3_client.eth.contract(
+            abi=compiled_contract['abi'],
+            bytecode=compiled_contract['bin']
+        )
+
+        # Deployment parameters
+        timelock = int(time.time()) + 3600  # 1 hour from now
+        amount_wei = web3_client.to_wei(1, 'ether')
+
+        # Deploy contract
+        tx_hash = Contract.constructor(
+            secret_hash,
+            accounts['bob'],
+            timelock
+        ).transact({
+            'from': accounts['alice'],
+            'value': amount_wei
+        })
+
+        # Wait for transaction receipt
+        tx_receipt = web3_client.eth.wait_for_transaction_receipt(tx_hash)
+
+        # Verify deployment
+        assert tx_receipt['status'] == 1, "Contract deployment failed"
+        assert tx_receipt['contractAddress'] is not None
+
+        # Get deployed contract instance
+        contract_address = tx_receipt['contractAddress']
+        htlc = web3_client.eth.contract(
+            address=contract_address,
+            abi=compiled_contract['abi']
+        )
+
+        # Verify contract state
+        assert htlc.functions.secretHash().call() == secret_hash
+        assert htlc.functions.recipient().call() == accounts['bob']
+        assert htlc.functions.sender().call() == accounts['alice']
+        assert htlc.functions.timelock().call() == timelock
+        assert htlc.functions.claimed().call() is False
+        assert htlc.functions.refunded().call() is False
+
+        # Verify contract balance
+        contract_balance = web3_client.eth.get_balance(contract_address)
+        assert contract_balance == amount_wei
+
+        print(f"✓ Contract deployed at {contract_address}")
+        print(f"✓ Contract holds {web3_client.from_wei(contract_balance, 'ether')} ETH")
+        print(f"✓ Secret hash: {secret_hash.hex()}")
+        print(f"✓ Timelock: {timelock}")
+
+    def test_real_eth_claim_and_refund(self, web3_client, accounts, compiled_contract):
+        """
+        Test actual claim and refund on Ethereum
+
+        Tests:
+        1. Successful claim with valid secret before timelock
+        2. Failed claim with invalid secret
+        3. Failed claim after timelock expiry
+        4. Successful refund after timelock expiry
+        5. Failed refund before timelock expiry
+        6. Failed refund after claim
+        """
+
+        # ==================== TEST 1: Successful Claim ====================
+        print("\n=== TEST 1: Successful Claim ===")
+
+        # Generate secret and hash
+        secret = secrets.token_bytes(32)
+        secret_hash = hashlib.sha256(secret).digest()
+
+        # Deploy contract for claim test
+        Contract = web3_client.eth.contract(
+            abi=compiled_contract['abi'],
+            bytecode=compiled_contract['bin']
+        )
+
+        timelock = int(time.time()) + 3600  # 1 hour from now
+        amount_wei = web3_client.to_wei(1, 'ether')
+
+        tx_hash = Contract.constructor(
+            secret_hash,
+            accounts['bob'],
+            timelock
+        ).transact({
+            'from': accounts['alice'],
+            'value': amount_wei
+        })
+
+        tx_receipt = web3_client.eth.wait_for_transaction_receipt(tx_hash)
+        contract_address = tx_receipt['contractAddress']
+
+        htlc = web3_client.eth.contract(
+            address=contract_address,
+            abi=compiled_contract['abi']
+        )
+
+        # Get Bob's balance before claim
+        bob_balance_before = web3_client.eth.get_balance(accounts['bob'])
+
+        # Bob claims with correct secret
+        claim_tx = htlc.functions.claim(secret).transact({'from': accounts['bob']})
+        claim_receipt = web3_client.eth.wait_for_transaction_receipt(claim_tx)
+
+        assert claim_receipt['status'] == 1, "Claim transaction failed"
+
+        # Verify state
+        assert htlc.functions.claimed().call() is True
+        assert htlc.functions.refunded().call() is False
+        assert web3_client.eth.get_balance(contract_address) == 0
+
+        # Verify Bob received funds (accounting for gas)
+        bob_balance_after = web3_client.eth.get_balance(accounts['bob'])
+        gas_used = claim_receipt['gasUsed'] * claim_receipt['effectiveGasPrice']
+        expected_balance = bob_balance_before + amount_wei - gas_used
+        assert bob_balance_after == expected_balance
+
+        # Verify event emission
+        events = htlc.events.Claimed().process_receipt(claim_receipt)
+        assert len(events) == 1
+        assert events[0]['args']['secret'] == secret
+
+        print(f"✓ Bob successfully claimed {web3_client.from_wei(amount_wei, 'ether')} ETH")
+        print(f"✓ Secret revealed: {secret.hex()}")
+
+        # ==================== TEST 2: Invalid Secret Rejection ====================
+        print("\n=== TEST 2: Invalid Secret Rejection ===")
+
+        # Deploy new contract
+        secret2 = secrets.token_bytes(32)
+        secret_hash2 = hashlib.sha256(secret2).digest()
+
+        tx_hash2 = Contract.constructor(
+            secret_hash2,
+            accounts['bob'],
+            int(time.time()) + 3600
+        ).transact({
+            'from': accounts['alice'],
+            'value': amount_wei
+        })
+
+        tx_receipt2 = web3_client.eth.wait_for_transaction_receipt(tx_hash2)
+        htlc2 = web3_client.eth.contract(
+            address=tx_receipt2['contractAddress'],
+            abi=compiled_contract['abi']
+        )
+
+        # Try to claim with wrong secret
+        wrong_secret = secrets.token_bytes(32)
+
+        with pytest.raises(Exception) as exc_info:
+            htlc2.functions.claim(wrong_secret).transact({'from': accounts['bob']})
+
+        assert "Invalid secret" in str(exc_info.value) or "revert" in str(exc_info.value).lower()
+
+        # Verify state unchanged
+        assert htlc2.functions.claimed().call() is False
+        assert web3_client.eth.get_balance(tx_receipt2['contractAddress']) == amount_wei
+
+        print("✓ Invalid secret correctly rejected")
+
+        # ==================== TEST 3: Claim After Timelock Fails ====================
+        print("\n=== TEST 3: Claim After Timelock Fails ===")
+
+        # Deploy contract with very short timelock
+        secret3 = secrets.token_bytes(32)
+        secret_hash3 = hashlib.sha256(secret3).digest()
+
+        short_timelock = int(time.time()) + 2  # 2 seconds
+
+        tx_hash3 = Contract.constructor(
+            secret_hash3,
+            accounts['bob'],
+            short_timelock
+        ).transact({
+            'from': accounts['alice'],
+            'value': amount_wei
+        })
+
+        tx_receipt3 = web3_client.eth.wait_for_transaction_receipt(tx_hash3)
+        htlc3 = web3_client.eth.contract(
+            address=tx_receipt3['contractAddress'],
+            abi=compiled_contract['abi']
+        )
+
+        # Advance Anvil's block timestamp by 3600 seconds (beyond timelock)
+        web3_client.provider.make_request('evm_increaseTime', [3600])
+        web3_client.provider.make_request('evm_mine', [])
+
+        # Try to claim after expiry
+        with pytest.raises(Exception) as exc_info:
+            htlc3.functions.claim(secret3).transact({'from': accounts['bob']})
+
+        assert "Timelock expired" in str(exc_info.value) or "revert" in str(exc_info.value).lower()
+
+        print("✓ Claim after timelock correctly rejected")
+
+        # ==================== TEST 4: Successful Refund ====================
+        print("\n=== TEST 4: Successful Refund ===")
+
+        # Get Alice's balance before refund
+        alice_balance_before = web3_client.eth.get_balance(accounts['alice'])
+
+        # Alice refunds (timelock already expired)
+        refund_tx = htlc3.functions.refund().transact({'from': accounts['alice']})
+        refund_receipt = web3_client.eth.wait_for_transaction_receipt(refund_tx)
+
+        assert refund_receipt['status'] == 1, "Refund transaction failed"
+
+        # Verify state
+        assert htlc3.functions.claimed().call() is False
+        assert htlc3.functions.refunded().call() is True
+        assert web3_client.eth.get_balance(tx_receipt3['contractAddress']) == 0
+
+        # Verify Alice received refund (accounting for gas)
+        alice_balance_after = web3_client.eth.get_balance(accounts['alice'])
+        gas_used = refund_receipt['gasUsed'] * refund_receipt['effectiveGasPrice']
+        expected_balance = alice_balance_before + amount_wei - gas_used
+        assert alice_balance_after == expected_balance
+
+        # Verify event emission
+        events = htlc3.events.Refunded().process_receipt(refund_receipt)
+        assert len(events) == 1
+
+        print(f"✓ Alice successfully refunded {web3_client.from_wei(amount_wei, 'ether')} ETH")
+
+        # ==================== TEST 5: Refund Before Timelock Fails ====================
+        print("\n=== TEST 5: Refund Before Timelock Fails ===")
+
+        # Deploy new contract with future timelock (use blockchain's current timestamp)
+        secret4 = secrets.token_bytes(32)
+        secret_hash4 = hashlib.sha256(secret4).digest()
+
+        # Get current block timestamp from blockchain
+        latest_block = web3_client.eth.get_block('latest')
+        blockchain_time = latest_block['timestamp']
+        future_timelock = blockchain_time + 3600
+
+        tx_hash4 = Contract.constructor(
+            secret_hash4,
+            accounts['bob'],
+            future_timelock
+        ).transact({
+            'from': accounts['alice'],
+            'value': amount_wei
+        })
+
+        tx_receipt4 = web3_client.eth.wait_for_transaction_receipt(tx_hash4)
+        htlc4 = web3_client.eth.contract(
+            address=tx_receipt4['contractAddress'],
+            abi=compiled_contract['abi']
+        )
+
+        # Try to refund before timelock expiry
+        with pytest.raises(Exception) as exc_info:
+            htlc4.functions.refund().transact({'from': accounts['alice']})
+
+        assert "Timelock not expired" in str(exc_info.value) or "revert" in str(exc_info.value).lower()
+
+        print("✓ Refund before timelock correctly rejected")
+
+        # ==================== TEST 6: Refund After Claim Fails ====================
+        print("\n=== TEST 6: Refund After Claim Fails ===")
+
+        # Bob claims first
+        htlc4.functions.claim(secret4).transact({'from': accounts['bob']})
+
+        # Try to refund after claim (even though we could wait for timelock)
+        with pytest.raises(Exception) as exc_info:
+            htlc4.functions.refund().transact({'from': accounts['alice']})
+
+        assert "Already claimed" in str(exc_info.value) or "revert" in str(exc_info.value).lower()
+
+        print("✓ Refund after claim correctly rejected")
+
+        # ==================== Summary ====================
+        print("\n=== All Tests Passed ===")
+        print("✓ Contract deployment")
+        print("✓ Successful claim with valid secret")
+        print("✓ Invalid secret rejection")
+        print("✓ Claim after timelock rejection")
+        print("✓ Successful refund after timelock")
+        print("✓ Refund before timelock rejection")
+        print("✓ Refund after claim rejection")

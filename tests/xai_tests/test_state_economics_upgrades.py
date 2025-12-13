@@ -203,7 +203,7 @@ class TestUTXOSnapshotAndRestore:
         total_supply_from_snapshot = utxo_snapshot["total_value"]
 
         # Should match blockchain's calculation
-        bc_supply = bc.get_total_circulating_supply()
+        bc_supply = bc.get_circulating_supply()
         assert abs(total_supply_from_snapshot - bc_supply) < 0.01, "Supply mismatch"
 
     def test_snapshot_performance_vs_full_sync(self, blockchain_with_history, tmp_path):
