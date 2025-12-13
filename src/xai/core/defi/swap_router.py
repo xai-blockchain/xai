@@ -1099,7 +1099,7 @@ class SwapRouter:
                 type(e).__name__,
                 str(e),
                 extra={
-                    "address": address[:10] if address else "unknown",
+                    "address": signer[:10] if signer else "unknown",
                     "error_type": type(e).__name__,
                     "event": "swap_router.signature_verification_failed"
                 }
