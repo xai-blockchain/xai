@@ -20,6 +20,7 @@ from xai.core.security_validation import (
 )
 
 
+@pytest.mark.security
 class TestLogSecurityEvent:
     """Test security event logging functionality"""
 
@@ -76,6 +77,7 @@ class TestLogSecurityEvent:
         assert "details" in parsed
 
 
+@pytest.mark.security
 class TestValidateAmount:
     """Test amount validation"""
 
@@ -172,6 +174,7 @@ class TestValidateAmount:
         assert result == 100.0
 
 
+@pytest.mark.security
 class TestValidateAddress:
     """Test address validation"""
 
@@ -315,6 +318,7 @@ class TestValidateAddress:
         assert result == "XAI" + "a" * 40
 
 
+@pytest.mark.security
 class TestValidateFee:
     """Test fee validation"""
 
@@ -346,6 +350,7 @@ class TestValidateFee:
         assert validator.validate_fee(0) == 0
 
 
+@pytest.mark.security
 class TestValidateString:
     """Test string validation"""
 
@@ -406,6 +411,7 @@ class TestValidateString:
         assert validator.validate_string("  test  ") == "test"
 
 
+@pytest.mark.security
 class TestValidatePositiveInteger:
     """Test positive integer validation"""
 
@@ -452,6 +458,7 @@ class TestValidatePositiveInteger:
             validator.validate_positive_integer(2**63)
 
 
+@pytest.mark.security
 class TestValidateTimestamp:
     """Test timestamp validation"""
 
@@ -511,6 +518,7 @@ class TestValidateTimestamp:
         assert validator.validate_timestamp(slightly_future) == slightly_future
 
 
+@pytest.mark.security
 class TestValidateHexString:
     """Test hexadecimal string validation"""
 
@@ -554,6 +562,7 @@ class TestValidateHexString:
         assert result == "abcdef"
 
 
+@pytest.mark.security
 class TestValidateNetworkType:
     """Test network type validation"""
 
@@ -590,6 +599,7 @@ class TestValidateNetworkType:
             validator.validate_network_type(123)
 
 
+@pytest.mark.security
 class TestSanitizeForLogging:
     """Test data sanitization for logging"""
 
@@ -655,6 +665,7 @@ class TestSanitizeForLogging:
         assert validator.sanitize_for_logging([1, 2, 3]) == "[1, 2, 3]"
 
 
+@pytest.mark.security
 class TestValidateTransactionData:
     """Test complete transaction data validation"""
 
@@ -745,6 +756,7 @@ class TestValidateTransactionData:
             validate_transaction_data(data)
 
 
+@pytest.mark.security
 class TestValidateApiRequest:
     """Test API request validation"""
 
@@ -777,6 +789,7 @@ class TestValidateApiRequest:
             validate_api_request(data, max_size=10)
 
 
+@pytest.mark.security
 class TestValidationErrorException:
     """Test ValidationError exception class"""
 

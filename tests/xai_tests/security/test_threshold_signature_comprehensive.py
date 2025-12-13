@@ -9,6 +9,7 @@ import pytest
 from xai.security.threshold_signature import ThresholdSignatureScheme
 
 
+@pytest.mark.security
 class TestThresholdSignatureInitialization:
     """Test TSS initialization and configuration"""
 
@@ -48,6 +49,7 @@ class TestThresholdSignatureInitialization:
             ThresholdSignatureScheme(n_participants=5, t_threshold=-1)
 
 
+@pytest.mark.security
 class TestKeyShareGeneration:
     """Test distributed key share generation"""
 
@@ -106,6 +108,7 @@ class TestKeyShareGeneration:
         assert len(tss.private_key_shares) == 100
 
 
+@pytest.mark.security
 class TestSignatureShares:
     """Test participant signature share generation"""
 
@@ -203,6 +206,7 @@ class TestSignatureShares:
         assert sig is not None
 
 
+@pytest.mark.security
 class TestSignatureCombination:
     """Test combining signature shares"""
 
@@ -301,6 +305,7 @@ class TestSignatureCombination:
         assert combined2 is not None
 
 
+@pytest.mark.security
 class TestThresholdVariations:
     """Test different threshold configurations"""
 
@@ -359,6 +364,7 @@ class TestThresholdVariations:
         assert combined is not None
 
 
+@pytest.mark.security
 class TestEdgeCases:
     """Test edge cases and boundary conditions"""
 
@@ -421,6 +427,7 @@ class TestEdgeCases:
         assert 6 not in tss.private_key_shares
 
 
+@pytest.mark.security
 class TestSecurityProperties:
     """Test security-related properties"""
 
@@ -464,6 +471,7 @@ class TestSecurityProperties:
             tss.combine_shares(message, signed_shares)
 
 
+@pytest.mark.security
 class TestRealWorldScenarios:
     """Test real-world usage scenarios"""
 

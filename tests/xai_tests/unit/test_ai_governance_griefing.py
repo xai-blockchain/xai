@@ -2,6 +2,7 @@
 Tests for governance fraud detector covering burst/griefing scenarios.
 """
 
+import pytest
 import time
 
 from xai.core.ai_governance import GovernanceFraudDetector

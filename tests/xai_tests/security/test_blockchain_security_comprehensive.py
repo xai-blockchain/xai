@@ -33,6 +33,7 @@ from xai.core.blockchain import Blockchain, Block, Transaction
 from xai.core.wallet import Wallet
 
 
+@pytest.mark.security
 class TestBlockchainSecurityConfig:
     """Test security configuration constants"""
 
@@ -60,6 +61,7 @@ class TestBlockchainSecurityConfig:
         assert BlockchainSecurityConfig.MIN_TRANSACTION_AMOUNT == 0.00001
 
 
+@pytest.mark.security
 class TestReorganizationProtection:
     """Test reorganization protection (51% attack mitigation)"""
 
@@ -170,6 +172,7 @@ class TestReorganizationProtection:
         assert reorg.is_checkpoint_block(101) is False
 
 
+@pytest.mark.security
 class TestSupplyValidator:
     """Test supply validation (inflation bug protection)"""
 
@@ -274,6 +277,7 @@ class TestSupplyValidator:
         assert is_valid is False
 
 
+@pytest.mark.security
 class TestOverflowProtection:
     """Test integer/float overflow protection"""
 
@@ -370,6 +374,7 @@ class TestOverflowProtection:
         assert "exceeds" in msg
 
 
+@pytest.mark.security
 class TestMempoolManager:
     """Test mempool management with size limits"""
 
@@ -470,6 +475,7 @@ class TestMempoolManager:
         assert manager.current_bytes == 0
 
 
+@pytest.mark.security
 class TestBlockSizeValidator:
     """Test block and transaction size validation"""
 
@@ -532,6 +538,7 @@ class TestBlockSizeValidator:
         assert "too large" in error.lower()
 
 
+@pytest.mark.security
 class TestResourceLimiter:
     """Test resource limiter"""
 
@@ -590,6 +597,7 @@ class TestResourceLimiter:
         assert can_add is False
 
 
+@pytest.mark.security
 class TestDustProtection:
     """Test dust attack protection"""
 
@@ -624,6 +632,7 @@ class TestDustProtection:
         assert is_valid is False
 
 
+@pytest.mark.security
 class TestMedianTimePast:
     """Test median-time-past validation"""
 
@@ -730,6 +739,7 @@ class TestMedianTimePast:
         assert is_valid is False
 
 
+@pytest.mark.security
 class TestTimeValidator:
     """Test time validator"""
 
@@ -804,6 +814,7 @@ class TestTimeValidator:
         assert "median" in error.lower()
 
 
+@pytest.mark.security
 class TestBlockchainTimestampEnforcement:
     """Ensure Blockchain enforces MTP + future-drift when adding blocks."""
 
@@ -888,6 +899,7 @@ class TestBlockchainTimestampEnforcement:
         assert "wall_clock_drift" in latest
 
 
+@pytest.mark.security
 class TestEmergencyGovernanceTimelock:
     """Test emergency governance timelock"""
 
@@ -962,6 +974,7 @@ class TestEmergencyGovernanceTimelock:
         timelock.cancel_emergency_action("prop_999")
 
 
+@pytest.mark.security
 class TestBlockchainSecurityManager:
     """Test unified blockchain security manager"""
 

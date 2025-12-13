@@ -32,6 +32,7 @@ def rbac_manager(temp_config_dir):
     return RBAC()
 
 
+@pytest.mark.security
 class TestRBACInitialization:
     """Test RBAC initialization and configuration loading"""
 
@@ -90,6 +91,7 @@ class TestRBACInitialization:
         assert "admin" in rbac2.user_roles["user123"]
 
 
+@pytest.mark.security
 class TestRoleManagement:
     """Test role creation and management"""
 
@@ -136,6 +138,7 @@ class TestRoleManagement:
         assert len(rbac_manager.roles["super_admin"]) == 50
 
 
+@pytest.mark.security
 class TestUserRoleAssignment:
     """Test assigning roles to users"""
 
@@ -186,6 +189,7 @@ class TestUserRoleAssignment:
             assert "validator" in rbac_manager.user_roles[f"user_{i}"]
 
 
+@pytest.mark.security
 class TestRoleRemoval:
     """Test removing roles from users"""
 
@@ -232,6 +236,7 @@ class TestRoleRemoval:
         assert "user_judy" not in rbac_manager.user_roles
 
 
+@pytest.mark.security
 class TestPermissionChecking:
     """Test permission checking functionality"""
 
@@ -283,6 +288,7 @@ class TestPermissionChecking:
         assert rbac_manager.has_permission("user_quinn", "any_permission") is False
 
 
+@pytest.mark.security
 class TestPermissionDecorator:
     """Test permission_required decorator"""
 
@@ -350,6 +356,7 @@ class TestPermissionDecorator:
         assert create_node.__doc__ == "Create a new node"
 
 
+@pytest.mark.security
 class TestEdgeCases:
     """Test edge cases and boundary conditions"""
 
@@ -397,6 +404,7 @@ class TestEdgeCases:
         assert rbac_manager.has_permission("user_xavier", "创建节点")
 
 
+@pytest.mark.security
 class TestConcurrentAccess:
     """Test scenarios with multiple RBAC instances"""
 
@@ -419,6 +427,7 @@ class TestConcurrentAccess:
         assert rbac2.has_permission("user_zara", "custom_perm")
 
 
+@pytest.mark.security
 class TestComplexScenarios:
     """Test complex real-world scenarios"""
 

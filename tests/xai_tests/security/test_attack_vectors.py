@@ -17,6 +17,7 @@ from xai.core.wallet import Wallet
 from xai.core.blockchain_security import ReorganizationProtection
 
 
+@pytest.mark.security
 class TestDoubleSpendingAttack:
     """Test protection against double-spending attacks"""
 
@@ -111,6 +112,7 @@ class TestDoubleSpendingAttack:
         assert bc.get_balance(victim2.address) == 0.0
 
 
+@pytest.mark.security
 class Test51PercentAttack:
     """Test protection against 51% attacks"""
 
@@ -169,6 +171,7 @@ class Test51PercentAttack:
         assert not bc.validate_chain()
 
 
+@pytest.mark.security
 class TestSybilAttack:
     """Test protection against Sybil attacks"""
 
@@ -217,6 +220,7 @@ class TestSybilAttack:
         assert not wallet2.verify_signature(message, sig1, wallet2.public_key)
 
 
+@pytest.mark.security
 class TestRaceAttack:
     """Test protection against race attacks"""
 
@@ -275,6 +279,7 @@ class TestRaceAttack:
         assert len(bc.pending_transactions) >= initial_pending
 
 
+@pytest.mark.security
 class TestTimejackAttack:
     """Test protection against timejack attacks"""
 
@@ -326,6 +331,7 @@ class TestTimejackAttack:
         assert block2.timestamp >= block1.timestamp
 
 
+@pytest.mark.security
 class TestDustAttack:
     """Test protection against dust attacks"""
 
@@ -360,6 +366,7 @@ class TestDustAttack:
         assert min_value == 0.00001
 
 
+@pytest.mark.security
 class TestResourceExhaustion:
     """Test protection against resource exhaustion attacks"""
 
@@ -403,6 +410,7 @@ class TestResourceExhaustion:
         assert max_mempool == 50000
 
 
+@pytest.mark.security
 class TestInflationAttack:
     """Test protection against inflation bugs"""
 
@@ -460,6 +468,7 @@ class TestInflationAttack:
             assert reward < bc.max_supply
 
 
+@pytest.mark.security
 class TestReplayAttack:
     """Test protection against replay attacks"""
 

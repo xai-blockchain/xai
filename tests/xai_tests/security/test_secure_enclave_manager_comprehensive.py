@@ -9,6 +9,7 @@ import pytest
 from xai.security.secure_enclave_manager import SecureEnclaveManager
 
 
+@pytest.mark.security
 class TestSecureEnclaveInitialization:
     """Test secure enclave manager initialization"""
 
@@ -30,6 +31,7 @@ class TestSecureEnclaveInitialization:
         assert manager._simulate_enclave_available is True
 
 
+@pytest.mark.security
 class TestKeyGeneration:
     """Test key generation in secure enclave"""
 
@@ -114,6 +116,7 @@ class TestKeyGeneration:
         assert len(set(keys)) == 10
 
 
+@pytest.mark.security
 class TestPublicKeyRetrieval:
     """Test retrieving public keys from enclave"""
 
@@ -165,6 +168,7 @@ class TestPublicKeyRetrieval:
             assert public_key is not None
 
 
+@pytest.mark.security
 class TestDataSigning:
     """Test signing data in secure enclave"""
 
@@ -237,6 +241,7 @@ class TestDataSigning:
         assert signature is not None
 
 
+@pytest.mark.security
 class TestSignatureVerification:
     """Test verifying signatures"""
 
@@ -307,6 +312,7 @@ class TestSignatureVerification:
         assert is_valid is False
 
 
+@pytest.mark.security
 class TestEnclaveAvailability:
     """Test enclave availability checking"""
 
@@ -321,6 +327,7 @@ class TestEnclaveAvailability:
         assert manager._is_enclave_available() is False
 
 
+@pytest.mark.security
 class TestEdgeCases:
     """Test edge cases and boundary conditions"""
 
@@ -382,6 +389,7 @@ class TestEdgeCases:
         assert signature is not None
 
 
+@pytest.mark.security
 class TestRealWorldScenarios:
     """Test real-world usage scenarios"""
 

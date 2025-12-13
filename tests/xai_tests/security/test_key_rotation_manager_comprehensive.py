@@ -11,6 +11,7 @@ from datetime import datetime
 from xai.security.key_rotation_manager import KeyRotationManager
 
 
+@pytest.mark.security
 class TestKeyRotationManagerInitialization:
     """Test initialization and configuration"""
 
@@ -62,6 +63,7 @@ class TestKeyRotationManagerInitialization:
         assert len(manager.historical_keys) == 0
 
 
+@pytest.mark.security
 class TestKeyGeneration:
     """Test key generation functionality"""
 
@@ -110,6 +112,7 @@ class TestKeyGeneration:
             assert key != b'\xff' * 32
 
 
+@pytest.mark.security
 class TestKeyRotation:
     """Test key rotation functionality"""
 
@@ -193,6 +196,7 @@ class TestKeyRotation:
         assert historical_entry["rotation_timestamp"] == first_rotation_time
 
 
+@pytest.mark.security
 class TestActiveKeyRetrieval:
     """Test retrieving active key"""
 
@@ -216,6 +220,7 @@ class TestActiveKeyRetrieval:
         assert manager.get_active_key() is not None
 
 
+@pytest.mark.security
 class TestHistoricalKeyRetrieval:
     """Test retrieving historical keys"""
 
@@ -277,6 +282,7 @@ class TestHistoricalKeyRetrieval:
         assert isinstance(first_key_entry["deactivation_timestamp"], int)
 
 
+@pytest.mark.security
 class TestKeyLengthVariations:
     """Test different key lengths"""
 
@@ -304,6 +310,7 @@ class TestKeyLengthVariations:
             assert len(manager.active_key) == 64
 
 
+@pytest.mark.security
 class TestRotationIntervals:
     """Test different rotation intervals"""
 
@@ -340,6 +347,7 @@ class TestRotationIntervals:
         assert rotation_due is True
 
 
+@pytest.mark.security
 class TestEdgeCases:
     """Test edge cases and boundary conditions"""
 
@@ -394,6 +402,7 @@ class TestEdgeCases:
             assert rotation_times[i] <= rotation_times[i + 1]
 
 
+@pytest.mark.security
 class TestSecurityProperties:
     """Test security-related properties"""
 
@@ -434,6 +443,7 @@ class TestSecurityProperties:
         assert manager.active_key.hex() not in str(manager.__dict__)
 
 
+@pytest.mark.security
 class TestRealWorldScenarios:
     """Test real-world usage scenarios"""
 

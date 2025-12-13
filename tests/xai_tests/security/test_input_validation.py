@@ -15,6 +15,7 @@ from xai.core.blockchain import Blockchain, Transaction
 from xai.core.wallet import Wallet
 
 
+@pytest.mark.security
 class TestAddressValidation:
     """Test wallet address validation"""
 
@@ -91,6 +92,7 @@ class TestAddressValidation:
         assert wallet.address[0:3] == "XAI"
 
 
+@pytest.mark.security
 class TestAmountValidation:
     """Test transaction amount validation"""
 
@@ -200,6 +202,7 @@ class TestAmountValidation:
             pass
 
 
+@pytest.mark.security
 class TestInjectionAttacks:
     """Test protection against injection attacks"""
 
@@ -299,6 +302,7 @@ class TestInjectionAttacks:
                 pass
 
 
+@pytest.mark.security
 class TestCryptographicValidation:
     """Test cryptographic signature validation"""
 
@@ -365,6 +369,7 @@ class TestCryptographicValidation:
         assert not wallet.verify_signature(message, tampered_sig, wallet.public_key)
 
 
+@pytest.mark.security
 class TestBufferOverflow:
     """Test protection against buffer overflow attempts"""
 
@@ -398,6 +403,7 @@ class TestBufferOverflow:
         assert BlockchainSecurityConfig.MAX_BLOCK_SIZE > 0
 
 
+@pytest.mark.security
 class TestEncodingAttacks:
     """Test protection against encoding attacks"""
 
@@ -447,6 +453,7 @@ class TestEncodingAttacks:
             )
 
 
+@pytest.mark.security
 class TestResourceLimitValidation:
     """Test validation of resource limits"""
 
@@ -490,6 +497,7 @@ class TestResourceLimitValidation:
         assert not bc.validate_transaction(tx)
 
 
+@pytest.mark.security
 class TestTypeValidation:
     """Test type validation"""
 

@@ -2,12 +2,14 @@
 Fuzz testing for API schemas.
 """
 
+import pytest
 from faker import Faker
 import requests
 
 FAKER = Faker()
 BASE_URL = "http://localhost:18545"
 
+@pytest.mark.security
 def test_fuzz_contract_endpoints():
     """
     Fuzz the smart contract endpoints with random data.

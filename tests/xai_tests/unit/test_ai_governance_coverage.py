@@ -35,6 +35,7 @@ from xai.core.ai_governance import (
 # =============================================================================
 
 
+@pytest.mark.security
 class TestVotingPowerDisplay:
     """Test voting power transparency display."""
 
@@ -119,6 +120,7 @@ class TestVotingPowerDisplay:
 # =============================================================================
 
 
+@pytest.mark.security
 class TestVotingPower:
     """Test quadratic voting power calculations."""
 
@@ -324,6 +326,7 @@ class TestVotingPower:
 # =============================================================================
 
 
+@pytest.mark.security
 class TestAIWorkloadDistribution:
     """Test AI workload distribution system."""
 
@@ -554,6 +557,7 @@ class TestAIWorkloadDistribution:
 # =============================================================================
 
 
+@pytest.mark.security
 class TestConsensusRules:
     """Test dynamic consensus rules."""
 
@@ -698,6 +702,7 @@ class TestConsensusRules:
 # =============================================================================
 
 
+@pytest.mark.security
 class TestAIGovernanceProposal:
     """Test AI governance proposal lifecycle."""
 
@@ -996,6 +1001,7 @@ class TestAIGovernanceProposal:
 # =============================================================================
 
 
+@pytest.mark.security
 class TestAIGovernance:
     """Test simplified AIGovernance facade."""
 
@@ -1400,6 +1406,7 @@ class TestAIGovernance:
 # =============================================================================
 
 
+@pytest.mark.security
 class TestAIGovernanceIntegration:
     """Integration tests for complete governance workflows."""
 
@@ -1491,6 +1498,7 @@ class TestAIGovernanceIntegration:
 # =============================================================================
 
 
+@pytest.mark.security
 class TestEdgeCasesAndErrorHandling:
     """Test edge cases and error handling."""
 
@@ -1793,6 +1801,7 @@ class TestEdgeCasesAndErrorHandling:
 # =============================================================================
 
 
+@pytest.mark.security
 class TestPerformanceAndBoundaries:
     """Test performance with large datasets and boundary conditions."""
 

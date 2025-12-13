@@ -22,6 +22,7 @@ from xai.blockchain.oracle_manipulation_detection import OracleManipulationDetec
 from xai.security.circuit_breaker import CircuitBreaker, CircuitBreakerState
 
 
+@pytest.mark.security
 class TestOracleManipulationProtection:
     """Test oracle manipulation attack prevention."""
 
@@ -470,6 +471,7 @@ class TestOracleManipulationProtection:
         assert oracle.get_price("XAI/USD") == 101_000_000
 
 
+@pytest.mark.security
 class TestOracleEdgeCases:
     """Test edge cases and error conditions."""
 

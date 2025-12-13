@@ -14,6 +14,7 @@ from xai.core.blockchain import Transaction, Blockchain
 from xai.core.wallet import Wallet
 
 
+@pytest.mark.security
 class TestTransactionValidatorInit:
     """Test TransactionValidator initialization"""
 
@@ -49,6 +50,7 @@ class TestTransactionValidatorInit:
         assert validator.security_validator is not None
 
 
+@pytest.mark.security
 class TestBasicStructuralValidation:
     """Test basic transaction structural validation"""
 
@@ -107,6 +109,7 @@ class TestBasicStructuralValidation:
         assert hasattr(tx, 'outputs')
 
 
+@pytest.mark.security
 class TestDataTypeValidation:
     """Test data type and format validation"""
 
@@ -233,6 +236,7 @@ class TestDataTypeValidation:
         assert result is False
 
 
+@pytest.mark.security
 class TestTransactionIDVerification:
     """Test transaction ID verification"""
 
@@ -282,6 +286,7 @@ class TestTransactionIDVerification:
         assert result is False
 
 
+@pytest.mark.security
 class TestSignatureVerification:
     """Test cryptographic signature verification"""
 
@@ -347,6 +352,7 @@ class TestSignatureVerification:
         assert result is False
 
 
+@pytest.mark.security
 class TestUTXOValidation:
     """Test UTXO-based validation"""
 
@@ -463,6 +469,7 @@ class TestUTXOValidation:
         assert result is False
 
 
+@pytest.mark.security
 class TestNonceValidation:
     """Test nonce validation for replay attack prevention"""
 
@@ -514,6 +521,7 @@ class TestNonceValidation:
                 assert result is False
 
 
+@pytest.mark.security
 class TestTimeCapsuleLockValidation:
     """Test time capsule lock transaction validation"""
 
@@ -680,6 +688,7 @@ class TestTimeCapsuleLockValidation:
                 result = validator.validate_transaction(tx)
 
 
+@pytest.mark.security
 class TestGovernanceVoteValidation:
     """Test governance vote transaction validation"""
 
@@ -879,6 +888,7 @@ class TestGovernanceVoteValidation:
                 result = validator.validate_transaction(tx)
 
 
+@pytest.mark.security
 class TestExceptionHandling:
     """Test exception handling in transaction validation"""
 
@@ -947,6 +957,7 @@ class TestExceptionHandling:
         assert result is False
 
 
+@pytest.mark.security
 class TestGetTransactionValidator:
     """Test global transaction validator instance"""
 

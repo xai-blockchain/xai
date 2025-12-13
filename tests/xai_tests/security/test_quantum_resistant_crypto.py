@@ -22,6 +22,7 @@ from src.xai.security.quantum_resistant_crypto import (
 )
 
 
+@pytest.mark.security
 class TestMLDSASignatures:
     """Test ML-DSA (CRYSTALS-Dilithium) signature algorithms"""
 
@@ -82,6 +83,7 @@ class TestMLDSASignatures:
         assert not crypto.verify(keypair.public_key, wrong_message, signature, PQCAlgorithm.ML_DSA_65)
 
 
+@pytest.mark.security
 class TestFalconSignatures:
     """Test Falcon signature algorithms"""
 
@@ -129,6 +131,7 @@ class TestFalconSignatures:
         assert len(signature) < 1000
 
 
+@pytest.mark.security
 class TestSPHINCSSignatures:
     """Test SPHINCS+ signature algorithms"""
 
@@ -173,6 +176,7 @@ class TestSPHINCSSignatures:
         assert len(keypair.private_key) == 64
 
 
+@pytest.mark.security
 class TestMLKEMEncapsulation:
     """Test ML-KEM (CRYSTALS-Kyber) key encapsulation"""
 
@@ -235,6 +239,7 @@ class TestMLKEMEncapsulation:
         assert ss2 == crypto.kem_decapsulate(keypair.private_key, ct2, PQCAlgorithm.ML_KEM_768)
 
 
+@pytest.mark.security
 class TestHybridSchemes:
     """Test hybrid classical + quantum schemes"""
 
@@ -308,6 +313,7 @@ class TestHybridSchemes:
         assert verification["quantum"] is False
 
 
+@pytest.mark.security
 class TestKeySerialization:
     """Test key serialization and deserialization"""
 
@@ -383,6 +389,7 @@ class TestKeySerialization:
         assert "key_id" in data
 
 
+@pytest.mark.security
 class TestAlgorithmInfo:
     """Test algorithm information queries"""
 
@@ -427,6 +434,7 @@ class TestAlgorithmInfo:
         assert info["nist_standard"] == "FIPS 203"
 
 
+@pytest.mark.security
 class TestErrorHandling:
     """Test error handling and edge cases"""
 
@@ -476,6 +484,7 @@ class TestErrorHandling:
         assert crypto.verify(keypair.public_key, message, signature)
 
 
+@pytest.mark.security
 class TestCrossAlgorithmCompatibility:
     """Test that keys from one algorithm don't work with another"""
 
@@ -504,6 +513,7 @@ class TestCrossAlgorithmCompatibility:
         assert not crypto.verify(keypair2.public_key, message, signature1, PQCAlgorithm.ML_DSA_65)
 
 
+@pytest.mark.security
 class TestPerformanceCharacteristics:
     """Test performance characteristics of different algorithms"""
 

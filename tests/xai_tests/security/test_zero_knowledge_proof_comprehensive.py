@@ -20,6 +20,7 @@ from xai.security.zero_knowledge_proof import (
 )
 
 
+@pytest.mark.security
 class TestSchnorrProtocol:
     """Test Schnorr protocol for proving knowledge of discrete logarithm."""
 
@@ -109,6 +110,7 @@ class TestSchnorrProtocol:
                proof1.response != proof2.response
 
 
+@pytest.mark.security
 class TestPedersenCommitments:
     """Test Pedersen commitment scheme."""
 
@@ -189,6 +191,7 @@ class TestPedersenCommitments:
             assert not zkp.pedersen_verify_commitment(commitment, wrong_value)
 
 
+@pytest.mark.security
 class TestRangeProofs:
     """Test range proof protocol."""
 
@@ -283,6 +286,7 @@ class TestRangeProofs:
         assert proof is None
 
 
+@pytest.mark.security
 class TestMembershipProofs:
     """Test set membership proof protocol."""
 
@@ -376,6 +380,7 @@ class TestMembershipProofs:
         assert not zkp.membership_proof_verify(proof, set2)
 
 
+@pytest.mark.security
 class TestUtilityFunctions:
     """Test utility functions."""
 
@@ -416,6 +421,7 @@ class TestUtilityFunctions:
         assert scalar1 != scalar2
 
 
+@pytest.mark.security
 class TestLegacyCompatibility:
     """Test legacy ZKP_Simulator for backwards compatibility."""
 
@@ -462,6 +468,7 @@ class TestLegacyCompatibility:
         assert not is_valid
 
 
+@pytest.mark.security
 class TestZKPSecurityProperties:
     """Test security properties of ZKP protocols."""
 
@@ -533,6 +540,7 @@ class TestZKPSecurityProperties:
         # (discrete log is hard)
 
 
+@pytest.mark.security
 class TestEdgeCases:
     """Test edge cases and error handling."""
 

@@ -30,6 +30,7 @@ from xai.core.node import Node
 from xai.core.advanced_consensus import AdvancedConsensus
 
 
+@pytest.mark.security
 class TestAPIToValidatorBoundary:
     """Test API → Transaction Validator boundary security"""
 
@@ -108,6 +109,7 @@ class TestAPIToValidatorBoundary:
         assert tx_size > max_tx_size, "Transaction should be rejected at API layer"
 
 
+@pytest.mark.security
 class TestValidatorToUTXOBoundary:
     """Test Transaction Validator → UTXO Manager boundary security"""
 
@@ -237,6 +239,7 @@ class TestValidatorToUTXOBoundary:
         assert success_count == 1, f"Expected 1 success, got {success_count}: {result_list}"
 
 
+@pytest.mark.security
 class TestUTXOToBlockchainBoundary:
     """Test UTXO Manager → Blockchain boundary security"""
 
@@ -308,6 +311,7 @@ class TestUTXOToBlockchainBoundary:
         assert len(blockchain.chain) == initial_height, "Chain height should be unchanged"
 
 
+@pytest.mark.security
 class TestP2PToConsensusBoundary:
     """Test P2P → Consensus boundary security"""
 
@@ -376,6 +380,7 @@ class TestP2PToConsensusBoundary:
         assert is_very_old, "Should detect very old timestamp"
 
 
+@pytest.mark.security
 class TestConsensusToBlockchainBoundary:
     """Test Consensus → Blockchain boundary security"""
 
@@ -439,6 +444,7 @@ class TestConsensusToBlockchainBoundary:
         assert "node1" not in suspicious_nodes, "Normal node should not be flagged"
 
 
+@pytest.mark.security
 class TestWalletToBlockchainBoundary:
     """Test Wallet → Blockchain boundary security"""
 
@@ -527,6 +533,7 @@ class TestWalletToBlockchainBoundary:
         assert not is_valid_tampered, "Tampered transaction should fail verification"
 
 
+@pytest.mark.security
 class TestMiningToBlockchainBoundary:
     """Test Mining → Blockchain boundary security"""
 
@@ -590,6 +597,7 @@ class TestMiningToBlockchainBoundary:
         assert coinbase_count == 2  # Invalid!
 
 
+@pytest.mark.security
 class TestGovernanceToBlockchainBoundary:
     """Test Governance → Blockchain boundary security"""
 
@@ -643,6 +651,7 @@ class TestGovernanceToBlockchainBoundary:
             assert True  # Proposal violates invariants
 
 
+@pytest.mark.security
 class TestAISystemsToBlockchainBoundary:
     """Test AI Systems → Blockchain boundary security"""
 
@@ -736,6 +745,7 @@ class TestAISystemsToBlockchainBoundary:
             "Nodes with equal stake should have equal consensus weight"
 
 
+@pytest.mark.security
 class TestCrossModuleRaceConditions:
     """Test race conditions across module boundaries"""
 

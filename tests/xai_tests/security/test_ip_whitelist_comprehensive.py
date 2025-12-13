@@ -41,6 +41,7 @@ def flask_app():
     return app
 
 
+@pytest.mark.security
 class TestIPWhitelistInitialization:
     """Test IP whitelist initialization"""
 
@@ -65,6 +66,7 @@ class TestIPWhitelistInitialization:
         assert len(wl2.whitelisted_ips) == 1
 
 
+@pytest.mark.security
 class TestAddingIPs:
     """Test adding IP addresses to whitelist"""
 
@@ -122,6 +124,7 @@ class TestAddingIPs:
         assert len(ip_whitelist.whitelisted_ips) == 3
 
 
+@pytest.mark.security
 class TestRemovingIPs:
     """Test removing IP addresses from whitelist"""
 
@@ -165,6 +168,7 @@ class TestRemovingIPs:
         assert ip_whitelist.is_whitelisted("192.168.1.3")
 
 
+@pytest.mark.security
 class TestIPWhitelistChecking:
     """Test checking if IPs are whitelisted"""
 
@@ -213,6 +217,7 @@ class TestIPWhitelistChecking:
         assert ip_whitelist.is_whitelisted("172.16.0.1") is False
 
 
+@pytest.mark.security
 class TestFlaskDecorator:
     """Test Flask decorator for whitelist enforcement"""
 
@@ -258,6 +263,7 @@ class TestFlaskDecorator:
             assert result == "success"
 
 
+@pytest.mark.security
 class TestNetworkRanges:
     """Test various network range scenarios"""
 
@@ -292,6 +298,7 @@ class TestNetworkRanges:
         assert ip_whitelist.is_whitelisted("8.8.8.8") is True
 
 
+@pytest.mark.security
 class TestEdgeCases:
     """Test edge cases and boundary conditions"""
 
@@ -335,6 +342,7 @@ class TestEdgeCases:
             pass
 
 
+@pytest.mark.security
 class TestConfigPersistence:
     """Test configuration file persistence"""
 
@@ -362,6 +370,7 @@ class TestConfigPersistence:
         assert len(whitelist2.whitelisted_ips) == 1
 
 
+@pytest.mark.security
 class TestSecurityScenarios:
     """Test real-world security scenarios"""
 

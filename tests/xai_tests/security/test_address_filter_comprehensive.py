@@ -9,6 +9,7 @@ import pytest
 from xai.security.address_filter import AddressFilter
 
 
+@pytest.mark.security
 class TestAddressFilterInitialization:
     """Test address filter initialization"""
 
@@ -31,6 +32,7 @@ class TestAddressFilterInitialization:
         assert isinstance(filter.blacklist, set)
 
 
+@pytest.mark.security
 class TestWhitelistManagement:
     """Test whitelist add/remove operations"""
 
@@ -88,6 +90,7 @@ class TestWhitelistManagement:
         assert filter.is_whitelisted("0xXYZ") is False
 
 
+@pytest.mark.security
 class TestBlacklistManagement:
     """Test blacklist add/remove operations"""
 
@@ -145,6 +148,7 @@ class TestBlacklistManagement:
         assert filter.is_blacklisted("0xGOOD") is False
 
 
+@pytest.mark.security
 class TestAddressCheckingBlacklistOnly:
     """Test check_address with blacklist only (whitelist disabled)"""
 
@@ -171,6 +175,7 @@ class TestAddressCheckingBlacklistOnly:
         assert filter.check_address("0xANYADDR") is True
 
 
+@pytest.mark.security
 class TestAddressCheckingWhitelistEnabled:
     """Test check_address with whitelist enabled"""
 
@@ -199,6 +204,7 @@ class TestAddressCheckingWhitelistEnabled:
         assert filter.check_address("") is False
 
 
+@pytest.mark.security
 class TestBlacklistPrecedence:
     """Test that blacklist always takes precedence"""
 
@@ -220,6 +226,7 @@ class TestBlacklistPrecedence:
         assert filter.check_address("0xADDR") is True
 
 
+@pytest.mark.security
 class TestDynamicConfiguration:
     """Test dynamic configuration changes"""
 
@@ -252,6 +259,7 @@ class TestDynamicConfiguration:
         assert filter.check_address("0xADDR") is True
 
 
+@pytest.mark.security
 class TestEdgeCases:
     """Test edge cases and boundary conditions"""
 
@@ -293,6 +301,7 @@ class TestEdgeCases:
         assert filter.check_address("0xGOOD") is True
 
 
+@pytest.mark.security
 class TestRealWorldScenarios:
     """Test real-world usage scenarios"""
 
@@ -405,6 +414,7 @@ class TestRealWorldScenarios:
         assert filter.check_address("0xBAD") is False
 
 
+@pytest.mark.security
 class TestMultipleFilters:
     """Test scenarios with multiple address filters"""
 

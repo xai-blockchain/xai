@@ -11,6 +11,7 @@ from datetime import datetime, timezone, timedelta
 from xai.security.circuit_breaker import CircuitBreaker, CircuitBreakerState
 
 
+@pytest.mark.security
 class TestCircuitBreakerInitialization:
     """Test circuit breaker initialization and configuration"""
 
@@ -71,6 +72,7 @@ class TestCircuitBreakerInitialization:
             CircuitBreaker(name="Test", half_open_test_limit=-5)
 
 
+@pytest.mark.security
 class TestCircuitBreakerClosedState:
     """Test circuit breaker behavior in CLOSED state"""
 
@@ -122,6 +124,7 @@ class TestCircuitBreakerClosedState:
         assert cb._failure_count == 0
 
 
+@pytest.mark.security
 class TestCircuitBreakerOpenState:
     """Test circuit breaker behavior in OPEN state"""
 
@@ -177,6 +180,7 @@ class TestCircuitBreakerOpenState:
         assert before <= cb._last_trip_timestamp <= after
 
 
+@pytest.mark.security
 class TestCircuitBreakerHalfOpenState:
     """Test circuit breaker behavior in HALF_OPEN state"""
 
@@ -281,6 +285,7 @@ class TestCircuitBreakerHalfOpenState:
         assert cb.state == CircuitBreakerState.CLOSED
 
 
+@pytest.mark.security
 class TestCircuitBreakerStateTransitions:
     """Test various state transition scenarios"""
 
@@ -342,6 +347,7 @@ class TestCircuitBreakerStateTransitions:
             assert cb._failure_count == i + 1
 
 
+@pytest.mark.security
 class TestCircuitBreakerEdgeCases:
     """Test edge cases and boundary conditions"""
 
@@ -441,6 +447,7 @@ class TestCircuitBreakerEdgeCases:
         assert cb.state == CircuitBreakerState.CLOSED
 
 
+@pytest.mark.security
 class TestCircuitBreakerUseCases:
     """Test real-world use case scenarios"""
 
@@ -527,6 +534,7 @@ class TestCircuitBreakerUseCases:
         assert bridge_cb.state == CircuitBreakerState.CLOSED
 
 
+@pytest.mark.security
 class TestCircuitBreakerNameValidation:
     """Test circuit breaker name handling"""
 

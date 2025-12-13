@@ -38,6 +38,7 @@ class MockBlockchain:
         self.chain = []
 
 
+@pytest.mark.security
 class TestAISafetyControlsComprehensive:
     """Comprehensive test suite for AI safety controls"""
 

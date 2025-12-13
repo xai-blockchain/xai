@@ -20,6 +20,7 @@ def _make_block(index: int, prev_hash: str, txs: list[Transaction]) -> Block:
     return Block(header, txs)
 
 
+@pytest.mark.security
 @pytest.mark.parametrize("fork_len", [1, 2])
 def test_reorg_simulator_tracks_utxo_digest(fork_len, tmp_path):
     chain = Blockchain(data_dir=str(tmp_path))

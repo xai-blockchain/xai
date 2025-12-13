@@ -19,6 +19,7 @@ from xai.core.p2p_security import (
 )
 
 
+@pytest.mark.security
 class TestP2PSecurityConfig:
     """Test P2P security configuration constants"""
 
@@ -42,6 +43,7 @@ class TestP2PSecurityConfig:
         assert P2PSecurityConfig.BAN_DURATION == 86400
 
 
+@pytest.mark.security
 class TestPeerReputation:
     """Test peer reputation tracking and management"""
 
@@ -295,6 +297,7 @@ class TestPeerReputation:
         assert diversity == 1  # Same /16 prefix
 
 
+@pytest.mark.security
 class TestMessageRateLimiter:
     """Test message rate limiting"""
 
@@ -373,6 +376,7 @@ class TestMessageRateLimiter:
         assert allowed is True
 
 
+@pytest.mark.security
 class TestMessageValidator:
     """Test message validation"""
 
@@ -426,6 +430,7 @@ class TestMessageValidator:
         assert "invalid" in error.lower()
 
 
+@pytest.mark.security
 class TestP2PSecurityManager:
     """Test unified P2P security manager"""
 
