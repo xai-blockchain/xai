@@ -1408,9 +1408,14 @@ class P2PNetworkManager:
                     self.peer_manager.reputation.record_invalid_transaction(peer_uri)
                 else:
                     self.peer_manager.reputation.record_valid_transaction(peer_uri)
-            except Exception as e:
+            except (NetworkError, requests.RequestException, ConnectionError, OSError, TimeoutError) as e:
                 # Network error broadcasting transaction - record reputation penalty
-                logger.debug(f"Failed to broadcast transaction to {peer_uri}: {e}")
+                logger.debug(
+                    "Failed to broadcast transaction to %s: %s",
+                    peer_uri,
+                    e,
+                    extra={"error_type": type(e).__name__},
+                )
                 self.peer_manager.reputation.record_invalid_transaction(peer_uri)
         self._dispatch_async(self.broadcast(message))
         if self.quic_enabled and QUIC_AVAILABLE:
