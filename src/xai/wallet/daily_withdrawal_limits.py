@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, TYPE_CHECKING
 from datetime import datetime, timezone, timedelta
 import logging
+
+if TYPE_CHECKING:
+    from xai.wallet.metrics_collector import MetricsCollector
 
 
 logger = logging.getLogger("xai.wallet.daily_limits")

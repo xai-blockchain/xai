@@ -9,6 +9,7 @@ import sys
 import os
 import time
 from decimal import Decimal
+from typing import List
 
 # Add core directory to path
 

@@ -12,11 +12,14 @@ import json
 import hashlib
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from datetime import datetime, timedelta
 
 from xai.core.config import Config
 from xai.core.crypto_utils import deterministic_keypair_from_seed
+
+if TYPE_CHECKING:
+    from xai.core.blockchain import Transaction
 
 logger = logging.getLogger(__name__)
 
@@ -246,6 +249,8 @@ class TimeCapsuleManager:
         if capsule.metadata.get("status") != "locked":
             return None
         capsule_address = self.capsule_address(capsule.capsule_id)
+
+        # Import at runtime to avoid circular dependency
         from xai.core.blockchain import Transaction
 
         claim_tx = Transaction(

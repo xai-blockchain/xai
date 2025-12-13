@@ -637,12 +637,9 @@ def _send_transaction(args: argparse.Namespace) -> int:
         print(f"Network error: {exc}", file=sys.stderr)
         return 2
     finally:
-        # Ensure cleanup - NameError is expected if variable was never assigned
-        try:
+        # Ensure cleanup - only delete if variable exists in local scope
+        if 'private_key' in locals():
             del private_key
-        except NameError:
-            # Variable was never created due to early error - this is expected
-            pass
 
 
 def _wallet_history(args: argparse.Namespace) -> int:
@@ -823,21 +820,20 @@ def _export_wallet(args: argparse.Namespace) -> int:
     except OSError as e:
         logger.error("Wallet export I/O error: %s", e, extra={"error_type": type(e).__name__})
         print(f"Export I/O error: {e}", file=sys.stderr)
-        # Clear sensitive data on error - NameError is expected if variables were never assigned
-        try:
-            del private_key, wallet_data
-        except NameError:
-            # One or more variables were never created due to early error - this is expected
-            pass
+        # Clear sensitive data on error - only delete if variables exist in local scope
+        if 'private_key' in locals():
+            del private_key
+        if 'wallet_data' in locals():
+            del wallet_data
         return 1
     except (ValueError, TypeError) as e:
         logger.error("Wallet export data error: %s", e, extra={"error_type": type(e).__name__})
         print(f"Export data error: {e}", file=sys.stderr)
-        # Clear sensitive data on error
-        try:
-            del private_key, wallet_data
-        except NameError:
-            pass
+        # Clear sensitive data on error - only delete if variables exist in local scope
+        if 'private_key' in locals():
+            del private_key
+        if 'wallet_data' in locals():
+            del wallet_data
         return 1
 
 

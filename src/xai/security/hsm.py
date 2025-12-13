@@ -339,7 +339,7 @@ class HardwareSecurityModule:
             )
             raise HSMKeyGenerationError(f"Invalid key parameters: {e}") from e
         except OSError as e:
-            logger.error(
+            self.logger.error(
                 "OSError occurred",
                 error_type="OSError",
                 error=str(e),
@@ -430,7 +430,7 @@ class HardwareSecurityModule:
             return signature
 
         except ValueError as e:
-            logger.debug(
+            self.logger.debug(
                 "ValueError in sign",
                 error_type="ValueError",
                 error=str(e),
@@ -445,7 +445,7 @@ class HardwareSecurityModule:
             )
             raise HSMSigningError(f"Invalid signing parameters: {e}") from e
         except InvalidSignature as e:
-            logger.error(
+            self.logger.error(
                 "InvalidSignature in sign",
                 error_type="InvalidSignature",
                 error=str(e),
@@ -460,7 +460,7 @@ class HardwareSecurityModule:
             )
             raise HSMCryptographicError(f"Signature operation failed: {e}") from e
         except OSError as e:
-            logger.error(
+            self.logger.error(
                 "OSError in sign",
                 error_type="OSError",
                 error=str(e),
@@ -559,7 +559,7 @@ class HardwareSecurityModule:
             return new_key_id
 
         except ValueError as e:
-            logger.debug(
+            self.logger.debug(
                 "ValueError in rotate_key",
                 error_type="ValueError",
                 error=str(e),

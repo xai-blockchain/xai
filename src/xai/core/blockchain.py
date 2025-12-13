@@ -49,7 +49,7 @@ from xai.core.blockchain_exceptions import (
     InvalidBlockError,
     InvalidTransactionError,
     ChainReorgError,
-    ValidationError as BlockchainValidationError,
+    ValidationError,
 )
 from xai.core.block_header import BlockHeader, canonical_json
 from xai.core.blockchain_interface import BlockchainDataProvider, GamificationBlockchainInterface
@@ -78,6 +78,8 @@ from xai.core.blockchain_components.consensus_mixin import BlockchainConsensusMi
 from xai.core.blockchain_components.mempool_mixin import BlockchainMempoolMixin
 from xai.core.blockchain_components.mining_mixin import BlockchainMiningMixin
 
+# Module-level logger for early initialization logging
+logger = get_structured_logger()
 
 _GOVERNANCE_METADATA_TYPE_MAP = {
     "governance_proposal": GovernanceTxType.SUBMIT_PROPOSAL,

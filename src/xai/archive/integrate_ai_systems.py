@@ -118,6 +118,7 @@ class IntegratedXAINode:
         # Add validation and warning for production
         if host == "0.0.0.0":
             import warnings
+            from warnings import SecurityWarning
             warnings.warn(
                 "XAI_HOST set to 0.0.0.0 (all interfaces). "
                 "This is not recommended for production. "

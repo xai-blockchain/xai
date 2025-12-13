@@ -12,6 +12,7 @@ import sys
 import os
 import time
 import unittest
+import tempfile
 from typing import List, Dict, Tuple
 
 import pytest
@@ -79,25 +80,27 @@ class BlockchainUnitTests:
     @staticmethod
     def test_blockchain_initialization():
         """Test blockchain initialization"""
-        blockchain = Blockchain(data_dir=str(tmp_path))
-        assert len(blockchain.chain) == 1, "Blockchain should start with genesis block"
-        assert blockchain.chain[0].index == 0, "Genesis block should have index 0"
+        with tempfile.TemporaryDirectory() as tmp_path:
+            blockchain = Blockchain(data_dir=str(tmp_path))
+            assert len(blockchain.chain) == 1, "Blockchain should start with genesis block"
+            assert blockchain.chain[0].index == 0, "Genesis block should have index 0"
         return True
 
     @staticmethod
     def test_transaction_validation():
         """Test transaction validation"""
-        blockchain = Blockchain(data_dir=str(tmp_path))
-        wallet1 = Wallet()
-        wallet2 = Wallet()
+        with tempfile.TemporaryDirectory() as tmp_path:
+            blockchain = Blockchain(data_dir=str(tmp_path))
+            wallet1 = Wallet()
+            wallet2 = Wallet()
 
-        # Give wallet1 some funds
-        blockchain.utxo_set[wallet1.address] = [{"txid": "test", "amount": 100.0, "spent": False}]
+            # Give wallet1 some funds
+            blockchain.utxo_set[wallet1.address] = [{"txid": "test", "amount": 100.0, "spent": False}]
 
-        tx = Transaction(wallet1.address, wallet2.address, 10.0, 0.1, wallet1.public_key, nonce=0)
-        tx.sign_transaction(wallet1.private_key)
+            tx = Transaction(wallet1.address, wallet2.address, 10.0, 0.1, wallet1.public_key, nonce=0)
+            tx.sign_transaction(wallet1.private_key)
 
-        assert blockchain.validate_transaction(tx), "Valid transaction should pass validation"
+            assert blockchain.validate_transaction(tx), "Valid transaction should pass validation"
         return True
 
     @staticmethod

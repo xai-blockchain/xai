@@ -199,13 +199,13 @@ class MarketMaker:
                         if response.status_code == 200:
                             cancelled.append(order["id"])
 
-            except requests.RequestException as e:
-                logger.error(
-                    "Failed to cancel order",
-                    order_id=order["id"],
-                    error=str(e),
-                    extra={"event": "market_maker.cancel_order_failed"},
-                )
+                    except requests.RequestException as e:
+                        logger.error(
+                            "Failed to cancel order",
+                            order_id=order["id"],
+                            error=str(e),
+                            extra={"event": "market_maker.cancel_order_failed"},
+                        )
 
         return cancelled
 
