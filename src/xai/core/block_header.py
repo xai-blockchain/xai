@@ -144,6 +144,25 @@ class BlockHeader:
         except (ValueError, TypeError) as e:
             raise TypeError(f"Timestamp must be a valid float: {e}") from e
 
+        # Validate timestamp is not NaN
+        if self.timestamp != self.timestamp:  # NaN != NaN is True
+            raise ValueError("Timestamp cannot be NaN")
+
+        # Validate timestamp is not infinity
+        if self.timestamp == float('inf') or self.timestamp == float('-inf'):
+            raise ValueError("Timestamp cannot be infinity")
+
+        # Validate timestamp doesn't cause overflow when converting to time_t
+        # Maximum safe timestamp is around 253402300799 (year 9999)
+        # We'll use a more conservative limit that works across platforms
+        MAX_SAFE_TIMESTAMP = 253402300799.0  # 9999-12-31 23:59:59 UTC
+        if self.timestamp > MAX_SAFE_TIMESTAMP:
+            raise OverflowError(f"Timestamp {self.timestamp} exceeds maximum safe value {MAX_SAFE_TIMESTAMP}")
+
+        # Validate timestamp is not negative (except 0 is allowed for edge cases)
+        # Note: We don't enforce > 0 here because blockchain validation will handle it
+        # This allows BlockHeader construction for testing purposes
+
         # Validate and coerce difficulty
         if difficulty is None:
             raise ValueError("Difficulty cannot be None")
