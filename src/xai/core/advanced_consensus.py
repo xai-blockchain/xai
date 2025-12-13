@@ -640,6 +640,12 @@ class DynamicDifficultyAdjustment:
         window_size = min(self.adjustment_window, chain_length - 1)
         recent_blocks = blockchain.chain[-window_size:]
 
+        # Check if original timestamps have zero delta (all blocks at same time)
+        # This is an edge case that should preserve current difficulty
+        original_time_delta = recent_blocks[-1].timestamp - recent_blocks[0].timestamp
+        if original_time_delta == 0:
+            return blockchain.difficulty
+
         # Calculate actual time taken with monotonic timestamps
         sanitized_timestamps = self._sanitize_block_timestamps(recent_blocks)
         time_taken = sanitized_timestamps[-1] - sanitized_timestamps[0]
