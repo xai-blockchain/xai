@@ -139,8 +139,9 @@ class ErrorRecoveryManager:
             try:
                 result = func(*args, **kwargs)
                 return True, result, None
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 self.error_logger.log_error(e, operation, "medium")
+                self.logger.error(f"Error in {operation}", extra={"error_type": type(e).__name__})
                 return False, None, str(e)
 
     def handle_corruption(self, force_rollback: bool = False) -> Tuple[bool, Optional[str]]:
@@ -271,8 +272,8 @@ class ErrorRecoveryManager:
                     self.backup_manager.create_backup(self.blockchain, f"auto_{int(time.time())}")
                     self.backup_manager.cleanup_old_backups(keep_count=24)
 
-            except Exception as e:
-                self.logger.error(f"Health monitoring error: {e}")
+            except (OSError, IOError, ValueError, TypeError, RuntimeError) as e:
+                self.logger.error(f"Health monitoring error: {e}", extra={"error_type": type(e).__name__})
 
             time.sleep(60)
 

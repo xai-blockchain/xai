@@ -304,13 +304,13 @@ class QuantumResistantCryptoManager:
                 extra={"event": "pqc.verify_algo_error", "algorithm": algorithm.value}
             )
             return False
-        except Exception as e:
-            # Catch any unexpected errors (e.g., malformed keys, wrong sizes)
+        except (RuntimeError, MemoryError, OverflowError, IndexError) as e:
+            # Catch cryptographic errors (e.g., malformed keys, wrong sizes)
             logger.error(
                 "Unexpected post-quantum signature verification error: %s",
                 e,
                 exc_info=True,
-                extra={"event": "pqc.verify_unexpected_error", "algorithm": algorithm.value}
+                extra={"event": "pqc.verify_unexpected_error", "algorithm": algorithm.value, "error_type": type(e).__name__}
             )
             return False
 
@@ -525,11 +525,11 @@ class QuantumResistantCryptoManager:
                 extra={"event": "pqc.hybrid_classical_invalid_params"}
             )
             results["classical"] = False
-        except Exception as e:
+        except (RuntimeError, MemoryError, AttributeError) as e:
             logger.warning(
                 "Classical ECDSA signature verification failed in hybrid scheme: %s",
                 e,
-                extra={"event": "pqc.hybrid_classical_verify_failed"}
+                extra={"event": "pqc.hybrid_classical_verify_failed", "error_type": type(e).__name__}
             )
             results["classical"] = False
 

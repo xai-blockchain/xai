@@ -248,5 +248,27 @@ def set_spend_limit() -> Tuple[Dict[str, Any], int]:
             severity="INFO",
         )
         return success_response({"address": address, "limit": limit_val})
-    except Exception as exc:
+    except (OSError, IOError) as exc:
+        logger.error(
+            "Storage error setting spend limit: %s",
+            str(exc),
+            extra={
+                "event": "api.spend_limit_storage_error",
+                "address": address,
+                "limit": limit_val,
+            },
+            exc_info=True,
+        )
+        return error_response("Failed to persist spending limit", status=500, code="storage_error")
+    except RuntimeError as exc:
+        logger.error(
+            "Runtime error setting spend limit: %s",
+            str(exc),
+            extra={
+                "event": "api.spend_limit_runtime_error",
+                "address": address,
+                "limit": limit_val,
+            },
+            exc_info=True,
+        )
         return error_response(str(exc), status=500, code="admin_error")

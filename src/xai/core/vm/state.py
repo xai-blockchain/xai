@@ -78,13 +78,16 @@ class EVMState:
             if account.nonce > current:
                 # Advance to the observed nonce. We do not decrease nonces.
                 tracker.set_nonce(account.address, int(account.nonce))
-        except Exception as e:
+        except (AttributeError, ValueError, TypeError, KeyError) as e:
             # Nonce persistence is a best-effort optimization; never break execution
-            # if the backing tracker is unavailable.
+            # if the backing tracker is unavailable or has type/state issues.
             logger.debug(
                 "Failed to persist nonce state (non-critical)",
-                address=account.address,
-                nonce=account.nonce,
-                error=str(e)
+                extra={
+                    "address": account.address,
+                    "nonce": account.nonce,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                }
             )
             return

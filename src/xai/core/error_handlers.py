@@ -82,8 +82,9 @@ class CircuitBreaker:
             result = func(*args, **kwargs)
             self._on_success()
             return True, result, None
-        except Exception as e:
+        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             self._on_failure()
+            self.logger.error("Circuit breaker call failed", extra={"error_type": type(e).__name__, "error": str(e)})
             return False, None, str(e)
 
     def _on_success(self) -> None:
@@ -189,9 +190,9 @@ class RetryStrategy:
                 if attempt > 0:
                     self.logger.info(f"Operation succeeded on attempt {attempt + 1}")
                 return True, result, None
-            except Exception as e:
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, ConnectionError, TimeoutError) as e:
                 last_error = str(e)
-                self.logger.warning(f"Attempt {attempt + 1} failed: {last_error}")
+                self.logger.warning(f"Attempt {attempt + 1} failed: {last_error}", extra={"error_type": type(e).__name__})
 
                 if attempt < self.max_retries:
                     # Calculate delay with exponential backoff

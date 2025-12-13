@@ -41,8 +41,8 @@ class MetricsServer:
             else:
                 logger.error(f"Failed to start metrics server: {e}")
                 print(f"✗ Failed to start metrics server: {e}")
-        except Exception as e:
-            logger.error(f"Unexpected error starting metrics server: {e}")
+        except (ValueError, TypeError, RuntimeError) as e:
+            logger.error(f"Unexpected error starting metrics server: {e}", extra={"error_type": type(e).__name__})
             print(f"✗ Metrics server error: {e}")
 
 

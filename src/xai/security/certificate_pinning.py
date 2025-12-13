@@ -246,13 +246,13 @@ class CertificatePinner:
                 extra={"event": "cert_pin.fetch_invalid_data", "hostname": hostname}
             )
             return None
-        except Exception as e:
+        except (RuntimeError, MemoryError, AttributeError, UnicodeDecodeError) as e:
             logger.error(
                 "Unexpected error fetching certificate for '%s': %s",
                 hostname,
                 e,
                 exc_info=True,
-                extra={"event": "cert_pin.fetch_unexpected_error", "hostname": hostname}
+                extra={"event": "cert_pin.fetch_unexpected_error", "hostname": hostname, "error_type": type(e).__name__}
             )
             return None
 

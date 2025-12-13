@@ -85,11 +85,12 @@ class StateManager:
 
                 return True
 
-            except Exception as e:
+            except (ValueError, KeyError, AttributeError, TypeError, RuntimeError, OSError, IOError) as e:
                 self.logger.error(
                     "Failed to add block to chain",
                     index=block.index,
                     error=str(e),
+                    error_type=type(e).__name__,
                 )
                 return False
 

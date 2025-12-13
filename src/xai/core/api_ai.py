@@ -136,6 +136,12 @@ class AIAPIHandler:
             )
             return self._personal_ai_response(result)
         except Exception as e:
+            logger.error(
+                "Personal AI atomic swap operation failed",
+                error_type=type(e).__name__,
+                error=str(e),
+                function="personal_atomic_swap_handler",
+            )
             return jsonify({
                 "success": False,
                 "error": "OPERATION_FAILED",
@@ -309,6 +315,13 @@ class AIAPIHandler:
             try:
                 self.node.validator.validate_address(guardian)
             except ValidationError as ve:
+                logger.warning(
+                    "Invalid guardian address in wallet recovery",
+                    error_type="ValidationError",
+                    error=str(ve),
+                    guardian=guardian,
+                    function="personal_wallet_recovery_handler",
+                )
                 return (
                     jsonify(
                         {

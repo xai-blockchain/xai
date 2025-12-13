@@ -78,15 +78,27 @@ def health_check() -> Tuple[Dict[str, Any], int]:
                 backlog["pending_transactions"] = stats.get("pending_transactions_count", 0)
                 backlog["orphan_blocks"] = stats.get("orphan_blocks_count", 0)
                 backlog["orphan_transactions"] = stats.get("orphan_transactions_count", 0)
-            except Exception as exc:
-                blockchain_summary = {"accessible": False, "error": str(exc)}
+            except (AttributeError, KeyError) as exc:
+                blockchain_summary = {"accessible": False, "error": f"Blockchain data incomplete: {exc}"}
+                overall_status = "unhealthy"
+                http_status = 503
+            except (OSError, IOError) as exc:
+                blockchain_summary = {"accessible": False, "error": f"Storage error: {exc}"}
+                overall_status = "unhealthy"
+                http_status = 503
+            except RuntimeError as exc:
+                blockchain_summary = {"accessible": False, "error": f"Runtime error: {exc}"}
                 overall_status = "unhealthy"
                 http_status = 503
         else:
             blockchain_summary = {"accessible": False, "error": "Blockchain not initialized"}
             degrade("blockchain_unavailable")
-    except Exception as exc:
-        blockchain_summary = {"accessible": False, "error": str(exc)}
+    except (AttributeError, TypeError) as exc:
+        blockchain_summary = {"accessible": False, "error": f"Configuration error: {exc}"}
+        overall_status = "unhealthy"
+        http_status = 503
+    except RuntimeError as exc:
+        blockchain_summary = {"accessible": False, "error": f"Runtime error: {exc}"}
         overall_status = "unhealthy"
         http_status = 503
 
@@ -101,10 +113,14 @@ def health_check() -> Tuple[Dict[str, Any], int]:
         with open(test_file, "w") as handle:
             handle.write("ok")
         os.remove(test_file)
-    except Exception as exc:
+    except (OSError, IOError, PermissionError) as exc:
         storage_status = "degraded"
         degrade("storage_unwritable")
-        services["storage_error"] = str(exc)
+        services["storage_error"] = f"Storage error: {exc}"
+    except (TypeError, ValueError) as exc:
+        storage_status = "degraded"
+        degrade("storage_misconfigured")
+        services["storage_error"] = f"Configuration error: {exc}"
     services["storage"] = storage_status
 
     # Network/P2P checks
@@ -135,10 +151,14 @@ def health_check() -> Tuple[Dict[str, Any], int]:
                 if peer_count == 0:
                     degrade("no_connected_peers")
             network["peers"] = peer_count
-        except Exception as exc:
+        except (AttributeError, TypeError) as exc:
             p2p_status = "degraded"
             degrade("p2p_error")
-            services["p2p_error"] = str(exc)
+            services["p2p_error"] = f"Configuration error: {exc}"
+        except RuntimeError as exc:
+            p2p_status = "degraded"
+            degrade("p2p_error")
+            services["p2p_error"] = f"Runtime error: {exc}"
     else:
         p2p_status = "unavailable"
         network["peers"] = 0
@@ -172,7 +192,29 @@ def prometheus_metrics() -> Tuple[str, int, Dict[str, str]]:
     try:
         metrics_output = node.metrics_collector.export_prometheus()
         return metrics_output, 200, {"Content-Type": "text/plain; version=0.0.4"}
-    except Exception as e:
+    except AttributeError as e:
+        logger.error(
+            "Metrics collector unavailable: %s",
+            str(e),
+            extra={"event": "api.metrics_unavailable"},
+            exc_info=True,
+        )
+        return f"# Error: Metrics collector unavailable\n", 503, {"Content-Type": "text/plain"}
+    except (OSError, IOError) as e:
+        logger.error(
+            "Storage error exporting metrics: %s",
+            str(e),
+            extra={"event": "api.metrics_storage_error"},
+            exc_info=True,
+        )
+        return f"# Error: Storage error generating metrics\n", 500, {"Content-Type": "text/plain"}
+    except RuntimeError as e:
+        logger.error(
+            "Runtime error generating metrics: %s",
+            str(e),
+            extra={"event": "api.metrics_runtime_error"},
+            exc_info=True,
+        )
         return f"# Error generating metrics: {e}\n", 500, {"Content-Type": "text/plain"}
 
 
@@ -206,7 +248,23 @@ def get_mempool_overview() -> Tuple[Dict[str, Any], int]:
             jsonify({"success": False, "error": "Blockchain unavailable"}),
             503,
         )
-    except Exception as exc:
+    except (ValueError, TypeError) as exc:
+        logger.error(
+            "Invalid mempool request: %s",
+            str(exc),
+            extra={"event": "api.mempool_invalid_request", "limit": limit},
+            exc_info=True,
+        )
+        return jsonify({"success": False, "error": f"Invalid request: {exc}"}), 400
+    except (OSError, IOError) as exc:
+        logger.error(
+            "Storage error accessing mempool: %s",
+            str(exc),
+            extra={"event": "api.mempool_storage_error"},
+            exc_info=True,
+        )
+        return jsonify({"success": False, "error": "Storage error"}), 500
+    except RuntimeError as exc:
         return handle_exception(exc, "mempool_overview")
 
 
@@ -227,7 +285,23 @@ def get_mempool_stats() -> Tuple[Dict[str, Any], int]:
             jsonify({"success": False, "error": "Blockchain unavailable"}),
             503,
         )
-    except Exception as exc:
+    except (ValueError, TypeError) as exc:
+        logger.error(
+            "Invalid mempool stats request: %s",
+            str(exc),
+            extra={"event": "api.mempool_stats_invalid_request", "limit": limit},
+            exc_info=True,
+        )
+        return jsonify({"success": False, "error": f"Invalid request: {exc}"}), 400
+    except (OSError, IOError) as exc:
+        logger.error(
+            "Storage error accessing mempool stats: %s",
+            str(exc),
+            extra={"event": "api.mempool_stats_storage_error"},
+            exc_info=True,
+        )
+        return jsonify({"success": False, "error": "Storage error"}), 500
+    except RuntimeError as exc:
         return handle_exception(exc, "mempool_stats")
 
     limits = overview.get("limits", {}) or {}

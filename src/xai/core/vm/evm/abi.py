@@ -37,8 +37,8 @@ def keccak256(data: bytes) -> bytes:
         return k.digest()
     except ImportError:
         logger.debug("sha3 library not available, trying fallback")
-    except Exception as e:
-        logger.warning("Failed to use sha3 library", extra={"error": str(e)})
+    except (AttributeError, TypeError, RuntimeError) as e:
+        logger.warning("Failed to use sha3 library", extra={"error": str(e), "error_type": type(e).__name__})
 
     # pycryptodome
     try:
@@ -49,16 +49,16 @@ def keccak256(data: bytes) -> bytes:
         return k.digest()
     except ImportError:
         logger.debug("pycryptodome library not available, trying fallback")
-    except Exception as e:
-        logger.warning("Failed to use pycryptodome library", extra={"error": str(e)})
+    except (AttributeError, TypeError, ValueError, RuntimeError) as e:
+        logger.warning("Failed to use pycryptodome library", extra={"error": str(e), "error_type": type(e).__name__})
 
     # hashlib keccak (not widely available)
     try:
         return hashlib.new("keccak256", data).digest()
     except ValueError:
         logger.debug("hashlib keccak256 not available, using SHA3-256 fallback")
-    except Exception as e:
-        logger.warning("Failed to use hashlib keccak256", extra={"error": str(e)})
+    except (AttributeError, TypeError, RuntimeError) as e:
+        logger.warning("Failed to use hashlib keccak256", extra={"error": str(e), "error_type": type(e).__name__})
 
     # Fallback (SHA3-256) - not identical to Keccak-256
     logger.debug("Using SHA3-256 fallback (not identical to Keccak-256)")

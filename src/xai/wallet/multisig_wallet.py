@@ -164,12 +164,25 @@ class MultiSigWallet:
                         "key_prefix": pub_key_hex[:16]
                     }
                 )
-            except Exception as e:
+            except (ValueError, TypeError) as e:
+                # Invalid hex encoding or signature format
                 invalid_signatures.append(pub_key_hex[:16])
                 logger.debug(
-                    "Invalid multisig signature",
+                    "Invalid multisig signature format",
                     extra={
                         "event": "multisig.invalid_signature",
+                        "key_prefix": pub_key_hex[:16],
+                        "error_type": type(e).__name__
+                    }
+                )
+                continue
+            except Exception as e:
+                # Cryptographic verification failure
+                invalid_signatures.append(pub_key_hex[:16])
+                logger.debug(
+                    "Cryptographic signature verification failed",
+                    extra={
+                        "event": "multisig.signature_verification_failed",
                         "key_prefix": pub_key_hex[:16],
                         "error_type": type(e).__name__
                     }
@@ -281,8 +294,10 @@ class MultiSigWallet:
             public_key = load_pem_public_key(bytes.fromhex(public_key_hex))
             signature = bytes.fromhex(signature_hex)
             public_key.verify(signature, digest, ec.ECDSA(hashes.SHA256()))
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Invalid signature format: {e}") from e
         except Exception as e:
-            raise ValueError(f"Invalid signature: {e}")
+            raise ValueError(f"Signature verification failed: {e}") from e
 
         # Add signature
         tx["signatures"][public_key_hex] = signature_hex

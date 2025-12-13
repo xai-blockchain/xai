@@ -160,8 +160,10 @@ def decrypt_wallet_data(data: DecryptionData) -> Dict[str, Any]:
     try:
         plaintext = aesgcm.decrypt(data.nonce, data.encrypted_data, None)
         return json.loads(plaintext.decode('utf-8'))
-    except Exception as e:
-        raise ValueError(f"Decryption failed: {str(e)}")
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Decryption failed - invalid ciphertext or key: {str(e)}") from e
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Decryption succeeded but data is not valid JSON: {str(e)}") from e
 
 
 def get_private_key_secure(
@@ -243,10 +245,12 @@ def get_private_key_secure(
 
         except FileNotFoundError:
             raise FileNotFoundError(f"Keystore file not found: {keystore_path}")
-        except json.JSONDecodeError:
-            raise ValueError("Invalid keystore file format")
-        except Exception as e:
-            raise ValueError(f"Failed to load keystore: {e}")
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid keystore file format: {e}") from e
+        except OSError as e:
+            raise ValueError(f"Failed to read keystore file: {e}") from e
+        except (KeyError, TypeError, ValueError) as e:
+            raise ValueError(f"Invalid keystore data structure: {e}") from e
 
     # Method 2: Check environment variable (with security warning)
     if allow_env:

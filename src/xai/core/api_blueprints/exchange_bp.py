@@ -76,7 +76,23 @@ def get_order_book() -> Tuple[Dict[str, Any], int]:
             ),
             200,
         )
-    except Exception as exc:
+    except (ValueError, KeyError) as exc:
+        logger.error(
+            "Invalid order book data: %s",
+            str(exc),
+            extra={"event": "api.order_book_invalid_data"},
+            exc_info=True,
+        )
+        return jsonify({"success": False, "error": "Invalid order book data"}), 500
+    except (OSError, IOError) as exc:
+        logger.error(
+            "Storage error reading order book: %s",
+            str(exc),
+            extra={"event": "api.order_book_storage_error"},
+            exc_info=True,
+        )
+        return jsonify({"success": False, "error": "Storage error"}), 500
+    except RuntimeError as exc:
         return handle_exception(exc, "exchange_get_order_book")
 
 
@@ -91,7 +107,23 @@ def get_exchange_balance(address: str) -> Tuple[Dict[str, Any], int]:
     try:
         balances = node.exchange_wallet_manager.get_all_balances(address)
         return jsonify({"success": True, "address": address, "balances": balances}), 200
-    except Exception as exc:
+    except (ValueError, KeyError) as exc:
+        logger.error(
+            "Invalid balance request: %s",
+            str(exc),
+            extra={"event": "api.balance_invalid_request", "address": address},
+            exc_info=True,
+        )
+        return jsonify({"success": False, "error": f"Invalid request: {exc}"}), 400
+    except (OSError, IOError) as exc:
+        logger.error(
+            "Storage error reading balance: %s",
+            str(exc),
+            extra={"event": "api.balance_storage_error", "address": address},
+            exc_info=True,
+        )
+        return jsonify({"success": False, "error": "Storage error"}), 500
+    except RuntimeError as exc:
         return handle_exception(exc, "exchange_get_balance")
 
 

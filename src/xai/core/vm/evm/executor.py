@@ -1102,7 +1102,7 @@ class EVMPrecompiles:
 
         try:
             from py_ecc.optimized_bn128 import add, is_on_curve, FQ, curve_order, b
-        except Exception as exc:
+        except (ImportError, AttributeError, ModuleNotFoundError) as exc:
             raise VMExecutionError(f"ECADD dependency error: {exc}")
 
         # Infinity handling: (0,0) represents point at infinity per spec
@@ -1147,7 +1147,7 @@ class EVMPrecompiles:
 
         try:
             from py_ecc.optimized_bn128 import multiply, is_on_curve, FQ, curve_order, b
-        except Exception as exc:
+        except (ImportError, AttributeError, ModuleNotFoundError) as exc:
             raise VMExecutionError(f"ECMUL dependency error: {exc}")
 
         # Point at infinity
@@ -1185,7 +1185,7 @@ class EVMPrecompiles:
 
         try:
             from py_ecc.optimized_bn128 import pairing, normalize, is_on_curve, FQ, FQ2, b2
-        except Exception as exc:
+        except (ImportError, AttributeError, ModuleNotFoundError) as exc:
             raise VMExecutionError(f"ECPAIRING dependency error: {exc}")
 
         # Compute product of pairings; equal to identity -> success (1), else 0
@@ -1421,7 +1421,7 @@ class EVMPrecompiles:
                 pairing,
                 curve_order,
             )
-        except Exception as exc:  # pragma: no cover - dependency/import guard
+        except (ImportError, AttributeError, ModuleNotFoundError) as exc:  # pragma: no cover - dependency/import guard
             raise VMExecutionError(f"KZG dependency error: {exc}") from exc
 
         commitment_point = cls._decode_g1_point(

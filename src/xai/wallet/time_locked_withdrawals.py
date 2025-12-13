@@ -243,8 +243,18 @@ class TimeLockedWithdrawalManager:
             snapshot = [w.to_dict() for w in self.pending_withdrawals.values() if w.status == "pending"]
             with open(self.storage_path, "w", encoding="utf-8") as handle:
                 json.dump(snapshot, handle, indent=2)
-        except Exception as exc:
-            logger.error("Failed to persist withdrawals: %s", exc)
+        except OSError as exc:
+            logger.error(
+                "Failed to persist withdrawals due to I/O error: %s",
+                exc,
+                extra={"error_type": type(exc).__name__, "path": self.storage_path}
+            )
+        except (TypeError, ValueError) as exc:
+            logger.error(
+                "Failed to serialize withdrawal data: %s",
+                exc,
+                extra={"error_type": type(exc).__name__, "path": self.storage_path}
+            )
 
     def _load_state(self) -> None:
         if not self.storage_path or not os.path.exists(self.storage_path):
@@ -261,8 +271,24 @@ class TimeLockedWithdrawalManager:
                     item["release_timestamp"],
                 )
                 self.pending_withdrawals[withdrawal.withdrawal_id] = withdrawal
-        except Exception as exc:
-            logger.error("Failed to load withdrawal state: %s", exc)
+        except OSError as exc:
+            logger.error(
+                "Failed to load withdrawal state due to I/O error: %s",
+                exc,
+                extra={"error_type": type(exc).__name__, "path": self.storage_path}
+            )
+        except json.JSONDecodeError as exc:
+            logger.error(
+                "Failed to parse withdrawal state file: %s",
+                exc,
+                extra={"error_type": type(exc).__name__, "path": self.storage_path}
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            logger.error(
+                "Invalid withdrawal state data format: %s",
+                exc,
+                extra={"error_type": type(exc).__name__, "path": self.storage_path}
+            )
 
 
 # Example Usage (for testing purposes)

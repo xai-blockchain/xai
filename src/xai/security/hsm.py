@@ -347,7 +347,7 @@ class HardwareSecurityModule:
                 details={"error": str(e), "error_type": "storage"}
             )
             raise HSMStorageError(f"Failed to store key: {e}") from e
-        except Exception as e:
+        except (RuntimeError, MemoryError, OverflowError) as e:
             self._audit_log(
                 operation="generate_key",
                 key_id="N/A",
@@ -358,7 +358,7 @@ class HardwareSecurityModule:
             self.logger.error(
                 "Key generation failed",
                 exc_info=True,
-                extra={"event": "hsm.key_generation_failed", "user_id": user_id}
+                extra={"event": "hsm.key_generation_failed", "user_id": user_id, "error_type": type(e).__name__}
             )
             raise HSMCryptographicError(f"Key generation failed: {e}") from e
 
@@ -451,7 +451,7 @@ class HardwareSecurityModule:
                 details={"error": str(e), "error_type": "storage"}
             )
             raise HSMStorageError(f"Failed to access key storage: {e}") from e
-        except Exception as e:
+        except (RuntimeError, MemoryError, OverflowError, AttributeError) as e:
             self._audit_log(
                 operation="sign",
                 key_id=key_id,
@@ -462,7 +462,7 @@ class HardwareSecurityModule:
             self.logger.error(
                 "Signing operation failed",
                 exc_info=True,
-                extra={"event": "hsm.signing_failed", "key_id": key_id[:16], "user_id": user_id}
+                extra={"event": "hsm.signing_failed", "key_id": key_id[:16], "user_id": user_id, "error_type": type(e).__name__}
             )
             raise HSMSigningError(f"Signing operation failed: {e}") from e
 
@@ -562,7 +562,7 @@ class HardwareSecurityModule:
                 details={"error": str(e), "error_type": "storage"}
             )
             raise HSMStorageError(f"Failed to persist key rotation: {e}") from e
-        except Exception as e:
+        except (RuntimeError, MemoryError, AttributeError) as e:
             self._audit_log(
                 operation="rotate_key",
                 key_id=old_key_id,
@@ -573,7 +573,7 @@ class HardwareSecurityModule:
             self.logger.error(
                 "Key rotation failed",
                 exc_info=True,
-                extra={"event": "hsm.key_rotation_failed", "old_key_id": old_key_id[:16], "user_id": user_id}
+                extra={"event": "hsm.key_rotation_failed", "old_key_id": old_key_id[:16], "user_id": user_id, "error_type": type(e).__name__}
             )
             raise HSMKeyRotationError(f"Key rotation failed: {e}") from e
 
@@ -690,13 +690,13 @@ class HardwareSecurityModule:
                     extra={"event": "hsm.multisig_verify_storage_error", "key_id": key_id[:16]}
                 )
                 continue
-            except Exception as e:
+            except (RuntimeError, MemoryError, AttributeError, KeyError) as e:
                 logging.error(
                     "Signature verification failed for key %s: %s",
                     key_id,
                     e,
                     exc_info=True,
-                    extra={"event": "hsm.multisig_verify_failed", "key_id": key_id[:16]}
+                    extra={"event": "hsm.multisig_verify_failed", "key_id": key_id[:16], "error_type": type(e).__name__}
                 )
                 continue
 

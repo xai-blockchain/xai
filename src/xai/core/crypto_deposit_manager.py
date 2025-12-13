@@ -285,8 +285,8 @@ class CryptoDepositManager:
                 deposit_type="crypto",
                 tx_hash=deposit["tx_hash"],
             )
-        except Exception as exc:  # pragma: no cover - defensive logging
-            logger.exception("Failed to credit exchange wallet for crypto deposit", exc_info=exc)
+        except (ValueError, KeyError, AttributeError, TypeError, RuntimeError) as exc:  # pragma: no cover - defensive logging
+            logger.exception("Failed to credit exchange wallet for crypto deposit", exc_info=exc, extra={"error_type": type(exc).__name__})
             return {"success": False, "error": str(exc)}
 
     # ===== Public Query APIs =====

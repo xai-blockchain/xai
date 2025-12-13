@@ -49,13 +49,12 @@ class SpendingLimitManager:
             except (json.JSONDecodeError, OSError) as e:
                 logger.warning(
                     "Failed to load spending limits state, using defaults",
-                    extra={"error": str(e), "path": self.path, "event": "spending_limits.load_failed"}
+                    extra={"error": str(e), "path": self.path, "event": "spending_limits.load_failed", "error_type": type(e).__name__}
                 )
-            except Exception as e:
-                logger.error(
-                    "Unexpected error loading spending limits",
-                    extra={"error": str(e), "path": self.path, "event": "spending_limits.load_error"},
-                    exc_info=True
+            except (KeyError, TypeError, ValueError) as e:
+                logger.warning(
+                    "Invalid spending limits data format, using defaults",
+                    extra={"error": str(e), "path": self.path, "event": "spending_limits.invalid_format", "error_type": type(e).__name__}
                 )
         return SpendingState(limits={}, usage={})
 
@@ -64,12 +63,27 @@ class SpendingLimitManager:
         try:
             with open(self.path, "w", encoding="utf-8") as fh:
                 json.dump(data, fh)
-        except Exception as e:
-            # Persistence failures should not crash API
+        except OSError as e:
+            # File I/O failures should not crash API
             logger.warning(
                 "Failed to persist spending limits to disk",
-                path=self.path,
-                error=str(e)
+                extra={
+                    "path": self.path,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "event": "spending_limits.save_failed"
+                }
+            )
+        except (TypeError, ValueError) as e:
+            # Data serialization failures
+            logger.error(
+                "Invalid data format for spending limits persistence",
+                extra={
+                    "path": self.path,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                    "event": "spending_limits.serialization_error"
+                }
             )
 
     def set_limit(self, address: str, amount_per_day: float) -> None:

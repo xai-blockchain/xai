@@ -309,7 +309,7 @@ class TransactionValidator:
                 error=str(e),
             )
             return False
-        except Exception as e:
+        except (ValueError, KeyError, AttributeError, TypeError) as e:
             txid = getattr(transaction, "txid", "UNKNOWN")
             txid_str = str(txid)
             txid_short = txid_str[:10] if txid and len(txid_str) >= 10 else txid_str
@@ -317,6 +317,7 @@ class TransactionValidator:
                 f"An unexpected error occurred during transaction validation for {txid_short}...: {e}",
                 txid=txid,
                 error=str(e),
+                error_type=type(e).__name__,
                 exc_info=True,
             )
             return False

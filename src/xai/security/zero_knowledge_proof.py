@@ -233,12 +233,12 @@ class ZeroKnowledgeProof:
                 extra={"event": "zkp.schnorr_verify_computation_error"}
             )
             return False
-        except Exception as e:
+        except (RuntimeError, OverflowError, MemoryError) as e:
             logger.error(
                 "Unexpected error in Schnorr proof verification: %s",
                 e,
                 exc_info=True,
-                extra={"event": "zkp.schnorr_verify_unexpected_error"}
+                extra={"event": "zkp.schnorr_verify_unexpected_error", "error_type": type(e).__name__}
             )
             return False
 
@@ -447,12 +447,12 @@ class ZeroKnowledgeProof:
                 extra={"event": "zkp.range_verify_computation_error"}
             )
             return False
-        except Exception as e:
+        except (RuntimeError, OverflowError, MemoryError) as e:
             logger.error(
                 "Unexpected error in range proof verification: %s",
                 e,
                 exc_info=True,
-                extra={"event": "zkp.range_verify_unexpected_error"}
+                extra={"event": "zkp.range_verify_unexpected_error", "error_type": type(e).__name__}
             )
             return False
 
@@ -550,12 +550,12 @@ class ZeroKnowledgeProof:
                 extra={"event": "zkp.membership_verify_computation_error"}
             )
             return False
-        except Exception as e:
+        except (RuntimeError, OverflowError, MemoryError) as e:
             logger.error(
                 "Unexpected error in membership proof verification: %s",
                 e,
                 exc_info=True,
-                extra={"event": "zkp.membership_verify_unexpected_error"}
+                extra={"event": "zkp.membership_verify_unexpected_error", "error_type": type(e).__name__}
             )
             return False
 
@@ -695,12 +695,12 @@ class ZKP_Simulator:
                 extra={"event": "zkp.identity_verify_computation_error"}
             )
             return False
-        except Exception as e:
+        except (RuntimeError, OverflowError, MemoryError) as e:
             logger.error(
                 "Privacy-preserving identity verification failed: %s",
                 e,
                 exc_info=True,
-                extra={"event": "zkp.identity_verify_unexpected_error"}
+                extra={"event": "zkp.identity_verify_unexpected_error", "error_type": type(e).__name__}
             )
             return False
 

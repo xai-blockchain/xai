@@ -250,10 +250,11 @@ class MiningManager:
             # Process time capsules
             self.blockchain.timecapsule_manager.process_block(block)
 
-        except Exception as e:
+        except (ValueError, KeyError, AttributeError, TypeError, RuntimeError) as e:
             # Don't fail mining due to gamification errors
             self.logger.warning(
                 "Gamification processing failed for block",
                 index=block.index,
                 error=str(e),
+                error_type=type(e).__name__,
             )
