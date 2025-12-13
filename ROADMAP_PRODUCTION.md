@@ -438,10 +438,10 @@ This roadmap targets production readiness with security-first posture, robust co
 
 ### Performance Tests
 
-- [ ] Add mempool eviction under load stress tests.
-- [ ] Add storage compaction performance tests.
-- [ ] Add QUIC vs TCP latency comparison tests.
-- [ ] Add block propagation latency tests with realistic network conditions.
+- [x] Add mempool eviction under load stress tests. ✅ COMPLETE - `test_mempool_load.py` with 10k+ transaction tests, high insertion rate (1000 tx/sec), eviction, concurrent access, retrieval, memory scaling, fee prioritization, and expiration tests. Includes memory profiling with psutil.
+- [x] Add storage compaction performance tests. ✅ COMPLETE - `test_storage_compaction.py` with storage growth (100/500/1000 blocks), file rotation, UTXO set growth, compaction (500 blocks), block index building (300 blocks), query performance, pruning (1000 blocks), and database lookup tests.
+- [x] Add QUIC vs TCP latency comparison tests. ✅ COMPLETE - `test_network_latency.py` with TCP connection/roundtrip latency, QUIC connection/message latency, protocol comparison, transaction/block broadcast throughput, latency under load, and bandwidth utilization tests.
+- [x] Add block propagation latency tests with realistic network conditions. ✅ COMPLETE - `test_block_propagation.py` with single/multiple peer propagation, bandwidth usage, compact block relay, star/mesh topology, network partition recovery, concurrent propagation, and transaction flood scenarios.
 
 ### Skipped Tests
 
