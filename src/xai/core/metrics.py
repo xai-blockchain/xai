@@ -34,6 +34,9 @@ from datetime import datetime
 from pythonjsonlogger import jsonlogger
 from pathlib import Path
 
+# Create a logger for use before StructuredLogger is instantiated
+logger = logging.getLogger(__name__)
+
 
 # ==================== STRUCTURED LOGGING SETUP ====================
 
