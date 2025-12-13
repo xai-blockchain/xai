@@ -687,12 +687,16 @@ class P2PNetworkManager:
         self._handshake_deadlines.pop(peer_id, None)
         try:
             self.peer_manager.disconnect_peer(peer_id)
-        except Exception as exc:
+        except (PeerError, ValueError, RuntimeError) as exc:
             logger.debug(
                 "Error disconnecting peer %s: %s",
                 peer_id[:16],
                 exc,
-                extra={"event": "p2p.disconnect_cleanup_failed", "peer": peer_id},
+                extra={
+                    "event": "p2p.disconnect_cleanup_failed",
+                    "peer": peer_id,
+                    "error_type": type(exc).__name__,
+                },
             )
 
     def _emit_security_event(
@@ -853,12 +857,16 @@ class P2PNetworkManager:
                 if websocket:
                     try:
                         await websocket.close()
-                    except Exception as exc:  # pragma: no cover - defensive
+                    except (NetworkError, ConnectionError, OSError, RuntimeError) as exc:  # pragma: no cover - defensive
                         logger.debug(
                             "Error closing peer %s after missing handshake: %s",
                             peer_id[:16],
                             exc,
-                            extra={"event": "p2p.handshake_close_failed", "peer": peer_id},
+                            extra={
+                                "event": "p2p.handshake_close_failed",
+                                "peer": peer_id,
+                                "error_type": type(exc).__name__,
+                            },
                         )
                 self._disconnect_peer(peer_id, websocket)
                 self.peer_manager.reputation.record_invalid_transaction(peer_id)

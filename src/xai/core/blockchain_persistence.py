@@ -509,7 +509,13 @@ class BlockchainStorage:
 
             return None
 
-        except Exception as e:
+        except (OSError, IOError, PermissionError, ValueError) as e:
+            logger.error(
+                "Failed to recover from checkpoints",
+                operation="_recover_from_checkpoint",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             print(f"Failed to recover from checkpoints: {e}")
             return None
 
@@ -556,7 +562,14 @@ class BlockchainStorage:
 
                 return True, blockchain_data, f"Restored from backup: {backup_filename}"
 
-            except Exception as e:
+            except (json.JSONDecodeError, CorruptedDataError, OSError, IOError, KeyError, ValueError) as e:
+                logger.error(
+                    "Failed to restore from backup file",
+                    operation="restore_from_backup",
+                    backup_filename=backup_filename,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 return False, None, f"Failed to restore from backup: {str(e)}"
 
     def list_backups(self) -> List[dict]:
@@ -603,7 +616,13 @@ class BlockchainStorage:
 
             return backup_info
 
-        except Exception as e:
+        except (OSError, IOError, PermissionError) as e:
+            logger.error(
+                "Failed to list backup files",
+                operation="list_backups",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             print(f"Failed to list backups: {e}")
             return []
 
@@ -651,7 +670,13 @@ class BlockchainStorage:
 
             return checkpoint_info
 
-        except Exception as e:
+        except (OSError, IOError, PermissionError, ValueError) as e:
+            logger.error(
+                "Failed to list checkpoint files",
+                operation="list_checkpoints",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             print(f"Failed to list checkpoints: {e}")
             return []
 

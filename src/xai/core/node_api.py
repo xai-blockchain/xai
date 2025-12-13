@@ -1690,7 +1690,13 @@ class NodeAPIRoutes:
 
                 return jsonify({"success": True, "orders": user_orders}), 200
 
-            except Exception as e:
+            except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, KeyError) as e:
+                logger.error(
+                    "Get my orders failed",
+                    address=address,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 return jsonify({"error": str(e)}), 500
 
         @self.app.route("/exchange/trades", methods=["GET"])
@@ -1711,7 +1717,13 @@ class NodeAPIRoutes:
                 all_trades.sort(key=lambda x: x["timestamp"], reverse=True)
                 return jsonify({"success": True, "trades": all_trades[:limit]}), 200
 
-            except Exception as e:
+            except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, KeyError) as e:
+                logger.error(
+                    "Get recent trades failed",
+                    limit=limit,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 return jsonify({"error": str(e)}), 500
 
         # Add more exchange routes...
@@ -1750,7 +1762,12 @@ class NodeAPIRoutes:
                 return self._success_response(result if isinstance(result, dict) else {"result": result})
             except ValueError as exc:
                 return self._error_response(str(exc), status=400, code="deposit_invalid")
-            except Exception as exc:
+            except (DatabaseError, StorageError, OSError, IOError, TypeError, KeyError, AttributeError) as exc:
+                logger.error(
+                    "Exchange deposit failed",
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                )
                 return self._handle_exception(exc, "exchange_deposit")
 
         @self.app.route("/exchange/withdraw", methods=["POST"])
@@ -1780,7 +1797,12 @@ class NodeAPIRoutes:
                 return self._success_response(result if isinstance(result, dict) else {"result": result})
             except ValueError as exc:
                 return self._error_response(str(exc), status=400, code="withdraw_invalid")
-            except Exception as exc:
+            except (DatabaseError, StorageError, OSError, IOError, TypeError, KeyError, AttributeError) as exc:
+                logger.error(
+                    "Exchange withdraw failed",
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                )
                 return self._handle_exception(exc, "exchange_withdraw")
 
         @self.app.route("/exchange/balance/<address>", methods=["GET"])
@@ -1791,7 +1813,13 @@ class NodeAPIRoutes:
             try:
                 balances = self.node.exchange_wallet_manager.get_all_balances(address)
                 return jsonify({"success": True, "address": address, "balances": balances}), 200
-            except Exception as e:
+            except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, AttributeError) as e:
+                logger.error(
+                    "Get user balance failed",
+                    address=address,
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 return jsonify({"error": str(e)}), 500
 
         @self.app.route("/exchange/balance/<address>/<currency>", methods=["GET"])
