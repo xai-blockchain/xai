@@ -372,6 +372,7 @@ This roadmap targets production readiness with security-first posture, robust co
 - [ ] Logging migration progress 20: ThresholdSignatureScheme uses structured logging for share/signature events (no prints).
 - [ ] Logging migration progress 21: SaltedHashManager now logs initialization; demo removed.
 - [ ] Logging migration progress 22: AuditLogger demo remains removed; production TSS now uses structured logging for the main guard (no print-based demo, exits with guidance to run tests).
+- [x] **Exception refactoring milestone**: Completed comprehensive typed exception migration for 4 critical infrastructure files (73 bare `except Exception` handlers eliminated): blockchain.py (24 handlers → DatabaseError, StorageError, ValidationError, etc.), blockchain_persistence.py (14 handlers → DatabaseError, StorageError, CorruptedDataError), node_api.py (19 handlers → DatabaseError, StorageError, OSError, IOError), node_p2p.py (16 handlers → NetworkError, PeerError, ValidationError). All handlers now use specific exception types with error_type logging for enhanced diagnostics. Created blockchain_exceptions.py module with 23 typed exception classes (BlockchainError base class, 5 ValidationError variants, 4 ConsensusError types, 4 StorageError classes, 3 MempoolError types, 4 NetworkError variants, 5 VMError classes, 2 initialization errors). All files verified with py_compile.
 - [ ] Add structured logging to all exception handlers.
 - [ ] Propagate signature verification errors - never silently continue.
 
