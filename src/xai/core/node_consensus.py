@@ -386,8 +386,16 @@ class ConsensusManager:
                 continue
 
             # Verify transaction signature
-            if hasattr(tx, "verify_signature") and not tx.verify_signature():
-                return False, f"Invalid signature in transaction {i}: {tx.txid}"
+            if hasattr(tx, "verify_signature"):
+                try:
+                    tx.verify_signature()
+                except Exception as e:
+                    # Import signature verification exceptions
+                    from xai.core.transaction import SignatureVerificationError
+                    if isinstance(e, SignatureVerificationError):
+                        return False, f"Signature verification failed for transaction {i} ({tx.txid}): {e}"
+                    else:
+                        return False, f"Unexpected error verifying signature for transaction {i} ({tx.txid}): {type(e).__name__}: {e}"
 
             # Check sender has sufficient balance (except for special transactions)
             if tx.tx_type == "normal":

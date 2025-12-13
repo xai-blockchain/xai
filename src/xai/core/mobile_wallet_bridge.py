@@ -143,8 +143,15 @@ class MobileWalletBridge:
         tx.signature = signature
         tx.tx_type = "mobile"
 
-        if not tx.verify_signature():
-            raise ValueError("Signature verification failed")
+        # Verify signature - now raises detailed exceptions
+        try:
+            tx.verify_signature()
+        except Exception as e:
+            from xai.core.transaction import SignatureVerificationError
+            if isinstance(e, SignatureVerificationError):
+                raise ValueError(f"Signature verification failed: {e}") from e
+            else:
+                raise ValueError(f"Unexpected signature verification error: {type(e).__name__}: {e}") from e
 
         tx.txid = tx.calculate_hash()
 
