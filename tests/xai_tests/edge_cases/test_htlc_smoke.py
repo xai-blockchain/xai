@@ -99,7 +99,8 @@ class TestHTLCFundingOperations:
         # Verify bytecode
         assert isinstance(bytecode, str)
         assert len(bytecode) > 0
-        assert bytecode.startswith('60')  # EVM bytecode starts with PUSH
+        # EVM bytecode starts with PUSH (60=PUSH1, 61=PUSH2, etc.)
+        assert bytecode[0] == '6', f"Expected bytecode to start with PUSH opcode (6x), got {bytecode[:2]}"
 
         # Verify contract has required functions
         function_names = [item['name'] for item in abi if item.get('type') == 'function']
@@ -135,13 +136,21 @@ class TestHTLCFundingOperations:
 
         # Verify swap contains required fields
         assert 'secret_hash' in swap
-        assert 'redeem_script' in swap
-        assert 'witness_program' in swap
-        assert 'funding_address' in swap
+        assert 'script_template' in swap  # UTXO coins use script_template
+        assert 'contract_type' in swap
+        assert swap['contract_type'] == 'HTLC_UTXO'
 
         # Verify secret hash is SHA-256
         assert len(swap['secret_hash']) == 64  # Hex string
         assert swap['secret_hash'] == hashlib.sha256(secret).hexdigest()
+
+        # Verify script template contains expected elements
+        script = swap['script_template']
+        assert 'OP_IF' in script
+        assert 'OP_SHA256' in script
+        secret_hash = swap['secret_hash']
+        assert secret_hash in script  # Hash should be in script
+        assert 'OP_CHECKLOCKTIMEVERIFY' in script
 
     def test_htlc_ethereum_contract_generation(self):
         """Test Ethereum HTLC contract generation"""

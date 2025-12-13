@@ -75,12 +75,95 @@ class BlockHeader:
         miner_pubkey: Optional[str] = None,
         version: Optional[int] = None,
     ) -> None:
-        self.index = index
+        # Validate and coerce index
+        if index is None:
+            raise ValueError("Block index cannot be None")
+        try:
+            # Coerce float to int
+            coerced_index = int(index)
+            if isinstance(index, float) and index != coerced_index:
+                # Truncate float to int (1.5 -> 1)
+                self.index = coerced_index
+            else:
+                self.index = coerced_index
+        except (ValueError, TypeError) as e:
+            raise TypeError(f"Block index must be a valid integer: {e}") from e
+
+        # Validate index range
+        if self.index < 0:
+            raise ValueError("Block index cannot be negative")
+
+        # Validate previous_hash
+        if previous_hash is None:
+            raise ValueError("Previous hash cannot be None")
+        if not isinstance(previous_hash, str):
+            raise TypeError("Previous hash must be a string")
+        if len(previous_hash) == 0:
+            raise ValueError("Previous hash cannot be empty")
+        # Validate hash format (must be hex and proper length)
+        if len(previous_hash) != 64:
+            raise ValueError(f"Previous hash must be 64 characters (got {len(previous_hash)})")
+        # Validate hex characters only
+        try:
+            int(previous_hash, 16)
+        except ValueError as e:
+            raise ValueError(f"Previous hash must be a valid hexadecimal string: {e}") from e
+        # Check for null bytes
+        if '\x00' in previous_hash:
+            raise ValueError("Previous hash cannot contain null bytes")
+        # Check for non-ASCII characters
+        if not previous_hash.isascii():
+            raise ValueError("Previous hash must contain only ASCII characters")
         self.previous_hash = previous_hash
+
+        # Validate merkle_root
+        if merkle_root is None:
+            raise ValueError("Merkle root cannot be None")
+        if not isinstance(merkle_root, str):
+            raise TypeError("Merkle root must be a string")
+        if len(merkle_root) != 64:
+            raise ValueError(f"Merkle root must be 64 characters (got {len(merkle_root)})")
+        # Validate hex format
+        try:
+            int(merkle_root, 16)
+        except ValueError as e:
+            raise ValueError(f"Merkle root must be a valid hexadecimal string: {e}") from e
+        # Check for null bytes
+        if '\x00' in merkle_root:
+            raise ValueError("Merkle root cannot contain null bytes")
+        # Check for non-ASCII characters
+        if not merkle_root.isascii():
+            raise ValueError("Merkle root must contain only ASCII characters")
         self.merkle_root = merkle_root
-        self.timestamp = timestamp
-        self.difficulty = difficulty
-        self.nonce = nonce
+
+        # Validate timestamp
+        if timestamp is None:
+            raise ValueError("Timestamp cannot be None")
+        try:
+            self.timestamp = float(timestamp)
+        except (ValueError, TypeError) as e:
+            raise TypeError(f"Timestamp must be a valid float: {e}") from e
+
+        # Validate and coerce difficulty
+        if difficulty is None:
+            raise ValueError("Difficulty cannot be None")
+        try:
+            self.difficulty = int(difficulty)
+        except (ValueError, TypeError) as e:
+            raise TypeError(f"Difficulty must be a valid integer: {e}") from e
+        if self.difficulty < 0:
+            raise ValueError("Difficulty cannot be negative")
+
+        # Validate and coerce nonce
+        if nonce is None:
+            raise ValueError("Nonce cannot be None")
+        try:
+            self.nonce = int(nonce)
+        except (ValueError, TypeError) as e:
+            raise TypeError(f"Nonce must be a valid integer: {e}") from e
+        if self.nonce < 0:
+            raise ValueError("Nonce cannot be negative")
+
         self.signature = signature
         self.miner_pubkey = miner_pubkey
         if version is None:

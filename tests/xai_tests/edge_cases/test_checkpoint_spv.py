@@ -347,8 +347,10 @@ class TestSPVProofValidation:
         block = bc.mine_pending_transactions(sender.address)
 
         # Create checkpoint at this block
-        checkpoint_mgr = CheckpointManager(bc)
-        checkpoint = checkpoint_mgr.create_checkpoint()
+        checkpoint_mgr = CheckpointManager(bc.data_dir)
+        checkpoint = checkpoint_mgr.create_checkpoint(
+            block, bc.utxo_manager, bc.total_supply
+        )
 
         try:
             # Generate proof for transaction
@@ -358,7 +360,7 @@ class TestSPVProofValidation:
             # Verify proof against checkpoint's merkle root
             is_valid = Block.verify_merkle_proof(
                 tx.txid,
-                checkpoint.get('merkle_root', block.merkle_root),
+                checkpoint.merkle_root if checkpoint else block.merkle_root,
                 proof
             )
 
@@ -409,11 +411,16 @@ class TestSPVProofValidation:
         main_tip = bc.get_latest_block()
 
         # Checkpoint before reorg
-        checkpoint_mgr = CheckpointManager(bc)
-        pre_reorg_checkpoint = checkpoint_mgr.create_checkpoint()
+        checkpoint_mgr = CheckpointManager(bc.data_dir)
+        pre_reorg_checkpoint = checkpoint_mgr.create_checkpoint(
+            main_tip, bc.utxo_manager, bc.total_supply
+        )
 
         # After potential reorg, verify checkpoint
-        is_valid = checkpoint_mgr.validate_checkpoint(pre_reorg_checkpoint)
+        if pre_reorg_checkpoint:
+            is_valid = checkpoint_mgr.verify_checkpoint(pre_reorg_checkpoint.height)
+        else:
+            is_valid = False
 
         # Should still be valid if no actual reorg occurred
         assert isinstance(is_valid, bool)

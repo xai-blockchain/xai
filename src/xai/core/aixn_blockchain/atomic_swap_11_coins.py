@@ -553,11 +553,18 @@ class AtomicSwapHTLC:
     def _recommended_utxo_fee(self, amount: float) -> Dict[str, Any]:
         fee_rate = Decimal(str(getattr(Config, "ATOMIC_SWAP_FEE_RATE", 0.0000005)))
         tx_size = int(getattr(Config, "ATOMIC_SWAP_UTXO_TX_SIZE", 300))
-        fee = CrossChainVerifier.calculate_atomic_swap_fee(
-            amount,
-            fee_rate,
-            tx_size_bytes=tx_size,
-        )
+
+        # For zero amounts, calculate network fee only (no safety buffer)
+        if amount == 0:
+            network_fee = (fee_rate * Decimal(tx_size)).quantize(Decimal("0.00000001"), rounding=ROUND_UP)
+            fee = float(network_fee)
+        else:
+            fee = CrossChainVerifier.calculate_atomic_swap_fee(
+                amount,
+                fee_rate,
+                tx_size_bytes=tx_size,
+            )
+
         return {
             "total_fee": float(fee),
             "unit": self.coin_type.name,

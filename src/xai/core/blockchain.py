@@ -1360,7 +1360,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
             header = BlockHeader(
                 index=0,
-                previous_hash="0",
+                previous_hash="0" * 64,
                 merkle_root=merkle_root,
                 timestamp=genesis_data["timestamp"],
                 difficulty=self.difficulty,
@@ -1421,7 +1421,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
             header = BlockHeader(
                 index=0,
-                previous_hash="0",
+                previous_hash="0" * 64,
                 merkle_root=self.calculate_merkle_root(genesis_transactions),
                 timestamp=time.time(),
                 difficulty=self.difficulty,

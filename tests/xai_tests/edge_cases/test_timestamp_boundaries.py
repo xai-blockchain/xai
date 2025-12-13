@@ -158,10 +158,11 @@ class TestTimestampBoundaries:
         max_future = getattr(Config, 'MAX_FUTURE_BLOCK_TIME', 7200)
 
         # Create block just under the limit
+        # Don't specify merkle_root - let Block calculate it from transactions
         header = BlockHeader(
             index=latest.index + 1,
             previous_hash=latest.hash,
-            merkle_root="0" * 64,
+            merkle_root=Block._calculate_merkle_root_static([]),  # Correct merkle root for empty tx list
             timestamp=time.time() + max_future - 10,  # 10 seconds before limit
             difficulty=4,
             nonce=0

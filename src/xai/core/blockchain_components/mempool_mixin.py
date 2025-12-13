@@ -584,6 +584,7 @@ class BlockchainMempoolMixin:
 
         overview: Dict[str, Any] = {
             "pending_count": len(pending),
+            "pool_size": len(pending),  # Alias for pending_count for backward compatibility
             "size_bytes": size_bytes,
             "size_kb": size_bytes / 1024.0,
             "total_amount": total_amount,
@@ -606,6 +607,14 @@ class BlockchainMempoolMixin:
                 "evicted_low_fee_total": self._mempool_evicted_low_fee_total,
                 "expired_total": self._mempool_expired_total,
                 "active_bans": self._count_active_bans(now),
+            },
+            "statistics": {
+                "evicted_low_fee_total": self._mempool_evicted_low_fee_total,
+                "expired_total": self._mempool_expired_total,
+                "rejected_invalid_total": self._mempool_rejected_invalid_total,
+                "rejected_banned_total": self._mempool_rejected_banned_total,
+                "rejected_low_fee_total": self._mempool_rejected_low_fee_total,
+                "rejected_sender_cap_total": self._mempool_rejected_sender_cap_total,
             },
             "timestamp": now,
         }
