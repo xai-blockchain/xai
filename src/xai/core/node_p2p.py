@@ -1445,9 +1445,14 @@ class P2PNetworkManager:
                     headers=self._peer_headers(),
                     timeout=self._http_timeout,
                 )
-            except Exception as e:
+            except (NetworkError, requests.RequestException, ConnectionError, OSError, TimeoutError) as e:
                 # Network error broadcasting block - peer may be down, continue to others
-                logger.debug(f"Failed to broadcast block to {peer_uri}: {e}")
+                logger.debug(
+                    "Failed to broadcast block to %s: %s",
+                    peer_uri,
+                    e,
+                    extra={"error_type": type(e).__name__},
+                )
         self._dispatch_async(self.broadcast(message))
         if self.quic_enabled:
             payload = json.dumps(message).encode("utf-8")
@@ -1564,12 +1569,16 @@ class P2PNetworkManager:
                 chunk_range = futures[future]
                 try:
                     chunk_blocks = future.result()
-                except Exception as exc:
+                except (NetworkError, ValidationError, ValueError, RuntimeError) as exc:
                     logger.warning(
                         "Parallel chunk %s failed: %s",
                         chunk_range,
                         exc,
-                        extra={"event": "p2p.parallel_sync_chunk_failed", "chunk": chunk_range},
+                        extra={
+                            "event": "p2p.parallel_sync_chunk_failed",
+                            "chunk": chunk_range,
+                            "error_type": type(exc).__name__,
+                        },
                     )
                     return False
                 if not chunk_blocks:
@@ -1754,11 +1763,14 @@ class P2PNetworkManager:
             return None
         try:
             return deserializer(block_payload)
-        except Exception as exc:
+        except (ValidationError, ValueError, TypeError, KeyError, RuntimeError) as exc:
             logger.debug(
                 "Block deserialization failed: %s",
                 exc,
-                extra={"event": "p2p.parallel_sync_deserialize_exception"},
+                extra={
+                    "event": "p2p.parallel_sync_deserialize_exception",
+                    "error_type": type(exc).__name__,
+                },
             )
             return None
 
@@ -1782,11 +1794,14 @@ class P2PNetworkManager:
             try:
                 if self._parallel_chunk_sync(ahead_summaries, local_height):
                     return True
-            except Exception as exc:
+            except (NetworkError, ValidationError, ValueError, RuntimeError) as exc:
                 logger.warning(
                     "Parallel sync encountered error: %s; falling back to sequential sync",
                     exc,
-                    extra={"event": "p2p.parallel_sync_unhandled"},
+                    extra={
+                        "event": "p2p.parallel_sync_unhandled",
+                        "error_type": type(exc).__name__,
+                    },
                 )
             sequential_candidates = [summary for summary in ahead_summaries if summary.get("total", 0) <= self.parallel_sync_page_limit]
             if not sequential_candidates:
@@ -1810,12 +1825,15 @@ class P2PNetworkManager:
                 peer_uri = futures[future]
                 try:
                     remote_blocks = future.result()
-                except Exception as exc:
+                except (NetworkError, ValidationError, ValueError, RuntimeError) as exc:
                     logger.debug(
                         "Parallel sync failed for %s: %s",
                         peer_uri,
                         exc,
-                        extra={"event": "p2p.parallel_sync_download_failed"},
+                        extra={
+                            "event": "p2p.parallel_sync_download_failed",
+                            "error_type": type(exc).__name__,
+                        },
                     )
                     continue
 

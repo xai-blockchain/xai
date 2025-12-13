@@ -2023,7 +2023,12 @@ class NodeAPIRoutes:
 
             except ValueError as exc:
                 return self._error_response(str(exc), status=400, code="payment_invalid")
-            except Exception as exc:
+            except (DatabaseError, StorageError, OSError, IOError, TypeError, KeyError, AttributeError) as exc:
+                logger.error(
+                    "Exchange buy with card failed",
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                )
                 return self._handle_exception(exc, "exchange_buy_with_card")
 
         @self.app.route("/exchange/payment-methods", methods=["GET"])
@@ -2034,7 +2039,12 @@ class NodeAPIRoutes:
             try:
                 methods = self.node.payment_processor.get_supported_payment_methods()
                 return jsonify({"success": True, "methods": methods}), 200
-            except Exception as e:
+            except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, AttributeError) as e:
+                logger.error(
+                    "Get payment methods failed",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 return jsonify({"error": str(e)}), 500
 
         @self.app.route("/exchange/calculate-purchase", methods=["POST"])
@@ -2049,5 +2059,10 @@ class NodeAPIRoutes:
             try:
                 calc = self.node.payment_processor.calculate_purchase(data["usd_amount"])
                 return jsonify(calc), 200
-            except Exception as e:
+            except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, AttributeError) as e:
+                logger.error(
+                    "Calculate purchase failed",
+                    error=str(e),
+                    error_type=type(e).__name__,
+                )
                 return jsonify({"error": str(e)}), 500
