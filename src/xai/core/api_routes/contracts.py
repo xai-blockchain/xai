@@ -121,13 +121,45 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
         tx.metadata = metadata
         tx.signature = model.signature
 
-        if not tx.verify_signature():
-            return routes._error_response(
-                "Invalid signature",
-                status=400,
-                code="invalid_signature",
-                context={"sender": model.sender},
+        # Verify signature - now raises exceptions
+        try:
+            tx.verify_signature()
+        except Exception as e:
+            from xai.core.transaction import (
+                SignatureVerificationError,
+                MissingSignatureError,
+                InvalidSignatureError,
+                SignatureCryptoError
             )
+
+            if isinstance(e, MissingSignatureError):
+                return routes._error_response(
+                    "Missing signature or public key",
+                    status=400,
+                    code="missing_signature",
+                    context={"sender": model.sender, "error": str(e)}
+                )
+            elif isinstance(e, InvalidSignatureError):
+                return routes._error_response(
+                    "Invalid signature",
+                    status=400,
+                    code="invalid_signature",
+                    context={"sender": model.sender, "error": str(e)}
+                )
+            elif isinstance(e, SignatureCryptoError):
+                return routes._error_response(
+                    "Signature verification error",
+                    status=500,
+                    code="crypto_error",
+                    context={"sender": model.sender, "error": str(e)}
+                )
+            else:
+                return routes._error_response(
+                    "Unexpected signature verification error",
+                    status=500,
+                    code="verification_error",
+                    context={"sender": model.sender, "error": str(e)}
+                )
 
         if blockchain.add_transaction(tx):
             routes.node.broadcast_transaction(tx)
@@ -246,13 +278,45 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
                 context={"error": str(exc)},
             )
 
-        if not tx.verify_signature():
-            return routes._error_response(
-                "Invalid signature",
-                status=400,
-                code="invalid_signature",
-                context={"sender": model.sender},
+        # Verify signature - now raises exceptions
+        try:
+            tx.verify_signature()
+        except Exception as e:
+            from xai.core.transaction import (
+                SignatureVerificationError,
+                MissingSignatureError,
+                InvalidSignatureError,
+                SignatureCryptoError
             )
+
+            if isinstance(e, MissingSignatureError):
+                return routes._error_response(
+                    "Missing signature or public key",
+                    status=400,
+                    code="missing_signature",
+                    context={"sender": model.sender, "error": str(e)}
+                )
+            elif isinstance(e, InvalidSignatureError):
+                return routes._error_response(
+                    "Invalid signature",
+                    status=400,
+                    code="invalid_signature",
+                    context={"sender": model.sender, "error": str(e)}
+                )
+            elif isinstance(e, SignatureCryptoError):
+                return routes._error_response(
+                    "Signature verification error",
+                    status=500,
+                    code="crypto_error",
+                    context={"sender": model.sender, "error": str(e)}
+                )
+            else:
+                return routes._error_response(
+                    "Unexpected signature verification error",
+                    status=500,
+                    code="verification_error",
+                    context={"sender": model.sender, "error": str(e)}
+                )
 
         if blockchain.add_transaction(tx):
             routes.node.broadcast_transaction(tx)

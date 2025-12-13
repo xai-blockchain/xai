@@ -227,13 +227,47 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
                     },
                 )
 
-            if not tx.verify_signature():
-                return routes._error_response(
-                    "Invalid signature",
-                    status=400,
-                    code="invalid_signature",
-                    context={"sender": model.sender},
+            # Verify signature - now raises exceptions
+            try:
+                tx.verify_signature()
+            except Exception as e:
+                # Import signature verification exceptions
+                from xai.core.transaction import (
+                    SignatureVerificationError,
+                    MissingSignatureError,
+                    InvalidSignatureError,
+                    SignatureCryptoError
                 )
+
+                if isinstance(e, MissingSignatureError):
+                    return routes._error_response(
+                        "Missing signature or public key",
+                        status=400,
+                        code="missing_signature",
+                        context={"sender": model.sender, "error": str(e)}
+                    )
+                elif isinstance(e, InvalidSignatureError):
+                    return routes._error_response(
+                        "Invalid signature",
+                        status=400,
+                        code="invalid_signature",
+                        context={"sender": model.sender, "error": str(e)}
+                    )
+                elif isinstance(e, SignatureCryptoError):
+                    return routes._error_response(
+                        "Signature verification error",
+                        status=500,
+                        code="crypto_error",
+                        context={"sender": model.sender, "error": str(e)}
+                    )
+                else:
+                    # Unexpected error
+                    return routes._error_response(
+                        "Unexpected signature verification error",
+                        status=500,
+                        code="verification_error",
+                        context={"sender": model.sender, "error": str(e)}
+                    )
 
             if blockchain.add_transaction(tx):
                 try:

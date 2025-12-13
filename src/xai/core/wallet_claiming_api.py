@@ -138,7 +138,8 @@ class FraudDetector:
                 from xai.core.crypto_utils import verify_signature_hex
 
                 # Verify the signature using ECDSA
-                is_valid = verify_signature_hex(identifier, signature, public_key)
+                # CRITICAL: verify_signature_hex(public_hex, message, signature_hex) - correct parameter order
+                is_valid = verify_signature_hex(public_key, identifier.encode(), signature)
 
                 if not is_valid:
                     logger.warning(f"Invalid signature for {identifier}")

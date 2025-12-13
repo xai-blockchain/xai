@@ -334,19 +334,25 @@ class ValidationManager:
             header: Block header with signature
 
         Returns:
-            True if signature is valid or not required, False otherwise
+            True if signature is valid, False otherwise
+
+        Note:
+            Signatures are required for all blocks. Missing signatures are rejected.
+            This ensures all blocks have cryptographic proof of miner authenticity.
         """
         if not header.signature or not header.miner_pubkey:
-            # Signature not required
-            return True
+            # SECURITY: Reject blocks with missing signatures
+            # All blocks must be signed by their miner for authenticity
+            return False
 
         from xai.core.crypto_utils import verify_signature_hex
 
         # Verify signature
+        # CRITICAL: verify_signature_hex(public_hex, message, signature_hex) - correct parameter order
         return verify_signature_hex(
-            message=header.calculate_hash(),
-            signature=header.signature,
-            public_key=header.miner_pubkey,
+            header.miner_pubkey,
+            header.calculate_hash().encode(),
+            header.signature,
         )
 
     def _block_within_size_limits(
