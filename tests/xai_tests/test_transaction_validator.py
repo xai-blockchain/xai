@@ -169,15 +169,20 @@ class TestTransactionValidator:
         assert validator.validate_transaction(coinbase_tx) is True
         validator.logger.debug.assert_called_once()
 
-    def test_invalid_nonce(self, validator, valid_transaction, mock_nonce_tracker):
-        """Test validation fails if nonce is invalid."""
+    def test_invalid_nonce(self, validator, valid_transaction, mock_nonce_tracker, mock_blockchain):
+        """Test validation fails if nonce is invalid (too high)."""
+        # Set up mock blockchain with empty pending transactions list
+        mock_blockchain.pending_transactions = []
+
+        # Transaction has nonce=0, but expected nonce is 0 (already used)
+        # This means the transaction is trying to reuse a nonce that was already consumed
         mock_nonce_tracker.validate_nonce.return_value = False
-        mock_nonce_tracker.get_next_nonce.return_value = (
-            1  # Simulate expected nonce is 1, but tx.nonce is 0
-        )
-        mock_nonce_tracker.get_nonce.return_value = (
-            1  # Ensure backward-compatible check doesn't allow it
-        )
+        mock_nonce_tracker.get_next_nonce.return_value = 0  # Expected nonce is 0
+        mock_nonce_tracker.get_nonce.return_value = 1  # Current nonce is already 1
+
+        # Modify transaction to have a nonce that's too high (2 when expected is 0)
+        valid_transaction.nonce = 2
+
         result = validator.validate_transaction(valid_transaction)
         assert result is False
         validator.logger.warn.assert_called_once()
