@@ -161,9 +161,18 @@ def register_blockchain_routes(routes: "NodeAPIRoutes") -> None:
                 status=400,
                 code="invalid_payload",
             )
-        header = payload.get("header") if isinstance(payload, dict) else None
+        # Debug: log payload structure
+        logger.info(
+            "DEBUG receive_block: payload type=%s, keys=%s, preview=%s",
+            type(payload).__name__,
+            list(payload.keys()) if isinstance(payload, dict) else "N/A",
+            str(payload)[:500],
+            extra={"event": "p2p.block_receive_debug"}
+        )
+        # Support both nested format (with "header" key) and flat format (Block.to_dict())
+        header = payload.get("header") if "header" in payload else payload
         required_header = ["index", "previous_hash", "merkle_root", "timestamp", "difficulty", "nonce"]
-        if not header or any(header.get(f) in (None, "") for f in required_header):
+        if not isinstance(header, dict) or any(header.get(f) in (None, "") for f in required_header):
             return routes._error_response(
                 "Invalid block payload",
                 status=400,

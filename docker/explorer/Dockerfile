@@ -15,6 +15,9 @@ ENV PYTHONUNBUFFERED=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
+    pkg-config \
+    build-essential \
+    libsecp256k1-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -24,6 +27,7 @@ RUN groupadd -r explorer -g 1001 && \
 WORKDIR /app
 
 # Copy requirements and install
+COPY constraints.txt /constraints.txt
 COPY src/xai/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

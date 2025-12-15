@@ -78,11 +78,27 @@ class P2PNetworkManager:
         max_bandwidth_in: int = 1024 * 1024, # 1 MB/s
         max_bandwidth_out: int = 1024 * 1024, # 1 MB/s
         peer_api_key: Optional[str] = None,
+        api_port: Optional[int] = None,
     ) -> None:
+        # Configure logger with handler if not already configured
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter('[%(levelname)s] %(name)s: %(message)s')
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+            logger.setLevel(logging.INFO)
+            logger.info("P2P Network Manager logger configured")
+
         self.blockchain = blockchain
         storage_ref = getattr(self.blockchain, "storage", None)
         data_dir_candidate = getattr(storage_ref, "data_dir", "data")
         data_dir = data_dir_candidate if isinstance(data_dir_candidate, str) else "data"
+
+        # Override max_connections from Config if available (for testnet flexibility)
+        configured_max = getattr(Config, "P2P_MAX_CONNECTIONS_PER_IP", None)
+        if configured_max is not None:
+            max_connections = int(configured_max)
+
         if peer_manager is None:
             peer_manager = PeerManager(
                 max_connections_per_ip=max_connections,
@@ -101,6 +117,8 @@ class P2PNetworkManager:
         self.consensus_manager = consensus_manager
         self.host = host
         self.port = port
+        self.api_port = api_port  # HTTP API port for this node
+        self.peer_api_endpoints: Dict[str, str] = {}  # Map peer_id -> HTTP API endpoint
         self.quic_enabled = bool(getattr(Config, "P2P_ENABLE_QUIC", False) and QUIC_AVAILABLE)
         self.quic_dial_timeout = float(getattr(Config, "P2P_QUIC_DIAL_TIMEOUT", 1.0))
         self.server: Optional[websockets.WebSocketServer] = None
@@ -153,6 +171,10 @@ class P2PNetworkManager:
         self.checkpoint_sync: Optional[CheckpointSyncManager] = (
             CheckpointSyncManager(self.blockchain, p2p_manager=self) if self.partial_sync_enabled else None
         )
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._persistent_peers: Set[str] = set()  # Peers to maintain connections to
+        self._reconnect_tasks: Dict[str, asyncio.Task] = {}  # Ongoing reconnection tasks
+        self._connection_monitor_task: Optional[asyncio.Task] = None
 
     @staticmethod
     def _normalize_peer_uri(peer_uri: str) -> str:
@@ -270,23 +292,63 @@ class P2PNetworkManager:
                     )
 
     def get_peer_count(self) -> int:
-        """Return count of known peers (HTTP/WebSocket)."""
+        """Return count of connected peers (deduped by host) or known HTTP peers."""
+        unique_hosts = {
+            info.get("ip_address")
+            for info in getattr(self.peer_manager, "connected_peers", {}).values()
+            if info.get("ip_address")
+        }
         with self._peer_lock:
-            return len(self.http_peers)
+            http_count = len(self.http_peers)
+        return max(http_count, len(unique_hosts))
 
     def get_peers(self) -> Set[str]:
+        """
+        Return a combined set of peers from HTTP registration and active connections.
+
+        Active connections are represented as websocket URIs using the configured
+        P2P port so APIs can surface something meaningful even when no HTTP peers
+        have been registered explicitly.
+        """
+        peers: Set[str] = set()
         with self._peer_lock:
-            return set(self.http_peers)
+            peers.update(self.http_peers)
+        for host in {
+            info.get("ip_address")
+            for info in getattr(self.peer_manager, "connected_peers", {}).values()
+            if info.get("ip_address")
+        }:
+            peers.add(f"wss://{host}:{self.port}")
+        return peers
 
     async def start(self) -> None:
         """Starts the P2P network manager."""
+        # Store reference to the event loop for async dispatch
+        self._loop = asyncio.get_running_loop()
+
         ssl_context = self.peer_manager.encryption.create_ssl_context(
             is_server=True,
             require_client_cert=self.peer_manager.require_client_cert,
             ca_bundle=self.peer_manager.ca_bundle_path,
         )
+
+        # Configure WebSocket keep-alive and timeouts for stability
+        # Based on: https://websockets.readthedocs.io/en/stable/topics/keepalive.html
+        ping_interval = int(getattr(Config, "P2P_PING_INTERVAL_SECONDS", 20))
+        ping_timeout = int(getattr(Config, "P2P_PING_TIMEOUT_SECONDS", 20))
+        close_timeout = int(getattr(Config, "P2P_CLOSE_TIMEOUT_SECONDS", 10))
+
         self.server = await websockets.serve(
-            self._handler, self.host, self.port, ssl=ssl_context
+            self._handler,
+            self.host,
+            self.port,
+            ssl=ssl_context,
+            ping_interval=ping_interval,  # Send ping every 20s to keep connection alive
+            ping_timeout=ping_timeout,    # Wait 20s for pong before considering connection dead
+            close_timeout=close_timeout,  # Wait 10s for close handshake
+            max_size=2**20,              # 1MB max message size
+            max_queue=32,                # Max queued messages
+            compression=None              # Disable compression for lower latency
         )
         transport = "quic+ws" if self.quic_enabled else "ws"
         logger.info(
@@ -323,7 +385,16 @@ class P2PNetworkManager:
         asyncio.create_task(self._connect_to_peers())
         asyncio.create_task(self._health_check())
         asyncio.create_task(self._broadcast_handshake_periodically())
-        asyncio.create_task(self._broadcast_handshake_periodically())
+
+        # Start connection monitoring task for automatic reconnection
+        # Based on: https://www.lightspark.com/glossary/exponential-backoff
+        self._connection_monitor_task = asyncio.create_task(self._monitor_connections())
+        logger.info("Connection monitoring started", extra={"event": "p2p.monitor_started"})
+
+        # Start periodic sync task to pull missing blocks from peers
+        # Based on research: Bitcoin/Tendermint nodes actively pull blocks when behind
+        self._periodic_sync_task = asyncio.create_task(self._periodic_sync())
+        logger.info("Periodic sync task started", extra={"event": "p2p.periodic_sync_started"})
 
     async def stop(self) -> None:
         """Stops the P2P network manager."""
@@ -340,6 +411,21 @@ class P2PNetworkManager:
 
     async def _send_handshake(self, websocket: Any, peer_id: str) -> None:
         """Send protocol version/capabilities handshake to a peer."""
+        # Build API endpoint URL for this node
+        api_endpoint = None
+        if self.api_port:
+            # Use http:// for local/internal communication
+            api_endpoint = f"http://{self.host}:{self.api_port}"
+            # If host is 0.0.0.0, provide a more usable endpoint
+            if self.host in ("0.0.0.0", "::"):
+                import socket
+                try:
+                    hostname = socket.gethostname()
+                    api_endpoint = f"http://{hostname}:{self.api_port}"
+                except Exception:
+                    # Fallback to localhost
+                    api_endpoint = f"http://localhost:{self.api_port}"
+
         handshake_payload = {
             "type": "handshake",
             "payload": {
@@ -347,11 +433,12 @@ class P2PNetworkManager:
                 "features": list(getattr(P2PSecurityConfig, "SUPPORTED_FEATURES", set())),
                 "node_id": self.peer_manager.encryption._node_identity_fingerprint(),  # noqa: SLF001
                 "height": len(self.blockchain.chain),
+                "api_endpoint": api_endpoint,  # HTTP API endpoint for sync
             },
         }
         await self._send_signed_message(websocket, peer_id, handshake_payload)
 
-    async def _handler(self, websocket: Any, path: str) -> None:
+    async def _handler(self, websocket: Any, path: Optional[str] = None) -> None:
         """Handles incoming WebSocket connections."""
         remote_ip = websocket.remote_address[0]
         if not self.peer_manager.can_connect(remote_ip):
@@ -413,6 +500,34 @@ class P2PNetworkManager:
                 extra={"event": "p2p.peer_disconnected", "peer": peer_id}
             )
 
+    async def _listen_to_outbound_peer(self, websocket: Any, peer_id: str) -> None:
+        """Listen for messages on outbound connections and route them through the main handler."""
+        try:
+            remote_addr = getattr(websocket, "remote_address", None)
+            remote_ip = remote_addr[0] if remote_addr and len(remote_addr) > 0 else "<outbound>"
+        except (TypeError, IndexError, AttributeError):
+            remote_ip = "<outbound>"
+        try:
+            async for message in websocket:
+                await self._handle_message(websocket, message)
+        except ConnectionClosed as exc:
+            self._record_connection_reset_event(peer_id, reason=str(exc))
+            logger.debug(
+                "Outbound connection to peer %s closed: %s",
+                remote_ip,
+                type(exc).__name__,
+                extra={"event": "p2p.outbound_closed", "peer": peer_id},
+            )
+        finally:
+            if peer_id in self.connections or self._handshake_received.get(peer_id) is not None:
+                conn = self.connections.get(peer_id)
+                self._disconnect_peer(peer_id, conn)
+            logger.info(
+                "Outbound peer disconnected: %s",
+                remote_ip,
+                extra={"event": "p2p.outbound_disconnected", "peer": peer_id}
+            )
+
     def _record_connection_reset_event(self, peer_id: str, *, reason: Optional[str] = None, now: Optional[float] = None) -> None:
         """
         Track connection reset/disconnect storms and ban peers that repeatedly reset
@@ -453,7 +568,34 @@ class P2PNetworkManager:
 
     async def _connect_to_peers(self) -> None:
         """Connects to the initial set of peers with backoff/retry."""
-        peers_to_connect = self.peer_manager.discovery.get_random_peers()
+        peers_to_connect = set(self.peer_manager.discovery.get_random_peers())
+        if not peers_to_connect:
+            try:
+                discovered = await self.peer_manager.discover_peers()
+                peers_to_connect = set(discovered or [])
+            except Exception as exc:  # pragma: no cover - defensive logging
+                logger.warning(
+                    "Peer discovery failed during startup: %s",
+                    type(exc).__name__,
+                    extra={"event": "p2p.discovery_failed", "error": str(exc)},
+                )
+        bootstrap_seeds = set(getattr(self.peer_manager.discovery, "bootstrap_nodes", []) or [])
+        peers_to_connect.update(bootstrap_seeds)
+
+        # Add bootstrap nodes to http_peers for periodic sync
+        with self._peer_lock:
+            for peer_uri in bootstrap_seeds:
+                normalized = self._normalize_peer_uri(peer_uri)
+                self.http_peers.add(normalized)
+
+        logger.info(
+            "Bootstrapping P2P connections to %d peers",
+            len(peers_to_connect),
+            extra={
+                "event": "p2p.bootstrap_connect",
+                "peers": list(peers_to_connect),
+            },
+        )
         for peer_uri in peers_to_connect:
             asyncio.create_task(self._connect_with_retry(peer_uri))
 
@@ -465,7 +607,22 @@ class P2PNetworkManager:
                 ssl_context = self.peer_manager.encryption.create_ssl_context(
                     ca_bundle=self.peer_manager.ca_bundle_path
                 )
-                websocket = await websockets.connect(peer_uri, ssl=ssl_context)
+
+                # Configure outbound WebSocket with keep-alive
+                # Based on: https://websockets.readthedocs.io/en/stable/reference/asyncio/client.html
+                ping_interval = int(getattr(Config, "P2P_PING_INTERVAL_SECONDS", 20))
+                ping_timeout = int(getattr(Config, "P2P_PING_TIMEOUT_SECONDS", 20))
+                close_timeout = int(getattr(Config, "P2P_CLOSE_TIMEOUT_SECONDS", 10))
+
+                websocket = await websockets.connect(
+                    peer_uri,
+                    ssl=ssl_context,
+                    ping_interval=ping_interval,
+                    ping_timeout=ping_timeout,
+                    close_timeout=close_timeout,
+                    max_size=2**20,
+                    compression=None
+                )
                 ssl_object = websocket.transport.get_extra_info("ssl_object")
                 fingerprint = self.peer_manager.encryption.fingerprint_from_ssl_object(ssl_object) if ssl_object else None
                 if not self.peer_manager.is_cert_allowed(fingerprint):
@@ -486,14 +643,16 @@ class P2PNetworkManager:
                     extra={"event": "p2p.outbound_connected", "peer": peer_uri}
                 )
                 await self._send_handshake(websocket, peer_id)
+                asyncio.create_task(self._listen_to_outbound_peer(websocket, peer_id))
                 return
             except (WebSocketException, OSError, ConnectionError, asyncio.TimeoutError, ValueError) as e:
-                logger.debug(
+                logger.warning(
                     "Failed to connect to peer %s on attempt %d/%d: %s",
                     peer_uri,
                     attempt + 1,
                     max_retries,
-                    type(e).__name__
+                    type(e).__name__,
+                    extra={"event": "p2p.outbound_retry", "peer": peer_uri, "error_type": type(e).__name__},
                 )
                 if attempt < max_retries - 1:
                     await asyncio.sleep(delay)
@@ -542,6 +701,202 @@ class P2PNetworkManager:
                             "error_type": type(exc).__name__,
                         },
                     )
+
+    async def _monitor_connections(self) -> None:
+        """
+        Monitor connections to persistent peers and automatically reconnect on failure.
+        Implements exponential backoff as recommended by Bitcoin and Tendermint.
+        Based on: https://github.com/tendermint/tendermint/issues/939
+        """
+        monitor_interval = int(getattr(Config, "P2P_MONITOR_INTERVAL_SECONDS", 30))
+        max_backoff = int(getattr(Config, "P2P_MAX_RECONNECT_BACKOFF_SECONDS", 300))
+
+        while True:
+            await asyncio.sleep(monitor_interval)
+
+            # Get persistent peers from bootstrap nodes config
+            if hasattr(self.peer_manager, 'discovery') and hasattr(self.peer_manager.discovery, 'bootstrap_nodes'):
+                bootstrap_peers = set(self.peer_manager.discovery.bootstrap_nodes)
+                self._persistent_peers.update(bootstrap_peers)
+
+            # Check each persistent peer
+            for peer_uri in list(self._persistent_peers):
+                # Skip if already reconnecting
+                if peer_uri in self._reconnect_tasks:
+                    task = self._reconnect_tasks[peer_uri]
+                    if not task.done():
+                        continue
+                    # Clean up completed task
+                    del self._reconnect_tasks[peer_uri]
+
+                # Check if peer is connected
+                is_connected = False
+                with self._peer_lock:
+                    if peer_uri in self.http_peers:
+                        is_connected = True
+                    else:
+                        # Check by hostname match in connections
+                        try:
+                            parsed = urlparse(peer_uri)
+                            hostname = parsed.hostname
+                            for peer_id in self.connections:
+                                if hostname and hostname in peer_id:
+                                    is_connected = True
+                                    break
+                        except Exception:
+                            pass
+
+                # Reconnect if not connected
+                if not is_connected:
+                    logger.info(
+                        "Persistent peer %s disconnected, scheduling reconnection",
+                        peer_uri,
+                        extra={"event": "p2p.persistent_peer_disconnected", "peer_uri": peer_uri}
+                    )
+                    task = asyncio.create_task(self._reconnect_persistent_peer(peer_uri, max_backoff))
+                    self._reconnect_tasks[peer_uri] = task
+
+    async def _periodic_sync(self) -> None:
+        """
+        Periodically check if we're behind peers and sync missing blocks.
+        Based on research findings:
+        - Bitcoin nodes actively request blocks when behind
+        - Tendermint uses periodic state sync
+        - Blockchain nodes need both push (broadcast) AND pull (sync) mechanisms
+        Research sources:
+        - https://developer.bitcoin.org/devguide/p2p_network.html
+        - https://blog.cosmos.network/cosmos-sdk-state-sync-guide-99e4cf43be2f
+        """
+        sync_interval = int(getattr(Config, "P2P_SYNC_INTERVAL_SECONDS", 30))
+        logger.info("Periodic sync configured with interval=%ds", sync_interval, extra={"event": "p2p.periodic_sync_config"})
+
+        while True:
+            logger.info("Periodic sync sleeping for %ds...", sync_interval, extra={"event": "p2p.periodic_sync_sleep"})
+            await asyncio.sleep(sync_interval)
+            logger.info("Periodic sync awake, checking sync status", extra={"event": "p2p.periodic_sync_awake"})
+
+            try:
+                # Get peer API endpoints from connected peers (via handshake)
+                peers = self._get_peer_api_endpoints()
+                logger.info("Periodic sync found %d peer API endpoints: %s", len(peers), peers, extra={"event": "p2p.periodic_sync_peers"})
+                if not peers:
+                    logger.info("Periodic sync: No peer API endpoints, skipping", extra={"event": "p2p.periodic_sync_no_peers"})
+                    continue
+
+                local_height = len(getattr(self.blockchain, "chain", []))
+                logger.info("Periodic sync: Local height=%d", local_height, extra={"event": "p2p.periodic_sync_local_height"})
+                summaries = self._collect_peer_chain_summaries(peers)
+                logger.info("Periodic sync got %d summaries", len(summaries), extra={"event": "p2p.periodic_sync_summaries"})
+
+                if not summaries:
+                    logger.info("Periodic sync: No summaries, skipping", extra={"event": "p2p.periodic_sync_no_summaries"})
+                    continue
+
+                # Check if any peer is ahead
+                max_peer_height = max(s.get("total", 0) for s in summaries)
+                logger.info("Periodic sync: Max peer height=%d", max_peer_height, extra={"event": "p2p.periodic_sync_peer_height"})
+
+                if max_peer_height > local_height:
+                    blocks_behind = max_peer_height - local_height
+                    logger.info(
+                        "Node is %d blocks behind (local: %d, peer max: %d), syncing...",
+                        blocks_behind,
+                        local_height,
+                        max_peer_height,
+                        extra={
+                            "event": "p2p.periodic_sync_needed",
+                            "local_height": local_height,
+                            "peer_height": max_peer_height,
+                            "blocks_behind": blocks_behind
+                        }
+                    )
+
+                    # Call sync in a thread since it's not async
+                    loop = asyncio.get_event_loop()
+                    await loop.run_in_executor(None, self.sync_with_network)
+
+                    # Log result
+                    new_height = len(getattr(self.blockchain, "chain", []))
+                    if new_height > local_height:
+                        logger.info(
+                            "Periodic sync added %d blocks (height: %d -> %d)",
+                            new_height - local_height,
+                            local_height,
+                            new_height,
+                            extra={
+                                "event": "p2p.periodic_sync_success",
+                                "old_height": local_height,
+                                "new_height": new_height,
+                                "blocks_synced": new_height - local_height
+                            }
+                        )
+                    else:
+                        logger.debug(
+                            "Periodic sync completed but no blocks added",
+                            extra={"event": "p2p.periodic_sync_no_progress"}
+                        )
+
+            except Exception as exc:
+                logger.debug(
+                    "Periodic sync encountered error: %s",
+                    exc,
+                    extra={
+                        "event": "p2p.periodic_sync_error",
+                        "error_type": type(exc).__name__
+                    }
+                )
+
+    async def _reconnect_persistent_peer(self, peer_uri: str, max_backoff: int = 300) -> None:
+        """
+        Reconnect to a persistent peer with exponential backoff.
+        Based on: https://docs.cometbft.com/v0.38/spec/p2p/legacy-docs/config
+        """
+        base_delay = 5  # Start with 5 second delay
+        max_attempts = 50  # Try for ~4 hours with exponential backoff
+        delay = base_delay
+
+        for attempt in range(1, max_attempts + 1):
+            try:
+                logger.info(
+                    "Reconnection attempt %d/%d to %s (delay: %ds)",
+                    attempt,
+                    max_attempts,
+                    peer_uri,
+                    delay,
+                    extra={"event": "p2p.reconnect_attempt", "peer_uri": peer_uri, "attempt": attempt}
+                )
+
+                # Try to connect
+                await self._connect_with_retry(peer_uri, max_retries=1, initial_delay=1)
+
+                # Success! Exit the reconnection loop
+                logger.info(
+                    "Successfully reconnected to persistent peer %s after %d attempts",
+                    peer_uri,
+                    attempt,
+                    extra={"event": "p2p.reconnect_success", "peer_uri": peer_uri, "attempts": attempt}
+                )
+                return
+
+            except Exception as exc:
+                logger.debug(
+                    "Reconnection attempt %d failed for %s: %s",
+                    attempt,
+                    peer_uri,
+                    exc,
+                    extra={"event": "p2p.reconnect_failed", "peer_uri": peer_uri, "attempt": attempt}
+                )
+
+                # Exponential backoff with cap
+                delay = min(delay * 2, max_backoff)
+                await asyncio.sleep(delay)
+
+        logger.warning(
+            "Giving up reconnection to %s after %d attempts",
+            peer_uri,
+            max_attempts,
+            extra={"event": "p2p.reconnect_gave_up", "peer_uri": peer_uri}
+        )
 
     async def _disconnect_idle_connections(self) -> None:
         """Close peers that have been idle beyond the configured timeout."""
@@ -739,6 +1094,8 @@ class P2PNetworkManager:
 
     def _log_security_event(self, peer_id: str, message: str) -> None:
         """Log security-related events with lightweight rate limiting to avoid log flooding."""
+        if os.getenv("XAI_P2P_DISABLE_SECURITY_EVENTS", "0").lower() in {"1", "true", "yes", "on"}:
+            return
         if self.security_log_limiter.is_rate_limited(peer_id):
             return
         logger.warning(
@@ -754,11 +1111,23 @@ class P2PNetworkManager:
         )
         
     async def _handle_message(self, websocket: Optional[WebSocketServerProtocol], message: Union[str, bytes]) -> None:
-        """Handles incoming messages from peers."""
+        """Handles incoming messages from peers, splitting concatenated messages on newlines."""
         remote_addr = getattr(websocket, "remote_address", ("<quic>", 0))
         fallback_peer = remote_addr[0] if isinstance(remote_addr, (tuple, list)) and remote_addr else str(remote_addr)
         peer_id = self.websocket_peer_ids.get(websocket, fallback_peer)
-        raw_bytes = message if isinstance(message, (bytes, bytearray)) else message.encode("utf-8")
+
+        # Convert to string and split on newlines to handle concatenated messages
+        message_str = message if isinstance(message, str) else message.decode("utf-8", errors="replace")
+        individual_messages = [msg.strip() for msg in message_str.split("\n") if msg.strip()]
+
+        # Process each message separately
+        for msg in individual_messages:
+            await self._process_single_message(websocket, peer_id, msg.encode("utf-8"))
+
+    async def _process_single_message(self, websocket: Optional[WebSocketServerProtocol], peer_id: str, raw_bytes: bytes) -> None:
+        """Process a single message from a peer."""
+        debug_signing = bool(int(os.getenv("XAI_P2P_DEBUG_SIGNING", "0")))
+        message_data: Optional[Dict[str, Any]] = None
         now = time.time()
         if peer_id in self._connection_last_seen:
             self._connection_last_seen[peer_id] = now
@@ -793,14 +1162,29 @@ class P2PNetworkManager:
             return
 
         try:
-            # Verify message signature
             verified_message = self.peer_manager.encryption.verify_signed_message(raw_bytes)
+            message_data = verified_message
             if not verified_message:
+                digest = hashlib.sha256(raw_bytes).hexdigest()
+                preview = raw_bytes[:512].decode("utf-8", errors="replace")
+                logger.warning(
+                    "Signature verification failed for peer %s (size=%d, sha256=%s)%s",
+                    peer_id[:16],
+                    len(raw_bytes),
+                    digest,
+                    f" preview={preview}" if debug_signing else "",
+                    extra={
+                        "event": "p2p.invalid_signature",
+                        "peer": peer_id,
+                        "sha256": digest,
+                        "preview": preview if debug_signing else None,
+                    },
+                )
                 self._log_security_event(peer_id, "invalid_or_stale_signature")
                 self._emit_security_event(
                     event_type="p2p.invalid_signature",
                     severity="WARNING",
-                    payload={"peer": peer_id},
+                    payload={"peer": peer_id, "sha256": digest},
                 )
                 self.peer_manager.reputation.record_invalid_transaction(peer_id) # Generic penalty
                 return
@@ -876,6 +1260,19 @@ class P2PNetworkManager:
                 self.peer_features[peer_id] = payload or {}
                 self._handshake_received[peer_id] = time.time()
                 self._handshake_deadlines.pop(peer_id, None)
+
+                # Extract and store peer's API endpoint for HTTP sync
+                if payload and isinstance(payload, dict):
+                    api_endpoint = payload.get("api_endpoint")
+                    if api_endpoint:
+                        with self._peer_lock:
+                            self.peer_api_endpoints[peer_id] = api_endpoint
+                        logger.info(
+                            "Stored API endpoint for peer %s: %s",
+                            peer_id[:16],
+                            api_endpoint,
+                            extra={"event": "p2p.peer_api_endpoint_stored", "peer": peer_id}
+                        )
                 return
             if message_type == "transaction":
                 dedup_id = self._derive_payload_fingerprint(payload, ("txid", "hash", "id"))
@@ -923,7 +1320,9 @@ class P2PNetworkManager:
             elif message_type == "chain":
                 self.received_chains.append(payload)
             elif message_type == "get_peers":
-                peers = list(self.peer_manager.connected_peers.keys())
+                peers = self._http_peers_snapshot()
+                bootstrap = getattr(self.peer_manager.discovery, "bootstrap_nodes", []) or []
+                peers.extend([seed for seed in bootstrap if seed not in peers])
                 await self._send_signed_message(
                     websocket,
                     peer_id,
@@ -963,18 +1362,51 @@ class P2PNetworkManager:
                     extra={"event": "p2p.unknown_message_type", "peer": peer_id}
                 )
         except json.JSONDecodeError:
+            preview = raw_bytes[:256].decode("utf-8", errors="replace") if isinstance(raw_bytes, (bytes, bytearray)) else str(raw_bytes)[:256]
             logger.warning(
-                "Invalid JSON received from peer %s",
+                "Invalid JSON received from peer %s preview=%s",
                 peer_id[:16],
-                extra={"event": "p2p.invalid_json", "peer": peer_id}
+                preview,
+                extra={"event": "p2p.invalid_json", "peer": peer_id, "preview": preview}
             )
             self.peer_manager.reputation.record_invalid_transaction(peer_id)
         except (ValueError, TypeError, AttributeError, RuntimeError, KeyError) as e:
+            message_preview = raw_bytes[:256].decode("utf-8", errors="replace") if isinstance(raw_bytes, (bytes, bytearray)) else str(raw_bytes)[:256]
+            msg_type = None
+            block_prev = None
+            block_index = None
+            try:
+                msg_type = (message_data or {}).get("type") or (message_data or {}).get("payload", {}).get("type")
+            except Exception:
+                msg_type = None
+            try:
+                parsed = message_data or json.loads(raw_bytes.decode("utf-8"))
+                inner = parsed.get("message", parsed) if isinstance(parsed, dict) else {}
+                payload_dict = inner.get("payload", {}) if isinstance(inner, dict) else {}
+                block_payload = payload_dict.get("payload", payload_dict) if isinstance(payload_dict, dict) else {}
+                if isinstance(block_payload, dict):
+                    block_prev = block_payload.get("previous_hash")
+                    block_index = block_payload.get("index")
+            except Exception:
+                block_prev = block_prev
             logger.error(
-                "Error handling message from peer %s: %s",
+                "Error handling message from peer %s: %s (%s) type=%s preview=%s prev=%s idx=%s",
                 peer_id[:16],
                 type(e).__name__,
-                extra={"event": "p2p.message_handling_error", "peer": peer_id}
+                str(e),
+                msg_type,
+                message_preview,
+                block_prev,
+                block_index,
+                extra={
+                    "event": "p2p.message_handling_error",
+                    "peer": peer_id,
+                    "error": str(e),
+                    "message_type": msg_type,
+                    "preview": message_preview,
+                    "block_previous_hash": block_prev,
+                    "block_index": block_index,
+                }
             )
             self.peer_manager.reputation.record_invalid_transaction(peer_id)
 
@@ -1080,10 +1512,11 @@ class P2PNetworkManager:
             signed_message = self.peer_manager.encryption.create_signed_message(message)
         except (ValueError, RuntimeError) as exc:
             logger.error(
-                "Failed to sign message for peer %s: %s",
+                "Failed to sign message for peer %s: %s - %s",
                 peer_id[:16],
                 type(exc).__name__,
-                extra={"event": "p2p.sign_failed", "peer": peer_id}
+                str(exc),
+                extra={"event": "p2p.sign_failed", "peer": peer_id, "error_message": str(exc)}
             )
             return
 
@@ -1108,7 +1541,8 @@ class P2PNetworkManager:
             return
 
         try:
-            await websocket.send(signed_message.decode("utf-8"))
+            # Add newline delimiter to prevent message concatenation
+            await websocket.send(signed_message.decode("utf-8") + "\n")
         except (ConnectionClosed, WebSocketException, OSError, RuntimeError) as exc:
             logger.error(
                 "Error sending message to peer %s: %s",
@@ -1176,13 +1610,27 @@ class P2PNetworkManager:
         with self._peer_lock:
             return list(self.http_peers)
 
+    def _get_peer_api_endpoints(self) -> list[str]:
+        """Get list of connected peers' HTTP API endpoints."""
+        with self._peer_lock:
+            return list(self.peer_api_endpoints.values())
+
     def _dispatch_async(self, coro: Any) -> None:
-        """Run or schedule an asyncio coroutine even when no loop is running."""
+        """Schedule an asyncio coroutine on the main event loop."""
+        # Try to get the currently running loop
         try:
             loop = asyncio.get_running_loop()
-            loop.create_task(coro)
         except RuntimeError:
-            asyncio.run(coro)
+            # No running loop - use stored loop or get the default one
+            loop = self._loop or asyncio.get_event_loop()
+
+        # Schedule the coroutine as a task
+        if loop.is_running():
+            # Loop is running - schedule task using call_soon_threadsafe for thread safety
+            asyncio.run_coroutine_threadsafe(coro, loop)
+        else:
+            # Loop exists but not running yet - create task directly
+            loop.create_task(coro)
 
     def _get_checkpoint_metadata(self) -> Optional[Dict[str, Any]]:
         """Return highest checkpoint metadata from peers or local store."""
@@ -1395,13 +1843,26 @@ class P2PNetworkManager:
         txid = payload.get("txid")
         if txid:
             self._announce_inventory(transactions=[txid])
-        for peer_uri in self._http_peers_snapshot():
+
+        # Use peer API endpoints from handshake (HTTP URLs)
+        peer_endpoints = self._get_peer_api_endpoints()
+        if not peer_endpoints:
+            # Fallback to legacy http_peers if no API endpoints available yet
+            peer_endpoints = self._http_peers_snapshot()
+
+        for peer_uri in peer_endpoints:
             endpoint = f"{peer_uri.rstrip('/')}/transaction/receive"
             try:
+                # Create signed message for the transaction payload
+                signed_message_bytes = self.peer_manager.encryption.create_signed_message(payload)
+
                 response = requests.post(
                     endpoint,
-                    json=payload,
-                    headers=self._peer_headers(),
+                    data=signed_message_bytes,
+                    headers={
+                        **(self._peer_headers() or {}),
+                        "Content-Type": "application/json"
+                    },
                     timeout=self._http_timeout,
                 )
                 if response.status_code >= 400:
@@ -1436,18 +1897,38 @@ class P2PNetworkManager:
         block_hash = payload.get("hash") or payload.get("block_hash")
         if block_hash:
             self._announce_inventory(blocks=[block_hash])
-        for peer_uri in self._http_peers_snapshot():
+
+        # Use peer API endpoints from handshake (HTTP URLs)
+        peer_endpoints = self._get_peer_api_endpoints()
+        if not peer_endpoints:
+            # Fallback to legacy http_peers if no API endpoints available yet
+            peer_endpoints = self._http_peers_snapshot()
+
+        for peer_uri in peer_endpoints:
             endpoint = f"{peer_uri.rstrip('/')}/block/receive"
             try:
-                requests.post(
+                # Create signed message for the block payload
+                signed_message_bytes = self.peer_manager.encryption.create_signed_message(message["payload"])
+
+                response = requests.post(
                     endpoint,
-                    json=message["payload"],
-                    headers=self._peer_headers(),
+                    data=signed_message_bytes,
+                    headers={
+                        **(self._peer_headers() or {}),
+                        "Content-Type": "application/json"
+                    },
                     timeout=self._http_timeout,
                 )
+                if response.status_code == 200:
+                    logger.info(
+                        "Broadcast block %s to %s",
+                        block_hash[:16] if block_hash else "unknown",
+                        peer_uri,
+                        extra={"event": "p2p.block_broadcast_success"}
+                    )
             except (NetworkError, requests.RequestException, ConnectionError, OSError, TimeoutError) as e:
                 # Network error broadcasting block - peer may be down, continue to others
-                logger.debug(
+                logger.warning(
                     "Failed to broadcast block to %s: %s",
                     peer_uri,
                     e,
@@ -1776,7 +2257,11 @@ class P2PNetworkManager:
 
     def _http_sync(self) -> bool:
         """HTTP-based synchronization for manually registered peers."""
-        peers = self._http_peers_snapshot()
+        # Get API endpoints from connected peers (via handshake)
+        peers = self._get_peer_api_endpoints()
+        if not peers:
+            # Fallback to legacy http_peers if no API endpoints available yet
+            peers = self._http_peers_snapshot()
         if not peers:
             return False
 
@@ -1972,6 +2457,9 @@ class P2PNetworkManager:
         if longest_chain:
             self.blockchain.chain = longest_chain.chain
             self.blockchain.pending_transactions = longest_chain.pending_transactions
+            new_diff = getattr(longest_chain, "difficulty", None)
+            if isinstance(new_diff, (int, float)) and new_diff > 0:
+                self.blockchain.difficulty = new_diff
             return True
         return False
 
@@ -1981,9 +2469,11 @@ class P2PNetworkManager:
         if self._http_sync():
             return True
         try:
-            ws_synced = asyncio.run(self._ws_sync())
+            asyncio.get_running_loop()
         except RuntimeError:
-            # Already inside an event loop; schedule and return False to avoid blocking
+            ws_synced = asyncio.run(self._ws_sync())
+        else:
+            # Already inside an event loop; schedule without blocking
             self._dispatch_async(self._ws_sync())
             ws_synced = False
         return partial_applied or ws_synced

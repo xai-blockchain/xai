@@ -186,6 +186,11 @@ class MiningRateLimitError(MiningError):
     recoverable = True  # Can retry after rate limit window
 
 
+class MiningAbortedError(MiningError):
+    """Raised when mining is aborted due to receiving a peer block at the same height."""
+    recoverable = True  # Can retry mining next block
+
+
 # ==================== Smart Contract & VM Errors ====================
 
 

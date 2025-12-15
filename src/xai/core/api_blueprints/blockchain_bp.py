@@ -236,6 +236,14 @@ def receive_block() -> Tuple[Dict[str, Any], int]:
         payload = verified.get("payload")
         sender_id = verified.get("sender")
         nonce = verified.get("nonce")
+        # Debug: log payload structure
+        logger.info(
+            "Received block payload: type=%s, keys=%s, preview=%s",
+            type(payload).__name__,
+            list(payload.keys()) if isinstance(payload, dict) else "N/A",
+            str(payload)[:200] if payload else "None",
+            extra={"event": "p2p.block_receive_debug"}
+        )
         if not sender_id or not nonce:
             return error_response(
                 "Unauthorized P2P message",
@@ -262,14 +270,24 @@ def receive_block() -> Tuple[Dict[str, Any], int]:
             status=400,
             code="invalid_payload",
         )
-    header = payload.get("header") if isinstance(payload, dict) else None
-    required_header = ["index", "previous_hash", "merkle_root", "timestamp", "difficulty", "nonce"]
-    if not header or any(header.get(f) in (None, "") for f in required_header):
+    # Support both nested format (with "header" key) and flat format (Block.to_dict())
+    required_fields = ["index", "previous_hash", "merkle_root", "timestamp", "difficulty", "nonce"]
+    if isinstance(payload, dict):
+        # Check if payload has nested header or flat structure
+        check_dict = payload.get("header") if "header" in payload else payload
+        missing_fields = [f for f in required_fields if check_dict.get(f) in (None, "")]
+        if missing_fields:
+            return error_response(
+                "Invalid block payload",
+                status=400,
+                code="invalid_payload",
+                context={"missing_header_fields": missing_fields},
+            )
+    else:
         return error_response(
             "Invalid block payload",
             status=400,
             code="invalid_payload",
-            context={"missing_header_fields": [f for f in required_header if not header or header.get(f) in (None, "")]},
         )
 
     try:

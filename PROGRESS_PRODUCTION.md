@@ -8,6 +8,7 @@
 - QUIC client sends now use bounded dial timeouts with error counters, and the security ops dashboard includes a QUIC error panel (datasource uid `prometheus`).
 - `./k8s/apply-monitoring-overlays.sh` publishes Alertmanager/Prometheus/Grafana overlays (SIEM routes + fast-mining panels) to staging/prod namespaces; verify via `verify-deployment.sh`.
 - Local smoke harness (`scripts/ci/kind_monitoring_smoke.sh`) spins up the Kind dev cluster, applies overlays, injects a mock SIEM, and runs the verifier/probe without needing staging/prod access.
+- Docker 4-node testnet stabilization underway: P2P fingerprints now derive from signing keys (tolerant on testnet), compose disables geo diversity for local peering, and P2P port logging aligns to 8765; rebuild/health verification pending.
 - Kind smoke test executed (2025-11-30) and returned `[OK] Monitoring overlay verification completed without critical failures` with the SIEM probe succeeding against the mock endpoint.
 - Local pytest sanity: `.venv` created, `pip install -e . && -r requirements.txt` applied, and `tests/xai_tests/unit/test_p2p_security_probes.py` passes (pytest 9.0.1).
 - Local Docker/Kind dev cluster (`k8s/kind/dev-cluster.yaml`) spins up a control-plane + worker pair for monitoring dry-runs; namespace `xai-blockchain` hosts the applied Alertmanager/Prometheus/Grafana configmaps.
@@ -28,3 +29,4 @@
    - To unblock: supply a populated kubeconfig (see `k8s/kubeconfig.staging-prod.example`), export it via `export KUBECONFIG=/path/to/kubeconfig`, then select `kubectl config use-context xai-staging-monitoring` (or `xai-prod-monitoring`) before running `./k8s/apply-monitoring-overlays.sh <namespace>` and `./k8s/verify-monitoring-overlays.sh --namespace=<monitoring-ns> --alertmanager-service=<svc> --probe-siem`.
 2) Validate Grafana auto-provisions `xai-grafana-security-ops` (datasource uid `prometheus`) and renders the fast-mining + QUIC error panels in staging/prod after overlays are applied (local validator now confirms datasource + QUIC panels).
 3) Re-run full suite or pre-merge CI gate once staging configs are applied to ensure no regressions.
+4) [ ] Rebuild docker 4-node testnet with the relaxed P2P fingerprint/diversity settings and confirm peers connect (health endpoints >0 peers, explorer stable).

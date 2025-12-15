@@ -65,84 +65,71 @@ docker-compose logs -f xai-node
 
 ### Testnet Setup
 
-For a complete multi-node testnet:
+For detailed testnet setup instructions with proven consensus configurations, see **[docker/testnet/TESTNET_SETUP.md](testnet/TESTNET_SETUP.md)**.
+
+#### Quick Start Options
 
 ```bash
-cp .env.example .env
 cd docker/testnet
-docker compose up -d
+
+# 1-Node (development/API testing)
+docker compose -f docker-compose.one-node.yml up -d --build
+
+# 2-Node (minimal consensus testing)
+docker compose -f docker-compose.two-node.yml up -d --build
+
+# 3-Node (recommended for consensus debugging - 100% consensus)
+docker compose -f docker-compose.three-node.yml up -d --build
+
+# 4-Node (full mesh network - 98%+ consensus)
+docker compose -f docker-compose.four-node.yml up -d --build
+
+# Sentry nodes (public relay testing)
+docker compose -f docker-compose.sentry.yml up -d --build
 ```
 
-This starts:
-- 1 Bootstrap node (mining enabled)
-- 2 Peer nodes
-- PostgreSQL database
-- Redis cache
-- Prometheus + Grafana monitoring
-- Block explorer
+#### Available Configurations
 
-### Monitoring Validation Workflow
+| Configuration | Nodes | Use Case | Expected Consensus |
+|--------------|-------|----------|-------------------|
+| `docker-compose.one-node.yml` | 1 | Development, API testing | N/A |
+| `docker-compose.two-node.yml` | 2 | Minimal consensus testing | 100% |
+| `docker-compose.three-node.yml` | 3 | Consensus debugging | 100% |
+| `docker-compose.four-node.yml` | 4 | Full mesh connectivity | 98%+ |
+| `docker-compose.sentry.yml` | 4+2 | Validator + relay nodes | 98%+ |
 
-Use this when you need a locally running node plus Prometheus/Grafana to exercise new dashboards or alert rules.
+#### Port Allocations
 
-1. **Copy the default env file** (needed by several containers):
+| Node | API | P2P | Metrics |
+|------|-----|-----|---------|
+| Bootstrap | 12001 | 12002 | 12070 |
+| Node 1 | 12011 | 12012 | 12071 |
+| Node 2 | 12021 | 12022 | 12072 |
+| Node 3 | 12031 | 12032 | 12073 |
+| Sentry 1 | 12041 | 12042 | 12074 |
+| Sentry 2 | 12051 | 12052 | 12075 |
+| Explorer | 12080 | - | - |
 
-   ```bash
-   cp .env.example .env
-   ```
+**Note:** All configurations use subnet 172.30.1.0/24 with gateway 172.30.1.1.
 
-2. **Start the testnet stack**. If port `9091` is already in use on your workstation, scale `xai-testnet-node1` to zero so only the bootstrap node and node2 expose metrics ports:
+### Monitoring and Verification
 
-   ```bash
-   cd docker/testnet
-   docker compose up -d --scale xai-testnet-node1=0
-   ```
+Use these commands to verify testnet health:
 
-   Exposed ports (all on localhost):
-   - Bootstrap API/WebSocket: `8080/8081`
-   - Bootstrap Prometheus exporter: `9090`
-   - Node2 API: `8085`
-   - Node2 Prometheus exporter: `9092`
-   - Postgres: `5433`
-   - Redis: `6380`
-   - Prometheus UI: `9093`
-   - Grafana UI: `3001`
-   - Explorer UI: `8082`
+```bash
+# Check node health (replace PORT with actual port)
+curl http://localhost:12001/health
 
-3. **Verify containers are healthy**:
+# Compare block heights across nodes
+for port in 12001 12011 12021 12031; do
+  echo "Port $port: $(curl -s http://localhost:$port/block/latest | jq '{height: .block_number, hash: .hash[0:16]}')"
+done
 
-   ```bash
-   docker ps
-   # Expect: xai-testnet-bootstrap, xai-testnet-node2, postgres, redis, prometheus, grafana, explorer
-   ```
+# View container logs
+docker logs xai-testnet-bootstrap -f --tail 100
+```
 
-4. **Generate `/send` rejection metrics** so the new dashboard panels/alerts have data:
-
-   ```bash
-   # Stale timestamp
-   curl -s -X POST http://localhost:8080/send \
-     -H "Content-Type: application/json" \
-     -d '{"sender":"XAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","recipient":"XAIBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB","amount":1,"fee":0.001,"public_key":"04CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC","nonce":1,"signature":"ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB","timestamp":1000}'
-
-   # TXID mismatch (set timestamp to current time)
-   curl -s -X POST http://localhost:8080/send \
-     -H "Content-Type: application/json" \
-     -d '{"sender":"XAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","recipient":"XAIBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB","amount":1,"fee":0.001,"public_key":"04CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC","nonce":2,"signature":"ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB","timestamp":'$(date +%s)',"txid":"deadbeef"}'
-   ```
-
-   Each failing request increments `xai_send_rejections_*` counters.
-
-5. **Inspect dashboards/alerts**:
-   - Grafana: http://localhost:3001 (default credentials `admin/admin`). Open the “Security Operations” dashboard and look for the “/send Rejections by Reason” panel.
-   - Prometheus rules: http://localhost:9093/rules (the `SendTimestampDrift` alert transitions to `pending` after a few samples).
-
-6. **Stop the stack when finished**:
-
-   ```bash
-   docker compose down
-   ```
-
-   If you scaled node1 to zero when starting, the `down` command tears everything down (no need to repeat the `--scale` flag).
+For detailed monitoring setup with Prometheus and Grafana, see the monitoring configurations in `docker/testnet/monitoring/`.
 
 ## Architecture
 

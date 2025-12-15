@@ -70,12 +70,16 @@ make clean          # Clean up resources
 
 | Service | URL | Default Credentials |
 |---------|-----|-------------------|
-| API | http://localhost:8080 | - |
-| Block Explorer | http://localhost:8082 | - |
-| Grafana | http://localhost:3000 | admin/admin |
-| Prometheus | http://localhost:9091 | - |
-| PostgreSQL | localhost:5432 | xai/[password] |
-| Redis | localhost:6379 | - |
+| Bootstrap API | http://localhost:12001 | - |
+| Node1 API | http://localhost:12011 | - |
+| Node2 API | http://localhost:12021 | - |
+| Node3 API | http://localhost:12031 | - |
+| Block Explorer | http://localhost:12080 | - |
+| Grafana | http://localhost:12030 | admin/testnet123 |
+| Prometheus | http://localhost:12090 | - |
+| Faucet | http://localhost:12060 | - |
+| PostgreSQL | testnet-postgres:5432 (internal) | xai_testnet/testnet_password |
+| Redis | testnet-redis:6379 (internal) | - |
 
 ## Testnet
 
@@ -97,11 +101,15 @@ make testnet-down
 
 | Service | URL |
 |---------|-----|
-| Bootstrap Node | http://localhost:8080 |
-| Node 1 | http://localhost:8084 |
-| Node 2 | http://localhost:8085 |
-| Explorer | http://localhost:8087 |
-| Grafana | http://localhost:3001 |
+| Bootstrap Node | http://localhost:12001 |
+| Node 1 | http://localhost:12011 |
+| Node 2 | http://localhost:12021 |
+| Node 3 | http://localhost:12031 |
+| Explorer | http://localhost:12080 |
+| Grafana | http://localhost:12030 |
+
+- P2P websockets listen on 8765 in each container (host forwards 12002/12012/12022/12032); `XAI_NODE_PORT` is set to 8765 so logs match the actual listener.
+- Peer diversity/geo limits are disabled in `docker/testnet/docker-compose.yml` (`XAI_P2P_*` zeros/high unknown threshold) to allow all validators to connect on the same local /16 with self-signed certs.
 
 ## Database
 
@@ -139,10 +147,10 @@ docker-compose exec redis /bin/sh
 docker stats
 
 # Check health
-curl http://localhost:8080/health
+curl http://localhost:12001/health
 
 # Prometheus metrics
-curl http://localhost:9090/metrics
+curl http://localhost:12070/metrics
 
 # View specific service stats
 docker stats xai-node
@@ -177,7 +185,7 @@ make db-restore BACKUP=db-20250112.sql
 make health
 
 # Individual checks
-curl http://localhost:8080/health
+curl http://localhost:12001/health
 docker-compose exec postgres pg_isready
 docker-compose exec redis redis-cli ping
 ```
@@ -315,11 +323,11 @@ docker system prune -af --volumes
 ### Port Already in Use
 ```bash
 # Check what's using the port
-netstat -ano | findstr :8080  # Windows
-lsof -i :8080                 # Linux/Mac
+netstat -ano | findstr :12001  # Windows
+lsof -i :12001                 # Linux/Mac
 
 # Change port in .env
-XAI_API_PORT=8090
+XAI_API_PORT=12001
 ```
 
 ## Performance Tuning
@@ -368,16 +376,16 @@ docker scout cves xai-node
 
 ```bash
 # Health check
-curl http://localhost:8080/health
+curl http://localhost:12001/health
 
 # Get blockchain info
-curl http://localhost:8080/api/v1/blockchain/info
+curl http://localhost:12001/api/v1/blockchain/info
 
 # Get latest blocks
-curl http://localhost:8080/api/v1/blocks?limit=10
+curl http://localhost:12001/api/v1/blocks?limit=10
 
 # Get peers
-curl http://localhost:8080/api/v1/peers
+curl http://localhost:12001/api/v1/peers
 ```
 
 ## Useful Docker Commands

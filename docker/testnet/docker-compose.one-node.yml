@@ -1,0 +1,147 @@
+# XAI Blockchain - Single Node Testnet
+# Minimal setup for development, API testing, and mining validation
+# This configuration runs a single validator node with empty block mining enabled
+
+services:
+  xai-testnet-bootstrap:
+    build:
+      context: ../..
+      dockerfile: docker/node/Dockerfile
+    container_name: xai-testnet-bootstrap
+    hostname: bootstrap-node
+    restart: unless-stopped
+    environment:
+      XAI_ENV: testnet
+      XAI_NETWORK: testnet
+      XAI_API_PORT: 12001
+      XAI_METRICS_PORT: 12070
+      XAI_DEFAULT_HOST: 0.0.0.0
+      # No bootstrap nodes - this is the only node
+      XAI_P2P_BOOTSTRAP_NODES: ""
+      # Mining configuration
+      XAI_FAST_MINING: "1"
+      XAI_ALLOW_EMPTY_MINING: "1"
+      XAI_MINING_HEARTBEAT_SECONDS: "5"
+      XAI_MINING_COOLDOWN_SECONDS: "10.0"
+      # Disable geo/ASN diversity for local testnet
+      XAI_P2P_MAX_PEERS_PER_PREFIX: "0"
+      XAI_P2P_MAX_PEERS_PER_ASN: "0"
+      XAI_P2P_MAX_PEERS_PER_COUNTRY: "0"
+      XAI_P2P_MIN_UNIQUE_PREFIXES: "0"
+      XAI_P2P_MIN_UNIQUE_ASNS: "0"
+      XAI_P2P_MIN_UNIQUE_COUNTRIES: "0"
+      XAI_P2P_MAX_UNKNOWN_GEO: "100"
+      # Security settings (enable signature verification)
+      XAI_P2P_POW_ENABLED: "0"
+      XAI_P2P_DEBUG_SIGNING: "1"
+      XAI_P2P_DISABLE_SIGNATURE_VERIFY: "0"
+      XAI_P2P_DISABLE_SECURITY_EVENTS: "1"
+      # P2P configuration
+      XAI_NODE_PORT: 8765
+      XAI_P2P_PING_INTERVAL_SECONDS: "20"
+      XAI_P2P_PING_TIMEOUT_SECONDS: "20"
+      XAI_P2P_CLOSE_TIMEOUT_SECONDS: "10"
+      XAI_P2P_MONITOR_INTERVAL_SECONDS: "30"
+      XAI_P2P_MAX_RECONNECT_BACKOFF_SECONDS: "300"
+      XAI_P2P_SYNC_INTERVAL_SECONDS: "30"
+      XAI_P2P_MAX_CONNECTIONS_PER_IP: "50"
+      # Logging
+      LOG_LEVEL: DEBUG
+      # Database configuration
+      POSTGRES_HOST: testnet-postgres
+      REDIS_HOST: testnet-redis
+      POSTGRES_DB: xai_testnet
+      POSTGRES_USER: xai_testnet
+      POSTGRES_PASSWORD: testnet_password
+    ports:
+      - "12001:12001"
+      - "12002:8765"
+      - "12070:12070"
+    volumes:
+      - bootstrap-data:/data
+      - bootstrap-logs:/logs
+      - ./config:/config:ro
+    networks:
+      testnet-network:
+        ipv4_address: 172.30.1.10
+    depends_on:
+      - testnet-postgres
+      - testnet-redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:12001/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  testnet-postgres:
+    image: postgres:15-alpine
+    container_name: xai-testnet-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: xai_testnet
+      POSTGRES_USER: xai_testnet
+      POSTGRES_PASSWORD: testnet_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - testnet-postgres-data:/var/lib/postgresql/data
+    networks:
+      testnet-network:
+        ipv4_address: 172.30.1.20
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xai_testnet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  testnet-redis:
+    image: redis:7-alpine
+    container_name: xai-testnet-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - testnet-redis-data:/data
+    networks:
+      testnet-network:
+        ipv4_address: 172.30.1.21
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  testnet-explorer:
+    build:
+      context: ../..
+      dockerfile: docker/explorer/Dockerfile
+    container_name: xai-testnet-explorer
+    restart: unless-stopped
+    environment:
+      XAI_API_URL: http://xai-testnet-bootstrap:12001
+      EXPLORER_PORT: 12080
+      EXPLORER_ENV: testnet
+    ports:
+      - "12080:12080"
+    networks:
+      testnet-network:
+        ipv4_address: 172.30.1.31
+    depends_on:
+      - xai-testnet-bootstrap
+
+networks:
+  testnet-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.1.0/24
+          gateway: 172.30.1.1
+
+volumes:
+  bootstrap-data:
+  bootstrap-logs:
+  testnet-postgres-data:
+  testnet-redis-data:

@@ -1,16 +1,12 @@
-# XAI Blockchain - Default Testnet Configuration (4-Node)
-# Bootstrap validator + 3 peer validators with proven 98%+ consensus settings
-#
-# For other configurations, see:
-# - docker-compose.one-node.yml   (single node for development)
-# - docker-compose.two-node.yml   (minimal 2-node consensus testing)
-# - docker-compose.three-node.yml (3-node with 100% consensus)
-# - docker-compose.four-node.yml  (same as this file)
-# - docker-compose.sentry.yml     (4 validators + 2 sentry relay nodes)
-#
-# Documentation: TESTNET_SETUP.md
+# XAI Blockchain - Sentry Node Testnet
+# 4 validator nodes + 2 sentry (relay) nodes for realistic network testing
+# Sentry nodes do NOT mine - they relay blocks between validators and public network
 
 services:
+  # ==========================================================================
+  # VALIDATOR NODES (Mining Enabled)
+  # ==========================================================================
+
   xai-testnet-bootstrap:
     build:
       context: ../..
@@ -24,11 +20,12 @@ services:
       XAI_API_PORT: 12001
       XAI_METRICS_PORT: 12070
       XAI_DEFAULT_HOST: 0.0.0.0
-      XAI_P2P_BOOTSTRAP_NODES: "wss://xai-testnet-node1:8765,wss://xai-testnet-node2:8765,wss://xai-testnet-node3:8765"
+      # Connect to validators and sentries
+      XAI_P2P_BOOTSTRAP_NODES: "wss://xai-testnet-node1:8765,wss://xai-testnet-node2:8765,wss://xai-testnet-node3:8765,wss://xai-testnet-sentry1:8765,wss://xai-testnet-sentry2:8765"
       XAI_FAST_MINING: "1"
       XAI_ALLOW_EMPTY_MINING: "1"
       XAI_MINING_HEARTBEAT_SECONDS: "5"
-      XAI_MINING_COOLDOWN_SECONDS: "12.0"
+      XAI_MINING_COOLDOWN_SECONDS: "10.0"
       XAI_P2P_MAX_PEERS_PER_PREFIX: "0"
       XAI_P2P_MAX_PEERS_PER_ASN: "0"
       XAI_P2P_MAX_PEERS_PER_COUNTRY: "0"
@@ -88,11 +85,11 @@ services:
       XAI_API_PORT: 12011
       XAI_METRICS_PORT: 12071
       XAI_DEFAULT_HOST: 0.0.0.0
-      XAI_P2P_BOOTSTRAP_NODES: "wss://xai-testnet-bootstrap:8765,wss://xai-testnet-node2:8765,wss://xai-testnet-node3:8765"
+      XAI_P2P_BOOTSTRAP_NODES: "wss://xai-testnet-bootstrap:8765,wss://xai-testnet-node2:8765,wss://xai-testnet-node3:8765,wss://xai-testnet-sentry1:8765,wss://xai-testnet-sentry2:8765"
       XAI_FAST_MINING: "1"
       XAI_ALLOW_EMPTY_MINING: "0"
       XAI_MINING_HEARTBEAT_SECONDS: "5"
-      XAI_MINING_COOLDOWN_SECONDS: "12.0"
+      XAI_MINING_COOLDOWN_SECONDS: "10.0"
       XAI_P2P_MAX_PEERS_PER_PREFIX: "0"
       XAI_P2P_MAX_PEERS_PER_ASN: "0"
       XAI_P2P_MAX_PEERS_PER_COUNTRY: "0"
@@ -147,11 +144,11 @@ services:
       XAI_API_PORT: 12021
       XAI_METRICS_PORT: 12072
       XAI_DEFAULT_HOST: 0.0.0.0
-      XAI_P2P_BOOTSTRAP_NODES: "wss://xai-testnet-bootstrap:8765,wss://xai-testnet-node1:8765,wss://xai-testnet-node3:8765"
+      XAI_P2P_BOOTSTRAP_NODES: "wss://xai-testnet-bootstrap:8765,wss://xai-testnet-node1:8765,wss://xai-testnet-node3:8765,wss://xai-testnet-sentry1:8765,wss://xai-testnet-sentry2:8765"
       XAI_FAST_MINING: "1"
       XAI_ALLOW_EMPTY_MINING: "0"
       XAI_MINING_HEARTBEAT_SECONDS: "5"
-      XAI_MINING_COOLDOWN_SECONDS: "12.0"
+      XAI_MINING_COOLDOWN_SECONDS: "10.0"
       XAI_P2P_MAX_PEERS_PER_PREFIX: "0"
       XAI_P2P_MAX_PEERS_PER_ASN: "0"
       XAI_P2P_MAX_PEERS_PER_COUNTRY: "0"
@@ -206,11 +203,11 @@ services:
       XAI_API_PORT: 12031
       XAI_METRICS_PORT: 12073
       XAI_DEFAULT_HOST: 0.0.0.0
-      XAI_P2P_BOOTSTRAP_NODES: "wss://xai-testnet-bootstrap:8765,wss://xai-testnet-node1:8765,wss://xai-testnet-node2:8765"
+      XAI_P2P_BOOTSTRAP_NODES: "wss://xai-testnet-bootstrap:8765,wss://xai-testnet-node1:8765,wss://xai-testnet-node2:8765,wss://xai-testnet-sentry1:8765,wss://xai-testnet-sentry2:8765"
       XAI_FAST_MINING: "1"
       XAI_ALLOW_EMPTY_MINING: "0"
       XAI_MINING_HEARTBEAT_SECONDS: "5"
-      XAI_MINING_COOLDOWN_SECONDS: "12.0"
+      XAI_MINING_COOLDOWN_SECONDS: "10.0"
       XAI_P2P_MAX_PEERS_PER_PREFIX: "0"
       XAI_P2P_MAX_PEERS_PER_ASN: "0"
       XAI_P2P_MAX_PEERS_PER_COUNTRY: "0"
@@ -251,6 +248,144 @@ services:
       - xai-testnet-bootstrap
       - testnet-postgres
       - testnet-redis
+
+  # ==========================================================================
+  # SENTRY NODES (Non-Mining Relay Nodes)
+  # ==========================================================================
+  # Sentry nodes:
+  # - Do NOT mine blocks (XAI_FAST_MINING: "0")
+  # - Relay blocks between validators and external network
+  # - Protect validator IPs from public exposure
+  # - Accept connections from public peers
+  # ==========================================================================
+
+  xai-testnet-sentry1:
+    build:
+      context: ../..
+      dockerfile: docker/node/Dockerfile
+    container_name: xai-testnet-sentry1
+    hostname: testnet-sentry-1
+    restart: unless-stopped
+    environment:
+      XAI_ENV: testnet
+      XAI_NETWORK: testnet
+      XAI_API_PORT: 12041
+      XAI_METRICS_PORT: 12074
+      XAI_DEFAULT_HOST: 0.0.0.0
+      # Sentry connects to all validators and other sentries
+      XAI_P2P_BOOTSTRAP_NODES: "wss://xai-testnet-bootstrap:8765,wss://xai-testnet-node1:8765,wss://xai-testnet-node2:8765,wss://xai-testnet-node3:8765,wss://xai-testnet-sentry2:8765"
+      # SENTRY SPECIFIC: Mining DISABLED - relay only
+      XAI_FAST_MINING: "0"
+      XAI_ALLOW_EMPTY_MINING: "0"
+      XAI_MINING_HEARTBEAT_SECONDS: "5"
+      XAI_MINING_COOLDOWN_SECONDS: "10.0"
+      XAI_P2P_MAX_PEERS_PER_PREFIX: "0"
+      XAI_P2P_MAX_PEERS_PER_ASN: "0"
+      XAI_P2P_MAX_PEERS_PER_COUNTRY: "0"
+      XAI_P2P_MIN_UNIQUE_PREFIXES: "0"
+      XAI_P2P_MIN_UNIQUE_ASNS: "0"
+      XAI_P2P_MIN_UNIQUE_COUNTRIES: "0"
+      XAI_P2P_MAX_UNKNOWN_GEO: "100"
+      XAI_P2P_POW_ENABLED: "0"
+      XAI_P2P_DEBUG_SIGNING: "1"
+      XAI_P2P_DISABLE_SIGNATURE_VERIFY: "0"
+      XAI_P2P_DISABLE_SECURITY_EVENTS: "1"
+      XAI_NODE_PORT: 8765
+      XAI_P2P_PING_INTERVAL_SECONDS: "20"
+      XAI_P2P_PING_TIMEOUT_SECONDS: "20"
+      XAI_P2P_CLOSE_TIMEOUT_SECONDS: "10"
+      XAI_P2P_MONITOR_INTERVAL_SECONDS: "30"
+      XAI_P2P_MAX_RECONNECT_BACKOFF_SECONDS: "300"
+      XAI_P2P_SYNC_INTERVAL_SECONDS: "30"
+      # SENTRY SPECIFIC: Higher connection limit for public peers
+      XAI_P2P_MAX_CONNECTIONS_PER_IP: "100"
+      LOG_LEVEL: INFO
+      POSTGRES_HOST: testnet-postgres
+      REDIS_HOST: testnet-redis
+      POSTGRES_DB: xai_testnet
+      POSTGRES_USER: xai_testnet
+      POSTGRES_PASSWORD: testnet_password
+    ports:
+      - "12041:12041"
+      - "12042:8765"
+      - "12074:12074"
+    volumes:
+      - sentry1-data:/data
+      - sentry1-logs:/logs
+      - ./config:/config:ro
+    networks:
+      testnet-network:
+        ipv4_address: 172.30.1.41
+    depends_on:
+      - xai-testnet-bootstrap
+      - testnet-postgres
+      - testnet-redis
+
+  xai-testnet-sentry2:
+    build:
+      context: ../..
+      dockerfile: docker/node/Dockerfile
+    container_name: xai-testnet-sentry2
+    hostname: testnet-sentry-2
+    restart: unless-stopped
+    environment:
+      XAI_ENV: testnet
+      XAI_NETWORK: testnet
+      XAI_API_PORT: 12051
+      XAI_METRICS_PORT: 12075
+      XAI_DEFAULT_HOST: 0.0.0.0
+      # Sentry connects to all validators and other sentries
+      XAI_P2P_BOOTSTRAP_NODES: "wss://xai-testnet-bootstrap:8765,wss://xai-testnet-node1:8765,wss://xai-testnet-node2:8765,wss://xai-testnet-node3:8765,wss://xai-testnet-sentry1:8765"
+      # SENTRY SPECIFIC: Mining DISABLED - relay only
+      XAI_FAST_MINING: "0"
+      XAI_ALLOW_EMPTY_MINING: "0"
+      XAI_MINING_HEARTBEAT_SECONDS: "5"
+      XAI_MINING_COOLDOWN_SECONDS: "10.0"
+      XAI_P2P_MAX_PEERS_PER_PREFIX: "0"
+      XAI_P2P_MAX_PEERS_PER_ASN: "0"
+      XAI_P2P_MAX_PEERS_PER_COUNTRY: "0"
+      XAI_P2P_MIN_UNIQUE_PREFIXES: "0"
+      XAI_P2P_MIN_UNIQUE_ASNS: "0"
+      XAI_P2P_MIN_UNIQUE_COUNTRIES: "0"
+      XAI_P2P_MAX_UNKNOWN_GEO: "100"
+      XAI_P2P_POW_ENABLED: "0"
+      XAI_P2P_DEBUG_SIGNING: "1"
+      XAI_P2P_DISABLE_SIGNATURE_VERIFY: "0"
+      XAI_P2P_DISABLE_SECURITY_EVENTS: "1"
+      XAI_NODE_PORT: 8765
+      XAI_P2P_PING_INTERVAL_SECONDS: "20"
+      XAI_P2P_PING_TIMEOUT_SECONDS: "20"
+      XAI_P2P_CLOSE_TIMEOUT_SECONDS: "10"
+      XAI_P2P_MONITOR_INTERVAL_SECONDS: "30"
+      XAI_P2P_MAX_RECONNECT_BACKOFF_SECONDS: "300"
+      XAI_P2P_SYNC_INTERVAL_SECONDS: "30"
+      # SENTRY SPECIFIC: Higher connection limit for public peers
+      XAI_P2P_MAX_CONNECTIONS_PER_IP: "100"
+      LOG_LEVEL: INFO
+      POSTGRES_HOST: testnet-postgres
+      REDIS_HOST: testnet-redis
+      POSTGRES_DB: xai_testnet
+      POSTGRES_USER: xai_testnet
+      POSTGRES_PASSWORD: testnet_password
+    ports:
+      - "12051:12051"
+      - "12052:8765"
+      - "12075:12075"
+    volumes:
+      - sentry2-data:/data
+      - sentry2-logs:/logs
+      - ./config:/config:ro
+    networks:
+      testnet-network:
+        ipv4_address: 172.30.1.42
+    depends_on:
+      - xai-testnet-bootstrap
+      - testnet-postgres
+      - testnet-redis
+
+  # ==========================================================================
+  # INFRASTRUCTURE
+  # ==========================================================================
 
   testnet-postgres:
     image: postgres:15-alpine
@@ -323,9 +458,13 @@ volumes:
   node1-data:
   node2-data:
   node3-data:
+  sentry1-data:
+  sentry2-data:
   bootstrap-logs:
   node1-logs:
   node2-logs:
   node3-logs:
+  sentry1-logs:
+  sentry2-logs:
   testnet-postgres-data:
   testnet-redis-data:

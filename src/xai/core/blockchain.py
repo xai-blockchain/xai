@@ -341,6 +341,14 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         self._mempool_lock = threading.RLock()
         self.seen_txids: set[str] = set()
         self._sender_pending_count: dict[str, int] = defaultdict(int)
+
+        # Mining coordination to prevent race conditions during block propagation
+        # When a peer block is received, mining pauses for a cooldown period to allow
+        # all network blocks to propagate before resuming, preventing simultaneous mining
+        self._last_peer_block_time: float = 0.0
+        self._mining_cooldown_seconds: float = float(os.getenv("XAI_MINING_COOLDOWN_SECONDS", "5.0"))
+        self._abort_current_mining: bool = False  # Flag to abort ongoing mining when peer block received
+        self._mining_target_height: Optional[int] = None  # Height currently being mined
         self.max_reorg_depth = int(os.getenv("XAI_MAX_REORG_DEPTH", "100"))
         self.max_orphan_blocks = int(os.getenv("XAI_MAX_ORPHAN_BLOCKS", "200"))
 
@@ -804,7 +812,28 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
     @classmethod
     def deserialize_block(cls, block_data: Dict[str, Any]) -> Block:
-        header_data = block_data.get("header", {})
+        # Accept both nested-header and flattened block dicts over the wire
+        header_data = {}
+        if isinstance(block_data, dict):
+            header_data = dict(block_data.get("header") or {})
+        if not header_data:
+            header_data = {
+                "index": block_data.get("index", 0),
+                "previous_hash": block_data.get("previous_hash"),
+                "merkle_root": block_data.get("merkle_root"),
+                "timestamp": block_data.get("timestamp", time.time()),
+                "difficulty": block_data.get("difficulty", 4),
+                "nonce": block_data.get("nonce", 0),
+                "signature": block_data.get("signature"),
+                "miner_pubkey": block_data.get("miner_pubkey"),
+                "version": block_data.get("version"),
+            }
+        # Ensure required header fields exist even when peers omit them
+        header_data.setdefault("previous_hash", "0" * 64)
+        header_data.setdefault("merkle_root", hashlib.sha256(b"").hexdigest())
+        header_data.setdefault("timestamp", time.time())
+        header_data.setdefault("difficulty", 4)
+        header_data.setdefault("nonce", 0)
         header = BlockHeader(
             index=header_data.get("index", 0),
             previous_hash=header_data.get("previous_hash", "0"),
@@ -823,7 +852,24 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
     def deserialize_chain(cls, chain_data: List[Dict[str, Any]]) -> List[BlockHeader]:
         headers = []
         for bd in chain_data:
-            header_data = bd.get("header", {})
+            header_data = dict(bd.get("header") or {})
+            if not header_data:
+                header_data = {
+                    "index": bd.get("index", 0),
+                    "previous_hash": bd.get("previous_hash"),
+                    "merkle_root": bd.get("merkle_root"),
+                    "timestamp": bd.get("timestamp", time.time()),
+                    "difficulty": bd.get("difficulty", 4),
+                    "nonce": bd.get("nonce", 0),
+                    "signature": bd.get("signature"),
+                    "miner_pubkey": bd.get("miner_pubkey"),
+                    "version": bd.get("version"),
+                }
+            header_data.setdefault("previous_hash", "0" * 64)
+            header_data.setdefault("merkle_root", hashlib.sha256(b"").hexdigest())
+            header_data.setdefault("timestamp", time.time())
+            header_data.setdefault("difficulty", 4)
+            header_data.setdefault("nonce", 0)
             header = BlockHeader(
                 index=header_data.get("index", 0),
                 previous_hash=header_data.get("previous_hash", "0"),
@@ -2874,9 +2920,36 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         """Return a copy of the recent timestamp drift history for diagnostics."""
         return list(self._timestamp_drift_history)
 
+    def should_pause_mining(self) -> bool:
+        """
+        Check if mining should be paused due to recent peer block reception.
+
+        Returns True if a block was received from a peer within the cooldown period,
+        preventing race conditions during block propagation across the network.
+        """
+        if self._last_peer_block_time == 0.0:
+            return False  # No peer blocks received yet
+        time_since_peer_block = time.time() - self._last_peer_block_time
+        return time_since_peer_block < self._mining_cooldown_seconds
+
     def _add_block_to_chain(self, block: Block) -> bool:
         """Helper method to add a validated block to the chain."""
         self.chain.append(block)
+
+        # Update mining coordination timestamp when receiving peer blocks
+        # This signals mining to pause for the cooldown period to prevent race conditions
+        self._last_peer_block_time = time.time()
+
+        # If we're currently mining a block at this height, abort it immediately
+        # This prevents creating competing blocks at the same height
+        if self._mining_target_height is not None and block.index == self._mining_target_height:
+            self._abort_current_mining = True
+            self.logger.info(
+                "Aborting current mining: peer block received at target height",
+                target_height=self._mining_target_height,
+                peer_block_hash=block.hash[:16],
+            )
+
         self._process_governance_block_transactions(block)
         if self.smart_contract_manager:
             receipts = self.smart_contract_manager.process_block(block)
@@ -3493,6 +3566,52 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 "difficulty": self.difficulty,
             },
         }
+
+    def from_dict(self, data: Dict[str, Any]) -> SimpleNamespace:
+        """
+        Materialize a lightweight blockchain snapshot from serialized data.
+
+        Args:
+            data: Dict produced by to_dict() containing chain/pending/difficulty
+
+        Returns:
+            SimpleNamespace with `chain`, `pending_transactions`, and `difficulty`
+        """
+        if not isinstance(data, dict):
+            raise ValueError("Serialized blockchain data must be a dict")
+
+        raw_chain = data.get("chain") or []
+        materialized_chain = []
+        for block_dict in raw_chain:
+            try:
+                block = self.deserialize_block(block_dict)
+                materialized_chain.append(block)
+            except (ValueError, KeyError, TypeError) as exc:
+                self.logger.debug(
+                    "Failed to deserialize block from peer data",
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                )
+                return SimpleNamespace(chain=[], pending_transactions=[], difficulty=self.difficulty)
+
+        raw_pending = data.get("pending_transactions") or []
+        pending_txs = []
+        for tx_dict in raw_pending:
+            try:
+                pending_txs.append(self._transaction_from_dict(tx_dict))
+            except (ValueError, KeyError, TypeError) as exc:
+                self.logger.debug(
+                    "Failed to deserialize pending transaction from peer data",
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                )
+
+        difficulty = data.get("difficulty", self.difficulty)
+        return SimpleNamespace(
+            chain=materialized_chain,
+            pending_transactions=pending_txs,
+            difficulty=difficulty,
+        )
 
     def _block_to_full_dict(self, block: Any) -> Dict[str, Any]:
         """Convert a block (header or full) to dictionary with transactions."""

@@ -1378,9 +1378,10 @@ class NodeAPIRoutes:
                     status=400,
                     code="invalid_payload",
                 )
-            header = payload.get("header") if isinstance(payload, dict) else None
+            # Support both nested format (with "header" key) and flat format (Block.to_dict())
+            header = payload.get("header") if "header" in payload else payload
             required_header = ["index", "previous_hash", "merkle_root", "timestamp", "difficulty", "nonce"]
-            if not header or any(header.get(f) in (None, "") for f in required_header):
+            if not isinstance(header, dict) or any(header.get(f) in (None, "") for f in required_header):
                 return self._error_response(
                     "Invalid block payload",
                     status=400,

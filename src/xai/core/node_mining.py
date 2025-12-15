@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 import time
 import threading
+import random
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
@@ -81,8 +82,20 @@ class MiningManager:
         This method runs in a background thread and continuously checks for
         pending transactions to mine. When transactions are available, it mines
         a new block and broadcasts it to peers.
+
+        Mining is paused for a cooldown period after receiving blocks from peers
+        to prevent race conditions during block propagation across the network.
         """
         while self.is_mining:
+            # Check if mining should be paused due to recent peer block reception
+            if self.blockchain.should_pause_mining():
+                time.sleep(0.5)  # Wait briefly and check again
+                continue
+
+            # Add random jitter (0-1 second) to prevent synchronized mining attempts
+            # This ensures nodes don't all start mining at exactly the same moment
+            time.sleep(random.uniform(0, 1.0))
+
             if self.blockchain.pending_transactions:
                 tx_count = len(self.blockchain.pending_transactions)
                 print(f"⛏️  Mining block with {tx_count} transactions...")

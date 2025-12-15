@@ -62,6 +62,7 @@ from xai.core.security_middleware import setup_security_middleware, SecurityConf
 from xai.core.request_validator_middleware import setup_request_validation
 from xai.core.node_identity import load_or_create_identity
 from xai.core.partial_sync import PartialSyncCoordinator
+from xai.core.transaction import Transaction
 
 
 class CORSPolicyManager:
@@ -430,6 +431,7 @@ class BlockchainNode:
 
         # Peer-to-peer networking
         self.peer_manager = PeerManager(
+            max_connections_per_ip=getattr(Config, "P2P_MAX_CONNECTIONS_PER_IP", 50),
             trusted_peer_pubkeys=getattr(Config, "TRUSTED_PEER_PUBKEYS", []),
             trusted_cert_fingerprints=getattr(Config, "TRUSTED_PEER_CERT_FINGERPRINTS", []),
             trusted_peer_pubkeys_file=getattr(Config, "TRUSTED_PEER_PUBKEYS_FILE", None) or None,
@@ -446,11 +448,20 @@ class BlockchainNode:
             consensus_manager=self.consensus_manager,
             host=self.host,
             port=kwargs.get("p2p_port", 8765),
+            api_port=self.port,  # Pass HTTP API port for handshake
         )
         # Provide P2P to partial sync after creation
         self.partial_sync_coordinator.p2p_manager = self.p2p_manager
         # Provide identity to P2P manager
         setattr(self.p2p_manager, "node_identity", self.identity)
+
+        # Mining heartbeat (allow empty blocks on idle testnet)
+        heartbeat_env = os.getenv("XAI_ALLOW_EMPTY_MINING", "0").lower()
+        self.allow_empty_mining = heartbeat_env in {"1", "true", "yes", "on"}
+        try:
+            self.mining_heartbeat_seconds = max(1, int(os.getenv("XAI_MINING_HEARTBEAT_SECONDS", "10")))
+        except ValueError:
+            self.mining_heartbeat_seconds = 10
 
         # Setup security middleware
         security_config = SecurityConfig()
@@ -874,7 +885,22 @@ class BlockchainNode:
         whenever there are pending transactions.
         """
         while self.is_mining:
-            if self.blockchain.pending_transactions:
+            should_mine = bool(self.blockchain.pending_transactions)
+            if self.allow_empty_mining and not should_mine:
+                # Emit a heartbeat block after a small idle window so the chain advances
+                if time.time() - self.last_mining_time >= self.mining_heartbeat_seconds:
+                    hb_tx = Transaction(
+                        sender="COINBASE",
+                        recipient=self.miner_address,
+                        amount=0,
+                        tx_type="heartbeat",
+                        outputs=[{"address": self.miner_address, "amount": 0}],
+                    )
+                    hb_tx.txid = hb_tx.calculate_hash()
+                    self.blockchain.pending_transactions.append(hb_tx)
+                    should_mine = True
+
+            if should_mine:
                 try:
                     logger.debug(
                         "Mining block with %d transactions",
@@ -894,6 +920,7 @@ class BlockchainNode:
                     if time_since_last_block > 0:
                         mining_rate = self.mined_blocks_counter / time_since_last_block
                         self.metrics_collector.get_metric("xai_mining_rate_blocks_per_second").set(mining_rate)
+                    self.last_mining_time = time.time()
 
                     if self.mined_blocks_counter > 100:
                         self.mined_blocks_counter = 0

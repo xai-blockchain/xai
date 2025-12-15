@@ -14,6 +14,7 @@ Protects against:
 import re
 import logging
 import json
+import os
 from typing import Any, Union, Dict, Callable, List
 from datetime import datetime, timezone
 
@@ -45,6 +46,8 @@ class SecurityEventRouter:
 
     @classmethod
     def dispatch(cls, event_type: str, details: Dict[str, Any], severity: str) -> None:
+        if os.getenv("XAI_P2P_DISABLE_SECURITY_EVENTS", "0").lower() in {"1", "true", "yes", "on"}:
+            return
         for sink in list(cls._sinks):
             try:
                 sink(event_type, details, severity)

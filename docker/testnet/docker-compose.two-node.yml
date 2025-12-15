@@ -1,16 +1,14 @@
-# XAI Blockchain - Default Testnet Configuration (4-Node)
-# Bootstrap validator + 3 peer validators with proven 98%+ consensus settings
-#
-# For other configurations, see:
-# - docker-compose.one-node.yml   (single node for development)
-# - docker-compose.two-node.yml   (minimal 2-node consensus testing)
-# - docker-compose.three-node.yml (3-node with 100% consensus)
-# - docker-compose.four-node.yml  (same as this file)
-# - docker-compose.sentry.yml     (4 validators + 2 sentry relay nodes)
-#
-# Documentation: TESTNET_SETUP.md
+version: '3.8'
+
+# ============================================================================
+# XAI Blockchain - Two Node Testnet
+# Minimal setup (bootstrap + 1 peer validator) for faster consensus debugging
+# ============================================================================
 
 services:
+  # --------------------------------------------------------------------------
+  # Bootstrap Node
+  # --------------------------------------------------------------------------
   xai-testnet-bootstrap:
     build:
       context: ../..
@@ -24,11 +22,11 @@ services:
       XAI_API_PORT: 12001
       XAI_METRICS_PORT: 12070
       XAI_DEFAULT_HOST: 0.0.0.0
-      XAI_P2P_BOOTSTRAP_NODES: "wss://xai-testnet-node1:8765,wss://xai-testnet-node2:8765,wss://xai-testnet-node3:8765"
+      XAI_P2P_BOOTSTRAP_NODES: "wss://xai-testnet-node1:8765"
       XAI_FAST_MINING: "1"
       XAI_ALLOW_EMPTY_MINING: "1"
       XAI_MINING_HEARTBEAT_SECONDS: "5"
-      XAI_MINING_COOLDOWN_SECONDS: "12.0"
+      XAI_MINING_COOLDOWN_SECONDS: "10.0"
       XAI_P2P_MAX_PEERS_PER_PREFIX: "0"
       XAI_P2P_MAX_PEERS_PER_ASN: "0"
       XAI_P2P_MAX_PEERS_PER_COUNTRY: "0"
@@ -44,9 +42,12 @@ services:
       XAI_P2P_PING_INTERVAL_SECONDS: "20"
       XAI_P2P_PING_TIMEOUT_SECONDS: "20"
       XAI_P2P_CLOSE_TIMEOUT_SECONDS: "10"
+      # Connection monitoring and reconnection
       XAI_P2P_MONITOR_INTERVAL_SECONDS: "30"
       XAI_P2P_MAX_RECONNECT_BACKOFF_SECONDS: "300"
+      # Periodic sync to pull missing blocks from peers
       XAI_P2P_SYNC_INTERVAL_SECONDS: "30"
+      # Increase connection limits for testnet (all containers same subnet)
       XAI_P2P_MAX_CONNECTIONS_PER_IP: "50"
       LOG_LEVEL: DEBUG
       POSTGRES_HOST: testnet-postgres
@@ -75,6 +76,9 @@ services:
       retries: 3
       start_period: 60s
 
+  # --------------------------------------------------------------------------
+  # Validator Node 1
+  # --------------------------------------------------------------------------
   xai-testnet-node1:
     build:
       context: ../..
@@ -88,11 +92,11 @@ services:
       XAI_API_PORT: 12011
       XAI_METRICS_PORT: 12071
       XAI_DEFAULT_HOST: 0.0.0.0
-      XAI_P2P_BOOTSTRAP_NODES: "wss://xai-testnet-bootstrap:8765,wss://xai-testnet-node2:8765,wss://xai-testnet-node3:8765"
+      XAI_P2P_BOOTSTRAP_NODES: "wss://xai-testnet-bootstrap:8765"
       XAI_FAST_MINING: "1"
       XAI_ALLOW_EMPTY_MINING: "0"
       XAI_MINING_HEARTBEAT_SECONDS: "5"
-      XAI_MINING_COOLDOWN_SECONDS: "12.0"
+      XAI_MINING_COOLDOWN_SECONDS: "10.0"
       XAI_P2P_MAX_PEERS_PER_PREFIX: "0"
       XAI_P2P_MAX_PEERS_PER_ASN: "0"
       XAI_P2P_MAX_PEERS_PER_COUNTRY: "0"
@@ -108,9 +112,12 @@ services:
       XAI_P2P_PING_INTERVAL_SECONDS: "20"
       XAI_P2P_PING_TIMEOUT_SECONDS: "20"
       XAI_P2P_CLOSE_TIMEOUT_SECONDS: "10"
+      # Connection monitoring and reconnection
       XAI_P2P_MONITOR_INTERVAL_SECONDS: "30"
       XAI_P2P_MAX_RECONNECT_BACKOFF_SECONDS: "300"
+      # Periodic sync to pull missing blocks from peers
       XAI_P2P_SYNC_INTERVAL_SECONDS: "30"
+      # Increase connection limits for testnet (all containers same subnet)
       XAI_P2P_MAX_CONNECTIONS_PER_IP: "50"
       LOG_LEVEL: INFO
       POSTGRES_HOST: testnet-postgres
@@ -134,124 +141,9 @@ services:
       - testnet-postgres
       - testnet-redis
 
-  xai-testnet-node2:
-    build:
-      context: ../..
-      dockerfile: docker/node/Dockerfile
-    container_name: xai-testnet-node2
-    hostname: testnet-node-2
-    restart: unless-stopped
-    environment:
-      XAI_ENV: testnet
-      XAI_NETWORK: testnet
-      XAI_API_PORT: 12021
-      XAI_METRICS_PORT: 12072
-      XAI_DEFAULT_HOST: 0.0.0.0
-      XAI_P2P_BOOTSTRAP_NODES: "wss://xai-testnet-bootstrap:8765,wss://xai-testnet-node1:8765,wss://xai-testnet-node3:8765"
-      XAI_FAST_MINING: "1"
-      XAI_ALLOW_EMPTY_MINING: "0"
-      XAI_MINING_HEARTBEAT_SECONDS: "5"
-      XAI_MINING_COOLDOWN_SECONDS: "12.0"
-      XAI_P2P_MAX_PEERS_PER_PREFIX: "0"
-      XAI_P2P_MAX_PEERS_PER_ASN: "0"
-      XAI_P2P_MAX_PEERS_PER_COUNTRY: "0"
-      XAI_P2P_MIN_UNIQUE_PREFIXES: "0"
-      XAI_P2P_MIN_UNIQUE_ASNS: "0"
-      XAI_P2P_MIN_UNIQUE_COUNTRIES: "0"
-      XAI_P2P_MAX_UNKNOWN_GEO: "100"
-      XAI_P2P_POW_ENABLED: "0"
-      XAI_P2P_DEBUG_SIGNING: "1"
-      XAI_P2P_DISABLE_SIGNATURE_VERIFY: "0"
-      XAI_P2P_DISABLE_SECURITY_EVENTS: "1"
-      XAI_NODE_PORT: 8765
-      XAI_P2P_PING_INTERVAL_SECONDS: "20"
-      XAI_P2P_PING_TIMEOUT_SECONDS: "20"
-      XAI_P2P_CLOSE_TIMEOUT_SECONDS: "10"
-      XAI_P2P_MONITOR_INTERVAL_SECONDS: "30"
-      XAI_P2P_MAX_RECONNECT_BACKOFF_SECONDS: "300"
-      XAI_P2P_SYNC_INTERVAL_SECONDS: "30"
-      XAI_P2P_MAX_CONNECTIONS_PER_IP: "50"
-      LOG_LEVEL: INFO
-      POSTGRES_HOST: testnet-postgres
-      REDIS_HOST: testnet-redis
-      POSTGRES_DB: xai_testnet
-      POSTGRES_USER: xai_testnet
-      POSTGRES_PASSWORD: testnet_password
-    ports:
-      - "12021:12021"
-      - "12022:8765"
-      - "12072:12072"
-    volumes:
-      - node2-data:/data
-      - node2-logs:/logs
-      - ./config:/config:ro
-    networks:
-      testnet-network:
-        ipv4_address: 172.30.1.12
-    depends_on:
-      - xai-testnet-bootstrap
-      - testnet-postgres
-      - testnet-redis
-
-  xai-testnet-node3:
-    build:
-      context: ../..
-      dockerfile: docker/node/Dockerfile
-    container_name: xai-testnet-node3
-    hostname: testnet-node-3
-    restart: unless-stopped
-    environment:
-      XAI_ENV: testnet
-      XAI_NETWORK: testnet
-      XAI_API_PORT: 12031
-      XAI_METRICS_PORT: 12073
-      XAI_DEFAULT_HOST: 0.0.0.0
-      XAI_P2P_BOOTSTRAP_NODES: "wss://xai-testnet-bootstrap:8765,wss://xai-testnet-node1:8765,wss://xai-testnet-node2:8765"
-      XAI_FAST_MINING: "1"
-      XAI_ALLOW_EMPTY_MINING: "0"
-      XAI_MINING_HEARTBEAT_SECONDS: "5"
-      XAI_MINING_COOLDOWN_SECONDS: "12.0"
-      XAI_P2P_MAX_PEERS_PER_PREFIX: "0"
-      XAI_P2P_MAX_PEERS_PER_ASN: "0"
-      XAI_P2P_MAX_PEERS_PER_COUNTRY: "0"
-      XAI_P2P_MIN_UNIQUE_PREFIXES: "0"
-      XAI_P2P_MIN_UNIQUE_ASNS: "0"
-      XAI_P2P_MIN_UNIQUE_COUNTRIES: "0"
-      XAI_P2P_MAX_UNKNOWN_GEO: "100"
-      XAI_P2P_POW_ENABLED: "0"
-      XAI_P2P_DEBUG_SIGNING: "1"
-      XAI_P2P_DISABLE_SIGNATURE_VERIFY: "0"
-      XAI_P2P_DISABLE_SECURITY_EVENTS: "1"
-      XAI_NODE_PORT: 8765
-      XAI_P2P_PING_INTERVAL_SECONDS: "20"
-      XAI_P2P_PING_TIMEOUT_SECONDS: "20"
-      XAI_P2P_CLOSE_TIMEOUT_SECONDS: "10"
-      XAI_P2P_MONITOR_INTERVAL_SECONDS: "30"
-      XAI_P2P_MAX_RECONNECT_BACKOFF_SECONDS: "300"
-      XAI_P2P_SYNC_INTERVAL_SECONDS: "30"
-      XAI_P2P_MAX_CONNECTIONS_PER_IP: "50"
-      LOG_LEVEL: INFO
-      POSTGRES_HOST: testnet-postgres
-      REDIS_HOST: testnet-redis
-      POSTGRES_DB: xai_testnet
-      POSTGRES_USER: xai_testnet
-      POSTGRES_PASSWORD: testnet_password
-    ports:
-      - "12031:12031"
-      - "12032:8765"
-      - "12073:12073"
-    volumes:
-      - node3-data:/data
-      - node3-logs:/logs
-      - ./config:/config:ro
-    networks:
-      testnet-network:
-        ipv4_address: 172.30.1.13
-    depends_on:
-      - xai-testnet-bootstrap
-      - testnet-postgres
-      - testnet-redis
-
+  # --------------------------------------------------------------------------
+  # PostgreSQL Database
+  # --------------------------------------------------------------------------
   testnet-postgres:
     image: postgres:15-alpine
     container_name: xai-testnet-postgres
@@ -272,6 +164,9 @@ services:
       timeout: 5s
       retries: 5
 
+  # --------------------------------------------------------------------------
+  # Redis Cache
+  # --------------------------------------------------------------------------
   testnet-redis:
     image: redis:7-alpine
     container_name: xai-testnet-redis
@@ -292,6 +187,9 @@ services:
       timeout: 5s
       retries: 5
 
+  # --------------------------------------------------------------------------
+  # Explorer (optional but useful for quick block visibility)
+  # --------------------------------------------------------------------------
   testnet-explorer:
     build:
       context: ../..
@@ -310,6 +208,9 @@ services:
     depends_on:
       - xai-testnet-bootstrap
 
+# ============================================================================
+# Network / Volumes
+# ============================================================================
 networks:
   testnet-network:
     driver: bridge
@@ -321,11 +222,7 @@ networks:
 volumes:
   bootstrap-data:
   node1-data:
-  node2-data:
-  node3-data:
   bootstrap-logs:
   node1-logs:
-  node2-logs:
-  node3-logs:
   testnet-postgres-data:
   testnet-redis-data:

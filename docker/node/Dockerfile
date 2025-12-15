@@ -16,13 +16,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libssl-dev \
     libffi-dev \
     python3-dev \
+    pkg-config \
+    libsecp256k1-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python dependencies
 COPY pyproject.toml ./
+COPY constraints.txt ./constraints.txt
+COPY README.md ./README.md
+COPY src/ ./src/
 
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir .
+    pip install --no-cache-dir -c constraints.txt .
 
 # ============================================================================
 # Stage 2: Runtime

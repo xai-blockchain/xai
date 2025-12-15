@@ -1,14 +1,5 @@
-# XAI Blockchain - Default Testnet Configuration (4-Node)
-# Bootstrap validator + 3 peer validators with proven 98%+ consensus settings
-#
-# For other configurations, see:
-# - docker-compose.one-node.yml   (single node for development)
-# - docker-compose.two-node.yml   (minimal 2-node consensus testing)
-# - docker-compose.three-node.yml (3-node with 100% consensus)
-# - docker-compose.four-node.yml  (same as this file)
-# - docker-compose.sentry.yml     (4 validators + 2 sentry relay nodes)
-#
-# Documentation: TESTNET_SETUP.md
+# XAI Blockchain - Four Node Testnet
+# Bootstrap validator + 3 peer validators for consensus debugging and full mesh connectivity
 
 services:
   xai-testnet-bootstrap:
