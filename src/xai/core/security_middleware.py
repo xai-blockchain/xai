@@ -20,6 +20,7 @@ import hmac
 import json
 import re
 import logging
+import threading
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List, Tuple, Callable
 from collections import defaultdict
@@ -32,6 +33,14 @@ import html
 # Security logger
 security_logger = logging.getLogger("xai.security.middleware")
 security_logger.setLevel(logging.INFO)
+
+# Password hashing - use bcrypt for secure password verification
+try:
+    import bcrypt
+    BCRYPT_AVAILABLE = True
+except ImportError:
+    BCRYPT_AVAILABLE = False
+    security_logger.warning("bcrypt not available - using PBKDF2 fallback for password hashing")
 
 if not security_logger.handlers:
     handler = logging.StreamHandler()
@@ -92,6 +101,8 @@ class SecurityConfig:
         "/peer",
         "/faucet/claim",
         "/csrf-token",  # Endpoint to get CSRF token
+        "/block/receive",  # P2P block broadcasting
+        "/transaction/receive",  # P2P transaction broadcasting
     ]
     CSRF_EXEMPT_METHODS: List[str] = ["GET", "HEAD", "OPTIONS"]
 
@@ -229,13 +240,21 @@ class TokenManager:
 
 
 class RateLimiter:
-    """Advanced rate limiting with endpoint-specific rules."""
+    """Advanced rate limiting with endpoint-specific rules and memory management."""
+
+    # Memory management constants
+    MAX_HISTORY_ENTRIES = 50000  # Maximum unique IP:endpoint combinations to track
+    MAX_BLOCKED_IPS = 10000  # Maximum blocked IPs to track
+    CLEANUP_INTERVAL = 1000  # Run cleanup every N requests
+    STALE_ENTRY_AGE = 3600  # Remove entries older than 1 hour (seconds)
 
     def __init__(self):
-        """Initialize rate limiter."""
+        """Initialize rate limiter with memory-safe defaults."""
         self.request_history: Dict[str, List[float]] = defaultdict(list)
         self.blocked_ips: Dict[str, datetime] = {}
         self.failed_attempts: Dict[str, int] = defaultdict(int)
+        self._request_count = 0  # Counter for cleanup scheduling
+        self._last_access: Dict[str, float] = {}  # Track last access time for LRU eviction
 
     def get_client_ip(self) -> str:
         """Get client IP address from request."""
@@ -257,14 +276,103 @@ class RateLimiter:
 
     def block_ip(self, client_ip: str) -> None:
         """Block an IP address temporarily."""
+        # Enforce max blocked IPs limit with LRU eviction
+        if len(self.blocked_ips) >= self.MAX_BLOCKED_IPS:
+            self._evict_oldest_blocked_ips(self.MAX_BLOCKED_IPS // 10)
+
         self.blocked_ips[client_ip] = (
             datetime.now(timezone.utc) + timedelta(seconds=SecurityConfig.BLOCK_DURATION)
         )
         security_logger.warning(f"IP blocked due to suspicious activity: {client_ip}")
 
+    def _evict_oldest_blocked_ips(self, count: int) -> None:
+        """Evict the oldest blocked IPs by expiry time."""
+        if not self.blocked_ips:
+            return
+        # Sort by expiry time (oldest first) and remove
+        sorted_ips = sorted(self.blocked_ips.items(), key=lambda x: x[1])
+        for ip, _ in sorted_ips[:count]:
+            del self.blocked_ips[ip]
+            self.failed_attempts.pop(ip, None)
+
+    def cleanup_stale_entries(self) -> int:
+        """
+        Remove stale entries from request history to prevent memory leaks.
+
+        Returns:
+            Number of entries removed
+        """
+        import time
+        now = time.time()
+        removed = 0
+
+        # Remove entries with no recent requests
+        stale_keys = [
+            key for key, last_time in self._last_access.items()
+            if now - last_time > self.STALE_ENTRY_AGE
+        ]
+        for key in stale_keys:
+            self.request_history.pop(key, None)
+            self._last_access.pop(key, None)
+            removed += 1
+
+        # Clean expired blocked IPs
+        expired_blocks = [
+            ip for ip, expiry in self.blocked_ips.items()
+            if datetime.now(timezone.utc) > expiry
+        ]
+        for ip in expired_blocks:
+            del self.blocked_ips[ip]
+            self.failed_attempts.pop(ip, None)
+
+        # Reset failed attempts for IPs with no recent activity
+        stale_ips = [
+            ip for ip in self.failed_attempts.keys()
+            if not any(ip in key for key in self.request_history.keys())
+        ]
+        for ip in stale_ips:
+            del self.failed_attempts[ip]
+
+        if removed > 0:
+            security_logger.debug(f"Rate limiter cleanup: removed {removed} stale entries")
+
+        return removed
+
+    def _enforce_memory_limit(self) -> None:
+        """Enforce memory limits using LRU eviction if necessary."""
+        import time
+
+        if len(self.request_history) <= self.MAX_HISTORY_ENTRIES:
+            return
+
+        # Evict oldest 10% of entries by last access time
+        evict_count = max(1, self.MAX_HISTORY_ENTRIES // 10)
+        sorted_entries = sorted(self._last_access.items(), key=lambda x: x[1])
+
+        for key, _ in sorted_entries[:evict_count]:
+            self.request_history.pop(key, None)
+            self._last_access.pop(key, None)
+
+        security_logger.info(
+            f"Rate limiter LRU eviction: removed {evict_count} entries, "
+            f"current size: {len(self.request_history)}"
+        )
+
+    def get_memory_stats(self) -> Dict[str, int]:
+        """Get memory usage statistics for monitoring."""
+        return {
+            "history_entries": len(self.request_history),
+            "blocked_ips": len(self.blocked_ips),
+            "failed_attempts_tracked": len(self.failed_attempts),
+            "max_history_entries": self.MAX_HISTORY_ENTRIES,
+            "max_blocked_ips": self.MAX_BLOCKED_IPS,
+        }
+
     def check_rate_limit(self, client_ip: str, endpoint: str = "") -> bool:
         """
         Check if request is within rate limits.
+
+        Includes automatic memory management to prevent unbounded growth.
 
         Args:
             client_ip: Client IP address
@@ -276,6 +384,13 @@ class RateLimiter:
         import time
 
         now = time.time()
+
+        # Periodic cleanup to prevent memory leaks
+        self._request_count += 1
+        if self._request_count >= self.CLEANUP_INTERVAL:
+            self._request_count = 0
+            self.cleanup_stale_entries()
+            self._enforce_memory_limit()
 
         # Check if IP is blocked
         if self.is_blocked(client_ip):
@@ -290,7 +405,10 @@ class RateLimiter:
 
         key = f"{client_ip}:{endpoint}" if endpoint else client_ip
 
-        # Clean old entries
+        # Update last access time for LRU tracking
+        self._last_access[key] = now
+
+        # Clean old entries for this key
         self.request_history[key] = [
             ts for ts in self.request_history[key]
             if now - ts < window
@@ -618,6 +736,10 @@ class SecurityMiddleware:
         self.input_sanitizer = InputSanitizer()
         self.totp_manager = TOTPManager()
 
+        # Secure credential storage - thread-safe with hashed passwords
+        self._credentials_lock = threading.RLock()
+        self._credentials: Dict[str, str] = {}  # user_id -> hashed_password
+
         # Set Flask configuration
         self._configure_flask()
 
@@ -824,19 +946,197 @@ class SecurityMiddleware:
 
     def _verify_credentials(self, user_id: str, password: str) -> bool:
         """
-        Verify user credentials.
+        Verify user credentials using secure password hashing.
 
-        In production, this should verify against a database with hashed passwords.
+        Uses bcrypt for password verification with constant-time comparison
+        to prevent timing attacks. Falls back to PBKDF2 if bcrypt unavailable.
 
         Args:
             user_id: User identifier
             password: Password to verify
 
         Returns:
-            True if credentials are valid
+            True if credentials are valid, False otherwise
         """
-        # Placeholder - in production, verify against database
-        return True
+        if not user_id or not password:
+            security_logger.warning(
+                "Authentication attempt with empty credentials",
+                extra={"user_id": user_id[:20] if user_id else "empty"}
+            )
+            return False
+
+        with self._credentials_lock:
+            stored_hash = self._credentials.get(user_id)
+
+        if stored_hash is None:
+            # Unknown user - perform dummy comparison to prevent timing attacks
+            # This ensures the response time is similar whether user exists or not
+            if BCRYPT_AVAILABLE:
+                try:
+                    # Use a pre-computed dummy hash for timing consistency
+                    dummy_hash = b"$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYA2qwp1Rq2S"
+                    bcrypt.checkpw(password.encode("utf-8"), dummy_hash)
+                except Exception:
+                    pass
+            else:
+                # PBKDF2 dummy verification
+                hashlib.pbkdf2_hmac(
+                    "sha256",
+                    password.encode("utf-8"),
+                    b"dummy_salt_for_timing",
+                    600000
+                )
+            security_logger.warning(
+                "Authentication attempt for unknown user",
+                extra={"user_id": user_id[:20]}
+            )
+            return False
+
+        # Verify password against stored hash
+        try:
+            if BCRYPT_AVAILABLE:
+                # bcrypt.checkpw is constant-time
+                is_valid = bcrypt.checkpw(
+                    password.encode("utf-8"),
+                    stored_hash.encode("utf-8") if isinstance(stored_hash, str) else stored_hash
+                )
+            else:
+                # PBKDF2 fallback - extract salt from stored hash
+                # Format: "pbkdf2:salt_hex:hash_hex"
+                parts = stored_hash.split(":")
+                if len(parts) != 3 or parts[0] != "pbkdf2":
+                    security_logger.error("Corrupted password hash format")
+                    return False
+                salt = bytes.fromhex(parts[1])
+                expected_hash = bytes.fromhex(parts[2])
+                computed_hash = hashlib.pbkdf2_hmac(
+                    "sha256",
+                    password.encode("utf-8"),
+                    salt,
+                    600000
+                )
+                # Constant-time comparison
+                is_valid = hmac.compare_digest(computed_hash, expected_hash)
+
+            if is_valid:
+                security_logger.info(
+                    "Successful authentication",
+                    extra={"user_id": user_id[:20]}
+                )
+            else:
+                security_logger.warning(
+                    "Failed authentication attempt - invalid password",
+                    extra={"user_id": user_id[:20]}
+                )
+            return is_valid
+
+        except Exception as e:
+            security_logger.error(
+                f"Password verification error: {type(e).__name__}",
+                extra={"user_id": user_id[:20]}
+            )
+            return False
+
+    def register_user(self, user_id: str, password: str) -> bool:
+        """
+        Register a new user with securely hashed password.
+
+        Uses bcrypt (12 rounds) or PBKDF2 (600K iterations) for password hashing.
+
+        Args:
+            user_id: User identifier (must be unique)
+            password: Plain text password to hash and store
+
+        Returns:
+            True if registration successful, False if user already exists
+
+        Raises:
+            ValueError: If user_id or password is empty or invalid
+        """
+        if not user_id or not isinstance(user_id, str):
+            raise ValueError("user_id must be a non-empty string")
+        if not password or not isinstance(password, str):
+            raise ValueError("password must be a non-empty string")
+        if len(password) < 8:
+            raise ValueError("password must be at least 8 characters")
+        if len(password) > 128:
+            raise ValueError("password must not exceed 128 characters")
+
+        with self._credentials_lock:
+            if user_id in self._credentials:
+                security_logger.warning(
+                    "Registration attempt for existing user",
+                    extra={"user_id": user_id[:20]}
+                )
+                return False
+
+            # Hash password
+            if BCRYPT_AVAILABLE:
+                # bcrypt with 12 rounds (secure default)
+                password_hash = bcrypt.hashpw(
+                    password.encode("utf-8"),
+                    bcrypt.gensalt(rounds=12)
+                ).decode("utf-8")
+            else:
+                # PBKDF2 fallback with 600K iterations
+                salt = secrets.token_bytes(32)
+                hash_bytes = hashlib.pbkdf2_hmac(
+                    "sha256",
+                    password.encode("utf-8"),
+                    salt,
+                    600000
+                )
+                password_hash = f"pbkdf2:{salt.hex()}:{hash_bytes.hex()}"
+
+            self._credentials[user_id] = password_hash
+            security_logger.info(
+                "User registered successfully",
+                extra={"user_id": user_id[:20]}
+            )
+            return True
+
+    def change_password(self, user_id: str, old_password: str, new_password: str) -> bool:
+        """
+        Change a user's password after verifying the old password.
+
+        Args:
+            user_id: User identifier
+            old_password: Current password for verification
+            new_password: New password to set
+
+        Returns:
+            True if password changed successfully, False otherwise
+        """
+        if not self._verify_credentials(user_id, old_password):
+            return False
+
+        if not new_password or len(new_password) < 8:
+            raise ValueError("New password must be at least 8 characters")
+        if len(new_password) > 128:
+            raise ValueError("New password must not exceed 128 characters")
+
+        with self._credentials_lock:
+            if BCRYPT_AVAILABLE:
+                password_hash = bcrypt.hashpw(
+                    new_password.encode("utf-8"),
+                    bcrypt.gensalt(rounds=12)
+                ).decode("utf-8")
+            else:
+                salt = secrets.token_bytes(32)
+                hash_bytes = hashlib.pbkdf2_hmac(
+                    "sha256",
+                    new_password.encode("utf-8"),
+                    salt,
+                    600000
+                )
+                password_hash = f"pbkdf2:{salt.hex()}:{hash_bytes.hex()}"
+
+            self._credentials[user_id] = password_hash
+            security_logger.info(
+                "Password changed successfully",
+                extra={"user_id": user_id[:20]}
+            )
+            return True
 
 
 def setup_security_middleware(

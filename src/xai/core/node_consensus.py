@@ -18,6 +18,45 @@ if TYPE_CHECKING:
 # Configure logging
 logger = logging.getLogger(__name__)
 
+
+def _record_consensus_metrics(
+    metric_name: str,
+    value: float = 1.0,
+    operation: str = "inc",
+    labels: Optional[Dict[str, Any]] = None
+) -> None:
+    """
+    Record consensus metrics to the metrics collector singleton.
+
+    Args:
+        metric_name: Name of the metric
+        value: Value to record
+        operation: 'inc' for counter, 'set' for gauge, 'observe' for histogram
+        labels: Optional labels for the metric
+    """
+    try:
+        from xai.core.monitoring import MetricsCollector
+        collector = MetricsCollector.instance()
+        if not collector:
+            return
+
+        metric = collector.get_metric(metric_name)
+        if not metric:
+            return
+
+        if operation == "inc":
+            metric.inc(value)
+        elif operation == "set":
+            metric.set(value)
+        elif operation == "observe":
+            if labels:
+                metric.observe(value, labels=labels)
+            else:
+                metric.observe(value)
+    except (ImportError, AttributeError, RuntimeError, TypeError):
+        # Metrics not available - silent fail
+        pass
+
 # Timestamp validation constants
 # Maximum time a block timestamp can be ahead of current system time
 # Using 2 hours (7200 seconds) as per Bitcoin's standard
@@ -88,9 +127,12 @@ class ConsensusManager:
             >>> if not is_valid:
             ...     print(f"Block invalid: {error}")
         """
+        _validation_start = time.time()
+
         # Check block hash is correctly calculated
         calculated_hash = block.calculate_hash()
         if block.hash != calculated_hash:
+            _record_consensus_metrics("xai_blocks_received_total", 1, operation="inc")
             return False, f"Invalid block hash. Expected: {calculated_hash}, got: {block.hash}"
 
         block_version = self._extract_block_version(block)
@@ -106,17 +148,20 @@ class ConsensusManager:
                     "version": block_version,
                 },
             )
+            _record_consensus_metrics("xai_blocks_received_total", 1, operation="inc")
             return False, f"Unsupported block header version {block_version}"
 
         # Check proof of work meets difficulty using proper target comparison
         # The hash must be numerically less than target = 2^256 / difficulty
         if not self._validate_pow(block.hash, self.blockchain.difficulty):
+            _record_consensus_metrics("xai_blocks_received_total", 1, operation="inc")
             return False, f"Invalid proof of work. Hash does not meet difficulty {self.blockchain.difficulty}"
 
         # If we have the previous block, validate linkage
         if previous_block is not None:
             # Check previous hash links correctly
             if block.previous_hash != previous_block.hash:
+                _record_consensus_metrics("xai_blocks_received_total", 1, operation="inc")
                 return (
                     False,
                     f"Previous hash mismatch. Expected: {previous_block.hash}, got: {block.previous_hash}",
@@ -124,6 +169,7 @@ class ConsensusManager:
 
             # Check index is sequential
             if block.index != previous_block.index + 1:
+                _record_consensus_metrics("xai_blocks_received_total", 1, operation="inc")
                 return (
                     False,
                     f"Invalid block index. Expected: {previous_block.index + 1}, got: {block.index}",
@@ -137,6 +183,7 @@ class ConsensusManager:
                 history_end_index=history_end_index,
             )
             if not is_valid:
+                _record_consensus_metrics("xai_blocks_received_total", 1, operation="inc")
                 return False, error
 
         else:
@@ -144,10 +191,20 @@ class ConsensusManager:
             chain_snapshot = getattr(self.blockchain, "chain", []) or []
             expected_index = len(chain_snapshot)
             if expected_index > 0 and block.index != expected_index:
+                _record_consensus_metrics("xai_blocks_received_total", 1, operation="inc")
                 return (
                     False,
                     f"Block index mismatch. Expected {expected_index}, got {block.index}",
                 )
+
+        # Record successful validation metrics
+        _validation_duration = time.time() - _validation_start
+        _record_consensus_metrics(
+            "xai_transaction_validation_duration_seconds",
+            _validation_duration,
+            operation="observe"
+        )
+        _record_consensus_metrics("xai_blocks_received_total", 1, operation="inc")
 
         return True, None
 

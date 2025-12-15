@@ -16,6 +16,7 @@ from xai.core.blockchain_exceptions import (
     DatabaseError,
     StateError,
     ValidationError,
+    MiningAbortedError,
 )
 
 if TYPE_CHECKING:
@@ -23,6 +24,45 @@ if TYPE_CHECKING:
     from xai.core.block_header import BlockHeader
     from xai.core.transaction import Transaction
     from xai.core.gamification import GamificationBlockchainInterface
+
+
+def _record_mining_metrics(
+    metric_name: str,
+    value: float = 1.0,
+    operation: str = "inc",
+    labels: Optional[Dict[str, Any]] = None
+) -> None:
+    """
+    Record mining metrics to the metrics collector singleton.
+
+    Args:
+        metric_name: Name of the metric (e.g., 'xai_blocks_mined_total')
+        value: Value to record
+        operation: 'inc' for counter, 'set' for gauge, 'observe' for histogram
+        labels: Optional labels for the metric
+    """
+    try:
+        from xai.core.monitoring import MetricsCollector
+        collector = MetricsCollector.instance()
+        if not collector:
+            return
+
+        metric = collector.get_metric(metric_name)
+        if not metric:
+            return
+
+        if operation == "inc":
+            metric.inc(value)
+        elif operation == "set":
+            metric.set(value)
+        elif operation == "observe":
+            if labels:
+                metric.observe(value, labels=labels)
+            else:
+                metric.observe(value)
+    except (ImportError, AttributeError, RuntimeError, TypeError):
+        # Metrics not available - silent fail
+        pass
 
 
 class BlockchainMiningMixin:
@@ -96,11 +136,28 @@ class BlockchainMiningMixin:
             raise ValueError(
                 "node_identity with private_key and public_key is required for block signing."
             )
+        # Check mining cooldown - wait for blocks to propagate before mining again
+        # This prevents race conditions where we mine faster than blocks propagate
+        if hasattr(self, '_is_mining_paused') and self._is_mining_paused():
+            self.logger.debug("Mining paused - waiting for block propagation cooldown")
+            return None
+
+        # Record mining start time for duration metrics
+        _mining_start_time = time.time()
+
+        # Record pre-mining metrics
+        _record_mining_metrics(
+            "xai_pending_transactions",
+            len(self.pending_transactions),
+            operation="set"
+        )
+
         max_block_size_bytes = self._max_block_size_bytes
         max_transactions_per_block = self._max_transactions_per_block
 
         # Adjust difficulty based on recent block times
         self.difficulty = self.calculate_next_difficulty()
+        _record_mining_metrics("xai_difficulty", self.difficulty, operation="set")
         if self.fast_mining_enabled and self.difficulty > self.max_test_mining_difficulty:
             self.logger.info(
                 "Capping mining difficulty for fast-mining mode",
@@ -215,8 +272,26 @@ class BlockchainMiningMixin:
             version=Config.BLOCK_HEADER_VERSION,
         )
 
-        # Mine the block
-        header.hash = self.mine_block(header)
+        # Set mining target and reset abort flag before mining
+        self._mining_target_height = header.index
+        self._abort_current_mining = False
+
+        # Mine the block (may be aborted if peer block received)
+        try:
+            header.hash = self.mine_block(header)
+        except MiningAbortedError:
+            # Mining was aborted because a peer block was received at this height
+            self.logger.info(
+                "Mining aborted: peer block received at target height",
+                target_height=header.index,
+            )
+            self._mining_target_height = None
+            return None
+        finally:
+            # Clear mining state
+            self._mining_target_height = None
+            self._abort_current_mining = False
+
         header.signature = sign_message_hex(
             node_identity["private_key"], header.hash.encode()
         )
@@ -246,6 +321,12 @@ class BlockchainMiningMixin:
         try:
             # Add to chain (cache)
             self.chain.append(new_block)
+
+            # Update mining coordination timestamp for self-mined blocks
+            # This ensures the node pauses mining after creating a block, giving peers
+            # time to receive and process the block before the next mining cycle starts
+            self._last_peer_block_time = time.time()
+
             self._process_governance_block_transactions(new_block)
             self.storage._save_block_to_disk(new_block)
 
@@ -344,6 +425,22 @@ class BlockchainMiningMixin:
                 block_hash=new_block.hash[:16],
                 nonce_updates=len(nonce_changes),
             )
+
+            # Record post-mining metrics
+            _mining_duration = time.time() - _mining_start_time
+            _record_mining_metrics(
+                "xai_block_mining_duration_seconds",
+                _mining_duration,
+                operation="observe"
+            )
+            _record_mining_metrics("xai_blocks_mined_total", 1, operation="inc")
+            _record_mining_metrics(
+                "xai_transactions_processed_total",
+                len(new_block.transactions),
+                operation="inc"
+            )
+            _record_mining_metrics("xai_chain_height", new_block.index, operation="set")
+            _record_mining_metrics("xai_pending_transactions", 0, operation="set")
 
             return new_block
 
@@ -461,7 +558,17 @@ class BlockchainMiningMixin:
 
         target = "0" * effective_difficulty
 
+        nonce_check_interval = 10  # Check abort flag every 10 nonce attempts for fastest abort
         while True:
+            # Check if mining should be aborted (peer block received at target height)
+            if header.nonce % nonce_check_interval == 0 and self._abort_current_mining:
+                self.logger.info(
+                    "Mining aborted: peer block received",
+                    target_height=self._mining_target_height,
+                    nonce_attempts=header.nonce,
+                )
+                raise MiningAbortedError("Peer block received at mining target height")
+
             hash_attempt = header.calculate_hash()
             if hash_attempt.startswith(target):
                 self.logger.info(f"Block mined! Hash: {hash_attempt}")
