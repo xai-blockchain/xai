@@ -448,7 +448,15 @@ class Transaction:
             # Convert public key hex to bytes before hashing (matches wallet.py)
             pub_key_bytes = bytes.fromhex(self.public_key)
             pub_hash = hashlib.sha256(pub_key_bytes).hexdigest()
-            expected_address = f"XAI{pub_hash[:40]}"
+
+            # Use network-appropriate prefix (must match wallet.py)
+            from xai.core.config import NETWORK
+            prefix = "XAI" if NETWORK.lower() == "mainnet" else "TXAI"
+            raw_address = f"{prefix}{pub_hash[:40]}"
+
+            # Apply checksum encoding to match wallet address format
+            from xai.core.address_checksum import to_checksum_address
+            expected_address = to_checksum_address(raw_address)
 
             if expected_address != self.sender:
                 logger.debug(
