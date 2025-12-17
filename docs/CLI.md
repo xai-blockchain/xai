@@ -166,6 +166,24 @@ xai wallet send \
 xai wallet portfolio TXAI1234567890abcdef
 ```
 
+### Watch-Only Wallets
+
+Monitor addresses without storing private keys:
+
+```bash
+# Add a single address
+xai wallet watch add --address XAI_ADDRESS_TO_WATCH --label "treasury"
+
+# Derive multiple addresses from an xpub (receiving chain)
+xai wallet watch add --xpub XPUB... --derive-count 10 --label "hardware-wallet"
+
+# List and filter watch entries
+xai wallet watch list --tag treasury
+
+# Remove an entry
+xai wallet watch remove --address XAI_ADDRESS_TO_WATCH
+```
+
 ---
 
 ## Mining Examples
@@ -201,8 +219,21 @@ xai mining stats --address YOUR_ADDRESS
 --node-url URL        # Custom node URL (default: http://localhost:18545)
 --timeout SECONDS     # Request timeout (default: 30)
 --json-output         # Output raw JSON
+--transport [http|local]  # Choose HTTP (default) or direct on-disk access
+--local-data-dir PATH     # Data directory when using --transport local (default ~/.xai)
+--local-mempool-limit N   # Max mempool entries returned in local mode (default 200)
 --help                # Show help
 ```
+
+### Local Transport Mode
+
+Run CLI commands directly against the on-disk blockchain state (no HTTP dependency):
+
+```bash
+xai --transport local --local-data-dir ~/.xai blockchain info --json-output
+```
+
+Local mode is read-only and supports balance queries, chain info, block inspection, mempool snapshots, and state exports without requiring the REST API to be online.
 
 ---
 

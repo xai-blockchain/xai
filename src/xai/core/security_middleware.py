@@ -22,7 +22,8 @@ import re
 import logging
 import threading
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any, List, Tuple, Callable
+from typing import Optional, Dict, Any, List, Tuple, Callable, Set
+import ipaddress
 from collections import defaultdict
 from functools import wraps
 from urllib.parse import urlparse
@@ -148,6 +149,12 @@ class SecurityConfig:
     # Security event thresholds
     SUSPICIOUS_ACTIVITY_THRESHOLD: int = 5  # Failed attempts before blocking
     BLOCK_DURATION: int = 900  # 15 minutes
+    TRUST_PROXY_HEADERS: bool = False
+    TRUSTED_PROXY_IPS: List[str] = []
+    TRUSTED_PROXY_NETWORKS: List[str] = []
+    STRICT_SESSION_FINGERPRINTING: bool = True
+    SESSION_BIND_USER_AGENT: bool = True
+    SESSION_BIND_ACCEPT_LANGUAGE: bool = False
 
 
 class TokenManager:
@@ -542,12 +549,64 @@ class InputSanitizer:
 
 
 class SessionManager:
-    """Manages secure user sessions."""
+    """Manages secure user sessions with optional fingerprinting and IP binding."""
 
     def __init__(self):
         """Initialize session manager."""
         self.active_sessions: Dict[str, Dict[str, Any]] = {}
         self.session_tokens: Dict[str, str] = {}
+
+    @staticmethod
+    def _is_trusted_proxy(ip_str: str) -> bool:
+        """Return True if the given IP is in the trusted proxy allowlist/ranges."""
+        try:
+            ip_obj = ipaddress.ip_address(ip_str)
+        except ValueError:
+            return False
+        trusted = set(SecurityConfig.TRUSTED_PROXY_IPS or [])
+        if ip_str in trusted:
+            return True
+        for network in SecurityConfig.TRUSTED_PROXY_NETWORKS or []:
+            try:
+                if ip_obj in ipaddress.ip_network(network, strict=False):
+                    return True
+            except ValueError:
+                continue
+        return False
+
+    @classmethod
+    def _resolve_client_ip(cls) -> str:
+        """
+        Resolve the client IP without trusting spoofable headers unless explicitly allowed.
+        """
+        remote_ip = request.remote_addr or "127.0.0.1"
+        if not SecurityConfig.TRUST_PROXY_HEADERS:
+            return remote_ip
+
+        if not cls._is_trusted_proxy(remote_ip):
+            return remote_ip
+
+        forwarded_for = request.headers.get("X-Forwarded-For", "")
+        if forwarded_for:
+            for candidate in forwarded_for.split(","):
+                candidate = candidate.strip()
+                if not candidate:
+                    continue
+                try:
+                    ipaddress.ip_address(candidate)
+                    return candidate
+                except ValueError:
+                    continue
+
+        real_ip = request.headers.get("X-Real-IP", "").strip()
+        if real_ip:
+            try:
+                ipaddress.ip_address(real_ip)
+                return real_ip
+            except ValueError:
+                pass
+
+        return remote_ip
 
     def create_session(self, user_id: str, metadata: Optional[Dict[str, Any]] = None) -> str:
         """
@@ -561,14 +620,21 @@ class SessionManager:
             Session token
         """
         session_token = secrets.token_hex(32)
+        user_agent = request.headers.get("User-Agent", "")
+        accept_language = request.headers.get("Accept-Language", "")
         session_data = {
             "user_id": user_id,
             "created_at": datetime.now(timezone.utc),
             "last_activity": datetime.now(timezone.utc),
-            "ip_address": request.remote_addr or "127.0.0.1",
-            "user_agent": request.headers.get("User-Agent", ""),
+            "ip_address": self._resolve_client_ip(),
+            "user_agent": user_agent,
+            "accept_language": accept_language,
             "metadata": metadata or {},
         }
+        if SecurityConfig.STRICT_SESSION_FINGERPRINTING:
+            session_data["fingerprint"] = self._build_fingerprint(
+                session_data["ip_address"], user_agent, accept_language
+            )
 
         self.active_sessions[session_token] = session_data
         self.session_tokens[user_id] = session_token
@@ -597,15 +663,48 @@ class SessionManager:
             return False, None
 
         # Check IP consistency
-        current_ip = request.remote_addr or "127.0.0.1"
+        current_ip = self._resolve_client_ip()
         if session_data["ip_address"] != current_ip:
-            security_logger.warning(f"Session IP mismatch: {session_token}")
+            security_logger.warning(
+                f"Session IP mismatch: {session_token}",
+                extra={"event": "session.ip_mismatch", "expected": session_data["ip_address"], "observed": current_ip},
+            )
             return False, None
+
+        if SecurityConfig.STRICT_SESSION_FINGERPRINTING:
+            expected = session_data.get("fingerprint")
+            observed = self._build_fingerprint(
+                current_ip,
+                request.headers.get("User-Agent", ""),
+                request.headers.get("Accept-Language", ""),
+            )
+            if expected and expected != observed:
+                security_logger.warning(
+                    "Session fingerprint mismatch",
+                    extra={
+                        "event": "session.fingerprint_mismatch",
+                        "session_id": session_token,
+                    },
+                )
+                return False, None
 
         # Update last activity
         session_data["last_activity"] = datetime.now(timezone.utc)
 
         return True, session_data
+
+    @staticmethod
+    def _build_fingerprint(ip_address: str, user_agent: str, accept_language: str) -> str:
+        """
+        Build a fingerprint for session binding based on configured attributes.
+        """
+        components = [ip_address]
+        if SecurityConfig.SESSION_BIND_USER_AGENT:
+            components.append(user_agent or "")
+        if SecurityConfig.SESSION_BIND_ACCEPT_LANGUAGE:
+            components.append(accept_language or "")
+        data = "|".join(components).encode("utf-8")
+        return hashlib.sha256(data).hexdigest()
 
     def destroy_session(self, session_token: str) -> None:
         """
@@ -638,10 +737,29 @@ class TOTPManager:
             self.pyotp = pyotp
             self.AVAILABLE = True
             self.user_secrets: Dict[str, str] = {}
+            self.user_backup_codes: Dict[str, Dict[str, Any]] = {}
             security_logger.info("TOTP manager initialized successfully")
         except ImportError:
             security_logger.warning("pyotp not installed - 2FA will be disabled")
             self.AVAILABLE = False
+            self.user_backup_codes = {}
+
+    @staticmethod
+    def _hash_backup_code(code: str, salt: bytes) -> str:
+        """
+        Hash a backup code with the provided salt for secure storage.
+
+        Args:
+            code: Plaintext backup code
+            salt: Per-user salt bytes
+
+        Returns:
+            Hex-encoded SHA-256 digest
+        """
+        digest = hashlib.sha256()
+        digest.update(salt)
+        digest.update(code.encode("utf-8"))
+        return digest.hexdigest()
 
     def generate_secret(self, user_id: str, issuer: str = "XAI-Wallet") -> Dict[str, str]:
         """
@@ -708,9 +826,68 @@ class TOTPManager:
             return []
 
         codes = [secrets.token_hex(4) for _ in range(count)]
-        # In production, store these securely in database
-        security_logger.info(f"Generated {count} backup codes for {user_id}")
+        salt = secrets.token_bytes(16)
+        hashed_codes: Set[str] = set()
+        for code in codes:
+            hashed_codes.add(self._hash_backup_code(code, salt))
+
+        self.user_backup_codes[user_id] = {
+            "salt": salt,
+            "hashes": hashed_codes,
+            "generated_at": datetime.now(timezone.utc),
+            "used": set(),
+        }
+        security_logger.info(
+            "Generated backup codes",
+            extra={
+                "event": "totp.backup.generated",
+                "user_id": user_id,
+                "count": count,
+            },
+        )
         return codes
+
+    def verify_backup_code(self, user_id: str, code: str) -> bool:
+        """
+        Verify a previously issued backup code. Codes are single-use.
+
+        Args:
+            user_id: User identifier
+            code: Backup code provided by the user
+
+        Returns:
+            True if the code is valid and unused, False otherwise.
+        """
+        if not self.AVAILABLE:
+            security_logger.warning(
+                "Backup code verification attempted while TOTP unavailable",
+                extra={"event": "totp.backup.verify_unavailable"},
+            )
+            return False
+
+        record = self.user_backup_codes.get(user_id)
+        if not record:
+            security_logger.warning(
+                "No backup codes found for user",
+                extra={"event": "totp.backup.missing", "user_id": user_id},
+            )
+            return False
+
+        candidate_hash = self._hash_backup_code(code, record["salt"])
+        if candidate_hash not in record["hashes"]:
+            security_logger.warning(
+                "Invalid backup code attempt",
+                extra={"event": "totp.backup.invalid", "user_id": user_id},
+            )
+            return False
+
+        record["hashes"].remove(candidate_hash)
+        record["used"].add(candidate_hash)
+        security_logger.info(
+            "Backup code accepted",
+            extra={"event": "totp.backup.accepted", "user_id": user_id},
+        )
+        return True
 
 
 class SecurityMiddleware:

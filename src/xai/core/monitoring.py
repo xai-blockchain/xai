@@ -537,6 +537,45 @@ class MetricsCollector:
         self.register_counter("xai_p2p_invalid_signature_total", "Total P2P messages rejected for invalid or stale signatures")
         self.register_counter("xai_p2p_quic_errors_total", "Total QUIC transport errors detected")
         self.register_counter("xai_p2p_quic_timeouts_total", "Total QUIC dial/send timeouts detected")
+        self.register_histogram(
+            "xai_storage_read_latency_seconds",
+            "Latency of storage read operations",
+            buckets=[0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5],
+        )
+        self.register_histogram(
+            "xai_storage_write_latency_seconds",
+            "Latency of storage write operations",
+            buckets=[0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5],
+        )
+        self.register_counter("xai_storage_reads_total", "Total storage read operations")
+        self.register_counter("xai_storage_writes_total", "Total storage write operations")
+        self.register_counter("xai_storage_errors_total", "Total storage I/O errors")
+        self.register_counter("xai_storage_bytes_read_total", "Total bytes read from storage")
+        self.register_counter("xai_storage_bytes_written_total", "Total bytes written to storage")
+        self.register_gauge("xai_storage_data_dir_bytes", "Approximate size of blockchain data directory in bytes")
+
+        # Smart contract metrics
+        self.register_counter("xai_contract_calls_total", "Total smart contract call transactions processed")
+        self.register_counter("xai_contract_deployments_total", "Total smart contract deployments processed")
+        self.register_counter("xai_contract_success_total", "Successful smart contract executions")
+        self.register_counter("xai_contract_failures_total", "Failed smart contract executions")
+        self.register_counter("xai_contract_gas_used_total", "Total gas consumed by smart contract execution")
+        self.register_histogram(
+            "xai_contract_execution_duration_seconds",
+            "Smart contract execution latency",
+            buckets=[0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5],
+        )
+
+        # Validator / finality metrics
+        self.register_counter("xai_validator_votes_total", "Validator votes recorded for block finality")
+        self.register_counter("xai_validator_double_sign_events_total", "Validator double-sign detections")
+        self.register_counter("xai_validator_misbehavior_reports_total", "Validator misbehavior reports emitted")
+
+        # Economic metrics
+        self.register_counter("xai_economic_block_reward_total", "Total base block rewards minted")
+        self.register_counter("xai_economic_fees_total", "Total transaction fees awarded to miners")
+        self.register_counter("xai_economic_streak_bonus_total", "Total streak bonuses credited to miners")
+        self.register_counter("xai_economic_coinbase_payout_total", "Total coinbase payouts (rewards + fees + bonuses)")
 
         # Start time for uptime calculation
         self.start_time = time.time()

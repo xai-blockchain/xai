@@ -77,6 +77,11 @@ The XAI Blockchain Explorer now has a **complete production-grade backend** with
 - `run.sh` - Quick start script
 - `README.md` - Comprehensive documentation
 
+### 🔄 Live Data Bridge (2025-12-16)
+- `services/indexer.py` now establishes a persistent WebSocket bridge to the node's `/ws` endpoint (with optional `XAI_NODE_API_KEY`), subscribes to `blocks`, `wallet-trades`, and `mining` channels, and writes those events straight into PostgreSQL while rebroadcasting them to explorer clients.
+- Realtime blocks mined by the chain now appear instantly in `/api/v1/ws/live` and `/api/v1/blocks` without waiting for the polling loop, finally wiring the blockchain into the explorer's live feed.
+- Added active mempool monitoring: the indexer polls `/mempool` + `/mempool/stats`, stores snapshots (`mempool_stats`) and hot transactions (`mempool_transactions`), and exposes them via `/api/v1/mempool` and `/api/v1/mempool/stats` for dashboards and alerting.
+
 ---
 
 ## API Endpoints Reference

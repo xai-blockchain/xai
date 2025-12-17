@@ -54,7 +54,20 @@ All commands support these global options:
 --node-url TEXT      XAI node URL (default: http://localhost:18545)
 --timeout FLOAT      Request timeout in seconds (default: 30.0)
 --json-output        Output raw JSON for scripting
+--transport [http|local]  Select HTTP (default) or direct on-disk access
+--local-data-dir PATH     Override blockchain data dir for local transport
+--local-mempool-limit N   Cap mempool entries returned when offline (default 200)
 ```
+
+### Offline / Local Transport
+
+Use `--transport local` to query blockchain data directly from disk—ideal when the REST API is unreachable or during forensic reviews. Provide the node's data directory (defaults to `~/.xai`):
+
+```bash
+xai --transport local --local-data-dir ~/.xai --json-output blockchain block 1000
+```
+
+Local transport currently offers read-only capabilities (balances, blocks, mempool, state snapshots). Mutating operations such as mining control or transaction submission still require HTTP transport.
 
 ## Wallet Commands
 
@@ -117,6 +130,26 @@ xai wallet history TXAI_YOUR_ADDRESS --limit 20 --offset 20
 - Amount
 - Counterparty address
 - Transaction ID
+
+### Watch-Only Wallets
+
+Track balances without exposing private keys. Watch entries are stored securely under `~/.xai/watch_only.json`.
+
+```bash
+# Add a single address
+xai wallet watch add --address XAI123... --label "treasury"
+
+# Derive ten receiving addresses from an xpub
+xai wallet watch add --xpub XPUB123... --derive-count 10 --label "ledger"
+
+# List entries (JSON for scripting)
+xai wallet watch list --json
+
+# Remove an entry when no longer needed
+xai wallet watch remove --address XAI123...
+```
+
+Use `--tags` to categorize entries and `--tag` filters when listing. The `watch-address` command remains as a backwards-compatible alias for `watch add`.
 
 ### Send Transaction
 

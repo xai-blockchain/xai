@@ -19,7 +19,7 @@ import os
 import secrets as secrets_module
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Callable, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +102,9 @@ TIME_CAPSULE_MASTER_KEY = _get_required_secret("XAI_TIME_CAPSULE_MASTER_KEY", NE
 PERSONAL_AI_WEBHOOK_URL = os.getenv("XAI_PERSONAL_AI_WEBHOOK_URL", "")
 PERSONAL_AI_WEBHOOK_TIMEOUT = int(os.getenv("XAI_PERSONAL_AI_WEBHOOK_TIMEOUT", "5"))
 WALLET_PASSWORD = os.getenv("XAI_WALLET_PASSWORD", "")
+EMERGENCY_PAUSER_ADDRESS = os.getenv("XAI_EMERGENCY_PAUSER", "0xAdmin").strip() or "0xAdmin"
+EMERGENCY_CIRCUIT_BREAKER_THRESHOLD = int(os.getenv("XAI_EMERGENCY_CIRCUIT_THRESHOLD", "3"))
+EMERGENCY_CIRCUIT_BREAKER_TIMEOUT_SECONDS = int(os.getenv("XAI_EMERGENCY_CIRCUIT_TIMEOUT_SECONDS", "300"))
 
 def _parse_origin_list(raw: str) -> List[str]:
     """Convert comma-separated origins into normalized list."""
@@ -121,6 +124,9 @@ API_KEY_STORE_PATH = os.getenv(
     "XAI_API_KEY_STORE",
     os.path.join(os.getcwd(), "secure_keys", "api_keys.json"),
 )
+API_KEY_DEFAULT_TTL_DAYS = int(os.getenv("XAI_API_KEY_DEFAULT_TTL_DAYS", "90"))
+API_KEY_MAX_TTL_DAYS = int(os.getenv("XAI_API_KEY_MAX_TTL_DAYS", "365"))
+API_KEY_ALLOW_PERMANENT = bool(int(os.getenv("XAI_API_KEY_ALLOW_PERMANENT", "0")))
 API_PEER_SHARED_KEY = os.getenv("XAI_PEER_API_KEY", "").strip()
 SECURITY_WEBHOOK_URL = os.getenv("XAI_SECURITY_WEBHOOK_URL", "").strip()
 SECURITY_WEBHOOK_TOKEN = os.getenv("XAI_SECURITY_WEBHOOK_TOKEN", "").strip()
@@ -130,11 +136,60 @@ SECURITY_WEBHOOK_QUEUE_PATH = os.getenv(
 )
 SECURITY_WEBHOOK_QUEUE_KEY = os.getenv("XAI_SECURITY_WEBHOOK_QUEUE_KEY", "").strip()
 API_ADMIN_KEYS = [key.strip() for key in os.getenv("XAI_API_ADMIN_KEYS", "").split(",") if key.strip()]
+API_OPERATOR_KEYS = [key.strip() for key in os.getenv("XAI_API_OPERATOR_KEYS", "").split(",") if key.strip()]
+API_AUDITOR_KEYS = [key.strip() for key in os.getenv("XAI_API_AUDITOR_KEYS", "").split(",") if key.strip()]
 API_ADMIN_TOKEN = os.getenv("XAI_API_ADMIN_TOKEN", "")
 if API_ADMIN_TOKEN:
     API_ADMIN_KEYS.append(API_ADMIN_TOKEN)
 API_AUTH_REQUIRED = bool(int(os.getenv("XAI_API_AUTH_REQUIRED", "0")))
 API_AUTH_KEYS = [key.strip() for key in os.getenv("XAI_API_KEYS", "").split(",") if key.strip()]
+
+_RUNTIME_MUTABLE_FIELDS: Dict[str, Tuple[str, Callable[[str], Any]]] = {
+    "API_RATE_LIMIT": ("XAI_API_RATE_LIMIT", int),
+    "API_RATE_WINDOW_SECONDS": ("XAI_API_RATE_WINDOW_SECONDS", int),
+    "API_MAX_JSON_BYTES": ("XAI_API_MAX_JSON_BYTES", int),
+    "API_ALLOWED_ORIGINS": ("XAI_API_ALLOWED_ORIGINS", _parse_origin_list),
+}
+_RUNTIME_INITIAL_VALUES = {key: globals()[key] for key in _RUNTIME_MUTABLE_FIELDS}
+
+
+def reload_runtime(overrides: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    """
+    Reload selected runtime configuration values from environment.
+
+    Args:
+        overrides: Optional mapping of env var -> value to apply for this reload
+
+    Returns:
+        Dictionary describing changed attributes and timestamp.
+
+    Raises:
+        ConfigurationError: If a provided override fails validation.
+    """
+    env = os.environ.copy()
+    if overrides:
+        env.update({key: str(value) for key, value in overrides.items()})
+
+    changes: Dict[str, Dict[str, Any]] = {}
+    for attr, (env_var, parser) in _RUNTIME_MUTABLE_FIELDS.items():
+        raw = env.get(env_var)
+        if raw is None:
+            continue
+        try:
+            new_value = parser(raw) if raw.strip() else _RUNTIME_INITIAL_VALUES[attr]
+        except Exception as exc:  # pylint: disable=broad-except
+            raise ConfigurationError(f"Invalid value for {env_var}: {exc}") from exc
+        current_value = globals()[attr]
+        if new_value != current_value:
+            globals()[attr] = new_value
+            setattr(TestnetConfig, attr, new_value)
+            setattr(MainnetConfig, attr, new_value)
+            changes[attr] = {"old": current_value, "new": new_value}
+
+    return {
+        "changed": changes,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 def _parse_supported_versions(raw: str) -> list[str]:
@@ -328,8 +383,14 @@ class TestnetConfig:
     API_RATE_WINDOW_SECONDS = API_RATE_WINDOW_SECONDS
     API_MAX_JSON_BYTES = API_MAX_JSON_BYTES
     API_KEY_STORE_PATH = API_KEY_STORE_PATH
+    API_KEY_DEFAULT_TTL_DAYS = API_KEY_DEFAULT_TTL_DAYS
+    API_KEY_MAX_TTL_DAYS = API_KEY_MAX_TTL_DAYS
+    API_KEY_ALLOW_PERMANENT = API_KEY_ALLOW_PERMANENT
     API_ALLOWED_ORIGINS = API_ALLOWED_ORIGINS
     API_ADMIN_KEYS = API_ADMIN_KEYS
+    EMERGENCY_PAUSER_ADDRESS = EMERGENCY_PAUSER_ADDRESS
+    EMERGENCY_CIRCUIT_BREAKER_THRESHOLD = EMERGENCY_CIRCUIT_BREAKER_THRESHOLD
+    EMERGENCY_CIRCUIT_BREAKER_TIMEOUT_SECONDS = EMERGENCY_CIRCUIT_BREAKER_TIMEOUT_SECONDS
     API_AUTH_REQUIRED = API_AUTH_REQUIRED
     API_AUTH_KEYS = API_AUTH_KEYS
     API_SUPPORTED_VERSIONS = API_SUPPORTED_VERSIONS
@@ -468,8 +529,14 @@ class MainnetConfig:
     API_RATE_WINDOW_SECONDS = API_RATE_WINDOW_SECONDS
     API_MAX_JSON_BYTES = API_MAX_JSON_BYTES
     API_KEY_STORE_PATH = API_KEY_STORE_PATH
+    API_KEY_DEFAULT_TTL_DAYS = API_KEY_DEFAULT_TTL_DAYS
+    API_KEY_MAX_TTL_DAYS = API_KEY_MAX_TTL_DAYS
+    API_KEY_ALLOW_PERMANENT = API_KEY_ALLOW_PERMANENT
     API_ALLOWED_ORIGINS = API_ALLOWED_ORIGINS
     API_ADMIN_KEYS = API_ADMIN_KEYS
+    EMERGENCY_PAUSER_ADDRESS = EMERGENCY_PAUSER_ADDRESS
+    EMERGENCY_CIRCUIT_BREAKER_THRESHOLD = EMERGENCY_CIRCUIT_BREAKER_THRESHOLD
+    EMERGENCY_CIRCUIT_BREAKER_TIMEOUT_SECONDS = EMERGENCY_CIRCUIT_BREAKER_TIMEOUT_SECONDS
     API_AUTH_REQUIRED = API_AUTH_REQUIRED
     API_AUTH_KEYS = API_AUTH_KEYS
     API_SUPPORTED_VERSIONS = API_SUPPORTED_VERSIONS
@@ -593,4 +660,5 @@ __all__ = [
     "API_RATE_WINDOW_SECONDS",
     "API_MAX_JSON_BYTES",
     "SAFE_GENESIS_HASHES",
+    "reload_runtime",
 ]

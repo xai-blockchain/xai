@@ -190,7 +190,7 @@ class CircuitBreaker:
             extra={
                 "event": "breaker.triggered",
                 "breaker_id": self.id[:10],
-                "name": self.name,
+                "breaker_name": self.name,
                 "target": self.target[:10] if self.target else "system",
                 "level": self.protection_level.value,
             }

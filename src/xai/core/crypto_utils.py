@@ -59,10 +59,59 @@ def deterministic_keypair_from_seed(seed: bytes) -> Tuple[str, str]:
     return _private_key_to_hex(private_key), _public_key_to_hex(private_key.public_key())
 
 
+def _validate_signature_range(r: int, s: int) -> None:
+    """
+    Ensure signature components fall within the curve order.
+
+    Raises:
+        ValueError: If either component is out of range.
+    """
+    if not (1 <= r < _CURVE_ORDER):
+        raise ValueError("Signature r component out of range.")
+    if not (1 <= s < _CURVE_ORDER):
+        raise ValueError("Signature s component out of range.")
+
+
+def canonicalize_signature_components(r: int, s: int) -> Tuple[int, int]:
+    """
+    Normalize signature components to canonical low-S form.
+
+    Args:
+        r: Signature r component
+        s: Signature s component
+
+    Returns:
+        Tuple of canonical (r, s)
+    """
+    _validate_signature_range(r, s)
+    if s > _CURVE_ORDER // 2:
+        s = _CURVE_ORDER - s
+    return r, s
+
+
+def is_canonical_signature(r: int, s: int) -> bool:
+    """
+    Check whether signature components are already canonical.
+
+    Args:
+        r: Signature r component
+        s: Signature s component
+
+    Returns:
+        True if components fall within range and have low-S form.
+    """
+    try:
+        _validate_signature_range(r, s)
+    except ValueError:
+        return False
+    return s <= _CURVE_ORDER // 2
+
+
 def sign_message_hex(private_hex: str, message: bytes) -> str:
     private_key = load_private_key_from_hex(private_hex)
     der_signature = private_key.sign(message, ec.ECDSA(hashes.SHA256()))
     r, s = decode_dss_signature(der_signature)
+    r, s = canonicalize_signature_components(r, s)
     return (r.to_bytes(32, "big") + s.to_bytes(32, "big")).hex()
 
 
@@ -74,6 +123,8 @@ def verify_signature_hex(public_hex: str, message: bytes, signature_hex: str) ->
             return False
         r = int.from_bytes(raw_signature[:32], "big")
         s = int.from_bytes(raw_signature[32:], "big")
+        if not is_canonical_signature(r, s):
+            return False
         der_signature = encode_dss_signature(r, s)
         public_key.verify(der_signature, message, ec.ECDSA(hashes.SHA256()))
         return True

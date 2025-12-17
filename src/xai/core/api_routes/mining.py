@@ -52,6 +52,9 @@ def register_mining_routes(
         auth_error = routes._require_api_auth()
         if auth_error:
             return auth_error
+        paused = routes._reject_if_paused("mine_block")
+        if paused:
+            return paused
 
         try:
             limiter = _get_mining_limiter()
@@ -96,7 +99,7 @@ def register_mining_routes(
                 ),
                 200,
             )
-        except (ValueError, RuntimeError) as exc:
+        except Exception as exc:
             return routes._handle_exception(exc, "mine_block")
 
     @app.route("/auto-mine/start", methods=["POST"])
@@ -117,6 +120,9 @@ def register_mining_routes(
         auth_error = routes._require_api_auth()
         if auth_error:
             return auth_error
+        paused = routes._reject_if_paused("start_auto_mining")
+        if paused:
+            return paused
         if node.is_mining:
             return jsonify({"message": "Mining already active"})
 
@@ -141,6 +147,9 @@ def register_mining_routes(
         auth_error = routes._require_api_auth()
         if auth_error:
             return auth_error
+        paused = routes._reject_if_paused("stop_auto_mining")
+        if paused:
+            return paused
         if not node.is_mining:
             return jsonify({"message": "Mining not active"})
 

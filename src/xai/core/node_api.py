@@ -76,8 +76,11 @@ from xai.core.security_validation import log_security_event, SecurityValidator
 from xai.core.monitoring import MetricsCollector
 from xai.core.api_auth import APIAuthManager, APIKeyStore
 from xai.network.peer_manager import PeerManager
+from xai.performance.profiling import MemoryProfiler, CPUProfiler
 from xai.wallet.spending_limits import SpendingLimitManager
 from xai.core.vm.evm.abi import keccak256
+from xai.security.circuit_breaker import CircuitBreaker
+from xai.blockchain.emergency_pause import EmergencyPauseManager
 from xai.core.api_routes import (
     register_transaction_routes,
     register_contract_routes,
@@ -92,6 +95,7 @@ from xai.core.api_routes import (
     register_admin_routes,
     register_crypto_deposit_routes,
 )
+from xai.core.api_routes.blockchain import _block_to_payload, _build_block_summary
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Transaction
@@ -502,7 +506,12 @@ class NodeAPIRoutes:
             candidate_validator if isinstance(candidate_validator, RequestValidator) else RequestValidator()
         )
         store_path = getattr(Config, "API_KEY_STORE_PATH", os.path.join(os.getcwd(), "secure_keys", "api_keys.json"))
-        self.api_key_store = APIKeyStore(store_path)
+        self.api_key_store = APIKeyStore(
+            store_path,
+            default_ttl_days=getattr(Config, "API_KEY_DEFAULT_TTL_DAYS", 90),
+            max_ttl_days=getattr(Config, "API_KEY_MAX_TTL_DAYS", 365),
+            allow_permanent=getattr(Config, "API_KEY_ALLOW_PERMANENT", False),
+        )
         self.error_registry = ErrorHandlerRegistry()
         self.security_validator = getattr(node, "validator", SecurityValidator())
         self.api_auth = APIAuthManager.from_config(store=self.api_key_store)
@@ -510,6 +519,17 @@ class NodeAPIRoutes:
         self.api_versioning = APIVersioningManager(self.app)
         self._body_size_limit = max(1, int(getattr(Config, "API_MAX_JSON_BYTES", 1_000_000)))
         self._install_request_size_limits()
+        self.emergency_circuit_breaker = CircuitBreaker(
+            name="global-emergency",
+            failure_threshold=getattr(Config, "EMERGENCY_CIRCUIT_BREAKER_THRESHOLD", 3),
+            recovery_timeout_seconds=getattr(Config, "EMERGENCY_CIRCUIT_BREAKER_TIMEOUT_SECONDS", 300),
+        )
+        self.emergency_pause_manager = EmergencyPauseManager(
+            authorized_pauser_address=getattr(Config, "EMERGENCY_PAUSER_ADDRESS", "0xAdmin"),
+            circuit_breaker=self.emergency_circuit_breaker,
+        )
+        self.memory_profiler = MemoryProfiler()
+        self.cpu_profiler = CPUProfiler()
 
     def _install_request_size_limits(self) -> None:
         """
@@ -548,6 +568,23 @@ class NodeAPIRoutes:
             context=context,
             event_type="api.payload_too_large",
         )
+
+    def _reject_if_paused(self, operation: str) -> Optional[Tuple[Dict[str, Any], int]]:
+        """
+        Enforce the emergency pause/circuit breaker at API boundaries.
+
+        Returns an error response tuple if the node is paused.
+        """
+        if self.emergency_pause_manager and self.emergency_pause_manager.is_paused():
+            status = self.emergency_pause_manager.get_status()
+            return self._error_response(
+                "Operations are paused by administrator",
+                status=423,
+                code="paused",
+                context={"operation": operation, "status": status},
+                event_type="api.paused",
+            )
+        return None
 
     def _verify_signed_peer_message(self) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
         """
@@ -596,7 +633,7 @@ class NodeAPIRoutes:
         register_wallet_routes(self)
         register_faucet_routes(
             self,
-            simple_rate_limiter_getter=get_rate_limiter,
+            simple_rate_limiter_getter=self._get_admin_rate_limiter,
             advanced_rate_limiter_getter=self._get_advanced_rate_limiter,
         )
         register_mining_routes(
@@ -647,6 +684,15 @@ class NodeAPIRoutes:
             return get_advanced_rate_limiter()
         except (ImportError, RuntimeError, AttributeError):
             return None
+
+    def _get_admin_rate_limiter(self):
+        """Wrapper to fetch standard rate limiter for admin APIs."""
+        return get_rate_limiter()
+
+    def _algo_features_enabled(self) -> bool:
+        """Determine whether algorithmic features are enabled."""
+        external_flag = getattr(node_utils, "ALGO_FEATURES_ENABLED", False)
+        return bool(external_flag or ALGO_FEATURES_ENABLED)
 
     def _success_response(self, payload: Dict[str, Any], status: int = 200):
         """Return a success payload with consistent structure."""
@@ -824,13 +870,18 @@ class NodeAPIRoutes:
         )
 
     def _require_admin_auth(self):
-        allowed, reason = self.api_auth.authorize_admin(request)
+        return self._require_control_role({"admin"})
+
+    def _require_control_role(self, allowed_scopes: Sequence[str]):
+        allowed, scope, reason = self.api_auth.authorize_scope(request, set(allowed_scopes))
         if allowed:
             return None
+        status = 401 if reason and "missing" in reason.lower() else 403
         return self._error_response(
-            reason or "Admin token invalid",
-            status=401,
+            reason or "Insufficient permissions",
+            status=status,
             code="admin_unauthorized",
+            context={"required": list(allowed_scopes), "scope": scope},
             event_type="api_admin_auth_failure",
         )
 
@@ -907,14 +958,14 @@ class NodeAPIRoutes:
                         backlog["pending_transactions"] = stats.get("pending_transactions_count", 0)
                         backlog["orphan_blocks"] = stats.get("orphan_blocks_count", 0)
                         backlog["orphan_transactions"] = stats.get("orphan_transactions_count", 0)
-                    except (ValueError, RuntimeError, KeyError) as exc:  # pragma: no cover - defensive
+                    except Exception as exc:  # pragma: no cover - defensive
                         blockchain_summary = {"accessible": False, "error": str(exc)}
                         overall_status = "unhealthy"
                         http_status = 503
                 else:
                     blockchain_summary = {"accessible": False, "error": "Blockchain not initialized"}
                     degrade("blockchain_unavailable")
-            except (ValueError, RuntimeError, OSError) as exc:  # pragma: no cover - defensive
+            except Exception as exc:  # pragma: no cover - defensive
                 blockchain_summary = {"accessible": False, "error": str(exc)}
                 overall_status = "unhealthy"
                 http_status = 503
@@ -1014,7 +1065,7 @@ class NodeAPIRoutes:
             try:
                 metrics_output = self.node.metrics_collector.export_prometheus()
                 return metrics_output, 200, {"Content-Type": "text/plain; version=0.0.4"}
-            except (RuntimeError, AttributeError, ValueError) as e:
+            except Exception as e:
                 return f"# Error generating metrics: {e}\n", 500, {"Content-Type": "text/plain"}
 
         @self.app.route("/stats", methods=["GET"])
@@ -1026,6 +1077,23 @@ class NodeAPIRoutes:
             stats["is_mining"] = self.node.is_mining
             stats["node_uptime"] = time.time() - self.node.start_time
             return jsonify(stats)
+
+        @self.app.route("/state/snapshot", methods=["GET"])
+        def get_state_snapshot() -> Tuple[Dict[str, Any], int]:
+            """Expose a deterministic snapshot of chain state for integrity audits."""
+            try:
+                if not hasattr(self.blockchain, "compute_state_snapshot"):
+                    raise RuntimeError("State snapshots unavailable")
+                snapshot = self.blockchain.compute_state_snapshot()
+            except (DatabaseError, StorageError, OSError, RuntimeError, ValueError) as exc:
+                logger.error(
+                    "Failed to compute state snapshot",
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                )
+                return self._handle_exception(exc, "state_snapshot")
+
+            return jsonify({"success": True, "state": snapshot}), 200
 
         @self.app.route("/mempool", methods=["GET"])
         def get_mempool_overview() -> Tuple[Dict[str, Any], int]:
@@ -1147,6 +1215,73 @@ class NodeAPIRoutes:
                 "transactions_returned": overview.get("transactions_returned", 0),
             }
             return jsonify(response_body), 200
+
+        @self.app.route("/consensus/info", methods=["GET"])
+        def consensus_info() -> Tuple[Dict[str, Any], int]:
+            """Expose consensus manager status metrics."""
+            manager = getattr(self.node, "consensus_manager", None)
+            if manager is None:
+                return self._error_response(
+                    "Consensus manager unavailable",
+                    status=503,
+                    code="consensus_unavailable",
+                )
+            try:
+                info = manager.get_consensus_info()
+            except Exception as exc:
+                return self._handle_exception(exc, "consensus_info")
+            return jsonify({"success": True, "consensus": info}), 200
+
+        @self.app.route("/mempool/<txid>", methods=["DELETE"])
+        def delete_mempool_transaction(txid: str) -> Tuple[Dict[str, Any], int]:
+            """Remove a specific transaction from the mempool (admin only)."""
+            auth_error = self._require_admin_auth()
+            if auth_error:
+                return auth_error
+
+            ban_sender = request.args.get("ban_sender", "").strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
+
+            try:
+                removed, metadata = self.blockchain.remove_transaction_from_mempool(
+                    txid,
+                    ban_sender=ban_sender,
+                )
+            except ValueError as exc:
+                return self._error_response(
+                    str(exc),
+                    status=400,
+                    code="invalid_mempool_request",
+                    context={"txid": txid},
+                )
+            except (DatabaseError, StorageError, OSError, RuntimeError) as exc:
+                logger.error(
+                    "Failed to evict transaction from mempool",
+                    txid=txid,
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                )
+                return self._handle_exception(exc, "mempool_delete")
+
+            if not removed:
+                return self._error_response(
+                    "Transaction not found in mempool",
+                    status=404,
+                    code="tx_not_found",
+                    context={"txid": txid},
+                )
+
+            payload = {
+                "success": True,
+                "txid": txid,
+                "sender": metadata.get("sender"),
+                "ban_applied": ban_sender and bool(metadata.get("sender")),
+            }
+            return jsonify(payload), 200
 
     # ==================== BLOCKCHAIN ROUTES ====================
 
@@ -1281,6 +1416,60 @@ class NodeAPIRoutes:
             # Fallback for blocks without hash (shouldn't happen in production)
             return jsonify(payload), 200
 
+        @self.app.route("/block/latest", methods=["GET"])
+        def get_latest_block() -> Tuple[Dict[str, Any], int]:
+            """Return the most recent block plus a concise summary."""
+            summary_param = request.args.get("summary", "false")
+            summary_only = str(summary_param).lower() in {"1", "true", "yes", "on"}
+
+            getter = getattr(self.blockchain, "get_latest_block", None)
+            try:
+                if callable(getter):
+                    block_obj = getter()
+                else:
+                    chain = getattr(self.blockchain, "chain", [])
+                    block_obj = chain[-1] if chain else None
+            except (LookupError, RuntimeError, ValueError, AttributeError) as exc:
+                logger.warning(
+                    "Failed to load latest block",
+                    exc_info=True,
+                    extra={"event": "api.block.latest_error", "error_type": type(exc).__name__},
+                )
+                return self._error_response(
+                    "Unable to load latest block",
+                    status=500,
+                    code="latest_block_error",
+                )
+
+            if block_obj is None:
+                return self._error_response(
+                    "No blocks available",
+                    status=404,
+                    code="latest_block_missing",
+                )
+
+            payload = _block_to_payload(block_obj)
+            if not isinstance(payload, dict):
+                return self._error_response(
+                    "Latest block unavailable",
+                    status=500,
+                    code="latest_block_invalid",
+                )
+
+            summary = _build_block_summary(payload)
+            body: Dict[str, Any] = {
+                "summary": summary,
+                "block_number": summary.get("height"),
+                "hash": summary.get("hash"),
+                "timestamp": summary.get("timestamp"),
+            }
+            if not summary_only:
+                body["block"] = payload
+            response = jsonify(body)
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            return response, 200
+
         @self.app.route("/block/<block_hash>", methods=["GET"])
         def get_block_by_hash(block_hash: str) -> Tuple[Dict[str, Any], int]:
             """Get a block by its hash."""
@@ -1356,6 +1545,90 @@ class NodeAPIRoutes:
 
             # Fallback for blocks without hash (shouldn't happen in production)
             return jsonify(payload), 200
+
+        @self.app.route("/blocks/validate", methods=["POST"])
+        def validate_block_endpoint() -> Tuple[Dict[str, Any], int]:
+            """Validate a block by index or hash and optionally inspect transactions."""
+            consensus_manager = getattr(self.node, "consensus_manager", None)
+            if consensus_manager is None:
+                return self._error_response(
+                    "Consensus manager unavailable",
+                    status=503,
+                    code="consensus_unavailable",
+                )
+
+            payload = request.get_json(silent=True) or {}
+            block_index = payload.get("index")
+            block_hash = payload.get("hash")
+            include_transactions = bool(payload.get("include_transactions"))
+
+            target_block = None
+            previous_block = None
+
+            try:
+                if block_index is not None:
+                    height = int(block_index)
+                    target_block = self.blockchain.get_block(height)
+                    previous_block = self.blockchain.get_block(height - 1) if height > 0 else None
+                elif block_hash:
+                    normalized_hash = InputSanitizer.validate_hash(block_hash)
+                    target_block = self.blockchain.get_block_by_hash(normalized_hash)
+                    block_height = getattr(target_block, "index", None) if target_block else None
+                    if isinstance(block_height, int) and block_height > 0:
+                        previous_block = self.blockchain.get_block(block_height - 1)
+                else:
+                    return self._error_response(
+                        "Provide either block index or hash",
+                        status=400,
+                        code="missing_identifier",
+                    )
+            except (ValueError, TypeError) as exc:
+                return self._error_response(
+                    f"Invalid block identifier: {exc}",
+                    status=400,
+                    code="invalid_identifier",
+                )
+            except (DatabaseError, StorageError, ValidationError, RuntimeError) as exc:
+                return self._handle_exception(exc, "block_lookup")
+
+            if target_block is None:
+                return self._error_response(
+                    "Block not found",
+                    status=404,
+                    code="block_not_found",
+                    context={"index": block_index, "hash": block_hash},
+                )
+
+            history_chain = getattr(self.blockchain, "chain", None)
+            history_end_index = getattr(target_block, "index", None)
+            try:
+                is_valid, error = consensus_manager.validate_block(
+                    target_block,
+                    previous_block,
+                    history_chain=history_chain,
+                    history_end_index=history_end_index,
+                )
+            except (ValueError, RuntimeError) as exc:
+                return self._handle_exception(exc, "block_validate")
+
+            response_body: Dict[str, Any] = {
+                "success": True,
+                "block_index": getattr(target_block, "index", block_index),
+                "block_hash": getattr(target_block, "hash", block_hash),
+                "valid": bool(is_valid),
+                "error": error,
+            }
+
+            if include_transactions:
+                try:
+                    tx_valid, tx_error = consensus_manager.validate_block_transactions(target_block)
+                    response_body["transactions_valid"] = tx_valid
+                    response_body["transactions_error"] = tx_error
+                except (ValueError, RuntimeError) as exc:
+                    response_body["transactions_valid"] = False
+                    response_body["transactions_error"] = str(exc)
+
+            return jsonify(response_body), 200
 
         @self.app.route("/block/receive", methods=["POST"])
         def receive_block() -> Tuple[Dict[str, Any], int]:

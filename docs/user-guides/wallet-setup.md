@@ -566,12 +566,13 @@ Monitor addresses without private keys:
 
 ```bash
 # Add watch-only address
-python src/xai/wallet/cli.py watch-address \
-  --address XAI_ADDRESS_TO_WATCH \
-  --name "watched-wallet"
+xai wallet watch add --address XAI_ADDRESS_TO_WATCH --label "watched-wallet"
 
-# Check balance (no sending capability)
-python src/xai/wallet/cli.py balance --address XAI_ADDRESS_TO_WATCH
+# Derive addresses from hardware wallet xpub (receiving chain)
+xai wallet watch add --xpub XPUB... --derive-count 5 --label "ledger"
+
+# List and monitor
+xai wallet watch list --tag watched-wallet
 ```
 
 ### Paper Wallets

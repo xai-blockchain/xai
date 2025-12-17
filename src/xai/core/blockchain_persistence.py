@@ -25,6 +25,7 @@ from .blockchain_exceptions import (
     CorruptedDataError,
     ValidationError,
 )
+from xai.core.monitoring import MetricsCollector
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,7 @@ class BlockchainStorage:
 
         # Thread safety
         self.lock = Lock()
+        self._metrics: Optional[MetricsCollector | bool] = None
 
         # Metadata file
         self.metadata_file = os.path.join(self.data_dir, "blockchain_metadata.json")
@@ -118,6 +120,98 @@ class BlockchainStorage:
         actual_checksum = self._calculate_checksum(data)
         return actual_checksum == expected_checksum
 
+    def _get_metrics_collector(self) -> Optional[MetricsCollector]:
+        """Lazily acquire the shared metrics collector without breaking storage flow on errors."""
+        if self._metrics is False:
+            return None
+        if self._metrics is None:
+            try:
+                self._metrics = MetricsCollector.instance()
+            except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+                logger.debug(
+                    "Metrics collector unavailable for storage instrumentation",
+                    extra={
+                        "event": "storage.metrics_unavailable",
+                        "error": str(exc),
+                        "error_type": type(exc).__name__,
+                    },
+                )
+                self._metrics = False
+        return self._metrics if self._metrics is not False else None
+
+    def _calculate_data_dir_size(self) -> int:
+        """Calculate total size of the data directory without following symlinks."""
+        total_size = 0
+        stack = [self.data_dir]
+        while stack:
+            path = stack.pop()
+            try:
+                with os.scandir(path) as entries:
+                    for entry in entries:
+                        try:
+                            if entry.is_symlink():
+                                continue
+                            if entry.is_dir(follow_symlinks=False):
+                                stack.append(entry.path)
+                            else:
+                                total_size += entry.stat(follow_symlinks=False).st_size
+                        except (OSError, FileNotFoundError, PermissionError):
+                            continue
+            except (OSError, FileNotFoundError, PermissionError):
+                continue
+        return total_size
+
+    def _update_data_dir_gauge(self) -> None:
+        collector = self._get_metrics_collector()
+        if not collector:
+            return
+        gauge = collector.get_metric("xai_storage_data_dir_bytes")
+        if gauge:
+            gauge.set(float(self._calculate_data_dir_size()))
+
+    def _record_storage_write(self, duration_seconds: float, bytes_written: int) -> None:
+        collector = self._get_metrics_collector()
+        if not collector:
+            return
+        histogram = collector.get_metric("xai_storage_write_latency_seconds")
+        if hasattr(histogram, "observe"):
+            histogram.observe(duration_seconds)
+        counter = collector.get_metric("xai_storage_writes_total")
+        if counter:
+            counter.inc()
+        byte_counter = collector.get_metric("xai_storage_bytes_written_total")
+        if byte_counter and bytes_written:
+            byte_counter.inc(float(bytes_written))
+        self._update_data_dir_gauge()
+
+    def _record_storage_read(self, duration_seconds: float, bytes_read: int) -> None:
+        collector = self._get_metrics_collector()
+        if not collector:
+            return
+        histogram = collector.get_metric("xai_storage_read_latency_seconds")
+        if hasattr(histogram, "observe"):
+            histogram.observe(duration_seconds)
+        counter = collector.get_metric("xai_storage_reads_total")
+        if counter:
+            counter.inc()
+        byte_counter = collector.get_metric("xai_storage_bytes_read_total")
+        if byte_counter and bytes_read:
+            byte_counter.inc(float(bytes_read))
+
+    def _record_storage_error(self, operation: str, duration_seconds: float = 0.0) -> None:
+        collector = self._get_metrics_collector()
+        if not collector:
+            return
+        error_counter = collector.get_metric("xai_storage_errors_total")
+        if error_counter:
+            error_counter.inc()
+        if operation.startswith("load"):
+            histogram = collector.get_metric("xai_storage_read_latency_seconds")
+        else:
+            histogram = collector.get_metric("xai_storage_write_latency_seconds")
+        if hasattr(histogram, "observe") and duration_seconds:
+            histogram.observe(duration_seconds)
+
     def save_to_disk(self, blockchain_data: dict, create_backup: bool = True) -> Tuple[bool, str]:
         """
         Save blockchain to disk with atomic write
@@ -132,6 +226,8 @@ class BlockchainStorage:
         Returns:
             tuple: (success: bool, message: str)
         """
+        start = time.perf_counter()
+        bytes_written = 0
         with self.lock:
             try:
                 # Serialize blockchain data
@@ -152,6 +248,7 @@ class BlockchainStorage:
                 package = {"metadata": metadata, "blockchain": blockchain_data}
 
                 package_json = json.dumps(package, indent=2, sort_keys=True)
+                bytes_written = len(package_json.encode("utf-8"))
 
                 # Create backup if requested and file exists
                 if create_backup and os.path.exists(self.blockchain_file):
@@ -181,12 +278,14 @@ class BlockchainStorage:
                 if block_height % BlockchainStorageConfig.CHECKPOINT_INTERVAL == 0:
                     self._create_checkpoint(blockchain_data, block_height)
 
+                self._record_storage_write(time.perf_counter() - start, bytes_written)
                 return (
                     True,
                     f"Blockchain saved successfully (height: {block_height}, checksum: {checksum[:8]}...)",
                 )
 
             except (DatabaseError, StorageError, OSError, IOError, PermissionError) as e:
+                self._record_storage_error("save_to_disk", time.perf_counter() - start)
                 logger.error(
                     "Failed to save blockchain to disk",
                     operation="save_to_disk",
@@ -204,12 +303,15 @@ class BlockchainStorage:
         Returns:
             tuple: (success: bool, blockchain_data: dict or None, message: str)
         """
+        start = time.perf_counter()
+        bytes_read = 0
         with self.lock:
             # Check if blockchain file exists
             if not os.path.exists(self.blockchain_file):
                 return False, None, "No blockchain file found"
 
             try:
+                bytes_read = os.path.getsize(self.blockchain_file)
                 # Read file
                 with open(self.blockchain_file, "r") as f:
                     package = json.load(f)
@@ -230,6 +332,7 @@ class BlockchainStorage:
 
                 block_height = len(blockchain_data.get("chain", []))
 
+                self._record_storage_read(time.perf_counter() - start, bytes_read)
                 return (
                     True,
                     blockchain_data,
@@ -244,9 +347,11 @@ class BlockchainStorage:
                     error_type="JSONDecodeError",
                 )
                 print(f"WARNING: JSON decode error: {e}. Attempting recovery...")
+                self._record_storage_error("load_from_disk", time.perf_counter() - start)
                 return self._attempt_recovery()
 
             except (DatabaseError, StorageError, CorruptedDataError, OSError, IOError) as e:
+                self._record_storage_error("load_from_disk", time.perf_counter() - start)
                 logger.error(
                     "Failed to load blockchain from disk",
                     operation="load_from_disk",

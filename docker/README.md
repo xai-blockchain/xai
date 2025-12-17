@@ -122,7 +122,7 @@ curl http://localhost:12001/health
 
 # Compare block heights across nodes
 for port in 12001 12011 12021 12031; do
-  echo "Port $port: $(curl -s http://localhost:$port/block/latest | jq '{height: .block_number, hash: .hash[0:16]}')"
+  echo "Port $port: $(curl -s \"http://localhost:$port/block/latest?summary=1\" | jq '{height: .block_number, hash: .hash[0:16]}')"
 done
 
 # View container logs

@@ -13,11 +13,17 @@ This module provides:
 All validation functions raise ValueError with clear error messages.
 """
 
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, Iterable
 from decimal import Decimal, ROUND_DOWN, getcontext, InvalidOperation
 import re
 
 from xai.core.security_validation import SecurityValidator, ValidationError
+from xai.core.address_checksum import (
+    validate_address as validate_checksum,
+    normalize_address,
+    is_checksum_valid,
+    to_checksum_address
+)
 
 # Set global decimal precision for blockchain operations
 getcontext().prec = 28
@@ -36,73 +42,121 @@ MIN_ADDRESS_LENGTH = 40
 MAX_ADDRESS_LENGTH = 100
 
 
-def validate_address(address: str, *, allow_special: bool = True) -> str:
+class AddressFormatValidator:
+    """
+    Dedicated XAI address validator with network-aware prefix enforcement.
+
+    Provides strict validation with options to allow legacy formats and special
+    system addresses while guarding against malformed or spoofed prefixes.
+    """
+
+    def __init__(
+        self,
+        *,
+        allowed_prefixes: Iterable[str] = VALID_PREFIXES,
+        expected_prefix: Optional[str] = None,
+        allow_special: bool = True,
+        allow_legacy: bool = True,
+    ) -> None:
+        self.allowed_prefixes = tuple(allowed_prefixes)
+        self.expected_prefix = expected_prefix
+        self.allow_special = allow_special
+        self.allow_legacy = allow_legacy
+
+    def _require_prefix(self, address: str) -> str:
+        for candidate in sorted(self.allowed_prefixes, key=len, reverse=True):
+            if address.startswith(candidate):
+                if self.expected_prefix and not address.startswith(self.expected_prefix):
+                    raise ValueError(f"Address must use network prefix {self.expected_prefix}")
+                return candidate
+        raise ValueError(f"Invalid address prefix: must start with {' or '.join(self.allowed_prefixes)}")
+
+    def _validate_hex_body(self, body: str) -> None:
+        if not body:
+            raise ValueError("Address body missing after prefix")
+        if not re.fullmatch(r"[A-Fa-f0-9]+", body):
+            raise ValueError("Address body must be hexadecimal")
+
+    def validate(self, address: str, require_checksum: bool = False) -> str:
+        """
+        Validate and normalize an address. Returns the normalized address.
+
+        Args:
+            address: Address to validate
+            require_checksum: If True, require valid EIP-55 checksum
+        """
+        if not address or not isinstance(address, str):
+            raise ValueError("Address must be a non-empty string")
+
+        normalized = address.strip()
+        if not normalized:
+            raise ValueError("Address cannot be empty")
+
+        if self.allow_special and normalized in SPECIAL_ADDRESSES:
+            return normalized
+
+        prefix = self._require_prefix(normalized)
+        prefix_len = len(prefix)
+        body = normalized[prefix_len:]
+        self._validate_hex_body(body)
+
+        body_len = len(body)
+        if body_len + prefix_len > MAX_ADDRESS_LENGTH:
+            raise ValueError(f"Address too long: maximum {MAX_ADDRESS_LENGTH} characters")
+
+        if not self.allow_legacy and body_len != 40:
+            raise ValueError("Address must be prefix + 40 hex characters")
+
+        if self.allow_legacy and 22 <= body_len <= 60:
+            return normalized
+        if body_len == 40:
+            # For 40-character hex addresses, optionally validate/apply checksum
+            if require_checksum or (body != body.lower() and body != body.upper()):
+                # Mixed case present or checksum required - validate it
+                is_valid, result = validate_checksum(normalized, require_checksum=require_checksum)
+                if not is_valid:
+                    raise ValueError(result)
+                return result
+            return normalized
+
+        raise ValueError("Invalid address format: must be prefix + hex payload")
+
+    def is_valid(self, address: str) -> bool:
+        """Return True if address is valid, False otherwise."""
+        try:
+            self.validate(address)
+            return True
+        except ValueError:
+            return False
+
+
+def validate_address(address: str, *, allow_special: bool = True, require_checksum: bool = False, apply_checksum: bool = True) -> str:
     """
     Validate and normalize XAI blockchain address.
 
-    XAI addresses follow the format:
-    - Mainnet: XAI + 40 hex characters (e.g., XAI1234567890abcdef...)
-    - Testnet: TXAI + 40 hex characters (e.g., TXAI1234567890abcdef...)
-    - Special: COINBASE, XAITRADEFEE, TXAITRADEFEE (if allow_special=True)
-
     Args:
         address: Address to validate
-        allow_special: Whether to allow special addresses (COINBASE, etc.)
+        allow_special: Allow special system addresses (COINBASE, etc.)
+        require_checksum: Require valid EIP-55 checksum (strict mode)
+        apply_checksum: Return checksummed format (recommended)
 
     Returns:
-        Validated and normalized address
+        Validated and optionally checksummed address
 
-    Raises:
-        ValueError: If address is invalid
-
-    Examples:
-        >>> validate_address("XAI" + "0" * 40)
-        'XAI0000000000000000000000000000000000000000'
-        >>> validate_address("COINBASE")
-        'COINBASE'
-        >>> validate_address("invalid")
-        ValueError: Invalid address format
+    See AddressFormatValidator for detailed rules.
     """
-    if not address or not isinstance(address, str):
-        raise ValueError("Address must be a non-empty string")
+    validator = AddressFormatValidator(allow_special=allow_special)
+    validated = validator.validate(address, require_checksum=require_checksum)
 
-    address = address.strip()
+    # Apply checksum to standard addresses if requested
+    if apply_checksum and validated not in SPECIAL_ADDRESSES:
+        try:
+            validated = normalize_address(validated)
+        except ValueError:
+            # If checksum fails, return original validated address
+            pass
 
-    if not address:
-        raise ValueError("Address cannot be empty")
-
-    # Special addresses
-    if allow_special and address in SPECIAL_ADDRESSES:
-        return address
-
-    # Standard XAI/TXAI addresses: prefix + 40 hex chars (strict)
-    if re.fullmatch(r'(XAI|TXAI)[A-Fa-f0-9]{40}', address):
-        return address
-
-    # Legacy format: prefix + variable hex (22-60 chars) for backward compatibility
-    if re.fullmatch(r'(XAI|TXAI)[A-Fa-f0-9]{22,60}', address):
-        return address
-
-    # Check if prefix is missing
-    if not address.startswith(VALID_PREFIXES):
-        raise ValueError(
-            f"Invalid address prefix: must start with {' or '.join(VALID_PREFIXES)}"
-        )
-
-    # Check length
-    if len(address) < MIN_ADDRESS_LENGTH:
-        raise ValueError(
-            f"Address too short: minimum {MIN_ADDRESS_LENGTH} characters"
-        )
-
-    if len(address) > MAX_ADDRESS_LENGTH:
-        raise ValueError(
-            f"Address too long: maximum {MAX_ADDRESS_LENGTH} characters"
-        )
-
-    raise ValueError(
-        "Invalid address format: must be XAI/TXAI prefix followed by hex characters"
-    )
+    return validated
 
 
 def validate_amount(
@@ -466,6 +520,7 @@ class MonetaryAmount:
 
 # Backwards compatibility: expose SecurityValidator for advanced use cases
 __all__ = [
+    'AddressFormatValidator',
     'validate_address',
     'validate_amount',
     'validate_fee',
@@ -475,4 +530,7 @@ __all__ = [
     'SecurityValidator',
     'ValidationError',
     'MonetaryAmount',
+    'normalize_address',
+    'is_checksum_valid',
+    'to_checksum_address',
 ]

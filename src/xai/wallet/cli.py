@@ -19,7 +19,7 @@ import secrets
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Tuple, Optional
+from typing import Any, Dict, Tuple, Optional, List
 
 import requests
 try:
@@ -33,12 +33,26 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 
 from xai.core.wallet import Wallet
+from xai.core.watch_only_wallet import (
+    WatchOnlyWalletStore,
+    WatchOnlyWalletError,
+    DuplicateWatchAddressError,
+    WatchAddressNotFoundError,
+    XpubDerivationError,
+)
 from xai.wallet.mnemonic_qr_backup import (
     MnemonicQRBackupGenerator,
     QRCodeUnavailableError,
 )
+from xai.wallet.multisig_wallet import MultiSigWallet
 from xai.wallet.two_factor_profile import TwoFactorProfile, TwoFactorProfileStore
 from xai.security.two_factor_auth import TwoFactorAuthManager, TwoFactorSetup
+from xai.core.hardware_wallet import (
+    get_default_hardware_wallet,
+    get_hardware_wallet_manager,
+    HardwareWallet,
+    HARDWARE_WALLET_ENABLED,
+)
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -55,6 +69,74 @@ ARGON2_PARALLELISM = 4
 SALT_SIZE = 32  # 256 bits
 NONCE_SIZE = 12  # 96 bits for AES-GCM
 KEY_SIZE = 32  # 256 bits for AES-256
+
+
+def _get_hardware_wallet(args: argparse.Namespace) -> HardwareWallet:
+    """Get hardware wallet based on CLI args."""
+    if getattr(args, 'ledger', False):
+        try:
+            from xai.core.hardware_wallet_ledger import LedgerHardwareWallet
+            wallet = LedgerHardwareWallet()
+            wallet.connect()
+            return wallet
+        except ImportError:
+            print("Ledger support requires: pip install ledgerblue", file=sys.stderr)
+            sys.exit(1)
+        except Exception as e:
+            print(f"Failed to connect to Ledger: {e}", file=sys.stderr)
+            sys.exit(1)
+    elif getattr(args, 'trezor', False):
+        try:
+            from xai.core.hardware_wallet_trezor import TrezorHardwareWallet
+            wallet = TrezorHardwareWallet()
+            wallet.connect()
+            return wallet
+        except ImportError:
+            print("Trezor support requires: pip install trezor", file=sys.stderr)
+            sys.exit(1)
+        except Exception as e:
+            print(f"Failed to connect to Trezor: {e}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        print("Specify --ledger or --trezor", file=sys.stderr)
+        sys.exit(1)
+
+
+def _add_watch_add_arguments(parser: argparse.ArgumentParser) -> None:
+    """Attach watch-only add options to a parser."""
+    parser.add_argument("--address", help="Address to monitor (XAI/TXAI).")
+    parser.add_argument("--xpub", help="Extended public key for deriving multiple watch-only addresses.")
+    parser.add_argument(
+        "--derive-count",
+        type=int,
+        default=5,
+        help="Number of sequential addresses to derive when using --xpub (default: 5).",
+    )
+    parser.add_argument(
+        "--start-index",
+        type=int,
+        default=0,
+        help="Starting child index when deriving from --xpub (default: 0).",
+    )
+    parser.add_argument(
+        "--change",
+        type=int,
+        choices=[0, 1],
+        default=0,
+        help="Change chain when deriving from --xpub (0=receiving, 1=change).",
+    )
+    parser.add_argument("--label", help="Optional label applied to each address.")
+    parser.add_argument("--notes", help="Optional notes metadata stored with the entry.")
+    parser.add_argument(
+        "--tags",
+        nargs="*",
+        help="Optional tags (space-separated) stored with the entry.",
+    )
+    parser.add_argument(
+        "--store",
+        help="Override watch-only store path (default: ~/.xai/watch_only.json).",
+    )
+    parser.add_argument("--json", action="store_true", help="Emit JSON output instead of plaintext.")
 
 
 def derive_key_from_password(password: str, salt: bytes, kdf: str = "pbkdf2") -> bytes:
@@ -1039,6 +1121,96 @@ def _mnemonic_qr_backup(args: argparse.Namespace) -> int:
     return 0
 
 
+def _watch_store_from_args(args: argparse.Namespace) -> WatchOnlyWalletStore:
+    """Instantiate a watch-only store honoring CLI overrides."""
+    store_path = getattr(args, "store", None)
+    if store_path:
+        return WatchOnlyWalletStore(Path(store_path))
+    return WatchOnlyWalletStore()
+
+
+def _watch_add(args: argparse.Namespace) -> int:
+    """Add watch-only addresses manually or via xpub derivation."""
+    store = _watch_store_from_args(args)
+    tags = args.tags or []
+    results: List[Dict[str, Any]] = []
+    try:
+        if args.xpub:
+            added = store.add_from_xpub(
+                args.xpub,
+                change=args.change,
+                start_index=args.start_index,
+                count=args.derive_count,
+                label=args.label,
+                notes=args.notes,
+                tags=tags,
+            )
+            results = [entry.to_dict() for entry in added]
+        else:
+            if not args.address:
+                print("ERROR: --address is required when --xpub is not provided.", file=sys.stderr)
+                return 1
+            entry = store.add_address(
+                args.address,
+                label=args.label,
+                notes=args.notes,
+                tags=tags,
+            )
+            results = [entry.to_dict()]
+    except DuplicateWatchAddressError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    except (WatchOnlyWalletError, XpubDerivationError, ValueError) as exc:
+        logger.error("Failed to add watch-only address: %s", exc, exc_info=True)
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    if args.json:
+        print(json.dumps(results, indent=2))
+    else:
+        if not results:
+            print("No new watch-only addresses were added (duplicates).")
+        else:
+            for entry in results:
+                label = f" ({entry['label']})" if entry.get("label") else ""
+                print(f"Added watch-only address {entry['address']}{label}")
+    return 0
+
+
+def _watch_list(args: argparse.Namespace) -> int:
+    """List configured watch-only addresses."""
+    store = _watch_store_from_args(args)
+    entries = store.list_addresses(tags=args.tag)
+    payload = [entry.to_dict() for entry in entries]
+    if args.json:
+        print(json.dumps(payload, indent=2))
+    else:
+        if not payload:
+            print("No watch-only addresses configured.")
+        else:
+            for entry in payload:
+                label = f" ({entry['label']})" if entry.get("label") else ""
+                tags = f" [{', '.join(entry['tags'])}]" if entry.get("tags") else ""
+                print(f"{entry['address']}{label}{tags} - source={entry.get('source', 'manual')}")
+    return 0
+
+
+def _watch_remove(args: argparse.Namespace) -> int:
+    """Remove an address from the watch-only store."""
+    store = _watch_store_from_args(args)
+    try:
+        entry = store.remove_address(args.address)
+    except (WatchOnlyWalletError, WatchAddressNotFoundError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(entry.to_dict(), indent=2))
+    else:
+        label = f" ({entry.label})" if entry.label else ""
+        print(f"Removed watch-only address {entry.address}{label}")
+    return 0
+
+
 def _setup_two_factor(args: argparse.Namespace) -> int:
     """Provision a TOTP secret for the provided profile label."""
     label = args.label.strip()
@@ -1152,6 +1324,363 @@ def _require_two_factor(profile_label: str, otp: Optional[str] = None) -> None:
 
     logger.info("2FA verification successful for profile: %s", profile_label)
     print(f"2FA verification successful ({message}).")
+
+
+def _hw_address(args: argparse.Namespace) -> int:
+    """Get address from hardware wallet."""
+    try:
+        hw = _get_hardware_wallet(args)
+        address = hw.get_address()
+        pubkey = hw.get_public_key()
+
+        if args.json:
+            print(json.dumps({"address": address, "public_key": pubkey}, indent=2))
+        else:
+            device = "Ledger" if getattr(args, 'ledger', False) else "Trezor"
+            print(f"Device: {device}")
+            print(f"Address: {address}")
+            print(f"Public Key: {pubkey[:32]}...{pubkey[-8:]}")
+        return 0
+    except Exception as e:
+        logger.error("Hardware wallet error: %s", e)
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def _hw_sign(args: argparse.Namespace) -> int:
+    """Sign a message with hardware wallet."""
+    try:
+        hw = _get_hardware_wallet(args)
+
+        # Read message from file or stdin
+        if args.message_file:
+            with open(args.message_file, 'rb') as f:
+                message = f.read()
+        elif args.message:
+            message = args.message.encode('utf-8')
+        else:
+            print("Reading message from stdin (Ctrl+D to end):", file=sys.stderr)
+            message = sys.stdin.buffer.read()
+
+        # Show what we're signing
+        msg_preview = message[:64].hex() if len(message) > 64 else message.hex()
+        print(f"Signing {len(message)} bytes: {msg_preview}{'...' if len(message) > 64 else ''}", file=sys.stderr)
+        print("Please confirm on your device...", file=sys.stderr)
+
+        signature = hw.sign_transaction(message)
+        sig_hex = signature.hex() if isinstance(signature, bytes) else signature
+
+        if args.json:
+            print(json.dumps({"signature": sig_hex, "message_hash": hashlib.sha256(message).hexdigest()}, indent=2))
+        else:
+            print(f"Signature: {sig_hex}")
+        return 0
+    except Exception as e:
+        logger.error("Signing error: %s", e)
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def _hw_verify(args: argparse.Namespace) -> int:
+    """Verify hardware wallet address matches on-device display."""
+    try:
+        hw = _get_hardware_wallet(args)
+        address = hw.get_address()
+
+        device = "Ledger" if getattr(args, 'ledger', False) else "Trezor"
+        print(f"\n{'='*50}")
+        print(f"ADDRESS VERIFICATION - {device}")
+        print(f"{'='*50}")
+        print(f"\nAddress from device: {address}")
+        print(f"\nPlease verify this address matches your {device} screen.")
+        print("If it does NOT match, your device may be compromised!")
+        print(f"{'='*50}\n")
+
+        if args.json:
+            print(json.dumps({"address": address, "device": device.lower()}, indent=2))
+        return 0
+    except Exception as e:
+        logger.error("Verification error: %s", e)
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def _hw_send(args: argparse.Namespace) -> int:
+    """Send transaction using hardware wallet."""
+    # Optional 2FA check
+    if getattr(args, 'two_fa_profile', None):
+        try:
+            _require_two_factor(args.two_fa_profile, getattr(args, 'otp', None))
+        except (ValueError, KeyError, OSError) as exc:
+            print(f"2FA verification failed: {exc}", file=sys.stderr)
+            return 1
+
+    try:
+        hw = _get_hardware_wallet(args)
+        sender_address = hw.get_address()
+
+        # Verify sender matches hardware wallet
+        if args.sender and args.sender != sender_address:
+            print(f"Warning: --sender {args.sender} differs from device address {sender_address}", file=sys.stderr)
+            print("Using device address.", file=sys.stderr)
+
+        device = "Ledger" if getattr(args, 'ledger', False) else "Trezor"
+        print(f"\n{'='*50}")
+        print(f"HARDWARE WALLET TRANSACTION - {device}")
+        print(f"{'='*50}")
+        print(f"From:   {sender_address}")
+        print(f"To:     {args.recipient}")
+        print(f"Amount: {args.amount} XAI")
+        print(f"Fee:    {args.fee} XAI")
+        print(f"{'='*50}")
+        print(f"\nPlease review and confirm on your {device}...")
+
+        # Build transaction for signing
+        tx_payload = json.dumps({
+            "sender": sender_address,
+            "recipient": args.recipient,
+            "amount": args.amount,
+            "fee": args.fee,
+            "timestamp": int(time.time()),
+        }).encode('utf-8')
+
+        signature = hw.sign_transaction(tx_payload)
+        sig_hex = signature.hex() if isinstance(signature, bytes) else signature
+
+        # Submit to node
+        endpoint = f"{args.base_url.rstrip('/')}/transaction"
+        payload = {
+            "sender": sender_address,
+            "recipient": args.recipient,
+            "amount": args.amount,
+            "fee": args.fee,
+            "signature": sig_hex,
+            "public_key": hw.get_public_key(),
+        }
+
+        response = requests.post(endpoint, json=payload, timeout=args.timeout)
+        response.raise_for_status()
+        data = response.json()
+
+        if args.json:
+            print(json.dumps(data, indent=2))
+        else:
+            if data.get("success"):
+                print(f"\nTransaction sent successfully!")
+                print(f"TX ID: {data.get('txid', 'pending')}")
+            else:
+                print(f"\nTransaction failed: {data.get('error', 'Unknown error')}")
+                return 1
+        return 0
+    except requests.RequestException as exc:
+        print(f"Network error: {exc}", file=sys.stderr)
+        return 2
+    except Exception as e:
+        logger.error("Transaction error: %s", e)
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def _multisig_create(args: argparse.Namespace) -> int:
+    """Create a new multisig wallet configuration."""
+    try:
+        # Read public keys from file or args
+        if args.keys_file:
+            with open(args.keys_file, 'r') as f:
+                public_keys = [line.strip() for line in f if line.strip()]
+        else:
+            public_keys = args.public_keys
+
+        if not public_keys or len(public_keys) < 2:
+            print("Error: At least 2 public keys required for multisig", file=sys.stderr)
+            return 1
+
+        if args.threshold > len(public_keys):
+            print(f"Error: Threshold ({args.threshold}) cannot exceed number of keys ({len(public_keys)})", file=sys.stderr)
+            return 1
+
+        # Create multisig wallet to validate
+        wallet = MultiSigWallet(public_keys, args.threshold)
+
+        # Generate multisig configuration
+        config = {
+            "version": "1.0",
+            "type": "multisig",
+            "threshold": args.threshold,
+            "total_signers": len(public_keys),
+            "public_keys": public_keys,
+            "created_at": int(time.time()),
+        }
+
+        # Save configuration
+        output_path = args.output or f"multisig_{args.threshold}of{len(public_keys)}.json"
+        with open(output_path, 'w') as f:
+            json.dump(config, f, indent=2)
+
+        if args.json:
+            print(json.dumps(config, indent=2))
+        else:
+            print(f"Multisig wallet created: {args.threshold}-of-{len(public_keys)}")
+            print(f"Configuration saved to: {output_path}")
+            print(f"Share this file with all signers.")
+
+        return 0
+    except Exception as e:
+        logger.error("Multisig creation error: %s", e)
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def _multisig_sign(args: argparse.Namespace) -> int:
+    """Add a signature to a multisig transaction."""
+    try:
+        # Load transaction file
+        with open(args.tx_file, 'r') as f:
+            tx_data = json.load(f)
+
+        # Get private key securely
+        private_key = get_private_key_secure(
+            keystore_path=args.keystore,
+            allow_env=False,
+            prompt="Enter your private key for signing"
+        )
+
+        # Derive public key from private key
+        from xai.core.crypto_utils import derive_public_key_hex, sign_message_hex
+        public_key = derive_public_key_hex(private_key)
+
+        # Sign the transaction payload
+        payload = json.dumps(tx_data.get("payload", tx_data), sort_keys=True).encode('utf-8')
+        signature = sign_message_hex(payload.hex(), private_key)
+
+        # Add signature to transaction
+        if "signatures" not in tx_data:
+            tx_data["signatures"] = []
+
+        # Check if already signed by this key
+        for sig in tx_data["signatures"]:
+            if sig.get("public_key") == public_key:
+                print("Warning: This key has already signed this transaction", file=sys.stderr)
+                return 1
+
+        tx_data["signatures"].append({
+            "public_key": public_key,
+            "signature": signature,
+            "signed_at": int(time.time()),
+        })
+
+        # Save updated transaction
+        output_path = args.output or args.tx_file
+        with open(output_path, 'w') as f:
+            json.dump(tx_data, f, indent=2)
+
+        sig_count = len(tx_data["signatures"])
+        threshold = tx_data.get("threshold", "?")
+
+        if args.json:
+            print(json.dumps({"signatures": sig_count, "threshold": threshold, "output": output_path}))
+        else:
+            print(f"Signature added ({sig_count}/{threshold})")
+            print(f"Updated transaction saved to: {output_path}")
+            if sig_count >= int(threshold) if threshold != "?" else False:
+                print("Transaction has enough signatures! Ready to submit.")
+
+        return 0
+    except Exception as e:
+        logger.error("Multisig signing error: %s", e)
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def _multisig_submit(args: argparse.Namespace) -> int:
+    """Submit a fully-signed multisig transaction."""
+    try:
+        # Load transaction file
+        with open(args.tx_file, 'r') as f:
+            tx_data = json.load(f)
+
+        signatures = tx_data.get("signatures", [])
+        threshold = tx_data.get("threshold", 0)
+
+        if len(signatures) < threshold:
+            print(f"Error: Not enough signatures ({len(signatures)}/{threshold})", file=sys.stderr)
+            return 1
+
+        # Prepare submission payload
+        payload = tx_data.get("payload", {})
+        submission = {
+            **payload,
+            "multisig": True,
+            "signatures": [{"public_key": s["public_key"], "signature": s["signature"]} for s in signatures],
+            "threshold": threshold,
+        }
+
+        # Submit to node
+        endpoint = f"{args.base_url.rstrip('/')}/transaction/multisig"
+        response = requests.post(endpoint, json=submission, timeout=args.timeout)
+        response.raise_for_status()
+        data = response.json()
+
+        if args.json:
+            print(json.dumps(data, indent=2))
+        else:
+            if data.get("success"):
+                print(f"Multisig transaction submitted successfully!")
+                print(f"TX ID: {data.get('txid', 'pending')}")
+            else:
+                print(f"Submission failed: {data.get('error', 'Unknown error')}")
+                return 1
+
+        return 0
+    except requests.RequestException as exc:
+        print(f"Network error: {exc}", file=sys.stderr)
+        return 2
+    except Exception as e:
+        logger.error("Multisig submit error: %s", e)
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+
+def _multisig_status(args: argparse.Namespace) -> int:
+    """Check status of a multisig transaction file."""
+    try:
+        with open(args.tx_file, 'r') as f:
+            tx_data = json.load(f)
+
+        signatures = tx_data.get("signatures", [])
+        threshold = tx_data.get("threshold", 0)
+        payload = tx_data.get("payload", {})
+
+        if args.json:
+            print(json.dumps({
+                "threshold": threshold,
+                "signatures_collected": len(signatures),
+                "ready": len(signatures) >= threshold,
+                "signers": [s.get("public_key", "")[:16] + "..." for s in signatures],
+                "payload": payload,
+            }, indent=2))
+        else:
+            print(f"{'='*50}")
+            print(f"MULTISIG TRANSACTION STATUS")
+            print(f"{'='*50}")
+            print(f"Threshold:   {threshold} signatures required")
+            print(f"Collected:   {len(signatures)} signatures")
+            print(f"Status:      {'✓ READY TO SUBMIT' if len(signatures) >= threshold else f'⏳ Need {threshold - len(signatures)} more'}")
+            print(f"{'='*50}")
+            if payload:
+                print(f"Sender:      {payload.get('sender', 'N/A')}")
+                print(f"Recipient:   {payload.get('recipient', 'N/A')}")
+                print(f"Amount:      {payload.get('amount', 'N/A')} XAI")
+            print(f"{'='*50}")
+            print(f"Signers:")
+            for i, sig in enumerate(signatures, 1):
+                pk = sig.get("public_key", "unknown")
+                print(f"  {i}. {pk[:20]}...{pk[-8:]}")
+
+        return 0
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1546,6 +2075,156 @@ def build_parser() -> argparse.ArgumentParser:
     )
     twofa_disable.add_argument("--label", required=True, help="Profile label to delete")
     twofa_disable.set_defaults(func=_two_factor_disable)
+
+    # Watch-only wallet management
+    watch = subparsers.add_parser(
+        "watch",
+        help="Manage watch-only wallet entries",
+        description="Add, list, and remove watch-only addresses for monitoring without private keys.",
+    )
+    watch_sub = watch.add_subparsers(dest="watch_command")
+    watch_sub.required = True
+
+    watch_add = watch_sub.add_parser(
+        "add",
+        help="Add a watch-only address (manual or derived from xpub)",
+    )
+    _add_watch_add_arguments(watch_add)
+    watch_add.set_defaults(func=_watch_add)
+
+    watch_list = watch_sub.add_parser("list", help="List watch-only addresses")
+    watch_list.add_argument(
+        "--tag",
+        action="append",
+        help="Filter by tag (repeatable, case-insensitive).",
+    )
+    watch_list.add_argument(
+        "--store",
+        help="Override watch-only store path (default: ~/.xai/watch_only.json).",
+    )
+    watch_list.add_argument("--json", action="store_true", help="Emit JSON output.")
+    watch_list.set_defaults(func=_watch_list)
+
+    watch_remove = watch_sub.add_parser("remove", help="Remove watch-only address")
+    watch_remove.add_argument("--address", required=True, help="Address to remove from the store.")
+    watch_remove.add_argument(
+        "--store",
+        help="Override watch-only store path (default: ~/.xai/watch_only.json).",
+    )
+    watch_remove.add_argument("--json", action="store_true", help="Emit JSON output.")
+    watch_remove.set_defaults(func=_watch_remove)
+
+    # Legacy alias for docs/scripts
+    watch_alias = subparsers.add_parser(
+        "watch-address",
+        help="Alias for 'watch add' to maintain backward compatibility with existing guides.",
+    )
+    _add_watch_add_arguments(watch_alias)
+    watch_alias.set_defaults(func=_watch_add)
+
+    # Hardware wallet commands
+    hw_address = subparsers.add_parser(
+        "hw-address",
+        help="Get address from connected hardware wallet",
+    )
+    hw_address.add_argument("--ledger", action="store_true", help="Use Ledger device")
+    hw_address.add_argument("--trezor", action="store_true", help="Use Trezor device")
+    hw_address.add_argument("--json", action="store_true", help="Output as JSON")
+    hw_address.set_defaults(func=_hw_address)
+
+    hw_sign = subparsers.add_parser(
+        "hw-sign",
+        help="Sign a message with hardware wallet",
+    )
+    hw_sign.add_argument("--ledger", action="store_true", help="Use Ledger device")
+    hw_sign.add_argument("--trezor", action="store_true", help="Use Trezor device")
+    hw_sign.add_argument("--message", help="Message to sign (text)")
+    hw_sign.add_argument("--message-file", help="File containing message to sign")
+    hw_sign.add_argument("--json", action="store_true", help="Output as JSON")
+    hw_sign.set_defaults(func=_hw_sign)
+
+    hw_verify = subparsers.add_parser(
+        "hw-verify",
+        help="Verify hardware wallet address (display on device)",
+    )
+    hw_verify.add_argument("--ledger", action="store_true", help="Use Ledger device")
+    hw_verify.add_argument("--trezor", action="store_true", help="Use Trezor device")
+    hw_verify.add_argument("--json", action="store_true", help="Output as JSON")
+    hw_verify.set_defaults(func=_hw_verify)
+
+    hw_send = subparsers.add_parser(
+        "hw-send",
+        help="Send XAI using hardware wallet for signing",
+        description=(
+            "Send XAI transaction signed by your hardware wallet.\n\n"
+            "SECURITY: Private key NEVER leaves your device.\n"
+            "The transaction is displayed on your device screen for verification.\n\n"
+            "Example: xai-wallet hw-send --ledger --recipient ADDR --amount 10"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    hw_send.add_argument("--ledger", action="store_true", help="Use Ledger device")
+    hw_send.add_argument("--trezor", action="store_true", help="Use Trezor device")
+    hw_send.add_argument("--sender", help="Sender address (optional, derived from device)")
+    hw_send.add_argument("--recipient", required=True, help="Recipient address")
+    hw_send.add_argument("--amount", type=float, required=True, help="Amount to send")
+    hw_send.add_argument("--fee", type=float, default=0.001, help="Transaction fee (default: 0.001)")
+    hw_send.add_argument("--base-url", default=DEFAULT_API_URL, help=f"Node API URL (default: {DEFAULT_API_URL})")
+    hw_send.add_argument("--timeout", type=float, default=30.0, help="HTTP timeout")
+    hw_send.add_argument("--json", action="store_true", help="Output as JSON")
+    hw_send.add_argument("--2fa-profile", help="Require TOTP verification")
+    hw_send.add_argument("--otp", help="2FA code (prompts if omitted)")
+    hw_send.set_defaults(func=_hw_send)
+
+    # Multisig commands
+    ms_create = subparsers.add_parser(
+        "multisig-create",
+        help="Create a new multisig wallet configuration",
+        description=(
+            "Create an M-of-N multisig wallet configuration.\n\n"
+            "Example: xai-wallet multisig-create --threshold 2 --public-keys KEY1 KEY2 KEY3"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    ms_create.add_argument("--threshold", "-m", type=int, required=True, help="Required signatures (M in M-of-N)")
+    ms_create.add_argument("--public-keys", "-k", nargs="+", help="Public keys (hex format)")
+    ms_create.add_argument("--keys-file", help="File containing public keys (one per line)")
+    ms_create.add_argument("--output", "-o", help="Output file for multisig config")
+    ms_create.add_argument("--json", action="store_true", help="Output as JSON")
+    ms_create.set_defaults(func=_multisig_create)
+
+    ms_sign = subparsers.add_parser(
+        "multisig-sign",
+        help="Add your signature to a multisig transaction",
+        description=(
+            "Sign a multisig transaction with your private key.\n\n"
+            "Example: xai-wallet multisig-sign --tx-file tx.json --keystore wallet.keystore"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    ms_sign.add_argument("--tx-file", required=True, help="Transaction file to sign")
+    ms_sign.add_argument("--keystore", help="Path to your encrypted keystore")
+    ms_sign.add_argument("--output", "-o", help="Output file (default: overwrite input)")
+    ms_sign.add_argument("--json", action="store_true", help="Output as JSON")
+    ms_sign.set_defaults(func=_multisig_sign)
+
+    ms_submit = subparsers.add_parser(
+        "multisig-submit",
+        help="Submit a fully-signed multisig transaction",
+    )
+    ms_submit.add_argument("--tx-file", required=True, help="Signed transaction file")
+    ms_submit.add_argument("--base-url", default=DEFAULT_API_URL, help=f"Node API URL (default: {DEFAULT_API_URL})")
+    ms_submit.add_argument("--timeout", type=float, default=30.0, help="HTTP timeout")
+    ms_submit.add_argument("--json", action="store_true", help="Output as JSON")
+    ms_submit.set_defaults(func=_multisig_submit)
+
+    ms_status = subparsers.add_parser(
+        "multisig-status",
+        help="Check status of a multisig transaction",
+    )
+    ms_status.add_argument("--tx-file", required=True, help="Transaction file to check")
+    ms_status.add_argument("--json", action="store_true", help="Output as JSON")
+    ms_status.set_defaults(func=_multisig_status)
 
     return parser
 

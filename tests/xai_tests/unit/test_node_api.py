@@ -48,18 +48,49 @@ class TestNodeAPICoreRoutes:
         node.blockchain = Mock()
         node.blockchain.chain = [Mock(index=0), Mock(index=1)]
         node.blockchain.pending_transactions = []
+        latest_block_payload = {
+            "index": 1,
+            "hash": "0xabc123",
+            "timestamp": DEFAULT_TIMESTAMP,
+            "transactions": [{"hash": "0xdeadbeef"}],
+            "header": {"index": 1, "timestamp": DEFAULT_TIMESTAMP, "difficulty": 4},
+        }
+        latest_block_obj = SimpleNamespace()
+        latest_block_obj.hash = latest_block_payload["hash"]
+        latest_block_obj.to_dict = Mock(return_value=latest_block_payload)
+        node.blockchain.get_latest_block = Mock(return_value=latest_block_obj)
         node.blockchain.get_stats = Mock(return_value={
             "height": 2,
             "difficulty": 4,
             "total_supply": 100.0
         })
         node.blockchain.get_mempool_overview = Mock(return_value={"pending_count": 0, "transactions": []})
+        node.blockchain.compute_state_snapshot = Mock(return_value={
+            "height": 2,
+            "tip": "00" * 32,
+            "pending_transactions": 0,
+            "mempool_bytes": 0,
+            "timestamp": DEFAULT_TIMESTAMP,
+            "utxo_digest": "abc123",
+        })
+        node.blockchain.remove_transaction_from_mempool = Mock(return_value=(True, {"sender": VALID_SENDER}))
         node.miner_address = "test_miner"
         node.peers = set(["http://peer1:5000", "http://peer2:5000"])
         node.is_mining = False
         node.start_time = time.time()
         node.metrics_collector = Mock()
         node.metrics_collector.export_prometheus = Mock(return_value="# HELP test_metric\ntest_metric 1.0")
+        node.consensus_manager = Mock()
+        node.consensus_manager.validate_block.return_value = (True, None)
+        node.consensus_manager.validate_block_transactions.return_value = (True, None)
+        node.consensus_manager.get_consensus_info = Mock(return_value={"difficulty": 4, "forks_detected": 0})
+        node.fee_optimizer = Mock()
+        node.fee_optimizer.fee_history = []
+        node.fee_optimizer.predict_optimal_fee.return_value = {"priority": "normal", "fee": 0.1}
+        node.fraud_detector = Mock()
+        node.fraud_detector.address_history = []
+        node.fraud_detector.flagged_addresses = []
+        node.fraud_detector.analyze_transaction.return_value = {"risk": 0.01}
         return node
 
     @pytest.fixture
@@ -194,6 +225,67 @@ class TestNodeAPICoreRoutes:
         assert data['is_mining'] == False
         assert 'node_uptime' in data
 
+    def test_state_snapshot_endpoint(self, client, mock_node):
+        """GET /state/snapshot returns snapshot data."""
+        response = client.get('/state/snapshot')
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["success"] is True
+        assert data["state"]["height"] == 2
+
+    def test_block_validation_endpoint_success(self, client, mock_node):
+        """POST /blocks/validate validates block by index."""
+        block = SimpleNamespace(
+            index=1,
+            hash="0" * 64,
+            previous_hash="1" * 64,
+            timestamp=DEFAULT_TIMESTAMP,
+            difficulty=4,
+        )
+        block.calculate_hash = lambda: block.hash
+        prev_block = SimpleNamespace(
+            index=0,
+            hash="1" * 64,
+            timestamp=DEFAULT_TIMESTAMP - 60,
+            difficulty=4,
+        )
+        prev_block.calculate_hash = lambda: prev_block.hash
+
+        def _get_block(idx):
+            if idx == 1:
+                return block
+            if idx == 0:
+                return prev_block
+            raise LookupError("missing block")
+
+        mock_node.blockchain.get_block = Mock(side_effect=_get_block)
+        response = client.post('/blocks/validate', json={"index": 1, "include_transactions": True})
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload["valid"] is True
+        assert payload["transactions_valid"] is True
+
+    def test_block_validation_requires_identifier(self, client):
+        """POST /blocks/validate requires index or hash."""
+        response = client.post('/blocks/validate', json={})
+        assert response.status_code == 400
+
+    def test_consensus_info_endpoint(self, client, mock_node):
+        """GET /consensus/info returns consensus manager data."""
+        mock_node.consensus_manager.get_consensus_info.return_value = {"difficulty": 5}
+        response = client.get('/consensus/info')
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["success"] is True
+        assert data["consensus"]["difficulty"] == 5
+
+    def test_mempool_drop_endpoint(self, client, api_routes, mock_node):
+        """DELETE /mempool/<txid> evicts a transaction with admin auth."""
+        api_routes.api_auth.authorize_scope = Mock(return_value=(True, "admin", None))
+        response = client.delete('/mempool/abc123')
+        assert response.status_code == 200
+        mock_node.blockchain.remove_transaction_from_mempool.assert_called_with("abc123", ban_sender=False)
+
     def test_payload_size_limit_rejects_large_body(self, mock_node, monkeypatch):
         """POST requests exceeding configured limit return 413 with structured error."""
         from xai.core.node_api import NodeAPIRoutes
@@ -244,6 +336,7 @@ class TestNodeAPIBlockchainRoutes:
         node.blockchain = Mock()
         node.blockchain.chain = blocks
         node.blockchain.pending_transactions = []
+        node.blockchain.get_latest_block = Mock(return_value=blocks[-1])
         node.blockchain.get_block_by_hash = Mock(side_effect=lambda h: next(
             (b for b in blocks if getattr(b, "hash", "").lower().lstrip("0x") == h.lower().lstrip("0x")), None
         ))
@@ -329,6 +422,34 @@ class TestNodeAPIBlockchainRoutes:
         assert response.status_code == 404
         data = response.get_json()
         assert 'error' in data
+
+    def test_get_latest_block_full_payload(self, client, mock_node_with_blocks):
+        """Test GET /block/latest returns summary + block payload."""
+        response = client.get("/block/latest")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert "summary" in data
+        assert "block" in data
+        assert data["summary"]["height"] == mock_node_with_blocks.blockchain.chain[-1].index
+        assert data["block_number"] == mock_node_with_blocks.blockchain.chain[-1].index
+        assert data["block"]["hash"] == mock_node_with_blocks.blockchain.chain[-1].hash
+
+    def test_get_latest_block_summary_only(self, client):
+        """Test GET /block/latest?summary=1 omits full block."""
+        response = client.get("/block/latest?summary=1")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert "block" not in data
+        assert data["summary"]["transactions"] == 0
+        assert data["block_number"] == data["summary"]["height"]
+
+    def test_get_latest_block_missing(self, client, mock_node_with_blocks):
+        """Test GET /block/latest returns 404 when blockchain empty."""
+        mock_node_with_blocks.blockchain.get_latest_block.return_value = None
+        response = client.get("/block/latest")
+        assert response.status_code == 404
+        data = response.get_json()
+        assert data["code"] == "latest_block_missing"
 
 
 class TestNodeAPITransactionRoutes:

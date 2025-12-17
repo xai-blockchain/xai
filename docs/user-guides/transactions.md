@@ -213,7 +213,8 @@ python src/xai/wallet/cli.py transactions --address YOUR_ADDRESS
 python src/xai/wallet/cli.py watch-transaction --tx-hash TX_HASH
 
 # Real-time monitoring (optional)
-python src/xai/wallet/cli.py watch-address --address YOUR_ADDRESS
+xai wallet watch add --address YOUR_ADDRESS --label "incoming-monitor"
+xai wallet watch list --tag incoming-monitor
 ```
 
 ### Verify Receipt

@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import logging
-logger = logging.getLogger(__name__)
-
-
 import time
 from typing import Any, Dict, List, TYPE_CHECKING
+
+logger = logging.getLogger(__name__)
 
 from .executor import (
     ExecutionMessage,
@@ -20,6 +19,30 @@ from .tx_processor import ContractTransactionProcessor
 
 if TYPE_CHECKING:  # pragma: no cover - avoid circular imports
     from xai.core.blockchain import Blockchain, Block, Transaction
+
+try:  # pragma: no cover - optional for lightweight test environments
+    from xai.core.monitoring import MetricsCollector  # type: ignore
+except ImportError:  # pragma: no cover
+    MetricsCollector = None  # type: ignore
+
+
+def _record_contract_metric(metric_name: str, value: float, operation: str = "inc") -> None:
+    """Safely record smart contract metrics if the collector is available."""
+    if MetricsCollector is None:
+        return
+    collector = getattr(MetricsCollector, "_instance", None)
+    if collector is None:
+        return
+    metric = collector.get_metric(metric_name)
+    if metric is None:
+        return
+    try:
+        if operation == "inc":
+            metric.inc(value)
+        elif operation == "observe":
+            metric.observe(value)
+    except (AttributeError, TypeError, ValueError):
+        logger.debug("Failed to record contract metric %s", metric_name)
 
 
 class SmartContractManager:
@@ -46,6 +69,7 @@ class SmartContractManager:
 
     def process_transaction(self, tx: "Transaction", block: "Block") -> Dict[str, Any]:
         metadata = dict(tx.metadata or {})
+        exec_start = time.perf_counter()
         try:
             result = self.processor.process(tx, block)
         except VMExecutionError as exc:
@@ -61,6 +85,24 @@ class SmartContractManager:
                 return_data=b"",
                 logs=[{"event": "vm_error", "message": str(exc)}],
             )
+        duration = max(time.perf_counter() - exec_start, 0.0)
+
+        tx_type = tx.tx_type or ""
+        gas_used = max(int(result.gas_used or 0), 0)
+        if tx_type == "contract_deploy":
+            _record_contract_metric("xai_contract_deployments_total", 1)
+        else:
+            _record_contract_metric("xai_contract_calls_total", 1)
+        if result.success:
+            _record_contract_metric("xai_contract_success_total", 1)
+        else:
+            _record_contract_metric("xai_contract_failures_total", 1)
+        _record_contract_metric("xai_contract_gas_used_total", gas_used)
+        _record_contract_metric(
+            "xai_contract_execution_duration_seconds",
+            duration,
+            operation="observe",
+        )
 
         contract_address = tx.recipient or self.blockchain.derive_contract_address(tx.sender, tx.nonce)
         normalized = contract_address.upper()

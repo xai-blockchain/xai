@@ -65,6 +65,19 @@ def _record_mining_metrics(
         pass
 
 
+def _record_economic_metrics(
+    base_reward: float,
+    total_fees: float,
+    streak_bonus: float,
+    coinbase_reward: float,
+) -> None:
+    """Record detailed economic metrics for each mined block."""
+    _record_mining_metrics("xai_economic_block_reward_total", base_reward)
+    _record_mining_metrics("xai_economic_fees_total", total_fees)
+    _record_mining_metrics("xai_economic_streak_bonus_total", streak_bonus)
+    _record_mining_metrics("xai_economic_coinbase_payout_total", coinbase_reward)
+
+
 class BlockchainMiningMixin:
     """
     Mixin providing mining functionality for the Blockchain class.
@@ -246,6 +259,8 @@ class BlockchainMiningMixin:
         # Create coinbase transaction (block reward + transaction fees + streak bonus)
         total_fees = sum(tx.fee for tx in prioritized_txs)
         coinbase_reward = final_reward + total_fees
+
+        _record_economic_metrics(base_reward, total_fees, streak_bonus, coinbase_reward)
 
         coinbase_tx = Transaction(
             "COINBASE",

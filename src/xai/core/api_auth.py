@@ -27,12 +27,21 @@ logger = logging.getLogger(__name__)
 
 
 class APIKeyStore:
-    """Persistent API key storage with auditing metadata."""
+    """Persistent API key storage with auditing metadata and expiration."""
 
-    def __init__(self, path: str) -> None:
+    def __init__(
+        self,
+        path: str,
+        default_ttl_days: int = 90,
+        max_ttl_days: int = 365,
+        allow_permanent: bool = False,
+    ) -> None:
         self.path = path
         self._audit_path = f"{path}.log"
         self._keys: Dict[str, Dict[str, Any]] = {}
+        self._default_ttl_seconds = max(default_ttl_days, 1) * 86400
+        self._max_ttl_seconds = max(max_ttl_days, default_ttl_days) * 86400
+        self._allow_permanent = allow_permanent
         self._load()
 
     @staticmethod
@@ -40,6 +49,7 @@ class APIKeyStore:
         return hashlib.sha256(key.encode("utf-8")).hexdigest()
 
     def _load(self) -> None:
+        """Load persisted API key metadata from disk, hydrating audit fields."""
         if os.path.exists(self.path):
             try:
                 with open(self.path, "r", encoding="utf-8") as handle:
@@ -50,8 +60,10 @@ class APIKeyStore:
                         self._keys = {}
             except (OSError, json.JSONDecodeError):
                 self._keys = {}
+        self._hydrate_metadata()
 
     def _persist(self) -> None:
+        """Persist API key store atomically to disk."""
         directory = os.path.dirname(self.path)
         if directory:
             os.makedirs(directory, exist_ok=True)
@@ -61,18 +73,49 @@ class APIKeyStore:
         os.replace(tmp_path, self.path)
 
     def list_keys(self) -> Dict[str, Dict[str, Any]]:
-        return dict(self._keys)
+        """Return all keys with computed expiration/expired fields."""
+        now = time.time()
+        result: Dict[str, Dict[str, Any]] = {}
+        for key_id, metadata in self._keys.items():
+            copied = dict(metadata)
+            copied["expired"] = self._is_expired(metadata, now)
+            result[key_id] = copied
+        return result
 
     @property
     def audit_log_path(self) -> str:
         return self._audit_path
 
-    def issue_key(self, label: str = "", scope: str = "user", plaintext: Optional[str] = None) -> Tuple[str, str]:
+    def issue_key(
+        self,
+        label: str = "",
+        scope: str = "user",
+        plaintext: Optional[str] = None,
+        ttl_seconds: Optional[int] = None,
+        permanent: bool = False,
+    ) -> Tuple[str, str]:
         new_key = plaintext or secrets.token_hex(32)
         key_id = self._hash_key(new_key)
-        self._keys[key_id] = {"label": label, "created": time.time(), "scope": scope}
+        created = time.time()
+        expires_at = self._compute_expires_at(created, ttl_seconds, permanent)
+        self._keys[key_id] = {
+            "label": label,
+            "created": created,
+            "scope": scope,
+            "expires_at": expires_at,
+            "permanent": expires_at is None,
+        }
         self._persist()
-        self._log_event("issue", key_id, {"label": label, "scope": scope})
+        self._log_event(
+            "issue",
+            key_id,
+            {
+                "label": label,
+                "scope": scope,
+                "expires_at": expires_at,
+                "permanent": expires_at is None,
+            },
+        )
         return new_key, key_id
 
     def revoke_key(self, key_id: str) -> bool:
@@ -83,18 +126,35 @@ class APIKeyStore:
             return True
         return False
 
-    def rotate_key(self, key_id: str, label: str = "", scope: str = "user") -> Tuple[str, str]:
+    def rotate_key(
+        self,
+        key_id: str,
+        label: str = "",
+        scope: str = "user",
+        ttl_seconds: Optional[int] = None,
+        permanent: bool = False,
+    ) -> Tuple[str, str]:
         """
         Rotate a key by revoking the old key and issuing a new one with the same label/scope.
         Returns plaintext and new key_id.
         """
         if key_id in self._keys:
             self.revoke_key(key_id)
-        plaintext, new_id = self.issue_key(label=label, scope=scope)
-        self._log_event("rotate", new_id, {"replaced": key_id})
+        plaintext, new_id = self.issue_key(label=label, scope=scope, ttl_seconds=ttl_seconds, permanent=permanent)
+        self._log_event(
+            "rotate",
+            new_id,
+            {
+                "replaced": key_id,
+                "scope": scope,
+                "expires_at": self._keys.get(new_id, {}).get("expires_at"),
+                "permanent": self._keys.get(new_id, {}).get("permanent"),
+            },
+        )
         return plaintext, new_id
 
     def _log_event(self, action: str, key_id: str, extra: Optional[Dict[str, Any]] = None) -> None:
+        """Append an audit log entry to the JSONL audit file and emit security event."""
         event = {
             "timestamp": time.time(),
             "action": action,
@@ -110,6 +170,7 @@ class APIKeyStore:
         self._emit_security_log(event)
 
     def get_events(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Return the most recent audit events (default 100)."""
         if not os.path.exists(self._audit_path):
             return []
         events: List[Dict[str, Any]] = []
@@ -125,6 +186,7 @@ class APIKeyStore:
         return events[-limit:]
 
     def _emit_security_log(self, event: Dict[str, Any]) -> None:
+        """Emit a structured security event for API key changes."""
         try:
             payload = {
                 "action": event.get("action"),
@@ -132,6 +194,8 @@ class APIKeyStore:
                 "scope": event.get("scope", "unknown"),
                 "label": event.get("label", ""),
                 "timestamp": event.get("timestamp"),
+                "expires_at": event.get("expires_at"),
+                "permanent": event.get("permanent", False),
             }
             severity = "WARNING" if event.get("action") == "revoke" else "INFO"
             log_security_event("api_key_audit", payload, severity=severity)
@@ -144,6 +208,55 @@ class APIKeyStore:
             )
             return
 
+    def _hydrate_metadata(self) -> None:
+        """Ensure keys loaded from disk contain expiration metadata."""
+        changed = False
+        now = time.time()
+        for metadata in self._keys.values():
+            created = metadata.get("created")
+            if not isinstance(created, (int, float)):
+                created = now
+                metadata["created"] = created
+                changed = True
+            if "expires_at" not in metadata:
+                metadata["expires_at"] = self._compute_expires_at(created, None, metadata.get("permanent", False))
+                changed = True
+            if metadata.get("expires_at") is None and not self._allow_permanent:
+                metadata["expires_at"] = self._compute_expires_at(created, None, False)
+                metadata["permanent"] = False
+                changed = True
+            if "permanent" not in metadata:
+                metadata["permanent"] = metadata.get("expires_at") is None
+                changed = True
+        if changed:
+            self._persist()
+
+    def _compute_expires_at(
+        self, created: float, ttl_seconds: Optional[int], permanent: bool
+    ) -> Optional[float]:
+        """Compute an expiration timestamp or None for permanent keys."""
+        if permanent:
+            if not self._allow_permanent:
+                raise ValueError("Permanent API keys are disabled by configuration")
+            return None
+        ttl = self._default_ttl_seconds if ttl_seconds is None else int(ttl_seconds)
+        if ttl <= 0:
+            raise ValueError("ttl_seconds must be positive")
+        ttl = min(ttl, self._max_ttl_seconds)
+        return created + ttl
+
+    @staticmethod
+    def _is_expired(metadata: Dict[str, Any], now: Optional[float] = None) -> bool:
+        """Return True if the provided metadata has elapsed expiration."""
+        expires_at = metadata.get("expires_at")
+        if expires_at is None:
+            return False
+        try:
+            expiry = float(expires_at)
+        except (TypeError, ValueError):
+            return True
+        return (now or time.time()) >= expiry
+
 
 class APIAuthManager:
     """API key authentication + rotation helper."""
@@ -154,25 +267,70 @@ class APIAuthManager:
         allowed_keys: Optional[List[str]] = None,
         store: Optional[APIKeyStore] = None,
         admin_keys: Optional[List[str]] = None,
+        operator_keys: Optional[List[str]] = None,
+        auditor_keys: Optional[List[str]] = None,
     ) -> None:
-        manual_users = [key.strip() for key in (allowed_keys or []) if key.strip()]
-        manual_admins = [key.strip() for key in (admin_keys or []) if key.strip()]
+        """
+        Initialize API authentication manager with optional manual and persisted keys.
+
+        Args:
+            required: If True, reject requests without a valid API key.
+            allowed_keys: Manual user-scope keys (plaintext) to permit.
+            store: Persistent APIKeyStore for issued/rotated keys.
+            admin_keys: Manual admin-scope keys (plaintext).
+            operator_keys: Manual operator-scope keys (plaintext).
+            auditor_keys: Manual auditor-scope keys (plaintext).
+        """
+        def _parse(keys: Optional[List[str]]) -> List[str]:
+            return [key.strip() for key in (keys or []) if key.strip()]
+
+        manual_users = _parse(allowed_keys)
+        manual_admins = _parse(admin_keys)
+        manual_operators = _parse(operator_keys)
+        manual_auditors = _parse(auditor_keys)
+
+        manual_user_hashes = {self._hash_key(key) for key in manual_users}
         self._manual_admin_hashes = {self._hash_key(key) for key in manual_admins}
-        self._manual_hashes = {self._hash_key(key) for key in manual_users} | self._manual_admin_hashes
+        self._manual_operator_hashes = {self._hash_key(key) for key in manual_operators}
+        self._manual_auditor_hashes = {self._hash_key(key) for key in manual_auditors}
+        self._manual_hashes = (
+            manual_user_hashes
+            | self._manual_admin_hashes
+            | self._manual_operator_hashes
+            | self._manual_auditor_hashes
+        )
+        self._manual_scope_map = {}
+        for hashed in manual_user_hashes:
+            self._manual_scope_map[hashed] = "user"
+        for hashed in self._manual_operator_hashes:
+            self._manual_scope_map[hashed] = "operator"
+        for hashed in self._manual_auditor_hashes:
+            self._manual_scope_map[hashed] = "auditor"
+        for hashed in self._manual_admin_hashes:
+            self._manual_scope_map[hashed] = "admin"
         self._store = store
         self._store_metadata: Dict[str, Dict[str, Any]] = store.list_keys() if store else {}
         self._store_hash_set = set(self._store_metadata.keys()) if store else set()
         self._store_admin_hashes = {
             key_id for key_id, meta in self._store_metadata.items() if meta.get("scope") == "admin"
         }
+        self._store_operator_hashes = {
+            key_id for key_id, meta in self._store_metadata.items() if meta.get("scope") == "operator"
+        }
+        self._store_auditor_hashes = {
+            key_id for key_id, meta in self._store_metadata.items() if meta.get("scope") == "auditor"
+        }
         self._required = required
 
     @classmethod
     def from_config(cls, store: Optional[APIKeyStore] = None) -> "APIAuthManager":
+        """Construct manager from Config settings and optional store."""
         return cls(
             required=getattr(Config, "API_AUTH_REQUIRED", False),
             allowed_keys=list(getattr(Config, "API_AUTH_KEYS", [])),
             admin_keys=list(getattr(Config, "API_ADMIN_KEYS", [])),
+            operator_keys=list(getattr(Config, "API_OPERATOR_KEYS", [])),
+            auditor_keys=list(getattr(Config, "API_AUDITOR_KEYS", [])),
             store=store,
         )
 
@@ -181,9 +339,11 @@ class APIAuthManager:
         return hashlib.sha256(key.encode("utf-8")).hexdigest()
 
     def is_enabled(self) -> bool:
+        """Return True if API auth is required/enabled."""
         return self._required
 
     def _extract_key(self, request: Request) -> Optional[str]:
+        """Extract API key from headers or query parameters."""
         header_key = request.headers.get("X-API-Key")
         if header_key:
             return header_key.strip()
@@ -199,6 +359,7 @@ class APIAuthManager:
         return None
 
     def authorize(self, request: Request) -> Tuple[bool, Optional[str]]:
+        """Authorize request using default scope rules."""
         if not self.is_enabled():
             return True, None
 
@@ -207,52 +368,146 @@ class APIAuthManager:
             return False, "API key missing or invalid"
 
         hashed = self._hash_key(key)
-        if hashed in self._manual_hashes or hashed in self._store_hash_set:
+        if hashed in self._manual_hashes:
             return True, None
+        if hashed in self._store_hash_set:
+            active, reason = self._is_store_key_active(hashed)
+            if active:
+                return True, None
+            return False, reason
         return False, "API key missing or invalid"
 
     def authorize_admin(self, request: Request) -> Tuple[bool, Optional[str]]:
+        """Authorize request as admin using admin token sources."""
         key = self._extract_admin_token(request)
         if not key:
             return False, "Admin token missing"
         hashed = self._hash_key(key)
         if hashed in self._manual_admin_hashes or hashed in self._store_admin_hashes:
+            if hashed in self._store_admin_hashes and hashed not in self._manual_admin_hashes:
+                active, reason = self._is_store_key_active(hashed)
+                if not active:
+                    return False, reason or "Admin token expired"
             return True, None
         return False, "Admin token invalid"
 
+    def authorize_with_scope(self, request: Request) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        Authorize request and return the resolved scope.
+
+        Returns:
+            (allowed, scope, reason)
+        """
+        # Admin token takes precedence and maps to admin scope
+        admin_token = self._extract_admin_token(request)
+        if admin_token:
+            hashed = self._hash_key(admin_token)
+            if hashed in self._manual_admin_hashes or hashed in self._store_admin_hashes:
+                if hashed in self._store_admin_hashes and hashed not in self._manual_admin_hashes:
+                    active, reason = self._is_store_key_active(hashed)
+                    if not active:
+                        return False, None, reason
+                return True, "admin", None
+            return False, None, "Admin token invalid"
+
+        if not self.is_enabled():
+            return True, None, None
+
+        api_key = self._extract_key(request)
+        if not api_key:
+            return False, None, "API key missing or invalid"
+
+        hashed = self._hash_key(api_key)
+        if hashed in self._manual_hashes:
+            return True, self._manual_scope_map.get(hashed, "user"), None
+        if hashed in self._store_hash_set:
+            active, reason = self._is_store_key_active(hashed)
+            if not active:
+                return False, None, reason
+            meta = self._store_metadata.get(hashed, {})
+            scope = meta.get("scope", "user")
+            return True, scope, None
+        return False, None, "API key missing or invalid"
+
+    def authorize_scope(self, request: Request, allowed_scopes: Set[str]) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        Authorize with scope enforcement.
+
+        Returns:
+            (allowed, scope, reason)
+        """
+        allowed_scopes_normalized = {scope.lower() for scope in allowed_scopes}
+        ok, scope, reason = self.authorize_with_scope(request)
+        if not ok:
+            return False, scope, reason
+        if scope is None:
+            return True, None, None
+        scope_normalized = scope.lower()
+        if "admin" in allowed_scopes_normalized and scope_normalized == "admin":
+            return True, scope, None
+        if scope_normalized in allowed_scopes_normalized:
+            return True, scope, None
+        return False, scope, "Forbidden: insufficient scope"
+
     def refresh_from_store(self) -> None:
+        """Reload store metadata to reflect newly issued/rotated/revoked keys."""
         if self._store:
             self._store_metadata = self._store.list_keys()
             self._store_hash_set = set(self._store_metadata.keys())
             self._store_admin_hashes = {
                 key_id for key_id, meta in self._store_metadata.items() if meta.get("scope") == "admin"
             }
+            self._store_operator_hashes = {
+                key_id for key_id, meta in self._store_metadata.items() if meta.get("scope") == "operator"
+            }
+            self._store_auditor_hashes = {
+                key_id for key_id, meta in self._store_metadata.items() if meta.get("scope") == "auditor"
+            }
 
     def list_key_metadata(self) -> Dict[str, Any]:
+        """Return summary metadata for manual and stored keys."""
         return {
             "manual_keys": len(self._manual_hashes),
             "manual_admin_keys": len(self._manual_admin_hashes),
             "store": self._store_metadata if self._store else {},
         }
 
-    def issue_key(self, label: str = "", scope: str = "user") -> Tuple[str, str]:
+    def issue_key(
+        self,
+        label: str = "",
+        scope: str = "user",
+        ttl_seconds: Optional[int] = None,
+        permanent: bool = False,
+    ) -> Tuple[str, str]:
+        """Issue a new key via the persistent store."""
         if not self._store:
             raise ValueError("API key store not configured")
-        plaintext, key_id = self._store.issue_key(label=label, scope=scope)
+        plaintext, key_id = self._store.issue_key(label=label, scope=scope, ttl_seconds=ttl_seconds, permanent=permanent)
         self.refresh_from_store()
         return plaintext, key_id
 
     def revoke_key(self, key_id: str) -> bool:
+        """Revoke a key by ID and refresh store metadata."""
         if not self._store:
             raise ValueError("API key store not configured")
         removed = self._store.revoke_key(key_id)
         self.refresh_from_store()
         return removed
 
-    def rotate_key(self, key_id: str, label: str = "", scope: str = "user") -> Tuple[str, str]:
+    def rotate_key(
+        self,
+        key_id: str,
+        label: str = "",
+        scope: str = "user",
+        ttl_seconds: Optional[int] = None,
+        permanent: bool = False,
+    ) -> Tuple[str, str]:
+        """Rotate a key via the store and emit rotation security event."""
         if not self._store:
             raise ValueError("API key store not configured")
-        new_plain, new_id = self._store.rotate_key(key_id, label=label, scope=scope)
+        new_plain, new_id = self._store.rotate_key(
+            key_id, label=label, scope=scope, ttl_seconds=ttl_seconds, permanent=permanent
+        )
         self.refresh_from_store()
         try:
             severity = "WARNING" if scope == "admin" else "INFO"
@@ -270,6 +525,7 @@ class APIAuthManager:
         return new_plain, new_id
 
     def _extract_admin_token(self, request: Request) -> Optional[str]:
+        """Extract admin token from custom header or Authorization prefix."""
         token = request.headers.get("X-Admin-Token")
         if token:
             return token.strip()
@@ -277,6 +533,44 @@ class APIAuthManager:
         if auth.lower().startswith("admin "):
             return auth.split(" ", 1)[1].strip()
         return None
+
+    def _is_store_key_active(self, key_id: str) -> Tuple[bool, Optional[str]]:
+        """
+        Determine if a stored key is still valid based on expiration metadata.
+        """
+        if key_id not in self._store_metadata:
+            return False, "API key missing or invalid"
+
+        metadata = self._store_metadata[key_id]
+        expires_at = metadata.get("expires_at")
+        if expires_at is None:
+            return True, None
+
+        try:
+            expiry = float(expires_at)
+        except (TypeError, ValueError):
+            expiry = 0.0
+
+        if time.time() >= expiry:
+            try:
+                log_security_event(
+                    "api_key_expired_attempt",
+                    {
+                        "key_id": key_id,
+                        "scope": metadata.get("scope", "unknown"),
+                        "label": metadata.get("label", ""),
+                        "expired_at": expires_at,
+                    },
+                    severity="WARNING",
+                )
+            except (RuntimeError, ValueError, TypeError, KeyError):
+                logger.debug(
+                    "Failed to emit api_key_expired_attempt event",
+                    extra={"event": "api_auth.expiration_log_failed", "key_id": key_id},
+                )
+            return False, "API key expired"
+
+        return True, None
 
 
 class JWTAuthManager:

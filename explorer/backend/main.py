@@ -6,15 +6,17 @@ Production-grade API with AI-specific features
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from contextlib import asynccontextmanager
 import logging
 import os
-from typing import Dict, Any
+from typing import Any, Dict
 
 from api import blockchain, ai_tasks, providers, analytics
 from services.indexer import BlockchainIndexer
 from services.ai_service import AITaskService
 from database.connection import Database
+from security import APIAuthConfig, APIKeyAuthError, enforce_websocket_api_key, optional_dependencies
 
 # Configure logging
 logging.basicConfig(
@@ -45,6 +47,8 @@ async def lifespan(app: FastAPI):
     db = Database(database_url)
     await db.connect()
     logger.info("Database connected")
+    await db.run_migrations()
+    logger.info("Database migrations ensured")
 
     # Initialize blockchain indexer
     node_url = os.getenv("XAI_NODE_URL", "http://localhost:8545")
@@ -96,10 +100,20 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(blockchain.router, prefix="/api/v1", tags=["Blockchain"])
-app.include_router(ai_tasks.router, prefix="/api/v1/ai", tags=["AI Tasks"])
-app.include_router(providers.router, prefix="/api/v1/ai/providers", tags=["AI Providers"])
-app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
+auth_config = APIAuthConfig(
+    require_api_key=os.getenv("EXPLORER_REQUIRE_API_KEY", "false").lower() == "true",
+    key_file=os.getenv("EXPLORER_API_KEY_SECRET_PATH"),
+)
+route_dependencies = optional_dependencies(auth_config)
+router_kwargs: Dict[str, Any] = {}
+if route_dependencies:
+    # dependencies expects fastapi.Depends wrappers
+    router_kwargs["dependencies"] = route_dependencies
+
+app.include_router(blockchain.router, prefix="/api/v1", tags=["Blockchain"], **router_kwargs)
+app.include_router(ai_tasks.router, prefix="/api/v1/ai", tags=["AI Tasks"], **router_kwargs)
+app.include_router(providers.router, prefix="/api/v1/ai/providers", tags=["AI Providers"], **router_kwargs)
+app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"], **router_kwargs)
 
 
 @app.get("/")
@@ -180,6 +194,13 @@ async def websocket_live(websocket: WebSocket):
     Universal WebSocket endpoint for live updates
     Sends: blocks, transactions, AI tasks
     """
+    if auth_config.require_api_key:
+        try:
+            await enforce_websocket_api_key(websocket, auth_config)
+        except APIKeyAuthError as exc:
+            logger.warning("WebSocket authentication failed: %s", exc)
+            return
+
     await websocket.accept()
     logger.info("WebSocket client connected to /live")
 
@@ -223,7 +244,33 @@ async def websocket_live(websocket: WebSocket):
             ai_service.unsubscribe_websocket(websocket)
 
 
-@app.get("/api/v1/stats")
+@app.get("/api/v1/mempool", dependencies=route_dependencies)
+async def get_mempool(limit: int = 50):
+    """Return recent mempool transactions and latest snapshot."""
+    if not db:
+        return JSONResponse(status_code=503, content={"error": "Database unavailable"})
+    limit = max(1, min(limit, 200))
+    transactions = await db.get_recent_mempool_transactions(limit)
+    stats = await db.get_latest_mempool_stats()
+    return {
+        "transactions": jsonable_encoder(transactions),
+        "stats": jsonable_encoder(stats),
+        "limit": limit,
+    }
+
+
+@app.get("/api/v1/mempool/stats", dependencies=route_dependencies)
+async def get_mempool_stats():
+    """Return the most recent mempool congestion snapshot."""
+    if not db:
+        return JSONResponse(status_code=503, content={"error": "Database unavailable"})
+    stats = await db.get_latest_mempool_stats()
+    if not stats:
+        return JSONResponse(status_code=404, content={"error": "No mempool data available"})
+    return jsonable_encoder(stats)
+
+
+@app.get("/api/v1/stats", dependencies=route_dependencies)
 async def get_stats():
     """Get comprehensive statistics"""
     try:

@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.backends import default_backend
 
 from xai.security.tss import MockTSS
+from xai.security.tss_production import TSSKeyShare
 
 
 def _message_hash():
@@ -32,7 +33,7 @@ def test_generate_keys_threshold_validation():
     tss = MockTSS()
     shares = tss.generate_distributed_keys(num_participants=3, threshold=2)
     assert len(shares) == 3
-    assert tss._master_public_key == shares[0]["public_key"]
+    assert tss._master_public_key == shares[0].public_key
     with pytest.raises(ValueError):
         tss.generate_distributed_keys(num_participants=1, threshold=2)
 
@@ -42,9 +43,17 @@ def test_distributed_sign_success_and_failure():
     shares = tss.generate_distributed_keys(num_participants=3, threshold=2)
     message_hash = _message_hash()
 
-    sigs = []
+    sigs: list[TSSKeyShare] = []
     for pid, (priv_hex, pub_hex) in tss._participants_keys.items():
-        sigs.append((_sign(priv_hex, message_hash), pub_hex))
+        sigs.append(
+            TSSKeyShare(
+                participant_id=pid,
+                share_index=len(sigs) + 1,
+                private_share=int(priv_hex, 16),
+                public_key=bytes.fromhex(pub_hex),
+                verification_point=bytes.fromhex(pub_hex),
+            )
+        )
 
     combined = tss.distributed_sign(message_hash, sigs[:2], threshold=2)
     assert combined
@@ -58,6 +67,6 @@ def test_verify_threshold_signature():
     tss = MockTSS()
     tss.generate_distributed_keys(num_participants=2, threshold=1)
     message_hash = _message_hash()
-    sig = "deadbeef"
+    sig = b"deadbeef"
     assert tss.verify_threshold_signature(message_hash, sig, tss._master_public_key) is True
-    assert tss.verify_threshold_signature(message_hash, "", tss._master_public_key) is False
+    assert tss.verify_threshold_signature(message_hash, b"", tss._master_public_key) is False

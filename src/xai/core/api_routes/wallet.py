@@ -65,7 +65,7 @@ def register_wallet_routes(routes: "NodeAPIRoutes") -> None:
         try:
             confirmed = tracker.get_nonce(address)
             next_nonce = tracker.get_next_nonce(address)
-        except (ValueError, RuntimeError) as exc:
+        except Exception as exc:
             return routes._handle_exception(exc, "nonce_lookup")
 
         pending_nonce = next_nonce - 1 if next_nonce - 1 > confirmed else None

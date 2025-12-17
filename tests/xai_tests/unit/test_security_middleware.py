@@ -1,5 +1,6 @@
 """
-Unit tests for SecurityMiddleware rate limiting and CSRF enforcement.
+SecurityMiddleware unit tests covering rate limiting, CSRF enforcement,
+and session fingerprint binding.
 """
 
 from flask import Flask, jsonify
@@ -11,6 +12,9 @@ def _build_app(monkeypatch):
     # Tighten limits for tests
     monkeypatch.setattr(SecurityConfig, "RATE_LIMIT_REQUESTS", 2)
     monkeypatch.setattr(SecurityConfig, "RATE_LIMIT_WINDOW", 1)
+    monkeypatch.setattr(SecurityConfig, "STRICT_SESSION_FINGERPRINTING", True)
+    monkeypatch.setattr(SecurityConfig, "SESSION_BIND_USER_AGENT", True)
+    monkeypatch.setattr(SecurityConfig, "SESSION_BIND_ACCEPT_LANGUAGE", False)
     app = Flask(__name__)
     app.config["SECRET_KEY"] = "secret"
     middleware = SecurityMiddleware(app)

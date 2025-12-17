@@ -17,7 +17,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from xai.core.api_auth import APIKeyStore  # noqa: E402
-from xai.core.config import API_KEY_STORE_PATH  # noqa: E402
+from xai.core.config import API_KEY_STORE_PATH, Config  # noqa: E402
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -42,6 +42,9 @@ def build_parser() -> argparse.ArgumentParser:
         default="user",
         help="Scope of the key (user: API auth, admin: /admin endpoints)",
     )
+    issue.add_argument("--ttl-days", type=float, default=None, help="Override default TTL in days")
+    issue.add_argument("--ttl-hours", type=float, default=None, help="Override default TTL in hours")
+    issue.add_argument("--permanent", action="store_true", help="Issue a non-expiring key (if allowed)")
 
     revoke = sub.add_parser("revoke", help="Revoke an API key by key_id")
     revoke.add_argument("key_id", help="SHA256 key id to revoke")
@@ -57,6 +60,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Admin secret to persist (falls back to XAI_BOOTSTRAP_ADMIN_KEY)",
     )
+    bootstrap.add_argument("--ttl-days", type=float, default=None, help="Override default TTL in days")
+    bootstrap.add_argument("--ttl-hours", type=float, default=None, help="Override default TTL in hours")
+    bootstrap.add_argument("--permanent", action="store_true", help="Issue a non-expiring key (if allowed)")
 
     return parser
 
@@ -71,9 +77,25 @@ def cmd_events(store: APIKeyStore, limit: int) -> None:
     print(json.dumps(events, indent=2))
 
 
-def cmd_issue(store: APIKeyStore, label: str, scope: str) -> None:
-    api_key, key_id = store.issue_key(label=label, scope=scope)
-    payload = {"api_key": api_key, "key_id": key_id, "scope": scope, "label": label}
+def _ttl_seconds_from_args(ttl_days: Optional[float], ttl_hours: Optional[float]) -> Optional[int]:
+    if ttl_days is not None:
+        return max(1, int(ttl_days * 86400))
+    if ttl_hours is not None:
+        return max(1, int(ttl_hours * 3600))
+    return None
+
+
+def cmd_issue(store: APIKeyStore, label: str, scope: str, ttl_seconds: Optional[int], permanent: bool) -> None:
+    api_key, key_id = store.issue_key(label=label, scope=scope, ttl_seconds=ttl_seconds, permanent=permanent)
+    metadata = store.list_keys().get(key_id, {})
+    payload = {
+        "api_key": api_key,
+        "key_id": key_id,
+        "scope": scope,
+        "label": label,
+        "expires_at": metadata.get("expires_at"),
+        "permanent": metadata.get("permanent", False),
+    }
     print(json.dumps(payload, indent=2))
 
 
@@ -119,14 +141,26 @@ def cmd_watch_events(store: APIKeyStore, limit: int, interval: float) -> int:
             return 0
 
 
-def cmd_bootstrap_admin(store: APIKeyStore, label: str, secret: Optional[str]) -> int:
+def cmd_bootstrap_admin(
+    store: APIKeyStore,
+    label: str,
+    secret: Optional[str],
+    ttl_seconds: Optional[int],
+    permanent: bool,
+) -> int:
     """Issue an admin key using a pre-provisioned secret (env or CLI)."""
     secret_value = (secret or os.getenv("XAI_BOOTSTRAP_ADMIN_KEY", "")).strip()
     if not secret_value:
         print(json.dumps({"error": "missing_secret", "message": "Provide --secret or XAI_BOOTSTRAP_ADMIN_KEY"}))
         return 1
 
-    _, key_id = store.issue_key(label=label, scope="admin", plaintext=secret_value)
+    _, key_id = store.issue_key(
+        label=label,
+        scope="admin",
+        plaintext=secret_value,
+        ttl_seconds=ttl_seconds,
+        permanent=permanent,
+    )
     fingerprint = hashlib.sha256(secret_value.encode("utf-8")).hexdigest()[:12]
     payload = {
         "operation": "bootstrap_admin",
@@ -141,7 +175,12 @@ def cmd_bootstrap_admin(store: APIKeyStore, label: str, secret: Optional[str]) -
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
-    store = APIKeyStore(args.store)
+    store = APIKeyStore(
+        args.store,
+        default_ttl_days=getattr(Config, "API_KEY_DEFAULT_TTL_DAYS", 90),
+        max_ttl_days=getattr(Config, "API_KEY_MAX_TTL_DAYS", 365),
+        allow_permanent=getattr(Config, "API_KEY_ALLOW_PERMANENT", False),
+    )
 
     if args.command == "list":
         cmd_list(store)
@@ -150,14 +189,24 @@ def main() -> int:
         cmd_events(store, args.limit)
         return 0
     if args.command == "issue":
-        cmd_issue(store, args.label, args.scope)
+        ttl_seconds = _ttl_seconds_from_args(args.ttl_days, args.ttl_hours)
+        try:
+            cmd_issue(store, args.label, args.scope, ttl_seconds, args.permanent)
+        except ValueError as exc:
+            print(json.dumps({"error": str(exc)}))
+            return 1
         return 0
     if args.command == "revoke":
         return cmd_revoke(store, args.key_id)
     if args.command == "watch-events":
         return cmd_watch_events(store, args.limit, args.interval)
     if args.command == "bootstrap-admin":
-        return cmd_bootstrap_admin(store, args.label, args.secret)
+        ttl_seconds = _ttl_seconds_from_args(args.ttl_days, args.ttl_hours)
+        try:
+            return cmd_bootstrap_admin(store, args.label, args.secret, ttl_seconds, args.permanent)
+        except ValueError as exc:
+            print(json.dumps({"error": str(exc)}))
+            return 1
     return 1
 
 

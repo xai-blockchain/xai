@@ -11,7 +11,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from xai.core.api_auth import APIAuthManager, APIKeyStore
 from xai.core.config import Config
@@ -64,11 +64,17 @@ def build_parser() -> argparse.ArgumentParser:
     issue = sub.add_parser("issue", help="Issue a new API key")
     issue.add_argument("--label", default="", help="Label for the key")
     issue.add_argument("--scope", default="user", choices=["user", "admin"], help="Scope for the key")
+    issue.add_argument("--ttl-days", type=float, default=None, help="Override default TTL in days")
+    issue.add_argument("--ttl-hours", type=float, default=None, help="Override default TTL in hours")
+    issue.add_argument("--permanent", action="store_true", help="Issue a non-expiring key (if allowed)")
 
     rotate = sub.add_parser("rotate", help="Rotate an existing key id")
     rotate.add_argument("key_id", help="Key id (hash) to rotate")
     rotate.add_argument("--label", default="", help="Label for new key")
     rotate.add_argument("--scope", default="user", choices=["user", "admin"], help="Scope for the new key")
+    rotate.add_argument("--ttl-days", type=float, default=None, help="Override default TTL in days")
+    rotate.add_argument("--ttl-hours", type=float, default=None, help="Override default TTL in hours")
+    rotate.add_argument("--permanent", action="store_true", help="Issue a non-expiring key (if allowed)")
 
     revoke = sub.add_parser("revoke", help="Revoke an existing key id")
     revoke.add_argument("key_id", help="Key id (hash) to revoke")
@@ -82,19 +88,58 @@ def main(argv: List[str]) -> int:
 
     enforce_rate_limit(time.time())
 
-    store = APIKeyStore(args.store_path)
+    store = APIKeyStore(
+        args.store_path,
+        default_ttl_days=getattr(Config, "API_KEY_DEFAULT_TTL_DAYS", 90),
+        max_ttl_days=getattr(Config, "API_KEY_MAX_TTL_DAYS", 365),
+        allow_permanent=getattr(Config, "API_KEY_ALLOW_PERMANENT", False),
+    )
     manager = APIAuthManager(required=False, store=store)
 
+    def ttl_seconds_from_args(ttl_days: Optional[float], ttl_hours: Optional[float]) -> Optional[int]:
+        if ttl_days is not None:
+            return max(1, int(ttl_days * 86400))
+        if ttl_hours is not None:
+            return max(1, int(ttl_hours * 3600))
+        return None
+
     if args.command == "issue":
-        key, key_id = manager.issue_key(label=args.label, scope=args.scope)
+        ttl_seconds = ttl_seconds_from_args(args.ttl_days, args.ttl_hours)
+        try:
+            key, key_id = manager.issue_key(
+                label=args.label,
+                scope=args.scope,
+                ttl_seconds=ttl_seconds,
+                permanent=args.permanent,
+            )
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+        metadata = store.list_keys().get(key_id, {})
         if args.scope == "admin":
             log_security_event("api_key_issue_admin", {"key_id": key_id, "label": args.label}, severity="WARNING")
-        print(f"PLAINTEXT={key}\nKEY_ID={key_id}")
+        expires_at = metadata.get("expires_at")
+        permanent = metadata.get("permanent", False)
+        print(f"PLAINTEXT={key}\nKEY_ID={key_id}\nEXPIRES_AT={expires_at}\nPERMANENT={permanent}")
         return 0
 
     if args.command == "rotate":
-        new_plain, new_id = manager.rotate_key(args.key_id, label=args.label, scope=args.scope)
-        print(f"NEW_PLAINTEXT={new_plain}\nNEW_KEY_ID={new_id}")
+        ttl_seconds = ttl_seconds_from_args(args.ttl_days, args.ttl_hours)
+        try:
+            new_plain, new_id = manager.rotate_key(
+                args.key_id,
+                label=args.label,
+                scope=args.scope,
+                ttl_seconds=ttl_seconds,
+                permanent=args.permanent,
+            )
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+        metadata = store.list_keys().get(new_id, {})
+        expires_at = metadata.get("expires_at")
+        permanent = metadata.get("permanent", False)
+        print(f"NEW_PLAINTEXT={new_plain}\nNEW_KEY_ID={new_id}\nEXPIRES_AT={expires_at}\nPERMANENT={permanent}")
         return 0
 
     if args.command == "revoke":

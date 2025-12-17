@@ -233,6 +233,34 @@ def _block_to_payload(block_obj: Any, fallback: Optional[Any] = None) -> Optiona
     return payload
 
 
+def _build_block_summary(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Construct a concise summary for a block response."""
+    header = payload.get("header") if isinstance(payload.get("header"), dict) else {}
+
+    def _first(*values: Any) -> Any:
+        for value in values:
+            if value not in (None, ""):
+                return value
+        return None
+
+    transactions = payload.get("transactions")
+    if isinstance(transactions, list):
+        tx_count = len(transactions)
+    elif isinstance(transactions, int):
+        tx_count = max(transactions, 0)
+    else:
+        tx_count = 0
+
+    return {
+        "height": _first(payload.get("index"), header.get("index")),
+        "hash": _first(payload.get("hash"), header.get("hash")),
+        "timestamp": _first(payload.get("timestamp"), header.get("timestamp")),
+        "difficulty": _first(payload.get("difficulty"), header.get("difficulty")),
+        "miner": _first(payload.get("miner"), header.get("miner")),
+        "transactions": tx_count,
+    }
+
+
 def _lookup_block_by_hash(blockchain: Any, block_hash: str, normalized: str) -> Optional[Any]:
     """Lookup a block by hash via direct and chain iteration fallback."""
     block_obj = None

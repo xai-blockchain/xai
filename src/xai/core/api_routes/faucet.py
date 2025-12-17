@@ -51,9 +51,11 @@ def register_faucet_routes(
         except PydanticValidationError as exc:
             logger.warning(
                 "PydanticValidationError in claim_faucet",
-                error_type="PydanticValidationError",
-                error=str(exc),
-                function="claim_faucet",
+                extra={
+                    "error_type": "PydanticValidationError",
+                    "error": str(exc),
+                    "function": "claim_faucet",
+                },
             )
             routes._record_faucet_metric(success=False)
             return routes._error_response(

@@ -12,6 +12,7 @@ import hashlib
 import json
 import logging
 import os
+import shutil
 import time
 from typing import List, Dict, Optional, TYPE_CHECKING, Any
 from xai.core.block_index import BlockIndex
@@ -46,9 +47,10 @@ class BlockchainStorage:
 
         # Initialize block index for O(1) lookups
         self.enable_index = enable_index
+        self.index_db_path = os.path.join(self.data_dir, "block_index.db")
+        self._index_cache_size = 256
         if enable_index:
-            index_db_path = os.path.join(self.data_dir, "block_index.db")
-            self.block_index = BlockIndex(db_path=index_db_path, cache_size=256)
+            self.block_index = BlockIndex(db_path=self.index_db_path, cache_size=self._index_cache_size)
             # Check if we need to build index for existing blocks
             self._ensure_index_built()
         else:
@@ -198,14 +200,49 @@ class BlockchainStorage:
                 with open(os.path.join(self.blocks_dir, block_file), "r", encoding="utf-8") as bf:
                     for line in bf:
                         f.write(line)
-            f.flush()
-            os.fsync(f.fileno())
 
-        for block_file in block_files:
-            os.remove(os.path.join(self.blocks_dir, block_file))
+    def reset_storage(self, *, preserve_checkpoints: bool = False) -> None:
+        """Remove on-disk blockchain data so the chain can rebuild from genesis."""
+        logger.warning(
+            "Resetting blockchain storage to genesis state",
+            extra={"event": "storage.reset"},
+        )
+        if self.block_index:
+            self.block_index.close()
+
+        shutil.rmtree(self.blocks_dir, ignore_errors=True)
+        os.makedirs(self.blocks_dir, exist_ok=True)
+
+        state_artifacts = [
+            self.utxo_file,
+            self.pending_tx_file,
+            self.contracts_file,
+            self.receipts_file,
+            self.journal_file,
+            self.index_db_path,
+            os.path.join(self.data_dir, "checksum.json"),
+        ]
+        for path in state_artifacts:
+            try:
+                if path and os.path.exists(path):
+                    os.remove(path)
+            except OSError as exc:
+                logger.warning(
+                    "Failed removing storage artifact",
+                    extra={"event": "storage.reset_warning", "path": path, "error": str(exc)},
+                )
+
+        # Optionally wipe checkpoints to avoid resurrecting invalid history
+        if not preserve_checkpoints:
+            checkpoints_dir = os.path.join(self.data_dir, "checkpoints")
+            shutil.rmtree(checkpoints_dir, ignore_errors=True)
+            os.makedirs(checkpoints_dir, exist_ok=True)
 
         self.block_file_index = 0
-        os.rename(compacted_file, os.path.join(self.blocks_dir, "blocks_0.json"))
+        if self.enable_index:
+            self.block_index = BlockIndex(db_path=self.index_db_path, cache_size=self._index_cache_size)
+        else:
+            self.block_index = None
 
 
     def _should_compress_block(self, block_index: int) -> bool:

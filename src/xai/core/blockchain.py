@@ -1486,6 +1486,202 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             self.utxo_manager, self.pending_transactions, self.contracts, self.contract_receipts
         )
 
+    def reset_chain_state(self, *, preserve_checkpoints: bool = False) -> Dict[str, Any]:
+        """
+        Reset the blockchain data directory back to genesis.
+
+        Args:
+            preserve_checkpoints: Keep checkpoint files on disk if True.
+
+        Returns:
+            Summary information about the reset operation.
+        """
+        with self._chain_lock:
+            previous_height = self.chain[-1].index if self.chain else -1
+        old_chain = list(self.chain)
+        utxo_snapshot = self.utxo_manager.snapshot()
+        nonce_snapshot = self.nonce_tracker.snapshot() if self.nonce_tracker else None
+        mempool_snapshot = list(self.pending_transactions)
+
+        wal_entry = self._write_reorg_wal(
+            old_tip=self.chain[-1].hash if self.chain else None,
+            new_tip=None,
+            fork_point=0,
+        )
+
+        address_index_path = os.path.join(self.data_dir, "address_index.db")
+        try:
+            self.storage.reset_storage(preserve_checkpoints=preserve_checkpoints)
+            if not preserve_checkpoints:
+                try:
+                    self.checkpoint_manager.reset_all_checkpoints()
+                except Exception as exc:
+                    self.logger.warning(
+                        "Checkpoint reset failed during chain reset",
+                        error=str(exc),
+                        error_type=type(exc).__name__,
+                    )
+
+            try:
+                self.address_index.close()
+            except Exception:
+                pass
+            try:
+                os.remove(address_index_path)
+            except FileNotFoundError:
+                pass
+            self.address_index = AddressTransactionIndex(address_index_path)
+
+            self.chain = []
+            self.pending_transactions = []
+            self.orphan_transactions = []
+            self.orphan_blocks.clear()
+            self.seen_txids.clear()
+            self._sender_pending_count.clear()
+            self.utxo_manager.clear()
+            self.nonce_tracker.reset()
+            self.contracts.clear()
+            self.contract_receipts.clear()
+
+            self.create_genesis_block()
+            self.storage.save_state_to_disk(
+                self.utxo_manager,
+                self.pending_transactions,
+                self.contracts,
+                self.contract_receipts,
+            )
+            self._commit_reorg_wal(wal_entry)
+            return {
+                "previous_height": previous_height,
+                "new_height": self.chain[-1].index if self.chain else -1,
+                "checkpoints_preserved": preserve_checkpoints,
+            }
+        except Exception as exc:
+            self.logger.error(
+                "Failed to reset chain state",
+                error=str(exc),
+                error_type=type(exc).__name__,
+            )
+            self.chain = old_chain
+            self.utxo_manager.restore(utxo_snapshot)
+            if nonce_snapshot and self.nonce_tracker:
+                self.nonce_tracker.restore(nonce_snapshot)
+            self.pending_transactions = mempool_snapshot
+            try:
+                if not os.path.exists(address_index_path):
+                    self.address_index = AddressTransactionIndex(address_index_path)
+                self.address_index.rebuild_from_chain(self)
+            except Exception as index_exc:
+                self.logger.warning(
+                    "Failed to rebuild address index after reset failure",
+                    error=str(index_exc),
+                    error_type=type(index_exc).__name__,
+                )
+            self._rollback_reorg_wal(wal_entry)
+            raise
+
+    def restore_checkpoint(self, target_height: int) -> Dict[str, Any]:
+        """
+        Restore blockchain state to the specified checkpoint height.
+
+        Args:
+            target_height: Height of the checkpoint to restore.
+
+        Returns:
+            Summary of the rollback operation.
+        """
+        checkpoint = self.checkpoint_manager.load_checkpoint(target_height)
+        if not checkpoint:
+            raise ValueError(f"No checkpoint found at height {target_height}")
+
+        with self._chain_lock:
+            if not self.chain:
+                raise ValueError("Cannot restore checkpoint on empty chain")
+            current_height = self.chain[-1].index
+            if target_height >= current_height:
+                raise ValueError(
+                    f"Checkpoint height {target_height} must be below current height {current_height}"
+                )
+
+        old_chain = list(self.chain)
+        utxo_snapshot = self.utxo_manager.snapshot()
+        nonce_snapshot = self.nonce_tracker.snapshot() if self.nonce_tracker else None
+        mempool_snapshot = list(self.pending_transactions)
+
+        wal_entry = self._write_reorg_wal(
+            old_tip=self.chain[-1].hash if self.chain else None,
+            new_tip=None,
+            fork_point=target_height,
+        )
+
+        try:
+            truncated_chain: List[Block] = []
+            for index in range(target_height + 1):
+                block = self.storage.load_block_from_disk(index)
+                if not block:
+                    raise StorageError(f"Missing block {index} while restoring checkpoint")
+                truncated_chain.append(block)
+
+            tip_hash = truncated_chain[-1].hash or truncated_chain[-1].header.hash
+            if tip_hash != checkpoint.block_hash:
+                raise ValidationError(
+                    f"Checkpoint hash mismatch at height {target_height}: "
+                    f"expected {checkpoint.block_hash}, got {tip_hash}"
+                )
+
+            self.chain = truncated_chain
+            self.utxo_manager.restore(checkpoint.utxo_snapshot)
+            self.pending_transactions = []
+            self.orphan_transactions = []
+            self.orphan_blocks.clear()
+            self.seen_txids.clear()
+            self._sender_pending_count.clear()
+            self.nonce_tracker.reset()
+            self._rebuild_nonce_tracker(truncated_chain)
+            self._rebuild_governance_state_from_chain()
+            if self.smart_contract_manager:
+                self._rebuild_contract_state()
+
+            try:
+                self.address_index.rollback_to_block(target_height + 1)
+                self.address_index.commit()
+            except (DatabaseError, StorageError, ValueError, RuntimeError) as exc:
+                self.logger.warning(
+                    "Address index rollback failed during checkpoint restore",
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                )
+
+            self.checkpoint_manager.latest_checkpoint_height = target_height
+
+            self.storage.save_state_to_disk(
+                self.utxo_manager,
+                self.pending_transactions,
+                self.contracts,
+                self.contract_receipts,
+            )
+            self._commit_reorg_wal(wal_entry)
+            previous_height = old_chain[-1].index if old_chain else -1
+            return {
+                "previous_height": previous_height,
+                "new_height": target_height,
+                "removed_blocks": previous_height - target_height,
+                "checkpoint_height": target_height,
+            }
+        except Exception as exc:
+            self.logger.error(
+                "Failed to restore checkpoint",
+                error=str(exc),
+                error_type=type(exc).__name__,
+            )
+            self.chain = old_chain
+            self.utxo_manager.restore(utxo_snapshot)
+            if nonce_snapshot and self.nonce_tracker:
+                self.nonce_tracker.restore(nonce_snapshot)
+            self.pending_transactions = mempool_snapshot
+            self._rollback_reorg_wal(wal_entry)
+            raise
+
     def get_latest_block(self) -> Block:
         """Get the last block in the chain by loading it from disk.
 

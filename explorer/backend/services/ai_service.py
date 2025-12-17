@@ -73,6 +73,8 @@ class AITaskService:
                     tasks = response.json()
                     # Broadcast new tasks to WebSocket clients
                     for task in tasks.get("tasks", []):
+                        if self.db:
+                            await self.db.upsert_ai_task(task)
                         await self._broadcast_ai_update(task)
         except Exception as e:
             logger.debug(f"Could not check AI tasks: {e}")

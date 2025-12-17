@@ -42,6 +42,13 @@ class CheckpointSyncManager:
     """Coordinate checkpoint discovery and selection for partial sync."""
 
     def __init__(self, blockchain: Any, p2p_manager: Optional[Any] = None):
+        """
+        Initialize checkpoint sync coordination.
+
+        Args:
+            blockchain: Blockchain instance with checkpoint_manager/config.
+            p2p_manager: Optional P2P manager exposing checkpoint metadata hooks.
+        """
         self.blockchain = blockchain
         self.p2p_manager = p2p_manager
         self.checkpoint_manager = getattr(blockchain, "checkpoint_manager", None)
@@ -155,6 +162,9 @@ class CheckpointSyncManager:
     def fetch_validate_apply(self) -> bool:
         """
         End-to-end helper: pick best checkpoint metadata, fetch payload, validate, and apply.
+
+        Returns:
+            True if a checkpoint was fetched, validated, and applied; False otherwise.
         """
         meta = self.get_best_checkpoint_metadata()
         payload = None
@@ -324,6 +334,7 @@ class CheckpointSyncManager:
         return True
 
     def _log_provenance(self, payload: CheckpointPayload, raw: Dict[str, Any], source: str) -> None:
+        """Record accepted checkpoint metadata for audit/metrics."""
         entry = {
             "height": payload.height,
             "block_hash": payload.block_hash,
@@ -354,6 +365,7 @@ class CheckpointSyncManager:
         return list(self._provenance_log)
 
     def _record_metrics(self, entry: dict) -> None:
+        """Emit checkpoint acceptance metrics if monitoring is available."""
         try:
             from xai.core.monitoring import MetricsCollector
 
@@ -426,6 +438,9 @@ class CheckpointSyncManager:
         Supports:
         - Local file path via `meta["url"]` pointing to a file.
         - HTTP(S) URL fetch with JSON payload.
+
+        Returns:
+            Parsed CheckpointPayload if found and well-formed, else None.
         """
         url = meta.get("url")
         if not url:
@@ -469,4 +484,13 @@ class CheckpointSyncManager:
 
     @staticmethod
     def _is_metadata_complete(meta: Dict[str, Any]) -> bool:
-        return bool(meta.get("height") is not None and meta.get("block_hash"))
+        try:
+            height = int(meta.get("height"))
+        except (TypeError, ValueError):
+            return False
+        if height < 0:
+            return False
+        block_hash = meta.get("block_hash")
+        if not block_hash or not isinstance(block_hash, str):
+            return False
+        return True

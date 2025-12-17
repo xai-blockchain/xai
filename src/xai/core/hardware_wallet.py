@@ -25,6 +25,8 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 
+from xai.core.crypto_utils import canonicalize_signature_components
+
 if TYPE_CHECKING:  # pragma: no cover - type checking only
     from xai.core.hardware_wallet_ledger import LedgerHardwareWallet  # noqa: F401
     from xai.core.hardware_wallet_trezor import TrezorHardwareWallet  # noqa: F401
@@ -225,6 +227,7 @@ class MockHardwareWallet:
 
         # Convert DER to raw r || s format (64 bytes)
         r, s = decode_dss_signature(der_signature)
+        r, s = canonicalize_signature_components(r, s)
         signature = r.to_bytes(32, "big") + s.to_bytes(32, "big")
 
         logger.debug(

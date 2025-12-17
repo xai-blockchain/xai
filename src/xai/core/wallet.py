@@ -18,6 +18,7 @@ from xai.core.crypto_utils import (
     sign_message_hex,
     verify_signature_hex,
 )
+from xai.core.address_checksum import to_checksum_address
 
 # BIP-39 mnemonic support
 from mnemonic import Mnemonic
@@ -163,27 +164,30 @@ class Wallet:
 
     def _generate_address(self, public_key: str) -> str:
         """
-        Generates an XAI address from a public key.
+        Generates an XAI address from a public key with EIP-55 checksum.
 
         The address format is 'XAI' followed by the first 40 characters of the SHA256 hash
-        of the public key bytes.
+        of the public key bytes, with mixed-case checksum encoding.
 
         Security Note:
             The public key is first converted from hex string to bytes before hashing.
             This ensures consistent address generation across all wallet implementations
             and matches the standard practice of hashing raw cryptographic data.
+            The checksum provides error detection for typos and copy/paste errors.
 
         Args:
             public_key: The public key as a hex string (64 bytes / 128 hex chars).
 
         Returns:
-            The generated XAI address string (format: XAI + 40 hex chars).
+            The generated XAI address string with checksum (format: XAI + 40 mixed-case hex chars).
         """
         # Convert hex string to bytes before hashing (security best practice)
         # Hashing the bytes ensures consistent address generation across implementations
         pub_key_bytes = bytes.fromhex(public_key)
         pub_hash = hashlib.sha256(pub_key_bytes).hexdigest()
-        return f"XAI{pub_hash[:40]}"
+        raw_address = f"XAI{pub_hash[:40]}"
+        # Apply EIP-55 checksum for error detection
+        return to_checksum_address(raw_address)
 
     def sign_message(self, message: str) -> str:
         """

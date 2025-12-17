@@ -579,5 +579,25 @@ XAI is experimental software under active development. The network is provided a
 ---
 
 **Document Version**: 0.2.0
-**Last Updated**: January 2025
-**Contact**: See project support channel
+**Last Updated**: December 2025
+
+---
+
+## Contact
+
+- Website: https://xaiblockchain.com
+- GitHub: https://github.com/xai-blockchain
+- Discord: https://discord.gg/xai-blockchain
+- Twitter: @xaiblockchain
+- Email: contact@xaiblockchain.com
+
+---
+
+## Other Projects
+
+XAI is part of a suite of blockchain projects designed for the decentralized future:
+
+- **AURA** — Privacy-preserving identity verification with zero-PII architecture. [useyouraura.com](https://useyouraura.com)
+- **PAW Network** — Verifiable AI compute coordination with native DEX and oracle. [poaiwblockchain.com](https://poaiwblockchain.com)
+
+*Building the decentralized future, together.*

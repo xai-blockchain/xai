@@ -180,6 +180,16 @@ The dashboard shows:
 - System resource utilization
 - Chain sync status
 
+### Specialized Dashboards
+
+In addition to the primary overview panel, dedicated JSON dashboards ship with the repo:
+
+- **XAI P2P Security** - `monitoring/dashboards/grafana/xai-p2p-security.json`
+- **XAI Mempool Overview** - `monitoring/dashboards/grafana/xai-mempool-overview.json`
+- **XAI Consensus Overview** *(new)* - `monitoring/dashboards/grafana/xai-consensus-overview.json`
+
+These mirror the docker-ready copies under `docker/monitoring/grafana/dashboards/` so testnet stacks automatically provision real-time views for each subsystem.
+
 ## Implementation Architecture
 
 ### Metrics Class

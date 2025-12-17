@@ -42,7 +42,7 @@ def register_algo_routes(routes: "NodeAPIRoutes") -> None:
             ServiceUnavailable: If algorithmic features are not enabled (503).
         """
         fee_optimizer = getattr(node, "fee_optimizer", None)
-        enabled = getattr(node_utils, "ALGO_FEATURES_ENABLED", ALGO_FEATURES_ENABLED) or ALGO_FEATURES_ENABLED
+        enabled = routes._algo_features_enabled()
         if not (enabled and fee_optimizer):
             return jsonify({"error": "Algorithmic features not available"}), 503
 
@@ -124,7 +124,7 @@ def register_algo_routes(routes: "NodeAPIRoutes") -> None:
             ValidationError: If transaction payload is invalid (400).
             ServiceUnavailable: If algorithmic features are not enabled (503).
         """
-        enabled = getattr(node_utils, "ALGO_FEATURES_ENABLED", ALGO_FEATURES_ENABLED) or ALGO_FEATURES_ENABLED
+        enabled = routes._algo_features_enabled()
         fraud_detector = getattr(node, "fraud_detector", None)
         if not (enabled and fraud_detector):
             return jsonify({"error": "Algorithmic features not available"}), 503
@@ -167,7 +167,7 @@ def register_algo_routes(routes: "NodeAPIRoutes") -> None:
         """
         fee_optimizer = getattr(node, "fee_optimizer", None)
         fraud_detector = getattr(node, "fraud_detector", None)
-        enabled = getattr(node_utils, "ALGO_FEATURES_ENABLED", ALGO_FEATURES_ENABLED) or ALGO_FEATURES_ENABLED
+        enabled = routes._algo_features_enabled()
 
         if not enabled:
             return jsonify({"enabled": False, "features": []})

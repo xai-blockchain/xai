@@ -427,6 +427,17 @@ class CheckpointManager:
         if pruned_count > 0:
             logger.info(f"Pruned {pruned_count} checkpoints, keeping {len(checkpoints_to_keep)}")
 
+    def reset_all_checkpoints(self) -> None:
+        """Delete every checkpoint and reset tracking metadata."""
+        try:
+            shutil.rmtree(self.checkpoints_dir, ignore_errors=True)
+            os.makedirs(self.checkpoints_dir, exist_ok=True)
+            self.latest_checkpoint_height = None
+            logger.info("All checkpoints removed; ledger will rebuild from genesis.")
+        except (OSError, IOError) as exc:
+            logger.error("Failed to reset checkpoint directory", error=str(exc))
+            raise
+
     def _should_prune_checkpoint(self, height: int) -> bool:
         """
         Determine if a checkpoint should be pruned

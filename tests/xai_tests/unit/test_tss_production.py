@@ -21,6 +21,7 @@ from xai.security.tss_production import (
     SecretShare,
     TSSKeyShare,
 )
+from xai.security.tss import SecureTSS
 
 
 def _message_hash():
@@ -86,3 +87,20 @@ def test_combine_partial_signatures_rejects_inconsistent_r():
     ]
     with pytest.raises(ValueError):
         tss.combine_partial_signatures(partials, threshold=2)
+
+
+def test_secure_tss_wrapper_end_to_end(monkeypatch):
+    """SecureTSS should wrap ProductionTSS with correct threshold enforcement."""
+    tss = SecureTSS()
+    shares = tss.generate_distributed_keys(num_participants=4, threshold=3)
+    message = b"threshold message"
+
+    # deterministic nonce for reproducibility
+    monkeypatch.setattr("xai.security.tss_production.secrets.randbelow", lambda *args, **kwargs: 7)
+
+    signature = tss.distributed_sign(message, shares[:3])
+    assert signature
+    assert tss.verify_threshold_signature(message, signature, shares[0].public_key) is True
+
+    with pytest.raises(ValueError):
+        tss.distributed_sign(message, shares[:2])

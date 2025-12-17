@@ -126,6 +126,9 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
         auth_error = routes._require_api_auth()
         if auth_error:
             return auth_error
+        paused = routes._reject_if_paused("send_transaction")
+        if paused:
+            return paused
 
         try:
             from xai.core.advanced_rate_limiter import get_rate_limiter as get_advanced_rate_limiter
@@ -229,7 +232,7 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
 
             # Verify signature - now raises exceptions
             try:
-                tx.verify_signature()
+                verification_result = tx.verify_signature()
             except Exception as e:
                 # Import signature verification exceptions
                 from xai.core.transaction import (
@@ -268,6 +271,14 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
                         code="verification_error",
                         context={"sender": model.sender, "error": str(e)}
                     )
+            else:
+                if verification_result is False:
+                    return routes._error_response(
+                        "Invalid signature",
+                        status=400,
+                        code="invalid_signature",
+                        context={"sender": model.sender},
+                    )
 
             if blockchain.add_transaction(tx):
                 try:
@@ -300,6 +311,9 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
         auth_error = routes._require_api_auth()
         if auth_error:
             return auth_error
+        paused = routes._reject_if_paused("receive_transaction")
+        if paused:
+            return paused
 
         ok, err, payload = routes._verify_signed_peer_message()
         if not ok:

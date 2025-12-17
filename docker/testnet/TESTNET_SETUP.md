@@ -58,6 +58,7 @@ docker compose -f <config-file>.yml down -v
 | `docker-compose.three-node.yml` | 3 | Consensus debugging | 100% |
 | `docker-compose.four-node.yml` | 4 | Full mesh connectivity | 98%+ |
 | `docker-compose.sentry.yml` | 4+2 | Public relay testing | 98%+ |
+| `docker-compose.yml` | 4 + monitoring | Full stack with Prometheus/Grafana | 98%+ |
 
 ## 1-Node Setup
 
@@ -77,7 +78,7 @@ docker compose -f docker-compose.one-node.yml up -d --build
 curl http://localhost:12001/health
 
 # Check block height
-curl http://localhost:12001/block/latest
+curl "http://localhost:12001/block/latest?summary=1"
 ```
 
 ### Access Points
@@ -88,6 +89,8 @@ curl http://localhost:12001/block/latest
 | P2P WebSocket | ws://localhost:12002 |
 | Metrics | http://localhost:12070 |
 | Explorer | http://localhost:12080 |
+| Grafana (monitoring) | http://localhost:12091 |
+| Prometheus | http://localhost:12090 |
 
 ### Stop
 
@@ -116,8 +119,8 @@ curl http://localhost:12001/health  # Bootstrap
 curl http://localhost:12011/health  # Node 1
 
 # Compare block heights
-curl -s http://localhost:12001/block/latest | jq '.block_number'
-curl -s http://localhost:12011/block/latest | jq '.block_number'
+curl -s "http://localhost:12001/block/latest?summary=1" | jq '.block_number'
+curl -s "http://localhost:12011/block/latest?summary=1" | jq '.block_number'
 ```
 
 ### Access Points
@@ -155,7 +158,7 @@ done
 
 # Compare block heights and hashes
 for port in 12001 12011 12021; do
-  echo "Port $port: $(curl -s http://localhost:$port/block/latest | jq '{height: .block_number, hash: .hash[0:16]}')"
+  echo "Port $port: $(curl -s \"http://localhost:$port/block/latest?summary=1\" | jq '{height: .block_number, hash: .hash[0:16]}')"
 done
 ```
 
@@ -190,7 +193,7 @@ docker compose -f docker-compose.four-node.yml up -d --build
 ```bash
 # Quick consensus check
 for port in 12001 12011 12021 12031; do
-  echo "Port $port: $(curl -s http://localhost:$port/block/latest | jq '{height: .block_number, hash: .hash[0:16]}')"
+  echo "Port $port: $(curl -s http://localhost:$port/block/latest?summary=1 | jq '{height: .block_number, hash: .hash[0:16]}')"
 done
 ```
 
@@ -206,7 +209,7 @@ while true; do
   HEIGHTS=""
   HASHES=""
   for port in $PORTS; do
-    DATA=$(curl -s http://localhost:$port/block/latest)
+    DATA=$(curl -s "http://localhost:$port/block/latest?summary=1")
     HEIGHT=$(echo $DATA | jq -r '.block_number')
     HASH=$(echo $DATA | jq -r '.hash[0:16]')
     HEIGHTS="$HEIGHTS $HEIGHT"
@@ -219,6 +222,26 @@ EOF
 chmod +x /tmp/consensus_test.sh
 /tmp/consensus_test.sh
 ```
+
+### Automated Verification Harness
+
+The repository ships with an automated verifier that hits every node's `/health`, `/stats`, and `/peers`
+endpoints plus the explorer `/health` endpoint. It confirms consensus (matching heights + hashes),
+minimum peer counts, and explorer readiness in a single run.
+
+```bash
+# From the repository root (after `docker compose ... up`)
+python scripts/testnet/verify_four_node_network.py --min-peers 3
+
+# JSON output for CI
+python scripts/testnet/verify_four_node_network.py --json > /tmp/four-node-status.json
+```
+
+Flags:
+- `--node NAME=URL` to override defaults (repeat for each node, defaults to localhost ports)
+- `--min-peers` to adjust the peer threshold (default: 3 for a 4-node mesh)
+- `--explorer-url` or `--skip-explorer` to control explorer checks
+- `--json` for machine-readable output (non-zero exit code when any check fails)
 
 ### Access Points
 
@@ -315,7 +338,7 @@ declare -a HEIGHTS
 declare -a HASHES
 
 for port in $PORTS; do
-  DATA=$(curl -s http://localhost:$port/block/latest 2>/dev/null)
+  DATA=$(curl -s "http://localhost:$port/block/latest?summary=1" 2>/dev/null)
   if [ $? -eq 0 ] && [ -n "$DATA" ]; then
     HEIGHT=$(echo $DATA | jq -r '.block_number // "N/A"')
     HASH=$(echo $DATA | jq -r '.hash[0:16] // "N/A"')

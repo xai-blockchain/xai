@@ -181,21 +181,27 @@ class ShamirSecretSharing:
         Returns:
             True if share is valid
         """
-        # Verify by attempting reconstruction and checking consistency
+        # Verify by attempting reconstruction and checking consistency against a baseline
         try:
-            test_shares = other_shares + [share]
-            if len(test_shares) < 2:
+            threshold = len(other_shares) + 1
+            if threshold < 2:
                 return False
 
-            if len(test_shares) >= 2:
-                secret1 = cls.reconstruct_secret(test_shares[:2])
-                secret2 = cls.reconstruct_secret(test_shares[:2])
-                return secret1 == secret2
+            candidate_set = [share] + list(other_shares)[: threshold - 1]
+            if len({s.index for s in candidate_set}) != len(candidate_set):
+                return False
+
+            # Baseline secret reconstructed from any threshold-sized prefix of the original shares
+            baseline_shares = original_shares[:threshold]
+            if len(baseline_shares) < threshold:
+                return False
+
+            expected_secret = cls.reconstruct_secret(baseline_shares)
+            candidate_secret = cls.reconstruct_secret(candidate_set)
+            return expected_secret == candidate_secret
         except ValueError as exc:
             logging.debug("TSS share verification failed: %s", exc)
             return False
-
-        return True
 
 
 class ProductionTSS:

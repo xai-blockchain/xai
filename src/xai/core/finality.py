@@ -22,6 +22,11 @@ from xai.core.crypto_utils import verify_signature_hex
 from xai.core.structured_logger import get_structured_logger
 from xai.core.block_header import BlockHeader
 
+try:
+    from xai.core.monitoring import MetricsCollector  # type: ignore
+except ImportError:  # pragma: no cover - optional dependency in some unit tests
+    MetricsCollector = None  # type: ignore
+
 
 class FinalityError(Exception):
     """Base class for finality related errors."""
@@ -33,6 +38,40 @@ class FinalityConfigurationError(FinalityError):
 
 class FinalityValidationError(FinalityError):
     """Raised for invalid votes or signatures."""
+
+
+def _emit_finality_height_metric(height: Optional[int]) -> None:
+    """Push finalized height into Prometheus gauge when collector is active."""
+    if MetricsCollector is None:
+        return
+    collector = getattr(MetricsCollector, "_instance", None)
+    if collector is None:
+        return
+    metric = collector.get_metric("xai_consensus_finalized_height")
+    if metric is None:
+        return
+    try:
+        value = 0 if height is None else int(height)
+        metric.set(value)
+    except (TypeError, ValueError, AttributeError):
+        # Metric unavailable or incompatible gauge type
+        return
+
+
+def _record_validator_metric(metric_name: str, value: float = 1.0) -> None:
+    """Record validator-oriented counters when MetricsCollector is available."""
+    if MetricsCollector is None:
+        return
+    collector = getattr(MetricsCollector, "_instance", None)
+    if collector is None:
+        return
+    metric = collector.get_metric(metric_name)
+    if metric is None:
+        return
+    try:
+        metric.inc(value)
+    except (AttributeError, TypeError, ValueError):
+        return
 
 
 @dataclass(frozen=True)
@@ -126,6 +165,7 @@ class FinalityManager:
         self.state_path = os.path.join(self.data_dir, "finality_state.json")
         self._load_certificates()
         self._load_state()
+        self._update_finality_metrics()
 
     def build_vote_payload(self, header: BlockHeader) -> bytes:
         """Return the canonical message that validators must sign."""
@@ -155,6 +195,7 @@ class FinalityManager:
                 signed_block_hash=header.hash,
             )
             if is_double:
+                _record_validator_metric("xai_validator_double_sign_events_total")
                 self.logger.error(
                     "Validator double-sign detected",
                     validator=validator.address,
@@ -162,6 +203,7 @@ class FinalityManager:
                     proof=proof,
                 )
                 if self._misbehavior_callback:
+                    _record_validator_metric("xai_validator_misbehavior_reports_total")
                     try:
                         self._misbehavior_callback(validator.address, header.index, proof or {})
                     except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:  # pragma: no cover - defensive logging
@@ -182,6 +224,7 @@ class FinalityManager:
                 raise FinalityValidationError("Validator has already voted for this block.")
 
             votes[validator.address] = signature
+            _record_validator_metric("xai_validator_votes_total")
             accumulated_power = self.pending_power.get(header.hash, 0) + validator.voting_power
             self.pending_power[header.hash] = accumulated_power
 
@@ -210,6 +253,7 @@ class FinalityManager:
             aggregated_power=certificate.aggregated_power,
             quorum_power=self.quorum_power,
         )
+        self._update_finality_metrics(certificate.block_height)
 
     def _load_certificates(self) -> None:
         if not os.path.exists(self.store_path):
@@ -229,6 +273,7 @@ class FinalityManager:
                 continue
             self.certificates_by_hash[certificate.block_hash] = certificate
             self.certificates_by_height[certificate.block_height] = certificate
+        self._update_finality_metrics()
 
     def _load_state(self) -> None:
         """
@@ -264,7 +309,7 @@ class FinalityManager:
                     persisted=persisted_quorum,
                     current=self.quorum_power,
                 )
-
+        self._update_finality_metrics()
 
     def _persist_certificates(self) -> None:
         serialized = [cert.to_dict() for cert in self.certificates_by_hash.values()]
@@ -313,6 +358,16 @@ class FinalityManager:
         if not self.certificates_by_height:
             return None
         return max(self.certificates_by_height.keys())
+
+    def _update_finality_metrics(self, candidate_height: Optional[int] = None) -> None:
+        """
+        Update Prometheus gauges with the current finalized height. Safe no-op if
+        MetricsCollector is unavailable (unit tests or stripped builds).
+        """
+        height = candidate_height
+        if height is None:
+            height = self.get_highest_finalized_height()
+        _emit_finality_height_metric(height)
 
     def can_reorg_to_height(self, fork_point: Optional[int]) -> bool:
         """Return True if reorganizing up to fork_point is allowed under finality."""
@@ -402,3 +457,4 @@ class FinalityManager:
                     "pending_vote_count": len(self.pending_votes),
                 }
             )
+        self._update_finality_metrics()

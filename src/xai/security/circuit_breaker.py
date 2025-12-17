@@ -128,3 +128,21 @@ class CircuitBreaker:
                 return False
         else:  # CLOSED
             return True
+
+    def reset(self):
+        """Manually reset circuit to CLOSED state."""
+        self._transition_to_closed()
+
+    def force_open(self):
+        """Manually trip the circuit breaker regardless of thresholds."""
+        self._transition_to_open()
+
+    def snapshot(self) -> dict:
+        """Return a serializable snapshot of the breaker state for APIs."""
+        return {
+            "name": self.name,
+            "state": self.state.value,
+            "failure_threshold": self.failure_threshold,
+            "recovery_timeout_seconds": self.recovery_timeout_seconds,
+            "half_open_test_limit": self.half_open_test_limit,
+        }

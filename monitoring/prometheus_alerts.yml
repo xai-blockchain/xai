@@ -86,6 +86,45 @@ groups:
           summary: "High Network Latency"
           description: "95th percentile latency: {{ $value | humanizeDuration }}"
 
+      # ==================== MEMPOOL HEALTH ====================
+
+      - alert: MempoolGrowingUnbounded
+        expr: |
+          xai_transaction_pool_size > 2000
+        for: 5m
+        labels:
+          severity: warning
+          service: mempool
+        annotations:
+          summary: "Mempool size high"
+          description: "Mempool has {{ $value }} txs for 5m; check inclusion rate and fee settings."
+          runbook: "docs/runbooks/mempool-size.md"
+
+      - alert: MempoolStalledThroughput
+        expr: |
+          rate(xai_transactions_total{status="confirmed"}[10m]) < 1
+          and xai_transaction_pool_size > 500
+        for: 10m
+        labels:
+          severity: critical
+          service: mempool
+        annotations:
+          summary: "Mempool not draining"
+          description: "Confirmed tx rate <1/s while mempool >500 for 10m; investigate miners/validators."
+          runbook: "docs/runbooks/mempool-size.md"
+
+      - alert: BlockProductionSlow
+        expr: |
+          xai_block_production_rate_per_minute < 0.2
+        for: 10m
+        labels:
+          severity: warning
+          service: blockchain
+        annotations:
+          summary: "Block production below target"
+          description: "Blocks per minute dropped below 0.2; check mining/consensus health."
+          runbook: "docs/runbooks/block-production.md"
+
       # ==================== P2P SECURITY ====================
 
       - alert: P2PNonceReplaySpike

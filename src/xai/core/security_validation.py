@@ -41,11 +41,15 @@ class SecurityEventRouter:
 
     @classmethod
     def register_sink(cls, sink: Callable[[str, Dict[str, Any], str], None]) -> None:
+        """Register a callable sink to receive security events."""
         if sink and sink not in cls._sinks:
             cls._sinks.append(sink)
 
     @classmethod
     def dispatch(cls, event_type: str, details: Dict[str, Any], severity: str) -> None:
+        """
+        Dispatch a security event to all registered sinks unless disabled via env.
+        """
         if os.getenv("XAI_P2P_DISABLE_SECURITY_EVENTS", "0").lower() in {"1", "true", "yes", "on"}:
             return
         for sink in list(cls._sinks):
@@ -158,7 +162,8 @@ class SecurityValidator:
         Raises:
             ValidationError: If validation fails
         """
-        from xai.core.validation import validate_address as core_validate_address
+        from xai.core.config import NETWORK
+        from xai.core.validation import AddressFormatValidator
 
         # Type check
         if not isinstance(address, str):
@@ -193,9 +198,15 @@ class SecurityValidator:
                 )
                 raise ValidationError(f"{field_name} contains invalid or dangerous characters")
 
-        # Use centralized validation
+        # Use centralized validation with network-aware prefix enforcement
         try:
-            return core_validate_address(address, allow_special=True)
+            expected_prefix = "XAI" if NETWORK.lower() == "mainnet" else "TXAI"
+            validator = AddressFormatValidator(
+                expected_prefix=expected_prefix,
+                allow_special=True,
+                allow_legacy=True,
+            )
+            return validator.validate(address)
         except ValueError as e:
             raise ValidationError(f"{field_name}: {e}") from e
 

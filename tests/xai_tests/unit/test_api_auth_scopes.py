@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+import time
 
 import pytest
 
@@ -36,6 +37,12 @@ def test_api_auth_enforces_required_keys_and_admin_scope(tmp_path):
     ok, _ = manager.authorize_admin(make_request(headers={"X-Admin-Token": user_plain}))
     assert ok is False
 
+    allowed, scope, reason = manager.authorize_scope(make_request(headers={"X-API-Key": admin_plain}), {"admin"})
+    assert allowed is True and scope == "admin" and reason is None
+
+    allowed, scope, reason = manager.authorize_scope(make_request(headers={"X-API-Key": user_plain}), {"admin"})
+    assert allowed is False and scope == "user"
+
 
 def test_jwt_auth_scope_and_revocation():
     pytest.importorskip("jwt")
@@ -56,3 +63,20 @@ def test_jwt_auth_scope_and_revocation():
     ok, _, err = manager.authorize_request(make_request(headers={"Authorization": f"Bearer {access}"}))
     assert ok is False
     assert "revoked" in (err or "").lower()
+
+
+def test_api_auth_scope_checks_expired_keys(tmp_path):
+    store_path = tmp_path / "keys.json"
+    store = APIKeyStore(str(store_path))
+    plaintext, key_id = store.issue_key(label="expiring", scope="operator", ttl_seconds=60)
+    manager = APIAuthManager(required=True, store=store)
+    manager.refresh_from_store()
+
+    # Expire key
+    store._keys[key_id]["expires_at"] = time.time() - 5  # type: ignore[attr-defined]
+    store._persist()
+    manager.refresh_from_store()
+
+    allowed, scope, reason = manager.authorize_scope(make_request(headers={"X-API-Key": plaintext}), {"operator"})
+    assert allowed is False
+    assert reason == "API key expired"

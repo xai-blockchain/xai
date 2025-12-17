@@ -180,6 +180,70 @@ class BlockchainMempoolMixin:
                 }
         return active
 
+    def remove_transaction_from_mempool(
+        self,
+        txid: str,
+        *,
+        ban_sender: bool = False,
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Remove a specific transaction from the mempool.
+
+        Args:
+            txid: Transaction ID to evict.
+            ban_sender: Whether to record a sender penalty to prevent immediate resubmission.
+
+        Returns:
+            Tuple of (was_removed, metadata). Metadata contains sender/fee info when evicted.
+
+        Raises:
+            ValueError: If txid is empty.
+        """
+        if not txid:
+            raise ValueError("txid is required")
+
+        eviction_metadata: Dict[str, Any] = {}
+        removed = False
+        with self._mempool_lock:
+            for idx, tx in enumerate(list(self.pending_transactions)):
+                if tx.txid != txid:
+                    continue
+
+                removed_tx = self.pending_transactions.pop(idx)
+                removed = True
+                eviction_metadata = {
+                    "sender": getattr(removed_tx, "sender", None),
+                    "amount": getattr(removed_tx, "amount", None),
+                    "fee": getattr(removed_tx, "fee", None),
+                }
+                if removed_tx.inputs:
+                    utxo_keys = [(inp["txid"], inp["vout"]) for inp in removed_tx.inputs]
+                    self.utxo_manager.unlock_utxos_by_keys(utxo_keys)
+
+                self.seen_txids.discard(txid)
+                sender = eviction_metadata.get("sender")
+                if sender and sender in self._sender_pending_count:
+                    self._sender_pending_count[sender] = max(
+                        0,
+                        self._sender_pending_count[sender] - 1,
+                    )
+                if ban_sender and sender:
+                    ban_state = self._invalid_sender_tracker.get(sender, {})
+                    ban_state["banned_until"] = time.time() + self._mempool_invalid_ban_seconds
+                    ban_state["count"] = 0
+                    ban_state["first_seen"] = time.time()
+                    self._invalid_sender_tracker[sender] = ban_state
+                break
+
+        if removed:
+            self.logger.info(
+                "Transaction evicted from mempool",
+                txid=txid,
+                sender=eviction_metadata.get("sender"),
+                ban_applied=ban_sender,
+            )
+        return removed, eviction_metadata
+
     def add_transaction(self, transaction: "Transaction") -> bool:
         """
         Add transaction to pending pool after validation.
