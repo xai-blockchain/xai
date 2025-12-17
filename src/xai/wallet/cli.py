@@ -1484,43 +1484,60 @@ def _hw_send(args: argparse.Namespace) -> int:
 def _multisig_create(args: argparse.Namespace) -> int:
     """Create a new multisig wallet configuration."""
     try:
+        from xai.core.crypto_utils import load_public_key_from_hex
+        from cryptography.hazmat.primitives import serialization
+
         # Read public keys from file or args
         if args.keys_file:
             with open(args.keys_file, 'r') as f:
-                public_keys = [line.strip() for line in f if line.strip()]
+                public_keys_hex = [line.strip() for line in f if line.strip()]
         else:
-            public_keys = args.public_keys
+            public_keys_hex = args.public_keys
 
-        if not public_keys or len(public_keys) < 2:
+        if not public_keys_hex or len(public_keys_hex) < 2:
             print("Error: At least 2 public keys required for multisig", file=sys.stderr)
             return 1
 
-        if args.threshold > len(public_keys):
-            print(f"Error: Threshold ({args.threshold}) cannot exceed number of keys ({len(public_keys)})", file=sys.stderr)
+        if args.threshold > len(public_keys_hex):
+            print(f"Error: Threshold ({args.threshold}) cannot exceed number of keys ({len(public_keys_hex)})", file=sys.stderr)
             return 1
 
+        # Convert hex public keys to PEM format for multisig wallet
+        public_keys_pem = []
+        for hex_key in public_keys_hex:
+            try:
+                pub_key_obj = load_public_key_from_hex(hex_key)
+                pem_bytes = pub_key_obj.public_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PublicFormat.SubjectPublicKeyInfo
+                )
+                public_keys_pem.append(pem_bytes.hex())
+            except Exception as e:
+                print(f"Error: Invalid public key format: {hex_key[:16]}... - {e}", file=sys.stderr)
+                return 1
+
         # Create multisig wallet to validate
-        wallet = MultiSigWallet(public_keys, args.threshold)
+        wallet = MultiSigWallet(public_keys_pem, args.threshold)
 
         # Generate multisig configuration
         config = {
             "version": "1.0",
             "type": "multisig",
             "threshold": args.threshold,
-            "total_signers": len(public_keys),
-            "public_keys": public_keys,
+            "total_signers": len(public_keys_pem),
+            "public_keys": public_keys_pem,  # Store PEM format
             "created_at": int(time.time()),
         }
 
         # Save configuration
-        output_path = args.output or f"multisig_{args.threshold}of{len(public_keys)}.json"
+        output_path = args.output or f"multisig_{args.threshold}of{len(public_keys_pem)}.json"
         with open(output_path, 'w') as f:
             json.dump(config, f, indent=2)
 
         if args.json:
             print(json.dumps(config, indent=2))
         else:
-            print(f"Multisig wallet created: {args.threshold}-of-{len(public_keys)}")
+            print(f"Multisig wallet created: {args.threshold}-of-{len(public_keys_pem)}")
             print(f"Configuration saved to: {output_path}")
             print(f"Share this file with all signers.")
 
@@ -1545,9 +1562,17 @@ def _multisig_sign(args: argparse.Namespace) -> int:
             prompt="Enter your private key for signing"
         )
 
-        # Derive public key from private key
-        from xai.core.crypto_utils import derive_public_key_hex, sign_message_hex
-        public_key = derive_public_key_hex(private_key)
+        # Derive public key from private key and convert to PEM format
+        from xai.core.crypto_utils import derive_public_key_hex, sign_message_hex, load_public_key_from_hex
+        from cryptography.hazmat.primitives import serialization
+
+        public_key_hex = derive_public_key_hex(private_key)
+        pub_key_obj = load_public_key_from_hex(public_key_hex)
+        pem_bytes = pub_key_obj.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+        public_key = pem_bytes.hex()
 
         # Sign the transaction payload
         payload = json.dumps(tx_data.get("payload", tx_data), sort_keys=True).encode('utf-8')
