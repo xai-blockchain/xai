@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XAI Wallet - Trezor USB Permissions</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #e0e7ff;
+        }
+        .container {
+            background: rgba(30, 27, 75, 0.9);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 480px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        .icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 24px;
+            background: linear-gradient(135deg, #6366f1, #818cf8);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 16px;
+            color: #f1f5f9;
+        }
+        p {
+            color: #a5b4fc;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+        .status {
+            padding: 12px 20px;
+            background: rgba(99, 102, 241, 0.2);
+            border-radius: 8px;
+            font-size: 14px;
+            color: #c7d2fe;
+        }
+        .status.success {
+            background: rgba(34, 197, 94, 0.2);
+            color: #86efac;
+        }
+        .status.error {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">
+            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M20 4L4 12v16l16 8 16-8V12L20 4z" stroke="white" stroke-width="2" fill="none"/>
+                <path d="M20 20v16M4 12l16 8 16-8" stroke="white" stroke-width="2"/>
+            </svg>
+        </div>
+        <h1>Trezor USB Permissions</h1>
+        <p>This page handles USB permissions for your Trezor hardware wallet connection with XAI Wallet.</p>
+        <div id="status" class="status">
+            Waiting for Trezor Connect...
+        </div>
+    </div>
+    <script>
+        // This page is opened by Trezor Connect to handle USB permissions
+        // It communicates with the parent window via postMessage
+
+        const statusEl = document.getElementById('status');
+
+        window.addEventListener('message', (event) => {
+            if (event.origin !== 'https://connect.trezor.io') return;
+
+            if (event.data && event.data.type === 'popup-init') {
+                statusEl.textContent = 'Initializing connection...';
+            } else if (event.data && event.data.type === 'popup-handshake') {
+                statusEl.textContent = 'Handshake complete';
+                statusEl.classList.add('success');
+            } else if (event.data && event.data.type === 'popup-error') {
+                statusEl.textContent = 'Error: ' + (event.data.message || 'Unknown error');
+                statusEl.classList.add('error');
+            }
+        });
+
+        // Notify parent that we're ready
+        if (window.opener) {
+            window.opener.postMessage({ type: 'popup-ready' }, '*');
+        }
+    </script>
+</body>
+</html>

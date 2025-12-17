@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XAI Ledger Hardware Wallet Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 { color: #333; }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+      font-size: 14px;
+    }
+    button:hover { background: #0056b3; }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .status {
+      margin: 20px 0;
+      padding: 15px;
+      border-radius: 4px;
+      background: #e9ecef;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+    pre {
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    .section {
+      margin: 30px 0;
+      padding: 20px;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+    }
+    input {
+      width: 100%;
+      padding: 8px;
+      margin: 10px 0;
+      border: 1px solid #ced4da;
+      border-radius: 4px;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>XAI Ledger Hardware Wallet Test</h1>
+
+    <div class="status info">
+      <strong>Browser Support:</strong> <span id="browserSupport">Checking...</span><br>
+      <strong>Device Status:</strong> <span id="deviceStatus">Not connected</span>
+    </div>
+
+    <div class="section">
+      <h2>1. Connect to Ledger</h2>
+      <p>Make sure XAI app is open on your Ledger device before connecting.</p>
+      <button id="btnConnect">Connect Ledger</button>
+      <button id="btnDisconnect" disabled>Disconnect</button>
+      <div id="deviceInfo"></div>
+    </div>
+
+    <div class="section">
+      <h2>2. Get Address</h2>
+      <label>BIP32 Path:</label>
+      <input type="text" id="pathAddress" value="44'/22593'/0'/0/0">
+      <button id="btnGetAddress" disabled>Get Address</button>
+      <button id="btnVerifyAddress" disabled>Verify on Device</button>
+      <div id="addressResult"></div>
+    </div>
+
+    <div class="section">
+      <h2>3. Get Public Key</h2>
+      <label>BIP32 Path:</label>
+      <input type="text" id="pathPubKey" value="44'/22593'/0'/0/0">
+      <button id="btnGetPubKey" disabled>Get Public Key</button>
+      <div id="pubKeyResult"></div>
+    </div>
+
+    <div class="section">
+      <h2>4. Sign Transaction</h2>
+      <label>BIP32 Path:</label>
+      <input type="text" id="pathSign" value="44'/22593'/0'/0/0">
+      <label>Transaction JSON:</label>
+      <textarea id="txData" rows="6" style="width:100%; font-family:monospace; padding:8px;">
+{
+  "to": "XAI7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b",
+  "amount": 100,
+  "nonce": 1,
+  "timestamp": 1734450000000
+}</textarea>
+      <button id="btnSign" disabled>Sign Transaction (Confirm on Device)</button>
+      <div id="signResult"></div>
+    </div>
+
+    <div id="log" class="status" style="max-height: 300px; overflow-y: auto;"></div>
+  </div>
+
+  <script type="module">
+    import {
+      isLedgerSupported,
+      connectLedger,
+      getLedgerAddress,
+      getLedgerPublicKey,
+      signWithLedger,
+      verifyAddressOnDevice,
+      disconnectLedger,
+      isConnected,
+      LedgerUserRejectionError,
+      LedgerDeviceError,
+      LedgerTransportError
+    } from './ledger-hw.js';
+
+    // UI Elements
+    const btnConnect = document.getElementById('btnConnect');
+    const btnDisconnect = document.getElementById('btnDisconnect');
+    const btnGetAddress = document.getElementById('btnGetAddress');
+    const btnVerifyAddress = document.getElementById('btnVerifyAddress');
+    const btnGetPubKey = document.getElementById('btnGetPubKey');
+    const btnSign = document.getElementById('btnSign');
+
+    const browserSupport = document.getElementById('browserSupport');
+    const deviceStatus = document.getElementById('deviceStatus');
+    const deviceInfo = document.getElementById('deviceInfo');
+    const addressResult = document.getElementById('addressResult');
+    const pubKeyResult = document.getElementById('pubKeyResult');
+    const signResult = document.getElementById('signResult');
+    const logDiv = document.getElementById('log');
+
+    // Logging
+    function log(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.style.marginBottom = '5px';
+      entry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+      if (type === 'error') entry.style.color = '#dc3545';
+      if (type === 'success') entry.style.color = '#28a745';
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function showResult(element, message, isError = false) {
+      element.className = 'status ' + (isError ? 'error' : 'success');
+      element.innerHTML = message;
+    }
+
+    function updateUI() {
+      const connected = isConnected();
+      deviceStatus.textContent = connected ? 'Connected' : 'Not connected';
+      deviceStatus.style.color = connected ? '#28a745' : '#dc3545';
+
+      btnConnect.disabled = connected;
+      btnDisconnect.disabled = !connected;
+      btnGetAddress.disabled = !connected;
+      btnVerifyAddress.disabled = !connected;
+      btnGetPubKey.disabled = !connected;
+      btnSign.disabled = !connected;
+    }
+
+    // Check browser support
+    if (isLedgerSupported()) {
+      browserSupport.textContent = 'WebUSB Supported';
+      browserSupport.style.color = '#28a745';
+      log('Browser supports WebUSB', 'success');
+    } else {
+      browserSupport.textContent = 'WebUSB NOT Supported (use Chrome/Edge/Opera)';
+      browserSupport.style.color = '#dc3545';
+      log('WebUSB not supported in this browser', 'error');
+      btnConnect.disabled = true;
+    }
+
+    // Connect to Ledger
+    btnConnect.addEventListener('click', async () => {
+      try {
+        log('Connecting to Ledger device...');
+        const info = await connectLedger();
+        log(`Connected to ${info.productName}`, 'success');
+        showResult(deviceInfo, `
+          <strong>Device Info:</strong><br>
+          Product: ${info.productName}<br>
+          Manufacturer: ${info.manufacturerName}<br>
+          Serial: ${info.serialNumber || 'N/A'}
+        `);
+        updateUI();
+      } catch (error) {
+        log(`Connection failed: ${error.message}`, 'error');
+        if (error.statusCode === 0x6d00) {
+          showResult(deviceInfo, 'Please open the XAI app on your Ledger device', true);
+        } else {
+          showResult(deviceInfo, error.message, true);
+        }
+      }
+    });
+
+    // Disconnect
+    btnDisconnect.addEventListener('click', async () => {
+      await disconnectLedger();
+      log('Disconnected from Ledger', 'success');
+      updateUI();
+      deviceInfo.innerHTML = '';
+      addressResult.innerHTML = '';
+      pubKeyResult.innerHTML = '';
+      signResult.innerHTML = '';
+    });
+
+    // Get Address
+    btnGetAddress.addEventListener('click', async () => {
+      try {
+        const path = document.getElementById('pathAddress').value;
+        log(`Getting address for path: ${path}...`);
+        const address = await getLedgerAddress(path);
+        log(`Address retrieved: ${address}`, 'success');
+        showResult(addressResult, `<strong>Address:</strong><br><pre>${address}</pre>`);
+      } catch (error) {
+        log(`Failed to get address: ${error.message}`, 'error');
+        showResult(addressResult, error.message, true);
+      }
+    });
+
+    // Verify Address on Device
+    btnVerifyAddress.addEventListener('click', async () => {
+      try {
+        const path = document.getElementById('pathAddress').value;
+        log(`Verifying address on device for path: ${path}...`);
+        log('Please confirm on Ledger device screen');
+        const address = await verifyAddressOnDevice(path);
+        log(`Address verified: ${address}`, 'success');
+        showResult(addressResult, `<strong>Verified Address:</strong><br><pre>${address}</pre>`);
+      } catch (error) {
+        if (error instanceof LedgerUserRejectionError) {
+          log('User rejected address verification', 'error');
+          showResult(addressResult, 'User rejected on device', true);
+        } else {
+          log(`Verification failed: ${error.message}`, 'error');
+          showResult(addressResult, error.message, true);
+        }
+      }
+    });
+
+    // Get Public Key
+    btnGetPubKey.addEventListener('click', async () => {
+      try {
+        const path = document.getElementById('pathPubKey').value;
+        log(`Getting public key for path: ${path}...`);
+        const pubKey = await getLedgerPublicKey(path);
+        log(`Public key retrieved (64 bytes)`, 'success');
+        showResult(pubKeyResult, `<strong>Public Key (hex):</strong><br><pre>${pubKey}</pre>`);
+      } catch (error) {
+        log(`Failed to get public key: ${error.message}`, 'error');
+        showResult(pubKeyResult, error.message, true);
+      }
+    });
+
+    // Sign Transaction
+    btnSign.addEventListener('click', async () => {
+      try {
+        const path = document.getElementById('pathSign').value;
+        const txJson = document.getElementById('txData').value;
+        const tx = JSON.parse(txJson);
+
+        log(`Signing transaction...`);
+        log('Please review and confirm on Ledger device');
+        const signature = await signWithLedger(path, tx);
+        log(`Transaction signed successfully`, 'success');
+        showResult(signResult, `
+          <strong>Signature (r||s):</strong><br>
+          <pre>${signature}</pre>
+          <strong>Length:</strong> ${signature.length / 2} bytes
+        `);
+      } catch (error) {
+        if (error instanceof LedgerUserRejectionError) {
+          log('User rejected transaction', 'error');
+          showResult(signResult, 'User rejected transaction on device', true);
+        } else {
+          log(`Signing failed: ${error.message}`, 'error');
+          showResult(signResult, error.message, true);
+        }
+      }
+    });
+
+    updateUI();
+    log('Test page loaded. Ready to connect to Ledger device.');
+  </script>
+</body>
+</html>

@@ -78,7 +78,7 @@ def test_signatures_bound_to_nonce_and_sequence():
     legacy_hash = digest.finalize()
     forged_sig = privs[0].sign(legacy_hash, ec.ECDSA(hashes.SHA256())).hex()
 
-    with pytest.raises(ValueError, match="Invalid signature"):
+    with pytest.raises(ValueError, match="Signature verification failed"):
         wallet.add_partial_signature("tx1", publics[0], forged_sig)
 
     # Valid signature using canonical payload succeeds.

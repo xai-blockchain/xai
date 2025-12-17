@@ -97,5 +97,8 @@ class LedgerHardwareWallet(HardwareWallet):
         pub_bytes = bytes.fromhex(pub_hex)
         import hashlib
 
+        # Use network-appropriate prefix
+        from xai.core.config import NETWORK
+        prefix = "XAI" if NETWORK.lower() == "mainnet" else "TXAI"
         h = hashlib.sha256(pub_bytes).hexdigest()
-        return f"XAI{h[:40]}"
+        return f"{prefix}{h[:40]}"

@@ -504,9 +504,11 @@ class WalletAPIHandler:
         except ValueError as exc:
             logger.warning(
                 "ValueError in create_embedded_wallet_handler",
-                error_type="ValueError",
-                error=str(exc),
-                function="create_embedded_wallet_handler",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "create_embedded_wallet_handler"
+                }
             )
             return (
                 jsonify({"success": False, "error": "ALIAS_EXISTS", "message": str(exc)}),
@@ -652,9 +654,11 @@ class WalletAPIHandler:
         except ValueError as exc:
             logger.warning(
                 "ValueError in create_trade_order_handler",
-                error_type="ValueError",
-                error=str(exc),
-                function="create_trade_order_handler",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "create_trade_order_handler"
+                }
             )
             return jsonify({"success": False, "error": str(exc)}), 400
 
@@ -894,5 +898,5 @@ class WalletAPIHandler:
                 )
                 self.trade_peers[host] = time.time()
                 logger.info(f"Gossiped trade event to {host}")
-            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
+            except Exception as exc:
                 logger.warning(f"Trade gossip to {host} failed: {exc}")

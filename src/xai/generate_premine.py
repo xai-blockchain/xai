@@ -298,10 +298,10 @@ class PreMineGenerator:
             # Deterministic but cryptographically unpredictable selection
             hash_val = hashlib.sha256(f"time_capsule_seed_42_{i}".encode()).digest()
             hash_int = int.from_bytes(hash_val[:4], 'big')
-            # Select if hash mod 10000 < 920 (approximately 920 selected)
-            if hash_int % 10869 < 1000:  # Adjusted ratio to get ~920
+            # Select if hash mod 10380 < 1000 (produces ~933, truncated to 920)
+            if hash_int % 10380 < 1000:
                 time_capsule_indices.add(i)
-        # Ensure exactly 920 by adjusting
+        # Ensure exactly 920 by truncating to 920 (modulo produces slightly more)
         indices_list = sorted(time_capsule_indices)
         time_capsule_indices = set(indices_list[:920])
 

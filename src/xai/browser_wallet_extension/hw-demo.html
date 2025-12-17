@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XAI Hardware Wallet Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+        .wallet-info {
+            font-family: monospace;
+            font-size: 12px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .wallet-info div { margin: 5px 0; }
+        .wallet-info strong { color: #495057; }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .log-entry {
+            margin: 3px 0;
+            padding: 2px 0;
+            border-bottom: 1px solid #333;
+        }
+        .log-time { color: #6a9955; }
+        .log-event { color: #4fc1ff; font-weight: bold; }
+        .log-error { color: #f48771; }
+    </style>
+</head>
+<body>
+    <h1>XAI Hardware Wallet Demo</h1>
+
+    <!-- Wallet Selection -->
+    <div class="card">
+        <h2>1. Connect Hardware Wallet</h2>
+        <div class="button-group">
+            <button onclick="connectWallet('ledger')">Connect Ledger</button>
+            <button onclick="connectWallet('trezor')">Connect Trezor</button>
+            <button onclick="disconnectWallet()" id="disconnectBtn" disabled>Disconnect</button>
+        </div>
+        <div id="connectionStatus" class="status info" style="display: none;"></div>
+    </div>
+
+    <!-- Wallet Info -->
+    <div class="card" id="walletInfoCard" style="display: none;">
+        <h2>2. Wallet Information</h2>
+        <div class="wallet-info" id="walletInfo"></div>
+        <div class="button-group">
+            <button onclick="verifyAddress()">Verify Address on Device</button>
+        </div>
+    </div>
+
+    <!-- Transaction Signing -->
+    <div class="card" id="signCard" style="display: none;">
+        <h2>3. Sign Transaction</h2>
+        <div>
+            <label>Recipient Address:</label>
+            <input type="text" id="recipientAddr" placeholder="XAI...">
+        </div>
+        <div>
+            <label>Amount (XAI):</label>
+            <input type="number" id="amount" placeholder="1.0" step="0.01">
+        </div>
+        <div>
+            <label>Fee (XAI):</label>
+            <input type="number" id="fee" value="0.001" step="0.0001">
+        </div>
+        <div>
+            <label>Nonce:</label>
+            <input type="number" id="nonce" value="0">
+        </div>
+        <div>
+            <label>Memo (optional):</label>
+            <input type="text" id="memo" placeholder="Transaction note">
+        </div>
+        <div class="button-group">
+            <button onclick="signTransaction()">Sign Transaction</button>
+        </div>
+        <div id="signatureResult" style="display: none;"></div>
+    </div>
+
+    <!-- Message Signing -->
+    <div class="card" id="messageCard" style="display: none;">
+        <h2>4. Sign Message</h2>
+        <div>
+            <label>Message to Sign:</label>
+            <input type="text" id="messageText" placeholder="Enter message">
+        </div>
+        <div class="button-group">
+            <button onclick="signMessage()">Sign Message</button>
+        </div>
+        <div id="messageResult" style="display: none;"></div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="card">
+        <h2>Event Log</h2>
+        <div class="log" id="eventLog"></div>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <!-- Include hardware wallet modules -->
+    <script src="ledger-hw.js"></script>
+    <script src="trezor-hw.js"></script>
+    <script src="hw-manager.js"></script>
+
+    <script>
+        // Initialize hardware wallet manager
+        const hwManager = new HardwareWalletManager({
+            bip32Path: "m/44'/22593'/0'/0/0",
+            autoReconnect: false,
+        });
+
+        // Event listeners
+        hwManager.on('connecting', (data) => {
+            logEvent('connecting', `Connecting to ${data.type}...`);
+            showStatus('Connecting to ' + HardwareWalletManager.getWalletName(data.type) + '...', 'info');
+        });
+
+        hwManager.on('connected', (walletInfo) => {
+            logEvent('connected', `Connected to ${walletInfo.type}`, walletInfo);
+            showStatus('Successfully connected to ' + HardwareWalletManager.getWalletName(walletInfo.type), 'success');
+            displayWalletInfo(walletInfo);
+            document.getElementById('disconnectBtn').disabled = false;
+        });
+
+        hwManager.on('disconnected', (data) => {
+            logEvent('disconnected', `Disconnected from ${data.type}`);
+            showStatus('Wallet disconnected', 'info');
+            hideWalletInfo();
+            document.getElementById('disconnectBtn').disabled = true;
+        });
+
+        hwManager.on('signing', (data) => {
+            logEvent('signing', `Signing ${data.type}... Please confirm on device`);
+            showStatus('Please confirm on device...', 'info');
+        });
+
+        hwManager.on('signed', (data) => {
+            logEvent('signed', `${data.type} signed successfully`, data);
+            showStatus('Signature completed!', 'success');
+        });
+
+        hwManager.on('error', (data) => {
+            logEvent('error', data.error, data);
+            showStatus('Error: ' + data.error, 'error');
+        });
+
+        // Connect to wallet
+        async function connectWallet(walletType) {
+            try {
+                const walletInfo = await hwManager.connect(walletType);
+                console.log('Wallet connected:', walletInfo);
+            } catch (err) {
+                console.error('Connection failed:', err);
+            }
+        }
+
+        // Disconnect wallet
+        async function disconnectWallet() {
+            try {
+                await hwManager.disconnect();
+            } catch (err) {
+                console.error('Disconnect failed:', err);
+            }
+        }
+
+        // Verify address on device
+        async function verifyAddress() {
+            try {
+                showStatus('Check your device...', 'info');
+                const address = await hwManager.getAddress(true);
+                logEvent('verify', 'Address verified on device: ' + address);
+                showStatus('Address verified on device', 'success');
+            } catch (err) {
+                console.error('Address verification failed:', err);
+            }
+        }
+
+        // Sign transaction
+        async function signTransaction() {
+            const recipient = document.getElementById('recipientAddr').value;
+            const amount = document.getElementById('amount').value;
+            const fee = document.getElementById('fee').value;
+            const nonce = document.getElementById('nonce').value;
+            const memo = document.getElementById('memo').value;
+
+            if (!recipient || !amount) {
+                showStatus('Please enter recipient and amount', 'error');
+                return;
+            }
+
+            try {
+                const walletInfo = hwManager.getConnectedWallet();
+                const txPayload = {
+                    sender: walletInfo.address,
+                    recipient: recipient,
+                    amount: parseFloat(amount),
+                    fee: parseFloat(fee),
+                    nonce: parseInt(nonce, 10),
+                    memo: memo,
+                    network: 'testnet',
+                };
+
+                const signedTx = await hwManager.signTransaction(txPayload);
+
+                // Display result
+                const resultDiv = document.getElementById('signatureResult');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `
+                    <div class="wallet-info">
+                        <div><strong>Transaction Signed!</strong></div>
+                        <div><strong>Payload Hash:</strong> ${signedTx.payloadHash}</div>
+                        <div><strong>Signature:</strong> ${signedTx.signature}</div>
+                        <div><strong>Public Key:</strong> ${signedTx.publicKey}</div>
+                        <div><strong>Signed At:</strong> ${new Date(signedTx.signedAt * 1000).toLocaleString()}</div>
+                    </div>
+                `;
+
+                logEvent('tx_signed', 'Transaction signed', signedTx);
+            } catch (err) {
+                console.error('Transaction signing failed:', err);
+            }
+        }
+
+        // Sign message
+        async function signMessage() {
+            const message = document.getElementById('messageText').value;
+
+            if (!message) {
+                showStatus('Please enter a message', 'error');
+                return;
+            }
+
+            try {
+                const signature = await hwManager.signMessage(message);
+
+                // Display result
+                const resultDiv = document.getElementById('messageResult');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `
+                    <div class="wallet-info">
+                        <div><strong>Message Signed!</strong></div>
+                        <div><strong>Message:</strong> ${message}</div>
+                        <div><strong>Signature:</strong> ${signature}</div>
+                    </div>
+                `;
+
+                logEvent('msg_signed', 'Message signed', { message, signature });
+            } catch (err) {
+                console.error('Message signing failed:', err);
+            }
+        }
+
+        // Display wallet info
+        function displayWalletInfo(walletInfo) {
+            const infoDiv = document.getElementById('walletInfo');
+            infoDiv.innerHTML = `
+                <div><strong>Wallet Type:</strong> ${HardwareWalletManager.getWalletName(walletInfo.type)}</div>
+                <div><strong>Address:</strong> ${walletInfo.address}</div>
+                <div><strong>Public Key:</strong> ${walletInfo.publicKey}</div>
+                <div><strong>BIP32 Path:</strong> ${walletInfo.bip32Path}</div>
+                <div><strong>Connected:</strong> ${new Date(walletInfo.connectedAt).toLocaleString()}</div>
+            `;
+
+            document.getElementById('walletInfoCard').style.display = 'block';
+            document.getElementById('signCard').style.display = 'block';
+            document.getElementById('messageCard').style.display = 'block';
+        }
+
+        // Hide wallet info
+        function hideWalletInfo() {
+            document.getElementById('walletInfoCard').style.display = 'none';
+            document.getElementById('signCard').style.display = 'none';
+            document.getElementById('messageCard').style.display = 'none';
+            document.getElementById('signatureResult').style.display = 'none';
+            document.getElementById('messageResult').style.display = 'none';
+        }
+
+        // Show status message
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('connectionStatus');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+
+            // Auto-hide after 5 seconds for success messages
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        // Log event
+        function logEvent(event, message, data = null) {
+            const logDiv = document.getElementById('eventLog');
+            const time = new Date().toLocaleTimeString();
+            const isError = event === 'error';
+
+            let entry = `<div class="log-entry ${isError ? 'log-error' : ''}">`;
+            entry += `<span class="log-time">[${time}]</span> `;
+            entry += `<span class="log-event">${event.toUpperCase()}</span>: `;
+            entry += `${message}`;
+
+            if (data && typeof data === 'object') {
+                entry += `<br>&nbsp;&nbsp;${JSON.stringify(data, null, 2).replace(/\n/g, '<br>&nbsp;&nbsp;')}`;
+            }
+
+            entry += '</div>';
+
+            logDiv.innerHTML += entry;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // Clear log
+        function clearLog() {
+            document.getElementById('eventLog').innerHTML = '';
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            const supported = HardwareWalletManager.getSupportedWallets();
+            logEvent('init', `Supported wallets: ${supported.join(', ')}`);
+
+            if (supported.length === 0) {
+                showStatus('No hardware wallet support detected in this browser', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

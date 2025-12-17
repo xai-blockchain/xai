@@ -2,6 +2,8 @@
 
 XAI supports hardware wallets for secure transaction signing. Private keys never leave your device.
 
+> **See Also:** [Wallet Advanced Features - Hardware Wallets](wallet_advanced_features.md#hardware-wallets) for Python API examples and integration details.
+
 ## Supported Devices
 - **Ledger** (Nano S, Nano X, Nano S Plus) - requires `pip install ledgerblue`
 - **Trezor** (Model One, Model T, Safe 3) - requires `pip install trezor`

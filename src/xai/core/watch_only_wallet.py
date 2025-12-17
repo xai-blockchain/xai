@@ -49,9 +49,12 @@ def _utc_timestamp() -> str:
 
 def _public_key_hex_to_address(public_key_hex: str) -> str:
     """Convert uncompressed public key hex (without 0x04 prefix) to XAI address."""
+    # Use network-appropriate prefix
+    from xai.core.config import NETWORK
+    prefix = "XAI" if NETWORK.lower() == "mainnet" else "TXAI"
     pub_bytes = bytes.fromhex(public_key_hex)
     digest = hashlib.sha256(pub_bytes).hexdigest()
-    return f"XAI{digest[:40]}"
+    return f"{prefix}{digest[:40]}"
 
 
 @dataclass

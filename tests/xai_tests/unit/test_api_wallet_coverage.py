@@ -99,29 +99,44 @@ class TestCreateWalletEndpoint:
 
         return {'handler': handler, 'client': client, 'node': node}
 
-    @patch('xai.core.wallet.Wallet')
+    @patch('xai.core.api_wallet.Wallet')
     def test_create_wallet_success(self, mock_wallet_class, setup):
         """Test successful wallet creation."""
         # Create mock wallet instance
         mock_wallet = Mock()
         mock_wallet.address = "XAI_test_address_12345"
-        mock_wallet.public_key = b'\x04' + b'A' * 64
-        mock_wallet.private_key = b'\x01' + b'B' * 31
+        mock_wallet.public_key = "04" + "A" * 128  # Hex string, not bytes
+        mock_wallet.private_key = "B" * 64  # Hex string, not bytes
+        # Mock the _encrypt_payload method to return a valid encrypted keystore
+        mock_wallet._encrypt_payload = Mock(return_value={
+            "ciphertext": "base64_encrypted_data",
+            "nonce": "base64_nonce",
+            "salt": "base64_salt"
+        })
         mock_wallet_class.return_value = mock_wallet
 
-        response = setup['client'].post('/wallet/create')
+        response = setup['client'].post(
+            '/wallet/create',
+            data=json.dumps({"encryption_password": "strong_password_123"}),
+            content_type='application/json'
+        )
 
-        assert response.status_code == 200
+        assert response.status_code == 201
         data = response.get_json()
         assert data['success'] is True
         assert data['address'] == "XAI_test_address_12345"
         assert 'public_key' in data
-        assert 'private_key' in data
+        assert 'encrypted_keystore' in data
+        assert 'ciphertext' in data['encrypted_keystore']
+        assert 'nonce' in data['encrypted_keystore']
+        assert 'salt' in data['encrypted_keystore']
         assert 'warning' in data
-        assert 'Cannot be recovered' in data['warning']
+        assert 'NEVER share your password' in data['warning']
 
         # Verify Wallet was instantiated
         mock_wallet_class.assert_called_once()
+        # Verify encryption was called with the password
+        mock_wallet._encrypt_payload.assert_called_once()
 
 
 class TestEmbeddedWalletEndpoints:
@@ -1199,7 +1214,7 @@ class TestPrivateMethodsGossipTradeEvent:
 
         return {'handler': handler}
 
-    @patch('requests.post')
+    @patch('xai.core.api_wallet.requests.post')
     def test_gossip_trade_event_success(self, mock_post, setup, monkeypatch):
         """Test successful gossip to all peers."""
         from xai.core import config
@@ -1220,7 +1235,7 @@ class TestPrivateMethodsGossipTradeEvent:
         assert calls[0][1]['json'] == event
         assert calls[0][1]['headers']['X-Wallet-Trade-Secret'] == 'test_secret_456'
 
-    @patch('requests.post')
+    @patch('xai.core.api_wallet.requests.post')
     def test_gossip_trade_event_partial_failure(self, mock_post, setup, monkeypatch):
         """Test gossip with one peer failing."""
         from xai.core import config
@@ -1238,7 +1253,7 @@ class TestPrivateMethodsGossipTradeEvent:
 
         assert mock_post.call_count == 2
 
-    @patch('requests.post')
+    @patch('xai.core.api_wallet.requests.post')
     def test_gossip_trade_event_all_fail(self, mock_post, setup):
         """Test gossip when all peers fail."""
         mock_post.side_effect = Exception("Network error")
@@ -1247,7 +1262,7 @@ class TestPrivateMethodsGossipTradeEvent:
         # Should not raise exception
         setup['handler']._gossip_trade_event(event)
 
-    @patch('requests.post')
+    @patch('xai.core.api_wallet.requests.post')
     def test_gossip_trade_event_no_peers(self, mock_post):
         """Test gossip with no peers registered."""
         from xai.core.api_wallet import WalletAPIHandler
@@ -1265,7 +1280,7 @@ class TestPrivateMethodsGossipTradeEvent:
         # Should not make any requests
         mock_post.assert_not_called()
 
-    @patch('requests.post')
+    @patch('xai.core.api_wallet.requests.post')
     def test_gossip_trade_event_updates_timestamp(self, mock_post, setup, monkeypatch):
         """Test that successful gossip updates peer timestamp."""
         from xai.core import config

@@ -169,9 +169,12 @@ class MockHardwareWallet:
 
             # Generate address if not provided
             if not self.address:
+                # Use network-appropriate prefix
+                from xai.core.config import NETWORK
+                prefix = "XAI" if NETWORK.lower() == "mainnet" else "TXAI"
                 pub_key_bytes = bytes.fromhex(self._public_key_hex)
                 pub_hash = hashlib.sha256(pub_key_bytes).hexdigest()
-                self.address = f"XAI{pub_hash[:40]}"
+                self.address = f"{prefix}{pub_hash[:40]}"
 
         logger.warning(
             "MockHardwareWallet initialized - FOR TESTING ONLY",

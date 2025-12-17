@@ -51,17 +51,30 @@ class TestWalletAPICreation:
         """Test POST /wallet/create - successful wallet creation."""
         mock_wallet = Mock()
         mock_wallet.address = "addr123"
-        mock_wallet.public_key = b"pubkey123"
-        mock_wallet.private_key = b"privkey123"
+        mock_wallet.public_key = "04" + "a" * 128  # Hex string, not bytes
+        mock_wallet.private_key = "b" * 64  # Hex string, not bytes
+        # Mock the _encrypt_payload method to return a valid encrypted keystore
+        mock_wallet._encrypt_payload = Mock(return_value={
+            "ciphertext": "base64_encrypted_data",
+            "nonce": "base64_nonce",
+            "salt": "base64_salt"
+        })
         mock_wallet_class.return_value = mock_wallet
 
-        response = client.post('/wallet/create')
-        assert response.status_code == 200
+        response = client.post(
+            '/wallet/create',
+            data=json.dumps({"encryption_password": "strong_password_123"}),
+            content_type='application/json'
+        )
+        assert response.status_code == 201
         data = response.get_json()
         assert data['success'] == True
         assert data['address'] == 'addr123'
         assert 'public_key' in data
-        assert 'private_key' in data
+        assert 'encrypted_keystore' in data
+        assert 'ciphertext' in data['encrypted_keystore']
+        assert 'nonce' in data['encrypted_keystore']
+        assert 'salt' in data['encrypted_keystore']
         assert 'warning' in data
 
     def test_create_embedded_wallet_not_enabled(self, client, mock_node):
@@ -613,8 +626,8 @@ class TestGossipTradeEvent:
 
         assert mock_post.call_count == 2  # Called for each peer
 
-    @patch('xai.core.api_wallet.requests.post')
     @patch('xai.core.api_wallet.Config.WALLET_TRADE_PEER_SECRET', 'secret123')
+    @patch('xai.core.api_wallet.requests.post')
     def test_gossip_trade_event_failure(self, mock_post, wallet_api):
         """Test _gossip_trade_event - peer failure."""
         mock_post.side_effect = Exception("Connection refused")

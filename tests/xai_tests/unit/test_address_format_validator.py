@@ -19,7 +19,9 @@ def test_address_validator_allows_special_when_enabled():
 
 def test_validate_address_uses_default_validator():
     addr = "TXAI" + "a" * 40
-    assert validate_address(addr) == addr
+    # validate_address now returns checksummed format
+    result = validate_address(addr)
+    assert result.lower() == addr.lower()  # Same address, different case
 
 
 def test_address_validator_legacy_support_toggle():

@@ -185,9 +185,12 @@ class HDWallet:
 
         # Generate XAI address using the canonical wallet hashing scheme (SHA256 of
         # the uncompressed public key bytes without the 0x04 prefix).
+        # Use network-appropriate prefix
+        from xai.core.config import NETWORK
+        prefix = "XAI" if NETWORK.lower() == "mainnet" else "TXAI"
         pub_key_bytes = bytes.fromhex(public_key)
         pub_hash = hashlib.sha256(pub_key_bytes).hexdigest()
-        address = f"XAI{pub_hash[:40]}"
+        address = f"{prefix}{pub_hash[:40]}"
 
         derivation_path = f"m/44'/{self.XAI_COIN_TYPE}'/{account_index}'/{change}/{address_index}{hardened_marker}"
 

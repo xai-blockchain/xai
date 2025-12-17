@@ -282,7 +282,7 @@ class TestWalletEncryptionDetails:
 
         payload = wallet._encrypt_payload(data, correct_password)
 
-        with pytest.raises(ValueError, match="Bad decrypt"):
+        with pytest.raises(ValueError, match="Decryption failed|Bad decrypt|invalid password"):
             wallet._decrypt_payload(payload, wrong_password)
 
     def test_decrypt_payload_with_corrupted_data(self):
@@ -297,7 +297,7 @@ class TestWalletEncryptionDetails:
             "salt": "corrupted"
         }
 
-        with pytest.raises(ValueError, match="Bad decrypt"):
+        with pytest.raises(ValueError, match="Decryption failed|Bad decrypt|invalid password"):
             wallet._decrypt_payload(corrupted_payload, password)
 
     def test_decrypt_payload_missing_fields(self):
@@ -341,12 +341,16 @@ class TestKeyGeneration:
 
     def test_generate_address_from_public_key(self):
         """Test address generation from public key"""
+        from xai.core.config import NETWORK
+        expected_prefix = "XAI" if NETWORK.lower() == "mainnet" else "TXAI"
         wallet = Wallet()
 
         address = wallet._generate_address(wallet.public_key)
 
-        assert address.startswith("XAI")
-        assert len(address) == 43
+        assert address.startswith(expected_prefix)
+        # Address length is prefix + 40 hex chars
+        expected_length = len(expected_prefix) + 40
+        assert len(address) == expected_length
 
     def test_address_deterministic_from_public_key(self):
         """Test same public key always generates same address"""

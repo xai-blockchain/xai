@@ -1,11 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "XAI Browser Wallet & Miner",
-  "description": "Lightweight wallet, mining controls, and wallet-to-wallet trading access.",
-  "version": "0.1.0",
+  "name": "XAI Browser Wallet",
+  "description": "Secure XAI wallet with hardware wallet support (Ledger/Trezor), mining controls, and trading.",
+  "version": "0.2.0",
   "action": {
-    "default_title": "XAI Wallet Miner",
-    "default_popup": "popup.html"
+    "default_title": "XAI Wallet",
+    "default_popup": "popup-hw.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "background": {
     "service_worker": "background.js"
@@ -14,10 +20,30 @@
     "http://localhost:8545/*",
     "http://127.0.0.1:8545/*",
     "http://localhost:18545/*",
-    "http://127.0.0.1:18545/*"
+    "http://127.0.0.1:18545/*",
+    "https://connect.trezor.io/*"
   ],
   "permissions": [
     "storage",
-    "alarms"
- ]
+    "alarms",
+    "usb"
+  ],
+  "optional_permissions": [
+    "hid"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' https://connect.trezor.io; object-src 'self'"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["trezor-usb-permissions.html"],
+      "matches": ["https://connect.trezor.io/*"]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
 }

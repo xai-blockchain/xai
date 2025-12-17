@@ -99,7 +99,7 @@ class StructuredLogger:
             **extra_fields: Additional fields to include in JSON
         """
         extra_fields["timestamp"] = datetime.utcnow().isoformat()
-        extra_fields["message"] = message
+        extra_fields["log_message"] = message
 
         if level == "info":
             self.logger.info(message, extra=extra_fields)
@@ -663,7 +663,7 @@ class BlockchainMetrics:
         """Record network error"""
         with self._lock:
             self.network_errors.labels(error_type=error_type).inc()
-            self.logger.warning("Network error", error_type=error_type)
+            self.logger.warning("Network error", extra={"error_type": error_type})
 
     def record_api_request(
         self,
@@ -688,7 +688,7 @@ class BlockchainMetrics:
         """Record API error"""
         with self._lock:
             self.api_errors.labels(endpoint=endpoint, error_type=error_type).inc()
-            self.logger.error("API error", endpoint=endpoint, error_type=error_type)
+            self.logger.error("API error", extra={"endpoint": endpoint, "error_type": error_type})
 
     def update_mining_hashrate(self, hashrate: float) -> None:
         """Update mining hashrate"""

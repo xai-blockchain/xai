@@ -722,9 +722,12 @@ class ChainValidator:
                 return False
 
             # Verify address matches public key (hash bytes, not hex string)
+            # Use network-appropriate prefix
+            from xai.core.config import NETWORK
+            prefix = "XAI" if NETWORK.lower() == "mainnet" else "TXAI"
             pub_key_bytes = bytes.fromhex(public_key)
             pub_hash = hashlib.sha256(pub_key_bytes).hexdigest()
-            expected_address = f"XAI{pub_hash[:40]}"
+            expected_address = f"{prefix}{pub_hash[:40]}"
 
             if expected_address != sender:
                 return False

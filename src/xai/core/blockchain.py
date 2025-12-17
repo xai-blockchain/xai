@@ -519,8 +519,11 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         ]
 
     def _derive_address_from_public(self, public_key_hex: str) -> str:
+        # Use network-appropriate prefix
+        from xai.core.config import NETWORK
+        prefix = "XAI" if NETWORK.lower() == "mainnet" else "TXAI"
         digest = hashlib.sha256(bytes.fromhex(public_key_hex)).hexdigest()
-        return f"XAI{digest[:40]}"
+        return f"{prefix}{digest[:40]}"
 
     def _handle_finality_misbehavior(self, validator_address: str, block_height: int, proof: Dict[str, Any]) -> None:
         """Slash validators that violate finality guarantees."""
@@ -1166,9 +1169,12 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
     def derive_contract_address(self, sender: str, nonce: Optional[int]) -> str:
         """Deterministically derive a contract address from sender and nonce."""
+        # Use network-appropriate prefix
+        from xai.core.config import NETWORK
+        prefix = "XAI" if NETWORK.lower() == "mainnet" else "TXAI"
         base_nonce = nonce if nonce is not None else self.nonce_tracker.get_next_nonce(sender)
         digest = hashlib.sha256(f"{sender.lower()}:{base_nonce}".encode("utf-8")).hexdigest()
-        return f"XAI{digest[:38].upper()}"
+        return f"{prefix}{digest[:38].upper()}"
 
     def register_contract(
         self,
@@ -2096,7 +2102,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             return verify_signature_hex(header.miner_pubkey, header.hash.encode(), header.signature)
         except (ValueError, TypeError) as e:
             # Malformed signature or public key (e.g., not valid hex)
-            self.logger.debug("Signature verification failed due to malformed data", error=str(e), error_type=type(e).__name__)
+            self.logger.debug(
+                "Signature verification failed due to malformed data",
+                extra={"error": str(e), "error_type": type(e).__name__}
+            )
             return False
 
     def calculate_merkle_root(self, transactions: List[Transaction]) -> str:

@@ -83,7 +83,7 @@ class TestSecurePrivateKeyRetrieval:
 
     def test_get_private_key_interactive_input(self):
         """Test interactive secure input with getpass."""
-        test_key = "0xdeadbeef" + "a" * 54  # 64 hex chars total
+        test_key = "0xdeadbeef" + "a" * 56  # 64 hex chars total (8 + 56)
 
         with mock.patch("getpass.getpass", return_value=test_key):
             retrieved_key = get_private_key_secure()

@@ -397,7 +397,9 @@ class TestWalletMigration:
             legacy_file = f.name
 
         try:
-            wallet.migrate_wallet_encryption(legacy_file, password)
+            # Corrupted data should raise an exception (InvalidToken or ValueError)
+            with pytest.raises(Exception):
+                wallet.migrate_wallet_encryption(legacy_file, password)
         finally:
             if os.path.exists(legacy_file):
                 os.unlink(legacy_file)

@@ -84,7 +84,7 @@ class BlockchainLoader:
             logger.error("Failed to load blockchain", extra={"error": message})
             return False, None, f"Load failed: {message}"
 
-        logger.info("Blockchain loaded from disk", extra={"message": message})
+        logger.info("Blockchain loaded from disk", extra={"status_message": message})
 
         # Step 2: Validate the chain
         logger.info("Validating blockchain integrity")
@@ -159,7 +159,7 @@ class BlockchainLoader:
                 )
 
                 if not success:
-                    logger.warning("Failed to restore backup", extra={"error": message})
+                    logger.warning("Failed to restore backup", extra={"error_message": message})
                     continue
 
                 # Validate the restored backup

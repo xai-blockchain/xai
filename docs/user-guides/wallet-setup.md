@@ -95,9 +95,17 @@ npm start
 - Enhanced security for large holdings
 - Organizational fund management
 
-### 5. Hardware Wallet (Planned)
+### 5. Hardware Wallet
 
-**Coming Soon:** Integration with Ledger and Trezor hardware wallets for maximum security.
+**Best for:** Maximum security, large holdings, cold storage
+
+**Features:**
+- Private keys never leave the device
+- Secure element chip protection
+- Physical confirmation required for transactions
+- Support for Ledger and Trezor devices
+
+**Setup:** See [Wallet Advanced Features - Hardware Wallets](wallet_advanced_features.md#hardware-wallets)
 
 ## Creating Your First Wallet
 
@@ -589,10 +597,11 @@ python src/xai/wallet/cli.py generate-paper-wallet
 
 ### Integration with Hardware Wallets
 
-Coming soon - integration with:
-- Ledger Nano S/X
-- Trezor Model T
-- Other hardware wallet devices
+XAI supports hardware wallet integration:
+- Ledger Nano S/X (via `ledgerblue` library)
+- Trezor Model T (via `trezor` library)
+
+See [Wallet Advanced Features - Hardware Wallets](wallet_advanced_features.md#hardware-wallets) for detailed setup instructions.
 
 ## Next Steps
 
@@ -601,7 +610,15 @@ Now that you have your wallet set up:
 1. **Get Some XAI**: Use the [faucet](faucet.md) (testnet) or purchase XAI
 2. **Send a Transaction**: Follow the [Transaction Guide](transactions.md)
 3. **Explore Features**: Try time-locked transactions, atomic swaps
-4. **Secure Your Funds**: Review security best practices regularly
+4. **Advanced Features**: See [Wallet Advanced Features](wallet_advanced_features.md) for:
+   - Address checksums (XIP-55)
+   - Multisig wallets
+   - Hardware wallet integration
+   - Unsigned transactions (XUTX)
+   - Typed data signing (XIP-712)
+   - Watch-only wallets
+   - Two-factor authentication
+5. **Secure Your Funds**: Review security best practices regularly
 
 ---
 

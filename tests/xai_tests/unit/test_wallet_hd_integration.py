@@ -20,7 +20,8 @@ def test_wallet_from_mnemonic_matches_hd_wallet_derivation():
     hd_wallet = HDWallet(mnemonic=MNEMONIC, passphrase="xai")
     derived = hd_wallet.derive_address(account_index=0, change=0, address_index=5)
 
-    assert wallet.address == derived["address"]
+    # Wallet now returns checksummed addresses; compare case-insensitively
+    assert wallet.address.lower() == derived["address"].lower()
     assert wallet.public_key == derived["public_key"]
 
     metadata = wallet.get_derivation_metadata()

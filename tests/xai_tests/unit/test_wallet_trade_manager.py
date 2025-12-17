@@ -46,7 +46,7 @@ def test_wallet_trade_settlement(tmp_path):
         amount_offered=20.0,
         token_requested="XAI",
         amount_requested=10.0,
-        price=0.5,
+        price=2.0,
         order_type=SwapOrderType.BUY,
     )
 
@@ -60,5 +60,10 @@ def test_wallet_trade_settlement(tmp_path):
     buyer_balance = exchange_wallet.get_balance("buyer", "XAI")
     seller_balance = exchange_wallet.get_balance("seller", "USDT")
 
-    assert pytest.approx(buyer_balance["available"], rel=1e-8) == 10.0
-    assert pytest.approx(seller_balance["available"], rel=1e-8) == 20.0
+    # Buyer receives XAI minus maker fee (10 bps = 0.1%)
+    # 10.0 - (10.0 * 0.001) = 9.99
+    assert pytest.approx(buyer_balance["available"], rel=1e-8) == 9.99
+
+    # Seller receives USDT minus taker fee (20 bps = 0.2%)
+    # 20.0 - (20.0 * 0.002) = 19.96
+    assert pytest.approx(seller_balance["available"], rel=1e-8) == 19.96

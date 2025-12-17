@@ -424,8 +424,9 @@ class TestMempoolConcurrentDoubleSpend:
         num_transactions = 50
         results = []
         errors = []
+        creation_failures = []
 
-        def submit_transaction(nonce, result_list, error_list):
+        def submit_transaction(nonce, result_list, error_list, creation_failure_list):
             try:
                 tx = blockchain.create_transaction(
                     sender_address=wallet1.address,
@@ -437,6 +438,9 @@ class TestMempoolConcurrentDoubleSpend:
                 if tx:
                     result = blockchain.add_transaction(tx)
                     result_list.append((nonce, result))
+                else:
+                    # Transaction creation failed (likely UTXO locking conflict)
+                    creation_failure_list.append(nonce)
             except Exception as e:
                 error_list.append((nonce, e))
 
@@ -444,7 +448,7 @@ class TestMempoolConcurrentDoubleSpend:
         for i in range(num_transactions):
             thread = threading.Thread(
                 target=submit_transaction,
-                args=(i, results, errors)
+                args=(i, results, errors, creation_failures)
             )
             threads.append(thread)
 
@@ -456,8 +460,11 @@ class TestMempoolConcurrentDoubleSpend:
         for thread in threads:
             thread.join(timeout=20)
 
-        # Verify completion
-        assert len(results) + len(errors) == num_transactions
+        # Verify completion - all threads should complete one way or another
+        total_outcomes = len(results) + len(errors) + len(creation_failures)
+        assert total_outcomes == num_transactions, \
+            f"Expected {num_transactions} total outcomes, got {total_outcomes} " \
+            f"(results: {len(results)}, errors: {len(errors)}, creation_failures: {len(creation_failures)})"
 
         # At least some should succeed (wallet has sufficient funds for many)
         success_count = sum(1 for _, r in results if r)

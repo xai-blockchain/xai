@@ -128,7 +128,7 @@ class ThresholdSignatureScheme:
             extra={
                 "event": "threshold_signature.signature_combined",
                 "participants_used": participants_used,
-                "message": message.encode("ascii", "backslashreplace").decode("ascii"),
+                "signed_message": message.encode("ascii", "backslashreplace").decode("ascii"),
             },
         )
         return combined_signature

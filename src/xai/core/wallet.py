@@ -166,8 +166,8 @@ class Wallet:
         """
         Generates an XAI address from a public key with EIP-55 checksum.
 
-        The address format is 'XAI' followed by the first 40 characters of the SHA256 hash
-        of the public key bytes, with mixed-case checksum encoding.
+        The address format is 'XAI' (mainnet) or 'TXAI' (testnet) followed by the first 40
+        characters of the SHA256 hash of the public key bytes, with mixed-case checksum encoding.
 
         Security Note:
             The public key is first converted from hex string to bytes before hashing.
@@ -179,13 +179,20 @@ class Wallet:
             public_key: The public key as a hex string (64 bytes / 128 hex chars).
 
         Returns:
-            The generated XAI address string with checksum (format: XAI + 40 mixed-case hex chars).
+            The generated address string with checksum (format: XAI/TXAI + 40 mixed-case hex chars).
         """
+        # Import here to avoid circular dependency
+        from xai.core.config import NETWORK
+
         # Convert hex string to bytes before hashing (security best practice)
         # Hashing the bytes ensures consistent address generation across implementations
         pub_key_bytes = bytes.fromhex(public_key)
         pub_hash = hashlib.sha256(pub_key_bytes).hexdigest()
-        raw_address = f"XAI{pub_hash[:40]}"
+
+        # Use network-appropriate prefix
+        prefix = "XAI" if NETWORK.lower() == "mainnet" else "TXAI"
+        raw_address = f"{prefix}{pub_hash[:40]}"
+
         # Apply EIP-55 checksum for error detection
         return to_checksum_address(raw_address)
 

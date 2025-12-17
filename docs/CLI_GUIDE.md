@@ -757,4 +757,11 @@ To contribute to CLI development:
 - Block exploration
 - Mempool inspection
 
+## See Also
+
+- [Wallet Setup Guide](user-guides/wallet-setup.md) - Getting started with XAI wallets
+- [Wallet Advanced Features](user-guides/wallet_advanced_features.md) - Multisig, hardware wallets, typed signing
+- [Transaction Guide](user-guides/transactions.md) - Creating and submitting transactions
+- [Hardware Wallet Usage](user-guides/hardware_wallet_usage.md) - Ledger and Trezor integration
+
 This CLI sets a new standard for blockchain command-line interfaces, combining professional-grade security with beautiful, intuitive user experience and revolutionary AI-blockchain features.

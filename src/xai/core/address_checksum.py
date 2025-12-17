@@ -54,11 +54,12 @@ def to_checksum_address(address: str) -> str:
         >>> to_checksum_address("XAI7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b")
         'XAI7A8b9C0d1E2f3A4b5C6D7e8F9a0B1c2D3e4F5A6b'
     """
-    # Handle prefixes
-    if address.startswith("XAI"):
+    # Handle prefixes (case-insensitive)
+    address_upper = address.upper()
+    if address_upper.startswith("XAI") and not address_upper.startswith("XAIT"):
         prefix = "XAI"
         hex_part = address[3:]
-    elif address.startswith("TXAI"):
+    elif address_upper.startswith("TXAI"):
         prefix = "TXAI"
         hex_part = address[4:]
     else:
@@ -102,9 +103,11 @@ def is_checksum_valid(address: str) -> bool:
         True if checksum is valid or address is all lowercase/uppercase
         False if checksum is invalid
     """
-    if address.startswith("XAI"):
+    # Handle case-insensitive prefix check
+    address_upper = address.upper()
+    if address_upper.startswith("XAI") and not address_upper.startswith("XAIT"):
         hex_part = address[3:]
-    elif address.startswith("TXAI"):
+    elif address_upper.startswith("TXAI"):
         hex_part = address[4:]
     else:
         return False
@@ -131,11 +134,12 @@ def validate_address(address: str, require_checksum: bool = False) -> Tuple[bool
     Returns:
         Tuple of (is_valid, error_message or checksummed_address)
     """
-    # Check prefix
-    if address.startswith("XAI"):
+    # Check prefix (case-insensitive)
+    address_upper = address.upper()
+    if address_upper.startswith("XAI") and not address_upper.startswith("XAIT"):
         prefix = "XAI"
         hex_part = address[3:]
-    elif address.startswith("TXAI"):
+    elif address_upper.startswith("TXAI"):
         prefix = "TXAI"
         hex_part = address[4:]
     else:
@@ -154,7 +158,9 @@ def validate_address(address: str, require_checksum: bool = False) -> Tuple[bool
     # Check checksum if required or if mixed case
     if require_checksum or (hex_part != hex_part.lower() and hex_part != hex_part.upper()):
         if not is_checksum_valid(address):
-            expected = to_checksum_address(address.lower() if address.startswith("XAI") else "TXAI" + hex_part.lower())
+            # Reconstruct proper prefix for expected address
+            base_addr = prefix + hex_part.lower()
+            expected = to_checksum_address(base_addr)
             return False, f"Invalid checksum. Did you mean {expected}?"
 
     # Return checksummed version

@@ -697,9 +697,11 @@ class WalletTradeManager:
             except MarginException as exc:
                 logger.warning(
                     "MarginException in margin_deposit",
-                    error_type="MarginException",
-                    error=str(exc),
-                    function="margin_deposit",
+                    extra={
+                        "error_type": "MarginException",
+                        "error": str(exc),
+                        "function": "margin_deposit",
+                    },
                 )
                 return {"success": False, "error": str(exc)}
 
@@ -713,9 +715,11 @@ class WalletTradeManager:
             except MarginException as exc:
                 logger.warning(
                     "MarginException in margin_withdraw",
-                    error_type="MarginException",
-                    error=str(exc),
-                    function="margin_withdraw",
+                    extra={
+                        "error_type": "MarginException",
+                        "error": str(exc),
+                        "function": "margin_withdraw",
+                    },
                 )
                 return {"success": False, "error": str(exc)}
 
@@ -747,9 +751,11 @@ class WalletTradeManager:
             except MarginException as exc:
                 logger.warning(
                     "MarginException in open_margin_position",
-                    error_type="MarginException",
-                    error=str(exc),
-                    function="open_margin_position",
+                    extra={
+                        "error_type": "MarginException",
+                        "error": str(exc),
+                        "function": "open_margin_position",
+                    },
                 )
                 return {"success": False, "error": str(exc)}
 
@@ -776,9 +782,11 @@ class WalletTradeManager:
             except MarginException as exc:
                 logger.warning(
                     "MarginException in close_margin_position",
-                    error_type="MarginException",
-                    error=str(exc),
-                    function="close_margin_position",
+                    extra={
+                        "error_type": "MarginException",
+                        "error": str(exc),
+                        "function": "close_margin_position",
+                    },
                 )
                 return {"success": False, "error": str(exc)}
 
@@ -799,9 +807,11 @@ class WalletTradeManager:
             except MarginException as exc:
                 logger.warning(
                     "MarginException in get_margin_overview",
-                    error_type="MarginException",
-                    error=str(exc),
-                    function="get_margin_overview",
+                    extra={
+                        "error_type": "MarginException",
+                        "error": str(exc),
+                        "function": "get_margin_overview",
+                    },
                 )
                 return {"success": False, "error": str(exc)}
 
@@ -814,9 +824,11 @@ class WalletTradeManager:
             except MarginException as exc:
                 logger.warning(
                     "MarginException in perform_margin_liquidations",
-                    error_type="MarginException",
-                    error=str(exc),
-                    function="perform_margin_liquidations",
+                    extra={
+                        "error_type": "MarginException",
+                        "error": str(exc),
+                        "function": "perform_margin_liquidations",
+                    },
                 )
                 return {"success": False, "error": str(exc)}
 

@@ -37,7 +37,10 @@ class TestValidateAddress:
     def test_valid_txai_address(self):
         """Valid TXAI (testnet) address."""
         addr = "TXAI" + "a" * 40
-        assert validate_address(addr) == addr
+        # Now returns checksummed version
+        result = validate_address(addr)
+        assert result.startswith("TXAI")
+        assert len(result) == 44
 
     def test_valid_mixed_case_hex(self):
         """Address with mixed case hex characters."""
@@ -87,7 +90,7 @@ class TestValidateAddress:
 
     def test_invalid_hex_chars_raises(self):
         """Non-hex characters raise ValueError."""
-        with pytest.raises(ValueError, match="format"):
+        with pytest.raises(ValueError, match="hexadecimal"):
             validate_address("XAI" + "G" * 40)  # G is not hex
 
     def test_address_too_short(self):

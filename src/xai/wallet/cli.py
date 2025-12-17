@@ -164,7 +164,7 @@ def derive_key_from_password(password: str, salt: bytes, kdf: str = "pbkdf2") ->
         return ph.hash(password.encode('utf-8'), salt=salt).split(b'$')[-1]
     
     # Default to PBKDF2
-    kdf = pbkdf2.PBKDF2(
+    kdf = pbkdf2.PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=KEY_SIZE,
         salt=salt,
@@ -605,7 +605,7 @@ def _generate_address(args: argparse.Namespace) -> int:
         return 0
 
     # Default: Show address and public key only (SAFE)
-    logger.info("Wallet generated successfully (address only mode)", address=wallet.address)
+    logger.info("Wallet generated successfully (address only mode): %s", wallet.address)
     print("Wallet generated successfully!")
     print(f"Address:     {wallet.address}")
     print(f"Public Key:  {wallet.public_key}")
@@ -655,9 +655,10 @@ def _send_transaction(args: argparse.Namespace) -> int:
     Security: Private key is obtained securely via keystore or interactive input.
     NEVER passed as CLI argument.
     """
-    if args.two_fa_profile:
+    two_fa_profile = getattr(args, '2fa_profile', None)
+    if two_fa_profile:
         try:
-            _require_two_factor(args.two_fa_profile, args.otp)
+            _require_two_factor(two_fa_profile, args.otp)
         except (ValueError, KeyError) as exc:
             logger.error("2FA verification failed: %s", exc, extra={"error_type": type(exc).__name__})
             print(f"2FA verification failed: {exc}", file=sys.stderr)
@@ -768,9 +769,10 @@ def _export_wallet(args: argparse.Namespace) -> int:
 
     Security: Private key obtained securely, never via CLI argument.
     """
-    if args.two_fa_profile:
+    two_fa_profile = getattr(args, '2fa_profile', None)
+    if two_fa_profile:
         try:
-            _require_two_factor(args.two_fa_profile, args.otp)
+            _require_two_factor(two_fa_profile, args.otp)
         except (ValueError, KeyError) as exc:
             logger.error("2FA verification failed for export: %s", exc, extra={"error_type": type(exc).__name__})
             print(f"2FA verification failed: {exc}", file=sys.stderr)

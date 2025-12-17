@@ -13,7 +13,8 @@ def price_oracle(asset: str) -> Decimal:
 def test_margin_deposit_open_close(tmp_path):
     engine = MarginEngine(price_oracle=price_oracle)
     manager = WalletTradeManager(data_dir=str(tmp_path / "margin1"), margin_engine=engine)
-    deposit = manager.margin_deposit("acct1", 5)
+    # Deposit sufficient collateral for BTC position (0.1 BTC at $30k = $3000, leverage 5 = $600 required)
+    deposit = manager.margin_deposit("acct1", 1000)
     assert deposit["success"] is True
     opened = manager.open_margin_position("acct1", "BTC", 0.1, leverage=5)
     assert opened["success"] is True

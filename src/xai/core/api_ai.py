@@ -138,9 +138,11 @@ class AIAPIHandler:
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.error(
                 "Personal AI atomic swap operation failed",
-                error_type=type(e).__name__,
-                error=str(e),
-                function="personal_atomic_swap_handler",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                    "function": "personal_atomic_swap_handler"
+                }
             )
             return jsonify({
                 "success": False,
@@ -317,10 +319,12 @@ class AIAPIHandler:
             except ValidationError as ve:
                 logger.warning(
                     "Invalid guardian address in wallet recovery",
-                    error_type="ValidationError",
-                    error=str(ve),
-                    guardian=guardian,
-                    function="personal_wallet_recovery_handler",
+                    extra={
+                        "error_type": "ValidationError",
+                        "error": str(ve),
+                        "guardian": guardian,
+                        "function": "personal_wallet_recovery_handler"
+                    }
                 )
                 return (
                     jsonify(
@@ -364,10 +368,12 @@ class AIAPIHandler:
         except ValidationError as ve:
             logger.warning(
                 "Invalid region in node setup request",
-                error_type="ValidationError",
-                error=str(ve),
-                region=region,
-                function="personal_node_setup_handler",
+                extra={
+                    "error_type": "ValidationError",
+                    "error": str(ve),
+                    "region": region,
+                    "function": "personal_node_setup_handler"
+                }
             )
             return (
                 jsonify({"success": False, "error": "INVALID_REGION", "message": str(ve)}),
@@ -415,10 +421,12 @@ class AIAPIHandler:
         except ValidationError as ve:
             logger.warning(
                 "Invalid pool name in liquidity pool alert",
-                error_type="ValidationError",
-                error=str(ve),
-                pool_name=pool_name,
-                function="personal_liquidity_pool_alerts_handler",
+                extra={
+                    "error_type": "ValidationError",
+                    "error": str(ve),
+                    "pool_name": pool_name,
+                    "function": "personal_liquidity_pool_alerts_handler"
+                }
             )
             return (
                 jsonify({"success": False, "error": "INVALID_POOL_NAME", "message": str(ve)}),
@@ -596,10 +604,12 @@ class AIAPIHandler:
         except ValidationError as ve:
             logger.warning(
                 "Invalid user address in personal AI context",
-                error_type="ValidationError",
-                error=str(ve),
-                user_address=user_address,
-                function="_personal_ai_context",
+                extra={
+                    "error_type": "ValidationError",
+                    "error": str(ve),
+                    "user_address": user_address,
+                    "function": "_personal_ai_context"
+                }
             )
             return {"success": False, "error": "INVALID_ADDRESS", "message": str(ve)}
 
