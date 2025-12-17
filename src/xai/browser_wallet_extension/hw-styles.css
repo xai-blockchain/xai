@@ -1,0 +1,493 @@
+/**
+ * Hardware Wallet UI Styles for XAI Browser Extension
+ *
+ * Provides styling for hardware wallet connection, status, and signing flows.
+ * Matches the existing dark theme and maintains visual consistency.
+ */
+
+/* Hardware Wallet Section */
+.hw-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Hardware Wallet Status Indicator */
+.hw-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.hw-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.hw-status--connected {
+  background: rgba(94, 226, 251, 0.15);
+  color: #5fe2fb;
+}
+
+.hw-status--connected::before {
+  background: #5fe2fb;
+  box-shadow: 0 0 8px rgba(94, 226, 251, 0.8);
+  animation: hw-pulse 2s ease-in-out infinite;
+}
+
+.hw-status--disconnected {
+  background: rgba(255, 255, 255, 0.05);
+  color: #919bbf;
+}
+
+.hw-status--disconnected::before {
+  background: #606580;
+}
+
+@keyframes hw-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* Hardware Wallet Address Display */
+.hw-address-display {
+  font-size: 11px;
+  color: #c5d7ff;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-family: 'Courier New', monospace;
+  margin-bottom: 8px;
+}
+
+/* Hardware Wallet Buttons */
+.hw-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hw-button--connect {
+  background: linear-gradient(120deg, #7b4ef5, #9b6efb);
+  color: #ffffff;
+}
+
+.hw-button--connect:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(123, 78, 245, 0.4);
+}
+
+.hw-button--disconnect {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.hw-button--disconnect:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Connection Modal */
+.hw-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 12, 24, 0.85);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 2000;
+  animation: hw-modal-fade-in 0.2s ease-out;
+}
+
+@keyframes hw-modal-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.hw-modal__content {
+  background: linear-gradient(135deg, rgba(11, 27, 43, 0.98), rgba(9, 17, 34, 0.98));
+  border: 1px solid rgba(123, 78, 245, 0.3);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(123, 78, 245, 0.2);
+  animation: hw-modal-slide-up 0.3s ease-out;
+}
+
+@keyframes hw-modal-slide-up {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.hw-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.hw-modal__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.hw-modal__close {
+  background: none;
+  border: none;
+  color: #919bbf;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.hw-modal__close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+/* Device Selection */
+.hw-device-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hw-device-option {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hw-device-option:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(123, 78, 245, 0.5);
+  transform: translateY(-2px);
+}
+
+.hw-device-option:active {
+  transform: translateY(0);
+}
+
+.hw-device-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.hw-device-icon--ledger {
+  background: linear-gradient(135deg, #3844f7, #5865f2);
+}
+
+.hw-device-icon--trezor {
+  background: linear-gradient(135deg, #01b757, #00d863);
+}
+
+.hw-device-info {
+  flex: 1;
+}
+
+.hw-device-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0 0 4px 0;
+}
+
+.hw-device-description {
+  font-size: 12px;
+  color: #919bbf;
+  margin: 0;
+}
+
+/* Connecting View */
+.hw-connecting {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.hw-connecting__spinner {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 16px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #7b4ef5;
+  border-radius: 50%;
+  animation: hw-spin 1s linear infinite;
+}
+
+@keyframes hw-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.hw-connecting__text {
+  font-size: 14px;
+  color: #c5d7ff;
+  margin-bottom: 8px;
+}
+
+.hw-connecting__device {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.hw-connecting__instructions {
+  font-size: 12px;
+  color: #919bbf;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+/* Modal Messages */
+.hw-modal__message {
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-top: 12px;
+  line-height: 1.4;
+}
+
+.hw-modal__error {
+  background: rgba(255, 82, 82, 0.1);
+  border: 1px solid rgba(255, 82, 82, 0.3);
+  color: #ff8ea2;
+}
+
+.hw-modal__success {
+  background: rgba(94, 226, 251, 0.1);
+  border: 1px solid rgba(94, 226, 251, 0.3);
+  color: #5fe2fb;
+}
+
+/* Signing Prompt */
+.hw-signing-prompt {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 12, 24, 0.9);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 2000;
+  animation: hw-modal-fade-in 0.2s ease-out;
+}
+
+.hw-signing-prompt__content {
+  background: linear-gradient(135deg, rgba(11, 27, 43, 0.98), rgba(9, 17, 34, 0.98));
+  border: 1px solid rgba(94, 226, 251, 0.3);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 520px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(94, 226, 251, 0.2);
+  animation: hw-modal-slide-up 0.3s ease-out;
+}
+
+.hw-signing-prompt__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 16px 0;
+  text-align: center;
+}
+
+.hw-signing-prompt__device {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(123, 78, 245, 0.2);
+  border-radius: 12px;
+  font-weight: 600;
+  color: #9b6efb;
+}
+
+.hw-signing-prompt__device::before {
+  content: '🔐';
+  font-size: 14px;
+}
+
+.hw-signing-status {
+  text-align: center;
+  padding: 16px;
+  border-radius: 8px;
+  margin: 16px 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.hw-signing-status--waiting {
+  background: rgba(255, 255, 255, 0.05);
+  color: #c5d7ff;
+}
+
+.hw-signing-status--waiting::before {
+  content: '⏳';
+  display: block;
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.hw-signing-status--success {
+  background: rgba(94, 226, 251, 0.1);
+  color: #5fe2fb;
+}
+
+.hw-signing-status--success::before {
+  content: '✓';
+  display: block;
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.hw-signing-status--error {
+  background: rgba(255, 82, 82, 0.1);
+  color: #ff8ea2;
+}
+
+.hw-signing-status--error::before {
+  content: '✗';
+  display: block;
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.hw-signing-payload {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  color: #c5d7ff;
+  max-height: 200px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Utility Classes */
+.hidden {
+  display: none !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 400px) {
+  .hw-modal__content,
+  .hw-signing-prompt__content {
+    padding: 20px 16px;
+    max-width: 100%;
+  }
+
+  .hw-device-option {
+    padding: 12px;
+  }
+
+  .hw-device-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
+
+  .hw-device-name {
+    font-size: 14px;
+  }
+
+  .hw-device-description {
+    font-size: 11px;
+  }
+}
+
+/* Accessibility */
+.hw-modal[aria-hidden="true"],
+.hw-signing-prompt[aria-hidden="true"] {
+  display: none;
+}
+
+/* Focus states for keyboard navigation */
+.hw-device-option:focus,
+.hw-button:focus,
+.hw-modal__close:focus {
+  outline: 2px solid #7b4ef5;
+  outline-offset: 2px;
+}
+
+/* Smooth scrolling for overflow areas */
+.hw-signing-payload {
+  scroll-behavior: smooth;
+}
+
+.hw-signing-payload::-webkit-scrollbar {
+  width: 6px;
+}
+
+.hw-signing-payload::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 3px;
+}
+
+.hw-signing-payload::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.hw-signing-payload::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
