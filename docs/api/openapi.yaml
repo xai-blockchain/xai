@@ -15,7 +15,7 @@ info:
     name: MIT
     url: https://opensource.org/licenses/MIT
 servers:
-- url: http://localhost:5000
+- url: http://localhost:12001
   description: Local development
 - url: https://testnet-api.xai-blockchain.io
   description: Testnet

@@ -333,7 +333,7 @@ python examples/atomic_swap_example.py
 ```bash
 # API configuration
 export XAI_API_KEY="your-api-key"
-export XAI_API_URL="http://localhost:5000"
+export XAI_API_URL="http://localhost:12001"
 export XAI_TIMEOUT="30"
 ```
 

@@ -103,7 +103,7 @@ import {
 } from '@xai/react-native-sdk';
 
 const client = new XAIClient({
-  baseUrl: 'http://localhost:5000',
+  baseUrl: 'http://localhost:12001',
 });
 
 function App() {
@@ -199,7 +199,7 @@ Main client for interacting with XAI blockchain nodes.
 import { XAIClient } from '@xai/react-native-sdk';
 
 const client = new XAIClient({
-  baseUrl: 'http://localhost:5000',
+  baseUrl: 'http://localhost:12001',
   timeout: 30000,
   retries: 3,
   retryDelay: 1000,

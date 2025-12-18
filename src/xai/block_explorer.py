@@ -139,7 +139,7 @@ allowed_origins = get_allowed_origins()
 CORS(app, origins=allowed_origins)
 
 # Configuration
-NODE_URL = os.getenv("XAI_NODE_URL", "http://localhost:8545")
+NODE_URL = os.getenv("XAI_NODE_URL", "http://localhost:12001")
 
 
 def get_from_node(endpoint: str, use_cache: bool = True) -> Optional[Dict[str, Any]]:

@@ -1203,7 +1203,7 @@ npm install
 npm run dev
 
 # 5. Access explorer
-# Frontend: http://localhost:3000
+# Frontend: http://localhost:12080
 # Backend API: http://localhost:8000
 # API Docs: http://localhost:8000/docs
 ```
@@ -1257,7 +1257,7 @@ kubectl get pods -n xai-explorer
 #### 1. Create Test AI Task
 ```bash
 # Submit AI task via XAI node
-curl -X POST http://localhost:8545/ai/task \
+curl -X POST http://localhost:12001/ai/task \
   -H "Content-Type: application/json" \
   -d '{
     "task_type": "security_audit",

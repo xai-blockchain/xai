@@ -220,16 +220,16 @@ kubectl cluster-info
 ### Check Blockchain Node Health
 ```bash
 # Get node status
-kubectl exec -it xai-blockchain-node-0 -n xai-blockchain -- curl http://localhost:8546/health
+kubectl exec -it xai-blockchain-node-0 -n xai-blockchain -- curl http://localhost:12001/health
 
 # Check logs for errors
 kubectl logs xai-blockchain-node-0 -n xai-blockchain | grep -i error
 
 # Check connected peers
-kubectl exec -it xai-blockchain-node-0 -n xai-blockchain -- curl http://localhost:8546/peers
+kubectl exec -it xai-blockchain-node-0 -n xai-blockchain -- curl http://localhost:12001/peers
 
 # Check block height
-kubectl exec -it xai-blockchain-node-0 -n xai-blockchain -- curl http://localhost:8546/block_height
+kubectl exec -it xai-blockchain-node-0 -n xai-blockchain -- curl http://localhost:12001/block_height
 ```
 
 ### Monitor Resources

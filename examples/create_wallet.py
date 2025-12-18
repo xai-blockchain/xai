@@ -25,7 +25,7 @@ def main():
     
     # Initialize client (connects to local node by default)
     client = XAIClient(
-        base_url="http://localhost:5000"
+        base_url="http://localhost:12001"
     )
     
     try:

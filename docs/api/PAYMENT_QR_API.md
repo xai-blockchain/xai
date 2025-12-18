@@ -362,12 +362,96 @@ Or install manually:
 pip install 'qrcode[pil]>=7.4.0'
 ```
 
+### POST /payment/verify
+
+Verify a payment transaction against a payment request.
+
+**Request Body:**
+```json
+{
+  "request_id": "uuid",
+  "txid": "tx123...",
+  "sender": "XAI1...",
+  "recipient": "XAI2...",
+  "amount": 100.50,
+  "timestamp": 1703001234,
+  "confirmations": 6
+}
+```
+
+**Fields:**
+- `request_id` (optional): Payment request ID to verify against
+- `txid` (required): Transaction ID
+- `sender` (required): Sender address
+- `recipient` (required): Recipient address
+- `amount` (required): Transaction amount
+- `timestamp` (required): Transaction timestamp
+- `confirmations` (optional): Number of confirmations
+
+**Response (200 OK) - Valid:**
+```json
+{
+  "valid": true,
+  "verified": true,
+  "request_id": "uuid",
+  "txid": "tx123...",
+  "amount": 100.50,
+  "recipient": "XAI2...",
+  "confirmations": 6,
+  "status": "paid",
+  "message": "Payment verified successfully"
+}
+```
+
+**Response (200 OK) - Invalid:**
+```json
+{
+  "valid": false,
+  "verified": false,
+  "error": "Amount mismatch",
+  "error_code": "amount_mismatch",
+  "expected": 100.50,
+  "received": 95.00
+}
+```
+
+**Example:**
+```bash
+curl -X POST http://localhost:12001/payment/verify \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request_id": "uuid-here",
+    "txid": "tx123abc",
+    "recipient": "XAI1234567890abcdef1234567890abcdef12345678",
+    "amount": 100.50,
+    "timestamp": 1703001234
+  }'
+```
+
+## Merchant Integration
+
+For production merchant applications, see the comprehensive merchant integration guide:
+
+**[Merchant Integration Guide](MERCHANT_INTEGRATION.md)**
+
+The merchant guide covers:
+- MerchantPaymentProcessor API
+- Webhook notifications
+- Payment verification
+- Point of sale integration
+- E-commerce checkout flow
+- Production deployment best practices
+
 ## Testing
 
 Run the comprehensive test suite:
 
 ```bash
+# Payment QR API tests
 pytest tests/xai_tests/unit/test_payment_qr.py -v
+
+# Merchant payment processor tests
+pytest tests/xai_tests/unit/test_merchant_payment_processor.py -v
 ```
 
 Tests cover:
@@ -375,5 +459,8 @@ Tests cover:
 - Payment requests with various parameters
 - Payment tracking and status updates
 - URI parsing and validation
+- Payment verification
+- Webhook notifications
+- Event handlers
 - Error handling for invalid inputs
 - Edge cases and boundary conditions

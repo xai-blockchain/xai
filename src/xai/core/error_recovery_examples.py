@@ -254,7 +254,7 @@ def example_api_usage():
     """
     import requests
 
-    base_url = "http://localhost:5000"
+    base_url = "http://localhost:12001"
 
     # Get recovery status
     response = requests.get(f"{base_url}/recovery/status", timeout=30)

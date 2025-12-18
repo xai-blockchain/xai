@@ -232,13 +232,13 @@ kubectl get pods -n xai-blockchain -w
    kubectl port-forward -n xai-blockchain svc/xai-blockchain-rpc 8546:8546
 
    # Test RPC endpoint
-   curl http://localhost:8546/health
+   curl http://localhost:12001/health
    ```
 
 3. **Set Up Monitoring**
    ```bash
    kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
-   # Access http://localhost:3000 (admin/prom-operator)
+   # Access http://localhost:12030 (admin/prom-operator)
    ```
 
 4. **Configure Backups**

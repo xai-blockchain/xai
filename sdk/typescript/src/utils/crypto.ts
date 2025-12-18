@@ -49,9 +49,11 @@ export function generateAddress(publicKeyHex: string): string {
 export async function signMessage(privateKeyHex: string, message: string): Promise<string> {
   const privateKey = Buffer.from(privateKeyHex, 'hex');
   const messageHash = sha256(Buffer.from(message, 'utf-8'));
-  
+
   const signature = await secp256k1.signAsync(messageHash, privateKey);
-  return Buffer.from(signature).toString('hex');
+  // Convert Signature object to compact format (64 bytes)
+  const compactSig = signature.toCompactRawBytes();
+  return Buffer.from(compactSig).toString('hex');
 }
 
 /**
@@ -65,8 +67,10 @@ export async function verifySignature(
   try {
     const publicKey = Buffer.from(publicKeyHex, 'hex');
     const messageHash = sha256(Buffer.from(message, 'utf-8'));
-    const signature = Buffer.from(signatureHex, 'hex');
-    
+    const signatureBytes = Buffer.from(signatureHex, 'hex');
+
+    // Create Signature object from compact bytes
+    const signature = secp256k1.Signature.fromCompact(signatureBytes);
     return secp256k1.verify(signature, messageHash, publicKey);
   } catch (error) {
     return false;

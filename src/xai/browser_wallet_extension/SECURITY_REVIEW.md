@@ -76,9 +76,9 @@ grep -r "document.write" *   # No matches
 - [x] **Certificate validation**: Browser-enforced HTTPS validation
 
 **Host Permissions**:
-- `http://localhost:8545/*` - Local XAI node (development)
+- `http://localhost:12001/*` - Local XAI node (development)
 - `http://127.0.0.1:8545/*` - Local XAI node (alternative)
-- `http://localhost:18545/*` - Alternative port
+- `http://localhost:12001/*` - Alternative port
 - `http://127.0.0.1:18545/*` - Alternative port
 - `https://connect.trezor.io/*` - Official Trezor Connect service
 

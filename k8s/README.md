@@ -300,7 +300,7 @@ kubectl get svc -n monitoring
 # Port-forward to Grafana
 kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80
 
-# Access at http://localhost:3000
+# Access at http://localhost:12030
 # Default credentials: admin/prom-operator
 ```
 

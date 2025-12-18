@@ -8,7 +8,7 @@ import { XAIClient, Wallet } from '@xai/sdk';
 async function main() {
   // Initialize client
   const client = new XAIClient({
-    baseUrl: 'http://localhost:5000',
+    baseUrl: 'http://localhost:12001',
     wsUrl: 'ws://localhost:5000/ws',
   });
 

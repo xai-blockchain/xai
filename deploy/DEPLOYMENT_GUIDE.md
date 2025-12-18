@@ -431,7 +431,7 @@ EOF
 
 ### Grafana Dashboards
 
-1. Navigate to http://localhost:3000
+1. Navigate to http://localhost:12030
 2. Login with default credentials (admin/admin)
 3. Add Prometheus datasource
 4. Import XAI dashboards from `deploy/ansible/roles/monitoring/files/dashboards/`

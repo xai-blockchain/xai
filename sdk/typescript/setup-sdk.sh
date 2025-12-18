@@ -113,7 +113,7 @@ npm install @xai/sdk
 import { XAIClient } from '@xai/sdk';
 
 const client = new XAIClient({
-  baseUrl: 'http://localhost:5000'
+  baseUrl: 'http://localhost:12001'
 });
 
 const wallet = await client.wallet.create();

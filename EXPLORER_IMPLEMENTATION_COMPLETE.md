@@ -155,7 +155,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Set environment variables (optional)
-export XAI_NODE_URL=http://localhost:8545
+export XAI_NODE_URL=http://localhost:12001
 export PORT=8000
 
 # Run server
@@ -191,8 +191,8 @@ Services:
 Create `.env` file:
 ```bash
 DATABASE_URL=postgresql://xai:xai@localhost:5432/xai_explorer
-XAI_NODE_URL=http://localhost:8545
-CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+XAI_NODE_URL=http://localhost:12001
+CORS_ORIGINS=http://localhost:12030,http://localhost:5173
 HOST=0.0.0.0
 PORT=8000
 REDIS_URL=redis://localhost:6379
@@ -201,9 +201,9 @@ LOG_LEVEL=INFO
 
 Or use defaults:
 - Database: In-memory (for testing)
-- Node: http://localhost:8545
+- Node: http://localhost:12001
 - Port: 8000
-- CORS: localhost:3000, localhost:5173
+- CORS: localhost:12080, localhost:5173
 
 ---
 

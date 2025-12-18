@@ -103,8 +103,8 @@ from xai.core.security_middleware import setup_security_middleware, SecurityConf
 
 security_config = SecurityConfig()
 security_config.CORS_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:5000",
+    "http://localhost:12080",
+    "http://localhost:12080",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:5000",
     "https://127.0.0.1:3443",
@@ -113,7 +113,7 @@ security_config.CORS_ORIGINS = [
 security_middleware = setup_security_middleware(app, config=security_config, enable_cors=True)
 
 # Node API endpoint
-NODE_URL = os.getenv("XAI_API_URL", "http://localhost:5000")
+NODE_URL = os.getenv("XAI_API_URL", "http://localhost:12080")
 PUBLIC_NODE_URL = os.getenv("XAI_PUBLIC_NODE_URL", NODE_URL)
 PUBLIC_DASHBOARD_ORIGIN = os.getenv("XAI_PUBLIC_DASHBOARD_ORIGIN", "http://127.0.0.1:3000")
 

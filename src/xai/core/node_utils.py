@@ -32,7 +32,7 @@ def get_allowed_origins() -> List[str]:
     Example:
         >>> origins = get_allowed_origins()
         >>> print(origins)
-        ['http://localhost:3000', 'https://app.xai.io']
+        ['http://localhost:12080', 'https://app.xai.io']
     """
     cors_config_path = os.path.join(os.path.dirname(__file__), "..", "..", "config", "cors.yaml")
     if os.path.exists(cors_config_path):

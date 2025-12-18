@@ -61,7 +61,7 @@ def _cli_fail(exc: Exception, exit_code: int = 1) -> None:
     sys.exit(exit_code)
 
 # Default configuration
-DEFAULT_NODE_URL = "http://localhost:18545"
+DEFAULT_NODE_URL = "http://localhost:12001"
 DEFAULT_TIMEOUT = 30.0
 DEFAULT_DATA_DIR = Path(os.getenv("XAI_DATA_DIR", os.path.expanduser("~/.xai"))).expanduser()
 

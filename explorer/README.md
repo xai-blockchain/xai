@@ -61,8 +61,8 @@ Access API docs at: http://localhost:8000/docs
 Create `.env` file:
 ```
 DATABASE_URL=postgresql://xai:xai@localhost/xai_explorer
-XAI_NODE_URL=http://localhost:8545
-CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+XAI_NODE_URL=http://localhost:12001
+CORS_ORIGINS=http://localhost:12080,http://localhost:5173
 PORT=8000
 HOST=0.0.0.0
 ```

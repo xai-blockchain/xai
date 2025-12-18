@@ -37,7 +37,7 @@ export class BiometricAuth {
   /**
    * Get the type of biometric authentication available
    */
-  async getBiometricType(): Promise<BiometryTypes | null> {
+  async getBiometricType(): Promise<string | null> {
     try {
       const { available, biometryType } =
         await this.rnBiometrics.isSensorAvailable();

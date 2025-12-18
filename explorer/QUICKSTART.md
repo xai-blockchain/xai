@@ -57,8 +57,8 @@ curl http://localhost:8000/api/v1/analytics/network
 
 Default settings (no config needed):
 - Port: 8000
-- Node: http://localhost:8545
-- CORS: localhost:3000, localhost:5173
+- Node: http://localhost:12001
+- CORS: localhost:12080, localhost:5173
 
 Custom settings (optional):
 ```bash

@@ -17,7 +17,7 @@ All personal AI endpoints authenticate via headers so that the wallet never ship
 
 ## Example Fetch
 ```javascript
-const personalAiBase = 'http://localhost:8545/personal-ai';
+const personalAiBase = 'http://localhost:12001/personal-ai';
 
 async function requestAtomicSwap({userAddress, apiKey, provider, model, swapDetails}) {
   const response = await fetch(`${personalAiBase}/atomic-swap`, {
@@ -55,7 +55,7 @@ Personal AI endpoints share the assistant’s internal rate limits (`100/hour`, 
 ## Verification Tips
 - After a successful request, inspect the `ai_analysis` object to show atomic swap instructions.
 - Check `swap_transaction` or `contract_code` in the payload before presenting it to the user.
-- For integration testing, wire the wallet to the `http://localhost:8545/personal-ai` base URL or your deployed node, and replay requests using the snippet above.
+- For integration testing, wire the wallet to the `http://localhost:12001/personal-ai` base URL or your deployed node, and replay requests using the snippet above.
 
 ## Key Lifecycle & Deletion Assurance
 

@@ -11,11 +11,11 @@
 - Save and share the dashboard URL so the community can continuously monitor AI task throughput.
 
 ## Alerts
-Adjust your alertmanager to load `alerts/ai_bridge.rules` (see the provided file) so `AITokensHigh` fires when tokens spike beyond 100k in an hour. Pair the rule with `tools/ai_alert.py --base-url http://localhost:8545 --token-threshold 50000 --webhook https://hooks.example/ai` so Prometheus alerts reach your Slack/Teams webhook.
+Adjust your alertmanager to load `alerts/ai_bridge.rules` (see the provided file) so `AITokensHigh` fires when tokens spike beyond 100k in an hour. Pair the rule with `tools/ai_alert.py --base-url http://localhost:12001 --token-threshold 50000 --webhook https://hooks.example/ai` so Prometheus alerts reach your Slack/Teams webhook.
 
 ## CLI Helpers
-- `python tools/ai_inspect.py --base-url http://localhost:8545` prints bridge status, tasks, and metrics repeatedly (optionally `--watch`).
-- `python tools/ai_alert.py --base-url http://localhost:8545 --token-threshold 50000 --webhook https://hooks.example/ai` triggers alerts when token usage exceeds thresholds.
+- `python tools/ai_inspect.py --base-url http://localhost:12001` prints bridge status, tasks, and metrics repeatedly (optionally `--watch`).
+- `python tools/ai_alert.py --base-url http://localhost:12001 --token-threshold 50000 --webhook https://hooks.example/ai` triggers alerts when token usage exceeds thresholds.
 - `bash tools/run_monitoring.sh` can be scheduled (cron/systemd) so monitoring reports/alerts run every 5 minutes.
 
 ## CI Integration

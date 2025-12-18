@@ -27,7 +27,7 @@ class BlockchainIndexer:
             node_url = f"http://{node_url}"
         parsed = urlparse(node_url)
         if not parsed.scheme or not parsed.netloc:
-            raise ValueError("node_url must include scheme and host, e.g. http://localhost:18545")
+            raise ValueError("node_url must include scheme and host, e.g. http://localhost:12001")
 
         self.db = db
         self.node_url = node_url

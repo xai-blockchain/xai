@@ -60,7 +60,7 @@ docker-compose logs -f xai-node
 
 - API: http://localhost:8080
 - Block Explorer: http://localhost:8082
-- Grafana: http://localhost:3000
+- Grafana: http://localhost:12030
 - Prometheus: http://localhost:9091
 
 ### Testnet Setup
@@ -251,7 +251,7 @@ Key metrics:
 
 ### Grafana Dashboards
 
-Access Grafana at http://localhost:3000 (admin/admin)
+Access Grafana at http://localhost:12030 (admin/admin)
 
 Pre-configured dashboards:
 - **Node Overview**: General node health

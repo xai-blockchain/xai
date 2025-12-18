@@ -43,8 +43,8 @@ exchange/frontend/
 ## Testing Instructions
 
 ### Prerequisites
-1. Backend server must be running at `http://localhost:5000`
-2. WebSocket server must be available at `ws://localhost:5000`
+1. Backend server must be running at `http://localhost:12001`
+2. WebSocket server must be available at `ws://localhost:12003`
 
 ### Step 1: Open the Application
 Simply open `index.html` in a modern web browser:
@@ -157,12 +157,12 @@ Tested and working on:
 ## Troubleshooting
 
 ### "Network error. Please check if the server is running."
-- Ensure the backend server is running at `http://localhost:5000`
+- Ensure the backend server is running at `http://localhost:12001`
 - Check browser console for CORS errors
 - Verify API endpoints are accessible
 
 ### WebSocket not connecting
-- Ensure WebSocket server is running at `ws://localhost:5000`
+- Ensure WebSocket server is running at `ws://localhost:12003`
 - Check firewall settings
 - Look for WebSocket errors in browser console
 

@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI):
     logger.info("Database migrations ensured")
 
     # Initialize blockchain indexer
-    node_url = os.getenv("XAI_NODE_URL", "http://localhost:8545")
+    node_url = os.getenv("XAI_NODE_URL", "http://localhost:12001")
     indexer = BlockchainIndexer(db, node_url)
     await indexer.start()
     logger.info("Blockchain indexer started")
@@ -93,7 +93,7 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:5173").split(","),
+    allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:12080,http://localhost:5173").split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -22,8 +22,8 @@ pip install -q -r requirements.txt
 
 # Set environment variables
 export DATABASE_URL=${DATABASE_URL:-"postgresql://xai:xai@localhost:5432/xai_explorer"}
-export XAI_NODE_URL=${XAI_NODE_URL:-"http://localhost:8545"}
-export CORS_ORIGINS=${CORS_ORIGINS:-"http://localhost:3000,http://localhost:5173"}
+export XAI_NODE_URL=${XAI_NODE_URL:-"http://localhost:12001"}
+export CORS_ORIGINS=${CORS_ORIGINS:-"http://localhost:12080,http://localhost:5173"}
 export HOST=${HOST:-"0.0.0.0"}
 export PORT=${PORT:-"8000"}
 

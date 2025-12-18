@@ -27,7 +27,6 @@ from enum import Enum
 
 from eth_utils import keccak, to_bytes, to_hex
 import rlp
-from rlp.sedes import big_endian_int, Binary, binary
 
 logger = logging.getLogger(__name__)
 
@@ -130,27 +129,29 @@ class EVMBlockHeader:
 
     def rlp_encode(self) -> bytes:
         """RLP encode the header for hashing"""
+        # Simple RLP encoding without sedes for production use
+        # In production, would use proper Ethereum header encoding
         fields = [
-            Binary.fixed_length(32, allow_empty=False)(self.parent_hash),
-            Binary.fixed_length(32, allow_empty=False)(self.uncle_hash),
-            Binary.fixed_length(20, allow_empty=False)(self.coinbase),
-            Binary.fixed_length(32, allow_empty=False)(self.state_root),
-            Binary.fixed_length(32, allow_empty=False)(self.transactions_root),
-            Binary.fixed_length(32, allow_empty=False)(self.receipts_root),
-            Binary.fixed_length(256, allow_empty=False)(self.logs_bloom),
-            big_endian_int(self.difficulty),
-            big_endian_int(self.number),
-            big_endian_int(self.gas_limit),
-            big_endian_int(self.gas_used),
-            big_endian_int(self.timestamp),
-            binary(self.extra_data),
-            Binary.fixed_length(32, allow_empty=False)(self.mix_hash),
-            Binary.fixed_length(8, allow_empty=False)(self.nonce),
+            self.parent_hash,
+            self.uncle_hash,
+            self.coinbase,
+            self.state_root,
+            self.transactions_root,
+            self.receipts_root,
+            self.logs_bloom,
+            self.difficulty,
+            self.number,
+            self.gas_limit,
+            self.gas_used,
+            self.timestamp,
+            self.extra_data,
+            self.mix_hash,
+            self.nonce,
         ]
 
         # Add base_fee_per_gas if present (post-London)
         if self.base_fee_per_gas is not None:
-            fields.append(big_endian_int(self.base_fee_per_gas))
+            fields.append(self.base_fee_per_gas)
 
         return rlp.encode(fields)
 
@@ -495,10 +496,10 @@ class EVMLightClient:
 
         # RLP encode account data
         account_data = rlp.encode([
-            big_endian_int(proof.nonce),
-            big_endian_int(proof.balance),
-            Binary.fixed_length(32)(proof.storage_hash),
-            Binary.fixed_length(32)(proof.code_hash),
+            proof.nonce,
+            proof.balance,
+            proof.storage_hash,
+            proof.code_hash,
         ])
 
         # Verify Merkle-Patricia proof
@@ -629,7 +630,7 @@ class EVMLightClient:
 
     def get_latest_header(self) -> Optional[EVMBlockHeader]:
         """Get latest verified header"""
-        if self.latest_verified_height == 0:
+        if not self.headers:
             return None
         return self.headers.get(self.latest_verified_height)
 

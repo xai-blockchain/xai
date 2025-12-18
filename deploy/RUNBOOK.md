@@ -106,7 +106,7 @@ curl 'http://localhost:9091/api/v1/query_range?query=blockchain_height&start=170
 
 ### Grafana Dashboards
 
-**Access**: http://localhost:3000
+**Access**: http://localhost:12030
 
 Default login: admin/admin
 

@@ -8,7 +8,7 @@ import httpx
 router = APIRouter()
 
 # XAI Node connection
-node_url = "http://localhost:8545"
+node_url = "http://localhost:12001"
 
 
 @router.get("/blocks")

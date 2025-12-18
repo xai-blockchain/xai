@@ -52,31 +52,36 @@ The wizard will guide you through:
 - **Raspberry Pi/IoT:** [Lightweight Node Guide](docs/user-guides/lightweight_node_guide.md)
 - **Light Client:** [Light Client Mode](docs/user-guides/light_client_mode.md) (SPV, minimal resources)
 
-### 💧 Testnet Faucet
+### 💧 Testnet Faucet - Get Free XAI
 
-Get free testnet XAI tokens instantly for development and testing.
+**Official Public Faucet:** https://faucet.xai.network
 
-#### Quick Access
+Get 100 free testnet XAI tokens instantly for testing and development!
 
-**CLI Method (Recommended):**
+#### Quick Access Methods
+
+**1. Web UI (Easiest):**
+```
+Visit: https://faucet.xai.network
+Enter your TXAI address
+Click "Request Tokens"
+```
+
+**2. Command Line:**
 ```bash
 python src/xai/wallet/cli.py request-faucet --address TXAI_YOUR_ADDRESS
 ```
 
-**API Method:**
+**3. Direct API Call:**
 ```bash
+curl -X POST https://faucet.xai.network/claim \
+  -H "Content-Type: application/json" \
+  -d '{"address": "TXAI_YOUR_ADDRESS"}'
+
+# Or local node faucet:
 curl -X POST http://localhost:12001/faucet/claim \
   -H "Content-Type: application/json" \
   -d '{"address": "TXAI_YOUR_ADDRESS"}'
-```
-
-**Web UI:**
-Open the standalone faucet web interface:
-```bash
-# Start the faucet web UI (requires Docker)
-cd docker/faucet
-docker-compose up -d
-# Access at http://localhost:8086
 ```
 
 #### Faucet Specifications
@@ -84,10 +89,11 @@ docker-compose up -d
 | Parameter | Value |
 |-----------|-------|
 | **Amount** | 100 XAI per request |
-| **Rate Limit** | 1 request per hour per address |
-| **Delivery** | Next block (~2 minutes) |
-| **Endpoint** | `http://localhost:12001/faucet/claim` |
-| **Web UI Port** | 8086 (Docker) |
+| **Rate Limit** | 1 request per address per hour |
+| **Delivery Time** | Next block (~2 minutes) |
+| **Token Value** | Testnet only - no real value |
+| **Public Faucet** | https://faucet.xai.network |
+| **Local Endpoint** | `http://localhost:12001/faucet/claim` |
 
 **Note:** Testnet XAI has no real value. Use it freely for development and testing.
 
@@ -472,9 +478,11 @@ pre-commit run --all-files
 
 ### Getting Started
 
-- **[Quick Start Guide](docs/QUICK_START.md)** - Get up and running in 5 minutes
-- **[Testnet Guide](docs/user-guides/TESTNET_GUIDE.md)** - Join the testnet, use the faucet, and explore
-- **[Light Client Guide](docs/user-guides/LIGHT_CLIENT_GUIDE.md)** - Run a lightweight node (Raspberry Pi, mobile)
+- **[QUICKSTART Guide](docs/QUICKSTART.md)** ⭐ - THE complete beginner's guide (5 minutes)
+- **[Mobile Quick Start](docs/user-guides/mobile_quickstart.md)** - React Native & Flutter SDK setup
+- **[Lightweight Node Guide](docs/user-guides/lightweight_node_guide.md)** - Raspberry Pi, IoT devices
+- **[Light Client Mode](docs/user-guides/light_client_mode.md)** - SPV mode for minimal resources
+- **[Testnet Guide](docs/user-guides/TESTNET_GUIDE.md)** - Join the testnet, use the faucet, explore
 - **[Wallet Setup](docs/user-guides/wallet-setup.md)** - Advanced wallet features and security
 - **[Mining Guide](docs/user-guides/mining.md)** - Start mining on XAI
 

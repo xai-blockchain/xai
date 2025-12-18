@@ -14,7 +14,6 @@ import {
   PushNotificationConfig,
   NotificationPayload,
   NotificationType,
-  StorageError,
 } from '../types';
 import { SecureStorage, getSecureStorage } from './SecureStorage';
 
@@ -92,7 +91,7 @@ export class PushNotifications {
    * Subscribe to a notification topic
    * Override this method to integrate with your Firebase setup
    */
-  async subscribeToTopic(topic: string): Promise<void> {
+  async subscribeToTopic(_topic: string): Promise<void> {
     // This is a placeholder - implement with Firebase Messaging
     console.warn(
       'PushNotifications.subscribeToTopic() needs Firebase implementation'

@@ -57,7 +57,7 @@ from xai.core.hardware_wallet import (
 # Configure module logger
 logger = logging.getLogger(__name__)
 
-DEFAULT_API_URL = os.getenv("XAI_API_URL", "http://localhost:18545")
+DEFAULT_API_URL = os.getenv("XAI_API_URL", "http://localhost:12001")
 DEFAULT_KEYSTORE_DIR = Path.home() / ".xai" / "keystores"
 TWO_FACTOR_STORE = TwoFactorProfileStore()
 

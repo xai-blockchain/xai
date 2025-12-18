@@ -32,7 +32,7 @@ import { XAIClient } from '@xai/sdk';
 
 // Create client
 const client = new XAIClient({
-  baseUrl: 'http://localhost:5000',
+  baseUrl: 'http://localhost:12001',
   apiKey: 'your-api-key', // optional
 });
 
@@ -61,7 +61,7 @@ console.log('Transaction confirmed!');
 
 ```typescript
 const client = new XAIClient({
-  baseUrl: 'http://localhost:5000',    // API base URL
+  baseUrl: 'http://localhost:12001',    // API base URL
   apiKey: 'your-api-key',              // Optional API key
   timeout: 30000,                       // Request timeout (ms)
   maxRetries: 3,                        // Max retry attempts
@@ -267,7 +267,7 @@ console.log('Total votes:', votes.totalVotes);
 
 ```typescript
 // Connect to WebSocket
-client.connectWebSocket('ws://localhost:5000/ws');
+client.connectWebSocket('ws://localhost:12003');
 
 // Listen for new blocks
 client.on('new_block', (block) => {
@@ -394,7 +394,7 @@ client.connectWebSocket('wss://api.xai-blockchain.io/ws');
 import { XAIClient } from '@xai/sdk';
 
 const client = new XAIClient({
-  baseUrl: 'http://localhost:5000',
+  baseUrl: 'http://localhost:12001',
   timeout: 60000, // 60 seconds
   maxRetries: 5,
   retryDelay: 1000, // 1 second initial delay

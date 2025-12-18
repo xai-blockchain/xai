@@ -97,6 +97,7 @@ from xai.core.api_routes import (
     register_payment_routes,
     register_notification_routes,
     register_sync_routes,
+    register_light_client_routes,
 )
 from xai.core.api_routes.blockchain import _block_to_payload, _build_block_summary
 
@@ -653,6 +654,7 @@ class NodeAPIRoutes:
         register_payment_routes(self)
         register_notification_routes(self)
         register_sync_routes(self)
+        register_light_client_routes(self)
         register_admin_routes(self)
 
     def _log_event(self, event_type: str, payload: Optional[Dict[str, Any]] = None, severity: str = "INFO") -> None:

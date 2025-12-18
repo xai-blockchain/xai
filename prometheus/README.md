@@ -103,12 +103,12 @@ cd C:\grafana\bin
 grafana-server
 ```
 
-Access Grafana at: http://localhost:3000
+Access Grafana at: http://localhost:12030
 - Default credentials: admin/admin
 
 ### 5. Import Dashboards
 
-1. Open Grafana (http://localhost:3000)
+1. Open Grafana (http://localhost:12030)
 2. Go to **Dashboards** → **Import**
 3. Upload JSON files from `dashboards/grafana/`:
    - `xai_blockchain_overview.json`

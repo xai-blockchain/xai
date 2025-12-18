@@ -80,7 +80,7 @@ browser_wallet_extension/
 ```javascript
 // Initialize
 const hwManager = new HardwareWalletManager();
-await hwManager.initialize('http://localhost:8545');
+await hwManager.initialize('http://localhost:12001');
 
 // Connect device
 const result = await hwManager.connect('ledger'); // or 'trezor'

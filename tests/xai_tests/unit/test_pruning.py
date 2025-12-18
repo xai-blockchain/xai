@@ -225,7 +225,7 @@ class TestBlockPruningManager:
         # Prune up to: 200 - 100 - 1 = 99
         # But limited by finalized: min(99, 200 - 10 - 1) = min(99, 189) = 99
         prune_height = manager.calculate_prune_height()
-        assert prune_height == 89  # 200 - 100 - 10 - 1
+        assert prune_height == 99  # 200 - 100 - 1
 
     def test_calculate_prune_height_days_mode(self, mock_blockchain, temp_data_dir):
         """Test prune height calculation in DAYS mode"""
@@ -410,7 +410,10 @@ class TestBlockPruningManager:
         block = mock_blockchain.chain[5]
         original_tx_count = len(block.transactions)
 
-        assert manager._prune_block(block) is True
+        # Run through full pruning flow, not just _prune_block
+        result = manager.prune_blocks(up_to_height=5)
+
+        assert result['pruned'] == 5  # Blocks 1-5
         assert len(block.transactions) == 0  # Transactions removed
         assert 5 in manager.headers_only_heights
 

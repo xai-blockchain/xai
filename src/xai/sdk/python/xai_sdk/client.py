@@ -32,7 +32,7 @@ class XAIClient:
 
     def __init__(
         self,
-        base_url: str = "http://localhost:5000",
+        base_url: str = "http://localhost:12001",
         api_key: Optional[str] = None,
         timeout: int = 30,
         max_retries: int = 3,

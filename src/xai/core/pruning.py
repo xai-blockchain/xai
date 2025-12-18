@@ -73,19 +73,26 @@ class PruningPolicy:
     @classmethod
     def from_config(cls, config: Any = None) -> PruningPolicy:
         """Create policy from config object or environment"""
-        from xai.core import config as xai_config
+        # Always read from environment first for tests, fall back to config module
+        mode_str = os.getenv("XAI_PRUNE_MODE")
 
-        cfg = config or xai_config
+        if mode_str is None and config is None:
+            try:
+                from xai.core import config as xai_config
+                mode_str = getattr(xai_config, "PRUNE_MODE", "none")
+            except ImportError:
+                mode_str = "none"
+        elif mode_str is None:
+            mode_str = getattr(config, "PRUNE_MODE", "none")
 
         # Parse prune mode
-        mode_str = getattr(cfg, "PRUNE_MODE", os.getenv("XAI_PRUNE_MODE", "none"))
         try:
             mode = PruneMode(mode_str.lower())
         except ValueError:
             logger.warning("Invalid prune mode %s, defaulting to none", mode_str)
             mode = PruneMode.NONE
 
-        # Get retention settings
+        # Get retention settings - environment takes precedence
         retain_blocks = int(os.getenv("XAI_PRUNE_KEEP_BLOCKS", "1000"))
         retain_days = int(os.getenv("XAI_PRUNE_KEEP_DAYS", "30"))
 

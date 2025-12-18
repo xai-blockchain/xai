@@ -14,7 +14,7 @@ docker-compose up -d
 ### Access Services
 
 - **Prometheus**: http://localhost:9090
-- **Grafana**: http://localhost:3000 (admin/admin)
+- **Grafana**: http://localhost:12030 (admin/admin)
 - **AlertManager**: http://localhost:9093
 - **Node Exporter**: http://localhost:9100/metrics
 

@@ -184,7 +184,7 @@ kubectl port-forward -n xai-blockchain svc/xai-blockchain-metrics 9090:9090
 open http://localhost:9090
 
 # Test RPC endpoint
-curl http://localhost:8546/health
+curl http://localhost:12001/health
 ```
 
 ## Key Features
@@ -286,7 +286,7 @@ Monitoring Stack
 - 15-day data retention
 - 50Gi storage
 
-**Grafana**: http://localhost:3000 (after install)
+**Grafana**: http://localhost:12030 (after install)
 - Pre-configured dashboards
 - Custom metrics visualization
 - Alert rule management

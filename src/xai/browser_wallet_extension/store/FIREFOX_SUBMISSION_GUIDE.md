@@ -176,7 +176,7 @@ Essential for communicating with Ledger hardware wallets via the WebUSB API. Thi
 Alternative communication protocol for Trezor hardware wallets and some Ledger models using the WebHID API. This is an optional permission that users explicitly grant only when connecting their hardware wallet device.
 ```
 
-### host_permissions (localhost:8545, localhost:18545)
+### host_permissions (localhost:12001, localhost:12001)
 ```
 Allows the wallet to connect to local XAI blockchain nodes running on the user's computer at standard JSON-RPC ports. This is essential for:
 1. Developers testing smart contracts and blockchain features

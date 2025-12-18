@@ -34,7 +34,7 @@ docker compose up -d
 
 Access:
 - **Prometheus:** http://localhost:9090
-- **Grafana:** http://localhost:3000 (admin/admin)
+- **Grafana:** http://localhost:12030 (admin/admin)
 - **Alertmanager:** http://localhost:9093
 
 ### Option B: Manual Installation
@@ -43,7 +43,7 @@ See full instructions in `prometheus/README.md`
 
 ## 5. Import Dashboards (2 minutes)
 
-1. Open Grafana: http://localhost:3000
+1. Open Grafana: http://localhost:12030
 2. Login: admin/admin
 3. Navigate to **Dashboards** → **Import**
 4. Upload each file from `dashboards/grafana/`:

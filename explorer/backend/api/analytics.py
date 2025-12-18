@@ -10,7 +10,7 @@ import logging
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-node_url = "http://localhost:8545"
+node_url = "http://localhost:12001"
 
 
 @router.get("/network")

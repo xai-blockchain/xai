@@ -404,7 +404,7 @@ export EXPLORER_PORT="8082"
 export FLASK_DEBUG="False"  # ALWAYS False in production
 
 # Node connection
-export XAI_NODE_URL="http://localhost:8545"
+export XAI_NODE_URL="http://localhost:12001"
 ```
 
 ### Nginx Reverse Proxy (for HTTPS)

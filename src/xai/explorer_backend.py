@@ -1509,7 +1509,7 @@ CORS(app)
 sock = Sock(app)
 
 # Initialize components
-NODE_URL = os.getenv("XAI_NODE_URL", "http://localhost:8545")
+NODE_URL = os.getenv("XAI_NODE_URL", "http://localhost:12001")
 DB_PATH = os.getenv("EXPLORER_DB_PATH", ":memory:")
 
 db = ExplorerDatabase(DB_PATH)

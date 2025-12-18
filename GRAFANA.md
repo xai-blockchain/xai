@@ -164,7 +164,7 @@ scrape_configs:
 
 2. **Local Grafana** (development):
    ```
-   http://localhost:3000
+   http://localhost:12030
    Login: admin/admin
    ```
 
