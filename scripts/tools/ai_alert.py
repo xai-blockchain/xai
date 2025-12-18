@@ -20,7 +20,7 @@ def trigger_webhook(url, payload):
 
 def main():
     parser = argparse.ArgumentParser(description="AI metrics alert helper")
-    parser.add_argument("--base-url", required=True, help="Node base URL (http://localhost:8545)")
+    parser.add_argument("--base-url", required=True, help="Node base URL (http://localhost:12001)")
     parser.add_argument(
         "--token-threshold",
         type=int,

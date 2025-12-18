@@ -690,3 +690,247 @@ def register_payment_routes(routes: "NodeAPIRoutes") -> None:
                 "detail": str(e),
                 "code": "parse_error"
             }), 500
+
+    @app.route("/payment/verify", methods=["POST"])
+    def verify_payment() -> Tuple[Response, int]:
+        """Verify a payment against a payment request.
+
+        This endpoint verifies that a payment transaction matches a payment request,
+        checking amount, recipient, and expiry status. Used by merchants to validate
+        received payments.
+
+        Request Body (JSON):
+            {
+                "request_id": "uuid",           # Optional: Payment request ID
+                "txid": "tx123...",             # Required: Transaction ID
+                "sender": "XAI1...",            # Required: Sender address
+                "recipient": "XAI2...",         # Required: Recipient address
+                "amount": 100.50,               # Required: Transaction amount
+                "timestamp": 1703001234,        # Required: Transaction timestamp
+                "confirmations": 6              # Optional: Number of confirmations
+            }
+
+        Returns:
+            JSON response (200 OK):
+            {
+                "valid": true,
+                "verified": true,
+                "request_id": "uuid",           # If request_id provided
+                "txid": "tx123...",
+                "amount": 100.50,
+                "recipient": "XAI2...",
+                "confirmations": 6,
+                "status": "paid",
+                "message": "Payment verified successfully"
+            }
+
+            Or if verification fails:
+            {
+                "valid": false,
+                "verified": false,
+                "error": "Amount mismatch",
+                "error_code": "amount_mismatch",
+                "expected": 100.50,
+                "received": 95.00
+            }
+
+        Raises:
+            400: If request data is invalid
+            404: If payment request not found
+            500: If verification fails
+        """
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                "error": "Invalid request",
+                "detail": "JSON body required",
+                "code": "invalid_request"
+            }), 400
+
+        # Extract required fields
+        txid = data.get("txid")
+        recipient = data.get("recipient")
+        amount = data.get("amount")
+        timestamp = data.get("timestamp")
+
+        # Validate required fields
+        if not txid:
+            return jsonify({
+                "error": "Missing required field",
+                "detail": "txid is required",
+                "code": "missing_txid"
+            }), 400
+
+        if not recipient:
+            return jsonify({
+                "error": "Missing required field",
+                "detail": "recipient is required",
+                "code": "missing_recipient"
+            }), 400
+
+        if amount is None:
+            return jsonify({
+                "error": "Missing required field",
+                "detail": "amount is required",
+                "code": "missing_amount"
+            }), 400
+
+        # Validate recipient address
+        try:
+            validate_address(recipient)
+        except ValueError as e:
+            return jsonify({
+                "error": "Invalid recipient address",
+                "detail": str(e),
+                "code": "invalid_recipient"
+            }), 400
+
+        # Extract optional fields
+        request_id = data.get("request_id")
+        confirmations = data.get("confirmations", 0)
+
+        try:
+            # If request_id provided, verify against payment request
+            if request_id:
+                payment_request = _payment_requests.get(request_id)
+
+                if not payment_request:
+                    return jsonify({
+                        "error": "Payment request not found",
+                        "detail": f"No payment request with ID: {request_id}",
+                        "code": "request_not_found"
+                    }), 404
+
+                # Check if expired
+                current_time = int(time.time())
+                if payment_request["expires_at"] and current_time > payment_request["expires_at"]:
+                    return jsonify({
+                        "valid": False,
+                        "verified": False,
+                        "error": "Payment request expired",
+                        "error_code": "request_expired",
+                        "expires_at": payment_request["expires_at"],
+                        "current_time": current_time
+                    }), 200
+
+                # Verify amount
+                expected_amount = payment_request["amount"]
+                if abs(float(amount) - expected_amount) > 0.000001:
+                    return jsonify({
+                        "valid": False,
+                        "verified": False,
+                        "error": "Amount mismatch",
+                        "error_code": "amount_mismatch",
+                        "expected": expected_amount,
+                        "received": float(amount)
+                    }), 200
+
+                # Verify recipient
+                if recipient != payment_request["address"]:
+                    return jsonify({
+                        "valid": False,
+                        "verified": False,
+                        "error": "Recipient mismatch",
+                        "error_code": "recipient_mismatch",
+                        "expected": payment_request["address"],
+                        "received": recipient
+                    }), 200
+
+                # Verify timestamp is after request creation
+                if timestamp and timestamp < payment_request["created_at"]:
+                    return jsonify({
+                        "valid": False,
+                        "verified": False,
+                        "error": "Transaction predates payment request",
+                        "error_code": "invalid_timestamp",
+                        "request_created": payment_request["created_at"],
+                        "transaction_time": timestamp
+                    }), 200
+
+                # Update payment request status
+                if payment_request["status"] == "pending":
+                    payment_request["status"] = "paid"
+                    payment_request["paid_txid"] = txid
+                    payment_request["paid_at"] = timestamp or current_time
+                    _payment_requests[request_id] = payment_request
+
+                # Payment verified successfully
+                return jsonify({
+                    "valid": True,
+                    "verified": True,
+                    "request_id": request_id,
+                    "txid": txid,
+                    "amount": float(amount),
+                    "recipient": recipient,
+                    "confirmations": confirmations,
+                    "status": payment_request["status"],
+                    "message": "Payment verified successfully"
+                }), 200
+
+            else:
+                # No request_id - just validate transaction structure
+                # Search blockchain for transaction
+                found = False
+                for block in blockchain.chain[-100:]:  # Check last 100 blocks
+                    for tx in block.transactions:
+                        if tx.txid == txid:
+                            found = True
+                            # Verify transaction details
+                            if tx.recipient != recipient:
+                                return jsonify({
+                                    "valid": False,
+                                    "verified": False,
+                                    "error": "Recipient mismatch",
+                                    "error_code": "recipient_mismatch",
+                                    "expected_from_chain": tx.recipient,
+                                    "provided": recipient
+                                }), 200
+
+                            if abs(tx.amount - float(amount)) > 0.000001:
+                                return jsonify({
+                                    "valid": False,
+                                    "verified": False,
+                                    "error": "Amount mismatch",
+                                    "error_code": "amount_mismatch",
+                                    "expected_from_chain": tx.amount,
+                                    "provided": float(amount)
+                                }), 200
+
+                            # Transaction verified on blockchain
+                            return jsonify({
+                                "valid": True,
+                                "verified": True,
+                                "txid": txid,
+                                "amount": tx.amount,
+                                "recipient": tx.recipient,
+                                "sender": tx.sender,
+                                "confirmations": confirmations,
+                                "on_chain": True,
+                                "message": "Transaction verified on blockchain"
+                            }), 200
+
+                if not found:
+                    return jsonify({
+                        "valid": False,
+                        "verified": False,
+                        "error": "Transaction not found on blockchain",
+                        "error_code": "tx_not_found",
+                        "txid": txid
+                    }), 200
+
+        except Exception as e:
+            logger.error(
+                "Payment verification failed",
+                extra={
+                    "txid": txid,
+                    "recipient": recipient,
+                    "amount": amount,
+                    "error": str(e),
+                    "event": "payment.verification_failed"
+                }
+            )
+            return jsonify({
+                "error": "Verification failed",
+                "detail": str(e),
+                "code": "verification_error"
+            }), 500

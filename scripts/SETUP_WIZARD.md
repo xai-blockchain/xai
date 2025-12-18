@@ -5,12 +5,17 @@ Interactive configuration tool for new XAI node operators.
 ## Features
 
 - Beginner-friendly interface with colorful ASCII art
+- **System requirements check**: Python version, dependencies, network connectivity
+- **Disk space verification**: Ensures adequate storage for selected node mode
 - Network selection (testnet/mainnet) with safety warnings
 - Node mode selection (full/pruned/light/archival)
 - Mining configuration with optional wallet creation
+- **Monitoring setup**: Prometheus metrics configuration
 - Port configuration with automatic conflict detection
-- Secure secret generation for production use
+- Secure secret generation for production use (JWT, encryption keys, etc.)
 - .env file generation with automatic backup
+- **Systemd service generation**: Auto-start configuration for Linux
+- **Wallet integration**: Uses xai.core.wallet_factory when available
 - Optional wallet creation with mnemonic backup
 - Testnet token request guidance
 - Comprehensive next steps and documentation
@@ -39,9 +44,10 @@ curl -sSL https://xai.example.com/install | bash
 
 ## Requirements
 
-- Python 3.8 or higher
-- Standard library only (no external dependencies)
-- Terminal with ANSI color support (optional)
+- Python 3.10 or higher (wizard checks and warns if below 3.10)
+- Standard library only (no external dependencies for wizard itself)
+- Terminal with ANSI color support (optional, auto-detects)
+- Recommended: flask, requests, cryptography, eth_keys, ecdsa for full functionality
 
 ## What the Wizard Does
 
@@ -91,13 +97,23 @@ Enable mining to help secure the network and earn rewards:
 - Option to use existing wallet or create new one
 - Can be enabled later if skipped
 
-### 6. Security Secrets
+### 6. Monitoring Configuration (NEW)
+
+Optional Prometheus metrics for monitoring:
+
+- Enable/disable metrics collection
+- Configure metrics port (default: 12090)
+- Access metrics at http://localhost:12090/metrics
+
+### 7. Security Secrets
 
 Automatically generates cryptographically secure secrets:
 
 - **JWT Secret**: For API authentication (64 hex characters)
 - **Wallet Trade Secret**: For peer-to-peer trades (64 hex characters)
-- **Encryption Key**: For data encryption (64 hex characters)
+- **Time Capsule Master Key**: For time-locked transactions (64 hex characters)
+- **Embedded Salt**: For wallet encryption (64 hex characters)
+- **Lucky Block Seed**: For randomness generation (64 hex characters)
 
 On mainnet, these secrets are required and the wizard emphasizes their importance.
 

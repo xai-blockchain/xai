@@ -1,5 +1,5 @@
 #!/bin/bash
-BASE_URL=${BASE_URL:-http://localhost:8545}
+BASE_URL=${BASE_URL:-http://localhost:12001}
 WH_TOKEN=${WH_TOKEN:-https://hooks.example/ai}
 THRESHOLD=${THRESHOLD:-50000}
 

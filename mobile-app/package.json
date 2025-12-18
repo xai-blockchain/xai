@@ -11,10 +11,12 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "type-check": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
-    "clean": "react-native-clean-project"
+    "clean": "react-native-clean-project",
+    "postinstall": "rn-nodeify --install crypto,stream,buffer,process,vm --hack"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^1.21.0",
+    "@react-native-clipboard/clipboard": "^1.13.2",
     "@react-native-community/netinfo": "^11.2.1",
     "@react-navigation/bottom-tabs": "^6.5.11",
     "@react-navigation/native": "^6.1.9",
@@ -22,8 +24,10 @@
     "@react-navigation/stack": "^6.3.20",
     "axios": "^1.6.2",
     "bip39": "^3.1.0",
+    "buffer": "^6.0.3",
     "elliptic": "^6.5.4",
     "ethers": "^6.9.0",
+    "process": "^0.11.10",
     "react": "18.2.0",
     "react-native": "0.73.2",
     "react-native-biometrics": "^3.0.1",
@@ -37,9 +41,12 @@
     "react-native-reanimated": "^3.6.1",
     "react-native-safe-area-context": "^4.8.2",
     "react-native-screens": "^3.29.0",
+    "react-native-sha256": "^1.4.10",
     "react-native-svg": "^14.1.0",
     "react-native-vector-icons": "^10.0.3",
     "rn-nodeify": "^10.3.0",
+    "stream-browserify": "^3.0.0",
+    "vm-browserify": "^1.1.2",
     "zustand": "^4.4.7"
   },
   "devDependencies": {

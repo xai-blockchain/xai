@@ -83,7 +83,7 @@ def build_spec() -> Dict[str, Any]:
         }
     )
     spec["servers"] = [
-        {"url": "http://localhost:5000", "description": "Local development"},
+        {"url": "http://localhost:12080", "description": "Local development"},
         {"url": "https://testnet-api.xai-blockchain.io", "description": "Testnet"},
         {"url": "https://api.xai-blockchain.io", "description": "Production"},
     ]

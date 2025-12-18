@@ -25,7 +25,7 @@ def dump(name, data):
 
 def main():
     parser = argparse.ArgumentParser(description="Inspect AI bridge and metrics")
-    parser.add_argument("--base-url", required=True, help="Node base URL (http://localhost:8545)")
+    parser.add_argument("--base-url", required=True, help="Node base URL (http://localhost:12001)")
     parser.add_argument("--watch", action="store_true", help="Refresh every 30s")
 
     args = parser.parse_args()

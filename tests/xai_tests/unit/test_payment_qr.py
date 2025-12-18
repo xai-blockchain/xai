@@ -396,6 +396,126 @@ class TestQRCodeValidator:
             QRCodeValidator.sanitize_qr_data(123)
 
 
+class TestPaymentVerification:
+    """Test payment verification endpoint."""
+
+    @patch("xai.core.api_routes.payment.validate_address")
+    def test_verify_payment_with_request_id(self, mock_validate, client, mock_blockchain):
+        """Test verifying payment against a payment request."""
+        if not QRCODE_AVAILABLE:
+            pytest.skip("qrcode library not available")
+
+        # Create payment request first
+        create_payload = {
+            "address": TEST_ADDRESS,
+            "amount": "100.00"
+        }
+        create_response = client.post("/payment/request", json=create_payload)
+        request_id = create_response.get_json()["request_id"]
+
+        # Verify payment
+        verify_payload = {
+            "request_id": request_id,
+            "txid": "tx123abc",
+            "sender": TEST_ADDRESS_2,
+            "recipient": TEST_ADDRESS,
+            "amount": 100.00,
+            "timestamp": int(time.time()),
+            "confirmations": 1
+        }
+        response = client.post("/payment/verify", json=verify_payload)
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["valid"] is True
+        assert data["verified"] is True
+        assert data["request_id"] == request_id
+        assert data["status"] == "paid"
+
+    @patch("xai.core.api_routes.payment.validate_address")
+    def test_verify_payment_amount_mismatch(self, mock_validate, client, mock_blockchain):
+        """Test verification fails for amount mismatch."""
+        if not QRCODE_AVAILABLE:
+            pytest.skip("qrcode library not available")
+
+        # Create payment request
+        create_payload = {
+            "address": TEST_ADDRESS,
+            "amount": "100.00"
+        }
+        create_response = client.post("/payment/request", json=create_payload)
+        request_id = create_response.get_json()["request_id"]
+
+        # Try to verify with wrong amount
+        verify_payload = {
+            "request_id": request_id,
+            "txid": "tx123abc",
+            "recipient": TEST_ADDRESS,
+            "amount": 95.00,  # Wrong amount
+            "timestamp": int(time.time())
+        }
+        response = client.post("/payment/verify", json=verify_payload)
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["valid"] is False
+        assert data["verified"] is False
+        assert data["error_code"] == "amount_mismatch"
+
+    @patch("xai.core.api_routes.payment.validate_address")
+    def test_verify_payment_recipient_mismatch(self, mock_validate, client, mock_blockchain):
+        """Test verification fails for recipient mismatch."""
+        if not QRCODE_AVAILABLE:
+            pytest.skip("qrcode library not available")
+
+        # Create payment request
+        create_payload = {
+            "address": TEST_ADDRESS,
+            "amount": "100.00"
+        }
+        create_response = client.post("/payment/request", json=create_payload)
+        request_id = create_response.get_json()["request_id"]
+
+        # Try to verify with wrong recipient
+        verify_payload = {
+            "request_id": request_id,
+            "txid": "tx123abc",
+            "recipient": TEST_ADDRESS_2,  # Wrong address
+            "amount": 100.00,
+            "timestamp": int(time.time())
+        }
+        response = client.post("/payment/verify", json=verify_payload)
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["valid"] is False
+        assert data["verified"] is False
+        assert data["error_code"] == "recipient_mismatch"
+
+    def test_verify_payment_missing_required_fields(self, client, mock_blockchain):
+        """Test verification fails with missing fields."""
+        verify_payload = {
+            "txid": "tx123abc",
+            "recipient": TEST_ADDRESS
+            # Missing amount
+        }
+        response = client.post("/payment/verify", json=verify_payload)
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data["code"] == "missing_amount"
+
+    def test_verify_payment_request_not_found(self, client, mock_blockchain):
+        """Test verification fails for nonexistent request."""
+        verify_payload = {
+            "request_id": "nonexistent-id",
+            "txid": "tx123abc",
+            "recipient": TEST_ADDRESS,
+            "amount": 100.00,
+            "timestamp": int(time.time())
+        }
+        response = client.post("/payment/verify", json=verify_payload)
+        assert response.status_code == 404
+        data = response.get_json()
+        assert data["code"] == "request_not_found"
+
+
 class TestTransactionQRGenerator:
     """Test TransactionQRGenerator utility functions."""
 

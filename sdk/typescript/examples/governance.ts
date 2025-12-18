@@ -9,7 +9,7 @@ import { XAIClient, VoteChoice } from '../src';
 
 async function main() {
   const client = new XAIClient({
-    baseUrl: 'http://localhost:5000',
+    baseUrl: 'http://localhost:12080',
   });
 
   try {

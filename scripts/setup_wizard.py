@@ -23,6 +23,7 @@ import secrets
 import hashlib
 import json
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple
 
@@ -193,9 +194,103 @@ def generate_encryption_key() -> str:
     return secrets.token_hex(32)
 
 
+def check_disk_space(path: Path, required_gb: int) -> Tuple[bool, int]:
+    """Check if sufficient disk space is available.
+
+    Returns:
+        (is_sufficient, available_gb)
+    """
+    try:
+        stat = os.statvfs(path.parent if not path.exists() else path)
+        # Available space in GB
+        available_gb = (stat.f_bavail * stat.f_frsize) / (1024**3)
+        return available_gb >= required_gb, int(available_gb)
+    except Exception:
+        # If we can't check, assume it's OK
+        return True, 0
+
+
+def check_python_version() -> Tuple[bool, str]:
+    """Check if Python version meets requirements (3.10+).
+
+    Returns:
+        (is_sufficient, version_string)
+    """
+    version_info = sys.version_info
+    version_str = f"{version_info.major}.{version_info.minor}.{version_info.micro}"
+    is_ok = version_info >= (3, 10)
+    return is_ok, version_str
+
+
+def check_dependencies() -> List[Tuple[str, bool, str]]:
+    """Check if required Python packages are available.
+
+    Returns:
+        List of (package_name, is_available, version_or_error)
+    """
+    dependencies = []
+
+    # Core dependencies
+    packages = [
+        'flask',
+        'requests',
+        'cryptography',
+        'eth_keys',
+        'ecdsa',
+    ]
+
+    for package in packages:
+        try:
+            mod = __import__(package.replace('-', '_'))
+            version = getattr(mod, '__version__', 'unknown')
+            dependencies.append((package, True, version))
+        except ImportError as e:
+            dependencies.append((package, False, str(e)))
+
+    return dependencies
+
+
+def test_network_connectivity() -> Tuple[bool, str]:
+    """Test basic internet connectivity.
+
+    Returns:
+        (is_connected, message)
+    """
+    try:
+        # Try to resolve a DNS name
+        socket.gethostbyname('google.com')
+        return True, "Internet connectivity OK"
+    except socket.error:
+        return False, "No internet connection detected"
+
+
 def create_wallet() -> Tuple[str, str, str]:
-    """Create a new wallet and return (address, private_key, mnemonic)."""
-    # Simple secp256k1 keypair generation
+    """Create a new wallet and return (address, private_key, mnemonic).
+
+    Attempts to use the proper wallet module if available, falls back to
+    simplified generation for standalone wizard use.
+    """
+    # Try to use the proper wallet module
+    try:
+        # Add parent directory to path to import xai modules
+        project_root = Path(__file__).parent.parent
+        if str(project_root / 'src') not in sys.path:
+            sys.path.insert(0, str(project_root / 'src'))
+
+        from xai.core.wallet_factory import WalletFactory
+
+        # Use proper wallet creation
+        wallet = WalletFactory.create_wallet()
+        address = wallet.get_address()
+        private_key = wallet.get_private_key_hex()
+        mnemonic = wallet.get_mnemonic() if hasattr(wallet, 'get_mnemonic') else ""
+
+        return address, private_key, mnemonic
+    except ImportError:
+        # Fall back to simplified wallet generation
+        pass
+
+    # Simple secp256k1 keypair generation (fallback)
     private_key = secrets.token_hex(32)
 
     # Generate address from private key (simplified)
@@ -241,37 +336,45 @@ def write_env_file(config: Dict[str, str], env_path: Path):
         "# Network Configuration",
         f"XAI_NETWORK={config['network']}",
         f"XAI_NODE_MODE={config['node_mode']}",
+        f"XAI_NODE_NAME={config.get('node_name', 'xai-node')}",
         "",
         "# Port Configuration",
-        f"XAI_NODE_PORT={config['rpc_port']}",
+        f"XAI_RPC_PORT={config['rpc_port']}",
         f"XAI_P2P_PORT={config['p2p_port']}",
-        f"XAI_WS_PORT={config['ws_port']}",
+        f"XAI_METRICS_PORT={config.get('metrics_port', '12090')}",
         f"XAI_RPC_URL=http://localhost:{config['rpc_port']}",
         "",
         "# Data Directory",
         f"XAI_DATA_DIR={config['data_dir']}",
+        f"XAI_LOG_LEVEL={config.get('log_level', 'INFO')}",
         "",
         "# Mining Configuration",
         f"XAI_MINING_ENABLED={config['mining_enabled']}",
     ]
 
     if config.get('miner_address'):
-        lines.append(f"XAI_MINER_ADDRESS={config['miner_address']}")
+        lines.append(f"MINER_ADDRESS={config['miner_address']}")
+        lines.append(f"XAI_MINING_THREADS={config.get('mining_threads', '2')}")
 
     lines.extend([
         "",
         "# Security Secrets (auto-generated)",
         f"XAI_JWT_SECRET={config['jwt_secret']}",
         f"XAI_WALLET_TRADE_PEER_SECRET={config['wallet_trade_secret']}",
-        f"XAI_ENCRYPTION_KEY={config['encryption_key']}",
+        f"XAI_TIME_CAPSULE_MASTER_KEY={config.get('time_capsule_key', generate_encryption_key())}",
+        f"XAI_EMBEDDED_SALT={config.get('embedded_salt', generate_encryption_key())}",
+        f"XAI_LUCKY_BLOCK_SEED={config.get('lucky_block_seed', generate_encryption_key())}",
+        "",
+        "# Monitoring",
+        f"XAI_PROMETHEUS_ENABLED={config.get('prometheus_enabled', 'true')}",
         "",
         "# API Keys (optional - for AI features)",
         "# ANTHROPIC_API_KEY=",
         "# OPENAI_API_KEY=",
         "# GOOGLE_AI_API_KEY=",
         "",
-        "# Database (optional)",
-        f"# DATABASE_URL=sqlite:///{config['data_dir']}/blockchain.db",
+        "# Database",
+        f"DATABASE_URL=sqlite:///{config['data_dir']}/blockchain.db",
         "",
     ])
 
@@ -281,6 +384,47 @@ def write_env_file(config: Dict[str, str], env_path: Path):
     print_success(f"Configuration written to: {env_path}")
 
 
+def create_systemd_service(config: Dict[str, str], project_root: Path) -> Optional[Path]:
+    """Create a systemd service file for auto-starting the node.
+
+    Returns:
+        Path to the service file if created, None otherwise
+    """
+    service_name = f"xai-node-{config['network']}"
+    service_content = f"""[Unit]
+Description=XAI Blockchain Node ({config['network']})
+After=network.target
+
+[Service]
+Type=simple
+User={os.getenv('USER', 'xai')}
+WorkingDirectory={project_root}
+Environment="PATH=/usr/bin:/usr/local/bin"
+EnvironmentFile={project_root}/.env
+ExecStart=/usr/bin/python3 -m xai.core.node
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths={config['data_dir']}
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+    # Write to temporary location (user can move it)
+    service_file = project_root / f"{service_name}.service"
+    service_file.write_text(service_content)
+
+    return service_file
+
+
 def main():
     """Main wizard flow."""
     print(BANNER)
@@ -288,7 +432,44 @@ def main():
     print_info("Welcome to the XAI Node Setup Wizard!")
     print_info("This wizard will help you configure your XAI blockchain node.\n")
 
-    if not confirm("Ready to begin?", True):
+    # Pre-flight checks
+    print_header("System Requirements Check")
+
+    # Check Python version
+    py_ok, py_version = check_python_version()
+    if py_ok:
+        print_success(f"Python version: {py_version}")
+    else:
+        print_error(f"Python {py_version} is installed, but 3.10+ is required")
+        if not confirm("Continue anyway? (Not recommended)", False):
+            return
+
+    # Check dependencies
+    print_info("Checking Python dependencies...")
+    deps = check_dependencies()
+    missing_deps = []
+    for name, available, version in deps:
+        if available:
+            print_success(f"{name}: {version}")
+        else:
+            print_warning(f"{name}: Not installed")
+            missing_deps.append(name)
+
+    if missing_deps:
+        print_warning(f"\nMissing dependencies: {', '.join(missing_deps)}")
+        print_info("Install with: pip install " + " ".join(missing_deps))
+        if not confirm("Continue without these packages?", False):
+            return
+
+    # Check network connectivity
+    connected, msg = test_network_connectivity()
+    if connected:
+        print_success(msg)
+    else:
+        print_warning(msg)
+        print_info("You can still run a local node, but won't sync with peers")
+
+    if not confirm("\nReady to begin setup?", True):
         print_info("Setup cancelled. Run this script again when ready.")
         return
 
@@ -331,11 +512,31 @@ def main():
     print_header("Data Directory")
     print_info("Where should the blockchain data be stored?")
 
+    # Determine disk space requirements based on node mode
+    disk_requirements = {
+        'full': 50,
+        'pruned': 10,
+        'light': 1,
+        'archival': 500
+    }
+    required_gb = disk_requirements.get(config['node_mode'], 50)
+
     default_data_dir = str(Path.home() / ".xai")
     data_dir = prompt("Data directory path", default_data_dir)
     config['data_dir'] = str(Path(data_dir).expanduser().absolute())
 
     data_path = Path(config['data_dir'])
+
+    # Check disk space
+    space_ok, available_gb = check_disk_space(data_path, required_gb)
+    if space_ok:
+        print_success(f"Available disk space: {available_gb} GB")
+    else:
+        print_error(f"Only {available_gb} GB available, but {required_gb} GB recommended for {config['node_mode']} mode")
+        if not confirm("Continue anyway?", False):
+            print_error("Please free up disk space or choose a different location.")
+            return
+
     if data_path.exists():
         print_warning(f"Directory already exists: {config['data_dir']}")
         if not confirm("Use this directory?", True):
@@ -452,17 +653,33 @@ def main():
         config['mining_enabled'] = "false"
         print_info("Mining disabled. You can enable it later by editing the .env file.")
 
-    # Step 6: Generate Security Secrets
+    # Step 6: Monitoring Configuration
+    print_header("Monitoring Configuration")
+    print_info("XAI includes Prometheus metrics for monitoring node health.")
+
+    if confirm("Enable Prometheus metrics?", True):
+        config['prometheus_enabled'] = 'true'
+        metrics_port = prompt("Metrics port", "12090")
+        config['metrics_port'] = metrics_port
+        print_success("Metrics will be available at http://localhost:" + metrics_port + "/metrics")
+    else:
+        config['prometheus_enabled'] = 'false'
+
+    # Step 7: Generate Security Secrets
     print_header("Security Configuration")
     print_info("Generating secure secrets for your node...")
 
     config['jwt_secret'] = generate_jwt_secret()
     config['wallet_trade_secret'] = generate_wallet_trade_secret()
-    config['encryption_key'] = generate_encryption_key()
+    config['time_capsule_key'] = generate_encryption_key()
+    config['embedded_salt'] = generate_encryption_key()
+    config['lucky_block_seed'] = generate_encryption_key()
 
     print_success("JWT secret generated")
     print_success("Wallet trade secret generated")
-    print_success("Encryption key generated")
+    print_success("Time capsule key generated")
+    print_success("Embedded wallet salt generated")
+    print_success("Lucky block seed generated")
 
     if config['network'] == 'mainnet':
         print_warning("\nMAINNET SECURITY WARNING:")
@@ -470,8 +687,9 @@ def main():
         print_warning("- Back up your wallet private keys")
         print_warning("- Use a hardware wallet for large amounts")
         print_warning("- Consider running behind a firewall")
+        print_warning("- Enable firewall rules to protect P2P and RPC ports")
 
-    # Step 7: Write Configuration
+    # Step 8: Write Configuration
     print_header("Save Configuration")
 
     project_root = Path(__file__).parent.parent
@@ -488,7 +706,20 @@ def main():
 
     write_env_file(config, env_path)
 
-    # Step 8: Optional Wallet Creation
+    # Optional: Create systemd service
+    if sys.platform == 'linux':
+        print_info("\nSystemd service file can be created for auto-starting the node.")
+        if confirm("Create systemd service file?", False):
+            service_file = create_systemd_service(config, project_root)
+            if service_file:
+                print_success(f"Service file created: {service_file}")
+                print_info("\nTo install the service:")
+                print(f"  sudo cp {service_file} /etc/systemd/system/")
+                print(f"  sudo systemctl daemon-reload")
+                print(f"  sudo systemctl enable xai-node-{config['network']}")
+                print(f"  sudo systemctl start xai-node-{config['network']}")
+
+    # Step 9: Optional Wallet Creation
     print_header("Wallet Creation (Optional)")
 
     if config['mining_enabled'] == "true" and not config.get('miner_address'):
@@ -537,7 +768,7 @@ def main():
             write_env_file(config, env_path)
             print_success(f"Miner address updated in .env file")
 
-    # Step 9: Optional Testnet Tokens
+    # Step 10: Optional Testnet Tokens
     if config['network'] == 'testnet' and wallet_info:
         print_header("Testnet Tokens (Optional)")
         print_info("You can request free testnet tokens to start testing.")
@@ -549,7 +780,7 @@ def main():
             print(f"  Discord: {Colors.CYAN}https://discord.gg/xai-network{Colors.ENDC}")
             print_info("\nVisit the faucet URL or ask in Discord for testnet tokens.")
 
-    # Step 10: Summary and Next Steps
+    # Step 11: Summary and Next Steps
     print_header("Setup Complete!")
 
     print(f"\n{Colors.BOLD}{Colors.GREEN}Configuration Summary:{Colors.ENDC}\n")

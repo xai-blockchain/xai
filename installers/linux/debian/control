@@ -1,0 +1,96 @@
+Source: xai-blockchain
+Section: net
+Priority: optional
+Maintainer: XAI Blockchain Team <dev@xai-blockchain.io>
+Build-Depends: debhelper-compat (= 13),
+               dh-python,
+               python3-all (>= 3.10),
+               python3-setuptools,
+               python3-pip,
+               python3-wheel,
+               libssl-dev,
+               libffi-dev,
+               libsecp256k1-dev,
+               libgmp-dev,
+               pkg-config
+Standards-Version: 4.6.0
+Homepage: https://xai-blockchain.io
+Vcs-Git: https://github.com/xai-blockchain/xai.git
+Vcs-Browser: https://github.com/xai-blockchain/xai
+Rules-Requires-Root: no
+
+Package: xai-blockchain
+Architecture: any
+Depends: ${python3:Depends},
+         ${misc:Depends},
+         python3 (>= 3.10),
+         python3-flask (>= 3.0.0),
+         python3-cryptography (>= 41.0.0),
+         python3-requests (>= 2.31.0),
+         python3-yaml (>= 6.0),
+         python3-prometheus-client (>= 0.19.0),
+         python3-psutil (>= 5.9.0),
+         python3-websockets (>= 12.0),
+         python3-click (>= 8.1.0),
+         adduser
+Recommends: python3-dev,
+            libsecp256k1-0
+Suggests: nginx,
+          prometheus,
+          grafana
+Description: AI-Enhanced Blockchain Platform
+ XAI is a production-ready blockchain implementation featuring proof-of-work
+ consensus, intelligent AI-based governance, atomic swap support for
+ cross-chain trading, and comprehensive wallet management.
+ .
+ Key Features:
+  * Proof-of-Work (SHA-256) consensus with adjustable difficulty
+  * UTXO-based transaction model with full signature verification
+  * Smart contract engine with EVM compatibility
+  * AI governance system for proposals and voting
+  * Atomic swap support for 11+ cryptocurrencies
+  * Comprehensive wallet CLI with HD wallet support (BIP-32/BIP-39)
+  * Multi-signature transaction support
+  * Time capsule functionality for future transactions
+  * Block explorer with REST API
+  * Prometheus metrics and monitoring
+ .
+ This package includes the node daemon, wallet CLI, and all necessary tools
+ to run a full XAI blockchain node.
+
+Package: xai-blockchain-dev
+Architecture: all
+Depends: xai-blockchain (= ${binary:Version}),
+         ${misc:Depends},
+         python3-pytest (>= 8.0.0),
+         python3-pytest-cov (>= 4.1.0),
+         python3-pytest-mock (>= 3.12.0),
+         python3-black (>= 24.0.0),
+         python3-pylint (>= 3.0.0),
+         python3-mypy (>= 1.8.0),
+         python3-isort (>= 5.13.0)
+Recommends: python3-bandit,
+            python3-hypothesis
+Description: Development tools for XAI Blockchain
+ This package contains development tools and dependencies for building
+ and testing XAI blockchain applications.
+ .
+ Includes:
+  * Testing frameworks (pytest, pytest-cov, pytest-mock)
+  * Code quality tools (black, pylint, mypy, isort)
+  * Security analysis tools (bandit)
+  * Property-based testing (hypothesis)
+
+Package: xai-blockchain-doc
+Architecture: all
+Section: doc
+Depends: ${misc:Depends}
+Suggests: xai-blockchain
+Description: Documentation for XAI Blockchain
+ This package contains comprehensive documentation for the XAI blockchain
+ platform, including:
+  * API reference documentation
+  * Developer guides and tutorials
+  * Architecture and design documentation
+  * Security best practices
+  * Network deployment guides

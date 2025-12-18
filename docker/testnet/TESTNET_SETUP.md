@@ -30,6 +30,14 @@ This guide provides step-by-step instructions for deploying XAI blockchain testn
 # Navigate to testnet directory
 cd docker/testnet
 
+# Full stack (RECOMMENDED - includes explorer + monitoring)
+docker compose -f docker-compose.full.yml up -d --build
+# OR use default:
+docker compose up -d --build
+
+# Verify all services are running
+./verify_testnet_stack.sh
+
 # 1-Node (development/API testing)
 docker compose -f docker-compose.one-node.yml up -d --build
 
@@ -45,6 +53,11 @@ docker compose -f docker-compose.four-node.yml up -d --build
 # Sentry nodes (public relay testing)
 docker compose -f docker-compose.sentry.yml up -d --build
 
+# Full stack (4 nodes + explorer + monitoring) - RECOMMENDED
+docker compose -f docker-compose.full.yml up -d --build
+# OR use default (same as full.yml):
+docker compose up -d --build
+
 # Stop and clean up
 docker compose -f <config-file>.yml down -v
 ```
@@ -58,23 +71,48 @@ docker compose -f <config-file>.yml down -v
 | `docker-compose.three-node.yml` | 3 | Consensus debugging | 100% |
 | `docker-compose.four-node.yml` | 4 | Full mesh connectivity | 98%+ |
 | `docker-compose.sentry.yml` | 4+2 | Public relay testing | 98%+ |
-| `docker-compose.yml` | 4 + monitoring | Full stack with Prometheus/Grafana | 98%+ |
+| `docker-compose.yml` | 4 + explorer + monitoring | Default full stack (RECOMMENDED) | 98%+ |
+| `docker-compose.full.yml` | 4 + explorer + monitoring | Same as docker-compose.yml (explicit name) | 98%+ |
 | `docker-compose.override.yml.example` | N/A | Customization template | N/A |
+
+**Note**: `docker-compose.yml` and `docker-compose.full.yml` are identical and provide the complete stack with all monitoring and explorer services enabled by default.
 
 ### Explorer Integration
 
-All testnet configurations include a block explorer service by default, accessible at http://localhost:12080.
+All testnet configurations include a block explorer service by default, accessible at **http://localhost:12080**.
 
-**To disable the explorer** (if not needed):
+The explorer provides:
+- Real-time block and transaction viewing
+- Network status and peer information
+- API endpoint testing interface
+- Transaction submission
+- Address balance lookups
+
+**Explorer health check**:
+```bash
+curl http://localhost:12080/health
+```
+
+**Access explorer**: Open http://localhost:12080 in your browser after starting the testnet.
+
+## Verification Script
+
+After starting any testnet configuration, use the verification script to check all services:
 
 ```bash
-# Copy the example override file
-cp docker-compose.override.yml.example docker-compose.override.yml
-
-# Edit and uncomment the explorer profile section
-# This makes the explorer optional - start with --profile explorer
-docker compose -f docker-compose.three-node.yml --profile explorer up -d
+cd docker/testnet
+./verify_testnet_stack.sh
 ```
+
+This script checks:
+- Container health status for all services
+- Node API endpoints (health checks)
+- Explorer availability
+- Prometheus and Grafana monitoring
+- Consensus between nodes (matching heights and hashes)
+- Metrics endpoints
+
+The script outputs a colored summary with pass/fail status and provides troubleshooting commands if issues are detected.
 
 ## 1-Node Setup
 
@@ -101,11 +139,11 @@ curl "http://localhost:12001/block/latest?summary=1"
 
 | Service | URL |
 |---------|-----|
-| API | http://localhost:12001 |
+| Node API | http://localhost:12001 |
 | P2P WebSocket | ws://localhost:12002 |
 | Metrics | http://localhost:12070 |
-| Explorer | http://localhost:12080 |
-| Grafana (monitoring) | http://localhost:12091 |
+| **Block Explorer** | **http://localhost:12080** |
+| Grafana (monitoring) | http://localhost:12091 (admin/admin) |
 | Prometheus | http://localhost:12090 |
 
 ### Stop
@@ -145,7 +183,9 @@ curl -s "http://localhost:12011/block/latest?summary=1" | jq '.block_number'
 |------|-----|-----|---------|
 | Bootstrap | 12001 | 12002 | 12070 |
 | Node 1 | 12011 | 12012 | 12071 |
-| Explorer | 12080 | - | - |
+| **Explorer** | **12080** | - | - |
+| Grafana | 12091 | - | - |
+| Prometheus | 12090 | - | - |
 
 ### Stop
 
@@ -185,7 +225,9 @@ done
 | Bootstrap | 12001 | 12002 | 12070 |
 | Node 1 | 12011 | 12012 | 12071 |
 | Node 2 | 12021 | 12022 | 12072 |
-| Explorer | 12080 | - | - |
+| **Explorer** | **12080** | - | - |
+| Grafana | 12091 | - | - |
+| Prometheus | 12090 | - | - |
 
 ### Stop
 
@@ -267,7 +309,9 @@ Flags:
 | Node 1 | 12011 | 12012 | 12071 |
 | Node 2 | 12021 | 12022 | 12072 |
 | Node 3 | 12031 | 12032 | 12073 |
-| Explorer | 12080 | - | - |
+| **Explorer** | **12080** | - | - |
+| Grafana | 12091 | - | - |
+| Prometheus | 12090 | - | - |
 
 ### Stop
 
@@ -380,7 +424,10 @@ fi
 
 ### Prometheus Metrics
 
-If monitoring is enabled, access Prometheus at http://localhost:12090 and Grafana at http://localhost:12030.
+Monitoring is included by default in `docker-compose.yml` and `docker-compose.full.yml`. Access:
+- **Prometheus**: http://localhost:12090
+- **Grafana**: http://localhost:12091 (login: admin/admin)
+- **Block Explorer**: http://localhost:12080
 
 Key metrics:
 - `xai_blocks_total` - Total blocks mined
@@ -389,6 +436,19 @@ Key metrics:
 - `xai_mining_active` - Mining status (1=active, 0=paused)
 
 ## Troubleshooting
+
+### Explorer Not Loading
+
+```bash
+# Check explorer health
+curl http://localhost:12080/health
+
+# Check explorer logs
+docker logs xai-testnet-explorer
+
+# Verify explorer can reach node
+docker exec xai-testnet-explorer curl -f http://xai-testnet-bootstrap:12001/health
+```
 
 ### Nodes Not Connecting
 

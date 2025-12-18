@@ -1,0 +1,11 @@
+imports:
+- path: xai-node.jinja
+
+resources:
+- name: xai-blockchain-node
+  type: xai-node.jinja
+  properties:
+    zone: us-central1-a
+    machineType: n1-standard-2
+    diskSizeGb: 100
+    networkMode: testnet

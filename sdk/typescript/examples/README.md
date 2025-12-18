@@ -7,7 +7,7 @@ This directory contains example code demonstrating various features of the XAI T
 Before running the examples, make sure you have:
 
 1. Node.js 16.x or higher installed
-2. A running XAI blockchain node (default: http://localhost:5000)
+2. A running XAI blockchain node (default: http://localhost:12080)
 3. The SDK installed:
    ```bash
    npm install @xai/sdk
@@ -54,7 +54,7 @@ npx ts-node examples/governance.ts
 
 ## Configuring Node URL
 
-All examples connect to `http://localhost:5000` by default. To use a different node:
+All examples connect to `http://localhost:12080` by default. To use a different node:
 
 ```typescript
 const client = new XAIClient({

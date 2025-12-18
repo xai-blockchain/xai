@@ -8,10 +8,14 @@ services:
     build: .
     container_name: xai-node-1
     ports:
-      - "5000:5000"
+      - "12001:8545"  # RPC
+      - "12002:30303" # P2P
+      - "12003:8546"  # WebSocket
     environment:
       - XAI_HOST=0.0.0.0
-      - XAI_PORT=5000
+      - XAI_RPC_PORT=8545
+      - XAI_P2P_PORT=30303
+      - XAI_WS_PORT=8546
       - XAI_NETWORK=mainnet
     volumes:
       - xai-node-1-data:/app/data
@@ -24,10 +28,14 @@ services:
     build: .
     container_name: xai-node-2
     ports:
-      - "5001:5000"
+      - "12011:8545"  # RPC
+      - "12012:30303" # P2P
+      - "12013:8546"  # WebSocket
     environment:
       - XAI_HOST=0.0.0.0
-      - XAI_PORT=5000
+      - XAI_RPC_PORT=8545
+      - XAI_P2P_PORT=30303
+      - XAI_WS_PORT=8546
       - XAI_NETWORK=mainnet
     volumes:
       - xai-node-2-data:/app/data
@@ -42,10 +50,14 @@ services:
     build: .
     container_name: xai-node-3
     ports:
-      - "5002:5000"
+      - "12021:8545"  # RPC
+      - "12022:30303" # P2P
+      - "12023:8546"  # WebSocket
     environment:
       - XAI_HOST=0.0.0.0
-      - XAI_PORT=5000
+      - XAI_RPC_PORT=8545
+      - XAI_P2P_PORT=30303
+      - XAI_WS_PORT=8546
       - XAI_NETWORK=mainnet
     volumes:
       - xai-node-3-data:/app/data

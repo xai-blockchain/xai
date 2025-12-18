@@ -8,13 +8,13 @@ import { XAIClient } from '../src';
 
 async function main() {
   const client = new XAIClient({
-    baseUrl: 'http://localhost:5000',
+    baseUrl: 'http://localhost:12080',
   });
 
   try {
     // Connect to WebSocket
     console.log('Connecting to WebSocket...');
-    client.connectWebSocket('ws://localhost:5000/ws');
+    client.connectWebSocket('ws://localhost:12080/ws');
 
     // Handle connection events
     client.on('connected', () => {

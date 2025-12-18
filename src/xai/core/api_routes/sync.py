@@ -31,10 +31,15 @@ def register_sync_routes(node_api: 'NodeAPI') -> None:
     - GET /sync/snapshots - List all available snapshots
     """
 
+    @node_api.app.route("/api/v1/sync/checkpoint/manifest", methods=["GET"])
     @node_api.app.route("/sync/snapshot/latest", methods=["GET"])
     def get_latest_snapshot() -> Tuple[Dict[str, Any], int]:
         """
         Get metadata for the latest available snapshot.
+
+        Aliases:
+        - /api/v1/sync/checkpoint/manifest (v1 API)
+        - /sync/snapshot/latest (legacy)
 
         Returns:
             JSON response with snapshot metadata or error
@@ -111,10 +116,15 @@ def register_sync_routes(node_api: 'NodeAPI') -> None:
             )
             return jsonify({"error": "Internal server error"}), 500
 
+    @node_api.app.route("/api/v1/sync/checkpoint/<snapshot_id>/chunks", methods=["GET"])
     @node_api.app.route("/sync/snapshot/<snapshot_id>/chunks", methods=["GET"])
     def list_snapshot_chunks(snapshot_id: str) -> Tuple[Dict[str, Any], int]:
         """
         List all chunks for a snapshot.
+
+        Aliases:
+        - /api/v1/sync/checkpoint/{id}/chunks (v1 API)
+        - /sync/snapshot/{id}/chunks (legacy)
 
         Args:
             snapshot_id: ID of the snapshot
@@ -164,12 +174,17 @@ def register_sync_routes(node_api: 'NodeAPI') -> None:
             )
             return jsonify({"error": "Internal server error"}), 500
 
+    @node_api.app.route("/api/v1/sync/checkpoint/<snapshot_id>/chunk/<int:chunk_index>", methods=["GET"])
     @node_api.app.route("/sync/snapshot/<snapshot_id>/chunk/<int:chunk_index>", methods=["GET"])
     def download_chunk(snapshot_id: str, chunk_index: int) -> Response:
         """
         Download a specific chunk with Range header support.
 
         Supports HTTP Range headers for partial downloads and resume capability.
+
+        Aliases:
+        - /api/v1/sync/checkpoint/{id}/chunk/{n} (v1 API)
+        - /sync/snapshot/{id}/chunk/{n} (legacy)
 
         Args:
             snapshot_id: ID of the snapshot
@@ -352,6 +367,97 @@ def register_sync_routes(node_api: 'NodeAPI') -> None:
         except (ValueError, KeyError, AttributeError, TypeError, RuntimeError) as e:
             logger.error(
                 "Failed to list snapshots",
+                extra={"error": str(e), "error_type": type(e).__name__}
+            )
+            return jsonify({"error": "Internal server error"}), 500
+
+    @node_api.app.route("/api/v1/sync/progress", methods=["GET"])
+    def get_sync_progress() -> Tuple[Dict[str, Any], int]:
+        """
+        Get current sync progress for the client.
+
+        Returns progress for:
+        - Checkpoint/snapshot download
+        - Verification
+        - State application
+
+        Returns:
+            JSON response with sync progress details
+        """
+        try:
+            blockchain = getattr(node_api.node, "blockchain", None)
+            if not blockchain:
+                return jsonify({"error": "Blockchain not available"}), 503
+
+            checkpoint_sync = getattr(blockchain, "checkpoint_sync_manager", None)
+            if not checkpoint_sync:
+                return jsonify({"error": "Checkpoint sync not available"}), 503
+
+            # Get checkpoint sync progress
+            progress = checkpoint_sync.get_checkpoint_sync_progress()
+
+            return jsonify({
+                "status": "ok",
+                "progress": progress,
+            }), 200
+
+        except (ValueError, KeyError, AttributeError, TypeError, RuntimeError) as e:
+            logger.error(
+                "Failed to get sync progress",
+                extra={"error": str(e), "error_type": type(e).__name__}
+            )
+            return jsonify({"error": "Internal server error"}), 500
+
+    @node_api.app.route("/api/v1/sync/headers/progress", methods=["GET"])
+    def get_header_sync_progress() -> Tuple[Dict[str, Any], int]:
+        """
+        Get header synchronization progress.
+
+        Returns:
+            JSON response with header sync progress including:
+            - synced_headers: Number of headers synced
+            - total_headers: Total headers to sync
+            - percentage: Progress percentage
+            - estimated_completion: Estimated completion time (seconds)
+        """
+        try:
+            blockchain = getattr(node_api.node, "blockchain", None)
+            if not blockchain:
+                return jsonify({"error": "Blockchain not available"}), 503
+
+            # Get current chain height
+            current_height = len(blockchain.chain) if hasattr(blockchain, "chain") else 0
+
+            # Get target height from peers or checkpoint
+            target_height = current_height
+            checkpoint_sync = getattr(blockchain, "checkpoint_sync_manager", None)
+            if checkpoint_sync:
+                meta = checkpoint_sync.get_best_checkpoint_metadata()
+                if meta:
+                    target_height = meta.get("height", current_height)
+
+            # Calculate progress
+            synced_headers = current_height
+            total_headers = max(target_height, current_height)
+            percentage = (synced_headers / total_headers * 100.0) if total_headers > 0 else 100.0
+
+            # Estimate completion time (rough estimate based on sync rate)
+            remaining_headers = max(0, total_headers - synced_headers)
+            avg_sync_rate = 100  # headers per second (rough estimate)
+            estimated_completion = remaining_headers / avg_sync_rate if remaining_headers > 0 else 0
+
+            return jsonify({
+                "status": "ok",
+                "synced_headers": synced_headers,
+                "total_headers": total_headers,
+                "percentage": round(percentage, 2),
+                "estimated_completion": round(estimated_completion, 2),
+                "is_syncing": synced_headers < total_headers,
+            }), 200
+
+        except (ValueError, KeyError, AttributeError, TypeError, RuntimeError, ZeroDivisionError) as e:
+            logger.error(
+                "Failed to get header sync progress",
                 extra={"error": str(e), "error_type": type(e).__name__}
             )
             return jsonify({"error": "Internal server error"}), 500

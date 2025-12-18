@@ -408,9 +408,9 @@ sudo systemctl status xai-node
 tail -f /mnt/ssd/xai-data/logs/node.log
 
 # Via API
-curl http://localhost:18546/api/v2/node/status | jq
-curl http://localhost:18546/api/v2/blockchain/height
-curl http://localhost:18546/api/v2/node/peers
+curl http://localhost:12001/api/v2/node/status | jq
+curl http://localhost:12001/api/v2/blockchain/height
+curl http://localhost:12001/api/v2/node/peers
 ```
 
 ### System Resources
@@ -451,11 +451,11 @@ echo ""
 
 # Node info
 echo "Node Height:"
-curl -s http://localhost:18546/api/v2/blockchain/height | jq -r '.height'
+curl -s http://localhost:12001/api/v2/blockchain/height | jq -r '.height'
 echo ""
 
 echo "Peer Count:"
-curl -s http://localhost:18546/api/v2/node/peers | jq '. | length'
+curl -s http://localhost:12001/api/v2/node/peers | jq '. | length'
 echo ""
 
 # Disk usage

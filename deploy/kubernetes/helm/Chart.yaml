@@ -1,0 +1,16 @@
+apiVersion: v2
+name: xai-blockchain
+description: XAI Blockchain Node Helm Chart
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - blockchain
+  - xai
+  - cryptocurrency
+home: https://github.com/xai-blockchain/xai
+sources:
+  - https://github.com/xai-blockchain/xai
+maintainers:
+  - name: XAI Team
+    email: support@xai-blockchain.io

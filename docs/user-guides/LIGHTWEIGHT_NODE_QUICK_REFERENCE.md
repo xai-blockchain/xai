@@ -90,17 +90,17 @@ XAI_NETWORK_MAX_PEERS=50
 
 ### Check Node Status
 ```bash
-curl http://localhost:18546/api/v2/node/status
+curl http://localhost:12001/api/v2/node/status
 ```
 
 ### Get Current Height
 ```bash
-curl http://localhost:18546/api/v2/blockchain/height
+curl http://localhost:12001/api/v2/blockchain/height
 ```
 
 ### List Peers
 ```bash
-curl http://localhost:18546/api/v2/node/peers
+curl http://localhost:12001/api/v2/node/peers
 ```
 
 ### Monitor Logs

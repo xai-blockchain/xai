@@ -431,7 +431,7 @@ CORS (Cross-Origin Resource Sharing) is configured to restrict which domains can
 By default, the following origins are allowed in development:
 ```yaml
 origins:
-  - http://localhost:3000
+  - http://localhost:12080
   - http://localhost:8080
 ```
 

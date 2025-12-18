@@ -760,7 +760,7 @@ class TestFlagCombinations:
     def test_help_with_other_flags(self):
         """Test --help works even with other flags"""
         returncode, stdout, stderr = CLITestHelper.run_command(
-            ["xai", "--node-url", "http://localhost:8545", "wallet", "--help"]
+            ["xai", "--node-url", "http://localhost:12001", "wallet", "--help"]
         )
         assert returncode == 0
 

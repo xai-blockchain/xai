@@ -67,7 +67,7 @@ case "$1" in
         ;;
 
     stats)
-        curl -s http://localhost:5000/stats | python -m json.tool
+        curl -s http://localhost:12080/stats | python -m json.tool
         ;;
 
     *)

@@ -216,7 +216,7 @@ xai mining stats --address YOUR_ADDRESS
 ## Global Options
 
 ```bash
---node-url URL        # Custom node URL (default: http://localhost:18545)
+--node-url URL        # Custom node URL (default: http://localhost:12001)
 --timeout SECONDS     # Request timeout (default: 30)
 --json-output         # Output raw JSON
 --transport [http|local]  # Choose HTTP (default) or direct on-disk access
@@ -295,7 +295,7 @@ xai blockchain info --json-output
 ### Environment Variables
 
 ```bash
-export XAI_NODE_URL=http://localhost:18545
+export XAI_NODE_URL=http://localhost:12001
 export XAI_TIMEOUT=60
 export XAI_LEGACY_CLI=1  # Use legacy CLI
 ```
@@ -303,7 +303,7 @@ export XAI_LEGACY_CLI=1  # Use legacy CLI
 ### Node URL Priority
 1. `--node-url` CLI flag
 2. `XAI_NODE_URL` environment variable
-3. Default: `http://localhost:18545`
+3. Default: `http://localhost:12001`
 
 ---
 

@@ -9,7 +9,7 @@ LABEL description="XAI Block Explorer Web Interface"
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app \
-    EXPLORER_PORT=8087
+    EXPLORER_PORT=8082
 
 # Install dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -43,6 +43,6 @@ USER explorer
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:${EXPLORER_PORT}/health || exit 1
 
-EXPOSE 8087
+EXPOSE ${EXPLORER_PORT}
 
 CMD ["python", "explorer.py"]

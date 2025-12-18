@@ -168,7 +168,7 @@ python generate_premine.py
 
 ### API Health Check
 ```bash
-curl http://localhost:5000/stats
+curl http://localhost:12080/stats
 ```
 
 ### Log Monitoring
@@ -232,7 +232,7 @@ cp genesis_mainnet.json .
 ### High Memory Usage
 ```bash
 # Check stats
-curl http://localhost:5000/stats
+curl http://localhost:12080/stats
 
 # Restart node periodically
 ./deploy/node_manager.sh restart

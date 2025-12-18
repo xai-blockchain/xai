@@ -1,0 +1,332 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: xai-blockchain
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: xai-config
+  namespace: xai-blockchain
+data:
+  XAI_NETWORK: "testnet"
+  XAI_ENV: "production"
+  XAI_API_PORT: "8080"
+  XAI_NODE_PORT: "8333"
+  XAI_METRICS_PORT: "9090"
+  XAI_DEFAULT_HOST: "0.0.0.0"
+  POSTGRES_DB: "xai_testnet"
+  POSTGRES_USER: "xai_testnet"
+  POSTGRES_HOST: "postgres"
+  REDIS_HOST: "redis"
+  LOG_LEVEL: "INFO"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: xai-secrets
+  namespace: xai-blockchain
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "changeme-use-real-secret"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: xai-data
+  namespace: xai-blockchain
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: standard
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: xai-blockchain
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: standard
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: xai-blockchain
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: xai-config
+              key: POSTGRES_DB
+        - name: POSTGRES_USER
+          valueFrom:
+            configMapKeyRef:
+              name: xai-config
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: xai-secrets
+              key: POSTGRES_PASSWORD
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - xai_testnet
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-data
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: xai-blockchain
+spec:
+  ports:
+  - port: 5432
+    targetPort: 5432
+  selector:
+    app: postgres
+  clusterIP: None
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: xai-blockchain
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+          name: redis
+        command:
+        - redis-server
+        - --appendonly
+        - "yes"
+        - --maxmemory
+        - "256mb"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: xai-blockchain
+spec:
+  ports:
+  - port: 6379
+    targetPort: 6379
+  selector:
+    app: redis
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xai-node
+  namespace: xai-blockchain
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xai-node
+  template:
+    metadata:
+      labels:
+        app: xai-node
+    spec:
+      containers:
+      - name: xai-node
+        image: xaiblockchain/node:latest
+        ports:
+        - containerPort: 8080
+          name: api
+        - containerPort: 8333
+          name: p2p
+        - containerPort: 9090
+          name: metrics
+        envFrom:
+        - configMapRef:
+            name: xai-config
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: xai-secrets
+              key: POSTGRES_PASSWORD
+        volumeMounts:
+        - name: xai-storage
+          mountPath: /data
+        - name: xai-logs
+          mountPath: /logs
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: xai-storage
+        persistentVolumeClaim:
+          claimName: xai-data
+      - name: xai-logs
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xai-node
+  namespace: xai-blockchain
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: api
+  - port: 8333
+    targetPort: 8333
+    name: p2p
+  - port: 9090
+    targetPort: 9090
+    name: metrics
+  selector:
+    app: xai-node
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xai-explorer
+  namespace: xai-blockchain
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xai-explorer
+  template:
+    metadata:
+      labels:
+        app: xai-explorer
+    spec:
+      containers:
+      - name: explorer
+        image: xaiblockchain/explorer:latest
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: XAI_API_URL
+          value: "http://xai-node:8080"
+        - name: EXPLORER_PORT
+          value: "3000"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xai-explorer
+  namespace: xai-blockchain
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 3000
+    name: http
+  selector:
+    app: xai-explorer

@@ -351,10 +351,10 @@ export XAI_STORAGE_ENABLE_COMPRESSION=1
 ### Check Node Status
 ```bash
 # Via RPC API
-curl http://localhost:18546/api/v2/node/status
+curl http://localhost:12001/api/v2/node/status
 
 # Check sync progress
-curl http://localhost:18546/api/v2/blockchain/height
+curl http://localhost:12001/api/v2/blockchain/height
 ```
 
 ### Monitor Resources
@@ -407,7 +407,7 @@ grep ERROR logs/node.log
 **Solutions**:
 1. Check network connectivity:
    ```bash
-   curl http://localhost:18546/api/v2/node/peers
+   curl http://localhost:12001/api/v2/node/peers
    ```
 
 2. Enable checkpoint sync:

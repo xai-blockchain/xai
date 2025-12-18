@@ -4,6 +4,12 @@ Task 175: Complete mini app registry sandboxing
 
 This module provides secure sandboxing for third-party mini applications
 running within the mobile wallet.
+
+Now uses the secure sandbox implementation from xai.sandbox:
+- RestrictedPython for Python code execution
+- WebAssembly for compiled code
+- Capability-based permissions
+- Resource limits and isolation
 """
 
 from __future__ import annotations
@@ -15,6 +21,28 @@ import time
 from typing import Dict, Any, List, Optional, Set, Callable
 from dataclasses import dataclass, asdict
 from enum import Enum
+from pathlib import Path
+
+# Import secure sandbox components
+from xai.sandbox.permissions import (
+    Permission,
+    PermissionLevel,
+    PermissionManager,
+    PermissionDeniedError,
+    AuditLog,
+)
+from xai.sandbox.secure_executor import (
+    SecureExecutor,
+    ExecutionContext,
+    ExecutionResult,
+    ResourceLimits,
+    SandboxAPI,
+)
+from xai.sandbox.wasm_executor import (
+    WasmExecutor,
+    WasmResult,
+    WasmLimits,
+)
 
 logger = logging.getLogger(__name__)
 

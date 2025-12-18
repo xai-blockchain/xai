@@ -48,7 +48,7 @@ Create a `.env` (git-ignored) with explicit origins and body caps so every devel
 
 ```bash
 cat <<'EOF' > .env
-XAI_API_ALLOWED_ORIGINS='["http://localhost:3000","http://127.0.0.1:3000"]'
+XAI_API_ALLOWED_ORIGINS='["http://localhost:12080","http://127.0.0.1:3000"]'
 XAI_API_MAX_JSON_BYTES=1048576
 EOF
 ```
@@ -220,7 +220,7 @@ api:
   rate_limit: 100
   api_key_required: false
   allowed_origins:
-    - "http://localhost:3000"
+    - "http://localhost:12080"
     - "http://127.0.0.1:3000"
   max_json_bytes: 1048576  # 1MB body limit
 

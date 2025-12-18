@@ -147,11 +147,20 @@ Private Key: ************************************************
 
 **⚠️ IMPORTANT:** Save your private key securely! Never share it.
 
-### 2. Get Test Coins
+### 2. Get Test Coins (Testnet Faucet)
+
+Request free testnet XAI tokens:
 
 ```bash
 xai-wallet request-faucet --address YOUR_XAI_ADDRESS
 ```
+
+**Faucet Details:**
+- 100 XAI per request
+- 1 hour cooldown
+- Tokens arrive in ~2 minutes
+
+**[→ Complete Faucet Guide](../docs/user-guides/TESTNET_FAUCET.md)**
 
 ### 3. Check Your Balance
 
@@ -184,7 +193,7 @@ After installation, verify everything works:
 - [ ] `xai-wallet generate-address` creates a wallet
 - [ ] `xai-node --help` shows node options
 - [ ] Node starts without errors
-- [ ] RPC responds: `curl http://localhost:18546/health`
+- [ ] RPC responds: `curl http://localhost:12001/health`
 
 ---
 
@@ -226,13 +235,13 @@ xai-wallet export-key --address ADDR
 
 ```bash
 # Get blockchain info
-curl http://localhost:18546/info
+curl http://localhost:12001/info
 
 # Get latest block
-curl http://localhost:18546/block/latest
+curl http://localhost:12001/block/latest
 
 # Get transaction
-curl http://localhost:18546/transaction/TX_HASH
+curl http://localhost:12001/transaction/TX_HASH
 ```
 
 ---

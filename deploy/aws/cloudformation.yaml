@@ -1,0 +1,243 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'XAI Blockchain Node - Single-Node Production Deployment'
+
+Parameters:
+  InstanceType:
+    Type: String
+    Default: t3.large
+    AllowedValues:
+      - t3.medium
+      - t3.large
+      - t3.xlarge
+      - t3.2xlarge
+      - m5.large
+      - m5.xlarge
+      - m5.2xlarge
+    Description: EC2 instance type for XAI node
+
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 Key Pair for SSH access
+
+  SSHLocation:
+    Type: String
+    Default: 0.0.0.0/0
+    Description: IP range for SSH access (CIDR notation)
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+
+  VolumeSize:
+    Type: Number
+    Default: 100
+    MinValue: 50
+    MaxValue: 1000
+    Description: EBS volume size in GB
+
+  NetworkMode:
+    Type: String
+    Default: testnet
+    AllowedValues:
+      - testnet
+      - mainnet
+    Description: XAI network mode
+
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: ami-0c02fb55b34e20036
+    us-west-2:
+      AMI: ami-0d081196e3df05f4d
+    eu-west-1:
+      AMI: ami-0d75513e7706cf2d9
+    ap-southeast-1:
+      AMI: ami-0c802847a7dd848c0
+
+Resources:
+  XAISecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for XAI blockchain node
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref SSHLocation
+          Description: SSH access
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+          Description: XAI API
+        - IpProtocol: tcp
+          FromPort: 8333
+          ToPort: 8333
+          CidrIp: 0.0.0.0/0
+          Description: XAI P2P
+        - IpProtocol: tcp
+          FromPort: 9090
+          ToPort: 9090
+          CidrIp: 0.0.0.0/0
+          Description: Metrics
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 0.0.0.0/0
+          Description: Explorer
+      Tags:
+        - Key: Name
+          Value: XAI-Node-SG
+
+  XAIInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
+      SecurityGroupIds:
+        - !Ref XAISecurityGroup
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: !Ref VolumeSize
+            VolumeType: gp3
+            Iops: 3000
+            Throughput: 125
+            DeleteOnTermination: false
+            Encrypted: true
+      IamInstanceProfile: !Ref XAIInstanceProfile
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -e
+
+          # Update system
+          apt-get update
+          apt-get upgrade -y
+
+          # Install Docker
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sh get-docker.sh
+          systemctl enable docker
+          systemctl start docker
+
+          # Install Docker Compose
+          curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          chmod +x /usr/local/bin/docker-compose
+
+          # Create XAI directory
+          mkdir -p /opt/xai
+          cd /opt/xai
+
+          # Clone repository
+          apt-get install -y git
+          git clone https://github.com/xai-blockchain/xai.git .
+
+          # Create environment file
+          cat > .env <<EOF
+          XAI_NETWORK=${NetworkMode}
+          XAI_ENV=production
+          XAI_API_PORT=8080
+          XAI_NODE_PORT=8333
+          XAI_METRICS_PORT=9090
+          XAI_DATA_DIR=/data
+          XAI_LOG_DIR=/logs
+          POSTGRES_PASSWORD=$(openssl rand -hex 32)
+          EOF
+
+          # Start node
+          cd docker/testnet
+          docker-compose -f docker-compose.one-node.yml up -d
+
+          # Setup log rotation
+          cat > /etc/logrotate.d/xai <<LOGEOF
+          /data/logs/*.log {
+            daily
+            rotate 7
+            compress
+            delaycompress
+            notifempty
+            create 0640 root root
+            sharedscripts
+          }
+          LOGEOF
+
+          # Create systemd service
+          cat > /etc/systemd/system/xai-node.service <<SERVICEEOF
+          [Unit]
+          Description=XAI Blockchain Node
+          After=docker.service
+          Requires=docker.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          WorkingDirectory=/opt/xai/docker/testnet
+          ExecStart=/usr/local/bin/docker-compose -f docker-compose.one-node.yml up -d
+          ExecStop=/usr/local/bin/docker-compose -f docker-compose.one-node.yml down
+
+          [Install]
+          WantedBy=multi-user.target
+          SERVICEEOF
+
+          systemctl daemon-reload
+          systemctl enable xai-node
+
+          # Install CloudWatch agent
+          wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+          dpkg -i amazon-cloudwatch-agent.deb
+
+          echo "XAI Node deployment complete"
+      Tags:
+        - Key: Name
+          Value: XAI-Blockchain-Node
+
+  XAIRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - Key: Name
+          Value: XAI-Node-Role
+
+  XAIInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref XAIRole
+
+  XAIElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref XAIInstance
+      Tags:
+        - Key: Name
+          Value: XAI-Node-EIP
+
+Outputs:
+  InstanceId:
+    Description: EC2 Instance ID
+    Value: !Ref XAIInstance
+
+  PublicIP:
+    Description: Public IP address
+    Value: !Ref XAIElasticIP
+
+  APIURL:
+    Description: XAI API Endpoint
+    Value: !Sub 'http://${XAIElasticIP}:8080'
+
+  ExplorerURL:
+    Description: Block Explorer
+    Value: !Sub 'http://${XAIElasticIP}:3000'
+
+  SSHCommand:
+    Description: SSH command
+    Value: !Sub 'ssh -i ${KeyName}.pem ubuntu@${XAIElasticIP}'

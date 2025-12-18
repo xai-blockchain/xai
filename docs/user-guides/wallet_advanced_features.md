@@ -582,7 +582,7 @@ if manager.verify_code(secret_key, transaction_code):
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `XAI_API_URL` | Node API endpoint | `http://localhost:18545` |
+| `XAI_API_URL` | Node API endpoint | `http://localhost:12001` |
 | `XAI_HARDWARE_WALLET_ENABLED` | Enable hardware wallet mode | `false` |
 | `XAI_HARDWARE_WALLET_PROVIDER` | Provider: `ledger`, `trezor`, `mock` | `mock` |
 | `XAI_LEDGER_BIP32_PATH` | Ledger derivation path | `m/44'/22593'/0'/0/0` |

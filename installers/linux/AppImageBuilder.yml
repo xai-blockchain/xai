@@ -1,0 +1,68 @@
+# AppImage Builder Configuration for XAI Blockchain
+# Uses appimage-builder: https://appimage-builder.readthedocs.io/
+
+version: 1
+
+AppDir:
+  path: ./AppDir
+
+  app_info:
+    id: io.xai-blockchain.xai
+    name: XAI Blockchain
+    icon: xai
+    version: 0.2.0
+    exec: usr/bin/python3
+    exec_args: "-m xai.core.node $@"
+
+  apt:
+    arch: amd64
+    sources:
+      - sourceline: 'deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse'
+        key_url: 'http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x3b4fe6acc0b21f32'
+
+    include:
+      - python3.10
+      - python3-pip
+      - python3-venv
+      - libpython3.10
+      - libssl3
+      - libffi8
+      - libsecp256k1-0
+      - libgmp10
+
+  files:
+    include:
+      - /usr/bin/python3*
+      - /usr/lib/python3*
+      - /usr/share/python3*
+
+    exclude:
+      - usr/share/man
+      - usr/share/doc
+      - usr/share/icons
+      - usr/share/applications
+
+  runtime:
+    env:
+      PYTHONHOME: '${APPDIR}/usr'
+      PYTHONPATH: '${APPDIR}/usr/lib/python3.10:${APPDIR}/usr/lib/python3.10/site-packages'
+      XAI_DATA_DIR: '${HOME}/.xai'
+      XAI_CONFIG_DIR: '${HOME}/.xai/config'
+      XAI_LOG_DIR: '${HOME}/.xai/logs'
+      PYTHONUNBUFFERED: '1'
+
+  test:
+    fedora-30:
+      image: appimagecrafters/tests-env:fedora-30
+      command: ./AppRun --version
+    debian-stable:
+      image: appimagecrafters/tests-env:debian-stable
+      command: ./AppRun --version
+    ubuntu-xenial:
+      image: appimagecrafters/tests-env:ubuntu-xenial
+      command: ./AppRun --version
+
+AppImage:
+  arch: x86_64
+  update-information: guess
+  sign-key: None

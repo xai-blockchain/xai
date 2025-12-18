@@ -56,7 +56,7 @@ python -m xai.wallet.cli hw-send --ledger \
     --recipient XAI_ADDRESS \
     --amount 10.5 \
     [--fee 0.001] \
-    [--base-url http://localhost:18545] \
+    [--base-url http://localhost:12001] \
     [--2fa-profile wallet1] \
     [--json]
 ```

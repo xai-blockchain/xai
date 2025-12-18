@@ -51,7 +51,7 @@ xai
 All commands support these global options:
 
 ```bash
---node-url TEXT      XAI node URL (default: http://localhost:18545)
+--node-url TEXT      XAI node URL (default: http://localhost:12001)
 --timeout FLOAT      Request timeout in seconds (default: 30.0)
 --json-output        Output raw JSON for scripting
 --transport [http|local]  Select HTTP (default) or direct on-disk access
@@ -512,7 +512,7 @@ Create `~/.xai/config.yaml`:
 
 ```yaml
 node:
-  url: "http://localhost:18545"
+  url: "http://localhost:12001"
   timeout: 30
 
 wallet:
@@ -600,7 +600,7 @@ done
 
 ```bash
 # Test node connectivity
-curl http://localhost:18545/info
+curl http://localhost:12001/info
 
 # Specify different node
 xai --node-url http://mainnet.xai.network:18545 blockchain info
@@ -681,7 +681,7 @@ The CLI can be used programmatically:
 from xai.cli.enhanced_cli import XAIClient
 
 # Create client
-client = XAIClient(node_url="http://localhost:18545")
+client = XAIClient(node_url="http://localhost:12001")
 
 # Get balance
 balance = client.get_balance("TXAI_YOUR_ADDRESS")

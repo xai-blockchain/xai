@@ -16,21 +16,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Python dependencies
+RUN pip install --no-cache-dir flask requests
+
 # Create non-root user
 RUN groupadd -r faucet -g 1002 && \
     useradd -r -u 1002 -g faucet -m -d /home/faucet faucet
 
 WORKDIR /app
 
-# Copy requirements
-COPY src/xai/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy faucet application (placeholder - create if needed)
-COPY --chown=faucet:faucet docker/faucet/faucet.py ./
+# Copy faucet application
+COPY --chown=faucet:faucet faucet.py ./
 
 USER faucet
 
 EXPOSE 8086
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8086/health || exit 1
 
 CMD ["python", "faucet.py"]

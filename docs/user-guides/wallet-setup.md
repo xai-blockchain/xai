@@ -80,10 +80,10 @@ npm start
 **Features:**
 - No installation required
 - Check balances and transactions
-- Request testnet faucet funds
+- Request testnet faucet funds (see [Faucet Guide](TESTNET_FAUCET.md))
 - View blockchain data
 
-**Access:** Visit the block explorer at `http://localhost:18546/explorer`
+**Access:** Visit the block explorer at `http://localhost:12001/explorer`
 
 ### 4. Multi-Signature Wallet
 
@@ -607,7 +607,7 @@ See [Wallet Advanced Features - Hardware Wallets](wallet_advanced_features.md#ha
 
 Now that you have your wallet set up:
 
-1. **Get Some XAI**: Use the [faucet](faucet.md) (testnet) or purchase XAI
+1. **Get Some XAI**: Use the [testnet faucet](TESTNET_FAUCET.md) (100 XAI free) or purchase XAI on exchanges
 2. **Send a Transaction**: Follow the [Transaction Guide](transactions.md)
 3. **Explore Features**: Try time-locked transactions, atomic swaps
 4. **Advanced Features**: See [Wallet Advanced Features](wallet_advanced_features.md) for:

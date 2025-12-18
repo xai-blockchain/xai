@@ -88,7 +88,7 @@ python src/xai/wallet/cli.py send \
 # Output:
 # Transaction Hash: 0xabc123...
 # Status: Broadcast to network
-# Track: http://localhost:18546/explorer/transaction/0xabc123...
+# Track: http://localhost:12001/explorer/transaction/0xabc123...
 ```
 
 ### Send with Custom Fee
@@ -472,7 +472,7 @@ python src/xai/wallet/cli.py watch-transaction \
   --wait-confirmations 6
 
 # Check in block explorer
-# http://localhost:18546/explorer/transaction/TX_HASH
+# http://localhost:12001/explorer/transaction/TX_HASH
 
 # Real-time updates (desktop wallet)
 # Automatically updates in GUI transaction list
@@ -556,7 +556,7 @@ python src/xai/wallet/cli.py refresh-wallet
 python src/xai/wallet/cli.py resync
 
 # Check on block explorer
-# http://localhost:18546/explorer/transaction/TX_HASH
+# http://localhost:12001/explorer/transaction/TX_HASH
 
 # Verify transaction was broadcast
 python src/xai/wallet/cli.py transaction-status --tx-hash TX_HASH
@@ -608,7 +608,7 @@ python src/xai/wallet/cli.py transaction-status --tx-hash TX_HASH
 - [Wallet Setup Guide](wallet-setup.md) - Setting up and securing wallets
 - [Mining Guide](mining.md) - Understanding transaction mining
 - [FAQ](faq.md) - Common questions and answers
-- [Block Explorer](http://localhost:18546/explorer) - View transactions
+- [Block Explorer](http://localhost:12001/explorer) - View transactions
 
 ## Getting Help
 

@@ -23,6 +23,12 @@ try:
 except ImportError:
     config = None
 
+try:
+    from xai.core.pruning import BlockPruningManager, PruningPolicy
+except ImportError:
+    BlockPruningManager = None  # type: ignore
+    PruningPolicy = None  # type: ignore
+
 logger = logging.getLogger(__name__)
 
 
@@ -505,6 +511,7 @@ class NodeModeManager:
         self.pruned_node: Optional[PrunedNode] = None
         self.archival_node: Optional[ArchivalNode] = None
         self.fast_sync: Optional[FastSyncManager] = None
+        self.pruning_manager: Optional[Any] = None  # BlockPruningManager instance
 
         # Auto-configure from environment
         if auto_configure and config:
@@ -517,6 +524,24 @@ class NodeModeManager:
 
         mode_str = config.NODE_MODE
         prune_blocks = config.PRUNE_BLOCKS
+
+        # Initialize new BlockPruningManager if available and configured
+        if BlockPruningManager and hasattr(config, 'PRUNE_MODE'):
+            prune_mode = getattr(config, 'PRUNE_MODE', 'none')
+            if prune_mode != 'none':
+                try:
+                    self.pruning_manager = BlockPruningManager(self.blockchain)
+                    logger.info(
+                        "BlockPruningManager initialized with mode=%s",
+                        prune_mode,
+                        extra={"event": "pruning_manager.init", "mode": prune_mode}
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "Failed to initialize BlockPruningManager: %s",
+                        str(e),
+                        extra={"event": "pruning_manager.init_failed", "error": str(e)}
+                    )
 
         # Determine mode
         if mode_str == "pruned" or (mode_str == "full" and prune_blocks > 0):

@@ -3,7 +3,7 @@
 # INTERNAL USE ONLY - DELETE BEFORE PUBLIC RELEASE
 # Monitor node health and alert on issues
 
-NODE_URL="http://localhost:5000"
+NODE_URL="http://localhost:12080"
 ALERT_EMAIL=""  # Set email for alerts
 CHECK_INTERVAL=60  # seconds
 

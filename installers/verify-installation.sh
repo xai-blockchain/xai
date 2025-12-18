@@ -272,9 +272,9 @@ check_network_connectivity() {
     echo "Checking network connectivity..."
 
     # Check if node is accessible
-    if curl -f http://localhost:18546/health >/dev/null 2>&1; then
+    if curl -f http://localhost:12001/health >/dev/null 2>&1; then
         print_success "Node RPC is accessible on port 18546"
-    elif curl -f http://localhost:8546/health >/dev/null 2>&1; then
+    elif curl -f http://localhost:12001/health >/dev/null 2>&1; then
         print_success "Node RPC is accessible on port 8546 (mainnet)"
     else
         print_warning "Node RPC not accessible (node may not be running)"

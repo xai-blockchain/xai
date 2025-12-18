@@ -1,0 +1,86 @@
+{
+  "name": "@xai/react-native-sdk",
+  "version": "1.0.0",
+  "description": "Production-ready React Native SDK for the XAI blockchain with secure key storage and biometric authentication",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "prepublishOnly": "npm run build",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "xai",
+    "blockchain",
+    "react-native",
+    "sdk",
+    "cryptocurrency",
+    "web3",
+    "mobile",
+    "biometric",
+    "secure-storage"
+  ],
+  "author": "XAI Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/xai-blockchain/xai.git",
+    "directory": "sdk/react-native"
+  },
+  "bugs": {
+    "url": "https://github.com/xai-blockchain/xai/issues"
+  },
+  "homepage": "https://xai-blockchain.io",
+  "peerDependencies": {
+    "react": ">=17.0.0",
+    "react-native": ">=0.70.0",
+    "@react-native-async-storage/async-storage": ">=1.17.0",
+    "react-native-biometrics": ">=3.0.0",
+    "react-native-keychain": ">=8.0.0",
+    "react-native-get-random-values": ">=1.8.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.2",
+    "axios-retry": "^4.0.0",
+    "elliptic": "^6.5.4",
+    "bip39": "^3.1.0",
+    "buffer": "^6.0.3"
+  },
+  "devDependencies": {
+    "@react-native-async-storage/async-storage": "^1.21.0",
+    "@types/elliptic": "^6.4.18",
+    "@types/jest": "^29.5.11",
+    "@types/node": "^20.10.6",
+    "@types/react": "^18.2.45",
+    "@typescript-eslint/eslint-plugin": "^6.17.0",
+    "@typescript-eslint/parser": "^6.17.0",
+    "eslint": "^8.56.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.1.1",
+    "react": "18.2.0",
+    "react-native": "0.73.2",
+    "react-native-biometrics": "^3.0.1",
+    "react-native-get-random-values": "^1.11.0",
+    "react-native-keychain": "^8.1.2",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "react-native": {
+    "crypto": false
+  }
+}

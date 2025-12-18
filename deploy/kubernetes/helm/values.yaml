@@ -1,0 +1,101 @@
+# Default values for XAI Blockchain Node
+
+# Network configuration
+network:
+  mode: testnet  # testnet or mainnet
+
+# Node configuration
+node:
+  image:
+    repository: xaiblockchain/node
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  replicas: 1
+
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+
+  service:
+    type: LoadBalancer
+    apiPort: 8080
+    p2pPort: 8333
+    metricsPort: 9090
+
+  storage:
+    size: 100Gi
+    storageClass: standard
+
+# Explorer configuration
+explorer:
+  enabled: true
+  image:
+    repository: xaiblockchain/explorer
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  replicas: 1
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+  service:
+    type: LoadBalancer
+    port: 80
+
+# PostgreSQL configuration
+postgresql:
+  enabled: true
+  image:
+    repository: postgres
+    tag: 15-alpine
+
+  auth:
+    database: xai_testnet
+    username: xai_testnet
+    password: changeme
+
+  storage:
+    size: 50Gi
+    storageClass: standard
+
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+# Redis configuration
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: 7-alpine
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+# Monitoring
+monitoring:
+  enabled: false
+  prometheus:
+    enabled: false
+  grafana:
+    enabled: false

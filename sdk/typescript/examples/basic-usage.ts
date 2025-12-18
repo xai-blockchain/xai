@@ -1,56 +1,58 @@
 /**
  * Basic Usage Example
- *
- * Demonstrates fundamental operations with the XAI SDK.
+ * Demonstrates wallet creation, transaction building, and blockchain queries
  */
 
-import { XAIClient } from '../src';
+import { XAIClient, Wallet } from '@xai/sdk';
 
 async function main() {
-  // Create client
+  // Initialize client
   const client = new XAIClient({
     baseUrl: 'http://localhost:5000',
+    wsUrl: 'ws://localhost:5000/ws',
   });
 
+  console.log('XAI SDK Basic Usage Example\n');
+
+  // 1. Create a new wallet
+  console.log('1. Creating wallet...');
+  const wallet = client.wallet.create();
+  console.log('   Address:', wallet.address);
+  console.log('   Public Key:', wallet.publicKey.substring(0, 32) + '...');
+
+  // 2. Get wallet balance
+  console.log('\n2. Getting balance...');
   try {
-    // Check node health
-    const health = await client.healthCheck();
-    console.log('Node health:', health.status);
-
-    // Get node info
-    const info = await client.getInfo();
-    console.log('Node version:', info.version);
-
-    // Create a wallet
-    console.log('\n--- Creating Wallet ---');
-    const wallet = await client.wallet.create();
-    console.log('Wallet address:', wallet.address);
-    console.log('Public key:', wallet.publicKey);
-
-    // Get wallet balance
-    console.log('\n--- Checking Balance ---');
     const balance = await client.wallet.getBalance(wallet.address);
-    console.log('Balance:', balance.balance);
-    console.log('Available:', balance.availableBalance);
-
-    // Get blockchain stats
-    console.log('\n--- Blockchain Statistics ---');
-    const stats = await client.blockchain.getStats();
-    console.log('Total blocks:', stats.totalBlocks);
-    console.log('Total transactions:', stats.totalTransactions);
-    console.log('Network hashrate:', stats.hashrate);
-
-    // List recent blocks
-    console.log('\n--- Recent Blocks ---');
-    const blocks = await client.blockchain.listBlocks({ limit: 5 });
-    blocks.data.forEach((block) => {
-      console.log(`Block ${block.number}: ${block.hash} (${block.transactions} txs)`);
-    });
-  } catch (error) {
-    console.error('Error:', error);
-  } finally {
-    client.close();
+    console.log('   Balance:', balance.balance, 'XAI');
+  } catch (error: any) {
+    console.log('   Error:', error.message);
   }
+
+  // 3. Get blockchain info
+  console.log('\n3. Getting blockchain info...');
+  try {
+    const info = await client.blockchain.getInfo();
+    console.log('   Height:', info.height);
+    console.log('   Difficulty:', info.difficulty);
+    console.log('   Total Transactions:', info.total_transactions);
+  } catch (error: any) {
+    console.log('   Error:', error.message);
+  }
+
+  // 4. Build a transaction
+  console.log('\n4. Building transaction...');
+  const recipientAddress = 'XAI' + '0'.repeat(40);
+  const tx = await client.transaction
+    .build(wallet.address, recipientAddress, 10)
+    .setFee(0.1)
+    .setNonce(0)
+    .sign(wallet);
+  console.log('   Transaction ID:', tx.txid.substring(0, 32) + '...');
+  console.log('   Amount:', tx.amount, 'XAI');
+  console.log('   Fee:', tx.fee, 'XAI');
+
+  console.log('\nExample completed!');
 }
 
-main();
+main().catch(console.error);

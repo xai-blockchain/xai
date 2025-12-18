@@ -52,7 +52,9 @@ python src/xai/wallet/cli.py generate-address
 
 ## Step 3: Get Testnet Tokens (1 minute)
 
-Get free testnet XAI tokens from the faucet:
+Get free testnet XAI tokens from the faucet - choose your preferred method:
+
+### Method 1: CLI (Recommended)
 
 ```bash
 # Request testnet tokens (replace with your address)
@@ -63,19 +65,41 @@ python src/xai/wallet/cli.py request-faucet --address TXAI_YOUR_ADDRESS
 # Note: This is testnet XAI - it has no real value!
 ```
 
-**Faucet Details:**
-- **Amount:** 100 XAI per request
-- **Rate Limit:** Once per address per hour
-- **API Endpoint:** `http://localhost:18545/faucet/claim` (testnet)
-- **Web UI:** Coming soon
-
-### Alternative: Use API Directly
+### Method 2: API Direct
 
 ```bash
-curl -X POST http://localhost:18545/faucet/claim \
+curl -X POST http://localhost:12001/faucet/claim \
   -H "Content-Type: application/json" \
   -d '{"address": "TXAI_YOUR_ADDRESS"}'
+
+# Response:
+# {
+#   "success": true,
+#   "amount": 100.0,
+#   "txid": "abc123...",
+#   "message": "Testnet faucet claim successful! 100 XAI will be added to your address after the next block."
+# }
 ```
+
+### Method 3: Web UI
+
+```bash
+# Start the faucet web interface (Docker required)
+cd docker/faucet
+docker-compose up -d
+
+# Open in browser: http://localhost:8086
+# Enter your TXAI address and click "Request Tokens"
+```
+
+**Faucet Details:**
+- **Amount:** 100 XAI per request
+- **Rate Limit:** 1 request per hour per address
+- **Delivery:** Next block (~2 minutes)
+- **API Endpoint:** `POST http://localhost:12001/faucet/claim`
+- **Web UI:** http://localhost:8086 (when Docker faucet is running)
+
+**[→ Complete Faucet Documentation](user-guides/TESTNET_FAUCET.md)**
 
 ---
 
@@ -125,7 +149,7 @@ View your transaction in the blockchain explorer:
 python src/xai/explorer.py
 
 # Open in browser
-# http://localhost:5000
+# http://localhost:12080
 ```
 
 **Explorer Features:**
@@ -148,8 +172,9 @@ export XAI_NETWORK=testnet
 python -m xai.core.node
 
 # Node will start on:
-# - P2P Port: 18545
-# - RPC Port: 18546
+# - RPC Port: 12001
+# - P2P Port: 12002
+# - WebSocket: 12003
 ```
 
 **Start Mining:**
@@ -169,8 +194,10 @@ python -m xai.core.node --miner $MINER_ADDRESS
 | Parameter | Value |
 |-----------|-------|
 | Network ID | 0xABCD |
-| P2P Port | 18545 |
-| RPC Port | 18546 |
+| RPC Port | 12001 |
+| P2P Port | 12002 |
+| WebSocket Port | 12003 |
+| Explorer Port | 12080 |
 | Address Prefix | TXAI |
 | Block Time | 2 minutes |
 | Faucet Amount | 100 XAI |
@@ -178,10 +205,12 @@ python -m xai.core.node --miner $MINER_ADDRESS
 
 ### Testnet Endpoints
 
-- **RPC:** `http://localhost:18546`
-- **Faucet:** `http://localhost:18545/faucet/claim`
-- **Explorer:** `http://localhost:5000`
-- **WebSocket:** `ws://localhost:18546/ws`
+- **RPC:** `http://localhost:12001`
+- **Faucet:** `http://localhost:12001/faucet/claim`
+- **Explorer:** `http://localhost:12080`
+- **WebSocket:** `ws://localhost:12003`
+- **Grafana:** `http://localhost:12030` (Docker setup only)
+- **Prometheus:** `http://localhost:12090` (Docker setup only)
 
 ---
 
@@ -216,10 +245,10 @@ python -m xai.core.node
 python -m xai.core.node --miner TXAI_ADDRESS
 
 # Check node status
-curl http://localhost:18546/health
+curl http://localhost:12001/health
 
 # View peers
-curl http://localhost:18546/peers
+curl http://localhost:12001/peers
 ```
 
 ---

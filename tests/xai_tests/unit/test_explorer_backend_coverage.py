@@ -46,7 +46,7 @@ def test_db():
 @pytest.fixture
 def mock_node_url():
     """Mock node URL"""
-    return "http://localhost:8545"
+    return "http://localhost:12001"
 
 
 @pytest.fixture

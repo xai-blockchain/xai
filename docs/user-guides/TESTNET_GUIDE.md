@@ -77,8 +77,8 @@ api:
   host: "0.0.0.0"
   port: 18546
   cors_origins:
-    - "http://localhost:5000"
-    - "http://localhost:3000"
+    - "http://localhost:12080"
+    - "http://localhost:12080"
 
 # Mining settings
 mining:
@@ -100,85 +100,63 @@ python -m xai.core.node --config ~/.xai/testnet.yaml
 
 ## Testnet Faucet
 
-Get free testnet XAI tokens for development and testing.
+Get free testnet XAI tokens instantly for development and testing.
 
-### Faucet Details
+### Quick Access
 
-- **Amount:** 100 XAI per request
-- **Rate Limit:** 1 request per address per hour
-- **Rate Limit (IP):** 10 requests per IP per hour
-- **Requirements:** Valid TXAI address
-- **Delivery Time:** Next block (~2 minutes)
-
-### Using the Faucet (CLI)
-
+**CLI (Recommended):**
 ```bash
-# Request testnet tokens
 python src/xai/wallet/cli.py request-faucet --address TXAI_YOUR_ADDRESS
-
-# Output:
-# ✅ Testnet faucet claim successful!
-# 100 XAI will be added to your address after the next block.
-# Note: This is testnet XAI - it has no real value!
 ```
 
-### Using the Faucet (API)
-
+**API:**
 ```bash
-# POST request to faucet endpoint
-curl -X POST http://localhost:18545/faucet/claim \
+curl -X POST http://localhost:12001/faucet/claim \
   -H "Content-Type: application/json" \
-  -d '{
-    "address": "TXAI_YOUR_ADDRESS"
-  }'
-
-# Response:
-# {
-#   "success": true,
-#   "amount": 100.0,
-#   "txid": "abc123...",
-#   "message": "Testnet faucet claim successful! 100 XAI will be added to your address after the next block.",
-#   "note": "This is testnet XAI - it has no real value!"
-# }
+  -d '{"address": "TXAI_YOUR_ADDRESS"}'
 ```
 
-### Using the Faucet (Web UI)
-
-**Coming Soon:** Web-based faucet interface at `https://testnet-faucet.xai.io`
-
-Features will include:
-- Simple address input form
-- CAPTCHA verification
-- Real-time balance updates
-- Transaction status tracking
-
-### Faucet Rate Limiting
-
-If you exceed the rate limit:
-
-```json
-{
-  "success": false,
-  "error": "Rate limit exceeded",
-  "code": "rate_limited",
-  "retry_after": 3600,
-  "message": "You can request testnet tokens once per hour. Please try again in 58 minutes."
-}
+**Web UI:**
+```bash
+cd docker/faucet && docker-compose up -d
+# Open http://localhost:8086
 ```
 
-### Faucet Troubleshooting
+### Faucet Specifications
 
-**"Invalid address for this network"**
-- Ensure your address starts with `TXAI` (testnet prefix)
-- Check for typos in the address
+| Parameter | Value |
+|-----------|-------|
+| **Amount** | 100 XAI per request |
+| **Rate Limit** | 1 request per hour per address |
+| **Delivery** | Next block (~2 minutes) |
+| **Endpoint** | `POST /faucet/claim` |
+| **Web UI** | http://localhost:8086 |
 
-**"Rate limit exceeded"**
-- Wait one hour between requests to the same address
-- Use a different address if you need more tokens immediately
+### Full Documentation
 
-**"Faucet is disabled"**
-- The faucet may be temporarily disabled for maintenance
-- Check testnet status at `/health` endpoint
+For complete faucet documentation including:
+- All access methods (CLI, API, Web UI)
+- Detailed error handling
+- Rate limiting specifications
+- Troubleshooting guide
+- Integration examples (Python, JavaScript, Bash)
+- Advanced usage and best practices
+
+**[→ See Complete Faucet Documentation](TESTNET_FAUCET.md)**
+
+### Quick Troubleshooting
+
+**Tokens not received?**
+- Wait ~2 minutes for next block
+- Check balance: `python src/xai/wallet/cli.py balance --address TXAI_YOUR_ADDRESS`
+
+**Rate limited?**
+- Wait 1 hour between requests to same address
+- Use different address if needed immediately
+
+**Invalid address?**
+- Ensure address starts with `TXAI` (testnet prefix)
+- Generate new address: `python src/xai/wallet/cli.py generate-address`
 
 ---
 
@@ -193,7 +171,7 @@ View testnet blocks, transactions, and addresses in real-time.
 python src/xai/explorer.py
 
 # Access in browser
-# http://localhost:5000
+# http://localhost:12080
 ```
 
 ### Explorer Features
@@ -209,19 +187,19 @@ python src/xai/explorer.py
 
 ```bash
 # Get latest block
-curl http://localhost:5000/api/block/latest
+curl http://localhost:12080/api/block/latest
 
 # Get specific block
-curl http://localhost:5000/api/block/12345
+curl http://localhost:12080/api/block/12345
 
 # Get transaction
-curl http://localhost:5000/api/transaction/TX_HASH
+curl http://localhost:12080/api/transaction/TX_HASH
 
 # Get address balance
-curl http://localhost:5000/api/address/TXAI_ADDRESS
+curl http://localhost:12080/api/address/TXAI_ADDRESS
 
 # Get network stats
-curl http://localhost:5000/api/stats
+curl http://localhost:12080/api/stats
 ```
 
 ### Public Explorer (Coming Soon)
@@ -242,28 +220,28 @@ Features:
 
 ```bash
 # Health check
-GET http://localhost:18546/health
+GET http://localhost:12001/health
 
 # Get blockchain stats
-GET http://localhost:18546/stats
+GET http://localhost:12001/stats
 
 # Get latest block
-GET http://localhost:18546/block/latest
+GET http://localhost:12001/block/latest
 
 # Get specific block
-GET http://localhost:18546/block/{height}
+GET http://localhost:12001/block/{height}
 
 # Get transaction
-GET http://localhost:18546/transaction/{txid}
+GET http://localhost:12001/transaction/{txid}
 
 # Get address balance
-GET http://localhost:18546/account/{address}
+GET http://localhost:12001/account/{address}
 
 # Get address nonce
-GET http://localhost:18546/address/{address}/nonce
+GET http://localhost:12001/address/{address}/nonce
 
 # Submit transaction
-POST http://localhost:18546/send
+POST http://localhost:12001/send
 Content-Type: application/json
 {
   "from": "TXAI_FROM",
@@ -274,13 +252,13 @@ Content-Type: application/json
 }
 
 # Get mempool stats
-GET http://localhost:18546/mempool/stats
+GET http://localhost:12001/mempool/stats
 
 # Get peer list
-GET http://localhost:18546/peers
+GET http://localhost:12001/peers
 
 # Claim faucet
-POST http://localhost:18546/faucet/claim
+POST http://localhost:12001/faucet/claim
 Content-Type: application/json
 {
   "address": "TXAI_ADDRESS"
@@ -291,7 +269,7 @@ Content-Type: application/json
 
 ```javascript
 // Connect to WebSocket
-const ws = new WebSocket('ws://localhost:18546/ws');
+const ws = new WebSocket('ws://localhost:12003');
 
 // Subscribe to new blocks
 ws.send(JSON.stringify({
@@ -373,7 +351,7 @@ mining:
 3. Verify internet connection
 4. Try manual peer addition:
    ```bash
-   curl -X POST http://localhost:18546/peers/add \
+   curl -X POST http://localhost:12001/peers/add \
      -H "Content-Type: application/json" \
      -d '{"peer": "testnet-seed1.xai.io:18545"}'
    ```
@@ -386,7 +364,7 @@ mining:
 1. Verify address starts with `TXAI`
 2. Check rate limit (1 hour between requests)
 3. Wait for next block (~2 minutes) for tokens to arrive
-4. Check node is synced: `curl http://localhost:18546/stats`
+4. Check node is synced: `curl http://localhost:12001/stats`
 
 ### Transaction not confirming
 
@@ -394,9 +372,9 @@ mining:
 
 **Solutions:**
 1. Wait for next block (~2 minutes)
-2. Check mempool status: `curl http://localhost:18546/mempool/stats`
+2. Check mempool status: `curl http://localhost:12001/mempool/stats`
 3. Verify transaction fee is sufficient (minimum 0.0001 XAI)
-4. Check nonce is correct: `curl http://localhost:18546/address/TXAI_ADDRESS/nonce`
+4. Check nonce is correct: `curl http://localhost:12001/address/TXAI_ADDRESS/nonce`
 
 ### Mining no blocks
 
@@ -472,10 +450,10 @@ The testnet may be reset periodically for the following reasons:
 
 ```bash
 # Node status
-curl http://localhost:18546/health
+curl http://localhost:12001/health
 
 # Network stats
-curl http://localhost:18546/stats
+curl http://localhost:12001/stats
 
 # Response:
 # {
@@ -495,10 +473,10 @@ curl http://localhost:18546/stats
 tail -f ~/.xai/testnet/logs/node.log
 
 # Check peer connections
-curl http://localhost:18546/peers?verbose=true
+curl http://localhost:12001/peers?verbose=true
 
 # Monitor mining
-curl http://localhost:18546/mining/stats
+curl http://localhost:12001/mining/stats
 ```
 
 ---

@@ -365,7 +365,7 @@ chmod +x xai-light-setup.sh
 
 ```bash
 # Via API
-curl http://localhost:18546/light-client/status
+curl http://localhost:12001/light-client/status
 
 # Response:
 # {

@@ -24,6 +24,7 @@ from xai.core.api_routes.crypto_deposits import register_crypto_deposit_routes
 from xai.core.api_routes.payment import register_payment_routes
 from xai.core.api_routes.notifications import register_notification_routes
 from xai.core.api_routes.sync import register_sync_routes
+from xai.core.api_routes.light_client import register_light_client_routes
 
 __all__ = [
     "register_core_routes",
@@ -44,4 +45,5 @@ __all__ = [
     "register_payment_routes",
     "register_notification_routes",
     "register_sync_routes",
+    "register_light_client_routes",
 ]

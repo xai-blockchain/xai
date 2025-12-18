@@ -46,16 +46,21 @@ services:
     depends_on:
       - prometheus
 
-  # Placeholder for blockchain nodes - customize per chain type
+  # XAI Node 1 - Primary blockchain node
+  # Uncomment and configure with your node image
   # node1:
   #   image: your-xai-node-image
   #   container_name: xai-node1
   #   ports:
   #     - "12001:8545"  # RPC
   #     - "12002:30303" # P2P
-  #     - "12003:8546"  # WS
+  #     - "12003:8546"  # WebSocket
   #   volumes:
   #     - xai-node1-data:/data
+  #   environment:
+  #     - XAI_RPC_PORT=8545
+  #     - XAI_P2P_PORT=30303
+  #     - XAI_WS_PORT=8546
   #   networks:
   #     - xai-testnet
 
@@ -70,7 +75,9 @@ services:
       - "12050:5000"
     environment:
       - FLASK_ENV=development
+      - FLASK_PORT=5000
       - NODE_RPC_URL=http://xai-node1:8545
+      - XAI_RPC_PORT=12001
     volumes:
       - ../flask-app:/app
     networks:

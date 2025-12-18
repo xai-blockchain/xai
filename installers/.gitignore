@@ -1,0 +1,35 @@
+# Build artifacts
+*.deb
+*.rpm
+*.tar.gz
+*.zip
+
+# Build directories
+build/
+dist/
+*.egg-info/
+
+# Package build
+debian/.debhelper/
+debian/xai-blockchain/
+debian/files
+debian/*.substvars
+debian/*.log
+
+# RPM build
+rpmbuild/
+*.src.rpm
+
+# Checksums and signatures
+SHA256SUMS
+SHA256SUMS.asc
+SHA256SUMS.sig
+
+# Test artifacts
+test-results/
+.pytest_cache/
+
+# Temporary files
+*.tmp
+*.bak
+*~

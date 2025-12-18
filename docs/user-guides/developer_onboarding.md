@@ -8,6 +8,7 @@
 ## Key Commands
 - Run node: `python -m xai.core.node` (API on 12001, metrics 12070)
 - Run testnet stack: `cd docker/testnet && docker compose up -d --build`
+- Get testnet tokens: `python src/xai/wallet/cli.py request-faucet --address TXAI_YOUR_ADDRESS` (see [Faucet Guide](TESTNET_FAUCET.md))
 - Tests: `pytest` (unit) or `pytest -m integration`
 - Lint/format: `black . && isort .`; typecheck: `mypy`; security: `bandit -r src`
 - CLI completion: `xai completion --shell bash|zsh > /etc/bash_completion.d/xai` (or source in your shell)

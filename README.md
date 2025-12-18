@@ -12,26 +12,86 @@ XAI is a production-ready blockchain implementation featuring proof-of-work cons
 
 ## 🚀 Get Started in 5 Minutes
 
-**New to XAI?** Follow our [Quick Start Guide](docs/QUICK_START.md) to:
-- Install XAI blockchain in one command
-- Create your first wallet
-- Get free testnet tokens from the faucet
-- Send your first transaction
-- View it in the block explorer
+### Interactive Setup Wizard (Recommended)
 
-**[→ Read the Quick Start Guide](docs/QUICK_START.md)**
+The easiest way to set up your XAI node is using our interactive wizard:
+
+```bash
+# Clone and enter the repository
+git clone https://github.com/xai-blockchain/xai.git
+cd xai
+
+# Run the setup wizard
+python scripts/setup_wizard.py
+```
+
+The wizard will guide you through:
+- Network selection (testnet/mainnet)
+- Node mode configuration (full/pruned/light/archival)
+- Port configuration with conflict detection
+- Wallet creation
+- Security configuration
+- Optional systemd service installation
+
+**[→ See Setup Wizard Documentation](scripts/SETUP_WIZARD.md)**
+
+### Manual Setup
+
+**New to XAI?** Follow our **[QUICKSTART Guide](docs/QUICKSTART.md)** - get running in 5 minutes:
+- ✅ Multiple installation options (pip, Docker, packages)
+- ✅ Create your first wallet
+- ✅ Get free testnet tokens from faucet
+- ✅ Send your first transaction
+- ✅ View it in the block explorer
+
+**[→ START HERE: QUICKSTART Guide](docs/QUICKSTART.md)** ← **Complete beginner's guide**
+
+**Choose Your Path:**
+- **Desktop/Server:** [QUICKSTART Guide](docs/QUICKSTART.md)
+- **Mobile Development:** [Mobile Quick Start](docs/user-guides/mobile_quickstart.md) (React Native/Flutter)
+- **Raspberry Pi/IoT:** [Lightweight Node Guide](docs/user-guides/lightweight_node_guide.md)
+- **Light Client:** [Light Client Mode](docs/user-guides/light_client_mode.md) (SPV, minimal resources)
 
 ### 💧 Testnet Faucet
 
-Get free testnet XAI tokens for development:
+Get free testnet XAI tokens instantly for development and testing.
 
+#### Quick Access
+
+**CLI Method (Recommended):**
 ```bash
 python src/xai/wallet/cli.py request-faucet --address TXAI_YOUR_ADDRESS
 ```
 
-**Faucet:** 100 XAI per request | **Rate Limit:** 1 hour | **Delivery:** Next block (~2 min)
+**API Method:**
+```bash
+curl -X POST http://localhost:12001/faucet/claim \
+  -H "Content-Type: application/json" \
+  -d '{"address": "TXAI_YOUR_ADDRESS"}'
+```
 
-**[→ Complete Testnet Guide](docs/user-guides/TESTNET_GUIDE.md)**
+**Web UI:**
+Open the standalone faucet web interface:
+```bash
+# Start the faucet web UI (requires Docker)
+cd docker/faucet
+docker-compose up -d
+# Access at http://localhost:8086
+```
+
+#### Faucet Specifications
+
+| Parameter | Value |
+|-----------|-------|
+| **Amount** | 100 XAI per request |
+| **Rate Limit** | 1 request per hour per address |
+| **Delivery** | Next block (~2 minutes) |
+| **Endpoint** | `http://localhost:12001/faucet/claim` |
+| **Web UI Port** | 8086 (Docker) |
+
+**Note:** Testnet XAI has no real value. Use it freely for development and testing.
+
+**[→ Complete Faucet Documentation](docs/user-guides/TESTNET_FAUCET.md)** | **[→ Testnet Guide](docs/user-guides/TESTNET_GUIDE.md)**
 
 ---
 
@@ -82,7 +142,7 @@ export XAI_NETWORK=development
 python -m xai.core.node
 ```
 
-The node will start on port 18545 (testnet) or 8545 (mainnet).
+The node will start on port 12001 (RPC), 12002 (P2P), and 12003 (WebSocket).
 
 ### Start Mining
 
@@ -112,7 +172,7 @@ Use the faucet helper to receive test coins from a configured node:
 
 ```bash
 python src/xai/wallet/cli.py request-faucet --address YOUR_XAI_ADDRESS
-# Optional: override API host (defaults to http://localhost:18545)
+# Optional: override API host (defaults to http://localhost:12001)
 # python src/xai/wallet/cli.py request-faucet --address YOUR_XAI_ADDRESS --base-url http://remote-node:18545
 ```
 
@@ -211,13 +271,13 @@ valid = Block.verify_merkle_proof(txid, proof, block.merkle_root)
 
 ```bash
 # Get block information
-curl http://localhost:18546/block/12345
+curl http://localhost:12001/block/12345
 
 # Get transaction status
-curl http://localhost:18546/transaction/tx_hash
+curl http://localhost:12001/transaction/tx_hash
 
 # Get account balance
-curl http://localhost:18546/account/YOUR_ADDRESS
+curl http://localhost:12001/account/YOUR_ADDRESS
 ```
 
 ## Architecture Overview
@@ -345,7 +405,7 @@ XAI supports extensive configuration through environment variables:
 ```bash
 # Network Configuration
 export XAI_NETWORK=testnet          # Network type: testnet/mainnet
-export XAI_NODE_URL=http://localhost:8545  # Node RPC endpoint
+export XAI_NODE_URL=http://localhost:12001  # Node RPC endpoint
 
 # Block Explorer Configuration
 export XAI_CACHE_TTL=60             # Response cache TTL in seconds (default: 60)

@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  xai-faucet:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: xai-testnet-faucet
+    ports:
+      - "8086:8086"
+    environment:
+      # XAI Node API URL (adjust to your node's address)
+      XAI_API_URL: ${XAI_API_URL:-http://host.docker.internal:18545}
+
+      # Faucet web UI port
+      FAUCET_PORT: ${FAUCET_PORT:-8086}
+
+      # Amount to dispense per request (XAI)
+      FAUCET_AMOUNT: ${FAUCET_AMOUNT:-100}
+
+      # Cooldown period in seconds (default: 1 hour)
+      FAUCET_COOLDOWN: ${FAUCET_COOLDOWN:-3600}
+
+    networks:
+      - xai-network
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    labels:
+      com.xai.service: "faucet"
+      com.xai.description: "XAI Testnet Faucet Web Interface"
+
+networks:
+  xai-network:
+    name: xai-testnet
+    external: true

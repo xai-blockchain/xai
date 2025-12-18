@@ -1,0 +1,57 @@
+# DigitalOcean App Platform Specification
+# For one-click deployment to App Platform
+
+name: xai-blockchain-node
+region: nyc
+
+services:
+- name: xai-node
+  image:
+    registry_type: DOCKER_HUB
+    repository: xaiblockchain/node
+    tag: latest
+  instance_count: 1
+  instance_size_slug: professional-m
+
+  envs:
+  - key: XAI_NETWORK
+    value: "testnet"
+  - key: XAI_ENV
+    value: "production"
+  - key: XAI_API_PORT
+    value: "8080"
+  - key: XAI_NODE_PORT
+    value: "8333"
+  - key: XAI_METRICS_PORT
+    value: "9090"
+  - key: POSTGRES_PASSWORD
+    type: SECRET
+
+  http_port: 8080
+
+  routes:
+  - path: /
+
+  health_check:
+    http_path: /health
+    initial_delay_seconds: 60
+    period_seconds: 30
+    timeout_seconds: 10
+    success_threshold: 1
+    failure_threshold: 3
+
+databases:
+- name: xai-postgres
+  engine: PG
+  version: "15"
+  production: false
+  cluster_name: xai-db-cluster
+
+- name: xai-redis
+  engine: REDIS
+  version: "7"
+  production: false
+  cluster_name: xai-cache-cluster
+
+features:
+- buildpack-stack=ubuntu-22
