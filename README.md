@@ -1,8 +1,37 @@
 # XAI Blockchain
 
+![XAI Testnet](https://img.shields.io/badge/Testnet-Active-success)
+![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue)
+![License MIT](https://img.shields.io/badge/License-MIT-green)
+
 ## A Proof-of-Work Blockchain with AI Governance and Integrated Wallets
 
 XAI is a production-ready blockchain implementation featuring proof-of-work consensus, intelligent AI-based governance, atomic swap support for cross-chain trading, and comprehensive wallet management. Built for both individual users and enterprise compliance needs.
+
+---
+
+## 🚀 Get Started in 5 Minutes
+
+**New to XAI?** Follow our [Quick Start Guide](docs/QUICK_START.md) to:
+- Install XAI blockchain in one command
+- Create your first wallet
+- Get free testnet tokens from the faucet
+- Send your first transaction
+- View it in the block explorer
+
+**[→ Read the Quick Start Guide](docs/QUICK_START.md)**
+
+### 💧 Testnet Faucet
+
+Get free testnet XAI tokens for development:
+
+```bash
+python src/xai/wallet/cli.py request-faucet --address TXAI_YOUR_ADDRESS
+```
+
+**Faucet:** 100 XAI per request | **Rate Limit:** 1 hour | **Delivery:** Next block (~2 min)
+
+**[→ Complete Testnet Guide](docs/user-guides/TESTNET_GUIDE.md)**
 
 ---
 
@@ -381,12 +410,27 @@ pre-commit run --all-files
 
 ## Documentation
 
+### Getting Started
+
+- **[Quick Start Guide](docs/QUICK_START.md)** - Get up and running in 5 minutes
+- **[Testnet Guide](docs/user-guides/TESTNET_GUIDE.md)** - Join the testnet, use the faucet, and explore
+- **[Light Client Guide](docs/user-guides/LIGHT_CLIENT_GUIDE.md)** - Run a lightweight node (Raspberry Pi, mobile)
+- **[Wallet Setup](docs/user-guides/wallet-setup.md)** - Advanced wallet features and security
+- **[Mining Guide](docs/user-guides/mining.md)** - Start mining on XAI
+
+### Technical Documentation
+
 - **[Whitepaper](WHITEPAPER.md)** - Complete technical specification and design rationale
 - **[Technical Specifications](TECHNICAL.md)** - Detailed system documentation
 - **[Project Structure](PROJECT_STRUCTURE.md)** - Codebase organization and module descriptions
 - **[API Documentation](docs/api/)** - REST API endpoint reference
+- **[CLI Guide](docs/CLI_GUIDE.md)** - Complete command-line reference
+
+### Development & Security
+
 - **[Security Policy](SECURITY.md)** - Vulnerability disclosure and security best practices
 - **[Contributing Guide](CONTRIBUTING.md)** - Development guidelines and contribution process
+- **[Testing Guide](TESTING-GUIDE.md)** - Comprehensive testing documentation
 
 ## Network Parameters
 
