@@ -145,7 +145,7 @@ python -m pytest --co -q
 ```bash
 # Run a node (defaults shown)
 export XAI_NETWORK=development
-python -m xai.core.node
+xai-node
 ```
 
 The node will start on port 12001 (RPC), 12002 (P2P), and 12003 (WebSocket).
@@ -154,32 +154,52 @@ The node will start on port 12001 (RPC), 12002 (P2P), and 12003 (WebSocket).
 
 ```bash
 # Generate a wallet address first (or use existing)
-python src/xai/wallet/cli.py generate-address
+xai-wallet generate-address
 
 # Start mining with your address
 export MINER_ADDRESS=YOUR_XAI_ADDRESS
-python -m xai.core.node --miner $MINER_ADDRESS
+xai-node --miner $MINER_ADDRESS
 ```
 
 ### CLI Tooling
 
-Use the installed console scripts once the package is available (`pip install -e .` inside this repo).
+After installing the package (`pip install -e .`), three console commands are available:
 
-```
-python -m xai.wallet.cli request-faucet --address YOUR_XAI_ADDRESS
-python -m xai.wallet.cli generate-address
+- `xai` - Main CLI with blockchain, wallet, mining, AI, and network commands
+- `xai-wallet` - Wallet-specific CLI (legacy interface)
+- `xai-node` - Node management
+
+```bash
+# Main CLI (recommended)
+xai wallet balance --address YOUR_XAI_ADDRESS
+xai blockchain info
+xai ai submit-job --model gpt-4 --data "..."
+
+# Legacy wallet CLI (still supported)
+xai-wallet request-faucet --address YOUR_XAI_ADDRESS
+xai-wallet generate-address
 ```
 
-Each CLI command has a Python fall-back for ad-hoc usage (`python src/xai/cli/main.py ...` or `python src/xai/wallet/cli.py ...`), but the `xai`/`xai-wallet` entry points are preferred for reproducible automation.
+For development without installation, use Python module syntax:
+```bash
+python -m xai.cli.main --help
+python -m xai.wallet.cli --help
+python -m xai.core.node --help
+```
 
 ### Get Test Coins
 
-Use the faucet helper to receive test coins from a configured node:
+Use the faucet to receive test coins from a configured node:
 
 ```bash
-python src/xai/wallet/cli.py request-faucet --address YOUR_XAI_ADDRESS
+# Using main CLI
+xai wallet request-faucet --address YOUR_XAI_ADDRESS
+
+# Using legacy wallet CLI
+xai-wallet request-faucet --address YOUR_XAI_ADDRESS
+
 # Optional: override API host (defaults to http://localhost:12001)
-# python src/xai/wallet/cli.py request-faucet --address YOUR_XAI_ADDRESS --base-url http://remote-node:18545
+xai-wallet request-faucet --address YOUR_XAI_ADDRESS --base-url http://remote-node:18545
 ```
 
 ## Configuration

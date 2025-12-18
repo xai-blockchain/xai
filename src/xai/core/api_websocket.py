@@ -458,7 +458,7 @@ class WebSocketAPIHandler:
             while True:
                 time.sleep(2)  # Every 2 seconds for more responsive sync updates
 
-                # Broadcast light client sync progress
+                # Broadcast light client header sync progress
                 light_client_service = getattr(self.node, "light_client_service", None)
                 if light_client_service:
                     try:
@@ -467,16 +467,21 @@ class WebSocketAPIHandler:
 
                         # Only broadcast if actively syncing or recently completed
                         if progress_dict["sync_state"] in ["syncing", "stalled"]:
-                            self.broadcast_sync_progress({
-                                "percentage": progress_dict["sync_percentage"],
-                                "current": progress_dict["current_height"],
-                                "target": progress_dict["target_height"],
-                                "eta_seconds": progress_dict["estimated_time_remaining"],
-                                "headers_per_second": progress_dict["headers_per_second"],
-                                "sync_state": progress_dict["sync_state"],
+                            self.broadcast_ws({
+                                "channel": "sync",
+                                "type": "header_sync_progress",
+                                "data": {
+                                    "current_height": progress_dict["current_height"],
+                                    "target_height": progress_dict["target_height"],
+                                    "sync_percentage": progress_dict["sync_percentage"],
+                                    "estimated_time_remaining": progress_dict["estimated_time_remaining"],
+                                    "headers_per_second": progress_dict["headers_per_second"],
+                                    "sync_state": progress_dict["sync_state"],
+                                    "started_at": progress_dict["started_at"],
+                                }
                             })
                     except (RuntimeError, ValueError, AttributeError) as e:
-                        logger.debug(f"Failed to broadcast sync progress: {type(e).__name__}")
+                        logger.debug(f"Failed to broadcast header sync progress: {type(e).__name__}")
 
                 # Broadcast checkpoint sync progress
                 sync_coordinator = getattr(self.node, "partial_sync_coordinator", None)

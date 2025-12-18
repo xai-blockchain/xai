@@ -408,54 +408,82 @@ def register_sync_routes(node_api: 'NodeAPI') -> None:
             )
             return jsonify({"error": "Internal server error"}), 500
 
-    @node_api.app.route("/api/v1/sync/headers/progress", methods=["GET"])
-    def get_header_sync_progress() -> Tuple[Dict[str, Any], int]:
+    @node_api.app.route("/api/v1/sync/headers/status", methods=["GET"])
+    def get_header_sync_status() -> Tuple[Dict[str, Any], int]:
         """
-        Get header synchronization progress.
+        Get current header sync status.
 
         Returns:
-            JSON response with header sync progress including:
-            - synced_headers: Number of headers synced
-            - total_headers: Total headers to sync
-            - percentage: Progress percentage
-            - estimated_completion: Estimated completion time (seconds)
+            JSON response with sync status including:
+            - sync_state: Current sync state (syncing, synced, stalled, idle)
+            - current_height: Current blockchain height
+            - target_height: Target height to sync to
+            - is_syncing: Boolean indicating if actively syncing
         """
         try:
-            blockchain = getattr(node_api.node, "blockchain", None)
-            if not blockchain:
-                return jsonify({"error": "Blockchain not available"}), 503
+            # Get light client service
+            light_client_service = getattr(node_api.node, "light_client_service", None)
+            if not light_client_service:
+                return jsonify({"error": "Light client service not available"}), 503
 
-            # Get current chain height
-            current_height = len(blockchain.chain) if hasattr(blockchain, "chain") else 0
-
-            # Get target height from peers or checkpoint
-            target_height = current_height
-            checkpoint_sync = getattr(blockchain, "checkpoint_sync_manager", None)
-            if checkpoint_sync:
-                meta = checkpoint_sync.get_best_checkpoint_metadata()
-                if meta:
-                    target_height = meta.get("height", current_height)
-
-            # Calculate progress
-            synced_headers = current_height
-            total_headers = max(target_height, current_height)
-            percentage = (synced_headers / total_headers * 100.0) if total_headers > 0 else 100.0
-
-            # Estimate completion time (rough estimate based on sync rate)
-            remaining_headers = max(0, total_headers - synced_headers)
-            avg_sync_rate = 100  # headers per second (rough estimate)
-            estimated_completion = remaining_headers / avg_sync_rate if remaining_headers > 0 else 0
+            # Get sync progress
+            sync_progress = light_client_service.get_sync_progress()
 
             return jsonify({
                 "status": "ok",
-                "synced_headers": synced_headers,
-                "total_headers": total_headers,
-                "percentage": round(percentage, 2),
-                "estimated_completion": round(estimated_completion, 2),
-                "is_syncing": synced_headers < total_headers,
+                "sync_state": sync_progress.sync_state,
+                "current_height": sync_progress.current_height,
+                "target_height": sync_progress.target_height,
+                "is_syncing": sync_progress.sync_state in ["syncing", "stalled"],
+                "checkpoint_sync_enabled": sync_progress.checkpoint_sync_enabled,
+                "checkpoint_height": sync_progress.checkpoint_height,
             }), 200
 
-        except (ValueError, KeyError, AttributeError, TypeError, RuntimeError, ZeroDivisionError) as e:
+        except (ValueError, KeyError, AttributeError, TypeError, RuntimeError) as e:
+            logger.error(
+                "Failed to get header sync status",
+                extra={"error": str(e), "error_type": type(e).__name__}
+            )
+            return jsonify({"error": "Internal server error"}), 500
+
+    @node_api.app.route("/api/v1/sync/headers/progress", methods=["GET"])
+    def get_header_sync_progress() -> Tuple[Dict[str, Any], int]:
+        """
+        Get detailed header synchronization progress.
+
+        Returns:
+            JSON response with header sync progress including:
+            - current_height: Number of headers synced
+            - target_height: Total headers to sync
+            - sync_percentage: Progress percentage
+            - estimated_time_remaining: Estimated completion time (seconds)
+            - headers_per_second: Current sync speed
+            - sync_state: Current sync state
+            - started_at: When sync started (ISO format)
+        """
+        try:
+            # Get light client service
+            light_client_service = getattr(node_api.node, "light_client_service", None)
+            if not light_client_service:
+                return jsonify({"error": "Light client service not available"}), 503
+
+            # Get sync progress
+            sync_progress = light_client_service.get_sync_progress()
+
+            return jsonify({
+                "status": "ok",
+                "current_height": sync_progress.current_height,
+                "target_height": sync_progress.target_height,
+                "sync_percentage": sync_progress.sync_percentage,
+                "estimated_time_remaining": sync_progress.estimated_time_remaining,
+                "headers_per_second": sync_progress.headers_per_second,
+                "sync_state": sync_progress.sync_state,
+                "started_at": sync_progress.started_at.isoformat(),
+                "checkpoint_sync_enabled": sync_progress.checkpoint_sync_enabled,
+                "checkpoint_height": sync_progress.checkpoint_height,
+            }), 200
+
+        except (ValueError, KeyError, AttributeError, TypeError, RuntimeError) as e:
             logger.error(
                 "Failed to get header sync progress",
                 extra={"error": str(e), "error_type": type(e).__name__}

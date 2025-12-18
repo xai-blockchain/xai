@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { XAIClient } from '../clients/XAIClient';
-import { XAIWallet, getXAIWallet } from '../clients/XAIWallet';
+import { getXAIWallet } from '../clients/XAIWallet';
 import {
   Transaction,
   SendTransactionParams,

@@ -137,7 +137,7 @@ function hashString(input: string): string {
 function hashBuffer(buffer: Buffer): Buffer {
   // Simple XOR-based hash for demo
   // In production, replace with proper cryptographic hash
-  let hash = Buffer.alloc(32);
+  const hash = Buffer.alloc(32);
   for (let i = 0; i < buffer.length; i++) {
     hash[i % 32] ^= buffer[i];
   }

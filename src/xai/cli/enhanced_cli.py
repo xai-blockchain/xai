@@ -147,6 +147,14 @@ class XAIClient:
         """Fetch confirmed and next nonce for an address."""
         return self._request("GET", f"/address/{address}/nonce")
 
+    def get_sync_status(self) -> Dict[str, Any]:
+        """Get header sync status"""
+        return self._request("GET", "/api/v1/sync/headers/status")
+
+    def get_sync_progress(self) -> Dict[str, Any]:
+        """Get detailed header sync progress"""
+        return self._request("GET", "/api/v1/sync/headers/progress")
+
     def get_mempool(self) -> Dict[str, Any]:
         """Get mempool transactions"""
         return self._request("GET", "/mempool")
@@ -1808,6 +1816,158 @@ def network_peers(ctx: click.Context):
 
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
+
+
+# ============================================================================
+# Sync Commands
+# ============================================================================
+
+@cli.group()
+def sync():
+    """Synchronization status and control"""
+    pass
+
+
+@sync.command('status')
+@click.option('--watch', is_flag=True, help='Watch sync progress in real-time')
+@click.option('--interval', default=2, help='Update interval in seconds (with --watch)')
+@click.pass_context
+def sync_status(ctx: click.Context, watch: bool, interval: int):
+    """Show current header sync status and progress"""
+    client: XAIClient = ctx.obj['client']
+
+    def display_sync_status() -> bool:
+        """Display sync status. Returns True if still syncing."""
+        try:
+            # Get both status and progress
+            status_data = client.get_sync_status()
+            progress_data = client.get_sync_progress()
+
+            if ctx.obj['json_output']:
+                click.echo(json.dumps({
+                    "status": status_data,
+                    "progress": progress_data
+                }, indent=2))
+                return False
+
+            # Extract data
+            sync_state = status_data.get('sync_state', 'unknown')
+            current_height = progress_data.get('current_height', 0)
+            target_height = progress_data.get('target_height', 0)
+            sync_percentage = progress_data.get('sync_percentage', 0.0)
+            headers_per_second = progress_data.get('headers_per_second', 0.0)
+            eta_seconds = progress_data.get('estimated_time_remaining')
+            started_at = progress_data.get('started_at', '')
+
+            # Clear screen for watch mode
+            if watch:
+                console.clear()
+
+            # Determine status color and icon
+            if sync_state == 'synced':
+                status_color = "green"
+                status_icon = "✓"
+            elif sync_state == 'syncing':
+                status_color = "yellow"
+                status_icon = "⟳"
+            elif sync_state == 'stalled':
+                status_color = "red"
+                status_icon = "⚠"
+            else:
+                status_color = "blue"
+                status_icon = "○"
+
+            # Build status table
+            table = Table(show_header=False, box=box.ROUNDED)
+            table.add_row(
+                "[bold cyan]Sync State",
+                f"[{status_color}]{status_icon} {sync_state.upper()}[/]"
+            )
+            table.add_row("[bold cyan]Current Height", str(current_height))
+            table.add_row("[bold cyan]Target Height", str(target_height))
+
+            # Progress bar
+            if target_height > 0:
+                remaining = target_height - current_height
+                table.add_row("[bold cyan]Remaining", str(remaining))
+
+            # Percentage
+            table.add_row(
+                "[bold cyan]Progress",
+                f"{sync_percentage:.2f}%"
+            )
+
+            # Speed
+            if headers_per_second > 0:
+                table.add_row(
+                    "[bold cyan]Sync Speed",
+                    f"{headers_per_second:.2f} headers/sec"
+                )
+
+            # ETA
+            if eta_seconds is not None and eta_seconds > 0:
+                if eta_seconds < 60:
+                    eta_str = f"{eta_seconds:.0f}s"
+                elif eta_seconds < 3600:
+                    eta_str = f"{eta_seconds/60:.1f}m"
+                else:
+                    eta_str = f"{eta_seconds/3600:.1f}h"
+                table.add_row("[bold cyan]ETA", eta_str)
+
+            # Started at
+            if started_at:
+                try:
+                    started_dt = datetime.fromisoformat(started_at)
+                    table.add_row(
+                        "[bold cyan]Started At",
+                        started_dt.strftime("%Y-%m-%d %H:%M:%S")
+                    )
+                except (ValueError, TypeError):
+                    pass
+
+            # Checkpoint info
+            if status_data.get('checkpoint_sync_enabled'):
+                checkpoint_height = status_data.get('checkpoint_height')
+                if checkpoint_height:
+                    table.add_row(
+                        "[bold cyan]Checkpoint Height",
+                        str(checkpoint_height)
+                    )
+
+            title = "[bold green]Header Sync Status"
+            if watch:
+                title += f" (refreshing every {interval}s - press Ctrl+C to stop)"
+
+            console.print(Panel(table, title=title, border_style="green"))
+
+            # Return whether still syncing
+            return sync_state in ['syncing', 'stalled']
+
+        except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
+            if watch:
+                console.print(f"[bold red]Error:[/] {exc}")
+                return False
+            else:
+                raise
+
+    # One-shot mode
+    if not watch:
+        try:
+            display_sync_status()
+        except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
+            _cli_fail(exc)
+        return
+
+    # Watch mode
+    try:
+        while True:
+            still_syncing = display_sync_status()
+            if not still_syncing:
+                console.print("\n[green]Sync completed![/]")
+                break
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Stopped watching sync status[/]")
 
 
 # ============================================================================

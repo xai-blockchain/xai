@@ -4,16 +4,20 @@ XAI Node Setup Wizard
 Interactive configuration for new node operators
 
 Features:
-- Beginner-friendly interface with ASCII art
+- OS detection (Linux/macOS/Windows)
+- Prerequisites checking (Python 3.10+, pip, git)
+- Beginner-friendly interface with ASCII art and progress indicators
 - Network selection (testnet/mainnet)
+- Setup mode (Full Node, Light Client, Wallet Only, Developer Mode)
 - Node mode selection (full/pruned/light/archival)
 - Mining configuration
 - Port configuration with conflict detection
 - Data directory setup
-- .env file generation
-- Optional wallet creation
-- Optional testnet token request
+- .env file generation with environment variables
+- Optional wallet creation with secure password
+- Optional node startup
 - Summary and next steps
+- Safe re-run capability
 """
 
 import os
@@ -24,6 +28,8 @@ import hashlib
 import json
 import shutil
 import subprocess
+import platform
+import getpass
 from pathlib import Path
 from typing import Optional, Dict, List, Tuple
 
@@ -103,6 +109,23 @@ def print_warning(text: str):
 def print_error(text: str):
     """Print error message."""
     print(f"{Colors.RED}✗ {text}{Colors.ENDC}")
+
+
+def print_progress(current: int, total: int, description: str):
+    """Print progress indicator."""
+    percentage = int((current / total) * 100)
+    filled = int((current / total) * 30)
+    bar = '█' * filled + '░' * (30 - filled)
+    print(f"\r{Colors.CYAN}[{bar}] {percentage}% - {description}{Colors.ENDC}", end='', flush=True)
+    if current == total:
+        print()  # New line when complete
+
+
+def print_step(step: int, total: int, title: str):
+    """Print step header with progress."""
+    print(f"\n{Colors.BOLD}{Colors.BLUE}{'='*65}{Colors.ENDC}")
+    print(f"{Colors.BOLD}{Colors.BLUE}Step {step}/{total}: {title}{Colors.ENDC}")
+    print(f"{Colors.BOLD}{Colors.BLUE}{'='*65}{Colors.ENDC}\n")
 
 
 def prompt(text: str, default: Optional[str] = None) -> str:
@@ -210,6 +233,54 @@ def check_disk_space(path: Path, required_gb: int) -> Tuple[bool, int]:
         return True, 0
 
 
+def detect_os() -> Tuple[str, str, str]:
+    """Detect the operating system.
+
+    Returns:
+        (os_type, os_name, os_version)
+        os_type: 'linux', 'darwin' (macOS), 'windows'
+        os_name: Human-readable OS name
+        os_version: OS version string
+    """
+    system = platform.system().lower()
+
+    if system == 'linux':
+        os_type = 'linux'
+        try:
+            # Try to get Linux distribution info
+            import distro
+            os_name = f"{distro.name()} {distro.version()}"
+        except ImportError:
+            # Fallback if distro module not available
+            try:
+                with open('/etc/os-release', 'r') as f:
+                    lines = f.readlines()
+                    name = 'Linux'
+                    version = ''
+                    for line in lines:
+                        if line.startswith('PRETTY_NAME='):
+                            name = line.split('=')[1].strip().strip('"')
+                            break
+                    os_name = name
+            except:
+                os_name = 'Linux'
+        os_version = platform.release()
+    elif system == 'darwin':
+        os_type = 'darwin'
+        os_name = 'macOS'
+        os_version = platform.mac_ver()[0]
+    elif system == 'windows':
+        os_type = 'windows'
+        os_name = 'Windows'
+        os_version = platform.version()
+    else:
+        os_type = system
+        os_name = system.capitalize()
+        os_version = platform.release()
+
+    return os_type, os_name, os_version
+
+
 def check_python_version() -> Tuple[bool, str]:
     """Check if Python version meets requirements (3.10+).
 
@@ -220,6 +291,44 @@ def check_python_version() -> Tuple[bool, str]:
     version_str = f"{version_info.major}.{version_info.minor}.{version_info.micro}"
     is_ok = version_info >= (3, 10)
     return is_ok, version_str
+
+
+def check_git_installed() -> Tuple[bool, str]:
+    """Check if git is installed.
+
+    Returns:
+        (is_installed, version_or_error)
+    """
+    try:
+        result = subprocess.run(['git', '--version'],
+                              capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            version = result.stdout.strip().split()[-1]
+            return True, version
+        else:
+            return False, "git command failed"
+    except FileNotFoundError:
+        return False, "git not found"
+    except Exception as e:
+        return False, str(e)
+
+
+def check_pip_installed() -> Tuple[bool, str]:
+    """Check if pip is installed.
+
+    Returns:
+        (is_installed, version_or_error)
+    """
+    try:
+        result = subprocess.run([sys.executable, '-m', 'pip', '--version'],
+                              capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            version = result.stdout.strip().split()[1]
+            return True, version
+        else:
+            return False, "pip command failed"
+    except Exception as e:
+        return False, str(e)
 
 
 def check_dependencies() -> List[Tuple[str, bool, str]]:
@@ -432,8 +541,17 @@ def main():
     print_info("Welcome to the XAI Node Setup Wizard!")
     print_info("This wizard will help you configure your XAI blockchain node.\n")
 
+    total_steps = 11
+    current_step = 0
+
     # Pre-flight checks
-    print_header("System Requirements Check")
+    current_step += 1
+    print_step(current_step, total_steps, "System Requirements Check")
+
+    # Detect OS
+    os_type, os_name, os_version = detect_os()
+    print_success(f"Operating System: {os_name} {os_version}")
+    print_info(f"Platform: {os_type}")
 
     # Check Python version
     py_ok, py_version = check_python_version()
@@ -444,8 +562,24 @@ def main():
         if not confirm("Continue anyway? (Not recommended)", False):
             return
 
+    # Check git
+    git_ok, git_version = check_git_installed()
+    if git_ok:
+        print_success(f"git version: {git_version}")
+    else:
+        print_warning(f"git: {git_version}")
+        print_info("git is optional but recommended for updates")
+
+    # Check pip
+    pip_ok, pip_version = check_pip_installed()
+    if pip_ok:
+        print_success(f"pip version: {pip_version}")
+    else:
+        print_warning(f"pip: {pip_version}")
+        print_info("pip is needed to install Python dependencies")
+
     # Check dependencies
-    print_info("Checking Python dependencies...")
+    print_info("\nChecking Python dependencies...")
     deps = check_dependencies()
     missing_deps = []
     for name, available, version in deps:
@@ -474,9 +608,37 @@ def main():
         return
 
     config: Dict[str, str] = {}
+    config['os_type'] = os_type
 
-    # Step 1: Network Selection
-    print_header("Network Selection")
+    # Step: Setup Mode Selection
+    current_step += 1
+    print_step(current_step, total_steps, "Setup Mode Selection")
+    print_info("Choose what you want to set up:")
+
+    setup_mode_options = [
+        ("full-node", "Full Node", "Complete node with blockchain sync and validation"),
+        ("light-client", "Light Client", "Lightweight client that connects to full nodes"),
+        ("wallet-only", "Wallet Only", "Just wallet management, no blockchain sync"),
+        ("developer", "Developer Mode", "Full node + development tools + test environment"),
+    ]
+    setup_mode = select_option("Select setup mode:", setup_mode_options, default=0)
+    config['setup_mode'] = setup_mode
+    print_success(f"Setup mode: {setup_mode}")
+
+    # Adjust defaults based on setup mode
+    if setup_mode == "light-client":
+        config['node_mode'] = "light"
+    elif setup_mode == "wallet-only":
+        config['node_mode'] = "none"
+    elif setup_mode == "developer":
+        config['node_mode'] = "full"
+        config['mining_enabled'] = "true"
+    else:
+        config['node_mode'] = "full"
+
+    # Step: Network Selection
+    current_step += 1
+    print_step(current_step, total_steps, "Network Selection")
     print_info("Choose which network you want to connect to:")
     print_info("- Testnet: For testing and development (recommended for beginners)")
     print_info("- Mainnet: Production network with real value (requires careful setup)")
@@ -495,21 +657,25 @@ def main():
 
     print_success(f"Network: {config['network'].upper()}")
 
-    # Step 2: Node Mode Selection
-    print_header("Node Mode Selection")
-    print_info("Different node modes have different storage and sync requirements:")
+    # Step: Node Mode Selection (skip if wallet-only)
+    if config['setup_mode'] != "wallet-only":
+        current_step += 1
+        print_step(current_step, total_steps, "Node Mode Selection")
+        print_info("Different node modes have different storage and sync requirements:")
 
-    node_mode_options = [
-        ("full", "Full Node", "Store complete blockchain (recommended, ~50GB)"),
-        ("pruned", "Pruned Node", "Store recent blocks only (~10GB)"),
-        ("light", "Light Node", "Minimal storage, depends on full nodes (~1GB)"),
-        ("archival", "Archival Node", "Store all historical states (~500GB, for developers)"),
-    ]
-    config['node_mode'] = select_option("Select node mode:", node_mode_options, default=0)
-    print_success(f"Node mode: {config['node_mode']}")
+        node_mode_options = [
+            ("full", "Full Node", "Store complete blockchain (recommended, ~50GB)"),
+            ("pruned", "Pruned Node", "Store recent blocks only (~10GB)"),
+            ("light", "Light Node", "Minimal storage, depends on full nodes (~1GB)"),
+            ("archival", "Archival Node", "Store all historical states (~500GB, for developers)"),
+        ]
+        if config['setup_mode'] != "light-client":
+            config['node_mode'] = select_option("Select node mode:", node_mode_options, default=0)
+        print_success(f"Node mode: {config['node_mode']}")
 
-    # Step 3: Data Directory
-    print_header("Data Directory")
+    # Step: Data Directory
+    current_step += 1
+    print_step(current_step, total_steps, "Data Directory")
     print_info("Where should the blockchain data be stored?")
 
     # Determine disk space requirements based on node mode
@@ -517,9 +683,10 @@ def main():
         'full': 50,
         'pruned': 10,
         'light': 1,
-        'archival': 500
+        'archival': 500,
+        'none': 1  # wallet-only mode
     }
-    required_gb = disk_requirements.get(config['node_mode'], 50)
+    required_gb = disk_requirements.get(config.get('node_mode', 'full'), 50)
 
     default_data_dir = str(Path.home() / ".xai")
     data_dir = prompt("Data directory path", default_data_dir)
@@ -546,8 +713,9 @@ def main():
         data_path.mkdir(parents=True, exist_ok=True)
         print_success(f"Created directory: {config['data_dir']}")
 
-    # Step 4: Port Configuration
-    print_header("Port Configuration")
+    # Step: Port Configuration
+    current_step += 1
+    print_step(current_step, total_steps, "Port Configuration")
     print_info("Configure network ports for your node:")
     print_info("XAI project uses port range 12000-12999 to avoid conflicts")
 
@@ -624,8 +792,9 @@ def main():
         except ValueError:
             print_error("Please enter a valid port number")
 
-    # Step 5: Mining Configuration
-    print_header("Mining Configuration")
+    # Step: Mining Configuration
+    current_step += 1
+    print_step(current_step, total_steps, "Mining Configuration")
     print_info("Mining helps secure the network and earn rewards.")
     print_info("Mining requires CPU resources but can be started/stopped anytime.")
 
@@ -653,8 +822,9 @@ def main():
         config['mining_enabled'] = "false"
         print_info("Mining disabled. You can enable it later by editing the .env file.")
 
-    # Step 6: Monitoring Configuration
-    print_header("Monitoring Configuration")
+    # Step: Monitoring Configuration
+    current_step += 1
+    print_step(current_step, total_steps, "Monitoring Configuration")
     print_info("XAI includes Prometheus metrics for monitoring node health.")
 
     if confirm("Enable Prometheus metrics?", True):
@@ -665,8 +835,9 @@ def main():
     else:
         config['prometheus_enabled'] = 'false'
 
-    # Step 7: Generate Security Secrets
-    print_header("Security Configuration")
+    # Step: Security Configuration
+    current_step += 1
+    print_step(current_step, total_steps, "Security Configuration")
     print_info("Generating secure secrets for your node...")
 
     config['jwt_secret'] = generate_jwt_secret()
@@ -689,8 +860,9 @@ def main():
         print_warning("- Consider running behind a firewall")
         print_warning("- Enable firewall rules to protect P2P and RPC ports")
 
-    # Step 8: Write Configuration
-    print_header("Save Configuration")
+    # Step: Save Configuration
+    current_step += 1
+    print_step(current_step, total_steps, "Save Configuration")
 
     project_root = Path(__file__).parent.parent
     env_path = project_root / ".env"
@@ -719,8 +891,9 @@ def main():
                 print(f"  sudo systemctl enable xai-node-{config['network']}")
                 print(f"  sudo systemctl start xai-node-{config['network']}")
 
-    # Step 9: Optional Wallet Creation
-    print_header("Wallet Creation (Optional)")
+    # Step: Wallet Creation (Optional)
+    current_step += 1
+    print_step(current_step, total_steps, "Wallet Creation (Optional)")
 
     if config['mining_enabled'] == "true" and not config.get('miner_address'):
         print_info("You enabled mining but don't have a wallet yet.")
@@ -770,7 +943,8 @@ def main():
 
     # Step 10: Optional Testnet Tokens
     if config['network'] == 'testnet' and wallet_info:
-        print_header("Testnet Tokens (Optional)")
+        current_step += 1
+        print_step(current_step, total_steps, "Testnet Tokens (Optional)")
         print_info("You can request free testnet tokens to start testing.")
 
         if confirm("Request testnet tokens?", True):
@@ -780,8 +954,9 @@ def main():
             print(f"  Discord: {Colors.CYAN}https://discord.gg/xai-network{Colors.ENDC}")
             print_info("\nVisit the faucet URL or ask in Discord for testnet tokens.")
 
-    # Step 11: Summary and Next Steps
-    print_header("Setup Complete!")
+    # Step: Summary and Next Steps
+    current_step += 1
+    print_step(current_step, total_steps, "Setup Complete!")
 
     print(f"\n{Colors.BOLD}{Colors.GREEN}Configuration Summary:{Colors.ENDC}\n")
     print(f"  Network:        {Colors.CYAN}{config['network'].upper()}{Colors.ENDC}")

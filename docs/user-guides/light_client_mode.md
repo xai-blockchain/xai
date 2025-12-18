@@ -1,362 +1,383 @@
-# XAI Light Client Mode Guide
+# XAI Light Client Mode - User Guide
 
-Comprehensive guide to running XAI in light client mode using Simplified Payment Verification (SPV). Perfect for mobile devices, IoT, and resource-constrained environments.
+Your complete guide to running XAI in light client mode using Simplified Payment Verification (SPV). Designed for mobile devices, wallets, and resource-constrained environments.
 
 ---
 
 ## What is a Light Client?
 
-A light client verifies transactions without downloading the entire blockchain. Instead, it:
-1. Downloads only **block headers** (~80 bytes each)
-2. Requests **merkle proofs** for relevant transactions
-3. Verifies transactions are in blocks using cryptographic proofs
+A **light client** (also called an SPV client) lets you verify your transactions and check your balance without downloading the entire blockchain. Think of it like checking your bank balance on your phone - you don't need to download the bank's entire database to see your account.
 
-**Benefits:**
-- **Minimal Storage:** ~2-5 MB vs. several GB for full node
-- **Fast Sync:** Minutes instead of hours
-- **Low Bandwidth:** ~1-5 MB per day
-- **Mobile-Friendly:** Works on phones and tablets
-- **Battery Efficient:** Minimal CPU usage
+### How It Works
 
-**Trade-offs:**
-- **Privacy:** May reveal addresses to connected peers
-- **Trust:** Relies on full nodes for transaction data
-- **Limited Validation:** Doesn't verify all consensus rules
+Instead of downloading every transaction ever made, a light client:
 
----
+1. **Downloads only block headers** - Small summaries (~80 bytes each) instead of full blocks (~1 MB each)
+2. **Requests merkle proofs** - Mathematical proofs that your transaction is in a block
+3. **Verifies cryptographically** - Uses the proof to confirm your transaction is real
 
-## When to Use Light Client Mode
+### Benefits
 
-**Best For:**
-- Mobile wallet applications
-- Browser extensions
-- IoT devices with limited storage
-- Quick wallet setup (no waiting for sync)
-- Checking balances and sending transactions
-- Development and testing
+- **Tiny Storage:** Only ~2-5 MB instead of several gigabytes
+- **Fast Sync:** Ready in minutes instead of hours or days
+- **Low Data Usage:** Uses only ~1-5 MB per day
+- **Mobile-Friendly:** Perfect for phones and tablets
+- **Battery Efficient:** Minimal CPU and energy usage
+- **Always Up-to-Date:** Syncs quickly when you open your wallet
 
-**Not Recommended For:**
-- Mining operations (requires full validation)
-- Running a public API node
-- Block explorer backends
-- Consensus-critical applications
-- Privacy-sensitive use cases
+### Trade-offs
 
-**Alternative:** Use [Lightweight Node](lightweight_node_guide.md) for full validation with optimizations.
+- **Privacy:** Full nodes you connect to can see which addresses you're checking
+- **Trust Required:** You trust that the majority of full nodes are honest
+- **Limited Validation:** Only verifies that transactions exist, not all blockchain rules
 
 ---
 
-## How SPV Works
+## When Should You Use Light Client Mode?
 
-### Step 1: Download Headers
+### Perfect For
 
-```
-Full Block (~1 MB):          Header Only (~80 bytes):
-┌─────────────────────┐     ┌──────────────────┐
-│ Header              │  →  │ Version: 2       │
-│   Version           │     │ Prev Hash: 0x... │
-│   Previous Hash     │     │ Merkle Root: 0x..│
-│   Merkle Root       │     │ Timestamp: ...   │
-│   Timestamp         │     │ Difficulty: ...  │
-│   Difficulty        │     │ Nonce: ...       │
-│   Nonce             │     └──────────────────┘
-├─────────────────────┤
-│ Transactions        │
-│   TX 1 (~250 bytes) │
-│   TX 2 (~250 bytes) │
-│   ...               │
-│   TX 4000 (~1 MB)   │
-└─────────────────────┘
-```
+- **Mobile Wallet Apps** - iOS and Android wallets
+- **Browser Extensions** - Chrome, Firefox, Safari wallets
+- **Desktop Wallets** - Quick setup without long sync times
+- **IoT Devices** - Smart home devices, hardware wallets
+- **Quick Checks** - Just want to see your balance or send a payment
+- **Development & Testing** - Fast iteration without full node overhead
 
-### Step 2: Verify Merkle Proof
+### Not Recommended For
 
-When you need to verify a transaction:
+- **Mining** - Requires full blockchain validation
+- **Running Public APIs** - Need full node for serving data
+- **Block Explorers** - Must have complete transaction history
+- **High Privacy Requirements** - Full nodes offer better privacy
+- **Business Critical Validation** - When you must verify everything yourself
 
-```
-1. Request merkle proof from full node
-2. Receive proof path (300-500 bytes)
-3. Verify transaction is in block:
+### Need Full Validation?
 
-    Merkle Root (in header)
-         ├── Hash AB
-         │    ├── Hash A
-         │    │    ├── TX 1 ← Your transaction
-         │    │    └── TX 2
-         │    └── Hash B
-         │         ├── TX 3
-         │         └── TX 4
-         └── Hash CD
-              └── ... (proof path)
-
-4. Confirm transaction is valid if:
-   - Merkle proof matches root
-   - Block has valid PoW
-   - Block is on longest chain
-```
-
-### Step 3: Monitor Your Addresses
-
-Use **bloom filters** to privately request relevant transactions:
-
-```
-Instead of:
-  "Give me all transactions for address TXAI_123..."
-  (reveals your address to node)
-
-Use bloom filter:
-  "Give me transactions matching pattern: 10101001..."
-  (probabilistic, includes false positives for privacy)
-```
+If you need complete verification but want lower resource usage than a full node, check out the [Lightweight Node Guide](lightweight_node_guide.md) which offers full validation with optimizations.
 
 ---
 
-## Installation
+## Understanding SPV: How Light Clients Work
 
-### Quick Install
+SPV (Simplified Payment Verification) is the technology that makes light clients possible. Here's how it works in plain English:
+
+### Step 1: Download Block Headers Only
+
+Instead of downloading entire blocks, you only download the "header" - a tiny summary of each block.
+
+```
+Full Block (~1 MB):              Block Header (~80 bytes):
+┌──────────────────────┐        ┌──────────────────┐
+│ Header Information   │   →    │ Block Number     │
+│   Block Number       │        │ Previous Hash    │
+│   Previous Hash      │        │ Merkle Root      │
+│   Merkle Root        │        │ Timestamp        │
+│   Timestamp          │        │ Difficulty       │
+│   Difficulty         │        │ Nonce            │
+│   Nonce              │        └──────────────────┘
+├──────────────────────┤
+│ All Transactions     │        Saves ~99% bandwidth!
+│   TX 1 (250 bytes)   │
+│   TX 2 (250 bytes)   │
+│   TX 3 (250 bytes)   │
+│   ... (4,000 more)   │
+└──────────────────────┘
+```
+
+**Savings:** Downloading 100,000 headers = ~8 MB vs. 100,000 full blocks = ~100 GB
+
+### Step 2: Request Proof for Your Transactions
+
+When you want to verify a specific transaction (like a payment to you), you ask a full node for a "merkle proof":
+
+```
+1. You ask: "Is transaction ABC123 really in block 50,000?"
+2. Full node sends you a merkle proof (~500 bytes)
+3. You verify the proof matches the merkle root in the header
+4. If it matches, the transaction is confirmed!
+
+Visual Example:
+                Merkle Root (in block header)
+                        │
+            ┌───────────┴───────────┐
+         Hash AB                 Hash CD
+            │                       │
+      ┌─────┴─────┐           ┌─────┴─────┐
+   Hash A      Hash B      Hash C      Hash D
+      │           │           │           │
+   ┌──┴──┐    ┌──┴──┐    ┌──┴──┐    ┌──┴──┐
+  TX 1  TX 2  TX 3  TX 4  TX 5  TX 6  TX 7  TX 8
+   ↑
+   Your transaction
+
+The proof shows: TX 2, Hash B, Hash CD
+You verify by hashing up to the root!
+```
+
+**What This Proves:**
+- ✅ Your transaction is definitely in this block
+- ✅ The block is valid (has proof-of-work)
+- ✅ The block is on the longest chain
+
+**What This Doesn't Prove:**
+- ❌ That the transaction follows all rules (you trust the full nodes)
+- ❌ That there's no double-spend elsewhere
+
+### Step 3: Security Through Multiple Confirmations
+
+Light clients wait for multiple blocks to be built on top of your transaction's block before considering it final:
+
+```
+Your TX in Block 100
+   ↓
+Block 101 built on top (1 confirmation)
+   ↓
+Block 102 built on top (2 confirmations)
+   ↓
+Block 103 built on top (3 confirmations)
+   ↓
+...
+
+After 6 confirmations, reverting would require massive computational power.
+This makes your transaction practically irreversible.
+```
+
+**Recommended Confirmations:**
+- Small payment (<$100): 1-2 confirmations (~4 minutes)
+- Medium payment ($100-$10,000): 3-6 confirmations (~12 minutes)
+- Large payment (>$10,000): 6+ confirmations (~20+ minutes)
+
+---
+
+## Getting Started with Light Client Mode
+
+### Installation
+
+The XAI light client is included in the standard XAI installation. No special packages needed!
 
 ```bash
-# Install XAI with light client support
-pip install -c constraints.txt -e ".[light-client]"
+# Install XAI
+pip install xai
 
-# Or from package
-sudo apt install xai-light-client
-```
-
-### From Source
-
-```bash
-git clone https://github.com/your-org/xai.git
+# Or install from source
+git clone https://github.com/xai-foundation/xai.git
 cd xai
-pip install -c constraints.txt -e ".[light-client]"
+pip install -e .
 ```
 
----
+### Quick Start
 
-## Configuration
-
-### Basic Configuration
-
-Create `~/.xai/light-client.yaml`:
-
-```yaml
-# Light Client Mode Configuration
-node:
-  mode: light_client
-  network: testnet
-
-# SPV settings
-spv:
-  header_download_batch: 2000     # Download 2000 headers at a time
-  max_headers_in_memory: 50000    # Keep up to 50k headers in RAM
-  checkpoint_interval: 10000      # Checkpoint every 10k blocks
-  require_merkle_proofs: true     # Always verify merkle proofs
-
-# Network settings
-network:
-  type: testnet
-  max_peers: 8                    # Connect to 8 full nodes
-  bootstrap_peers:
-    - "testnet-node1.xai.network:18545"
-    - "testnet-node2.xai.network:18545"
-    - "testnet-node3.xai.network:18545"
-
-# Storage settings
-storage:
-  header_db_path: "~/.xai/headers.db"
-  max_db_size_mb: 100
-  enable_pruning: true
-
-# Performance
-performance:
-  sync_mode: fast
-  header_verification_threads: 2
-  bloom_filter_enabled: true
-  bloom_false_positive_rate: 0.0001
-```
-
-### Mainnet Configuration
-
-```yaml
-node:
-  mode: light_client
-  network: mainnet
-
-network:
-  type: mainnet
-  bootstrap_peers:
-    - "mainnet-node1.xai.network:8545"
-    - "mainnet-node2.xai.network:8545"
-    - "mainnet-node3.xai.network:8545"
-```
-
-### Privacy-Enhanced Configuration
-
-```yaml
-# Enhanced privacy settings
-privacy:
-  bloom_filter_randomization: true   # Add random false positives
-  rotate_peer_connections: true      # Change peers periodically
-  connection_rotation_minutes: 30    # Rotate every 30 minutes
-  address_query_delay_ms: 1000      # Delay between queries
-  use_tor: false                     # Use Tor (requires tor daemon)
-
-# More conservative bloom filter
-spv:
-  bloom_false_positive_rate: 0.001  # Higher rate = more privacy
-```
-
-### Performance-Optimized Configuration
-
-```yaml
-# Maximum performance
-performance:
-  sync_mode: fast
-  header_verification_threads: 4
-  parallel_proof_requests: 8        # Request 8 proofs in parallel
-  aggressive_caching: true
-
-network:
-  max_peers: 16                     # More peers = faster sync
-  connection_timeout: 10
-```
-
----
-
-## Running Light Client
-
-### Start Light Client
-
-```bash
-# Start with config file
-python -m xai.core.light_client --config ~/.xai/light-client.yaml
-
-# Or use environment variables
-export XAI_NETWORK=testnet
-export XAI_NODE_MODE=light_client
-python -m xai.core.light_client
-
-# Output:
-# [INFO] Starting XAI Light Client (testnet)
-# [INFO] Connecting to bootstrap peers...
-# [INFO] Downloading headers... (0 / 22341)
-# [INFO] Progress: 10000 / 22341 (44%)
-# [INFO] Progress: 20000 / 22341 (89%)
-# [INFO] Sync complete! Height: 22341
-# [INFO] Light client ready for queries
-```
-
-### Command Line Options
-
-```bash
-# Testnet mode
-python -m xai.core.light_client --testnet
-
-# Mainnet mode
-python -m xai.core.light_client --mainnet
-
-# Custom config
-python -m xai.core.light_client --config /path/to/config.yaml
-
-# Custom bootstrap peers
-python -m xai.core.light_client \
-  --peers node1.xai.io:18545,node2.xai.io:18545
-
-# Verbose logging
-python -m xai.core.light_client --log-level DEBUG
-
-# Re-sync from genesis
-python -m xai.core.light_client --resync
-
-# Start from checkpoint
-python -m xai.core.light_client --checkpoint 100000
-```
-
----
-
-## Using the Light Client
-
-### Python API
+The easiest way to use light client mode is through Python:
 
 ```python
-from xai.core.light_client import LightClient
+from xai.core.light_client import LightClient, BlockHeader
+from xai.core.light_client_service import LightClientService
 
-# Initialize light client
-client = LightClient(config_path="~/.xai/light-client.yaml")
-await client.start()
+# Create a light client instance
+client = LightClient()
 
-# Get current height
-height = await client.get_height()
-print(f"Current height: {height}")
+# Add headers as you receive them from full nodes
+header = BlockHeader(
+    index=12345,
+    timestamp=1704067200.0,
+    previous_hash="0xabc123...",
+    merkle_root="0xdef456...",
+    difficulty=1000,
+    nonce=42,
+    hash="0x789abc..."
+)
 
-# Get block header
-header = await client.get_header(block_height=12345)
-print(f"Block hash: {header.hash}")
-print(f"Merkle root: {header.merkle_root}")
+# The light client validates and stores the header
+if client.add_header(header):
+    print(f"Header {header.index} added successfully!")
+    print(f"Current chain height: {client.get_chain_height()}")
+```
 
-# Verify transaction with merkle proof
-tx_id = "0xabc123..."
-proof = await client.get_merkle_proof(tx_id, block_height=12345)
+---
 
-is_valid = await client.verify_transaction(
+## Connecting to Full Nodes
+
+Light clients need to connect to full nodes to get block headers and transaction proofs. You have several options:
+
+### Option 1: Public XAI Nodes (Easiest)
+
+Connect to public XAI infrastructure nodes:
+
+```python
+from xai.core.light_client_service import LightClientService
+
+# Connect to public testnet nodes
+service = LightClientService(blockchain)
+
+# Public testnet nodes (no configuration needed)
+public_nodes = [
+    "testnet-node1.xai.network:18545",
+    "testnet-node2.xai.network:18545",
+    "testnet-node3.xai.network:18545",
+]
+```
+
+### Option 2: Your Own Trusted Node (Most Secure)
+
+Run your own full node and connect your light client to it:
+
+```python
+# Connect to your own node
+my_trusted_node = "192.168.1.100:18545"  # Your full node IP
+
+# Now you don't trust any third parties!
+```
+
+**Why this is more secure:**
+- You control the full node
+- No privacy concerns (your node doesn't spy on you)
+- No trust required in third parties
+- Still get light client benefits (fast sync, low storage)
+
+### Option 3: Multiple Nodes for Security
+
+Connect to several nodes and require agreement:
+
+```python
+# Require 3 out of 5 nodes to agree before trusting data
+nodes = [
+    "node1.xai.network:18545",
+    "node2.xai.network:18545",
+    "node3.xai.network:18545",
+    "node4.xai.network:18545",
+    "node5.xai.network:18545",
+]
+
+# If 3+ nodes give the same answer, trust it
+min_agreement = 3
+```
+
+---
+
+## How to Verify Transactions
+
+Here's how to verify that a transaction is included in the blockchain using SPV:
+
+### Step 1: Get the Transaction Proof
+
+When you want to verify a specific transaction, ask a full node for the merkle proof:
+
+```python
+from xai.core.light_client_service import LightClientService
+
+# Initialize service with your blockchain instance
+service = LightClientService(blockchain)
+
+# Request proof for a specific transaction
+tx_id = "0xabc123def456..."  # Your transaction ID
+proof_data = service.get_transaction_proof(tx_id)
+
+if proof_data:
+    print(f"Transaction found in block {proof_data['block_index']}")
+    print(f"Block hash: {proof_data['block_hash']}")
+    print(f"Merkle root: {proof_data['merkle_root']}")
+else:
+    print("Transaction not found in blockchain")
+```
+
+### Step 2: Verify the Proof
+
+Now verify that the proof is valid:
+
+```python
+# Verify the proof (requires minimum 6 confirmations by default)
+is_valid, message = service.verify_proof(
     txid=tx_id,
-    merkle_proof=proof,
-    block_height=12345
+    proof_data=proof_data,
+    min_confirmations=6
 )
 
 if is_valid:
-    print("Transaction verified!")
+    print(f"✓ Transaction verified! {message}")
+    # Transaction is confirmed and safe to accept
 else:
-    print("Invalid transaction or proof")
-
-# Get balance (queries multiple peers)
-balance = await client.get_balance("TXAI_YOUR_ADDRESS")
-print(f"Balance: {balance} XAI")
-
-# Send transaction
-tx_hash = await client.send_transaction(
-    from_address="TXAI_YOUR_ADDRESS",
-    to_address="TXAI_RECIPIENT",
-    amount=10.0,
-    private_key="YOUR_PRIVATE_KEY"
-)
-
-print(f"Transaction sent: {tx_hash}")
-
-# Wait for confirmation
-confirmed = await client.wait_for_confirmation(tx_hash, confirmations=3)
-print("Transaction confirmed!")
-
-# Clean up
-await client.stop()
+    print(f"✗ Verification failed: {message}")
+    # Don't accept this transaction
 ```
 
-### Wallet CLI (Light Client Mode)
+### Step 3: Check Confirmation Count
 
-All wallet operations work in light client mode:
+For important transactions, always check how many confirmations it has:
 
-```bash
-# Check balance (SPV verified)
-python src/xai/wallet/cli.py balance \
-  --address TXAI_ADDRESS \
-  --light-client
+```python
+from xai.core.light_client import LightClient, SPVProof
 
-# Send transaction
-python src/xai/wallet/cli.py send \
-  --from TXAI_FROM \
-  --to TXAI_TO \
-  --amount 10.0 \
-  --light-client
+client = LightClient()
 
-# Verify transaction
-python src/xai/wallet/cli.py verify-tx \
-  TX_HASH \
-  --light-client
+# Assuming you have an SPVProof object
+confirmations = client.get_confirmations(tx_id)
+print(f"Transaction has {confirmations} confirmations")
 
-# Request testnet tokens
-python src/xai/wallet/cli.py request-faucet \
-  --address TXAI_ADDRESS \
-  --light-client
+# Check if it meets your security requirements
+if client.is_transaction_confirmed(tx_id, min_confirmations=6):
+    print("Transaction is confirmed and secure!")
+else:
+    print(f"Waiting for more confirmations...")
+```
+
+### Complete Example: Verify a Payment
+
+Here's a complete example of verifying a payment you received:
+
+```python
+from xai.core.light_client import LightClient, SPVProof
+from xai.core.light_client_service import LightClientService
+
+def verify_payment(tx_id, min_confirmations=6):
+    """
+    Verify that a payment transaction is confirmed.
+
+    Args:
+        tx_id: Transaction ID to verify
+        min_confirmations: Minimum confirmations required
+
+    Returns:
+        True if payment is verified and confirmed
+    """
+    # Initialize services
+    service = LightClientService(blockchain)
+    client = LightClient()
+
+    # Get transaction proof from full node
+    proof_data = service.get_transaction_proof(tx_id)
+    if not proof_data:
+        print(f"❌ Transaction {tx_id} not found")
+        return False
+
+    # Verify the merkle proof
+    is_valid, message = service.verify_proof(
+        txid=tx_id,
+        proof_data=proof_data,
+        min_confirmations=min_confirmations
+    )
+
+    if is_valid:
+        tx_data = proof_data['transaction']
+        print(f"✅ Payment verified!")
+        print(f"   From: {tx_data['from']}")
+        print(f"   To: {tx_data['to']}")
+        print(f"   Amount: {tx_data['amount']} XAI")
+        print(f"   Block: {proof_data['block_index']}")
+        print(f"   {message}")
+        return True
+    else:
+        print(f"❌ Verification failed: {message}")
+        return False
+
+# Example usage
+payment_tx_id = "0x1234567890abcdef..."
+if verify_payment(payment_tx_id, min_confirmations=6):
+    # Safe to credit user's account
+    print("Payment confirmed - crediting account")
+else:
+    # Wait for more confirmations
+    print("Payment not yet confirmed - please wait")
 ```
 
 ---
