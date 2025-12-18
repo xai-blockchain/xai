@@ -18,7 +18,7 @@ import json
 import hashlib
 import logging
 import time
-from typing import Dict, Any, List, Optional, Set, Callable
+from typing import Dict, Any, List, Optional, Set, Callable, Union
 from dataclasses import dataclass, asdict
 from enum import Enum
 from pathlib import Path
@@ -96,12 +96,25 @@ class AppSandbox:
     """
     Sandbox environment for mini apps
 
-    Provides isolated execution environment with controlled access to wallet APIs
+    Provides isolated execution environment with controlled access to wallet APIs.
+
+    Now uses secure execution backends:
+    - SecureExecutor for Python code (RestrictedPython)
+    - WasmExecutor for WebAssembly modules
+    - PermissionManager for capability-based security
     """
 
-    def __init__(self, app: MiniApp, wallet_interface: Any):
+    def __init__(
+        self,
+        app: MiniApp,
+        wallet_interface: Any,
+        permission_manager: Optional[PermissionManager] = None,
+        storage_path: Optional[Path] = None,
+    ):
         self.app = app
         self.wallet_interface = wallet_interface
+
+        # Legacy rate limiting (now also enforced by permission system)
         self.api_call_count = 0
         self.max_api_calls_per_minute = 60
         self.last_reset_time = time.time()
@@ -109,45 +122,122 @@ class AppSandbox:
         self.storage_used = 0
         self.allowed_domains: Set[str] = set()
 
-    def execute(self, code: str, context: Optional[Dict[str, Any]] = None) -> Any:
+        # New secure sandbox components
+        self.permission_manager = permission_manager or PermissionManager(
+            storage_path=storage_path / "permissions.json" if storage_path else None,
+            audit_log=AuditLog(
+                log_path=storage_path / "audit.log" if storage_path else None
+            )
+        )
+
+        # Secure executors
+        self.python_executor = SecureExecutor(
+            limits=ResourceLimits(
+                max_memory_mb=128,
+                max_cpu_seconds=5,
+                max_wall_time_seconds=10,
+                max_output_bytes=100 * 1024,  # 100KB
+            ),
+            use_subprocess=False,  # Use RestrictedPython by default
+        )
+
+        self.wasm_executor = WasmExecutor(
+            limits=WasmLimits(
+                max_memory_pages=256,  # 16MB
+                max_execution_fuel=1000000,
+                max_wall_time_seconds=10,
+            )
+        )
+
+        # Create sandbox API
+        self.sandbox_api = SandboxAPI(
+            app_id=app.app_id,
+            permission_manager=self.permission_manager,
+            wallet_interface=wallet_interface,
+        )
+
+    def execute(
+        self,
+        code: str,
+        language: str = "python",
+        entry_point: str = "main",
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Union[ExecutionResult, WasmResult]:
         """
-        Execute app code in sandbox
+        Execute app code in secure sandbox
 
         Args:
-            code: App code to execute
-            context: Execution context
+            code: App code to execute (Python source or WASM bytes)
+            language: Code language ("python" or "wasm")
+            entry_point: Entry point function name
+            context: Execution context/arguments
 
         Returns:
             Execution result
-        """
-        # This is a placeholder - in production, use proper sandboxing
-        # like RestrictedPython or a separate process with limited permissions
 
+        Raises:
+            PermissionError: If sandbox execution is disabled
+            NotImplementedError: If language is not supported
+        """
         # Check rate limiting
         if not self._check_rate_limit():
             raise PermissionError("API rate limit exceeded")
 
-        # Create restricted globals
-        restricted_globals = {
-            "app_api": self._create_app_api(),
-            "print": self._safe_print,
-            "__builtins__": self._create_restricted_builtins()
-        }
+        # Execute based on language
+        if language == "python":
+            return self._execute_python(code, entry_point, context or {})
+        elif language == "wasm":
+            return self._execute_wasm(code, entry_point, context or {})
+        else:
+            raise NotImplementedError(f"Language {language} not supported")
 
-        # Add context
-        if context:
-            restricted_globals.update(context)
+    def _execute_python(
+        self,
+        code: str,
+        entry_point: str,
+        arguments: Dict[str, Any],
+    ) -> ExecutionResult:
+        """Execute Python code using SecureExecutor"""
+        # Map old AppPermission to new Permission enum
+        allowed_imports = set()
+        if "storage" in self.app.permissions:
+            allowed_imports.add("json")
 
-        # Execute in restricted environment
-        # Feature flag: disable in server builds by default
-        import os
-        if os.getenv("XAI_ENABLE_SANDBOX_EXEC", "0") != "1":
-            raise PermissionError("Sandbox execution is disabled. Set XAI_ENABLE_SANDBOX_EXEC=1 to enable in controlled environments.")
-        # The 'exec' call has been removed due to the extreme security risk.
-        # A proper sandboxing mechanism (e.g., using a separate process,
-        # WebAssembly, or a heavily restricted Python interpreter) is required
-        # before this feature can be safely enabled.
-        raise NotImplementedError("In-process code execution is disabled for security reasons.")
+        # Create execution context
+        exec_context = ExecutionContext(
+            app_id=self.app.app_id,
+            code=code,
+            entry_point=entry_point,
+            arguments=arguments,
+            allowed_imports=allowed_imports,
+            allowed_network_domains=self.allowed_domains,
+            api_functions={
+                "get_balance": self.sandbox_api.get_balance,
+                "get_transactions": self.sandbox_api.get_transactions,
+                "create_transaction": self.sandbox_api.create_transaction,
+            }
+        )
+
+        # Execute
+        return self.python_executor.execute(exec_context)
+
+    def _execute_wasm(
+        self,
+        wasm_bytes: bytes,
+        entry_point: str,
+        arguments: Dict[str, Any],
+    ) -> WasmResult:
+        """Execute WebAssembly module"""
+        # Convert wasm_bytes (might be passed as string in old code)
+        if isinstance(wasm_bytes, str):
+            wasm_bytes = wasm_bytes.encode('latin1')
+
+        # Execute WASM
+        return self.wasm_executor.execute(
+            wasm_bytes=wasm_bytes,
+            function_name=entry_point,
+            arguments=list(arguments.values()),
+        )
 
     def _check_rate_limit(self) -> bool:
         """Check if rate limit is exceeded"""

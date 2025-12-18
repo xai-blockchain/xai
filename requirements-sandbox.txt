@@ -1,0 +1,22 @@
+# Optional dependencies for XAI Mini-App Sandbox
+#
+# The sandbox works without these, but they enhance security:
+#
+# Install all:
+#   pip install -r requirements-sandbox.txt
+#
+# Or individually as needed:
+#   pip install RestrictedPython  # Python execution security
+#   pip install wasmer            # WebAssembly support (recommended)
+#   pip install wasmtime          # WebAssembly support (alternative)
+
+# Python code execution (REQUIRED for Python mini-apps)
+RestrictedPython>=6.0
+
+# WebAssembly execution (OPTIONAL - choose one)
+# wasmer>=1.0          # Recommended - faster JIT compilation
+# wasmtime>=1.0        # Alternative - good WASI support
+# wasm3                # Lightweight interpreter
+
+# Linux syscall filtering (OPTIONAL - Linux only)
+# python-seccomp>=0.2  # Enhanced subprocess isolation
