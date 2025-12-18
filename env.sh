@@ -34,3 +34,6 @@ testnet-shutdown() {
 testnet-status() {
     docker ps --filter "name=xai" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 }
+
+# Kubernetes namespace for this project
+export KUBECONFIG="$PROJECT_ROOT/.kube/config"

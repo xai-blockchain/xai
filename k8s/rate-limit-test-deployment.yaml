@@ -1,0 +1,128 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-rate-limit-config
+  namespace: xai
+data:
+  nginx.conf: |
+    # Rate limiting configuration
+    # Applied via ingress annotations
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rate-limit-test
+  namespace: xai
+  labels:
+    app: rate-limit-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rate-limit-test
+  template:
+    metadata:
+      labels:
+        app: rate-limit-test
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 8080
+          name: http
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 1000
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          mkdir -p /tmp/nginx/cache/client_body
+          mkdir -p /tmp/nginx/cache/proxy
+          mkdir -p /tmp/nginx/cache/fastcgi
+          mkdir -p /tmp/nginx/cache/uwsgi
+          mkdir -p /tmp/nginx/cache/scgi
+          mkdir -p /tmp/nginx/run
+          mkdir -p /tmp/nginx/logs
+          touch /tmp/nginx/logs/access.log
+          touch /tmp/nginx/logs/error.log
+          cat > /tmp/nginx.conf << 'EOF'
+          pid /tmp/nginx/run/nginx.pid;
+          events {
+            worker_connections 1024;
+          }
+          http {
+            client_body_temp_path /tmp/nginx/cache/client_body;
+            proxy_temp_path /tmp/nginx/cache/proxy;
+            fastcgi_temp_path /tmp/nginx/cache/fastcgi;
+            uwsgi_temp_path /tmp/nginx/cache/uwsgi;
+            scgi_temp_path /tmp/nginx/cache/scgi;
+            access_log /tmp/nginx/logs/access.log;
+            error_log /tmp/nginx/logs/error.log;
+            server {
+              listen 8080;
+              location / {
+                root /tmp;
+                index index.html;
+              }
+            }
+          }
+          EOF
+          echo "Rate limit test server - $(date)" > /tmp/index.html
+          nginx -c /tmp/nginx.conf -g 'daemon off;'
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rate-limit-test-service
+  namespace: xai
+spec:
+  selector:
+    app: rate-limit-test
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rate-limit-test-ingress
+  namespace: xai
+  annotations:
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    nginx.ingress.kubernetes.io/limit-connections: "5"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "1"
+    nginx.ingress.kubernetes.io/limit-whitelist: ""
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: rpc-test.xai.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: rate-limit-test-service
+            port:
+              number: 80

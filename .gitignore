@@ -82,3 +82,4 @@ wallets/
 # Keep example files
 !.env.example
 !.env.template
+.kube/

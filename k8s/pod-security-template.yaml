@@ -1,0 +1,60 @@
+# Compliant Pod Template - Passes Restricted Pod Security Standard
+#
+# This template demonstrates all required security settings for pods running
+# in namespaces with pod-security.kubernetes.io/enforce=restricted
+#
+# Required Security Settings:
+# - runAsNonRoot: true (pod and container level)
+# - allowPrivilegeEscalation: false
+# - capabilities.drop: ["ALL"]
+# - seccompProfile.type: RuntimeDefault
+#
+# Usage:
+#   kubectl apply -f pod-security-template.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: compliant-pod
+  namespace: xai
+  labels:
+    app: example
+spec:
+  # Pod-level security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+
+  containers:
+  - name: app
+    # Using unprivileged nginx that listens on 8080
+    image: nginxinc/nginx-unprivileged:1.25
+
+    # Container-level security context (required)
+    securityContext:
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      capabilities:
+        drop:
+        - ALL
+      seccompProfile:
+        type: RuntimeDefault
+
+    ports:
+    - containerPort: 8080
+      protocol: TCP
+
+    # Resource limits (best practice)
+    resources:
+      limits:
+        cpu: "1"
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
