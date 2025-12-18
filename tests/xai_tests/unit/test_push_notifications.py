@@ -401,12 +401,11 @@ class TestPushService:
         mock_response = Mock()
         mock_response.status = 200
         mock_response.json = AsyncMock(return_value={"success": 1})
-
-        async def mock_post(*args, **kwargs):
-            return mock_response
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=None)
 
         mock_session = Mock()
-        mock_session.post = mock_post
+        mock_session.post = Mock(return_value=mock_response)
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
@@ -438,12 +437,11 @@ class TestPushService:
             "success": 0,
             "results": [{"error": "NotRegistered"}]
         })
-
-        async def mock_post(*args, **kwargs):
-            return mock_response
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=None)
 
         mock_session = Mock()
-        mock_session.post = mock_post
+        mock_session.post = Mock(return_value=mock_response)
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
@@ -471,12 +469,11 @@ class TestPushService:
         mock_response = Mock()
         mock_response.status = 200
         mock_response.json = AsyncMock(return_value={"success": 1})
-
-        async def mock_post(*args, **kwargs):
-            return mock_response
+        mock_response.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMock(return_value=None)
 
         mock_session = Mock()
-        mock_session.post = mock_post
+        mock_session.post = Mock(return_value=mock_response)
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
@@ -492,14 +489,14 @@ class TestPushService:
         address = "XAI1111111111111111111111111111111111111111"
         registry.register_device(address, "token_1", "android")
 
-        mock_response = AsyncMock()
+        mock_response = Mock()
         mock_response.status = 200
         mock_response.json = AsyncMock(return_value={"success": 1})
         mock_response.__aenter__ = AsyncMock(return_value=mock_response)
         mock_response.__aexit__ = AsyncMock(return_value=None)
 
-        mock_session = AsyncMock()
-        mock_session.post = AsyncMock(return_value=mock_response)
+        mock_session = Mock()
+        mock_session.post = Mock(return_value=mock_response)
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
@@ -525,14 +522,14 @@ class TestPushService:
             platform="android",
         )
 
-        mock_response = AsyncMock()
+        mock_response = Mock()
         mock_response.status = 200
         mock_response.json = AsyncMock(return_value={"success": 1})
         mock_response.__aenter__ = AsyncMock(return_value=mock_response)
         mock_response.__aexit__ = AsyncMock(return_value=None)
 
-        mock_session = AsyncMock()
-        mock_session.post = AsyncMock(return_value=mock_response)
+        mock_session = Mock()
+        mock_session.post = Mock(return_value=mock_response)
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock(return_value=None)
 
