@@ -1088,8 +1088,10 @@ class NodeAPIRoutes:
             except (DatabaseError, StorageError, OSError, RuntimeError, ValueError) as exc:
                 logger.error(
                     "Failed to compute state snapshot",
-                    error=str(exc),
-                    error_type=type(exc).__name__,
+                    extra={
+                        "error": str(exc),
+                        "error_type": type(exc).__name__
+                    }
                 )
                 return self._handle_exception(exc, "state_snapshot")
 
@@ -1114,8 +1116,10 @@ class NodeAPIRoutes:
             except (DatabaseError, StorageError, OSError, RuntimeError, ValueError) as exc:
                 logger.error(
                     "Mempool overview failed",
-                    error=str(exc),
-                    error_type=type(exc).__name__,
+                    extra={
+                        "error": str(exc),
+                        "error_type": type(exc).__name__
+                    }
                 )
                 return self._handle_exception(exc, "mempool_overview")
 
@@ -1138,8 +1142,10 @@ class NodeAPIRoutes:
             except (DatabaseError, StorageError, OSError, RuntimeError, ValueError) as exc:
                 logger.error(
                     "Mempool stats failed",
-                    error=str(exc),
-                    error_type=type(exc).__name__,
+                    extra={
+                        "error": str(exc),
+                        "error_type": type(exc).__name__
+                    }
                 )
                 return self._handle_exception(exc, "mempool_stats")
 
@@ -1261,9 +1267,11 @@ class NodeAPIRoutes:
             except (DatabaseError, StorageError, OSError, RuntimeError) as exc:
                 logger.error(
                     "Failed to evict transaction from mempool",
-                    txid=txid,
-                    error=str(exc),
-                    error_type=type(exc).__name__,
+                    extra={
+                        "txid": txid,
+                        "error": str(exc),
+                        "error_type": type(exc).__name__
+                    }
                 )
                 return self._handle_exception(exc, "mempool_delete")
 
@@ -1296,9 +1304,11 @@ class NodeAPIRoutes:
             except PaginationError as exc:
                 logger.warning(
                     "PaginationError in get_blocks",
-                    error_type="PaginationError",
-                    error=str(exc),
-                    function="get_blocks",
+                    extra={
+                        "error_type": "PaginationError",
+                        "error": str(exc),
+                        "function": "get_blocks"
+                    }
                 )
                 return self._error_response(
                     str(exc),
@@ -1339,9 +1349,11 @@ class NodeAPIRoutes:
             except (IndexError, KeyError, TypeError, AttributeError) as e:
                 logger.debug(
                     "Block not in chain cache",
-                    block_index=idx_int,
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    extra={
+                        "block_index": idx_int,
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
                 )
                 fallback_block = None
 
@@ -1354,9 +1366,11 @@ class NodeAPIRoutes:
                 except (DatabaseError, StorageError, ValidationError, KeyError, ValueError, TypeError) as e:
                     logger.debug(
                         "get_block failed",
-                        block_index=idx_int,
-                        error=str(e),
-                        error_type=type(e).__name__,
+                        extra={
+                            "block_index": idx_int,
+                            "error": str(e),
+                            "error_type": type(e).__name__
+                        }
                     )
                     block_obj = None
 
@@ -1754,8 +1768,10 @@ class NodeAPIRoutes:
             except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, KeyError) as exc:
                 logger.error(
                     "Exchange get order book failed",
-                    error=str(exc),
-                    error_type=type(exc).__name__,
+                    extra={
+                        "error": str(exc),
+                        "error_type": type(exc).__name__
+                    }
                 )
                 return self._handle_exception(exc, "exchange_get_order_book")
 
@@ -1882,15 +1898,19 @@ class NodeAPIRoutes:
             except ValueError as exc:
                 logger.warning(
                     "ValueError occurred",
-                    error_type="ValueError",
-                    error=str(exc),
+                    extra={
+                        "error_type": "ValueError",
+                        "error": str(exc)
+                    }
                 )
                 return self._error_response(str(exc), status=400, code="order_invalid")
             except (DatabaseError, StorageError, OSError, IOError, TypeError, KeyError, AttributeError) as exc:
                 logger.error(
                     "Exchange place order failed",
-                    error=str(exc),
-                    error_type=type(exc).__name__,
+                    extra={
+                        "error": str(exc),
+                        "error_type": type(exc).__name__
+                    }
                 )
                 return self._handle_exception(exc, "exchange_place_order")
 
@@ -1944,8 +1964,10 @@ class NodeAPIRoutes:
             except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, KeyError) as exc:
                 logger.error(
                     "Exchange cancel order failed",
-                    error=str(exc),
-                    error_type=type(exc).__name__,
+                    extra={
+                        "error": str(exc),
+                        "error_type": type(exc).__name__
+                    }
                 )
                 return self._handle_exception(exc, "exchange_cancel_order")
 
@@ -1978,9 +2000,11 @@ class NodeAPIRoutes:
             except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, KeyError) as e:
                 logger.error(
                     "Get my orders failed",
-                    address=address,
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    extra={
+                        "address": address,
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
                 )
                 return jsonify({"error": str(e)}), 500
 
@@ -2005,9 +2029,11 @@ class NodeAPIRoutes:
             except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, KeyError) as e:
                 logger.error(
                     "Get recent trades failed",
-                    limit=limit,
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    extra={
+                        "limit": limit,
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
                 )
                 return jsonify({"error": str(e)}), 500
 
@@ -2048,16 +2074,20 @@ class NodeAPIRoutes:
             except ValueError as exc:
                 logger.warning(
                     "ValueError in deposit_funds",
-                    error_type="ValueError",
-                    error=str(exc),
-                    function="deposit_funds",
+                    extra={
+                        "error_type": "ValueError",
+                        "error": str(exc),
+                        "function": "deposit_funds"
+                    }
                 )
                 return self._error_response(str(exc), status=400, code="deposit_invalid")
             except (DatabaseError, StorageError, OSError, IOError, TypeError, KeyError, AttributeError) as exc:
                 logger.error(
                     "Exchange deposit failed",
-                    error=str(exc),
-                    error_type=type(exc).__name__,
+                    extra={
+                        "error": str(exc),
+                        "error_type": type(exc).__name__
+                    }
                 )
                 return self._handle_exception(exc, "exchange_deposit")
 
@@ -2089,16 +2119,20 @@ class NodeAPIRoutes:
             except ValueError as exc:
                 logger.warning(
                     "ValueError in withdraw_funds",
-                    error_type="ValueError",
-                    error=str(exc),
-                    function="withdraw_funds",
+                    extra={
+                        "error_type": "ValueError",
+                        "error": str(exc),
+                        "function": "withdraw_funds"
+                    }
                 )
                 return self._error_response(str(exc), status=400, code="withdraw_invalid")
             except (DatabaseError, StorageError, OSError, IOError, TypeError, KeyError, AttributeError) as exc:
                 logger.error(
                     "Exchange withdraw failed",
-                    error=str(exc),
-                    error_type=type(exc).__name__,
+                    extra={
+                        "error": str(exc),
+                        "error_type": type(exc).__name__
+                    }
                 )
                 return self._handle_exception(exc, "exchange_withdraw")
 
@@ -2113,9 +2147,11 @@ class NodeAPIRoutes:
             except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, AttributeError) as e:
                 logger.error(
                     "Get user balance failed",
-                    address=address,
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    extra={
+                        "address": address,
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
                 )
                 return jsonify({"error": str(e)}), 500
 
@@ -2130,10 +2166,12 @@ class NodeAPIRoutes:
             except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, AttributeError) as e:
                 logger.error(
                     "Get currency balance failed",
-                    address=address,
-                    currency=currency,
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    extra={
+                        "address": address,
+                        "currency": currency,
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
                 )
                 return jsonify({"error": str(e)}), 500
 
@@ -2154,9 +2192,11 @@ class NodeAPIRoutes:
             except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, AttributeError) as e:
                 logger.error(
                     "Get transactions failed",
-                    address=address,
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    extra={
+                        "address": address,
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
                 )
                 return jsonify({"error": str(e)}), 500
 
@@ -2210,9 +2250,11 @@ class NodeAPIRoutes:
             except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, KeyError) as e:
                 logger.error(
                     "Get price history failed",
-                    timeframe=timeframe,
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    extra={
+                        "timeframe": timeframe,
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
                 )
                 return jsonify({"error": str(e)}), 500
 
@@ -2260,8 +2302,10 @@ class NodeAPIRoutes:
             except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, KeyError) as e:
                 logger.error(
                     "Get exchange stats failed",
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
                 )
                 return jsonify({"error": str(e)}), 500
 
@@ -2321,16 +2365,20 @@ class NodeAPIRoutes:
             except ValueError as exc:
                 logger.warning(
                     "ValueError in buy_with_card",
-                    error_type="ValueError",
-                    error=str(exc),
-                    function="buy_with_card",
+                    extra={
+                        "error_type": "ValueError",
+                        "error": str(exc),
+                        "function": "buy_with_card"
+                    }
                 )
                 return self._error_response(str(exc), status=400, code="payment_invalid")
             except (DatabaseError, StorageError, OSError, IOError, TypeError, KeyError, AttributeError) as exc:
                 logger.error(
                     "Exchange buy with card failed",
-                    error=str(exc),
-                    error_type=type(exc).__name__,
+                    extra={
+                        "error": str(exc),
+                        "error_type": type(exc).__name__
+                    }
                 )
                 return self._handle_exception(exc, "exchange_buy_with_card")
 
@@ -2345,8 +2393,10 @@ class NodeAPIRoutes:
             except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, AttributeError) as e:
                 logger.error(
                     "Get payment methods failed",
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
                 )
                 return jsonify({"error": str(e)}), 500
 
@@ -2365,7 +2415,9 @@ class NodeAPIRoutes:
             except (DatabaseError, StorageError, OSError, IOError, ValueError, TypeError, AttributeError) as e:
                 logger.error(
                     "Calculate purchase failed",
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
                 )
                 return jsonify({"error": str(e)}), 500

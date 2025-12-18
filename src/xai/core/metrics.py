@@ -78,9 +78,11 @@ class StructuredLogger:
             except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 logger.error(
                     "Exception in __init__",
-                    error_type="Exception",
-                    error=str(e),
-                    function="__init__",
+                    extra={
+                        "error_type": "Exception",
+                        "error": str(e),
+                        "function": "__init__"
+                    }
                 )
                 print(f"Warning: Could not create file log handler: {e}")
 

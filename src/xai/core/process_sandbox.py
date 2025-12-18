@@ -49,9 +49,11 @@ def apply_process_limits(
     except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:  # pragma: no cover - platform specific
         logger.error(
             "Exception in _bounded",
-            error_type="Exception",
-            error=str(exc),
-            function="_bounded",
+            extra={
+                "error_type": "Exception",
+                "error": str(exc),
+                "function": "_bounded"
+            }
         )
         log.warning("Failed to set memory limit: %s", exc, extra={"event": "sandbox.mem_fail"})
 
@@ -64,9 +66,11 @@ def apply_process_limits(
     except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:  # pragma: no cover - platform specific
         logger.error(
             "Exception in _bounded",
-            error_type="Exception",
-            error=str(exc),
-            function="_bounded",
+            extra={
+                "error_type": "Exception",
+                "error": str(exc),
+                "function": "_bounded"
+            }
         )
         log.warning("Failed to set CPU limit: %s", exc, extra={"event": "sandbox.cpu_fail"})
 
@@ -79,9 +83,11 @@ def apply_process_limits(
     except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:  # pragma: no cover - platform specific
         logger.error(
             "Exception in _bounded",
-            error_type="Exception",
-            error=str(exc),
-            function="_bounded",
+            extra={
+                "error_type": "Exception",
+                "error": str(exc),
+                "function": "_bounded"
+            }
         )
         log.warning("Failed to set file descriptor limit: %s", exc, extra={"event": "sandbox.fd_fail"})
 

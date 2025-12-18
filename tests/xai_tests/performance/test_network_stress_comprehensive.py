@@ -646,6 +646,7 @@ class TestConcurrentOperationsStress:
             blockchain.mine_pending_transactions(wallet.address)
 
         operation_counts = []
+        errors = []
         lock = threading.Lock()
 
         def wallet_operations(wallet, count):
@@ -661,10 +662,17 @@ class TestConcurrentOperationsStress:
                         wallet.private_key,
                         wallet.public_key,
                     )
-                    if blockchain.add_transaction(tx):
+                    if tx is None:
+                        with lock:
+                            errors.append("create_transaction returned None (insufficient funds?)")
+                    elif blockchain.add_transaction(tx):
                         local_count += 1
-                except Exception:
-                    pass
+                    else:
+                        with lock:
+                            errors.append("add_transaction returned False (validation failed?)")
+                except Exception as e:
+                    with lock:
+                        errors.append(f"{type(e).__name__}: {str(e)}")
             with lock:
                 operation_counts.append(local_count)
 
@@ -680,10 +688,16 @@ class TestConcurrentOperationsStress:
         total_ops = sum(operation_counts)
         metrics.record("total_operations", total_ops)
         metrics.record("concurrent_wallets", 20)
+        metrics.record("errors", len(errors))
 
         print(f"\n[Concurrent Wallet Test] Operations: {total_ops}, Wallets: 20")
+        if errors:
+            print(f"Errors encountered: {len(errors)}")
+            # Print first few errors for debugging
+            for error in errors[:5]:
+                print(f"  - {error}")
 
-        assert total_ops >= 50, "Should complete at least 50 operations"
+        assert total_ops >= 50, f"Should complete at least 50 operations (got {total_ops}, {len(errors)} errors)"
 
     def test_concurrent_api_requests(self, tmp_path):
         """Test handling concurrent API-like requests"""

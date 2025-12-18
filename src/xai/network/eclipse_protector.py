@@ -100,9 +100,11 @@ if __name__ == "__main__":
     except ValueError as e:
         logger.warning(
             "ValueError in check_for_eclipse_risk",
-            error_type="ValueError",
-            error=str(e),
-            function="check_for_eclipse_risk",
+            extra={
+                "error_type": "ValueError",
+                "error": str(e),
+                "function": "check_for_eclipse_risk"
+            }
         )
         print(f"Error (expected): {e}")
     protector.check_for_eclipse_risk()

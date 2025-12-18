@@ -309,9 +309,11 @@ class SwapStateMachine:
         except Exception as e:
             logger.error(
                 "Exception in _persist_swap",
-                error_type="Exception",
-                error=str(e),
-                function="_persist_swap",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(e),
+                    "function": "_persist_swap"
+                }
             )
             print(f"Error persisting swap {swap_id}: {e}")
 
@@ -339,9 +341,11 @@ class SwapStateMachine:
         except Exception as e:
             logger.error(
                 "Exception in _load_swaps",
-                error_type="Exception",
-                error=str(e),
-                function="_load_swaps",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(e),
+                    "function": "_load_swaps"
+                }
             )
             print(f"Error loading swaps: {e}")
 
@@ -518,9 +522,11 @@ class AtomicSwapHTLC:
         except ValueError as exc:
             logger.warning(
                 "ValueError in _create_utxo_htlc",
-                error_type="ValueError",
-                error=str(exc),
-                function="_create_utxo_htlc",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "_create_utxo_htlc"
+                }
             )
             contract["deployment_ready"] = False
             contract["deployment_error"] = str(exc)
@@ -678,9 +684,11 @@ class AtomicSwapHTLC:
         except Exception as exc:  # pragma: no cover - defensive network handling
             logger.warning(
                 "Exception in _create_ethereum_htlc",
-                error_type="Exception",
-                error=str(exc),
-                function="_create_ethereum_htlc",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(exc),
+                    "function": "_create_ethereum_htlc"
+                }
             )
             contract["deployment_ready"] = False
             contract["deployment_error"] = str(exc)
@@ -1044,9 +1052,11 @@ class CrossChainVerifier:
         except ValueError as exc:
             logger.warning(
                 "ValueError in verify_spv_proof",
-                error_type="ValueError",
-                error=str(exc),
-                function="verify_spv_proof",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "verify_spv_proof"
+                }
             )
             return False, f"SPV verification error: {exc}"
 
@@ -1112,9 +1122,11 @@ class CrossChainVerifier:
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.warning(
                 "Exception in verify_transaction_on_chain",
-                error_type="Exception",
-                error=str(exc),
-                function="verify_transaction_on_chain",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(exc),
+                    "function": "verify_transaction_on_chain"
+                }
             )
             return False, f"Verification failed: {exc}", None
 
@@ -1186,9 +1198,11 @@ class CrossChainVerifier:
         except Exception as exc:
             logger.warning(
                 "Exception in verify_transaction_spv",
-                error_type="Exception",
-                error=str(exc),
-                function="verify_transaction_spv",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(exc),
+                    "function": "verify_transaction_spv"
+                }
             )
             return False, f"Failed to fetch merkle proof: {exc}", None
         if not proof or not proof.get("hashes"):
@@ -1203,9 +1217,11 @@ class CrossChainVerifier:
         except Exception as exc:
             logger.warning(
                 "Exception in verify_transaction_spv",
-                error_type="Exception",
-                error=str(exc),
-                function="verify_transaction_spv",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(exc),
+                    "function": "verify_transaction_spv"
+                }
             )
             return False, f"Failed to fetch block header: {exc}", None
 

@@ -32,7 +32,9 @@ class TestCheckpointProtection:
             amount=12.0,
             fee=0.0,
         )
-        tx.txid = f"tx_{idx}_" + "x" * 58
+        # Create a valid 64-character hex hash
+        idx_hex = f"{idx:x}"
+        tx.txid = idx_hex.zfill(64)
         return tx
 
     def create_test_block(self, index: int, previous_hash: str, difficulty: int = 1) -> Block:
@@ -44,8 +46,10 @@ class TestCheckpointProtection:
             previous_hash=previous_hash,
             difficulty=difficulty
         )
-        # Mine the block (simple version)
-        block.hash = f"hash_{index}_" + "0" * 58
+        # Mine the block (simple version) - create valid 64-char hex hash
+        # Pad index to ensure exactly 64 characters
+        index_hex = f"{index:x}"
+        block.hash = index_hex.zfill(64)
         return block
 
     def test_reject_fork_before_checkpoint(self):
@@ -133,7 +137,7 @@ class TestCheckpointProtection:
         # Try to replace entire chain
         fork_chain = []
         for i in range(7):
-            prev_hash = fork_chain[-1].hash if fork_chain else "fork_genesis"
+            prev_hash = fork_chain[-1].hash if fork_chain else ("f" * 64)
             block = self.create_test_block(i, prev_hash)
             fork_chain.append(block)
 
@@ -194,7 +198,7 @@ class TestCheckpointProtection:
         fork_chain = self.blockchain.chain[:5].copy()
         # Different block at height 5
         different_block = self.create_test_block(5, fork_chain[-1].hash, difficulty=3)
-        different_block.hash = "different_" + "0" * 54
+        different_block.hash = "f" * 64  # Different valid 64-char hex hash
         fork_chain.append(different_block)
 
         for i in range(6, 12):
@@ -310,14 +314,19 @@ class TestCheckpointEdgeCases:
             amount=12.0,
             fee=0.0,
         )
-        tx.txid = f"tx_{idx}_" + "x" * 58
+        # Create a valid 64-character hex hash
+        idx_hex = f"{idx:x}"
+        tx.txid = idx_hex.zfill(64)
         return tx
 
     def create_test_block(self, index: int, previous_hash: str) -> Block:
         """Create a test block"""
         txs = [self.create_dummy_transaction(index)]
         block = Block(index=index, transactions=txs, previous_hash=previous_hash, difficulty=1)
-        block.hash = f"hash_{index}_" + "0" * 58
+        # Mine the block (simple version) - create valid 64-char hex hash
+        # Pad index to ensure exactly 64 characters
+        index_hex = f"{index:x}"
+        block.hash = index_hex.zfill(64)
         return block
 
     def test_empty_chain_with_checkpoint(self):

@@ -108,9 +108,11 @@ class StressTest(ABC):
                 except Exception as e:
                     logger.error(
                         "Exception in run",
-                        error_type="Exception",
-                        error=str(e),
-                        function="run",
+                        extra={
+                            "error_type": "Exception",
+                            "error": str(e),
+                            "function": "run"
+                        }
                     )
                     self.errors.append(str(e))
                     failed += 1
@@ -143,9 +145,11 @@ class StressTest(ABC):
         except Exception as e:
             logger.warning(
                 "Exception in _timed_operation",
-                error_type="Exception",
-                error=str(e),
-                function="_timed_operation",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(e),
+                    "function": "_timed_operation"
+                }
             )
             latency = time.time() - start
             self.errors.append(str(e))

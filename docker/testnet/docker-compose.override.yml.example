@@ -1,0 +1,52 @@
+# Docker Compose Override Example for Testnet
+# Copy this file to docker-compose.override.yml to customize testnet behavior
+#
+# This file works with any of the testnet configurations:
+# - docker-compose.one-node.yml
+# - docker-compose.two-node.yml
+# - docker-compose.three-node.yml
+# - docker-compose.four-node.yml
+#
+# Usage:
+#   cp docker-compose.override.yml.example docker-compose.override.yml
+#   docker compose -f docker-compose.three-node.yml up -d
+
+services:
+  # ============================================================================
+  # Disable Explorer (if not needed)
+  # ============================================================================
+  # Uncomment to make explorer optional - requires --profile explorer to start
+  # testnet-explorer:
+  #   profiles:
+  #     - explorer
+
+  # ============================================================================
+  # Development Overrides
+  # ============================================================================
+  # Enable debug logging on bootstrap node
+  # xai-testnet-bootstrap:
+  #   environment:
+  #     LOG_LEVEL: DEBUG
+  #     XAI_P2P_DEBUG_SIGNING: "1"
+
+  # ============================================================================
+  # Port Overrides (if port conflicts exist)
+  # ============================================================================
+  # testnet-explorer:
+  #   ports:
+  #     - "8080:12080"  # Use different host port if 12080 is in use
+
+  # ============================================================================
+  # Resource Limits (for low-memory systems)
+  # ============================================================================
+  # testnet-postgres:
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 512M
+  #
+  # testnet-redis:
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 256M

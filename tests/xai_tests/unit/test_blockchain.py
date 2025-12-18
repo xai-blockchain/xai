@@ -521,12 +521,12 @@ class TestBlockStructure:
         block = Block(
             header=1,  # index
             transactions=transactions,
-            previous_hash="prev_hash",
+            previous_hash="a" * 64,
             difficulty=4
         )
 
         assert block.index == 1
-        assert block.previous_hash == "prev_hash"
+        assert block.previous_hash == "a" * 64
         assert block.nonce == 0
         assert block.timestamp > 0
 
@@ -537,7 +537,7 @@ class TestBlockStructure:
         block = Block(
             header=1,  # index
             transactions=transactions,
-            previous_hash="prev_hash",
+            previous_hash="a" * 64,
             difficulty=4
         )
 
@@ -552,7 +552,7 @@ class TestBlockStructure:
         block = Block(
             header=1,  # index
             transactions=transactions,
-            previous_hash="prev_hash",
+            previous_hash="a" * 64,
             difficulty=4
         )
 

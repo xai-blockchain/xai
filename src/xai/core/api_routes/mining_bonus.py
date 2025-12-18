@@ -64,9 +64,11 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in register_miner",
-                error_type="ValueError",
-                error=str(exc),
-                function="register_miner",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "register_miner"
+                }
             )
             return routes._error_response(str(exc), status=400, code="mining_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:
@@ -103,9 +105,11 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in get_achievements",
-                error_type="ValueError",
-                error=str(exc),
-                function="get_achievements",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "get_achievements"
+                }
             )
             return routes._error_response(str(exc), status=400, code="mining_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:
@@ -151,9 +155,11 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in claim_bonus",
-                error_type="ValueError",
-                error=str(exc),
-                function="claim_bonus",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "claim_bonus"
+                }
             )
             return routes._error_response(str(exc), status=400, code="mining_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:
@@ -198,9 +204,11 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in create_referral_code",
-                error_type="ValueError",
-                error=str(exc),
-                function="create_referral_code",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "create_referral_code"
+                }
             )
             return routes._error_response(str(exc), status=400, code="referral_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:
@@ -251,9 +259,11 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in use_referral_code",
-                error_type="ValueError",
-                error=str(exc),
-                function="use_referral_code",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "use_referral_code"
+                }
             )
             return routes._error_response(str(exc), status=400, code="referral_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:
@@ -283,9 +293,11 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in get_user_bonuses",
-                error_type="ValueError",
-                error=str(exc),
-                function="get_user_bonuses",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "get_user_bonuses"
+                }
             )
             return routes._error_response(str(exc), status=400, code="mining_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:
@@ -316,9 +328,11 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in get_bonus_leaderboard",
-                error_type="ValueError",
-                error=str(exc),
-                function="get_bonus_leaderboard",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "get_bonus_leaderboard"
+                }
             )
             return routes._error_response(str(exc), status=400, code="mining_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:
@@ -355,9 +369,11 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in get_unified_leaderboard",
-                error_type="ValueError",
-                error=str(exc),
-                function="get_unified_leaderboard",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "get_unified_leaderboard"
+                }
             )
             return routes._error_response(str(exc), status=400, code="mining_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:
@@ -384,9 +400,11 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in get_mining_bonus_stats",
-                error_type="ValueError",
-                error=str(exc),
-                function="get_mining_bonus_stats",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "get_mining_bonus_stats"
+                }
             )
             return routes._error_response(str(exc), status=400, code="mining_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:

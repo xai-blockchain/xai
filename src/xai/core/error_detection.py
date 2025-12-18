@@ -369,9 +369,11 @@ class CorruptionDetector:
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.error(
                 "Exception in _check_utxo_consistency",
-                error_type="Exception",
-                error=str(e),
-                function="_check_utxo_consistency",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(e),
+                    "function": "_check_utxo_consistency"
+                }
             )
             errors.append(f"UTXO check failed: {str(e)}")
 
@@ -404,9 +406,11 @@ class CorruptionDetector:
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.error(
                 "Exception in _check_supply_validation",
-                error_type="Exception",
-                error=str(e),
-                function="_check_supply_validation",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(e),
+                    "function": "_check_supply_validation"
+                }
             )
             errors.append(f"Supply validation failed: {str(e)}")
 

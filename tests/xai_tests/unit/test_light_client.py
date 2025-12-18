@@ -10,7 +10,7 @@ def test_light_client_verification():
     tree = MerkleTree(leaves)
     header = BlockHeader(
         block_number=1,
-        prev_block_hash="0x0",
+        prev_block_hash="0" * 64,
         state_root="state",
         transactions_root=tree.get_root(),
         timestamp=int(time.time()),

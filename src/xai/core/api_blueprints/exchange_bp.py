@@ -95,9 +95,11 @@ def get_order_book() -> Tuple[Dict[str, Any], int]:
     except RuntimeError as exc:
         logger.warning(
             "RuntimeError in get_order_book",
-            error_type="RuntimeError",
-            error=str(exc),
-            function="get_order_book",
+            extra={
+                "error_type": "RuntimeError",
+                "error": str(exc),
+                "function": "get_order_book"
+            }
         )
         return handle_exception(exc, "exchange_get_order_book")
 
@@ -132,9 +134,11 @@ def get_exchange_balance(address: str) -> Tuple[Dict[str, Any], int]:
     except RuntimeError as exc:
         logger.warning(
             "RuntimeError in get_exchange_balance",
-            error_type="RuntimeError",
-            error=str(exc),
-            function="get_exchange_balance",
+            extra={
+                "error_type": "RuntimeError",
+                "error": str(exc),
+                "function": "get_exchange_balance"
+            }
         )
         return handle_exception(exc, "exchange_get_balance")
 
@@ -169,9 +173,11 @@ def get_exchange_balance_currency(address: str, currency: str) -> Tuple[Dict[str
     except RuntimeError as exc:
         logger.warning(
             "RuntimeError in get_exchange_balance_currency",
-            error_type="RuntimeError",
-            error=str(exc),
-            function="get_exchange_balance_currency",
+            extra={
+                "error_type": "RuntimeError",
+                "error": str(exc),
+                "function": "get_exchange_balance_currency"
+            }
         )
         return handle_exception(exc, "exchange_get_balance_currency")
 
@@ -243,8 +249,10 @@ def get_exchange_stats() -> Tuple[Dict[str, Any], int]:
     except RuntimeError as exc:
         logger.warning(
             "RuntimeError in get_exchange_stats",
-            error_type="RuntimeError",
-            error=str(exc),
-            function="get_exchange_stats",
+            extra={
+                "error_type": "RuntimeError",
+                "error": str(exc),
+                "function": "get_exchange_stats"
+            }
         )
         return handle_exception(exc, "exchange_get_stats")

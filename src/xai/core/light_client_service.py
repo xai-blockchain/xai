@@ -17,9 +17,45 @@ Security Considerations:
 
 import hashlib
 import logging
+import time
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SyncProgress:
+    """
+    Tracks header sync progress for light clients.
+
+    Provides comprehensive sync status information for mobile and web clients
+    to display progress bars, ETAs, and sync state.
+    """
+    current_height: int
+    target_height: int
+    sync_percentage: float
+    estimated_time_remaining: Optional[int]  # seconds
+    sync_state: str  # "syncing", "synced", "stalled", "idle"
+    headers_per_second: float
+    started_at: datetime
+    checkpoint_sync_enabled: bool = False
+    checkpoint_height: Optional[int] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "current_height": self.current_height,
+            "target_height": self.target_height,
+            "sync_percentage": round(self.sync_percentage, 2),
+            "estimated_time_remaining": self.estimated_time_remaining,
+            "sync_state": self.sync_state,
+            "headers_per_second": round(self.headers_per_second, 2),
+            "started_at": self.started_at.isoformat(),
+            "checkpoint_sync_enabled": self.checkpoint_sync_enabled,
+            "checkpoint_height": self.checkpoint_height,
+        }
 
 
 class MerkleProofError(Exception):
@@ -176,6 +212,14 @@ class LightClientService:
 
     def __init__(self, blockchain):
         self.blockchain = blockchain
+        # Sync progress tracking
+        self._sync_start_time: Optional[float] = None
+        self._sync_start_height: int = 0
+        self._last_height_update_time: float = time.time()
+        self._last_height: int = 0
+        self._target_height: int = 0
+        self._sync_history: List[Tuple[float, int]] = []  # (timestamp, height) pairs
+        self._stall_threshold: int = 30  # seconds without progress = stalled
 
     def get_recent_headers(
         self, count: int = 20, start_index: Optional[int] = None
@@ -361,3 +405,162 @@ class LightClientService:
             layers.append(next_layer)
 
         return layers
+
+    def start_sync(self, target_height: int) -> None:
+        """
+        Initialize sync progress tracking.
+
+        Args:
+            target_height: The blockchain height to sync to
+        """
+        chain = self.blockchain.chain
+        current_height = len(chain) - 1 if chain else 0
+
+        self._sync_start_time = time.time()
+        self._sync_start_height = current_height
+        self._last_height = current_height
+        self._target_height = target_height
+        self._last_height_update_time = time.time()
+        self._sync_history = [(time.time(), current_height)]
+
+        logger.info(
+            "Light client sync started",
+            extra={
+                "event": "light_client.sync_started",
+                "current_height": current_height,
+                "target_height": target_height
+            }
+        )
+
+    def update_sync_progress(self, current_height: Optional[int] = None) -> None:
+        """
+        Update sync progress tracking with current height.
+
+        Args:
+            current_height: Current blockchain height (if None, uses chain length)
+        """
+        if current_height is None:
+            chain = self.blockchain.chain
+            current_height = len(chain) - 1 if chain else 0
+
+        now = time.time()
+
+        # Only update if height changed
+        if current_height != self._last_height:
+            self._last_height = current_height
+            self._last_height_update_time = now
+            self._sync_history.append((now, current_height))
+
+            # Keep only last 100 data points
+            if len(self._sync_history) > 100:
+                self._sync_history = self._sync_history[-100:]
+
+    def get_sync_progress(self) -> SyncProgress:
+        """
+        Get current sync progress for light client.
+
+        Returns:
+            SyncProgress object with comprehensive sync status
+        """
+        chain = self.blockchain.chain
+        current_height = len(chain) - 1 if chain else 0
+
+        # Update progress if not already tracking
+        if self._sync_start_time is None:
+            self.start_sync(current_height)
+
+        # Calculate sync percentage
+        if self._target_height > 0:
+            remaining = max(0, self._target_height - current_height)
+            total = max(1, self._target_height - self._sync_start_height)
+            sync_percentage = min(100.0, ((total - remaining) / total) * 100.0)
+        else:
+            sync_percentage = 100.0
+
+        # Calculate headers per second
+        headers_per_second = self._calculate_headers_per_second()
+
+        # Estimate time remaining
+        estimated_time_remaining = None
+        if headers_per_second > 0 and current_height < self._target_height:
+            remaining_headers = self._target_height - current_height
+            estimated_time_remaining = int(remaining_headers / headers_per_second)
+
+        # Determine sync state
+        sync_state = self._determine_sync_state(
+            current_height, sync_percentage, headers_per_second
+        )
+
+        # Check for checkpoint sync
+        checkpoint_sync_enabled = False
+        checkpoint_height = None
+        if hasattr(self.blockchain, "checkpoint_manager"):
+            checkpoint_manager = self.blockchain.checkpoint_manager
+            if checkpoint_manager:
+                checkpoint_sync_enabled = True
+                checkpoint_height = getattr(
+                    checkpoint_manager, "latest_checkpoint_height", None
+                )
+
+        return SyncProgress(
+            current_height=current_height,
+            target_height=self._target_height,
+            sync_percentage=sync_percentage,
+            estimated_time_remaining=estimated_time_remaining,
+            sync_state=sync_state,
+            headers_per_second=headers_per_second,
+            started_at=datetime.fromtimestamp(self._sync_start_time),
+            checkpoint_sync_enabled=checkpoint_sync_enabled,
+            checkpoint_height=checkpoint_height,
+        )
+
+    def _calculate_headers_per_second(self) -> float:
+        """
+        Calculate average headers per second based on recent sync history.
+
+        Returns:
+            Headers per second as float
+        """
+        if len(self._sync_history) < 2:
+            return 0.0
+
+        # Use last N samples for moving average
+        samples = min(10, len(self._sync_history))
+        recent_history = self._sync_history[-samples:]
+
+        time_diff = recent_history[-1][0] - recent_history[0][0]
+        if time_diff <= 0:
+            return 0.0
+
+        height_diff = recent_history[-1][1] - recent_history[0][1]
+        return max(0.0, height_diff / time_diff)
+
+    def _determine_sync_state(
+        self, current_height: int, sync_percentage: float, headers_per_second: float
+    ) -> str:
+        """
+        Determine current sync state based on progress metrics.
+
+        Args:
+            current_height: Current blockchain height
+            sync_percentage: Percentage of sync completed
+            headers_per_second: Current sync speed
+
+        Returns:
+            Sync state string: "syncing", "synced", "stalled", or "idle"
+        """
+        # Check if synced
+        if sync_percentage >= 99.99 or current_height >= self._target_height:
+            return "synced"
+
+        # Check if stalled
+        time_since_update = time.time() - self._last_height_update_time
+        if time_since_update > self._stall_threshold and headers_per_second < 0.01:
+            return "stalled"
+
+        # Check if actively syncing
+        if headers_per_second > 0:
+            return "syncing"
+
+        # Default to idle
+        return "idle"

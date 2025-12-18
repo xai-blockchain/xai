@@ -684,9 +684,11 @@ class StrictAIPoolManager:
             # API call failed - don't charge tokens
             logger.warning(
                 "Exception in _execute_with_strict_limits",
-                error_type="Exception",
-                error=str(e),
-                function="_execute_with_strict_limits",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(e),
+                    "function": "_execute_with_strict_limits"
+                }
             )
             return {
                 "success": False,
@@ -812,9 +814,11 @@ class StrictAIPoolManager:
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.warning(
                 "Exception in _call_google_with_limit",
-                error_type="Exception",
-                error=str(e),
-                function="_call_google_with_limit",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(e),
+                    "function": "_call_google_with_limit"
+                }
             )
             return {"success": False, "error": str(e), "tokens_used": 0}
 

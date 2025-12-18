@@ -409,9 +409,11 @@ class BatchProcessor:
         except Exception as e:
             logger.warning(
                 "Exception in process_batch",
-                error_type="Exception",
-                error=str(e),
-                function="process_batch",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(e),
+                    "function": "process_batch"
+                }
             )
             self.failed_count += len(batch.transactions)
             print(f"Batch processing error: {e}")

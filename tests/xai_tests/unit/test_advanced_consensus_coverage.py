@@ -855,9 +855,10 @@ class TestAdvancedConsensusManagerComprehensive:
         manager = AdvancedConsensusManager(bc)
         wallet = Wallet()
 
-        # Create block with non-existent parent
-        block = Block(100, [], "nonexistent_parent", bc.difficulty)
-        block.hash = "orphan_block"
+        # Create block with non-existent parent (valid 64-char hex format but not in chain)
+        fake_parent_hash = "0" * 64  # Valid format but doesn't exist
+        block = Block(100, [], fake_parent_hash, bc.difficulty)
+        block.hash = "a" * 64  # Valid format hash
 
         accepted, message = manager.process_new_block(block)
 

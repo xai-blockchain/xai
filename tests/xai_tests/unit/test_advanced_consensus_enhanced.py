@@ -625,18 +625,20 @@ class TestAdvancedConsensusManagerEdgeCases:
         manager = AdvancedConsensusManager(bc)
         wallet = Wallet()
 
-        # Create chain of orphans
+        # Create chain of orphans (use valid 64-char hex hashes)
         parent_hash = bc.get_latest_block().hash
+        orphan1_hash = "a" * 64  # Valid format hash
+        orphan2_hash = "b" * 64  # Valid format hash
 
         orphan1 = Block(2, [], parent_hash, bc.difficulty)
-        orphan1.hash = "orphan1_hash"
+        orphan1.hash = orphan1_hash
 
-        orphan2 = Block(3, [], "orphan1_hash", bc.difficulty)
-        orphan2.hash = "orphan2_hash"
+        orphan2 = Block(3, [], orphan1_hash, bc.difficulty)
+        orphan2.hash = orphan2_hash
 
         # Add orphans
         manager.orphan_pool.add_orphan(orphan1, parent_hash)
-        manager.orphan_pool.add_orphan(orphan2, "orphan1_hash")
+        manager.orphan_pool.add_orphan(orphan2, orphan1_hash)
 
         # Process orphans
         manager.process_orphans_after_block(parent_hash)

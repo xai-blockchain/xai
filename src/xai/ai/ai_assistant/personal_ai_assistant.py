@@ -218,9 +218,11 @@ class PersonalAIAssistant:
             except Exception as exc:
                 logger.error(
                     "Exception in _init_additional_providers",
-                    error_type="Exception",
-                    error=str(exc),
-                    function="_init_additional_providers",
+                    extra={
+                        "error_type": "Exception",
+                        "error": str(exc),
+                        "function": "_init_additional_providers"
+                    }
                 )
                 print(f"Warning: failed to init {key} provider: {exc}")
         return providers
@@ -597,9 +599,11 @@ class PersonalAIAssistant:
         except Exception as exc:  # pragma: no cover - best-effort provider call
             logger.warning(
                 "Exception in _call_ai_provider",
-                error_type="Exception",
-                error=str(exc),
-                function="_call_ai_provider",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(exc),
+                    "function": "_call_ai_provider"
+                }
             )
             return {"success": False, "error": str(exc)}
 
@@ -644,9 +648,11 @@ class PersonalAIAssistant:
         except Exception as exc:
             logger.warning(
                 "Exception in _call_additional_provider",
-                error_type="Exception",
-                error=str(exc),
-                function="_call_additional_provider",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(exc),
+                    "function": "_call_additional_provider"
+                }
             )
             return {"success": False, "error": str(exc)}
 

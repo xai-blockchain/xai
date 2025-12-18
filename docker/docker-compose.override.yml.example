@@ -71,3 +71,9 @@ services:
       - redis
     profiles:
       - dev-tools
+
+  # Disable explorer if not needed
+  # Uncomment the lines below to require --profile explorer to start the explorer
+  # testnet-explorer:
+  #   profiles:
+  #     - explorer

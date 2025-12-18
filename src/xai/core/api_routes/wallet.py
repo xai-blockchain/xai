@@ -121,9 +121,11 @@ def register_wallet_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in get_history",
-                error_type="ValueError",
-                error=str(exc),
-                function="get_history",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "get_history"
+                }
             )
             return routes._error_response(
                 str(exc),

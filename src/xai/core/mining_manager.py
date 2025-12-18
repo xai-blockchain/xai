@@ -254,7 +254,9 @@ class MiningManager:
             # Don't fail mining due to gamification errors
             self.logger.warning(
                 "Gamification processing failed for block",
-                index=block.index,
-                error=str(e),
-                error_type=type(e).__name__,
+                extra={
+                    "index": block.index,
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
             )

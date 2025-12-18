@@ -1489,9 +1489,11 @@ class EVMInterpreter:
             # Execution error - revert and return failure
             logger.warning(
                 "VMExecutionError in _execute_subcall",
-                error_type="VMExecutionError",
-                error=str(e),
-                function="_execute_subcall",
+                extra={
+                    "error_type": "VMExecutionError",
+                    "error": str(e),
+                    "function": "_execute_subcall"
+                }
             )
             self.context.revert_to_snapshot(snapshot_id)
             self.context.pop_call()

@@ -89,9 +89,11 @@ def health_check() -> Tuple[Dict[str, Any], int]:
             except RuntimeError as exc:
                 logger.error(
                     "RuntimeError in degrade",
-                    error_type="RuntimeError",
-                    error=str(exc),
-                    function="degrade",
+                    extra={
+                        "error_type": "RuntimeError",
+                        "error": str(exc),
+                        "function": "degrade"
+                    }
                 )
                 blockchain_summary = {"accessible": False, "error": f"Runtime error: {exc}"}
                 overall_status = "unhealthy"
@@ -106,9 +108,11 @@ def health_check() -> Tuple[Dict[str, Any], int]:
     except RuntimeError as exc:
         logger.error(
             "RuntimeError in degrade",
-            error_type="RuntimeError",
-            error=str(exc),
-            function="degrade",
+            extra={
+                "error_type": "RuntimeError",
+                "error": str(exc),
+                "function": "degrade"
+            }
         )
         blockchain_summary = {"accessible": False, "error": f"Runtime error: {exc}"}
         overall_status = "unhealthy"
@@ -170,8 +174,10 @@ def health_check() -> Tuple[Dict[str, Any], int]:
         except RuntimeError as exc:
             logger.error(
                 "RuntimeError occurred",
-                error_type="RuntimeError",
-                error=str(exc),
+                extra={
+                    "error_type": "RuntimeError",
+                    "error": str(exc)
+                }
             )
             p2p_status = "degraded"
             degrade("p2p_error")
@@ -284,9 +290,11 @@ def get_mempool_overview() -> Tuple[Dict[str, Any], int]:
     except RuntimeError as exc:
         logger.warning(
             "RuntimeError in get_mempool_overview",
-            error_type="RuntimeError",
-            error=str(exc),
-            function="get_mempool_overview",
+            extra={
+                "error_type": "RuntimeError",
+                "error": str(exc),
+                "function": "get_mempool_overview"
+            }
         )
         return handle_exception(exc, "mempool_overview")
 
@@ -327,9 +335,11 @@ def get_mempool_stats() -> Tuple[Dict[str, Any], int]:
     except RuntimeError as exc:
         logger.warning(
             "RuntimeError in get_mempool_stats",
-            error_type="RuntimeError",
-            error=str(exc),
-            function="get_mempool_stats",
+            extra={
+                "error_type": "RuntimeError",
+                "error": str(exc),
+                "function": "get_mempool_stats"
+            }
         )
         return handle_exception(exc, "mempool_stats")
 

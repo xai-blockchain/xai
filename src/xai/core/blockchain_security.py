@@ -308,9 +308,11 @@ class OverflowProtection:
         except ValueError as e:
             logger.warning(
                 "ValueError in validate_amount",
-                error_type="ValueError",
-                error=str(e),
-                function="validate_amount",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(e),
+                    "function": "validate_amount"
+                }
             )
             return False, str(e)
 

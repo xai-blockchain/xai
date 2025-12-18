@@ -269,9 +269,11 @@ class BlockchainMetrics:
         except OSError as e:
             logger.error(
                 "OSError in start_server",
-                error_type="OSError",
-                error=str(e),
-                function="start_server",
+                extra={
+                    "error_type": "OSError",
+                    "error": str(e),
+                    "function": "start_server"
+                }
             )
             print(f"[ERROR] Failed to start metrics server on port {self.metrics_port}: {e}")
             print(f"  Port may already be in use. Try a different port.")
@@ -300,9 +302,11 @@ class BlockchainMetrics:
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.error(
                 "Exception in update_system_metrics",
-                error_type="Exception",
-                error=str(e),
-                function="update_system_metrics",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(e),
+                    "function": "update_system_metrics"
+                }
             )
             print(f"Warning: Failed to update system metrics: {e}")
 
@@ -422,9 +426,11 @@ def time_function(metric_name: str):
             except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 logger.error(
                     "Exception in wrapper",
-                    error_type="Exception",
-                    error=str(e),
-                    function="wrapper",
+                    extra={
+                        "error_type": "Exception",
+                        "error": str(e),
+                        "function": "wrapper"
+                    }
                 )
                 duration = time.time() - start
                 # Record failure

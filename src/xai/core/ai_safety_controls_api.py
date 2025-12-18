@@ -71,9 +71,11 @@ def add_safety_control_routes(app, node):
         except ValueError as exc:
             logger.warning(
                 "ValueError in cancel_personal_ai_request",
-                error_type="ValueError",
-                error=str(exc),
-                function="cancel_personal_ai_request",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "cancel_personal_ai_request"
+                }
             )
             return jsonify({"error": str(exc)}), 400
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
@@ -94,9 +96,11 @@ def add_safety_control_routes(app, node):
         except ValueError as exc:
             logger.warning(
                 "ValueError in check_request_status",
-                error_type="ValueError",
-                error=str(exc),
-                function="check_request_status",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "check_request_status"
+                }
             )
             return jsonify({"error": str(exc)}), 400
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
@@ -131,9 +135,11 @@ def add_safety_control_routes(app, node):
         except ValueError as exc:
             logger.warning(
                 "ValueError in emergency_stop_trading_bot",
-                error_type="ValueError",
-                error=str(exc),
-                function="emergency_stop_trading_bot",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "emergency_stop_trading_bot"
+                }
             )
             return jsonify({"error": str(exc)}), 400
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
@@ -169,9 +175,11 @@ def add_safety_control_routes(app, node):
         except ValueError as exc:
             logger.warning(
                 "ValueError in stop_all_trading_bots",
-                error_type="ValueError",
-                error=str(exc),
-                function="stop_all_trading_bots",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "stop_all_trading_bots"
+                }
             )
             return jsonify({"error": str(exc)}), 400
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
@@ -205,9 +213,11 @@ def add_safety_control_routes(app, node):
         except ValueError as exc:
             logger.warning(
                 "ValueError in pause_governance_task",
-                error_type="ValueError",
-                error=str(exc),
-                function="pause_governance_task",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "pause_governance_task"
+                }
             )
             return jsonify({"error": str(exc)}), 400
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
@@ -231,9 +241,11 @@ def add_safety_control_routes(app, node):
         except ValueError as exc:
             logger.warning(
                 "ValueError in resume_governance_task",
-                error_type="ValueError",
-                error=str(exc),
-                function="resume_governance_task",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "resume_governance_task"
+                }
             )
             return jsonify({"error": str(exc)}), 400
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
@@ -254,9 +266,11 @@ def add_safety_control_routes(app, node):
         except ValueError as exc:
             logger.warning(
                 "ValueError in check_governance_task_status",
-                error_type="ValueError",
-                error=str(exc),
-                function="check_governance_task_status",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "check_governance_task_status"
+                }
             )
             return jsonify({"error": str(exc)}), 400
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
@@ -309,9 +323,11 @@ def add_safety_control_routes(app, node):
         except ValueError as exc:
             logger.warning(
                 "ValueError in activate_global_emergency_stop",
-                error_type="ValueError",
-                error=str(exc),
-                function="activate_global_emergency_stop",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "activate_global_emergency_stop"
+                }
             )
             return jsonify({"error": str(exc)}), 400
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
@@ -343,9 +359,11 @@ def add_safety_control_routes(app, node):
         except ValueError as exc:
             logger.warning(
                 "ValueError in deactivate_global_emergency_stop",
-                error_type="ValueError",
-                error=str(exc),
-                function="deactivate_global_emergency_stop",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "deactivate_global_emergency_stop"
+                }
             )
             return jsonify({"error": str(exc)}), 400
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
@@ -390,9 +408,11 @@ def add_safety_control_routes(app, node):
         except ValueError as exc:
             logger.warning(
                 "ValueError in set_safety_level",
-                error_type="ValueError",
-                error=str(exc),
-                function="set_safety_level",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "set_safety_level"
+                }
             )
             return jsonify({"error": str(exc)}), 400
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
@@ -420,9 +440,11 @@ def add_safety_control_routes(app, node):
         except ValueError as exc:
             logger.warning(
                 "ValueError in get_safety_status",
-                error_type="ValueError",
-                error=str(exc),
-                function="get_safety_status",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "get_safety_status"
+                }
             )
             return jsonify({"error": str(exc)}), 400
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
@@ -447,9 +469,11 @@ def add_safety_control_routes(app, node):
         except ValueError as exc:
             logger.warning(
                 "ValueError in get_active_operations",
-                error_type="ValueError",
-                error=str(exc),
-                function="get_active_operations",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "get_active_operations"
+                }
             )
             return jsonify({"error": str(exc)}), 400
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
@@ -465,9 +489,11 @@ def add_safety_control_routes(app, node):
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
             logger.warning(
                 "Exception in list_safety_callers",
-                error_type="Exception",
-                error=str(exc),
-                function="list_safety_callers",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(exc),
+                    "function": "list_safety_callers"
+                }
             )
             return _server_error(exc, "ai.list_safety_callers_failed")
 
@@ -487,9 +513,11 @@ def add_safety_control_routes(app, node):
         except ValueError as exc:
             logger.warning(
                 "ValueError in add_safety_caller",
-                error_type="ValueError",
-                error=str(exc),
-                function="add_safety_caller",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "add_safety_caller"
+                }
             )
             return jsonify({"error": str(exc)}), 400
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
@@ -508,9 +536,11 @@ def add_safety_control_routes(app, node):
         except ValueError as exc:
             logger.warning(
                 "ValueError in remove_safety_caller",
-                error_type="ValueError",
-                error=str(exc),
-                function="remove_safety_caller",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "remove_safety_caller"
+                }
             )
             return jsonify({"error": str(exc)}), 400
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:

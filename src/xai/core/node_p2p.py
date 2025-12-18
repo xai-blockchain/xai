@@ -1663,9 +1663,11 @@ class P2PNetworkManager:
             except (StorageError, DatabaseError, ValueError, RuntimeError, AttributeError) as e:
                 logger.debug(
                     "Failed to load checkpoint for sync status",
-                    height=getattr(cm, "latest_checkpoint_height", None),
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    extra={
+                        "height": getattr(cm, "latest_checkpoint_height", None),
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
                 )
 
         if not candidates:

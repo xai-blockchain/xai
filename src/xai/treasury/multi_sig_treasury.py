@@ -327,9 +327,11 @@ if __name__ == "__main__":
     except ValueError as e:
         logger.warning(
             "ValueError in get_executed_transactions",
-            error_type="ValueError",
-            error=str(e),
-            function="get_executed_transactions",
+            extra={
+                "error_type": "ValueError",
+                "error": str(e),
+                "function": "get_executed_transactions"
+            }
         )
         print(f"Error (expected): {e}")
 
@@ -346,9 +348,11 @@ if __name__ == "__main__":
     except ValueError as e:
         logger.warning(
             "ValueError in get_executed_transactions",
-            error_type="ValueError",
-            error=str(e),
-            function="get_executed_transactions",
+            extra={
+                "error_type": "ValueError",
+                "error": str(e),
+                "function": "get_executed_transactions"
+            }
         )
         print(f"Error (expected): {e}")
 

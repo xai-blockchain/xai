@@ -58,9 +58,11 @@ class SocialRecoveryManager:
         except (OSError, IOError, ValueError, KeyError, json.JSONDecodeError) as e:
             logger.error(
                 "Exception in _load_data",
-                error_type=type(e).__name__,
-                error=str(e),
-                function="_load_data",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                    "function": "_load_data"
+                }
             )
             print(f"Error loading recovery configs: {e}")
             self.recovery_configs = {}
@@ -73,9 +75,11 @@ class SocialRecoveryManager:
         except (OSError, IOError, ValueError, KeyError, json.JSONDecodeError) as e:
             logger.error(
                 "Exception in _load_data",
-                error_type=type(e).__name__,
-                error=str(e),
-                function="_load_data",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                    "function": "_load_data"
+                }
             )
             print(f"Error loading recovery requests: {e}")
             self.recovery_requests = {}
@@ -88,9 +92,11 @@ class SocialRecoveryManager:
         except (OSError, IOError, ValueError, TypeError) as e:
             logger.error(
                 "Exception in _save_configs",
-                error_type=type(e).__name__,
-                error=str(e),
-                function="_save_configs",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                    "function": "_save_configs"
+                }
             )
             print(f"Error saving recovery configs: {e}")
             raise
@@ -103,9 +109,11 @@ class SocialRecoveryManager:
         except (OSError, IOError, ValueError, TypeError) as e:
             logger.error(
                 "Exception in _save_requests",
-                error_type=type(e).__name__,
-                error=str(e),
-                function="_save_requests",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                    "function": "_save_requests"
+                }
             )
             print(f"Error saving recovery requests: {e}")
             raise
@@ -688,9 +696,11 @@ if __name__ == "__main__":
     except ValueError as e:
         logger.warning(
             "ValueError in get_stats",
-            error_type="ValueError",
-            error=str(e),
-            function="get_stats",
+            extra={
+                "error_type": "ValueError",
+                "error": str(e),
+                "function": "get_stats"
+            }
         )
         print(f"Error: {e}")
 
@@ -704,9 +714,11 @@ if __name__ == "__main__":
     except ValueError as e:
         logger.warning(
             "ValueError in get_stats",
-            error_type="ValueError",
-            error=str(e),
-            function="get_stats",
+            extra={
+                "error_type": "ValueError",
+                "error": str(e),
+                "function": "get_stats"
+            }
         )
         print(f"Error: {e}")
 
@@ -717,9 +729,11 @@ if __name__ == "__main__":
     except ValueError as e:
         logger.warning(
             "ValueError in get_stats",
-            error_type="ValueError",
-            error=str(e),
-            function="get_stats",
+            extra={
+                "error_type": "ValueError",
+                "error": str(e),
+                "function": "get_stats"
+            }
         )
         print(f"Error: {e}")
 

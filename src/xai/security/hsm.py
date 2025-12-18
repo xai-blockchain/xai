@@ -341,8 +341,10 @@ class HardwareSecurityModule:
         except OSError as e:
             self.logger.error(
                 "OSError occurred",
-                error_type="OSError",
-                error=str(e),
+                extra={
+                    "error_type": "OSError",
+                    "error": str(e)
+                }
             )
             self._audit_log(
                 operation="generate_key",
@@ -432,9 +434,11 @@ class HardwareSecurityModule:
         except ValueError as e:
             self.logger.debug(
                 "ValueError in sign",
-                error_type="ValueError",
-                error=str(e),
-                function="sign",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(e),
+                    "function": "sign"
+                }
             )
             self._audit_log(
                 operation="sign",
@@ -447,9 +451,11 @@ class HardwareSecurityModule:
         except InvalidSignature as e:
             self.logger.error(
                 "InvalidSignature in sign",
-                error_type="InvalidSignature",
-                error=str(e),
-                function="sign",
+                extra={
+                    "error_type": "InvalidSignature",
+                    "error": str(e),
+                    "function": "sign"
+                }
             )
             self._audit_log(
                 operation="sign",
@@ -462,9 +468,11 @@ class HardwareSecurityModule:
         except OSError as e:
             self.logger.error(
                 "OSError in sign",
-                error_type="OSError",
-                error=str(e),
-                function="sign",
+                extra={
+                    "error_type": "OSError",
+                    "error": str(e),
+                    "function": "sign"
+                }
             )
             self._audit_log(
                 operation="sign",
@@ -561,9 +569,11 @@ class HardwareSecurityModule:
         except ValueError as e:
             self.logger.debug(
                 "ValueError in rotate_key",
-                error_type="ValueError",
-                error=str(e),
-                function="rotate_key",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(e),
+                    "function": "rotate_key"
+                }
             )
             self._audit_log(
                 operation="rotate_key",
@@ -576,9 +586,11 @@ class HardwareSecurityModule:
         except HSMKeyGenerationError as e:
             self.logger.error(
                 "HSMKeyGenerationError in rotate_key",
-                error_type="HSMKeyGenerationError",
-                error=str(e),
-                function="rotate_key",
+                extra={
+                    "error_type": "HSMKeyGenerationError",
+                    "error": str(e),
+                    "function": "rotate_key"
+                }
             )
             self._audit_log(
                 operation="rotate_key",
@@ -591,9 +603,11 @@ class HardwareSecurityModule:
         except OSError as e:
             self.logger.error(
                 "OSError in rotate_key",
-                error_type="OSError",
-                error=str(e),
-                function="rotate_key",
+                extra={
+                    "error_type": "OSError",
+                    "error": str(e),
+                    "function": "rotate_key"
+                }
             )
             self._audit_log(
                 operation="rotate_key",

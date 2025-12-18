@@ -57,8 +57,10 @@ try:
 except ImportError as e:
     logger.warning(
         "ImportError occurred",
-        error_type="ImportError",
-        error=str(e),
+        extra={
+            "error_type": "ImportError",
+            "error": str(e)
+        }
     )
     print(f"❌ Error loading Personal AI: {e}")
     sys.exit(1)
@@ -71,8 +73,10 @@ try:
 except ImportError as e:
     logger.warning(
         "ImportError occurred",
-        error_type="ImportError",
-        error=str(e),
+        extra={
+            "error_type": "ImportError",
+            "error": str(e)
+        }
     )
     print(f"⚠️  Warning: API extensions not available: {e}")
     print("   Node will work but without WebSocket support")
@@ -85,8 +89,10 @@ try:
 except ImportError as e:
     logger.warning(
         "ImportError occurred",
-        error_type="ImportError",
-        error=str(e),
+        extra={
+            "error_type": "ImportError",
+            "error": str(e)
+        }
     )
     print(f"⚠️  Warning: AI Trading Bot not available yet: {e}")
     print("   Will be available after Part 2 of integration")
@@ -177,9 +183,11 @@ class IntegratedXAINode:
         except Exception as e:
             logger.error(
                 "Exception in __init__",
-                error_type="Exception",
-                error=str(e),
-                function="__init__",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(e),
+                    "function": "__init__"
+                }
             )
             print(f"   ⚠️  AI Safety Controls initialization delayed: {e}")
             self.safety_controls = None
@@ -208,8 +216,10 @@ class IntegratedXAINode:
         except Exception as e:
             logger.error(
                 "Exception occurred",
-                error_type="Exception",
-                error=str(e),
+                extra={
+                    "error_type": "Exception",
+                    "error": str(e)
+                }
             )
             print(f"   ⚠️  API extensions partially loaded: {e}")
             self.api_extensions = None
@@ -232,8 +242,10 @@ class IntegratedXAINode:
         except Exception as e:
             logger.error(
                 "Exception occurred",
-                error_type="Exception",
-                error=str(e),
+                extra={
+                    "error_type": "Exception",
+                    "error": str(e)
+                }
             )
             print(f"   ⚠️  Time Capsule system not available: {e}")
 
@@ -251,8 +263,10 @@ class IntegratedXAINode:
         except Exception as e:
             logger.error(
                 "Exception occurred",
-                error_type="Exception",
-                error=str(e),
+                extra={
+                    "error_type": "Exception",
+                    "error": str(e)
+                }
             )
             print(f"   ⚠️  AI Safety Control API not available: {e}")
 

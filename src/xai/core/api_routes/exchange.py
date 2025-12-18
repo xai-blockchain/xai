@@ -224,8 +224,10 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError occurred",
-                error_type="ValueError",
-                error=str(exc),
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc)
+                }
             )
             return routes._error_response(str(exc), status=400, code="order_invalid")
         except (OSError, json.JSONDecodeError, RuntimeError) as exc:
@@ -429,9 +431,11 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in deposit_funds",
-                error_type="ValueError",
-                error=str(exc),
-                function="deposit_funds",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "deposit_funds"
+                }
             )
             return routes._error_response(str(exc), status=400, code="deposit_invalid")
         except (RuntimeError, OSError, json.JSONDecodeError) as exc:
@@ -487,9 +491,11 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in withdraw_funds",
-                error_type="ValueError",
-                error=str(exc),
-                function="withdraw_funds",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "withdraw_funds"
+                }
             )
             return routes._error_response(str(exc), status=400, code="withdraw_invalid")
         except (RuntimeError, OSError, json.JSONDecodeError) as exc:
@@ -774,9 +780,11 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in buy_with_card",
-                error_type="ValueError",
-                error=str(exc),
-                function="buy_with_card",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "buy_with_card"
+                }
             )
             return routes._error_response(str(exc), status=400, code="payment_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:
@@ -844,9 +852,11 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in calculate_purchase",
-                error_type="ValueError",
-                error=str(exc),
-                function="calculate_purchase",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "calculate_purchase"
+                }
             )
             return routes._error_response(str(exc), status=400, code="payment_invalid")
         except (RuntimeError, KeyError, TypeError) as exc:

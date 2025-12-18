@@ -74,9 +74,11 @@ class BlacklistSource(ABC):
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.warning(
                 "Exception in update",
-                error_type="Exception",
-                error=str(e),
-                function="update",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(e),
+                    "function": "update"
+                }
             )
             return {
                 "source": self.name,

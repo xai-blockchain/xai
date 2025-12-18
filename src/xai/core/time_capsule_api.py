@@ -189,9 +189,11 @@ def add_time_capsule_routes(app, node):
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
             logger.warning(
                 "Exception in submit_time_capsule_transaction",
-                error_type="Exception",
-                error=str(exc),
-                function="submit_time_capsule_transaction",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(exc),
+                    "function": "submit_time_capsule_transaction"
+                }
             )
             return jsonify({"success": False, "error": f"Invalid transaction payload: {exc}"}), 400
 

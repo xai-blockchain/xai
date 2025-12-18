@@ -11,7 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import os
-from typing import Any, Dict, Optional
+import time
+from typing import Any, Dict, Optional, Callable
 
 import requests
 from ecdsa import SECP256k1, VerifyingKey, BadSignatureError
@@ -60,6 +61,19 @@ class CheckpointSyncManager:
         self.rate_limit_seconds = int(getattr(getattr(blockchain, "config", None), "CHECKPOINT_REQUEST_RATE_SECONDS", 30))
         self._last_request_ts: float = 0.0
         self._provenance_log: list[dict] = []
+
+        # Progress tracking
+        self._sync_progress: Dict[str, Any] = {
+            "stage": "idle",  # idle, downloading, verifying, applying
+            "bytes_downloaded": 0,
+            "total_bytes": 0,
+            "download_percentage": 0.0,
+            "verification_percentage": 0.0,
+            "application_percentage": 0.0,
+            "started_at": None,
+            "estimated_completion": None,
+        }
+        self._progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None
 
     def _local_checkpoint_metadata(self) -> Optional[Dict[str, Any]]:
         """Return latest local checkpoint metadata if available."""
@@ -494,3 +508,62 @@ class CheckpointSyncManager:
         if not block_hash or not isinstance(block_hash, str):
             return False
         return True
+
+    def set_progress_callback(self, callback: Callable[[Dict[str, Any]], None]) -> None:
+        """
+        Set a callback function to be called when sync progress updates.
+
+        Args:
+            callback: Function that accepts progress dict
+        """
+        self._progress_callback = callback
+
+    def get_checkpoint_sync_progress(self) -> Dict[str, Any]:
+        """
+        Get current checkpoint sync progress.
+
+        Returns:
+            Dictionary with sync progress information including:
+            - stage: Current sync stage (idle, downloading, verifying, applying)
+            - bytes_downloaded: Bytes downloaded so far
+            - total_bytes: Total bytes to download
+            - download_percentage: Download progress percentage
+            - verification_percentage: Verification progress percentage
+            - application_percentage: State application progress percentage
+            - started_at: Timestamp when sync started
+            - estimated_completion: Estimated completion timestamp
+        """
+        return dict(self._sync_progress)
+
+    def _update_progress(self, updates: Dict[str, Any]) -> None:
+        """
+        Update sync progress and notify callback if set.
+
+        Args:
+            updates: Dictionary of progress fields to update
+        """
+        self._sync_progress.update(updates)
+
+        # Notify callback if set
+        if self._progress_callback:
+            try:
+                self._progress_callback(dict(self._sync_progress))
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+                import logging
+                logging.getLogger(__name__).debug(
+                    "Progress callback failed",
+                    extra={"error_type": type(e).__name__, "error": str(e)}
+                )
+
+    def _reset_progress(self) -> None:
+        """Reset progress tracking to initial state."""
+        self._sync_progress = {
+            "stage": "idle",
+            "bytes_downloaded": 0,
+            "total_bytes": 0,
+            "download_percentage": 0.0,
+            "verification_percentage": 0.0,
+            "application_percentage": 0.0,
+            "started_at": None,
+            "estimated_completion": None,
+        }

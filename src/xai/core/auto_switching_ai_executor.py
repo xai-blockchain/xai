@@ -223,9 +223,11 @@ class AutoSwitchingAIExecutor:
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.warning(
                 "Exception in execute_long_task_with_auto_switch",
-                error_type=type(e).__name__,
-                error=str(e),
-                function="execute_long_task_with_auto_switch",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                    "function": "execute_long_task_with_auto_switch"
+                }
             )
             task_state["status"] = TaskStatus.FAILED
             return {

@@ -18,7 +18,7 @@ def test_canonical_json_determinism():
 
 
 def test_block_header_hash_and_version_flag():
-    header = BlockHeader(index=1, previous_hash="0", merkle_root="root", timestamp=1.0, difficulty=1, nonce=0)
+    header = BlockHeader(index=1, previous_hash="0" * 64, merkle_root="a" * 64, timestamp=1.0, difficulty=1, nonce=0)
     orig_hash = header.hash
     # Changing nonce and recalculating updates hash
     header.nonce = 1
@@ -26,5 +26,5 @@ def test_block_header_hash_and_version_flag():
     assert header.hash != orig_hash
 
     # Version included when provided
-    header_v = BlockHeader(index=1, previous_hash="0", merkle_root="root", timestamp=1.0, difficulty=1, nonce=0, version=2)
+    header_v = BlockHeader(index=1, previous_hash="0" * 64, merkle_root="b" * 64, timestamp=1.0, difficulty=1, nonce=0, version=2)
     assert "version" in header_v.to_dict()

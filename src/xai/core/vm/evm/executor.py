@@ -232,9 +232,11 @@ class EVMBytecodeExecutor(BaseExecutor):
         except VMExecutionError as e:
             logger.warning(
                 "VMExecutionError in delegatecall",
-                error_type="VMExecutionError",
-                error=str(e),
-                function="delegatecall",
+                extra={
+                    "error_type": "VMExecutionError",
+                    "error": str(e),
+                    "function": "delegatecall"
+                }
             )
             return ExecutionResult(
                 success=False,
@@ -811,9 +813,11 @@ class EVMBytecodeExecutor(BaseExecutor):
         except VMExecutionError as exc:
             logger.warning(
                 "VMExecutionError in erc721_hook",
-                error_type="VMExecutionError",
-                error=str(exc),
-                function="erc721_hook",
+                extra={
+                    "error_type": "VMExecutionError",
+                    "error": str(exc),
+                    "function": "erc721_hook"
+                }
             )
             return ExecutionResult(
                 success=False,

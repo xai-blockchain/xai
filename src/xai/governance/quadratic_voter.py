@@ -251,9 +251,11 @@ if __name__ == "__main__":
         except ValueError as e:
             logger.warning(
                 "ValueError in cast_votes",
-                error_type="ValueError",
-                error=str(e),
-                function="cast_votes",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(e),
+                    "function": "cast_votes"
+                }
             )
             print(f"Error (expected): {e}")
 
@@ -282,9 +284,11 @@ if __name__ == "__main__":
         except ValueError as e:
             logger.warning(
                 "ValueError in cast_votes",
-                error_type="ValueError",
-                error=str(e),
-                function="cast_votes",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(e),
+                    "function": "cast_votes"
+                }
             )
             print(f"Error (expected): {e}")
 

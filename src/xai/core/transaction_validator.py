@@ -320,10 +320,12 @@ class TransactionValidator:
             txid_short = txid_str[:10] if txid and len(txid_str) >= 10 else txid_str
             self.logger.error(
                 f"An unexpected error occurred during transaction validation for {txid_short}...: {e}",
-                txid=txid,
-                error=str(e),
-                error_type=type(e).__name__,
                 exc_info=True,
+                extra={
+                    "txid": txid,
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
             )
             return False
 

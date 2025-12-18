@@ -392,9 +392,11 @@ class SecureAPIKeyManager:
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.warning(
                 "Exception in get_api_key_for_task",
-                error_type="Exception",
-                error=str(e),
-                function="get_api_key_for_task",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(e),
+                    "function": "get_api_key_for_task"
+                }
             )
             self._log_access("decrypt_error", key_id, "SYSTEM", f"Decryption failed: {str(e)}")
             return None

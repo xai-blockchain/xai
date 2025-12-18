@@ -469,3 +469,76 @@ This section contains findings from a 10-agent parallel audit covering all aspec
 ---
 
 *Audit completed: 2025-12-15 by 10 parallel audit agents*
+
+---
+
+## ADOPTION & ONBOARDING (Priority 10) - Added 2025-12-18
+
+### Status: Infrastructure exists but poor discoverability
+
+**Existing Strengths:**
+- Light client SPV implementation (light_client.py, light_client_service.py)
+- Mobile wallet bridge with offline signing (mobile_wallet_bridge.py)
+- Checkpoint-based fast sync (checkpoint_sync.py)
+- Multiple node modes (full, pruned, archival, light in node_modes.py)
+- Python SDK (production-ready in sdk/python/)
+- Docker testnet configurations (excellent)
+- REST API with OpenAPI spec + WebSocket support
+- Hardware wallet support (Ledger/Trezor)
+
+### CRITICAL - Early Adopter Blockers
+
+- [ ] **No native mobile SDKs** - Only Python SDK exists; need iOS (Swift), Android (Kotlin), React Native, or Flutter
+- [ ] **No TypeScript/JavaScript SDK** - Blocks web/mobile JS integration; need npm package
+- [ ] **CLI not exposed as `xai` command** - Requires `python -m xai.wallet.cli`; add pip entry points
+- [ ] **No one-click installer** - Need Windows .exe, macOS Homebrew tap, Linux deb/rpm packages
+- [ ] **Fragmented onboarding docs** - No single "New User Quick Start" page; create consolidated flow
+- [ ] **Faucet not discoverable** - Not linked from main README or getting-started; add prominent links
+- [ ] **Browser wallet not packaged** - Extension exists but not on Chrome/Firefox stores; package for distribution
+
+### HIGH - Mobile & Lightweight Gaps
+
+- [ ] **No mobile app** - Infrastructure exists (mobile/), but no actual iOS/Android app
+- [ ] **No mobile push notifications** - Need Firebase/APNs integration for real-time alerts
+- [ ] **No biometric auth framework** - Need Face ID/Touch ID wrappers at SDK level
+- [ ] **Mini-app sandbox disabled** - Security risk; needs WebAssembly or subprocess execution
+- [ ] **No progressive state sync** - Large checkpoints (>100MB) need chunked download for mobile
+- [ ] **No mobile-specific telemetry** - Need bandwidth/battery usage tracking
+- [ ] **No EVM/Cosmos light clients** - SPV is UTXO-only; need light verification for other chains
+
+### MEDIUM - Configuration & Documentation
+
+- [ ] **.env.example too minimal** - Only 25 lines; expand to include all options with comments
+- [ ] **No block retention policies** - Need configurable pruning (e.g., `--prune=1000` for last 1000 blocks)
+- [ ] **No lightweight node operator guide** - Document running on mobile/IoT/Raspberry Pi
+- [ ] **No "pure light client" docs** - Header-only mode undocumented for end users
+- [ ] **Port confusion** - START_TESTNET.sh uses 5000/3000 but docs say 8545/12001; standardize
+- [ ] **Explorer not auto-launched** - Separate from testnet stack; integrate into docker-compose
+
+### LOW - Polish & Developer Experience
+
+- [ ] **No setup wizard** - Add interactive Python/bash setup script with prompts
+- [ ] **No cloud one-liner deploy** - Need AWS CloudFormation/Terraform one-click templates
+- [ ] **No QR payment endpoint** - Add `/payment/qr` for merchant QR generation
+- [ ] **Header sync progress missing** - No UI/API for sync percentage during light client bootstrap
+- [ ] **No mobile quickstart video** - Visual guides aid adoption
+
+---
+
+### BLOCKCHAIN COMMUNITY EXPECTATIONS ASSESSMENT
+
+| Expectation | Status | Notes |
+|-------------|--------|-------|
+| Light client/SPV | ✅ Complete | 1,346 lines, merkle proofs, header sync |
+| Checkpoint sync | ✅ Complete | Quorum-validated, UTXO snapshots |
+| Pruned node mode | ⚠️ Partial | Mode exists but no retention config |
+| Mobile wallet | ⚠️ Infra only | Bridge + cache, no actual app |
+| Native SDKs | ❌ Missing | Only Python SDK exists |
+| One-click install | ❌ Missing | Manual shell commands required |
+| Testnet faucet | ✅ Working | Web UI + API, but undiscoverable |
+| Hardware wallets | ✅ Complete | Ledger + Trezor integrated |
+| Block explorer | ✅ Complete | AI-specific features, 30-sec startup |
+| WebSocket streaming | ✅ Complete | Real-time blocks/txs |
+| Documentation | ⚠️ Scattered | Comprehensive but poor discovery |
+
+**Verdict:** Core blockchain infrastructure is enterprise-grade. Adoption blocked by missing SDKs, installers, and consolidated onboarding experience. ~60-80 hours to achieve seamless early-adopter onboarding.

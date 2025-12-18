@@ -288,9 +288,11 @@ class BlockchainStorage:
                 self._record_storage_error("save_to_disk", time.perf_counter() - start)
                 logger.error(
                     "Failed to save blockchain to disk",
-                    operation="save_to_disk",
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    extra={
+                        "operation": "save_to_disk",
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
                 )
                 return False, f"Failed to save blockchain: {str(e)}"
 
@@ -343,8 +345,10 @@ class BlockchainStorage:
                 # Corrupted JSON - attempt recovery
                 logger.warning(
                     "JSON decode error during blockchain load",
-                    error=str(e),
-                    error_type="JSONDecodeError",
+                    extra={
+                        "error": str(e),
+                        "error_type": "JSONDecodeError"
+                    }
                 )
                 print(f"WARNING: JSON decode error: {e}. Attempting recovery...")
                 self._record_storage_error("load_from_disk", time.perf_counter() - start)
@@ -354,9 +358,11 @@ class BlockchainStorage:
                 self._record_storage_error("load_from_disk", time.perf_counter() - start)
                 logger.error(
                     "Failed to load blockchain from disk",
-                    operation="load_from_disk",
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    extra={
+                        "operation": "load_from_disk",
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
                 )
                 return False, None, f"Failed to load blockchain: {str(e)}"
 
@@ -382,9 +388,11 @@ class BlockchainStorage:
         except (OSError, IOError, PermissionError, shutil.Error) as e:
             logger.warning(
                 "Failed to create blockchain backup",
-                operation="_create_backup",
-                error=str(e),
-                error_type=type(e).__name__,
+                extra={
+                    "operation": "_create_backup",
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
             )
             print(f"Warning: Failed to create backup: {e}")
             return False
@@ -409,9 +417,11 @@ class BlockchainStorage:
         except (OSError, IOError, PermissionError) as e:
             logger.warning(
                 "Failed to cleanup old backups",
-                operation="_cleanup_old_backups",
-                error=str(e),
-                error_type=type(e).__name__,
+                extra={
+                    "operation": "_cleanup_old_backups",
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
             )
             print(f"Warning: Failed to cleanup old backups: {e}")
 
@@ -447,10 +457,12 @@ class BlockchainStorage:
         except (OSError, IOError, PermissionError) as e:
             logger.warning(
                 "Failed to create checkpoint",
-                operation="_create_checkpoint",
-                block_height=block_height,
-                error=str(e),
-                error_type=type(e).__name__,
+                extra={
+                    "operation": "_create_checkpoint",
+                    "block_height": block_height,
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
             )
             print(f"Warning: Failed to create checkpoint: {e}")
 
@@ -535,10 +547,12 @@ class BlockchainStorage:
                 except (json.JSONDecodeError, CorruptedDataError, OSError, IOError, KeyError, ValueError) as e:
                     logger.debug(
                         "Backup file is invalid, trying next",
-                        operation="_recover_from_backup",
-                        backup_file=os.path.basename(backup_file),
-                        error=str(e),
-                        error_type=type(e).__name__,
+                        extra={
+                            "operation": "_recover_from_backup",
+                            "backup_file": os.path.basename(backup_file),
+                            "error": str(e),
+                            "error_type": type(e).__name__
+                        }
                     )
                     print(f"Backup {os.path.basename(backup_file)} is invalid: {e}")
                     continue
@@ -548,9 +562,11 @@ class BlockchainStorage:
         except (OSError, IOError, PermissionError) as e:
             logger.error(
                 "Failed to recover from backups",
-                operation="_recover_from_backup",
-                error=str(e),
-                error_type=type(e).__name__,
+                extra={
+                    "operation": "_recover_from_backup",
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
             )
             print(f"Failed to recover from backups: {e}")
             return None
@@ -604,10 +620,12 @@ class BlockchainStorage:
                 except (json.JSONDecodeError, CorruptedDataError, OSError, IOError, KeyError, ValueError) as e:
                     logger.debug(
                         "Checkpoint file is invalid, trying next",
-                        operation="_recover_from_checkpoint",
-                        checkpoint_height=height,
-                        error=str(e),
-                        error_type=type(e).__name__,
+                        extra={
+                            "operation": "_recover_from_checkpoint",
+                            "checkpoint_height": height,
+                            "error": str(e),
+                            "error_type": type(e).__name__
+                        }
                     )
                     print(f"Checkpoint {height} is invalid: {e}")
                     continue
@@ -617,9 +635,11 @@ class BlockchainStorage:
         except (OSError, IOError, PermissionError, ValueError) as e:
             logger.error(
                 "Failed to recover from checkpoints",
-                operation="_recover_from_checkpoint",
-                error=str(e),
-                error_type=type(e).__name__,
+                extra={
+                    "operation": "_recover_from_checkpoint",
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
             )
             print(f"Failed to recover from checkpoints: {e}")
             return None
@@ -670,10 +690,12 @@ class BlockchainStorage:
             except (json.JSONDecodeError, CorruptedDataError, OSError, IOError, KeyError, ValueError) as e:
                 logger.error(
                     "Failed to restore from backup file",
-                    operation="restore_from_backup",
-                    backup_filename=backup_filename,
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    extra={
+                        "operation": "restore_from_backup",
+                        "backup_filename": backup_filename,
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
                 )
                 return False, None, f"Failed to restore from backup: {str(e)}"
 
@@ -724,9 +746,11 @@ class BlockchainStorage:
         except (OSError, IOError, PermissionError) as e:
             logger.error(
                 "Failed to list backup files",
-                operation="list_backups",
-                error=str(e),
-                error_type=type(e).__name__,
+                extra={
+                    "operation": "list_backups",
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
             )
             print(f"Failed to list backups: {e}")
             return []
@@ -778,9 +802,11 @@ class BlockchainStorage:
         except (OSError, IOError, PermissionError, ValueError) as e:
             logger.error(
                 "Failed to list checkpoint files",
-                operation="list_checkpoints",
-                error=str(e),
-                error_type=type(e).__name__,
+                extra={
+                    "operation": "list_checkpoints",
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
             )
             print(f"Failed to list checkpoints: {e}")
             return []
@@ -800,9 +826,11 @@ class BlockchainStorage:
         except (json.JSONDecodeError, OSError, IOError) as e:
             logger.error(
                 "Failed to read metadata file",
-                operation="get_metadata",
-                error=str(e),
-                error_type=type(e).__name__,
+                extra={
+                    "operation": "get_metadata",
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
             )
             print(f"Failed to read metadata: {e}")
             return None
@@ -845,8 +873,10 @@ class BlockchainStorage:
         except (json.JSONDecodeError, CorruptedDataError, OSError, IOError, KeyError, ValueError) as e:
             logger.error(
                 "Blockchain integrity check failed",
-                operation="verify_integrity",
-                error=str(e),
-                error_type=type(e).__name__,
+                extra={
+                    "operation": "verify_integrity",
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
             )
             return False, f"Integrity check failed: {str(e)}"

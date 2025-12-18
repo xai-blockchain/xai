@@ -881,9 +881,11 @@ class AISafetyControls:
                 except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                     logger.error(
                         "Exception in stop_all_trading_bots",
-                        error_type="Exception",
-                        error=str(e),
-                        function="stop_all_trading_bots",
+                        extra={
+                            "error_type": "Exception",
+                            "error": str(e),
+                            "function": "stop_all_trading_bots"
+                        }
                     )
                     errors.append(f"{user_address}: {e}")
 

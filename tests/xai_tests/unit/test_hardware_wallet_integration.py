@@ -14,8 +14,10 @@ def test_wallet_with_hardware_provider():
 
     # Address should match the hardware wallet's address
     assert wallet.address == mock_hw.address
-    assert wallet.address.startswith("XAI")
-    assert len(wallet.address) == 43  # XAI + 40 hex chars
+    # Address should start with XAI (mainnet) or TXAI (testnet)
+    assert wallet.address.startswith("XAI") or wallet.address.startswith("TXAI")
+    # Length: XAI + 40 hex = 43 chars, or TXAI + 40 hex = 44 chars
+    assert len(wallet.address) in (43, 44)
 
     # Sign a message
     message = "test"

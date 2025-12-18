@@ -144,9 +144,11 @@ if __name__ == "__main__":
     except ValueError as e:
         logger.warning(
             "ValueError in get_connection_counts",
-            error_type="ValueError",
-            error=str(e),
-            function="get_connection_counts",
+            extra={
+                "error_type": "ValueError",
+                "error": str(e),
+                "function": "get_connection_counts"
+            }
         )
         print(f"Error (expected): {e}")
     print(f"Current connections: {manager.get_connection_counts()}")
@@ -159,9 +161,11 @@ if __name__ == "__main__":
     except ValueError as e:
         logger.warning(
             "ValueError in get_connection_counts",
-            error_type="ValueError",
-            error=str(e),
-            function="get_connection_counts",
+            extra={
+                "error_type": "ValueError",
+                "error": str(e),
+                "function": "get_connection_counts"
+            }
         )
         print(f"Error (expected): {e}")
     print(f"Current connections: {manager.get_connection_counts()}")

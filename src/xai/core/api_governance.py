@@ -185,9 +185,11 @@ class GovernanceAPIHandler:
         except ValidationError as ve:
             logger.warning(
                 "ValidationError in fiat_unlock_vote_handler",
-                error_type="ValidationError",
-                error=str(ve),
-                function="fiat_unlock_vote_handler",
+                extra={
+                    "error_type": "ValidationError",
+                    "error": str(ve),
+                    "function": "fiat_unlock_vote_handler"
+                }
             )
             return (
                 jsonify({"success": False, "error": "INVALID_ADDRESS", "message": str(ve)}),
@@ -199,9 +201,11 @@ class GovernanceAPIHandler:
         except ValueError as ve:
             logger.warning(
                 "ValueError in fiat_unlock_vote_handler",
-                error_type="ValueError",
-                error=str(ve),
-                function="fiat_unlock_vote_handler",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(ve),
+                    "function": "fiat_unlock_vote_handler"
+                }
             )
             return (
                 jsonify({"success": False, "error": "VOTING_NOT_OPEN", "message": str(ve)}),

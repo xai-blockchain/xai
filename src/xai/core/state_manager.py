@@ -89,9 +89,11 @@ class StateManager:
             except (ValueError, KeyError, AttributeError, TypeError, RuntimeError, OSError, IOError) as e:
                 self.logger.error(
                     "Failed to add block to chain",
-                    index=block.index,
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    extra={
+                        "index": block.index,
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
                 )
                 return False
 
@@ -157,9 +159,11 @@ class StateManager:
             # Don't fail block addition if indexing fails
             self.logger.warning(
                 "Failed to update address index for block",
-                index=block.index,
-                error=str(e),
-                error_type=type(e).__name__,
+                extra={
+                    "index": block.index,
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
             )
 
     def _update_checkpoint(self, block: 'Block') -> None:
@@ -178,9 +182,11 @@ class StateManager:
             # Don't fail block addition if checkpointing fails
             self.logger.warning(
                 "Failed to create checkpoint",
-                block_height=block.index,
-                error=str(e),
-                error_type=type(e).__name__,
+                extra={
+                    "block_height": block.index,
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
             )
 
     def process_orphan_transactions(self) -> None:

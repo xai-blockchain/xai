@@ -83,9 +83,11 @@ def _wrap_blockchain_methods(blockchain, recovery_manager):
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.warning(
                 "Exception in wrapped_add_tx",
-                error_type="Exception",
-                error=str(e),
-                function="wrapped_add_tx",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(e),
+                    "function": "wrapped_add_tx"
+                }
             )
             recovery_manager.handle_invalid_transaction(transaction)
             return False
@@ -390,9 +392,11 @@ class RecoveryEnabledBlockchain:
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.warning(
                 "Exception in _validate",
-                error_type="Exception",
-                error=str(e),
-                function="_validate",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(e),
+                    "function": "_validate"
+                }
             )
             self.recovery_manager.handle_invalid_transaction(transaction)
             return False
@@ -503,9 +507,11 @@ class RecoveryScheduler:
             except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 logger.error(
                     "Exception in _run_scheduler",
-                    error_type="Exception",
-                    error=str(e),
-                    function="_run_scheduler",
+                    extra={
+                        "error_type": "Exception",
+                        "error": str(e),
+                        "function": "_run_scheduler"
+                    }
                 )
                 print(f"Scheduler error: {e}")
 

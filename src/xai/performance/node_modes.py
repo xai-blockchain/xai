@@ -18,6 +18,11 @@ from typing import Dict, Any, List, Optional, Set
 from dataclasses import dataclass, asdict
 from enum import Enum
 
+try:
+    from xai.core import config
+except ImportError:
+    config = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -67,17 +72,33 @@ class PrunedNode:
     Suitable for resource-constrained devices.
     """
 
-    def __init__(self, blockchain, keep_blocks: int = 1000):
+    def __init__(self, blockchain, keep_blocks: Optional[int] = None):
         """
         Initialize pruned node
 
         Args:
             blockchain: Blockchain instance
-            keep_blocks: Number of recent blocks to keep
+            keep_blocks: Number of recent blocks to keep (None = use config)
         """
         self.blockchain = blockchain
-        self.keep_blocks = keep_blocks
+
+        # Use config if available and keep_blocks not explicitly provided
+        if keep_blocks is None and config:
+            keep_blocks = config.PRUNE_BLOCKS
+
+        # Default to 1000 if still not set
+        if keep_blocks is None or keep_blocks <= 0:
+            keep_blocks = 1000
+
+        # Enforce minimum of 100 blocks
+        self.keep_blocks = max(100, keep_blocks)
         self.pruned_height = 0  # Height up to which blockchain is pruned
+
+        logger.info(
+            "PrunedNode initialized with keep_blocks=%d",
+            self.keep_blocks,
+            extra={"event": "pruned_node.init", "keep_blocks": self.keep_blocks}
+        )
 
     def prune_blockchain(self) -> int:
         """
@@ -99,13 +120,44 @@ class PrunedNode:
         if prune_to_height <= self.pruned_height:
             return 0
 
-        # Prune blocks (in production, would actually delete data)
-        pruned_count = prune_to_height - self.pruned_height
+        # Actually remove blocks from the chain (keep genesis block at index 0)
+        # Remove blocks between pruned_height+1 and prune_to_height (inclusive)
+        blocks_to_remove = prune_to_height - self.pruned_height
+
+        # Only prune if there are blocks to remove
+        if blocks_to_remove > 0:
+            # Remove from index 1 up to (but not including) prune_to_height+1
+            # This keeps genesis (index 0) and blocks from prune_to_height+1 onwards
+            for _ in range(blocks_to_remove):
+                # Always remove at index 1 (after genesis)
+                if len(self.blockchain.chain) > self.keep_blocks + 1:
+                    removed_block = self.blockchain.chain.pop(1)
+                    logger.debug(
+                        "Pruned block at height %d, hash=%s",
+                        removed_block.index,
+                        removed_block.hash,
+                        extra={
+                            "event": "pruned_node.block_pruned",
+                            "height": removed_block.index,
+                            "hash": removed_block.hash
+                        }
+                    )
+
+            logger.info(
+                "Pruned %d blocks, new chain length: %d",
+                blocks_to_remove,
+                len(self.blockchain.chain),
+                extra={
+                    "event": "pruned_node.prune_complete",
+                    "pruned_count": blocks_to_remove,
+                    "chain_length": len(self.blockchain.chain)
+                }
+            )
 
         # Update pruned height
         self.pruned_height = prune_to_height
 
-        return pruned_count
+        return blocks_to_remove
 
     def get_pruned_stats(self) -> Dict[str, Any]:
         """Get pruning statistics"""
@@ -440,19 +492,65 @@ class FastSyncManager:
 class NodeModeManager:
     """Manage node operation mode"""
 
-    def __init__(self, blockchain):
+    def __init__(self, blockchain, auto_configure: bool = True):
+        """
+        Initialize node mode manager
+
+        Args:
+            blockchain: Blockchain instance
+            auto_configure: Automatically configure from environment (default: True)
+        """
         self.blockchain = blockchain
         self.mode = NodeMode.FULL
         self.pruned_node: Optional[PrunedNode] = None
         self.archival_node: Optional[ArchivalNode] = None
         self.fast_sync: Optional[FastSyncManager] = None
 
+        # Auto-configure from environment
+        if auto_configure and config:
+            self._configure_from_environment()
+
+    def _configure_from_environment(self) -> None:
+        """Configure node mode from environment variables"""
+        if not config:
+            return
+
+        mode_str = config.NODE_MODE
+        prune_blocks = config.PRUNE_BLOCKS
+
+        # Determine mode
+        if mode_str == "pruned" or (mode_str == "full" and prune_blocks > 0):
+            self.set_mode(NodeMode.PRUNED, keep_blocks=prune_blocks)
+            logger.info(
+                "Node configured in PRUNED mode, keeping %d blocks",
+                prune_blocks,
+                extra={"event": "node_mode.configured", "mode": "pruned", "keep_blocks": prune_blocks}
+            )
+        elif mode_str == "archival":
+            self.set_mode(NodeMode.ARCHIVAL)
+            logger.info(
+                "Node configured in ARCHIVAL mode",
+                extra={"event": "node_mode.configured", "mode": "archival"}
+            )
+        elif mode_str == "light":
+            self.set_mode(NodeMode.LIGHT)
+            logger.info(
+                "Node configured in LIGHT mode",
+                extra={"event": "node_mode.configured", "mode": "light"}
+            )
+        else:
+            self.set_mode(NodeMode.FULL)
+            logger.info(
+                "Node configured in FULL mode",
+                extra={"event": "node_mode.configured", "mode": "full"}
+            )
+
     def set_mode(self, mode: NodeMode, **kwargs) -> None:
         """Set node operation mode"""
         self.mode = mode
 
         if mode == NodeMode.PRUNED:
-            keep_blocks = kwargs.get('keep_blocks', 1000)
+            keep_blocks = kwargs.get('keep_blocks')
             self.pruned_node = PrunedNode(self.blockchain, keep_blocks)
 
         elif mode == NodeMode.ARCHIVAL:
@@ -465,6 +563,47 @@ class NodeModeManager:
     def get_mode(self) -> NodeMode:
         """Get current node mode"""
         return self.mode
+
+    def on_new_block(self, block) -> None:
+        """
+        Called when a new block is added to the chain.
+        Performs mode-specific actions like auto-pruning.
+
+        Args:
+            block: The newly added block
+        """
+        if self.mode == NodeMode.PRUNED and self.pruned_node:
+            # Auto-prune old blocks
+            pruned_count = self.pruned_node.prune_blockchain()
+            if pruned_count > 0:
+                logger.info(
+                    "Auto-pruned %d blocks after new block %d",
+                    pruned_count,
+                    block.index,
+                    extra={
+                        "event": "node_mode.auto_prune",
+                        "pruned_count": pruned_count,
+                        "new_block_height": block.index
+                    }
+                )
+
+        elif self.mode == NodeMode.ARCHIVAL and self.archival_node:
+            # Update archival indices
+            self.archival_node._build_indices()
+
+        elif self.mode == NodeMode.FULL and self.fast_sync:
+            # Check if we should create a snapshot
+            if self.fast_sync.should_create_snapshot():
+                snapshot = self.fast_sync.create_snapshot()
+                logger.info(
+                    "Created state snapshot at height %d",
+                    snapshot.block_height,
+                    extra={
+                        "event": "node_mode.snapshot_created",
+                        "height": snapshot.block_height,
+                        "hash": snapshot.snapshot_hash
+                    }
+                )
 
     def get_stats(self) -> Dict[str, Any]:
         """Get mode-specific statistics"""

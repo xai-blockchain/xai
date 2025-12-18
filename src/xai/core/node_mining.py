@@ -111,9 +111,11 @@ class MiningManager:
                 except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                     logger.error(
                         "Exception in _mine_continuously",
-                        error_type="Exception",
-                        error=str(e),
-                        function="_mine_continuously",
+                        extra={
+                            "error_type": "Exception",
+                            "error": str(e),
+                            "function": "_mine_continuously"
+                        }
                     )
                     print(f"❌ Mining error: {e}")
 

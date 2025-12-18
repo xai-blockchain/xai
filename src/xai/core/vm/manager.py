@@ -75,9 +75,11 @@ class SmartContractManager:
         except VMExecutionError as exc:
             logger.warning(
                 "VMExecutionError in process_transaction",
-                error_type="VMExecutionError",
-                error=str(exc),
-                function="process_transaction",
+                extra={
+                    "error_type": "VMExecutionError",
+                    "error": str(exc),
+                    "function": "process_transaction"
+                }
             )
             result = ExecutionResult(
                 success=False,

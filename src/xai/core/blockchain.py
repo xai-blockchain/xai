@@ -193,8 +193,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 except (DatabaseError, StorageError, ValueError, RuntimeError) as e:
                     self.logger.error(
                         "Failed to rebuild address index on startup",
-                        error=str(e),
-                        error_type=type(e).__name__,
+                        extra={
+                            "error": str(e),
+                            "error_type": type(e).__name__
+                        }
                     )
                     # Continue without index - queries will fall back gracefully
 
@@ -446,8 +448,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         except (InitializationError, DatabaseError, OSError, ValueError) as exc:
             self.logger.error(
                 "Failed to initialize slashing manager",
-                error=str(exc),
-                error_type=type(exc).__name__,
+                extra={
+                    "error": str(exc),
+                    "error_type": type(exc).__name__
+                }
             )
             return None
 
@@ -549,10 +553,12 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         except (DatabaseError, ValueError, RuntimeError) as exc:
             self.logger.error(
                 "Failed to record slashing for finality violation",
-                validator=validator_address,
-                block_height=block_height,
-                error=str(exc),
-                error_type=type(exc).__name__,
+                extra={
+                    "validator": validator_address,
+                    "block_height": block_height,
+                    "error": str(exc),
+                    "error_type": type(exc).__name__
+                }
             )
 
     @property
@@ -776,10 +782,12 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             except (StorageError, DatabaseError, KeyError, IndexError, ValueError) as e:
                 self.logger.debug(
                     "Failed to load transaction from index",
-                    block_index=block_index,
-                    txid=txid,
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    extra={
+                        "block_index": block_index,
+                        "txid": txid,
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
                 )
                 continue
 
@@ -958,8 +966,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             except (StorageError, DatabaseError, ChainReorgError, ValidationError, OSError, ValueError) as e:
                 self.logger.error(
                     "Checkpoint recovery failed, falling back to full load",
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    extra={
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
                 )
                 return self._load_from_disk_full()
         else:
@@ -1161,9 +1171,11 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         except (ValidationError, ValueError, RuntimeError, KeyError) as exc:  # pragma: no cover - defensive logging
             self.logger.error(
                 "Governance proposal execution failed",
-                proposal_id=proposal_id,
-                error=str(exc),
-                error_type=type(exc).__name__,
+                extra={
+                    "proposal_id": proposal_id,
+                    "error": str(exc),
+                    "error_type": type(exc).__name__
+                }
             )
             return {"success": False, "error": str(exc)}
 
@@ -1524,8 +1536,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 except Exception as exc:
                     self.logger.warning(
                         "Checkpoint reset failed during chain reset",
-                        error=str(exc),
-                        error_type=type(exc).__name__,
+                        extra={
+                            "error": str(exc),
+                            "error_type": type(exc).__name__
+                        }
                     )
 
             try:
@@ -1565,8 +1579,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         except Exception as exc:
             self.logger.error(
                 "Failed to reset chain state",
-                error=str(exc),
-                error_type=type(exc).__name__,
+                extra={
+                    "error": str(exc),
+                    "error_type": type(exc).__name__
+                }
             )
             self.chain = old_chain
             self.utxo_manager.restore(utxo_snapshot)
@@ -1580,8 +1596,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             except Exception as index_exc:
                 self.logger.warning(
                     "Failed to rebuild address index after reset failure",
-                    error=str(index_exc),
-                    error_type=type(index_exc).__name__,
+                    extra={
+                        "error": str(index_exc),
+                        "error_type": type(index_exc).__name__
+                    }
                 )
             self._rollback_reorg_wal(wal_entry)
             raise
@@ -1654,8 +1672,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             except (DatabaseError, StorageError, ValueError, RuntimeError) as exc:
                 self.logger.warning(
                     "Address index rollback failed during checkpoint restore",
-                    error=str(exc),
-                    error_type=type(exc).__name__,
+                    extra={
+                        "error": str(exc),
+                        "error_type": type(exc).__name__
+                    }
                 )
 
             self.checkpoint_manager.latest_checkpoint_height = target_height
@@ -1677,8 +1697,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         except Exception as exc:
             self.logger.error(
                 "Failed to restore checkpoint",
-                error=str(exc),
-                error_type=type(exc).__name__,
+                extra={
+                    "error": str(exc),
+                    "error_type": type(exc).__name__
+                }
             )
             self.chain = old_chain
             self.utxo_manager.restore(utxo_snapshot)
@@ -1930,9 +1952,11 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         except (ValueError, TypeError, AttributeError) as e:
             self.logger.error(
                 "Error calculating merkle root",
-                block_hash=header.hash,
-                error=str(e),
-                error_type=type(e).__name__,
+                extra={
+                    "block_hash": header.hash,
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
             )
             return False
 
@@ -2066,10 +2090,12 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 # If any exception occurs during fork handling, restore state
                 self.logger.error(
                     "Exception during fork handling, rolling back to previous state",
-                    block_index=header.index,
-                    block_hash=header.hash,
-                    error=str(e),
-                    error_type=type(e).__name__,
+                    extra={
+                        "block_index": header.index,
+                        "block_hash": header.hash,
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
                 )
                 self.chain = old_chain
                 self.utxo_manager.restore(utxo_snapshot)
@@ -2328,8 +2354,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             except (DatabaseError, OSError, ValueError) as e:
                 self.logger.debug(
                     "Failed to save nonces after chain validation restore",
-                    error_type=type(e).__name__,
-                    error=str(e),
+                    extra={
+                        "error_type": type(e).__name__,
+                        "error": str(e)
+                    }
                 )
 
     def _calculate_block_work(self, block_like: Union["Block", BlockHeader, Any]) -> int:
@@ -2693,8 +2721,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             except (DatabaseError, StorageError, ValueError, RuntimeError) as idx_err:
                 self.logger.error(
                     "Failed to rebuild address index during reorg",
-                    error=str(idx_err),
-                    error_type=type(idx_err).__name__,
+                    extra={
+                        "error": str(idx_err),
+                        "error_type": type(idx_err).__name__
+                    }
                 )
                 # Don't fail the entire reorg - index can be rebuilt later
                 try:
@@ -2795,12 +2825,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             # ROLLBACK: Restore ALL state atomically
             self.logger.error(
                 "Chain reorganization failed, rolling back ALL state to previous snapshot",
-                error=str(e),
-                error_type=type(e).__name__,
                 extra={
                     "event": "reorg.rollback",
                     "error": str(e),
-                    "error_type": type(e).__name__,
+                    "error_type": type(e).__name__
                 }
             )
 
@@ -3054,9 +3082,11 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         except (ValidationError, ValueError, AttributeError, TypeError) as exc:
             self.logger.error(
                 "Block size validation failed unexpectedly",
-                context=context,
-                error=str(exc),
-                error_type=type(exc).__name__,
+                extra={
+                    "context": context,
+                    "error": str(exc),
+                    "error_type": type(exc).__name__
+                }
             )
             return False
 
@@ -3180,9 +3210,11 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         except (DatabaseError, StorageError, ValueError, RuntimeError) as e:
             self.logger.error(
                 "Failed to index block transactions",
-                block_index=block.index,
-                error=str(e),
-                error_type=type(e).__name__,
+                extra={
+                    "block_index": block.index,
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
             )
             # Don't fail block addition if indexing fails - index can be rebuilt
             # Rollback index to maintain consistency
@@ -3191,9 +3223,11 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             except (DatabaseError, StorageError, RuntimeError) as rollback_err:
                 self.logger.warning(
                     "Failed to rollback address index after block indexing failure",
-                    block_index=block.index,
-                    error=str(rollback_err),
-                    error_type=type(rollback_err).__name__,
+                    extra={
+                        "block_index": block.index,
+                        "error": str(rollback_err),
+                        "error_type": type(rollback_err).__name__
+                    }
                 )
 
         # Save to disk
@@ -3258,18 +3292,22 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                     except (DatabaseError, StorageError, ValueError, RuntimeError) as e:
                         self.logger.error(
                             "Failed to index orphan block transactions",
-                            block_index=orphan.index,
-                            error=str(e),
-                            error_type=type(e).__name__,
+                            extra={
+                                "block_index": orphan.index,
+                                "error": str(e),
+                                "error_type": type(e).__name__
+                            }
                         )
                         try:
                             self.address_index.rollback()
                         except (DatabaseError, StorageError, RuntimeError) as rollback_err:
                             self.logger.warning(
                                 "Failed to rollback address index after orphan block indexing failure",
-                                block_index=orphan.index,
-                                error=str(rollback_err),
-                                error_type=type(rollback_err).__name__,
+                                extra={
+                                    "block_index": orphan.index,
+                                    "error": str(rollback_err),
+                                    "error_type": type(rollback_err).__name__
+                                }
                             )
 
                     # Save to disk
@@ -3794,8 +3832,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             except (ValueError, KeyError, TypeError) as exc:
                 self.logger.debug(
                     "Failed to deserialize block from peer data",
-                    error=str(exc),
-                    error_type=type(exc).__name__,
+                    extra={
+                        "error": str(exc),
+                        "error_type": type(exc).__name__
+                    }
                 )
                 return SimpleNamespace(chain=[], pending_transactions=[], difficulty=self.difficulty)
 
@@ -3807,8 +3847,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             except (ValueError, KeyError, TypeError) as exc:
                 self.logger.debug(
                     "Failed to deserialize pending transaction from peer data",
-                    error=str(exc),
-                    error_type=type(exc).__name__,
+                    extra={
+                        "error": str(exc),
+                        "error_type": type(exc).__name__
+                    }
                 )
 
         difficulty = data.get("difficulty", self.difficulty)
@@ -4128,9 +4170,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         except (OSError, IOError, ValueError) as e:
             self.logger.error(
                 "WAL: Failed to write reorg entry",
-                error=str(e),
-                error_type=type(e).__name__,
-                extra={"event": "wal.write_failed", "error": str(e)},
+                extra={"event": "wal.write_failed", "error": str(e), "error_type": type(e).__name__}
             )
 
         return wal_entry
@@ -4165,9 +4205,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         except (OSError, IOError, ValueError) as e:
             self.logger.error(
                 "WAL: Failed to commit reorg",
-                error=str(e),
-                error_type=type(e).__name__,
-                extra={"event": "wal.commit_failed", "error": str(e)},
+                extra={"event": "wal.commit_failed", "error": str(e), "error_type": type(e).__name__}
             )
 
     def _rollback_reorg_wal(self, wal_entry: Dict[str, Any]) -> None:
@@ -4200,9 +4238,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         except (OSError, IOError, ValueError) as e:
             self.logger.error(
                 "WAL: Failed to record rollback",
-                error=str(e),
-                error_type=type(e).__name__,
-                extra={"event": "wal.rollback_failed", "error": str(e)},
+                extra={"event": "wal.rollback_failed", "error": str(e), "error_type": type(e).__name__}
             )
 
     def _recover_from_incomplete_reorg(self) -> None:
@@ -4255,7 +4291,5 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         except (OSError, IOError, ValueError, KeyError) as e:
             self.logger.error(
                 "WAL: Failed to recover from incomplete reorg - manual intervention may be required",
-                error=str(e),
-                error_type=type(e).__name__,
-                extra={"event": "wal.recovery_failed", "error": str(e)},
+                extra={"event": "wal.recovery_failed", "error": str(e), "error_type": type(e).__name__}
             )

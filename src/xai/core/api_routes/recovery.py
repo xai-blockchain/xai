@@ -78,9 +78,11 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in setup_recovery",
-                error_type="ValueError",
-                error=str(exc),
-                function="setup_recovery",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "setup_recovery"
+                }
             )
             return routes._error_response(str(exc), status=400, code="recovery_invalid")
         except (RuntimeError, TypeError, KeyError) as exc:
@@ -133,9 +135,11 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in request_recovery",
-                error_type="ValueError",
-                error=str(exc),
-                function="request_recovery",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "request_recovery"
+                }
             )
             return routes._error_response(str(exc), status=400, code="recovery_invalid")
         except (RuntimeError, TypeError, KeyError) as exc:
@@ -185,9 +189,11 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in vote_recovery",
-                error_type="ValueError",
-                error=str(exc),
-                function="vote_recovery",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "vote_recovery"
+                }
             )
             return routes._error_response(str(exc), status=400, code="recovery_invalid")
         except (RuntimeError, TypeError, KeyError) as exc:
@@ -217,9 +223,11 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in get_recovery_status",
-                error_type="ValueError",
-                error=str(exc),
-                function="get_recovery_status",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "get_recovery_status"
+                }
             )
             return routes._error_response(str(exc), status=400, code="recovery_invalid")
         except (RuntimeError, TypeError, KeyError) as exc:
@@ -269,9 +277,11 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in cancel_recovery",
-                error_type="ValueError",
-                error=str(exc),
-                function="cancel_recovery",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "cancel_recovery"
+                }
             )
             return routes._error_response(str(exc), status=400, code="recovery_invalid")
         except (RuntimeError, TypeError, KeyError) as exc:
@@ -318,9 +328,11 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in execute_recovery",
-                error_type="ValueError",
-                error=str(exc),
-                function="execute_recovery",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "execute_recovery"
+                }
             )
             return routes._error_response(str(exc), status=400, code="recovery_invalid")
         except (RuntimeError, TypeError, KeyError) as exc:
@@ -356,9 +368,11 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in get_recovery_config",
-                error_type="ValueError",
-                error=str(exc),
-                function="get_recovery_config",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "get_recovery_config"
+                }
             )
             return routes._error_response(str(exc), status=400, code="recovery_invalid")
         except (RuntimeError, TypeError, KeyError) as exc:
@@ -388,9 +402,11 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in get_guardian_duties",
-                error_type="ValueError",
-                error=str(exc),
-                function="get_guardian_duties",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "get_guardian_duties"
+                }
             )
             return routes._error_response(str(exc), status=400, code="recovery_invalid")
         except (RuntimeError, TypeError, KeyError) as exc:
@@ -425,9 +441,11 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in get_recovery_requests",
-                error_type="ValueError",
-                error=str(exc),
-                function="get_recovery_requests",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "get_recovery_requests"
+                }
             )
             return routes._error_response(str(exc), status=400, code="recovery_invalid")
         except (RuntimeError, TypeError, KeyError) as exc:
@@ -454,9 +472,11 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in get_recovery_stats",
-                error_type="ValueError",
-                error=str(exc),
-                function="get_recovery_stats",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "get_recovery_stats"
+                }
             )
             return routes._error_response(str(exc), status=400, code="recovery_invalid")
         except (RuntimeError, TypeError, KeyError) as exc:

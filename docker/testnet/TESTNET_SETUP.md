@@ -59,6 +59,22 @@ docker compose -f <config-file>.yml down -v
 | `docker-compose.four-node.yml` | 4 | Full mesh connectivity | 98%+ |
 | `docker-compose.sentry.yml` | 4+2 | Public relay testing | 98%+ |
 | `docker-compose.yml` | 4 + monitoring | Full stack with Prometheus/Grafana | 98%+ |
+| `docker-compose.override.yml.example` | N/A | Customization template | N/A |
+
+### Explorer Integration
+
+All testnet configurations include a block explorer service by default, accessible at http://localhost:12080.
+
+**To disable the explorer** (if not needed):
+
+```bash
+# Copy the example override file
+cp docker-compose.override.yml.example docker-compose.override.yml
+
+# Edit and uncomment the explorer profile section
+# This makes the explorer optional - start with --profile explorer
+docker compose -f docker-compose.three-node.yml --profile explorer up -d
+```
 
 ## 1-Node Setup
 

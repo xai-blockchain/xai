@@ -741,9 +741,11 @@ class ChainValidator:
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.warning(
                 "Exception in _verify_transaction_signature",
-                error_type="Exception",
-                error=str(e),
-                function="_verify_transaction_signature",
+                extra={
+                    "error_type": "Exception",
+                    "error": str(e),
+                    "function": "_verify_transaction_signature"
+                }
             )
             return False
 

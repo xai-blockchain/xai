@@ -358,4 +358,5 @@ class TestIntegrationWithValidation:
 
         # Should be checksummed
         assert is_checksum_valid(address)
-        assert address.startswith("XAI")
+        # Address prefix depends on network (XAI for mainnet, TXAI for testnet)
+        assert address.startswith("XAI") or address.startswith("TXAI")

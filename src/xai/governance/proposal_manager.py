@@ -268,9 +268,11 @@ if __name__ == "__main__":
     except ValueError as e:
         logger.warning(
             "ValueError in return_stake",
-            error_type="ValueError",
-            error=str(e),
-            function="return_stake",
+            extra={
+                "error_type": "ValueError",
+                "error": str(e),
+                "function": "return_stake"
+            }
         )
         print(f"Error: {e}")
 
@@ -281,9 +283,11 @@ if __name__ == "__main__":
     except ValueError as e:
         logger.warning(
             "ValueError in return_stake",
-            error_type="ValueError",
-            error=str(e),
-            function="return_stake",
+            extra={
+                "error_type": "ValueError",
+                "error": str(e),
+                "function": "return_stake"
+            }
         )
         print(f"Error (expected): {e}")
 
@@ -294,9 +298,11 @@ if __name__ == "__main__":
     except ValueError as e:
         logger.warning(
             "ValueError in return_stake",
-            error_type="ValueError",
-            error=str(e),
-            function="return_stake",
+            extra={
+                "error_type": "ValueError",
+                "error": str(e),
+                "function": "return_stake"
+            }
         )
         print(f"Error: {e}")
 

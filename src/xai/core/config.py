@@ -74,6 +74,11 @@ def _get_secret_with_default(env_var: str, default_generator=None) -> str:
 # Get network type from environment variable
 NETWORK = os.getenv("XAI_NETWORK", "testnet")  # Default to testnet for safety
 
+# Node operation mode configuration
+NODE_MODE = os.getenv("XAI_NODE_MODE", "full").strip().lower()
+PRUNE_BLOCKS = int(os.getenv("XAI_PRUNE_BLOCKS", "0"))
+CHECKPOINT_SYNC_ENABLED = bool(int(os.getenv("XAI_CHECKPOINT_SYNC", "1")))
+
 FEATURE_FLAGS = {
     "vm": os.getenv("XAI_VM_ENABLED", "0").strip() == "1",
 }
@@ -444,6 +449,9 @@ class TestnetConfig:
     WALLET_TRADE_PEER_SECRET = WALLET_TRADE_PEER_SECRET
     BLOCK_HEADER_VERSION = BLOCK_HEADER_VERSION
     BLOCK_HEADER_ALLOWED_VERSIONS = BLOCK_HEADER_ALLOWED_VERSIONS
+    NODE_MODE = NODE_MODE
+    PRUNE_BLOCKS = PRUNE_BLOCKS
+    CHECKPOINT_SYNC_ENABLED = CHECKPOINT_SYNC_ENABLED
 
     # Allow chain reset on testnet for development
     ALLOW_CHAIN_RESET = True
@@ -594,6 +602,9 @@ class MainnetConfig:
     P2P_POW_DIFFICULTY_BITS = P2P_POW_DIFFICULTY_BITS
     P2P_POW_MAX_ITERATIONS = P2P_POW_MAX_ITERATIONS
     P2P_POW_REUSE_WINDOW_SECONDS = P2P_POW_REUSE_WINDOW_SECONDS
+    NODE_MODE = NODE_MODE
+    PRUNE_BLOCKS = PRUNE_BLOCKS
+    CHECKPOINT_SYNC_ENABLED = CHECKPOINT_SYNC_ENABLED
 
     # No reset on mainnet
     ALLOW_CHAIN_RESET = False
@@ -660,5 +671,8 @@ __all__ = [
     "API_RATE_WINDOW_SECONDS",
     "API_MAX_JSON_BYTES",
     "SAFE_GENESIS_HASHES",
+    "NODE_MODE",
+    "PRUNE_BLOCKS",
+    "CHECKPOINT_SYNC_ENABLED",
     "reload_runtime",
 ]

@@ -39,9 +39,11 @@ def get_blocks() -> Dict[str, Any]:
     except PaginationError as exc:
         logger.warning(
             "PaginationError in get_blocks",
-            error_type="PaginationError",
-            error=str(exc),
-            function="get_blocks",
+            extra={
+                "error_type": "PaginationError",
+                "error": str(exc),
+                "function": "get_blocks"
+            }
         )
         return error_response(
             str(exc),

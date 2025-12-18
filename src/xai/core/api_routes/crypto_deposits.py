@@ -78,9 +78,11 @@ def register_crypto_deposit_routes(routes: "NodeAPIRoutes") -> None:
         except ValueError as exc:
             logger.warning(
                 "ValueError in generate_crypto_deposit_address",
-                error_type="ValueError",
-                error=str(exc),
-                function="generate_crypto_deposit_address",
+                extra={
+                    "error_type": "ValueError",
+                    "error": str(exc),
+                    "function": "generate_crypto_deposit_address"
+                }
             )
             return routes._error_response(str(exc), status=400, code="deposit_invalid")
         except (OSError, IOError) as exc:

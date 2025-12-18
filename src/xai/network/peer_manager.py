@@ -2201,9 +2201,11 @@ if __name__ == "__main__":
     except ValueError as e:
         logger.warning(
             "ValueError in get_ssl_context",
-            error_type="ValueError",
-            error=str(e),
-            function="get_ssl_context",
+            extra={
+                "error_type": "ValueError",
+                "error": str(e),
+                "function": "get_ssl_context"
+            }
         )
         print(f"Error (expected): {e}")
 
@@ -2213,9 +2215,11 @@ if __name__ == "__main__":
     except ValueError as e:
         logger.warning(
             "ValueError in get_ssl_context",
-            error_type="ValueError",
-            error=str(e),
-            function="get_ssl_context",
+            extra={
+                "error_type": "ValueError",
+                "error": str(e),
+                "function": "get_ssl_context"
+            }
         )
         print(f"Error (expected): {e}")
 
@@ -2227,9 +2231,11 @@ if __name__ == "__main__":
     except ValueError as e:
         logger.warning(
             "ValueError in get_ssl_context",
-            error_type="ValueError",
-            error=str(e),
-            function="get_ssl_context",
+            extra={
+                "error_type": "ValueError",
+                "error": str(e),
+                "function": "get_ssl_context"
+            }
         )
         print(f"Error (expected): {e}")
 
@@ -2245,9 +2251,11 @@ if __name__ == "__main__":
     except ValueError as e:
         logger.warning(
             "ValueError in get_ssl_context",
-            error_type="ValueError",
-            error=str(e),
-            function="get_ssl_context",
+            extra={
+                "error_type": "ValueError",
+                "error": str(e),
+                "function": "get_ssl_context"
+            }
         )
         print(f"Error: {e}")
 
@@ -2258,9 +2266,11 @@ if __name__ == "__main__":
     except ValueError as e:
         logger.warning(
             "ValueError in get_ssl_context",
-            error_type="ValueError",
-            error=str(e),
-            function="get_ssl_context",
+            extra={
+                "error_type": "ValueError",
+                "error": str(e),
+                "function": "get_ssl_context"
+            }
         )
         print(f"Error: {e}")
 

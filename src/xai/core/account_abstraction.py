@@ -1504,9 +1504,11 @@ class SponsoredTransactionProcessor:
         except SponsorSignatureVerificationError as exc:
             logger.warning(
                 "SponsorSignatureVerificationError in validate_sponsored_transaction",
-                error_type="SponsorSignatureVerificationError",
-                error=str(exc),
-                function="validate_sponsored_transaction",
+                extra={
+                    "error_type": "SponsorSignatureVerificationError",
+                    "error": str(exc),
+                    "function": "validate_sponsored_transaction"
+                }
             )
             return SponsorshipValidation(
                 result=SponsorshipResult.INVALID_SIGNATURE,

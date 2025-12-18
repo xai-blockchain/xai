@@ -75,9 +75,11 @@ def get_address_nonce(address: str) -> Tuple[Dict[str, Any], int]:
     except RuntimeError as exc:
         logger.warning(
             "RuntimeError in get_address_nonce",
-            error_type="RuntimeError",
-            error=str(exc),
-            function="get_address_nonce",
+            extra={
+                "error_type": "RuntimeError",
+                "error": str(exc),
+                "function": "get_address_nonce"
+            }
         )
         return handle_exception(exc, "nonce_lookup")
 
@@ -104,9 +106,11 @@ def get_history(address: str) -> Dict[str, Any]:
     except PaginationError as exc:
         logger.warning(
             "PaginationError in get_history",
-            error_type="PaginationError",
-            error=str(exc),
-            function="get_history",
+            extra={
+                "error_type": "PaginationError",
+                "error": str(exc),
+                "function": "get_history"
+            }
         )
         return error_response(
             str(exc),
@@ -120,9 +124,11 @@ def get_history(address: str) -> Dict[str, Any]:
     except ValueError as exc:
         logger.warning(
             "ValueError in get_history",
-            error_type="ValueError",
-            error=str(exc),
-            function="get_history",
+            extra={
+                "error_type": "ValueError",
+                "error": str(exc),
+                "function": "get_history"
+            }
         )
         return error_response(
             str(exc),
@@ -185,9 +191,11 @@ def claim_faucet() -> Tuple[Dict[str, Any], int]:
     except PydanticValidationError as exc:
         logger.warning(
             "PydanticValidationError in claim_faucet",
-            error_type="PydanticValidationError",
-            error=str(exc),
-            function="claim_faucet",
+            extra={
+                "error_type": "PydanticValidationError",
+                "error": str(exc),
+                "function": "claim_faucet"
+            }
         )
         _record_faucet_metric(success=False)
         return error_response(
@@ -253,9 +261,11 @@ def claim_faucet() -> Tuple[Dict[str, Any], int]:
     except RuntimeError as exc:
         logger.warning(
             "RuntimeError in claim_faucet",
-            error_type="RuntimeError",
-            error=str(exc),
-            function="claim_faucet",
+            extra={
+                "error_type": "RuntimeError",
+                "error": str(exc),
+                "function": "claim_faucet"
+            }
         )
         _record_faucet_metric(success=False)
         return handle_exception(exc, "faucet_queue")
