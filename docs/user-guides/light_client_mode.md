@@ -382,319 +382,586 @@ else:
 
 ---
 
-## Security Considerations
+## Security: Understanding the Trust Model
 
-### What SPV Verifies
+Light clients are secure for most use cases, but it's important to understand what they verify and what they trust.
 
-✅ **SPV Confirms:**
-- Transaction is included in a block (merkle proof)
-- Block has valid proof-of-work
-- Block is part of the longest chain
-- Transaction has required confirmations
+### What Light Clients Verify
 
-❌ **SPV Does NOT Verify:**
-- Transaction signatures (trusts full nodes)
-- Double-spend prevention (assumes honest majority)
-- UTXO set validity
-- Script execution correctness
-- All consensus rules
+When you use a light client, you get cryptographic proof of:
 
-### Security Best Practices
+- ✅ **Transaction Inclusion** - Your transaction is definitely in this block
+- ✅ **Proof-of-Work** - The block required real computational work to create
+- ✅ **Chain Validity** - The block is part of the longest chain
+- ✅ **Confirmations** - How many blocks have been built on top
 
-1. **Connect to Multiple Peers**
-   - Use 8+ full nodes
-   - Query multiple peers for important transactions
-   - Compare responses to detect dishonest nodes
+This means you can be confident that:
+- Your payment was included in the blockchain
+- The block is legitimate (not fake)
+- The network accepts this transaction
 
-```yaml
-network:
-  max_peers: 12                 # More peers = more security
-  min_peers_for_query: 3        # Require 3 peers to agree
-  consensus_threshold: 0.66     # 66% must agree
-```
+### What Light Clients Trust Full Nodes For
 
-2. **Use Trusted Checkpoints**
-   - Hardcode known block hashes
-   - Prevents long-range attacks
-   - Validate against checkpoints
+Light clients DO NOT verify everything. You trust full nodes for:
 
-```yaml
-security:
-  trusted_checkpoints:
-    - height: 100000
-      hash: "0x123abc..."
-      timestamp: 1704067200
-    - height: 200000
-      hash: "0x456def..."
-      timestamp: 1708723200
-```
+- ❌ **Transaction Validity** - That the sender actually had the funds
+- ❌ **Double-Spend Prevention** - That funds weren't spent twice
+- ❌ **All Consensus Rules** - That all blockchain rules were followed
 
-3. **Wait for Confirmations**
-   - Small amounts: 1 confirmation
-   - Medium amounts: 3-6 confirmations
-   - Large amounts: 6+ confirmations
+### How to Stay Safe
+
+#### 1. Use Multiple Full Nodes
+
+Never trust a single node. Connect to several and compare responses:
 
 ```python
-# Wait for confirmations
-await client.wait_for_confirmation(tx_hash, confirmations=6)
+# Check your transaction with multiple nodes
+# If they all agree, it's safe to trust
+nodes = [
+    "node1.xai.network:18545",
+    "node2.xai.network:18545",
+    "node3.xai.network:18545",
+]
+
+# Verify transaction with all nodes
+# If majority agree, trust the result
 ```
 
-4. **Verify Critical Transactions**
-   - For large amounts, verify with multiple peers
-   - Check merkle proof manually
-   - Use full node for critical transactions
+**Rule of Thumb:** For important transactions, require at least 3 nodes to give the same answer.
+
+#### 2. Wait for Multiple Confirmations
+
+More confirmations = more security. Each confirmation makes it exponentially harder to reverse your transaction.
 
 ```python
-# Verify with multiple peers
-proofs = await client.get_merkle_proof_multi_peer(tx_id, min_peers=5)
-
-if len(proofs) >= 5 and all_proofs_match(proofs):
-    print("Transaction verified by 5 peers")
+# For different security levels
+small_payment = 1    # ~2 minutes, suitable for <$100
+medium_payment = 3   # ~6 minutes, suitable for <$10,000
+large_payment = 6    # ~12 minutes, suitable for any amount
 ```
 
-5. **Run Your Own Full Node** (Ultimate Security)
-   - Connect light client to your trusted full node
-   - No trust in third-party nodes
-   - Full validation without downloading blockchain
+**Real-World Analogy:** Like waiting for a check to clear - more time = more confidence.
 
-```yaml
-network:
-  bootstrap_peers:
-    - "my-trusted-node.local:18545"  # Your full node
-  max_peers: 1                       # Only use your node
+#### 3. Run Your Own Full Node (Advanced)
+
+The most secure option is running your own full node and connecting your light client to it:
+
+```python
+# Connect only to your own trusted node
+my_node = "192.168.1.100:18545"
 ```
+
+**Benefits:**
+- Zero trust in third parties
+- Complete privacy (your node doesn't spy on you)
+- Full validation of all rules
+- Still get light client benefits (fast sync, low bandwidth)
+
+**When to consider this:**
+- Running a business accepting XAI payments
+- Managing large amounts of XAI
+- High privacy requirements
+- Maximum security needs
+
+#### 4. Understand Attack Scenarios
+
+**What could go wrong with a light client?**
+
+| Attack | Risk Level | How to Protect |
+|--------|-----------|----------------|
+| Dishonest node shows fake transaction | Low | Connect to multiple nodes |
+| All your nodes are malicious | Very Low | Use well-known public nodes |
+| Long-range attack (fake old blocks) | Low | Wait for confirmations |
+| Eclipse attack (all nodes controlled) | Very Low | Connect to diverse nodes |
+
+**Important:** Light clients are very secure for typical use cases. Most attacks require controlling many nodes or massive computational power.
 
 ---
 
 ## Privacy Considerations
 
-### Privacy Risks
+### Privacy Trade-offs
 
-**Address Disclosure:**
-- Light clients reveal addresses when querying balances
-- Full nodes can link addresses to IP addresses
-- Transaction patterns may be observable
+Light clients sacrifice some privacy for convenience. Here's what you should know:
 
-**Mitigation Strategies:**
+**What Full Nodes Can See:**
+- Which addresses you're checking balances for
+- Your IP address (unless you use Tor)
+- When you're online and using your wallet
+- Patterns of when you check certain addresses
 
-1. **Use Bloom Filters** (Default)
-   - Adds false positives to queries
-   - Makes it harder to determine exact addresses
+**What Full Nodes CANNOT See:**
+- Your private keys (always stays on your device)
+- Transactions you haven't made yet
+- Addresses you don't query about
+- Your full wallet contents (only what you ask about)
 
-2. **Rotate Connections**
-   - Change peers periodically
-   - Prevents single node from tracking activity
+### Improving Your Privacy
 
-```yaml
-privacy:
-  rotate_peer_connections: true
-  connection_rotation_minutes: 30
+#### Basic: Connect to Your Own Node
+
+The simplest privacy improvement is running your own full node:
+
+```python
+# Connect to your own node - perfect privacy
+my_private_node = "192.168.1.100:18545"
 ```
 
-3. **Use Tor** (Advanced)
-   - Routes all traffic through Tor network
-   - Hides IP address
+Now no third party knows what you're doing!
 
-```yaml
-privacy:
-  use_tor: true
-  tor_proxy: "127.0.0.1:9050"
+#### Advanced: Use Tor (Optional)
+
+Route your light client traffic through Tor to hide your IP address:
+
+```bash
+# Install Tor
+sudo apt install tor
+
+# Configure your light client to use Tor
+# (Future: Tor configuration will be added)
 ```
 
-4. **Run Multiple Light Clients**
-   - Use different clients for different addresses
-   - Prevents address linkage
+#### Intermediate: Change Nodes Frequently
+
+Don't let any single node track all your activity:
+
+```python
+import random
+import time
+
+nodes = [
+    "node1.xai.network:18545",
+    "node2.xai.network:18545",
+    "node3.xai.network:18545",
+    "node4.xai.network:18545",
+]
+
+# Rotate which node you use every 30 minutes
+current_node = random.choice(nodes)
+```
+
+### Privacy Tips
+
+1. **Don't reuse addresses** - Generate new address for each payment
+2. **Use your own node** - Best privacy option
+3. **Be aware of timing** - Querying right after a transaction reveals it's yours
+4. **Consider full node for high privacy** - Full nodes don't reveal what you're looking for
 
 ---
 
-## Resource Usage
+## Resource Usage: What Light Clients Actually Use
 
-### Storage Requirements
+One of the biggest advantages of light clients is how little they need from your device.
 
-| Component | Size | Growth Rate |
-|-----------|------|-------------|
-| Headers Database | ~1.8 MB | ~2 MB/year |
-| Bloom Filters | 100 KB | Stable |
-| Transaction Cache | 500 KB | Stable (pruned) |
-| Peer Database | 50 KB | Stable |
+### Storage (Disk Space)
+
+Light clients are tiny compared to full nodes:
+
+| What | Size | How Often It Grows |
+|------|------|-------------------|
+| Block Headers | ~1.8 MB | +2 MB per year |
+| Recent Transaction Proofs | ~500 KB | Stays constant (old ones deleted) |
+| Configuration & Peers | ~50 KB | Barely grows |
 | **Total** | **~3 MB** | **~2 MB/year** |
 
-### Bandwidth Requirements
+**Comparison:**
+- Light Client: 3 MB (size of 2 photos)
+- Full Node: 100+ GB (size of 25,000+ photos)
 
-| Operation | Bandwidth | Frequency |
-|-----------|-----------|-----------|
-| Initial Header Sync | ~1.8 MB | Once |
-| New Header Download | 80 bytes | Every 2 minutes |
-| Transaction Verification | 1-5 KB | Per transaction |
-| Merkle Proof Request | 300-500 bytes | Per verification |
-| **Daily Usage** | **~1-5 MB** | **Typical wallet use** |
+### Bandwidth (Internet Data)
 
-### Memory Requirements
+Light clients use very little data:
 
-| Configuration | RAM Usage |
-|---------------|-----------|
-| Minimal | 64-128 MB |
-| Standard | 128-256 MB |
-| Performance-Optimized | 256-512 MB |
+| Activity | Data Used | How Often |
+|----------|-----------|-----------|
+| Initial sync | ~2-5 MB | Once ever |
+| Daily header updates | ~60 KB | Automatic |
+| Checking balance | ~1-2 KB | When you check |
+| Verifying a payment | ~500 bytes | Per payment |
+| Sending a transaction | ~1 KB | Per send |
 
----
+**Daily Usage:** 1-5 MB for normal wallet use (less than loading one webpage!)
 
-## Advanced Topics
+### Memory (RAM)
 
-### Custom Checkpoint Server
+Light clients need very little RAM:
 
-Host your own checkpoint server for faster sync:
+| Usage Pattern | RAM Needed |
+|--------------|------------|
+| Mobile wallet (background) | 32-64 MB |
+| Mobile wallet (active use) | 64-128 MB |
+| Desktop wallet | 128-256 MB |
 
-```python
-# checkpoint_server.py
-from flask import Flask, jsonify
-from xai.core.blockchain import Blockchain
+**Comparison:** A single browser tab uses more RAM than a light client!
 
-app = Flask(__name__)
-blockchain = Blockchain()
+### Battery Usage (Mobile Devices)
 
-@app.route('/checkpoint/latest')
-def latest_checkpoint():
-    height = blockchain.get_height()
-    block = blockchain.get_block(height)
+Light clients are battery-friendly:
 
-    return jsonify({
-        'height': height,
-        'hash': block.hash,
-        'merkle_root': block.merkle_root,
-        'timestamp': block.timestamp,
-        'signature': sign_checkpoint(block)
-    })
+- **Background sync:** Minimal impact (updates every few minutes)
+- **Active use:** Similar to messaging app
+- **No mining:** Light clients can't mine, saving lots of energy
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
-```
+### CPU Usage
 
-Configure light client to use it:
+Very low computational requirements:
 
-```yaml
-spv:
-  checkpoint_url: "http://my-server.com:8080/checkpoint/latest"
-```
-
-### Merkle Proof Verification
-
-Manually verify merkle proofs:
-
-```python
-from xai.core.merkle import MerkleTree
-
-# Given a transaction and merkle proof
-tx_hash = "0xabc123..."
-merkle_proof = [
-    "0xdef456...",
-    "0x789abc...",
-    "0x012def...",
-]
-merkle_root = "0x345678..."
-
-# Verify
-def verify_merkle_proof(tx_hash, proof, root):
-    current_hash = tx_hash
-
-    for proof_hash in proof:
-        # Combine hashes (order matters)
-        if current_hash < proof_hash:
-            combined = current_hash + proof_hash
-        else:
-            combined = proof_hash + current_hash
-
-        current_hash = sha256(combined)
-
-    return current_hash == root
-
-is_valid = verify_merkle_proof(tx_hash, merkle_proof, merkle_root)
-```
+- Verifying merkle proofs: Milliseconds
+- Checking header proof-of-work: ~1 second per header
+- No complex validation: Light clients don't validate full blocks
 
 ---
 
-## Troubleshooting
+## Mobile Wallet Integration
 
-### Slow Initial Sync
+Light clients are perfect for mobile apps! Here's how to integrate XAI light client into your mobile wallet.
 
-**Solution:**
-- Use checkpoint sync
-- Increase `header_download_batch`
-- Connect to more peers
+### Checking Sync Progress
 
-```yaml
-spv:
-  header_download_batch: 5000
-network:
-  max_peers: 16
-```
-
-### Merkle Proof Verification Fails
-
-**Solution:**
-- Ensure connected to honest peers
-- Verify block is on main chain
-- Check for chain reorganization
+Mobile apps should show sync progress to users. XAI provides a built-in sync progress API:
 
 ```python
-# Get proof from multiple peers
-proofs = await client.get_merkle_proof_multi_peer(tx_id, min_peers=3)
+from xai.core.light_client_service import LightClientService
+
+service = LightClientService(blockchain)
+
+# Start syncing headers
+service.start_sync(target_height=50000)
+
+# Update progress as headers download
+while syncing:
+    service.update_sync_progress()
+    progress = service.get_sync_progress()
+
+    print(f"Syncing: {progress.sync_percentage:.1f}%")
+    print(f"Block {progress.current_height} of {progress.target_height}")
+    print(f"Speed: {progress.headers_per_second:.1f} headers/sec")
+
+    if progress.estimated_time_remaining:
+        mins = progress.estimated_time_remaining // 60
+        print(f"ETA: {mins} minutes")
+
+    if progress.sync_state == "synced":
+        print("Sync complete!")
+        break
 ```
 
-### High Bandwidth Usage
+### Mobile-Optimized Sync Manager
 
-**Solution:**
-- Reduce peer count
-- Limit bloom filter false positive rate
-- Disable aggressive caching
+For mobile apps with network constraints, use the MobileSyncManager:
 
-```yaml
-network:
-  max_peers: 4
-spv:
-  bloom_false_positive_rate: 0.00001  # Lower = less data
+```python
+from xai.mobile.sync_manager import (
+    MobileSyncManager,
+    NetworkCondition,
+    SyncState
+)
+from xai.core.chunked_sync import ChunkedStateSyncService
+
+# Initialize services
+chunked_service = ChunkedStateSyncService(blockchain, storage_dir="~/.xai/sync")
+mobile_sync = MobileSyncManager(
+    chunked_service=chunked_service,
+    storage_dir="~/.xai/mobile",
+    min_free_space_mb=100,
+    enable_background_sync=True
+)
+
+# Configure network conditions
+if on_wifi:
+    condition = NetworkCondition(
+        bandwidth_limit=0,  # Unlimited on WiFi
+        connection_type="wifi",
+        is_metered=False,
+        signal_strength=100
+    )
+else:  # On cellular
+    condition = NetworkCondition(
+        bandwidth_limit=500_000,  # 500 KB/s on cellular
+        connection_type="4g",
+        is_metered=True,
+        signal_strength=75
+    )
+
+mobile_sync.set_network_condition(condition)
+
+# Set progress callback for UI updates
+def on_progress(data):
+    state = data['state']
+    stats = data['statistics']
+
+    print(f"State: {state}")
+    print(f"Downloaded: {stats['bytes_downloaded'] / 1024 / 1024:.1f} MB")
+    print(f"Speed: {stats['average_speed'] / 1024:.1f} KB/s")
+
+mobile_sync.set_progress_callback(on_progress)
+
+# Pause/resume based on app state
+def on_app_background():
+    mobile_sync.pause_sync()
+
+def on_app_foreground():
+    mobile_sync.resume_sync()
 ```
 
-### Privacy Concerns
+### Example: React Native Integration
 
-**Solution:**
-- Enable Tor
-- Rotate connections frequently
-- Use bloom filter randomization
-- Run your own full node
+Here's a complete example for a React Native wallet:
 
-```yaml
-privacy:
-  use_tor: true
-  rotate_peer_connections: true
-  bloom_filter_randomization: true
+```javascript
+import { useEffect, useState } from 'react';
+import { XAILightClient } from '@xai/mobile-sdk';
+
+function WalletSyncScreen() {
+  const [progress, setProgress] = useState({
+    percentage: 0,
+    current: 0,
+    target: 0,
+    state: 'idle'
+  });
+
+  useEffect(() => {
+    const client = new XAILightClient({
+      network: 'testnet',
+      onProgress: (data) => {
+        setProgress({
+          percentage: data.sync_percentage,
+          current: data.current_height,
+          target: data.target_height,
+          state: data.sync_state
+        });
+      }
+    });
+
+    client.startSync();
+
+    return () => client.stop();
+  }, []);
+
+  if (progress.state === 'synced') {
+    return <WalletHomeScreen />;
+  }
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Syncing Blockchain</Text>
+      <ProgressBar progress={progress.percentage / 100} />
+      <Text>Block {progress.current} of {progress.target}</Text>
+      <Text>{progress.percentage.toFixed(1)}% complete</Text>
+    </View>
+  );
+}
 ```
+
+### Bandwidth Optimization for Mobile
+
+Save data with smart sync strategies:
+
+```python
+import wifi_detection  # Your platform's WiFi detection
+
+def should_sync():
+    """Only sync on WiFi to save mobile data"""
+    if wifi_detection.is_connected_to_wifi():
+        return True
+
+    # Or ask user permission for cellular sync
+    return ask_user("Sync on cellular data?")
+
+if should_sync():
+    service.start_sync(target_height=latest_height)
+else:
+    print("Waiting for WiFi connection...")
+```
+
+### See Also
+
+- [Sync Progress API Documentation](../SYNC_PROGRESS_API.md) - Complete API reference
+- [Mobile Quick Start Guide](mobile_quickstart.md) - Full mobile SDK documentation
 
 ---
 
-## Comparison: Light Client vs Lightweight Node vs Full Node
+## Troubleshooting Common Issues
 
-| Feature | Light Client | Lightweight Node | Full Node |
-|---------|--------------|------------------|-----------|
-| Storage | ~3 MB | ~500 MB - 2 GB | ~10+ GB |
-| Initial Sync | Minutes | Hours | Days |
-| Bandwidth | 1-5 MB/day | 50-200 MB/day | 500+ MB/day |
-| RAM | 64-256 MB | 512 MB - 2 GB | 2+ GB |
-| Validation | Headers only | Full validation | Full validation |
-| Mining | ❌ No | ❌ No | ✅ Yes |
-| Privacy | ⚠️ Limited | ✅ Good | ✅ Excellent |
-| Security | ⚠️ Trusts peers | ✅ Full verification | ✅ Full verification |
-| Use Case | Mobile, IoT | Raspberry Pi, Low-power | Production, Mining |
+### "Sync is taking forever"
+
+**Problem:** Initial header sync seems very slow
+
+**Solutions:**
+1. **Check your internet connection** - Header sync needs steady connection
+2. **Try different nodes** - Some nodes may be slow or overloaded
+3. **Be patient** - Even "slow" sync is usually under 10 minutes
+4. **Check if stuck** - If no progress for 5+ minutes, restart
+
+```python
+# Check sync status
+progress = service.get_sync_progress()
+print(f"State: {progress.sync_state}")  # Should show "syncing"
+print(f"Speed: {progress.headers_per_second} headers/sec")  # Should be > 0
+
+# If stalled, restart sync
+if progress.sync_state == "stalled":
+    service.start_sync(target_height=latest_height)
+```
+
+### "Transaction verification failed"
+
+**Problem:** Your transaction merkle proof doesn't verify
+
+**Possible Causes:**
+1. **Transaction isn't confirmed yet** - Wait for it to be included in a block
+2. **Node gave wrong proof** - Try a different node
+3. **Chain reorganization** - Block was orphaned, transaction will be in different block
+
+**Solution:**
+```python
+# Try getting proof from multiple nodes
+nodes = ["node1.xai.network:18545", "node2.xai.network:18545", "node3.xai.network:18545"]
+for node in nodes:
+    # Connect to node and get proof
+    proof = get_proof_from_node(node, tx_id)
+    if verify_proof(proof):
+        print(f"Verified using {node}")
+        break
+```
+
+### "Using too much mobile data"
+
+**Problem:** Light client consuming cellular data allowance
+
+**Solutions:**
+1. **Sync only on WiFi** - Wait for WiFi before syncing
+2. **Use less frequent checks** - Don't check balance every minute
+3. **Reduce header sync frequency** - Only sync when needed
+
+```python
+# Only sync on WiFi
+if not on_wifi():
+    print("Waiting for WiFi to sync...")
+    # Don't start sync
+else:
+    service.start_sync(target_height=latest_height)
+```
+
+### "Not enough storage space"
+
+**Problem:** Device says not enough space for sync
+
+**Note:** This shouldn't happen - light clients need only ~3 MB!
+
+**Solution:**
+- Check you have at least 10 MB free
+- Clear old transaction proofs
+- Restart app to reset storage
+
+### "Can't connect to any nodes"
+
+**Problem:** Unable to connect to full nodes
+
+**Solutions:**
+1. **Check internet connection**
+2. **Try different nodes** - Public nodes may be down
+3. **Check firewall** - Some networks block blockchain ports
+4. **Run your own node** - Most reliable option
+
+---
+
+## Comparison: Choosing the Right Node Type
+
+Not sure if a light client is right for you? Here's how different node types compare:
+
+| Feature | Light Client (SPV) | Lightweight Node | Full Node |
+|---------|-------------------|------------------|-----------|
+| **Storage** | ~3 MB | ~1-2 GB | ~100+ GB |
+| **Initial Sync** | 2-10 minutes | 1-4 hours | 1-3 days |
+| **Daily Data** | 1-5 MB | 50-200 MB | 500+ MB |
+| **RAM Needed** | 64-128 MB | 512 MB - 1 GB | 2+ GB |
+| **Validation** | Headers + proofs only | Everything | Everything |
+| **Can Mine** | No | No | Yes |
+| **Privacy** | Limited | Good | Excellent |
+| **Security** | Trusts majority of nodes | Fully validates | Fully validates |
+| **Best For** | Mobile, wallets, quick access | Home servers, Raspberry Pi | Business, mining, serving others |
+| **Trust Model** | Trust full nodes | Trust no one | Trust no one |
+
+### Quick Decision Guide
+
+**Choose a Light Client if:**
+- You're building a mobile wallet
+- You want fast, easy setup
+- Storage/bandwidth are limited
+- You're okay trusting well-known nodes
+- You just want to send/receive XAI
+
+**Choose a Lightweight Node if:**
+- You want full validation
+- You have modest hardware (Raspberry Pi)
+- You want better privacy
+- Storage isn't a major concern
+- See: [Lightweight Node Guide](lightweight_node_guide.md)
+
+**Choose a Full Node if:**
+- You're running a business
+- You want to mine XAI
+- You need maximum security
+- You want to help the network
+- Privacy is critical
+
+---
+
+## Summary
+
+Light clients using SPV (Simplified Payment Verification) let you use XAI without downloading the entire blockchain:
+
+**Key Points:**
+- ✅ Only ~3 MB storage needed (vs 100+ GB for full node)
+- ✅ Sync in minutes (vs days for full node)
+- ✅ Perfect for mobile wallets and quick access
+- ✅ Cryptographically verifies transactions are in blocks
+- ⚠️ Trusts full nodes for complete validation
+- ⚠️ Less privacy than running own node
+
+**Best Practices:**
+1. Connect to multiple nodes (at least 3)
+2. Wait for 6 confirmations for important transactions
+3. For maximum security, run your own full node and connect to it
+4. For mobile, use WiFi-only sync to save data
+
+**Getting Started:**
+```python
+from xai.core.light_client import LightClient
+from xai.core.light_client_service import LightClientService
+
+# Create light client
+client = LightClient()
+
+# Connect to service
+service = LightClientService(blockchain)
+
+# Start syncing
+service.start_sync(target_height=latest_height)
+
+# You're ready to verify transactions!
+```
 
 ---
 
 ## Next Steps
 
-- **[Lightweight Node Guide](lightweight_node_guide.md)** - Full validation with optimizations
-- **[Mobile Quick Start](mobile_quickstart.md)** - Integrate light client in mobile apps
-- **[Wallet Setup](wallet-setup.md)** - Advanced wallet features
-- **[API Documentation](../api/rest-api.md)** - Build apps using light clients
+- **[Mobile Quick Start Guide](mobile_quickstart.md)** - Build mobile wallets with light client
+- **[Sync Progress API](../SYNC_PROGRESS_API.md)** - Track sync progress in your app
+- **[Lightweight Node Guide](lightweight_node_guide.md)** - Full validation with lower resources
+- **[Wallet Setup Guide](wallet-setup.md)** - Complete wallet features
+- **[Testnet Guide](TESTNET_GUIDE.md)** - Try it on testnet first
 
 ---
 
-*Last Updated: January 2025 | XAI Version: 0.2.0*
+## Questions?
+
+- **Docs:** Check [FAQ](faq.md) for common questions
+- **Support:** Visit [troubleshooting guide](troubleshooting.md)
+- **Community:** Join XAI community channels
+
+---
+
+*Last Updated: December 2025 | XAI Version: 0.2.0*
+*Documentation for XAI Light Client (SPV) Implementation*
