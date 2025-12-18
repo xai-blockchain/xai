@@ -94,7 +94,7 @@ check_python() {
         return 1
     fi
 
-    print_success "Python $version detected"
+    print_success "Python $version detected" >&2
     echo "$python_cmd"
     return 0
 }
@@ -105,25 +105,14 @@ check_python_modules() {
 
     print_info "Checking Python dependencies..."
 
-    # List of required modules (all are Python standard library)
-    local required_modules=(
-        "socket"
-        "json"
-        "pathlib"
-        "secrets"
-        "hashlib"
-    )
+    # Test a simple Python script that imports what we need
+    # All modules are Python standard library and should always be available
+    local test_result
+    test_result=$($python_cmd -c "import socket, json, pathlib, secrets, hashlib, sys, os, shutil; print('OK')" 2>&1)
 
-    local missing_modules=()
-
-    for module in "${required_modules[@]}"; do
-        if ! $python_cmd -c "import $module" >/dev/null 2>&1; then
-            missing_modules+=("$module")
-        fi
-    done
-
-    if [ ${#missing_modules[@]} -gt 0 ]; then
-        print_error "Missing required Python modules: ${missing_modules[*]}"
+    if [ "$test_result" != "OK" ]; then
+        print_error "Python installation appears incomplete: $test_result"
+        print_error "Please reinstall Python 3.8 or higher"
         return 1
     fi
 

@@ -49,6 +49,13 @@ End-user documentation and tutorials.
 - [Staking Guide](user-guides/staking.md) - Staking tokens
 - [Troubleshooting](user-guides/troubleshooting.md) - Common issues and solutions
 
+#### Lightweight Node Guides
+Run XAI on resource-constrained devices.
+
+- [Lightweight Node Guide](user-guides/LIGHTWEIGHT_NODE_GUIDE.md) - Complete guide for all platforms
+- [Raspberry Pi Setup](user-guides/RASPBERRY_PI_SETUP.md) - Step-by-step Raspberry Pi installation
+- [Quick Reference](user-guides/LIGHTWEIGHT_NODE_QUICK_REFERENCE.md) - Commands and configurations at a glance
+
 ## Quick Links
 
 - [Installation Guide](deployment/local-setup.md#installation)

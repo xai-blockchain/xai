@@ -70,8 +70,10 @@ class SyncChunk:
             self.size_bytes = len(self.data)
 
     def verify_checksum(self) -> bool:
-        """Verify chunk data matches checksum."""
-        computed = hashlib.sha256(self.data).hexdigest()
+        """Verify chunk data matches checksum (on uncompressed data)."""
+        # If compressed, decompress first before checking
+        data_to_check = self.decompress() if self.compressed else self.data
+        computed = hashlib.sha256(data_to_check).hexdigest()
         return computed == self.checksum
 
     def compress(self) -> bytes:
@@ -311,50 +313,43 @@ class ChunkedStateSyncService:
         serialized = json.dumps(payload.to_dict(), sort_keys=True).encode("utf-8")
         total_size = len(serialized)
 
-        # Split into priority and regular data
-        priority_data, regular_data = self._split_by_priority(
-            payload.to_dict(),
-            priority_keys or ["utxo_snapshot", "account_balances"],
-        )
-
-        # Create chunks
+        # Create chunks directly from serialized data
         chunks: List[SyncChunk] = []
         priority_map: Dict[int, ChunkPriority] = {}
 
-        # Process priority data first
         chunk_index = 0
-        for data_bytes, priority in [
-            (priority_data, ChunkPriority.CRITICAL),
-            (regular_data, ChunkPriority.MEDIUM),
-        ]:
-            if not data_bytes:
-                continue
+        offset = 0
 
-            offset = 0
-            while offset < len(data_bytes):
-                chunk_data = data_bytes[offset : offset + self.chunk_size]
-                checksum = hashlib.sha256(chunk_data).hexdigest()
+        while offset < len(serialized):
+            chunk_data = serialized[offset : offset + self.chunk_size]
 
-                # Compress if enabled
-                compressed = False
-                if self.enable_compression:
-                    chunk_data = gzip.compress(chunk_data)
-                    compressed = True
+            # Calculate checksum on uncompressed data
+            checksum = hashlib.sha256(chunk_data).hexdigest()
 
-                chunk = SyncChunk(
-                    chunk_id=snapshot_id,
-                    chunk_index=chunk_index,
-                    total_chunks=0,  # Will be set later
-                    data=chunk_data,
-                    checksum=checksum,
-                    compressed=compressed,
-                    priority=priority,
-                )
+            # Store original size before compression
+            original_size = len(chunk_data)
 
-                chunks.append(chunk)
-                priority_map[chunk_index] = priority
-                chunk_index += 1
-                offset += self.chunk_size
+            # Compress if enabled
+            compressed = False
+            if self.enable_compression:
+                chunk_data = gzip.compress(chunk_data)
+                compressed = True
+
+            chunk = SyncChunk(
+                chunk_id=snapshot_id,
+                chunk_index=chunk_index,
+                total_chunks=0,  # Will be set later
+                data=chunk_data,
+                checksum=checksum,
+                compressed=compressed,
+                priority=ChunkPriority.MEDIUM,
+                size_bytes=original_size,
+            )
+
+            chunks.append(chunk)
+            priority_map[chunk_index] = ChunkPriority.MEDIUM
+            chunk_index += 1
+            offset += self.chunk_size
 
         # Update total_chunks in all chunks
         total_chunks = len(chunks)

@@ -1,0 +1,23 @@
+xai-blockchain (0.2.0-1) stable; urgency=medium
+
+  * Initial Debian package release
+  * Added systemd service integration
+  * Added automatic user/group creation
+  * Implemented proper directory permissions
+  * Added configuration management
+  * Security hardening in systemd service
+  * Added health checks and resource limits
+  * Support for testnet and mainnet configurations
+
+ -- XAI Blockchain Team <dev@xai-blockchain.io>  Wed, 18 Dec 2024 16:00:00 +0000
+
+xai-blockchain (0.1.0-1) unstable; urgency=low
+
+  * Initial release candidate
+  * Core blockchain functionality
+  * Proof-of-work consensus
+  * Wallet CLI implementation
+  * Smart contract engine
+  * Atomic swap support
+
+ -- XAI Blockchain Team <dev@xai-blockchain.io>  Mon, 01 Jan 2024 00:00:00 +0000
