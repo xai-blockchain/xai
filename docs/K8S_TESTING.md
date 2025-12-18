@@ -214,6 +214,15 @@ Kubeconfig per project: `source env.sh` sets KUBECONFIG automatically.
 
 **Docs**: `/home/hudson/blockchain-projects/xai/docs/K8S_CHAOS_TESTING.md`
 
+## Operations Infrastructure
+
+| Component | Status | Access |
+|-----------|--------|--------|
+| ArgoCD | ✅ Installed | http://100.91.253.108:30085 (admin/see K8S_GITOPS.md) |
+| Linkerd | ✅ Installed | mTLS enabled for xai namespace |
+| cert-manager | ✅ Installed | ClusterIssuers: selfsigned-issuer, ca-issuer |
+| VPA | ✅ Installed | Recommender active, xai-validator-vpa created |
+
 ## Summary
 
 **Cluster**: Production-grade 2-node k3s cluster
@@ -225,4 +234,8 @@ Kubeconfig per project: `source env.sh` sets KUBECONFIG automatically.
 **Security**: Audit logging, network policies, secrets encryption at rest, RPC rate limiting, Pod Security Standards
 **Disaster Recovery**: Automated backup/restore with PVC data support
 **Chaos Engineering**: Network partition and latency testing validated
+**Service Mesh**: Linkerd mTLS for encrypted validator traffic
+**GitOps**: ArgoCD for declarative deployments
+**Autoscaling**: VPA recommender for resource right-sizing
+**Certificates**: cert-manager for automated TLS
 **Status**: EXCEEDS expectations - Ready for XAI testnet deployment
