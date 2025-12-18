@@ -1,0 +1,32 @@
+---
+# Sample ArgoCD Application for XAI Blockchain
+# This is a template - update repoURL with actual repo access or configure SSH/credentials
+#
+# To use with private repo:
+# 1. Add SSH key: kubectl create secret generic github-ssh -n argocd --from-file=sshPrivateKey=/path/to/key
+# 2. Update repo config: kubectl patch configmap argocd-ssh-known-hosts-cm -n argocd
+# 3. Or use HTTPS with token in repo credentials
+#
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: xai-blockchain
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    # Update this URL to match your repo access method
+    # For private repos: configure credentials in ArgoCD settings
+    repoURL: https://github.com/decristofaroj/xai.git
+    targetRevision: main
+    path: k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: xai-staging
+  syncPolicy:
+    # Manual sync - set automated after repo access is configured
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true

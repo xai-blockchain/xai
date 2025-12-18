@@ -1,0 +1,41 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mev-protection
+  namespace: xai
+spec:
+  podSelector:
+    matchLabels:
+      app: xai-validator
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Only allow RPC access from authorized pods (block public mempool)
+  - from:
+    - podSelector:
+        matchLabels:
+          role: trusted-rpc-client
+    ports:
+    - protocol: TCP
+      port: 26657  # Tendermint RPC
+  # Allow P2P between validators
+  - from:
+    - podSelector:
+        matchLabels:
+          app: xai-validator
+    ports:
+    - protocol: TCP
+      port: 26656  # P2P port
+  egress:
+  # Allow validators to talk to each other
+  - to:
+    - podSelector:
+        matchLabels:
+          app: xai-validator
+  # Allow DNS
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: UDP
+      port: 53
