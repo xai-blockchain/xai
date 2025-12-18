@@ -21,6 +21,9 @@ from xai.core.api_routes.mining_bonus import register_mining_bonus_routes
 from xai.core.api_routes.exchange import register_exchange_routes
 from xai.core.api_routes.admin import register_admin_routes
 from xai.core.api_routes.crypto_deposits import register_crypto_deposit_routes
+from xai.core.api_routes.payment import register_payment_routes
+from xai.core.api_routes.notifications import register_notification_routes
+from xai.core.api_routes.sync import register_sync_routes
 
 __all__ = [
     "register_core_routes",
@@ -38,4 +41,7 @@ __all__ = [
     "register_exchange_routes",
     "register_admin_routes",
     "register_crypto_deposit_routes",
+    "register_payment_routes",
+    "register_notification_routes",
+    "register_sync_routes",
 ]

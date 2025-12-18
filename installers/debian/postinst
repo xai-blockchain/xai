@@ -1,0 +1,86 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    configure)
+        # Create xai user and group if they don't exist
+        if ! getent group xai > /dev/null 2>&1; then
+            addgroup --system xai
+        fi
+
+        if ! getent passwd xai > /dev/null 2>&1; then
+            adduser --system --home /var/lib/xai --shell /bin/bash \
+                    --ingroup xai --disabled-password --disabled-login \
+                    --gecos "XAI Blockchain Node" xai
+        fi
+
+        # Set ownership of data directories
+        chown -R xai:xai /var/lib/xai
+        chown -R xai:xai /var/log/xai
+        chown -R xai:xai /etc/xai
+
+        # Set permissions
+        chmod 750 /var/lib/xai
+        chmod 750 /var/log/xai
+        chmod 755 /etc/xai
+
+        # Create default configuration if it doesn't exist
+        if [ ! -f /etc/xai/node.yaml ]; then
+            cat > /etc/xai/node.yaml <<'EOF'
+# XAI Node Configuration
+
+network:
+  name: testnet
+  port: 18545
+  rpc_port: 18546
+
+data:
+  dir: /var/lib/xai/blockchain
+  wallets_dir: /var/lib/xai/wallets
+  state_dir: /var/lib/xai/state
+
+logging:
+  level: INFO
+  dir: /var/log/xai
+
+node:
+  enable_mining: false
+  max_peers: 50
+  checkpoint_sync: true
+EOF
+            chown xai:xai /etc/xai/node.yaml
+            chmod 644 /etc/xai/node.yaml
+        fi
+
+        # Reload systemd
+        if [ -d /run/systemd/system ]; then
+            systemctl --system daemon-reload >/dev/null || true
+        fi
+
+        echo ""
+        echo "XAI Blockchain installed successfully!"
+        echo ""
+        echo "Next steps:"
+        echo "  1. Start the node: sudo systemctl start xai-node"
+        echo "  2. Enable on boot: sudo systemctl enable xai-node"
+        echo "  3. Check status: sudo systemctl status xai-node"
+        echo "  4. View logs: sudo journalctl -u xai-node -f"
+        echo ""
+        echo "Configuration: /etc/xai/node.yaml"
+        echo "Data directory: /var/lib/xai"
+        echo "Logs: /var/log/xai"
+        echo ""
+        ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

@@ -661,9 +661,10 @@ def register_payment_routes(routes: "NodeAPIRoutes") -> None:
             if "amount" in parsed:
                 response_data["amount"] = parsed["amount"]
             if "message" in parsed:
-                response_data["memo"] = parsed["message"]
+                # URL decode the message
+                response_data["memo"] = unquote(parsed["message"])
             elif "label" in parsed:
-                response_data["memo"] = parsed["label"]
+                response_data["memo"] = unquote(parsed["label"])
             if expires_at is not None:
                 response_data["expires_at"] = expires_at
 

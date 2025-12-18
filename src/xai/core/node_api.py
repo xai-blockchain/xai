@@ -94,6 +94,8 @@ from xai.core.api_routes import (
     register_mining_bonus_routes,
     register_admin_routes,
     register_crypto_deposit_routes,
+    register_payment_routes,
+    register_notification_routes,
 )
 from xai.core.api_routes.blockchain import _block_to_payload, _build_block_summary
 
@@ -647,6 +649,8 @@ class NodeAPIRoutes:
         register_mining_bonus_routes(self)
         self._setup_exchange_routes()
         register_crypto_deposit_routes(self)
+        register_payment_routes(self)
+        register_notification_routes(self)
         register_admin_routes(self)
 
     def _log_event(self, event_type: str, payload: Optional[Dict[str, Any]] = None, severity: str = "INFO") -> None:
@@ -1077,6 +1081,123 @@ class NodeAPIRoutes:
             stats["is_mining"] = self.node.is_mining
             stats["node_uptime"] = time.time() - self.node.start_time
             return jsonify(stats)
+
+        @self.app.route("/sync/progress", methods=["GET"])
+        def get_sync_progress() -> Tuple[Dict[str, Any], int]:
+            """
+            Get light client sync progress.
+
+            Returns comprehensive sync status including:
+            - Current and target blockchain height
+            - Sync percentage and ETA
+            - Headers per second (sync speed)
+            - Sync state (syncing, synced, stalled, idle)
+            - Checkpoint sync information
+            """
+            try:
+                light_client_service = getattr(self.node, "light_client_service", None)
+                if not light_client_service:
+                    return jsonify({
+                        "error": "Light client service not available",
+                        "sync_state": "unavailable"
+                    }), 503
+
+                sync_progress = light_client_service.get_sync_progress()
+                return jsonify({
+                    "success": True,
+                    "progress": sync_progress.to_dict()
+                }), 200
+
+            except (RuntimeError, ValueError, AttributeError) as exc:
+                logger.error(
+                    "Failed to get sync progress",
+                    extra={
+                        "error": str(exc),
+                        "error_type": type(exc).__name__
+                    }
+                )
+                return jsonify({
+                    "error": f"Failed to get sync progress: {str(exc)}",
+                    "sync_state": "error"
+                }), 500
+
+        @self.app.route("/sync/status", methods=["GET"])
+        def get_sync_status() -> Tuple[Dict[str, Any], int]:
+            """
+            Get detailed sync status for all sync types.
+
+            Returns status for:
+            - Header sync (light client)
+            - Checkpoint sync (fast sync)
+            - State sync (full node)
+            """
+            try:
+                status = {
+                    "header_sync": None,
+                    "checkpoint_sync": None,
+                    "state_sync": None,
+                }
+
+                # Get header sync status (light client)
+                light_client_service = getattr(self.node, "light_client_service", None)
+                if light_client_service:
+                    try:
+                        sync_progress = light_client_service.get_sync_progress()
+                        status["header_sync"] = {
+                            "enabled": True,
+                            "status": sync_progress.to_dict()
+                        }
+                    except (RuntimeError, ValueError, AttributeError) as e:
+                        status["header_sync"] = {
+                            "enabled": True,
+                            "error": str(e)
+                        }
+                else:
+                    status["header_sync"] = {"enabled": False}
+
+                # Get checkpoint sync status
+                sync_coordinator = getattr(self.node, "partial_sync_coordinator", None)
+                sync_mgr = getattr(sync_coordinator, "sync_manager", None) if sync_coordinator else None
+                if sync_mgr and hasattr(sync_mgr, "get_checkpoint_sync_progress"):
+                    try:
+                        checkpoint_progress = sync_mgr.get_checkpoint_sync_progress()
+                        status["checkpoint_sync"] = {
+                            "enabled": True,
+                            "status": checkpoint_progress
+                        }
+                    except (RuntimeError, ValueError, AttributeError) as e:
+                        status["checkpoint_sync"] = {
+                            "enabled": True,
+                            "error": str(e)
+                        }
+                else:
+                    status["checkpoint_sync"] = {"enabled": False}
+
+                # Get state sync status (blockchain sync)
+                chain = self.blockchain.chain
+                current_height = len(chain) - 1 if chain else 0
+                status["state_sync"] = {
+                    "enabled": True,
+                    "current_height": current_height,
+                    "pending_transactions": len(self.blockchain.pending_transactions),
+                }
+
+                return jsonify({
+                    "success": True,
+                    "sync_status": status
+                }), 200
+
+            except (RuntimeError, ValueError, AttributeError) as exc:
+                logger.error(
+                    "Failed to get sync status",
+                    extra={
+                        "error": str(exc),
+                        "error_type": type(exc).__name__
+                    }
+                )
+                return jsonify({
+                    "error": f"Failed to get sync status: {str(exc)}"
+                }), 500
 
         @self.app.route("/state/snapshot", methods=["GET"])
         def get_state_snapshot() -> Tuple[Dict[str, Any], int]:

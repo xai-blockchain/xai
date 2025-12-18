@@ -16,3 +16,4 @@ flask-sock>=0.7.0
 py-ecc>=8.0.0
 pqcrypto==0.3.4
 gmpy2>=2.2.0
+qrcode[pil]>=7.4.0

@@ -427,6 +427,20 @@ class WebSocketAPIHandler:
 
                         logger.info(f"Closed stale connection: {client_id}")
 
+    def broadcast_sync_progress(self, progress_data: Dict[str, Any]) -> None:
+        """
+        Broadcast sync progress update to WebSocket clients subscribed to 'sync' channel.
+
+        Args:
+            progress_data: Sync progress data to broadcast
+        """
+        message = {
+            "channel": "sync",
+            "type": "sync_progress",
+            "data": progress_data
+        }
+        self.broadcast_ws(message)
+
     def start_background_tasks(self) -> None:
         """Start background monitoring tasks."""
 
@@ -439,6 +453,50 @@ class WebSocketAPIHandler:
                 stats = self.node.blockchain.get_stats()
                 self.broadcast_ws({"channel": "stats", "event": "update", "data": stats})
 
+        def sync_progress_updater() -> None:
+            """Periodically broadcast sync progress to WebSocket clients."""
+            while True:
+                time.sleep(2)  # Every 2 seconds for more responsive sync updates
+
+                # Broadcast light client sync progress
+                light_client_service = getattr(self.node, "light_client_service", None)
+                if light_client_service:
+                    try:
+                        sync_progress = light_client_service.get_sync_progress()
+                        progress_dict = sync_progress.to_dict()
+
+                        # Only broadcast if actively syncing or recently completed
+                        if progress_dict["sync_state"] in ["syncing", "stalled"]:
+                            self.broadcast_sync_progress({
+                                "percentage": progress_dict["sync_percentage"],
+                                "current": progress_dict["current_height"],
+                                "target": progress_dict["target_height"],
+                                "eta_seconds": progress_dict["estimated_time_remaining"],
+                                "headers_per_second": progress_dict["headers_per_second"],
+                                "sync_state": progress_dict["sync_state"],
+                            })
+                    except (RuntimeError, ValueError, AttributeError) as e:
+                        logger.debug(f"Failed to broadcast sync progress: {type(e).__name__}")
+
+                # Broadcast checkpoint sync progress
+                sync_coordinator = getattr(self.node, "partial_sync_coordinator", None)
+                sync_mgr = getattr(sync_coordinator, "sync_manager", None) if sync_coordinator else None
+                if sync_mgr and hasattr(sync_mgr, "get_checkpoint_sync_progress"):
+                    try:
+                        checkpoint_progress = sync_mgr.get_checkpoint_sync_progress()
+                        if checkpoint_progress.get("stage") not in ["idle", "completed"]:
+                            self.broadcast_ws({
+                                "channel": "sync",
+                                "type": "checkpoint_progress",
+                                "data": checkpoint_progress
+                            })
+                    except (RuntimeError, ValueError, AttributeError) as e:
+                        logger.debug(f"Failed to broadcast checkpoint progress: {type(e).__name__}")
+
         stats_thread = threading.Thread(target=stats_updater, daemon=True)
         stats_thread.start()
+
+        sync_thread = threading.Thread(target=sync_progress_updater, daemon=True)
+        sync_thread.start()
+
         logger.info("WebSocket background tasks started")

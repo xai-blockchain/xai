@@ -12,13 +12,14 @@ from dataclasses import dataclass
 import json
 import os
 import time
-from typing import Any, Dict, Optional, Callable
+from typing import Any, Dict, Optional, Callable, List
 
 import requests
 from ecdsa import SECP256k1, VerifyingKey, BadSignatureError
 import hashlib
 
 from .checkpoint_payload import CheckpointPayload
+from .chunked_sync import ChunkedStateSyncService, SyncProgress
 
 @dataclass
 class CheckpointMetadata:
@@ -42,13 +43,21 @@ class CheckpointMetadata:
 class CheckpointSyncManager:
     """Coordinate checkpoint discovery and selection for partial sync."""
 
-    def __init__(self, blockchain: Any, p2p_manager: Optional[Any] = None):
+    def __init__(
+        self,
+        blockchain: Any,
+        p2p_manager: Optional[Any] = None,
+        enable_chunked_sync: bool = False,
+        chunk_size: int = 1_000_000,
+    ):
         """
         Initialize checkpoint sync coordination.
 
         Args:
             blockchain: Blockchain instance with checkpoint_manager/config.
             p2p_manager: Optional P2P manager exposing checkpoint metadata hooks.
+            enable_chunked_sync: Enable chunked download for mobile clients
+            chunk_size: Size of each chunk in bytes (default 1MB)
         """
         self.blockchain = blockchain
         self.p2p_manager = p2p_manager
@@ -62,9 +71,23 @@ class CheckpointSyncManager:
         self._last_request_ts: float = 0.0
         self._provenance_log: list[dict] = []
 
+        # Chunked sync support
+        self.enable_chunked_sync = enable_chunked_sync
+        self.chunked_service: Optional[ChunkedStateSyncService] = None
+        if enable_chunked_sync:
+            storage_dir = os.path.join(
+                getattr(blockchain, "base_dir", "."),
+                "chunked_sync"
+            )
+            self.chunked_service = ChunkedStateSyncService(
+                storage_dir=storage_dir,
+                chunk_size=chunk_size,
+                enable_compression=True,
+            )
+
         # Progress tracking
         self._sync_progress: Dict[str, Any] = {
-            "stage": "idle",  # idle, downloading, verifying, applying
+            "stage": "idle",
             "bytes_downloaded": 0,
             "total_bytes": 0,
             "download_percentage": 0.0,
@@ -180,10 +203,17 @@ class CheckpointSyncManager:
         Returns:
             True if a checkpoint was fetched, validated, and applied; False otherwise.
         """
+        # Initialize progress tracking
+        self._update_progress({
+            "stage": "downloading",
+            "started_at": time.time(),
+        })
+
         meta = self.get_best_checkpoint_metadata()
         payload = None
         if meta:
             payload = self.fetch_payload(meta)
+
         # Fallback: use local checkpoint manager if metadata is local and no URL present
         if not payload and meta and meta.get("source") == "local" and self.checkpoint_manager:
             try:
@@ -195,17 +225,54 @@ class CheckpointSyncManager:
                     extra={"error_type": type(e).__name__, "error": str(e)}
                 )
                 payload = None
+
         # Fallback: request from peers if nothing was obtained
         if not payload:
             payload = self.request_checkpoint_from_peers()
+
         if not payload:
+            self._reset_progress()
             return False
+
+        # Update to verification stage
+        self._update_progress({
+            "stage": "verifying",
+            "download_percentage": 100.0,
+        })
+
         if not self._validate_payload_signature(payload.to_dict()):
+            self._reset_progress()
             return False
+
+        self._update_progress({"verification_percentage": 50.0})
+
         if not self._validate_work(payload.to_dict()):
+            self._reset_progress()
             return False
+
+        self._update_progress({"verification_percentage": 100.0})
+
         self._log_provenance(payload, payload.to_dict(), source=meta.get("source") if meta else "unknown")
-        return self.apply_payload(payload, self.blockchain)
+
+        # Update to applying stage
+        self._update_progress({
+            "stage": "applying",
+            "application_percentage": 0.0,
+        })
+
+        result = self.apply_payload(payload, self.blockchain)
+
+        # Complete or reset progress
+        if result:
+            self._update_progress({
+                "stage": "completed",
+                "application_percentage": 100.0,
+                "estimated_completion": time.time(),
+            })
+        else:
+            self._reset_progress()
+
+        return result
 
     def request_checkpoint_from_peers(self) -> Optional[CheckpointPayload]:
         """
@@ -567,3 +634,247 @@ class CheckpointSyncManager:
             "started_at": None,
             "estimated_completion": None,
         }
+
+    def fetch_chunked_payload(
+        self,
+        snapshot_id: str,
+        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> Optional[CheckpointPayload]:
+        """
+        Fetch checkpoint payload using chunked download with resume support.
+
+        Designed for mobile/slow connections. Automatically resumes interrupted downloads.
+
+        Args:
+            snapshot_id: ID of snapshot to download
+            progress_callback: Optional callback for progress updates
+
+        Returns:
+            Reconstructed checkpoint payload or None if download fails
+        """
+        if not self.chunked_service:
+            import logging
+            logging.getLogger(__name__).error("Chunked sync not enabled")
+            return None
+
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Get snapshot metadata
+        metadata = self.chunked_service.get_snapshot_metadata(snapshot_id)
+        if not metadata:
+            logger.error("Snapshot metadata not found", extra={"snapshot_id": snapshot_id})
+            return None
+
+        logger.info(
+            "Starting chunked download",
+            extra={
+                "snapshot_id": snapshot_id,
+                "height": metadata.height,
+                "total_chunks": metadata.total_chunks,
+                "total_size_mb": metadata.total_size / 1_000_000,
+            }
+        )
+
+        # Check for existing progress
+        progress = self.chunked_service.get_sync_progress(snapshot_id)
+        if not progress:
+            progress = SyncProgress(
+                snapshot_id=snapshot_id,
+                total_chunks=metadata.total_chunks,
+            )
+        elif progress.is_complete:
+            logger.info("Sync already complete", extra={"snapshot_id": snapshot_id})
+        else:
+            logger.info(
+                "Resuming download",
+                extra={
+                    "snapshot_id": snapshot_id,
+                    "progress": f"{progress.progress_percent:.1f}%",
+                    "remaining": len(progress.remaining_chunks),
+                }
+            )
+
+        # Update progress tracking
+        self._update_progress({
+            "stage": "downloading",
+            "total_bytes": metadata.total_size,
+            "started_at": progress.started_at,
+        })
+
+        # Download chunks
+        chunks = []
+        for chunk_index in range(metadata.total_chunks):
+            # Skip already downloaded chunks
+            if chunk_index in progress.downloaded_chunks:
+                chunk = self.chunked_service.get_chunk(snapshot_id, chunk_index)
+                if chunk:
+                    chunks.append(chunk)
+                continue
+
+            # Download chunk
+            chunk = self._download_chunk(snapshot_id, chunk_index)
+            if not chunk:
+                progress.mark_failed(chunk_index)
+                logger.error(
+                    "Failed to download chunk",
+                    extra={
+                        "snapshot_id": snapshot_id,
+                        "chunk_index": chunk_index,
+                    }
+                )
+                # Save progress and return None to allow retry
+                self.chunked_service.save_sync_progress(progress)
+                return None
+
+            # Verify chunk checksum
+            if not chunk.verify_checksum():
+                progress.mark_failed(chunk_index)
+                logger.error(
+                    "Chunk checksum verification failed",
+                    extra={
+                        "snapshot_id": snapshot_id,
+                        "chunk_index": chunk_index,
+                    }
+                )
+                self.chunked_service.save_sync_progress(progress)
+                return None
+
+            # Mark as downloaded
+            progress.mark_downloaded(chunk_index)
+            chunks.append(chunk)
+
+            # Update progress
+            bytes_downloaded = sum(c.size_bytes for c in chunks)
+            self._update_progress({
+                "bytes_downloaded": bytes_downloaded,
+                "download_percentage": progress.progress_percent,
+            })
+
+            # Call progress callback
+            if progress_callback:
+                try:
+                    progress_callback({
+                        "snapshot_id": snapshot_id,
+                        "progress_percent": progress.progress_percent,
+                        "chunks_downloaded": len(progress.downloaded_chunks),
+                        "total_chunks": metadata.total_chunks,
+                    })
+                except (ValueError, TypeError, RuntimeError, OSError, IOError) as e:
+                    logger.debug(
+                        "Progress callback failed",
+                        extra={"error_type": type(e).__name__, "error": str(e)}
+                    )
+
+            # Save progress periodically
+            if chunk_index % 10 == 0:
+                self.chunked_service.save_sync_progress(progress)
+
+        # Save final progress
+        self.chunked_service.save_sync_progress(progress)
+
+        # Verify and reconstruct payload
+        self._update_progress({"stage": "verifying"})
+        success, payload = self.chunked_service.verify_and_apply_chunks(
+            chunks,
+            metadata.state_hash,
+        )
+
+        if not success or not payload:
+            logger.error("Failed to verify and reconstruct payload", extra={"snapshot_id": snapshot_id})
+            return None
+
+        # Cleanup progress file
+        self.chunked_service.delete_progress(snapshot_id)
+
+        logger.info(
+            "Chunked download complete",
+            extra={
+                "snapshot_id": snapshot_id,
+                "height": payload.height,
+            }
+        )
+
+        return payload
+
+    def _download_chunk(self, snapshot_id: str, chunk_index: int) -> Optional['SyncChunk']:
+        """
+        Download a single chunk from local storage or remote peer.
+
+        Args:
+            snapshot_id: ID of snapshot
+            chunk_index: Index of chunk to download
+
+        Returns:
+            Downloaded chunk or None if failed
+        """
+        # Try local storage first
+        if self.chunked_service:
+            chunk = self.chunked_service.get_chunk(snapshot_id, chunk_index)
+            if chunk:
+                return chunk
+
+        # TODO: Implement remote chunk download via P2P
+        # For now, only support local chunks
+        return None
+
+    def create_chunked_snapshot(
+        self,
+        height: int,
+        payload: CheckpointPayload,
+    ) -> Optional[str]:
+        """
+        Create a chunked snapshot from a checkpoint payload.
+
+        Args:
+            height: Block height
+            payload: Checkpoint payload to chunk
+
+        Returns:
+            Snapshot ID or None if failed
+        """
+        if not self.chunked_service:
+            import logging
+            logging.getLogger(__name__).error("Chunked sync not enabled")
+            return None
+
+        try:
+            metadata, chunks = self.chunked_service.create_state_snapshot_chunks(
+                height=height,
+                payload=payload,
+            )
+            return metadata.snapshot_id
+        except (ValueError, KeyError, OSError, IOError, RuntimeError) as e:
+            import logging
+            logging.getLogger(__name__).error(
+                "Failed to create chunked snapshot",
+                extra={
+                    "height": height,
+                    "error": str(e),
+                    "error_type": type(e).__name__,
+                }
+            )
+            return None
+
+    def list_available_snapshots(self) -> List[Dict[str, Any]]:
+        """
+        List all available chunked snapshots.
+
+        Returns:
+            List of snapshot metadata dictionaries
+        """
+        if not self.chunked_service:
+            return []
+
+        snapshots = []
+        for snapshot_dir in self.chunked_service.snapshots_dir.iterdir():
+            if not snapshot_dir.is_dir():
+                continue
+
+            metadata = self.chunked_service.get_snapshot_metadata(snapshot_dir.name)
+            if metadata:
+                snapshots.append(metadata.to_dict())
+
+        # Sort by height descending
+        snapshots.sort(key=lambda s: s.get("height", 0), reverse=True)
+        return snapshots
