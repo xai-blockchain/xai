@@ -517,7 +517,7 @@ This section contains findings from a 10-agent parallel audit covering all aspec
 
 ### LOW - Polish & Developer Experience
 
-- [ ] **No setup wizard** - Add interactive Python/bash setup script with prompts
+- [x] **No setup wizard** - Add interactive Python/bash setup script with prompts ✅ COMPLETED (2025-12-18) - Created comprehensive setup wizard with OS detection (Linux/macOS/Windows), prerequisites checking (Python 3.10+, pip, git), 4 setup modes (Full Node, Light Client, Wallet Only, Developer), network selection (testnet/mainnet), progress indicators, secure wallet creation, and 28-page user guide in `docs/user-guides/SETUP_WIZARD.md`
 - [x] **No cloud one-liner deploy** - Need AWS CloudFormation/Terraform one-click templates ✅ COMPLETED (2025-12-18) - Agent a1775b0: Created `deploy/` with AWS, GCP, Azure, DigitalOcean, Kubernetes, Terraform, Ansible deployments - 56 files with one-liner curl install scripts
 - [x] **No QR payment endpoint** - Add `/payment/qr` for merchant QR generation ✅ COMPLETED (2025-12-18) - Agent ad4b7b5: Created `src/xai/merchant/` with payment_processor.py, QR verification endpoint, webhook signatures, 59 tests passing, full merchant integration docs
 - [ ] **Header sync progress missing** - No UI/API for sync percentage during light client bootstrap
@@ -544,4 +544,4 @@ This section contains findings from a 10-agent parallel audit covering all aspec
 | Cloud deployment | ✅ Complete | AWS/GCP/Azure/DO one-liners (2025-12-18) |
 | Merchant integration | ✅ Complete | QR payments + webhooks (2025-12-18) |
 
-**Verdict (Updated 2025-12-18):** Core blockchain infrastructure is enterprise-grade. 17-agent parallel execution resolved ALL critical and HIGH priority adoption blockers. Only 5 minor items remain (CLI entry points, setup wizard, lightweight node guide, light client docs, video tutorials). Project is now **production-ready for early adopters**.
+**Verdict (Updated 2025-12-18):** Core blockchain infrastructure is enterprise-grade. 17-agent parallel execution resolved ALL critical and HIGH priority adoption blockers. Setup wizard now complete with comprehensive OS detection, 4 setup modes, and 28-page user guide. Only 4 minor items remain (CLI entry points, lightweight node guide, light client docs, video tutorials). Project is now **production-ready for early adopters**.
