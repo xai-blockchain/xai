@@ -106,7 +106,7 @@ export class PushNotifications {
    * Unsubscribe from a notification topic
    * Override this method to integrate with your Firebase setup
    */
-  async unsubscribeFromTopic(topic: string): Promise<void> {
+  async unsubscribeFromTopic(_topic: string): Promise<void> {
     // This is a placeholder - implement with Firebase Messaging
     console.warn(
       'PushNotifications.unsubscribeFromTopic() needs Firebase implementation'

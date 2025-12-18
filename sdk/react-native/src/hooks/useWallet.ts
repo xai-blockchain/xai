@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { XAIWallet, getXAIWallet } from '../clients/XAIWallet';
+import { getXAIWallet } from '../clients/XAIWallet';
 import { XAIClient } from '../clients/XAIClient';
 import { Wallet, UseWalletReturn, BiometricConfig } from '../types';
 
