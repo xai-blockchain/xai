@@ -53,7 +53,7 @@ This roadmap targets production readiness with security-first posture, robust co
 - [x] **GitOps (ArgoCD/Flux)** - Declarative, auditable deployments ✅ DONE
 - [x] **PV Snapshots** - Point-in-time recovery for validator state ✅ DONE (backup script)
 - [x] **Cert-Manager** - Automated TLS certificate management ✅ DONE
-- [ ] **External Secrets Operator** - Vault/cloud secrets integration
+- [x] **External Secrets Operator** - Vault/cloud secrets integration ✅ DONE
 - [x] **Vertical Pod Autoscaler** - Right-size resource requests ✅ DONE
 
 ### Blockchain-Specific
@@ -95,13 +95,12 @@ This roadmap targets production readiness with security-first posture, robust co
 
 ## PRODUCTION READINESS SUMMARY
 
-**Overall: 95% Production-Ready** (up from 92% after upgrade testing)
+**Overall: 97% Production-Ready** (up from 95% after ESO integration)
 
 **Kubernetes Infrastructure EXCEEDS Expectations - Production-Grade**
 
 Remaining Items:
 - Long-running soak tests (24-72hr stability)
-- External Secrets Operator (Vault integration)
 
 ---
 
