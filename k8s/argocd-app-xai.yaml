@@ -19,7 +19,7 @@ spec:
   source:
     # Update this URL to match your repo access method
     # For private repos: configure credentials in ArgoCD settings
-    repoURL: https://github.com/decristofaroj/xai.git
+    repoURL: git@github.com:xai-blockchain/xai.git
     targetRevision: main
     path: k8s
   destination:
