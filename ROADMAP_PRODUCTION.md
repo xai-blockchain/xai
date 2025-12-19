@@ -34,7 +34,7 @@ This roadmap targets production readiness with security-first posture, robust co
 
 - [x] **Network Partition Testing** - Jepsen-style split-brain consensus validation ✅ DONE
 - [x] **Byzantine Fault Injection** - Simulate malicious/faulty validator behavior ✅ DONE
-- [ ] **Long-Running Soak Tests** - 24-72 hour stability tests for memory leaks
+- [ ] **Long-Running Soak Tests** - 24-72 hour stability tests for memory leaks ⏳ IN PROGRESS (ends 2025-12-20 ~02:11 UTC)
 - [x] **Backup/Restore Testing** - Validate disaster recovery procedures ✅ DONE
 - [x] **State Sync Testing** - New validators joining from snapshot ✅ DONE
 - [x] **Upgrade Migration Testing** - Chain upgrades without network halt ✅ DONE
