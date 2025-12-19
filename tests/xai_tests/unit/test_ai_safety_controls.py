@@ -503,3 +503,19 @@ class TestAISafetyControls:
 
         denied = safety.enforce_sandbox_action("sb_import", "import", {"module": "os"})
         assert denied["success"] is False
+
+    def test_sandbox_import_attachment_guard(self, safety, tmp_path):
+        """Imports allowlisted by sandbox but not by attachment guard should be blocked."""
+        limits = {
+            "max_memory_mb": 100,
+            "max_cpu_percent": 100,
+            "max_execution_time_seconds": 3600,
+            "max_network_requests": 100,
+            "allowed_imports": ["json", "os"],  # os should be rejected by guard
+            "blocked_operations": [],
+        }
+        safety.create_ai_sandbox("sb_guard", limits)
+
+        denied = safety.enforce_sandbox_action("sb_guard", "import", {"module": "os"})
+        assert denied["success"] is False
+        assert safety.sandboxes["sb_guard"]["is_active"] is False

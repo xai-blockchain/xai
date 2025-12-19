@@ -21,11 +21,14 @@ import resource
 import signal
 import subprocess
 import sys
+import sysconfig
 import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
+
+from xai.security.module_attachment_guard import ModuleAttachmentError, ModuleAttachmentGuard
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +123,14 @@ class SecureExecutor:
         # Check if seccomp is available (Linux only)
         self.has_seccomp = sys.platform.startswith('linux')
 
+        stdlib_path = Path(sysconfig.get_paths()["stdlib"]).resolve()
+        self.module_guard = ModuleAttachmentGuard(
+            self.SAFE_MODULES,
+            trusted_base=None,
+            trusted_stdlib=stdlib_path,
+            require_attribute=None,
+        )
+
     def execute(self, context: ExecutionContext) -> ExecutionResult:
         """
         Execute code in secure environment
@@ -182,6 +193,11 @@ class SecureExecutor:
                     error=f"Compilation errors: {'; '.join(byte_code.errors)}"
                 )
 
+            try:
+                allowed_imports = self._validate_allowed_imports(context.allowed_imports)
+            except SecurityViolation as exc:
+                return ExecutionResult(success=False, error=str(exc))
+
             # Create restricted globals
             restricted_globals = {
                 '__builtins__': self._create_safe_builtins(),
@@ -196,11 +212,14 @@ class SecureExecutor:
                 restricted_globals['api'] = context.api_functions
 
             # Add allowed imports
-            for module_name in context.allowed_imports & self.SAFE_MODULES:
+            for module_name in allowed_imports:
                 try:
                     restricted_globals[module_name] = __import__(module_name)
                 except ImportError:
-                    pass
+                    return ExecutionResult(
+                        success=False,
+                        error=f"Module {module_name} not found."
+                    )
 
             # Capture stdout/stderr
             old_stdout = sys.stdout
@@ -262,6 +281,26 @@ class SecureExecutor:
                 error=f"Execution error: {str(e)}",
             )
 
+    def _validate_allowed_imports(self, allowed_imports: Set[str]) -> Set[str]:
+        """Validate user-supplied allowed imports against the allowlist and trusted paths."""
+        requested = {str(mod) for mod in (allowed_imports or set())}
+        if not requested:
+            return set()
+
+        disallowed = requested - self.SAFE_MODULES
+        if disallowed:
+            raise SecurityViolation(f"Requested imports not allowlisted: {sorted(disallowed)}")
+
+        for module_name in requested:
+            try:
+                self.module_guard.verify_module(module_name)
+            except ModuleAttachmentError as exc:
+                raise SecurityViolation(
+                    f"Module {module_name} failed attachment validation: {exc}"
+                ) from exc
+
+        return requested
+
     def _execute_subprocess(self, context: ExecutionContext) -> ExecutionResult:
         """
         Execute code in isolated subprocess
@@ -274,12 +313,17 @@ class SecureExecutor:
         - Read-only filesystem (by default)
         """
         # Create temporary directory for execution
+        try:
+            allowed_imports = self._validate_allowed_imports(context.allowed_imports)
+        except SecurityViolation as exc:
+            return ExecutionResult(success=False, error=str(exc))
+
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
             # Write code to file
             code_file = temp_path / "code.py"
-            code_file.write_text(self._wrap_code_for_subprocess(context))
+            code_file.write_text(self._wrap_code_for_subprocess(context, allowed_imports))
 
             # Write API wrapper if needed
             if context.api_functions:
@@ -342,14 +386,27 @@ class SecureExecutor:
                     error=f"Subprocess execution failed: {str(e)}",
                 )
 
-    def _wrap_code_for_subprocess(self, context: ExecutionContext) -> str:
+    def _wrap_code_for_subprocess(self, context: ExecutionContext, allowed_imports: Set[str]) -> str:
         """Wrap user code with safety checks and API stubs"""
+        runtime_allowed = set(allowed_imports) | {"sys", "json"}
         wrapper = f'''
 import sys
 import json
 
 # Resource monitoring
 import resource
+import builtins
+
+_ALLOWED_IMPORTS = {sorted(runtime_allowed)!r}
+_REAL_IMPORT = builtins.__import__
+
+def _guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
+    root = name.split('.')[0]
+    if root not in _ALLOWED_IMPORTS:
+        raise ImportError(f"Import '{{name}}' not permitted in sandbox")
+    return _REAL_IMPORT(name, globals, locals, fromlist, level)
+
+builtins.__import__ = _guarded_import
 
 # Set strict limits
 resource.setrlimit(resource.RLIMIT_AS, ({self.limits.max_memory_mb * 1024 * 1024}, {self.limits.max_memory_mb * 1024 * 1024}))

@@ -340,12 +340,37 @@ def _load_genesis_file(override_path: Optional[Path]) -> Tuple[Dict[str, Any], P
 
     for candidate in candidate_paths:
         if candidate.exists():
+            _validate_genesis_path(candidate)
             with candidate.open("r", encoding="utf-8") as handle:
                 return json.load(handle), candidate
 
     raise click.ClickException(
         "Unable to locate genesis.json. Provide --genesis-path or set XAI_GENESIS_PATH."
     )
+
+
+def _validate_genesis_path(path: Path) -> None:
+    """Ensure genesis path is not world-writable and lives in a trusted location."""
+    if path.is_symlink():
+        raise click.ClickException(f"Genesis file must not be a symlink: {path}")
+    resolved = path.resolve()
+    try:
+        mode = resolved.stat().st_mode
+    except OSError as exc:
+        raise click.ClickException(f"Unable to read genesis path '{resolved}': {exc}") from exc
+
+    if mode & 0o002:
+        raise click.ClickException(f"Genesis file is world-writable: {resolved}")
+
+    repo_root = Path(__file__).resolve().parents[2]
+    if repo_root not in resolved.parents and "site-packages" not in str(resolved):
+        parent = resolved.parent
+        try:
+            parent_mode = parent.stat().st_mode
+        except OSError as exc:
+            raise click.ClickException(f"Genesis path parent unreadable: {parent}: {exc}") from exc
+        if parent_mode & 0o002:
+            raise click.ClickException(f"Genesis path parent is world-writable: {parent}")
 
 
 def _compute_genesis_hash(genesis_data: Dict[str, Any]) -> Tuple[str, str]:

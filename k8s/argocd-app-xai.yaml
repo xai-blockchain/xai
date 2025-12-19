@@ -26,7 +26,8 @@ spec:
     server: https://kubernetes.default.svc
     namespace: xai-staging
   syncPolicy:
-    # Manual sync - set automated after repo access is configured
+    automated:
+      prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - PruneLast=true

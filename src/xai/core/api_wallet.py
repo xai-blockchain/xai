@@ -24,6 +24,7 @@ from xai.core.security_validation import ValidationError
 from xai.core.wallet import Wallet
 
 logger = logging.getLogger(__name__)
+ATTACHMENT_SAFE = True
 
 trade_orders_counter = Counter("xai_trade_orders_total", "Total trade orders submitted")
 trade_matches_counter = Counter("xai_trade_matches_total", "Total trade matches created")

@@ -386,6 +386,39 @@ result = json.dumps({'test': 123})
         if executor.has_restricted_python:
             assert result.success
 
+    def test_disallowed_allowed_imports_rejected(self):
+        """Non-allowlisted imports should fail validation."""
+        executor = SecureExecutor(use_subprocess=False)
+
+        context = ExecutionContext(
+            app_id="test_app",
+            code="import os\n",
+            allowed_imports={"os"},
+        )
+
+        result = executor.execute(context)
+
+        if executor.has_restricted_python:
+            assert not result.success
+            assert "allowlisted" in result.error or "attachment" in result.error.lower()
+
+    def test_subprocess_import_guard_blocks_os(self):
+        """Subprocess execution should reject imports outside allowed list."""
+        executor = SecureExecutor(use_subprocess=True)
+
+        code = """
+import os
+"""
+        context = ExecutionContext(
+            app_id="test_app",
+            code=code,
+            allowed_imports={"json"},  # os should be blocked
+        )
+
+        result = executor.execute(context)
+        assert result.success is False
+        assert "not permitted" in result.error or "allowlisted" in result.error
+
     def test_entry_point_execution(self):
         """Entry point function should be called"""
         executor = SecureExecutor(use_subprocess=False)

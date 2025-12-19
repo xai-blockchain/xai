@@ -16,6 +16,7 @@ from flask import Flask, jsonify, request
 from xai.core.security_validation import ValidationError
 
 logger = logging.getLogger(__name__)
+ATTACHMENT_SAFE = True
 
 
 class GovernanceAPIHandler:

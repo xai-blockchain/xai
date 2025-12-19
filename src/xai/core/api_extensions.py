@@ -26,8 +26,30 @@ from xai.core.api_governance import GovernanceAPIHandler
 from xai.core.api_wallet import WalletAPIHandler
 from xai.core.api_ai import AIAPIHandler
 from xai.core.api_websocket import WebSocketAPIHandler
+from xai.security.module_attachment_guard import ModuleAttachmentError, ModuleAttachmentGuard
 
 logger = logging.getLogger(__name__)
+ATTACHMENT_SAFE = True
+
+_ALLOWED_EXTENSION_MODULES = {
+    "xai.core.api_mining",
+    "xai.core.api_governance",
+    "xai.core.api_wallet",
+    "xai.core.api_ai",
+    "xai.core.api_websocket",
+}
+_extension_guard = ModuleAttachmentGuard(_ALLOWED_EXTENSION_MODULES, require_attribute="ATTACHMENT_SAFE")
+
+# Validate extension modules at import time to fail fast if tampered/shadowed
+try:
+    _extension_guard.require_all()
+except ModuleAttachmentError as exc:  # pragma: no cover - defensive startup guard
+    logger.critical(
+        "API extension module validation failed: %s",
+        exc,
+        extra={"event": "api.extensions.validation_failed"}
+    )
+    raise
 
 
 class APIExtensions:

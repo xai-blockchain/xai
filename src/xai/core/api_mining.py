@@ -17,6 +17,7 @@ from prometheus_client import Gauge
 logger = logging.getLogger(__name__)
 
 miner_active_gauge = Gauge("xai_miner_active_count", "Number of miners currently running")
+ATTACHMENT_SAFE = True
 
 
 class MiningAPIHandler:

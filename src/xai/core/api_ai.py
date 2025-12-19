@@ -19,6 +19,7 @@ from flask import Flask, jsonify, request, Response, stream_with_context
 from xai.core.security_validation import ValidationError
 
 logger = logging.getLogger(__name__)
+ATTACHMENT_SAFE = True
 
 
 class AIAPIHandler:

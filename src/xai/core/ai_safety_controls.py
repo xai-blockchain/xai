@@ -22,6 +22,9 @@ from typing import Dict, List, Optional, Set, Any, Iterable, Tuple
 from enum import Enum
 import logging
 
+from xai.security.module_attachment_guard import ModuleAttachmentError, ModuleAttachmentGuard
+from xai.sandbox.secure_executor import SecureExecutor
+
 logger = logging.getLogger(__name__)
 
 
@@ -457,6 +460,11 @@ class AISafetyControls:
 
         # Global safety level
         self.safety_level: AISafetyLevel = AISafetyLevel.NORMAL
+        self._sandbox_module_guard = ModuleAttachmentGuard(
+            set(SecureExecutor.SAFE_MODULES) | {"time"},
+            trusted_base=Path(__file__).resolve().parents[2],
+            require_attribute=None,
+        )
 
         # Active operations tracking
         self.personal_ai_requests: Dict[str, Dict[str, Any]] = {}  # request_id -> request info
@@ -1381,10 +1389,19 @@ class AISafetyControls:
             if normalized_action == "import":
                 allowed = {imp.lower() for imp in limits.get("allowed_imports", [])}
                 module = (metadata or {}).get("module", "")
-                if allowed and module.lower() not in allowed:
+                module_normalized = module.lower()
+                if allowed and module_normalized not in allowed:
                     violation = self._register_sandbox_violation(
                         sandbox,
                         f"Import '{module}' is not permitted in sandbox",
+                    )
+                    return {"success": False, "violations": [violation]}
+                try:
+                    self._sandbox_module_guard.verify_module(module_normalized)
+                except ModuleAttachmentError as exc:
+                    violation = self._register_sandbox_violation(
+                        sandbox,
+                        f"Import '{module}' failed attachment validation: {exc}",
                     )
                     return {"success": False, "violations": [violation]}
 

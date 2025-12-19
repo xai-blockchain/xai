@@ -20,6 +20,12 @@
 - Added offline monitoring lint (`scripts/ci/lint_monitoring_assets.py`) to verify P2P/fast-mining signals and prometheus datasource wiring before rollout.
 - Provisioned the local Kind cluster (`kind-xai-monitoring-dev`), documented the workflow (`k8s/kind/README.md`), ran `./k8s/apply-monitoring-overlays.sh xai-blockchain` + `verify-monitoring-overlays.sh`, and updated the verifier to tolerate whitespace/escaped characters so the fast-mining + P2P checks pass cleanly.
 - Added `scripts/ci/kind_monitoring_smoke.sh` to automatically create the Kind cluster, apply overlays, publish a mock SIEM webhook ConfigMap, and run the verification (with SIEM probe) end-to-end.
+- Hardened module attachment points with a centralized allowlisted guard, path/attribute validation, and unit coverage for API extension loader + sandbox allowed imports.
+- Added CLI genesis loader guardrails to reject world-writable genesis files and parents; targeted unit tests passing without impacting the ongoing soak.
+- Extended module guard defenses to block symlinked modules and world-writable parent directories; targeted guard tests pass without affecting the soak run.
+- Added symlink rejection to the CLI genesis loader; targeted tests cover world-writable and symlink paths without disturbing the soak.
+- Expanded `.env.example` with explicit `XAI_GENESIS_PATH` guidance and safety notes to support safe configuration during onboarding.
+- Authored `docs/mobile_quickstart.md` text guide for Android/iOS emulator setup and basic checks while video remains pending.
 ## Outstanding / Next Up
 0) ✅ `python3 scripts/ci/lint_monitoring_assets.py` executed locally (2025-11-30) and the guard returned `[OK] Monitoring assets lint passed (Alertmanager/Prometheus/Grafana)`, so overlays contain the P2P/fast-mining signals before rollout.
 1) [BLOCKED] Run `./k8s/apply-monitoring-overlays.sh <namespace>` on staging/prod and confirm `/api/v2/alerts` + SIEM webhook logs show `config.fast_mining_*` and `p2p.*` alerts after triggering probes.

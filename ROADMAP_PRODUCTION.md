@@ -88,8 +88,9 @@ This roadmap targets production readiness with security-first posture, robust co
 ### Remaining Tasks
 
 - [ ] **No mobile app** - Infrastructure exists (mobile/), but no actual iOS/Android app
-- [ ] **.env.example too minimal** - Only 25 lines; expand to include all options with comments
+- [x] **.env.example too minimal** - Expanded with comprehensive options and genesis path safety notes
 - [ ] **No mobile quickstart video** - Visual guides aid adoption
+  - Progress 2025-12-20: Added `docs/mobile_quickstart.md` text guide; video still pending
 
 ---
 
@@ -101,6 +102,27 @@ This roadmap targets production readiness with security-first posture, robust co
 
 Remaining Items:
 - Long-running soak tests (24-72hr stability)
+
+---
+
+## MODULE ATTACHMENT SECURITY HARDENING (Priority 12)
+
+- [x] Inventory every module attachment point (API extensions, sandbox/mini-app execution, governance/AI loaders) and map ingress paths for untrusted modules.
+- [x] Add a centralized attachment guard (allowlist + path/attribute validation + tamper detection) covering all extension points.
+- [x] Enforce the guard at attachment call sites (API extension loader, sandbox allowed imports, governance/AI module hooks) with structured security logging.
+- [x] Add unit/defense-in-depth tests proving untrusted modules are blocked and trusted modules remain functional; document the hardening outcome.
+  - **Progress 2025-12-20 02:30Z:** Guard enforced in API extension loader and sandbox/AI safety import paths; targeted unit tests passing without touching soak environment.
+  - **Progress 2025-12-20 03:00Z:** Subprocess sandbox path now import-guarded with the centralized allowlist; new targeted subprocess test green without affecting soak.
+  - **Progress 2025-12-20 03:20Z:** Restricted-python path now returns explicit security violations for disallowed imports; targeted guard tests remain green without impacting soak.
+  - **Progress 2025-12-20 03:35Z:** Module guard now explicitly rejects world-writable modules; targeted guard test added without touching soak.
+  - **Progress 2025-12-20 03:50Z:** Genesis loader now rejects world-writable genesis files; targeted CLI genesis safeguard test passes without disturbing soak.
+  - **Progress 2025-12-20 04:05Z:** Added guard to reject world-writable genesis parent directories; targeted CLI test passes without impacting soak.
+  - **Progress 2025-12-20 04:20Z:** Module attachment guard now rejects symlinked modules; targeted guard test green without affecting soak.
+  - **Progress 2025-12-20 04:35Z:** Guard now rejects modules under world-writable parent directories; targeted test passes while soak runs.
+  - **Progress 2025-12-20 04:50Z:** Module attachment hardening plan complete; awaiting post-soak full security/sandbox/CLI suite to validate end-to-end.
+  - **Progress 2025-12-20 05:05Z:** Genesis loader now rejects symlinked genesis paths; targeted CLI tests all passing without disturbing soak.
+  - **Progress 2025-12-20 05:20Z:** Added stdlib allowlist sanity test for module guard to ensure trusted stdlib modules remain attachable; targeted test green with soak unaffected.
+  - **Pending post-soak validation:** Run `pytest tests/xai_tests/unit/test_sandbox_security.py tests/xai_tests/unit/test_ai_safety_controls.py tests/xai_tests/unit/test_enhanced_cli_genesis.py` and `pytest -m security` to reconfirm end-to-end attachment protections once soak ends.
 
 ---
 

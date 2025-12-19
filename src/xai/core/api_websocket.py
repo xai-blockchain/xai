@@ -22,6 +22,7 @@ from xai.core.api_auth import APIAuthManager
 from xai.core.security_validation import log_security_event
 
 logger = logging.getLogger(__name__)
+ATTACHMENT_SAFE = True
 
 
 class WebSocketLimiter:
