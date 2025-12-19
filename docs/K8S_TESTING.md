@@ -222,6 +222,8 @@ Kubeconfig per project: `source env.sh` sets KUBECONFIG automatically.
 | Linkerd | ✅ Installed | mTLS enabled for xai namespace |
 | cert-manager | ✅ Installed | ClusterIssuers: selfsigned-issuer, ca-issuer |
 | VPA | ✅ Installed | Recommender active, xai-validator-vpa created |
+| Vault | ✅ Installed | http://vault.vault.svc:8200 (dev mode) |
+| ESO | ✅ Installed | Syncs secrets from Vault → K8s |
 
 ## Summary
 

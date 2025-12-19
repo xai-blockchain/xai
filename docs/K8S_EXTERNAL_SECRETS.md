@@ -41,7 +41,11 @@ kubectl get secret xai-secrets-from-vault -n xai -o yaml
 | ESO installation | ✅ PASS |
 | ClusterSecretStore creation | ✅ PASS |
 | ExternalSecret sync | ✅ PASS |
-| Secret values verified | ✅ PASS |
+| Secret rotation & auto-sync | ✅ PASS |
+| Secret versioning & rollback | ✅ PASS |
+| Policy enforcement (read-only) | ✅ PASS |
+| Audit logging | ✅ PASS |
+| XAI pod integration | ✅ PASS |
 
 ## Production Notes
 - Dev mode Vault uses in-memory storage (data lost on restart)
