@@ -4,7 +4,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: xai-blockchain-hpa
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
     component: autoscaling
@@ -83,7 +83,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: xai-blockchain-monitor
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
     component: monitoring
@@ -114,7 +114,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
   name: xai-blockchain-alerts
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
     component: alerting
@@ -247,7 +247,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
   name: xai-blockchain-recording-rules
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
     component: metrics

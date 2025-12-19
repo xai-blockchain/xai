@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: xai-blockchain-config
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
     component: config
@@ -155,7 +155,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: xai-blockchain-trust
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
     component: trust

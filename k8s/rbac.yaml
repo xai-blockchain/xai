@@ -4,7 +4,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: xai-blockchain-sa
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
 
@@ -14,7 +14,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: xai-blockchain-role
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
 rules:
@@ -121,7 +121,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: xai-blockchain-rolebinding
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
 roleRef:
@@ -131,7 +131,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: xai-blockchain-sa
-    namespace: xai-blockchain
+    namespace: xai-staging
 
 ---
 # ClusterRoleBinding for cluster access
@@ -148,7 +148,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: xai-blockchain-sa
-    namespace: xai-blockchain
+    namespace: xai-staging
 
 ---
 # PodSecurityPolicy (Kubernetes < 1.25)
@@ -193,7 +193,7 @@ apiVersion: policy/v1alpha1
 kind: PodSecurityStandard
 metadata:
   name: xai-blockchain-pss
-  namespace: xai-blockchain
+  namespace: xai-staging
 spec:
   enforce: "baseline"
   audit: "restricted"
@@ -207,7 +207,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: xai-blockchain-allow-ingress
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
 spec:
@@ -234,7 +234,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: xai-blockchain-allow-p2p
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
 spec:
@@ -259,7 +259,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: xai-blockchain-allow-egress
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
 spec:
@@ -303,7 +303,7 @@ apiVersion: v1
 kind: ResourceQuota
 metadata:
   name: xai-blockchain-quota
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
 spec:
@@ -327,7 +327,7 @@ apiVersion: v1
 kind: LimitRange
 metadata:
   name: xai-blockchain-limits
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
 spec:

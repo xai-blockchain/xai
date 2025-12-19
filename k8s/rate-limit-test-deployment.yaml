@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: nginx-rate-limit-config
-  namespace: xai
+  namespace: xai-staging
 data:
   nginx.conf: |
     # Rate limiting configuration
@@ -12,7 +12,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: rate-limit-test
-  namespace: xai
+  namespace: xai-staging
   labels:
     app: rate-limit-test
 spec:
@@ -93,7 +93,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: rate-limit-test-service
-  namespace: xai
+  namespace: xai-staging
 spec:
   selector:
     app: rate-limit-test
@@ -107,7 +107,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: rate-limit-test-ingress
-  namespace: xai
+  namespace: xai-staging
   annotations:
     nginx.ingress.kubernetes.io/limit-rps: "10"
     nginx.ingress.kubernetes.io/limit-connections: "5"

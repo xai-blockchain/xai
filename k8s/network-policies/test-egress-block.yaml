@@ -4,7 +4,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: netpol-test
-  namespace: xai
+  namespace: xai-staging
   labels:
     app: netpol-test
 spec:

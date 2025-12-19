@@ -2,7 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: xai-blockchain-p2p-restrict-prod
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
 spec:

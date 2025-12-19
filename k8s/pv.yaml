@@ -104,7 +104,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: xai-blockchain-data-0
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
     ordinal: "0"
@@ -124,7 +124,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: xai-blockchain-data-1
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
     ordinal: "1"
@@ -144,7 +144,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: xai-blockchain-data-2
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
     ordinal: "2"

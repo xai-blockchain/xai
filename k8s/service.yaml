@@ -4,7 +4,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: xai-blockchain-headless
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
     component: node
@@ -39,7 +39,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: xai-blockchain-p2p
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
     component: p2p
@@ -66,7 +66,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: xai-blockchain-rpc
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
     component: rpc
@@ -93,7 +93,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: xai-blockchain-rpc-public
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
     component: rpc-public
@@ -120,7 +120,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: xai-blockchain-ws
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
     component: ws
@@ -147,7 +147,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: xai-blockchain-ws-public
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
     component: ws-public
@@ -174,7 +174,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: xai-blockchain-metrics
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
     component: metrics
@@ -199,7 +199,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: xai-blockchain-bootstrap
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
     component: bootstrap

@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: validator-keys-rotated
-  namespace: xai
+  namespace: xai-staging
 type: Opaque
 data:
   # Rotated validator key (base64 encoded)

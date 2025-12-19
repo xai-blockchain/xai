@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: xai-blockchain-node
-  namespace: xai-blockchain
+  namespace: xai-staging
   labels:
     app: xai-blockchain
     component: node
