@@ -372,7 +372,7 @@ def register_sync_routes(node_api: 'NodeAPI') -> None:
             return jsonify({"error": "Internal server error"}), 500
 
     @node_api.app.route("/api/v1/sync/progress", methods=["GET"])
-    def get_sync_progress() -> Tuple[Dict[str, Any], int]:
+    def get_sync_progress_v1() -> Tuple[Dict[str, Any], int]:
         """
         Get current sync progress for the client.
 

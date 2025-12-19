@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: xai
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - statefulset.yaml
+  - services.yaml
+
+commonLabels:
+  app: xai-node
+  env: testnet

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: xai-config
+data:
+  XAI_ENV: "production"
+  XAI_DATA_DIR: "/data"
+  XAI_LOG_DIR: "/data/logs"
+  XAI_API_PORT: "8080"
+  XAI_NODE_PORT: "26656"
+  XAI_NETWORK_TYPE: "testnet"
+  XAI_ALLOW_EMPTY_MINING: "true"
+  XAI_MINING_HEARTBEAT_SECONDS: "10"
+  XAI_DEFAULT_HOST: "0.0.0.0"
+  LOG_LEVEL: "info"

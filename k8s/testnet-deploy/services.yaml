@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: xai-headless
+spec:
+  clusterIP: None
+  selector:
+    app: xai-node
+  ports:
+    - name: p2p
+      port: 26656
+      targetPort: 26656
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xai-rpc
+spec:
+  type: ClusterIP
+  selector:
+    app: xai-node
+  ports:
+    - name: rpc
+      port: 8080
+      targetPort: 8080
+      protocol: TCP

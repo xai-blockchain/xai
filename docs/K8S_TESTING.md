@@ -238,4 +238,5 @@ Kubeconfig per project: `source env.sh` sets KUBECONFIG automatically.
 **GitOps**: ArgoCD for declarative deployments
 **Autoscaling**: VPA recommender for resource right-sizing
 **Certificates**: cert-manager for automated TLS
+**Upgrade Testing**: Rolling upgrades without network halt verified
 **Status**: EXCEEDS expectations - Ready for XAI testnet deployment

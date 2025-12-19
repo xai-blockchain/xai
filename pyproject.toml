@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "xai-blockchain"
-version = "0.1.0"
+version = "0.2.0"
 description = "XAI - AI-Enhanced Blockchain Platform"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -60,6 +60,10 @@ dependencies = [
     "gmpy2>=2.2.0",
     "click>=8.1.0", # For enhanced CLI
     "rich>=13.7.0", # For beautiful terminal output
+    "aiohttp>=3.9.0", # For async HTTP in push notifications
+    "rlp>=4.0.0", # For EVM RLP encoding
+    "web3>=6.0.0", # For Web3/EVM interactions
+    "eth-account>=0.11.0", # For Ethereum account management
 ]
 
 [project.optional-dependencies]
@@ -264,7 +268,7 @@ skips = ["B101", "B601"]
 # Commitizen configuration
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.1.0"
+version = "0.2.0"
 tag_format = "v$version"
 update_changelog_on_bump = true
 version_files = [
