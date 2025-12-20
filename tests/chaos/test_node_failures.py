@@ -243,27 +243,37 @@ class TestCascadingFailures:
         bc1 = Blockchain(data_dir=str(node1_dir))
         bc2 = Blockchain(data_dir=str(node2_dir))
 
-        # Sync
+        # Sync - both nodes start with the same block
         w, ident = new_wallet_and_identity()
         block = bc1.mine_pending_transactions(w.address, ident)
         bc2.add_block(block)
 
-        # Divergence
+        # Wait to ensure timestamp progresses (Unix timestamps have 1-second granularity)
+        time.sleep(1.1)
+
+        # Divergence - bc1 mines more blocks (longer chain)
         for _ in range(3):
+            time.sleep(1.1)  # Ensure strict timestamp ordering with 1-second granularity
             w1, id1 = new_wallet_and_identity()
             block1 = bc1.mine_pending_transactions(w1.address, id1)
 
+        # Wait before bc2 diverges
+        time.sleep(1.1)
+
+        # bc2 mines fewer blocks (shorter chain)
         for _ in range(2):
+            time.sleep(1.1)  # Ensure strict timestamp ordering
             w2, id2 = new_wallet_and_identity()
             block2 = bc2.mine_pending_transactions(w2.address, id2)
 
-        # bc1 is longer, bc2 should reorganize by ingesting the full winning chain
-        for block_header in bc1.chain[1:]:
-            full_block = bc1.storage.load_block_from_disk(block_header.index)
-            bc2.add_block(full_block)
+        # bc1 is longer, bc2 should reorganize to bc1's longer chain
+        # Use replace_chain to properly handle chain reorganization
+        result = bc2.replace_chain(bc1.chain)
+        assert result is True, "Chain reorganization should succeed"
 
-        # Recover consensus
+        # Recover consensus - both chains should now have the same length and last hash
         assert len(bc1.chain) == len(bc2.chain)
+        assert bc1.chain[-1].hash == bc2.chain[-1].hash
 
 
 class TestRandomFailures:

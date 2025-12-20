@@ -2879,7 +2879,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
         # Genesis block always valid by definition
         first = chain[0].header if hasattr(chain[0], "header") else chain[0]
-        if first.index != 0 or first.previous_hash != "0":
+        if first.index != 0 or first.previous_hash != "0" * 64:
             return False
 
         # SECURITY: Validate genesis block size as well

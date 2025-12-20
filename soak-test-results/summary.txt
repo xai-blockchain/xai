@@ -1,0 +1,16 @@
+=== SOAK TEST SUMMARY ===
+Duration: 24h
+Start: === XAI Soak Test Started ===
+Start: Fri Dec 19 02:11:27 AM UTC 2025
+End: Sat Dec 20 02:15:11 AM UTC 2025
+
+Final Status:
+NAME         READY   STATUS    RESTARTS   AGE   IP            NODE           NOMINATED NODE   READINESS GATES
+xai-node-0   1/1     Running   0          24h   10.42.0.105   bcpc-staging   <none>           <none>
+xai-node-1   1/1     Running   0          24h   10.42.1.69    wsl2-worker    <none>           <none>
+
+Restart Count:
+xai-node-0: 0 restarts
+xai-node-1: 0 restarts
+
+Check full log: /home/hudson/blockchain-projects/xai/soak-test-results/soak-20251219-021127.log
