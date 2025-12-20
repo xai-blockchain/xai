@@ -1191,7 +1191,7 @@ class TestBitcoinIntegration:
 
         # Ensure a wallet is loaded; if not, skip gracefully rather than failing
         try:
-            loaded_wallets = proxy.listwallets()
+            loaded_wallets = proxy._call('listwallets')
         except Exception:
             loaded_wallets = []
         if not loaded_wallets:
@@ -1529,9 +1529,16 @@ class TestEthereumIntegration:
 
     @pytest.fixture(scope="class")
     def anvil_process(self):
-        """Start Anvil node for testing on port 8546"""
+        """Connect to existing Anvil or start one for testing"""
         import subprocess
         import socket
+
+        # First check if Anvil is already running on port 8545 (external validator)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            if s.connect_ex(('127.0.0.1', 8545)) == 0:
+                # Anvil already running on 8545, use it
+                yield {'process': None, 'port': 8545}
+                return
 
         # Try ports 8546, 8547, 8548 in order
         for port in [8546, 8547, 8548]:
@@ -1541,7 +1548,7 @@ class TestEthereumIntegration:
                     # Port is available
                     break
         else:
-            pytest.skip("No available port found for Anvil (tried 8546-8548)")
+            pytest.skip("No available port found for Anvil (tried 8545-8548)")
 
         # Start Anvil
         proc = subprocess.Popen(
@@ -1555,9 +1562,10 @@ class TestEthereumIntegration:
 
         yield {'process': proc, 'port': port}
 
-        # Cleanup
-        proc.terminate()
-        proc.wait(timeout=5)
+        # Cleanup (only if we started the process)
+        if proc is not None:
+            proc.terminate()
+            proc.wait(timeout=5)
 
     @pytest.fixture
     def web3_client(self, anvil_process):
@@ -1686,8 +1694,9 @@ class TestEthereumIntegration:
             bytecode=compiled_contract['bin']
         )
 
-        # Deployment parameters
-        timelock = int(time.time()) + 3600  # 1 hour from now
+        # Deployment parameters (use blockchain timestamp, not system time)
+        current_block = web3_client.eth.get_block('latest')
+        timelock = current_block['timestamp'] + 3600  # 1 hour from blockchain's now
         amount_wei = web3_client.to_wei(1, 'ether')
 
         # Deploy contract
@@ -1757,7 +1766,9 @@ class TestEthereumIntegration:
             bytecode=compiled_contract['bin']
         )
 
-        timelock = int(time.time()) + 3600  # 1 hour from now
+        # Use blockchain timestamp, not system time
+        current_block = web3_client.eth.get_block('latest')
+        timelock = current_block['timestamp'] + 3600  # 1 hour from blockchain's now
         amount_wei = web3_client.to_wei(1, 'ether')
 
         tx_hash = Contract.constructor(
@@ -1812,10 +1823,12 @@ class TestEthereumIntegration:
         secret2 = secrets.token_bytes(32)
         secret_hash2 = hashlib.sha256(secret2).digest()
 
+        # Use blockchain timestamp, not system time
+        current_block2 = web3_client.eth.get_block('latest')
         tx_hash2 = Contract.constructor(
             secret_hash2,
             accounts['bob'],
-            int(time.time()) + 3600
+            current_block2['timestamp'] + 3600
         ).transact({
             'from': accounts['alice'],
             'value': amount_wei
@@ -1848,7 +1861,9 @@ class TestEthereumIntegration:
         secret3 = secrets.token_bytes(32)
         secret_hash3 = hashlib.sha256(secret3).digest()
 
-        short_timelock = int(time.time()) + 2  # 2 seconds
+        # Use blockchain timestamp, not system time
+        current_block3 = web3_client.eth.get_block('latest')
+        short_timelock = current_block3['timestamp'] + 2  # 2 seconds from blockchain's now
 
         tx_hash3 = Contract.constructor(
             secret_hash3,

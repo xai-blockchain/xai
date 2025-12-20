@@ -249,8 +249,9 @@ class TestHTLCClaimOperations:
         secret = bytes.fromhex("00" * 32)
         secret_hash = hashlib.sha256(secret).hexdigest()
 
-        # Deploy contract
-        timelock = int(time.time()) + 3600  # 1 hour from now
+        # Deploy contract (use blockchain timestamp, not system time)
+        current_block = eth_client.eth.get_block('latest')
+        timelock = current_block['timestamp'] + 3600  # 1 hour from blockchain's now
         try:
             contract = deploy_htlc(
                 eth_client,
@@ -303,8 +304,9 @@ class TestHTLCRefundOperations:
         secret = bytes.fromhex("00" * 32)
         secret_hash = hashlib.sha256(secret).hexdigest()
 
-        # Deploy contract with short timelock for testing
-        timelock = int(time.time()) + 2  # 2 seconds from now
+        # Deploy contract with short timelock (use blockchain timestamp)
+        current_block = eth_client.eth.get_block('latest')
+        timelock = current_block['timestamp'] + 2  # 2 seconds from blockchain's now
 
         try:
             contract = deploy_htlc(
