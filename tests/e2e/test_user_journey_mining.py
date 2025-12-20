@@ -21,7 +21,7 @@ class TestUserJourneyMining:
         """User starts a node and begins mining"""
         # User creates wallet for mining rewards
         miner_wallet = Wallet()
-        assert miner_wallet.address.startswith("XAI")
+        assert miner_wallet.address.startswith("TXAI")  # Testnet prefix
 
         # User initializes blockchain
         blockchain = Blockchain(data_dir=e2e_blockchain_dir)
