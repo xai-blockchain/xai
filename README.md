@@ -1,8 +1,6 @@
 # XAI Blockchain
 
-![XAI Testnet](https://img.shields.io/badge/Testnet-Active-success)
-![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue)
-![License MIT](https://img.shields.io/badge/License-MIT-green)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/) [![XAI Testnet](https://img.shields.io/badge/Testnet-Active-success)](https://faucet.xai.network) [![Discord](https://img.shields.io/badge/Discord-Join%20Us-7289da.svg)](https://discord.gg/xai) [![Twitter](https://img.shields.io/badge/Twitter-@XAIBlockchain-1DA1F2.svg)](https://twitter.com/XAIBlockchain)
 
 ## A Proof-of-Work Blockchain with AI Governance and Integrated Wallets
 

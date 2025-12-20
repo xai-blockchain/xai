@@ -1,0 +1,65 @@
+name: Bug Report
+description: Report a bug in XAI
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please provide as much detail as possible.
+
+        **Security vulnerabilities**: Do NOT report here. Email security@xai.network instead.
+
+  - type: input
+    id: version
+    attributes:
+      label: XAI Version
+      description: Output of `xai --version`
+      placeholder: "v0.2.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Start node with...
+        2. Execute command...
+        3. Observe error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      render: shell
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Node/Consensus
+        - Wallet
+        - AI Governance
+        - Atomic Swaps
+        - EVM
+        - P2P Network
+        - API
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python Version
+      placeholder: "3.10.0"

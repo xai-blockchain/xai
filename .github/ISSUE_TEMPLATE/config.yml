@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security Vulnerability
+    url: https://github.com/xai-blockchain/xai/security/advisories/new
+    about: Report security issues privately
+  - name: Questions & Support
+    url: https://discord.gg/xai
+    about: Get help on Discord
