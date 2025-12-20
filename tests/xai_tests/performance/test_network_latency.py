@@ -86,23 +86,8 @@ class TestTCPLatency:
         bc.create_genesis_block()
         return bc
 
-    @pytest.fixture
-    async def p2p_manager(self, blockchain):
-        """Create a P2P network manager."""
-        manager = P2PNetworkManager(
-            blockchain=blockchain,
-            host="127.0.0.1",
-            port=18765,
-            max_connections=10,
-        )
-        yield manager
-        # Cleanup
-        if manager.server:
-            manager.server.close()
-            await manager.server.wait_closed()
-
     @pytest.mark.asyncio
-    async def test_tcp_connection_establishment_latency(self, p2p_manager, benchmark):
+    async def test_tcp_connection_establishment_latency(self, blockchain):
         """
         Benchmark: TCP connection establishment latency.
 
@@ -111,6 +96,14 @@ class TestTCPLatency:
         print(f"\n=== TCP Connection Establishment Latency ===")
 
         import websockets
+
+        # Create P2P manager locally
+        p2p_manager = P2PNetworkManager(
+            blockchain=blockchain,
+            host="127.0.0.1",
+            port=18765,
+            max_connections=10,
+        )
 
         async def establish_connection():
             """Establish a WebSocket connection."""
@@ -157,7 +150,7 @@ class TestTCPLatency:
             assert avg_ms < 100, f"TCP connection too slow: {avg_ms:.2f} ms"
 
     @pytest.mark.asyncio
-    async def test_tcp_message_roundtrip_latency(self, p2p_manager):
+    async def test_tcp_message_roundtrip_latency(self, blockchain):
         """
         Test TCP message roundtrip latency.
 
@@ -167,6 +160,14 @@ class TestTCPLatency:
 
         import websockets
         import json
+
+        # Create P2P manager locally
+        p2p_manager = P2PNetworkManager(
+            blockchain=blockchain,
+            host="127.0.0.1",
+            port=18765,
+            max_connections=10,
+        )
 
         roundtrip_times = []
 
@@ -544,7 +545,7 @@ class TestMessageThroughput:
 
         # Get all blocks and simulate broadcast
         for i in range(1, min(chain_height + 1, 100)):
-            block = blockchain.storage.load_block_by_height(i)
+            block = blockchain.storage.load_block_from_disk(i)
             if block:
                 # Simulate broadcast preparation
                 block_data = {
@@ -632,7 +633,7 @@ class TestNetworkConditions:
             # Latency should remain reasonable under load
             assert avg_latency_ms < 10, f"Latency too high under load: {avg_latency_ms:.2f} ms"
 
-    def test_bandwidth_utilization(self, blockchain, benchmark):
+    def test_bandwidth_utilization(self, blockchain):
         """
         Benchmark: Bandwidth utilization.
 
@@ -667,33 +668,32 @@ class TestNetworkConditions:
 
         print(f"Total data size: {total_size_bytes / 1024:.2f} KB")
 
-        def simulate_transfer():
-            """Simulate data transfer."""
-            bytes_transferred = 0
+        # Simulate data transfer
+        bytes_transferred = 0
+        start = time.perf_counter()
 
-            for tx in transactions:
-                # Simulate serialization and transfer
-                tx_data = {
-                    "sender": tx.sender,
-                    "recipient": tx.recipient,
-                    "amount": tx.amount,
-                }
-                import json
-                data = json.dumps(tx_data).encode()
-                bytes_transferred += len(data)
+        for tx in transactions:
+            # Simulate serialization and transfer
+            tx_data = {
+                "sender": tx.sender,
+                "recipient": tx.recipient,
+                "amount": tx.amount,
+            }
+            import json
+            data = json.dumps(tx_data).encode()
+            bytes_transferred += len(data)
 
-            return bytes_transferred
+        elapsed = time.perf_counter() - start
 
-        result = benchmark(simulate_transfer)
-
-        print(f"Bytes transferred: {result / 1024:.2f} KB")
+        print(f"Bytes transferred: {bytes_transferred / 1024:.2f} KB")
+        print(f"Transfer time: {elapsed:.3f}s")
 
         # Calculate throughput
-        transfer_time = benchmark.stats.stats.mean
-        throughput_kbps = (result / 1024) / transfer_time
-
-        print(f"Transfer time: {transfer_time:.3f}s")
+        throughput_kbps = (bytes_transferred / 1024) / elapsed
         print(f"Throughput: {throughput_kbps:.2f} KB/s")
+
+        # Should have reasonable throughput
+        assert throughput_kbps > 100, f"Throughput too low: {throughput_kbps:.2f} KB/s"
 
 
 if __name__ == "__main__":
