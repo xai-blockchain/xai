@@ -186,7 +186,9 @@ class StructuredLogger:
         # Create log record with extra fields
         extra = {"extra_fields": kwargs} if kwargs else {}
 
-        log_func = getattr(self.logger, level.lower())
+        # Map WARN to warning for Python logging compatibility
+        log_method = "warning" if level.lower() == "warn" else level.lower()
+        log_func = getattr(self.logger, log_method)
         log_func(message, extra=extra)
 
     def debug(self, message: str, **kwargs):

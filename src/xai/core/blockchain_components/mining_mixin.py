@@ -346,12 +346,17 @@ class BlockchainMiningMixin:
             self.storage._save_block_to_disk(new_block)
 
             # Update UTXO set (collect nonce changes but don't commit yet)
+            # First pass: Create all outputs to make UTXOs available for spending
+            for tx in new_block.transactions:
+                self.utxo_manager.process_transaction_outputs(tx)
+
+            # Second pass: Spend inputs after all outputs are created
+            # This ensures that transactions can spend outputs from earlier txs in the same block
             for tx in new_block.transactions:
                 if tx.sender != "COINBASE":  # Regular transactions spend inputs
                     self.utxo_manager.process_transaction_inputs(tx)
                     # Collect nonce change without committing
                     nonce_changes.append((tx.sender, tx.nonce))
-                self.utxo_manager.process_transaction_outputs(tx)
 
             # Process gamification features for this block
             self._process_gamification_features(
