@@ -343,6 +343,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         self._mempool_lock = threading.RLock()
         self.seen_txids: set[str] = set()
         self._sender_pending_count: dict[str, int] = defaultdict(int)
+        self._spent_inputs: set[str] = set()  # O(1) double-spend detection for mempool
 
         # Mining coordination to prevent race conditions during block propagation
         # When a peer block is received, mining pauses for a cooldown period to allow

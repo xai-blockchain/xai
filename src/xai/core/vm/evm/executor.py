@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import time
 import logging
+from collections import OrderedDict
 from typing import TYPE_CHECKING, Optional, Dict, Any, List
 
 from .interpreter import EVMInterpreter
@@ -91,10 +92,11 @@ class EVMBytecodeExecutor(BaseExecutor):
         self.chain_id = chain_id or self.XAI_CHAIN_ID
         self._contract_locks: Dict[str, bool] = {}
 
-        # Bytecode cache for performance optimization
+        # Bytecode cache for performance optimization (LRU eviction)
         # Maps normalized address -> decoded bytecode (bytes)
         # This eliminates redundant dictionary lookups and hex decoding
-        self._code_cache: Dict[str, bytes] = {}
+        # Uses OrderedDict for O(1) LRU eviction
+        self._code_cache: OrderedDict[str, bytes] = OrderedDict()
         self._cache_hits = 0
         self._cache_misses = 0
         self._cache_max_size = 256  # Limit cache size to prevent memory bloat
@@ -645,9 +647,11 @@ class EVMBytecodeExecutor(BaseExecutor):
         # Normalize address for cache consistency
         normalized = address.upper()
 
-        # Check cache first (fast path)
+        # Check cache first (fast path) - move to end for LRU
         if normalized in self._code_cache:
             self._cache_hits += 1
+            # Move to end (most recently used)
+            self._code_cache.move_to_end(normalized)
             return self._code_cache[normalized]
 
         # Cache miss - fetch from blockchain
@@ -679,24 +683,21 @@ class EVMBytecodeExecutor(BaseExecutor):
 
     def _evict_cache_if_needed(self) -> None:
         """
-        Evict oldest entries from cache when size limit is reached.
+        Evict LRU entries from cache when size limit is reached.
 
-        Uses simple FIFO eviction strategy. When cache exceeds max size,
-        removes the first half of entries. This is simpler and faster than
-        LRU for our use case, as contract access patterns are highly skewed
-        (hot contracts stay hot).
+        Uses LRU eviction strategy with OrderedDict. When cache exceeds max size,
+        removes the least recently used entry (first entry in OrderedDict).
+        This ensures hot contracts stay cached while cold contracts are evicted.
         """
         if len(self._code_cache) > self._cache_max_size:
-            # Evict first half of cache entries
-            keys_to_evict = list(self._code_cache.keys())[: self._cache_max_size // 2]
-            for key in keys_to_evict:
-                del self._code_cache[key]
+            # Evict least recently used (first entry)
+            evicted_key, _ = self._code_cache.popitem(last=False)
 
             logger.debug(
-                "Evicted bytecode cache entries",
+                "Evicted LRU bytecode cache entry",
                 extra={
                     "event": "evm.cache_eviction",
-                    "evicted_count": len(keys_to_evict),
+                    "evicted_address": evicted_key,
                     "remaining_count": len(self._code_cache),
                 }
             )
