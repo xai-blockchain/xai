@@ -176,6 +176,25 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         self._init_consensus()
         self._init_mining()
 
+        # Initialize manager components for god class refactoring
+        # These managers encapsulate specific areas of blockchain functionality
+        # IMPORTANT: Must initialize BEFORE _load_from_disk() because create_genesis_block() depends on them
+        from xai.core.block_processor import BlockProcessor
+        from xai.core.chain_state import ChainState
+        from xai.core.fork_manager import ForkManager
+        from xai.core.mining import MiningCoordinator
+        from xai.core.mining_manager import MiningManager
+        from xai.core.state_manager import StateManager
+        from xai.core.validation_manager import ValidationManager
+
+        self.mining_manager = MiningManager(self)
+        self.validation_manager = ValidationManager(self)
+        self.state_manager = StateManager(self)
+        self.fork_manager = ForkManager(self)
+        self.chain_state = ChainState(self)
+        self.block_processor = BlockProcessor(self)
+        self.mining_coordinator = MiningCoordinator(self)
+
         if not self._load_from_disk():
             self.create_genesis_block()
 
@@ -202,24 +221,6 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                         }
                     )
                     # Continue without index - queries will fall back gracefully
-
-        # Initialize manager components for god class refactoring
-        # These managers encapsulate specific areas of blockchain functionality
-        from xai.core.block_processor import BlockProcessor
-        from xai.core.chain_state import ChainState
-        from xai.core.fork_manager import ForkManager
-        from xai.core.mining import MiningCoordinator
-        from xai.core.mining_manager import MiningManager
-        from xai.core.state_manager import StateManager
-        from xai.core.validation_manager import ValidationManager
-
-        self.mining_manager = MiningManager(self)
-        self.validation_manager = ValidationManager(self)
-        self.state_manager = StateManager(self)
-        self.fork_manager = ForkManager(self)
-        self.chain_state = ChainState(self)
-        self.block_processor = BlockProcessor(self)
-        self.mining_coordinator = MiningCoordinator(self)
 
     def _init_storage(
         self,
