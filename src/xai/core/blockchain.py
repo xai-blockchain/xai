@@ -3074,14 +3074,12 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
     def should_pause_mining(self) -> bool:
         """
         Check if mining should be paused due to recent peer block reception.
+        (delegated to MiningCoordinator)
 
         Returns True if a block was received from a peer within the cooldown period,
         preventing race conditions during block propagation across the network.
         """
-        if self._last_peer_block_time == 0.0:
-            return False  # No peer blocks received yet
-        time_since_peer_block = time.time() - self._last_peer_block_time
-        return time_since_peer_block < self._mining_cooldown_seconds
+        return self.mining_coordinator.should_pause_mining()
 
     def _add_block_to_chain(self, block: Block) -> bool:
         """Helper method to add a validated block to the chain."""

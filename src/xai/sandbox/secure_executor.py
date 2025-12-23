@@ -229,6 +229,7 @@ class SecureExecutor:
                 '__builtins__': self._create_safe_builtins(),
                 '_iter_unpack_sequence_': guarded_iter_unpack_sequence,
                 '_getiter_': iter,
+                '_getattr_': safer_getattr,
                 '__name__': f'sandbox_{context.app_id}',
                 '__file__': f'<{context.app_id}>',
             }
