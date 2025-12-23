@@ -1265,78 +1265,24 @@ class P2PNetworkManager:
                 self.peer_manager.reputation.record_invalid_transaction(peer_id)
                 return
 
+            # Message type dispatch - extracted handlers for complex types
             if message_type == "handshake":
-                self.peer_features[peer_id] = payload or {}
-                self._handshake_received[peer_id] = time.time()
-                self._handshake_deadlines.pop(peer_id, None)
-
-                # Extract and store peer's API endpoint for HTTP sync
-                if payload and isinstance(payload, dict):
-                    api_endpoint = payload.get("api_endpoint")
-                    if api_endpoint:
-                        with self._peer_lock:
-                            self.peer_api_endpoints[peer_id] = api_endpoint
-                        logger.info(
-                            "Stored API endpoint for peer %s: %s",
-                            peer_id[:16],
-                            api_endpoint,
-                            extra={"event": "p2p.peer_api_endpoint_stored", "peer": peer_id}
-                        )
+                self._handle_handshake_message(peer_id, payload)
                 return
             if message_type == "transaction":
-                dedup_id = self._derive_payload_fingerprint(payload, ("txid", "hash", "id"))
-                if self._is_duplicate_message("transaction", dedup_id):
-                    logger.debug(
-                        "Duplicate transaction %s dropped from peer %s",
-                        dedup_id,
-                        peer_id[:16],
-                        extra={"event": "p2p.duplicate_transaction", "peer": peer_id, "txid": dedup_id},
-                    )
-                    self._log_security_event(peer_id, "duplicate_transaction")
-                    self.peer_manager.reputation.record_invalid_transaction(peer_id)
-                    return
-                tx = self.blockchain._transaction_from_dict(payload)
-                if self.blockchain.add_transaction(tx):
-                    self.peer_manager.reputation.record_valid_transaction(peer_id)
-                else:
-                    self.peer_manager.reputation.record_invalid_transaction(peer_id)
+                if not self._handle_transaction_message(peer_id, payload):
+                    return  # Duplicate, already handled
             elif message_type == "block":
-                dedup_id = self._derive_payload_fingerprint(
-                    payload.get("header") if isinstance(payload, dict) else payload,
-                    ("hash", "block_hash"),
-                )
-                if self._is_duplicate_message("block", dedup_id):
-                    logger.debug(
-                        "Duplicate block %s dropped from peer %s",
-                        dedup_id,
-                        peer_id[:16],
-                        extra={"event": "p2p.duplicate_block", "peer": peer_id, "block_hash": dedup_id},
-                    )
-                    self._log_security_event(peer_id, "duplicate_block")
-                    self.peer_manager.reputation.record_invalid_block(peer_id)
-                    return
-                block = self.blockchain.deserialize_block(payload)
-                if self.blockchain.add_block(block):
-                    self.peer_manager.reputation.record_valid_block(peer_id)
-                else:
-                    self.peer_manager.reputation.record_invalid_block(peer_id)
+                if not self._handle_block_message(peer_id, payload):
+                    return  # Duplicate, already handled
             elif message_type == "get_chain":
                 await self._send_signed_message(
-                    websocket,
-                    peer_id,
-                    {"type": "chain", "payload": self.blockchain.to_dict()},
+                    websocket, peer_id, {"type": "chain", "payload": self.blockchain.to_dict()}
                 )
             elif message_type == "chain":
                 self.received_chains.append(payload)
             elif message_type == "get_peers":
-                peers = self._http_peers_snapshot()
-                bootstrap = getattr(self.peer_manager.discovery, "bootstrap_nodes", []) or []
-                peers.extend([seed for seed in bootstrap if seed not in peers])
-                await self._send_signed_message(
-                    websocket,
-                    peer_id,
-                    {"type": "peers", "payload": peers},
-                )
+                await self._handle_get_peers_message(websocket, peer_id)
             elif message_type == "peers":
                 self.peer_manager.discovery.exchange_peers(payload)
             elif message_type == "get_checkpoint":
@@ -1509,6 +1455,81 @@ class P2PNetworkManager:
                     "error_type": type(exc).__name__,
                 },
             )
+
+    def _handle_handshake_message(self, peer_id: str, payload: dict[str, Any] | None) -> None:
+        """Handle handshake message from peer."""
+        self.peer_features[peer_id] = payload or {}
+        self._handshake_received[peer_id] = time.time()
+        self._handshake_deadlines.pop(peer_id, None)
+
+        # Extract and store peer's API endpoint for HTTP sync
+        if payload and isinstance(payload, dict):
+            api_endpoint = payload.get("api_endpoint")
+            if api_endpoint:
+                with self._peer_lock:
+                    self.peer_api_endpoints[peer_id] = api_endpoint
+                logger.info(
+                    "Stored API endpoint for peer %s: %s",
+                    peer_id[:16],
+                    api_endpoint,
+                    extra={"event": "p2p.peer_api_endpoint_stored", "peer": peer_id}
+                )
+
+    def _handle_transaction_message(self, peer_id: str, payload: dict[str, Any] | None) -> bool:
+        """Handle transaction message from peer. Returns False if duplicate."""
+        dedup_id = self._derive_payload_fingerprint(payload, ("txid", "hash", "id"))
+        if self._is_duplicate_message("transaction", dedup_id):
+            logger.debug(
+                "Duplicate transaction %s dropped from peer %s",
+                dedup_id,
+                peer_id[:16],
+                extra={"event": "p2p.duplicate_transaction", "peer": peer_id, "txid": dedup_id},
+            )
+            self._log_security_event(peer_id, "duplicate_transaction")
+            self.peer_manager.reputation.record_invalid_transaction(peer_id)
+            return False
+        tx = self.blockchain._transaction_from_dict(payload)
+        if self.blockchain.add_transaction(tx):
+            self.peer_manager.reputation.record_valid_transaction(peer_id)
+        else:
+            self.peer_manager.reputation.record_invalid_transaction(peer_id)
+        return True
+
+    def _handle_block_message(self, peer_id: str, payload: dict[str, Any] | None) -> bool:
+        """Handle block message from peer. Returns False if duplicate."""
+        dedup_id = self._derive_payload_fingerprint(
+            payload.get("header") if isinstance(payload, dict) else payload,
+            ("hash", "block_hash"),
+        )
+        if self._is_duplicate_message("block", dedup_id):
+            logger.debug(
+                "Duplicate block %s dropped from peer %s",
+                dedup_id,
+                peer_id[:16],
+                extra={"event": "p2p.duplicate_block", "peer": peer_id, "block_hash": dedup_id},
+            )
+            self._log_security_event(peer_id, "duplicate_block")
+            self.peer_manager.reputation.record_invalid_block(peer_id)
+            return False
+        block = self.blockchain.deserialize_block(payload)
+        if self.blockchain.add_block(block):
+            self.peer_manager.reputation.record_valid_block(peer_id)
+        else:
+            self.peer_manager.reputation.record_invalid_block(peer_id)
+        return True
+
+    async def _handle_get_peers_message(
+        self, websocket: WebSocketServerProtocol | None, peer_id: str
+    ) -> None:
+        """Handle get_peers request from peer."""
+        peers = self._http_peers_snapshot()
+        bootstrap = getattr(self.peer_manager.discovery, "bootstrap_nodes", []) or []
+        peers.extend([seed for seed in bootstrap if seed not in peers])
+        await self._send_signed_message(
+            websocket,
+            peer_id,
+            {"type": "peers", "payload": peers},
+        )
 
     async def _send_signed_message(
         self,
