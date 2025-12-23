@@ -86,11 +86,21 @@ Thumbs.db
 *.crt
 *.p12
 *.pfx
-*_secret*
+*_secret.txt
+*_secret.json
+*_secret.yaml
+*_secret.yml
+.secret_key
 credentials.json
 *credentials*.json
 *secrets*.json
 secrets/
+
+# Allow specific secret management code files
+!flask_secret_manager.py
+!**/flask_secret_manager.py
+!test_flask_secret_manager.py
+!**/test_flask_secret_manager.py
 
 # Keystore and wallets
 *.keystore

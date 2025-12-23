@@ -11,59 +11,62 @@ This refactored version delegates most functionality to specialized modules:
 """
 
 from __future__ import annotations
-from typing import Optional, Set, Any, Dict, List, Callable
-import asyncio
-import json
-import os
-import sys
-import time
-import threading
+
 import argparse
-import weakref
+import asyncio
 import base64
-import re
+import json
 import logging
-from queue import Queue, Full
+import os
+import re
+import sys
+import threading
+import time
+import weakref
+from queue import Full, Queue
+from typing import Any, Callable
+
 import requests
 from cryptography.fernet import Fernet, InvalidToken
-from flask import Flask, request, make_response, jsonify
+from flask import Flask, jsonify, make_response, request
 from flask_cors import CORS
 
 logger = logging.getLogger(__name__)
 
+from xai.core.account_abstraction import AccountAbstractionManager
+
 # Import blockchain core
 from xai.core.blockchain import Blockchain, Transaction
-from xai.core.monitoring import MetricsCollector
-from xai.core.security_validation import SecurityValidator, SecurityEventRouter
-from xai.core.wallet import WalletManager
-from xai.core.account_abstraction import AccountAbstractionManager
 from xai.core.config import Config
-from xai.core.withdrawal_processor import WithdrawalProcessor
 from xai.core.crypto_deposit_monitor import (
     CryptoDepositMonitor,
     create_deposit_source,
 )
-from xai.core.process_sandbox import maybe_enable_process_sandbox
+from xai.core.monitoring import MetricsCollector
+from xai.core.node_api import NodeAPIRoutes
+from xai.core.node_consensus import ConsensusManager
+from xai.core.node_identity import load_or_create_identity
+from xai.core.node_p2p import P2PNetworkManager
 
 # Import refactored modules
 from xai.core.node_utils import (
+    ALGO_FEATURES_ENABLED,
+    DEFAULT_HOST,
+    DEFAULT_MINER_ADDRESS,
+    DEFAULT_PORT,
     get_allowed_origins,
     get_base_dir,
-    DEFAULT_HOST,
-    DEFAULT_PORT,
-    DEFAULT_MINER_ADDRESS,
-    ALGO_FEATURES_ENABLED,
 )
-from xai.core.node_api import NodeAPIRoutes
-from xai.core.node_consensus import ConsensusManager
-from xai.core.node_p2p import P2PNetworkManager
-from xai.network.peer_manager import PeerManager
-from xai.core.security_middleware import setup_security_middleware, SecurityConfig
-from xai.core.request_validator_middleware import setup_request_validation
-from xai.core.node_identity import load_or_create_identity
 from xai.core.partial_sync import PartialSyncCoordinator
+from xai.core.process_sandbox import maybe_enable_process_sandbox
+from xai.core.request_validator_middleware import setup_request_validation
+from xai.core.security_middleware import SecurityConfig, setup_security_middleware
+from xai.core.security_validation import SecurityEventRouter, SecurityValidator
 from xai.core.transaction import Transaction
-
+from xai.core.wallet import WalletManager
+from xai.core.withdrawal_processor import WithdrawalProcessor
+from xai.network.peer_manager import PeerManager
+from xai.core.flask_secret_manager import get_flask_secret_key
 
 class CORSPolicyManager:
     """Production-grade CORS policy management.
@@ -82,7 +85,7 @@ class CORSPolicyManager:
         self.allowed_origins = self._load_allowed_origins()
         self.setup_cors()
 
-    def _load_allowed_origins(self) -> List[str]:
+    def _load_allowed_origins(self) -> list[str]:
         """Load allowed origins from environment.
 
         Returns:
@@ -137,7 +140,7 @@ class CORSPolicyManager:
         """Register Flask hooks for CORS validation."""
 
         @self.app.before_request
-        def check_cors() -> Optional[Any]:
+        def check_cors() -> Any | None:
             """Validate origin on all requests."""
             origin = request.headers.get("Origin")
 
@@ -191,21 +194,20 @@ class CORSPolicyManager:
 
         return False
 
-
 class _SecurityWebhookForwarder:
     """Asynchronous webhook sender with retry/backoff."""
 
     def __init__(
         self,
         url: str,
-        headers: Dict[str, str],
+        headers: dict[str, str],
         timeout: int = 5,
         max_retries: int = 3,
         backoff: float = 1.5,
         max_queue: int = 500,
         start_worker: bool = True,
-        queue_path: Optional[str] = None,
-        encryption_key: Optional[str] = None,
+        queue_path: str | None = None,
+        encryption_key: str | None = None,
     ) -> None:
         self.url = url
         self.headers = dict(headers)
@@ -223,7 +225,7 @@ class _SecurityWebhookForwarder:
             self._worker_thread = threading.Thread(target=self._worker, daemon=True)
             self._worker_thread.start()
 
-    def enqueue(self, payload: Dict[str, Any]) -> None:
+    def enqueue(self, payload: dict[str, Any]) -> None:
         try:
             self.queue.put_nowait(payload)
             self._persist_queue()
@@ -244,7 +246,7 @@ class _SecurityWebhookForwarder:
                 self.queue.task_done()
                 self._persist_queue()
 
-    def _deliver(self, payload: Dict[str, Any]) -> None:
+    def _deliver(self, payload: dict[str, Any]) -> None:
         attempt = 0
         while attempt < self.max_retries:
             try:
@@ -318,7 +320,7 @@ class _SecurityWebhookForwarder:
             )
 
     @staticmethod
-    def _build_fernet(raw_key: Optional[str]) -> Optional[Fernet]:
+    def _build_fernet(raw_key: str | None) -> Fernet | None:
         if not raw_key:
             return None
         key = raw_key.strip().encode("utf-8")
@@ -340,7 +342,6 @@ class _SecurityWebhookForwarder:
                 )
                 return None
 
-
 from xai.core.blockchain_interface import BlockchainDataProvider
 
 class BlockchainNode:
@@ -357,10 +358,10 @@ class BlockchainNode:
 
     def __init__(
         self,
-        blockchain: Optional[Blockchain] = None,
+        blockchain: Blockchain | None = None,
         host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
-        miner_address: Optional[str] = None,
+        miner_address: str | None = None,
         **kwargs,
     ) -> None:
         """
@@ -381,21 +382,22 @@ class BlockchainNode:
         # Node state
         self.start_time: float = 0.0
         self.is_mining: bool = False
-        self.peers: Set[str] = set()
-        self.mining_thread: Optional[threading.Thread] = None
+        self.peers: set[str] = set()
+        self.mining_thread: threading.Thread | None = None
         self.mined_blocks_counter = 0
         self.last_mining_time = time.time()
-        self.withdrawal_processor: Optional[WithdrawalProcessor] = None
-        self._withdrawal_worker_thread: Optional[threading.Thread] = None
-        self._withdrawal_worker_stop: Optional[threading.Event] = None
+        self.withdrawal_processor: WithdrawalProcessor | None = None
+        self._withdrawal_worker_thread: threading.Thread | None = None
+        self._withdrawal_worker_stop: threading.Event | None = None
         self._withdrawal_worker_interval: int = 30
         self._withdrawal_stats_lock = threading.Lock()
-        self._last_withdrawal_stats: Optional[Dict[str, Any]] = None
-        self.crypto_deposit_monitor: Optional[CryptoDepositMonitor] = None
+        self._last_withdrawal_stats: dict[str, Any] | None = None
+        self.crypto_deposit_monitor: CryptoDepositMonitor | None = None
 
         # Flask app setup
         self.app = Flask(__name__)
-        self.app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(32).hex())
+        # Use persistent secret key manager to prevent session invalidation on restart
+        self.app.secret_key = get_flask_secret_key(data_dir=os.path.expanduser("~/.xai"))
 
         # Load or create node identity (used for P2P message signing)
         try:
@@ -514,7 +516,7 @@ class BlockchainNode:
         """Create a weakref-backed sink so global security events feed metrics."""
         node_ref = weakref.ref(self)
 
-        def _sink(event_type: str, details: Dict[str, Any], severity: str) -> None:
+        def _sink(event_type: str, details: dict[str, Any], severity: str) -> None:
             node = node_ref()
             if not node:
                 return
@@ -531,7 +533,7 @@ class BlockchainNode:
         timeout: int = 5,
         max_retries: int = 3,
         backoff: float = 1.5,
-    ) -> Optional[Callable[[str, Dict[str, Any], str], None]]:
+    ) -> Callable[[str, dict[str, Any], str], None] | None:
         sanitized_url = (url or "").strip()
         if not sanitized_url:
             return None
@@ -554,7 +556,7 @@ class BlockchainNode:
              encryption_key=encryption_key,
         )
 
-        def _sink(event_type: str, details: Dict[str, Any], severity: str) -> None:
+        def _sink(event_type: str, details: dict[str, Any], severity: str) -> None:
             normalized = (severity or "INFO").upper()
             if normalized not in {"WARNING", "WARN", "ERROR", "CRITICAL"}:
                 return
@@ -693,7 +695,7 @@ class BlockchainNode:
             self.account_abstraction = None
             logger.debug("Embedded wallets disabled: %s", type(exc).__name__)
 
-    def _configure_crypto_deposit_monitor(self, monitor_cfg: Dict[str, Any]) -> None:
+    def _configure_crypto_deposit_monitor(self, monitor_cfg: dict[str, Any]) -> None:
         """Initialize crypto deposit monitoring if enabled."""
         if not monitor_cfg or not monitor_cfg.get("ENABLED"):
             return
@@ -813,12 +815,12 @@ class BlockchainNode:
             monitor.stop()
             self.crypto_deposit_monitor = None
 
-    def _record_withdrawal_processor_metrics(self, stats: Dict[str, Any], queue_depth: int) -> None:
+    def _record_withdrawal_processor_metrics(self, stats: dict[str, Any], queue_depth: int) -> None:
         collector = getattr(self, "metrics_collector", None)
         if collector:
             collector.record_withdrawal_processor_stats(stats, queue_depth)
 
-    def get_withdrawal_processor_stats(self) -> Optional[Dict[str, Any]]:
+    def get_withdrawal_processor_stats(self) -> dict[str, Any] | None:
         """Return the latest withdrawal processor snapshot if available."""
         with self._withdrawal_stats_lock:
             if not self._last_withdrawal_stats:
@@ -980,7 +982,7 @@ class BlockchainNode:
     # ==================== EXCHANGE ORDER MATCHING ====================
 
     def _match_orders(
-        self, new_order: Dict[str, Any], all_orders: Dict[str, List[Dict[str, Any]]]
+        self, new_order: dict[str, Any], all_orders: dict[str, list[dict[str, Any]]]
     ) -> bool:
         """
         Internal method to match buy/sell orders and execute balance transfers.
@@ -1206,7 +1208,6 @@ class BlockchainNode:
         self._stop_withdrawal_worker()
         self._stop_crypto_deposit_monitor()
         await self.p2p_manager.stop()
-
 
 async def main_async() -> None:
     """Command-line entry point for running a blockchain node."""

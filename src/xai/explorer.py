@@ -3,22 +3,26 @@ XAI Block Explorer - Web Interface
 Local testing interface for blockchain features
 """
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session
-import requests
-from datetime import datetime
-import os
-import time
-import secrets
 import hashlib
 import hmac
 import logging
-from functools import wraps
+import os
+import secrets
+import time
 from collections import defaultdict
+from datetime import datetime
+from functools import wraps
 from threading import Lock
+
+import requests
+from flask import Flask, jsonify, redirect, render_template, request, session, url_for
+
 from xai.core.process_sandbox import maybe_enable_process_sandbox
+from xai.core.flask_secret_manager import get_flask_secret_key
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
+# Use persistent secret key manager to prevent session invalidation on restart
+app.secret_key = get_flask_secret_key(data_dir=os.path.expanduser("~/.xai"))
 logger = logging.getLogger(__name__)
 
 # Rate limiting configuration
@@ -99,7 +103,7 @@ app.config.update(
 )
 
 # Setup security middleware
-from xai.core.security_middleware import setup_security_middleware, SecurityConfig
+from xai.core.security_middleware import SecurityConfig, setup_security_middleware
 
 security_config = SecurityConfig()
 security_config.CORS_ORIGINS = [
