@@ -234,7 +234,7 @@ directory = "htmlcov"
 
 # MyPy configuration
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
@@ -250,6 +250,7 @@ pretty = true
 show_error_codes = true
 show_column_numbers = true
 show_error_context = true
+exclude = "(?x)(src/xai/archive/.*|archived_.*|.*/test_.*\\.py|.*/tmp_.*\\.py|.*_test\\.py)"
 
 [[tool.mypy.overrides]]
 module = "tests.*"

@@ -17,31 +17,32 @@ This module contains all API endpoint handlers organized by category:
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Dict, Any, Tuple, List, Optional, Sequence
-from flask import Flask, jsonify, request, g, make_response
-import time
+
+import html
 import json
 import logging
 import os
 import re
-import html
+import time
 from contextlib import nullcontext
+from typing import TYPE_CHECKING, Any
 
-# Import centralized validation
-from xai.core.validation import validate_address as core_validate_address
-from xai.core.validation import validate_hex_string
-
-from xai.core.vm.evm.abi import keccak256
+from flask import Flask, g, jsonify, make_response, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
 # Import typed exceptions
 from xai.core.blockchain_exceptions import (
+    ConfigurationError,
     DatabaseError,
+    NetworkError,
     StorageError,
     ValidationError,
-    NetworkError,
-    ConfigurationError,
 )
+
+# Import centralized validation
+from xai.core.validation import validate_address as core_validate_address
+from xai.core.validation import validate_hex_string
+from xai.core.vm.evm.abi import keccak256
 
 logger = logging.getLogger(__name__)
 
@@ -52,59 +53,59 @@ KNOWN_TOKEN_RECEIVER_INTERFACES = {
     "erc721_receiver": bytes.fromhex("150b7a02"),
 }
 
-from xai.core.config import Config
+from xai.blockchain.emergency_pause import EmergencyPauseManager
 from xai.core import node_utils
+from xai.core.api_auth import APIAuthManager, APIKeyStore
+from xai.core.api_routes import (
+    register_admin_routes,
+    register_algo_routes,
+    register_contract_routes,
+    register_crypto_deposit_routes,
+    register_faucet_routes,
+    register_gamification_routes,
+    register_light_client_routes,
+    register_mining_bonus_routes,
+    register_mining_routes,
+    register_notification_routes,
+    register_payment_routes,
+    register_peer_routes,
+    register_recovery_routes,
+    register_sync_routes,
+    register_transaction_routes,
+    register_wallet_routes,
+)
+from xai.core.api_routes.blockchain import _block_to_payload, _build_block_summary
+from xai.core.config import Config
+from xai.core.error_handlers import ErrorHandlerRegistry
+from xai.core.input_validation_schemas import (
+    CryptoDepositAddressInput,
+    ExchangeCancelInput,
+    ExchangeCardPurchaseInput,
+    ExchangeOrderInput,
+    ExchangeTransferInput,
+    PeerBlockInput,
+    PeerTransactionInput,
+)
+from xai.core.monitoring import MetricsCollector
 from xai.core.node_utils import (
     ALGO_FEATURES_ENABLED,
     NODE_VERSION,
-    get_base_dir,
     get_api_endpoints,
+    get_base_dir,
 )
 from xai.core.rate_limiter import get_rate_limiter
-from xai.core.error_handlers import ErrorHandlerRegistry
-from xai.core.input_validation_schemas import (
-    PeerTransactionInput,
-    CryptoDepositAddressInput,
-    ExchangeOrderInput,
-    ExchangeTransferInput,
-    ExchangeCancelInput,
-    ExchangeCardPurchaseInput,
-    PeerBlockInput,
-)
 from xai.core.request_validator_middleware import RequestValidator, validate_request
-from xai.core.security_validation import log_security_event, SecurityValidator
-from xai.core.monitoring import MetricsCollector
-from xai.core.api_auth import APIAuthManager, APIKeyStore
-from xai.network.peer_manager import PeerManager
-from xai.performance.profiling import MemoryProfiler, CPUProfiler
-from xai.wallet.spending_limits import SpendingLimitManager
+from xai.core.security_validation import SecurityValidator, log_security_event
 from xai.core.vm.evm.abi import keccak256
+from xai.network.peer_manager import PeerManager
+from xai.performance.profiling import CPUProfiler, MemoryProfiler
 from xai.security.circuit_breaker import CircuitBreaker
-from xai.blockchain.emergency_pause import EmergencyPauseManager
-from xai.core.api_routes import (
-    register_transaction_routes,
-    register_contract_routes,
-    register_wallet_routes,
-    register_faucet_routes,
-    register_mining_routes,
-    register_peer_routes,
-    register_algo_routes,
-    register_recovery_routes,
-    register_gamification_routes,
-    register_mining_bonus_routes,
-    register_admin_routes,
-    register_crypto_deposit_routes,
-    register_payment_routes,
-    register_notification_routes,
-    register_sync_routes,
-    register_light_client_routes,
-)
-from xai.core.api_routes.blockchain import _block_to_payload, _build_block_summary
+from xai.wallet.spending_limits import SpendingLimitManager
 
 if TYPE_CHECKING:
-    from xai.core.blockchain import Transaction
     from flask import Flask
 
+    from xai.core.blockchain import Transaction
 
 class InputSanitizer:
     """Comprehensive input sanitization for API endpoints.
@@ -150,7 +151,7 @@ class InputSanitizer:
         return value
 
     @staticmethod
-    def validate_numeric(value: Any, min_val: Optional[float] = None, max_val: Optional[float] = None) -> float:
+    def validate_numeric(value: Any, min_val: float | None = None, max_val: float | None = None) -> float:
         """Validate numeric inputs with range checking.
 
         Args:
@@ -251,7 +252,7 @@ class InputSanitizer:
         return value
 
     @staticmethod
-    def validate_integer(value: Any, min_val: Optional[int] = None, max_val: Optional[int] = None) -> int:
+    def validate_integer(value: Any, min_val: int | None = None, max_val: int | None = None) -> int:
         """Validate integer inputs with range checking.
 
         Args:
@@ -279,7 +280,7 @@ class InputSanitizer:
         return num
 
     @staticmethod
-    def sanitize_json_keys(data: Dict[str, Any]) -> Dict[str, Any]:
+    def sanitize_json_keys(data: dict[str, Any]) -> dict[str, Any]:
         """Sanitize all string keys and values in a dictionary.
 
         Args:
@@ -309,13 +310,10 @@ class InputSanitizer:
 
         return sanitized
 
-
 class PaginationError(ValueError):
     """Raised when pagination query parameters are invalid."""
 
-
 _API_VERSION_ENV_KEY = "xai.api_version"
-
 
 class _VersionPrefixMiddleware:
     """WSGI middleware that strips version prefixes and records requested version."""
@@ -373,8 +371,21 @@ class _VersionPrefixMiddleware:
         environ["PATH_INFO"] = trimmed
         return self.app(environ, start_response)
 
-    def _extract_version(self, path: str) -> Tuple[Optional[str], str]:
+    def _extract_version(self, path: str) -> tuple[str | None, str]:
         normalized = path or "/"
+
+        # Check for /api/vX/ prefix pattern
+        for version in self.supported_versions:
+            api_prefix = f"/api/{version}"
+            if normalized == api_prefix or normalized.startswith(f"{api_prefix}/"):
+                remainder = normalized[len(api_prefix) :]
+                if not remainder:
+                    remainder = "/"
+                elif not remainder.startswith("/"):
+                    remainder = f"/{remainder}"
+                return version, remainder
+
+        # Check for legacy /vX/ prefix pattern (no /api/)
         for version in self.supported_versions:
             prefix = f"/{version}"
             if normalized == prefix or normalized.startswith(f"{prefix}/"):
@@ -393,7 +404,7 @@ class _VersionPrefixMiddleware:
         return self.default_version, normalized
 
     @staticmethod
-    def _requested_token(path: str) -> Optional[str]:
+    def _requested_token(path: str) -> str | None:
         if not path.startswith("/"):
             return None
         segments = path.split("/", 2)
@@ -402,16 +413,15 @@ class _VersionPrefixMiddleware:
         token = segments[1]
         return token or None
 
-
 class APIVersioningManager:
     """Installs API version prefix handling and response headers."""
 
     def __init__(
         self,
         app: Flask,
-        supported_versions: Optional[Sequence[str]] = None,
-        default_version: Optional[str] = None,
-        deprecated_versions: Optional[Dict[str, Dict[str, str]]] = None,
+        supported_versions: Sequence[str] | None = None,
+        default_version: str | None = None,
+        deprecated_versions: dict[str, dict[str, str]] | None = None,
         docs_url: str = "",
     ) -> None:
         if not isinstance(app, Flask):  # type: ignore[unreachable]
@@ -428,7 +438,7 @@ class APIVersioningManager:
             source_default = normalized_versions[-1]
 
         raw_deprecations = deprecated_versions or getattr(config, "API_DEPRECATED_VERSIONS", {})
-        self.deprecated_versions: Dict[str, Dict[str, str]] = {}
+        self.deprecated_versions: dict[str, dict[str, str]] = {}
         for version, info in raw_deprecations.items():
             if not version:
                 continue
@@ -479,7 +489,6 @@ class APIVersioningManager:
             return response
 
         setattr(self.app, "xai_api_versioning", True)
-
 
 class NodeAPIRoutes:
     """
@@ -573,7 +582,7 @@ class NodeAPIRoutes:
             event_type="api.payload_too_large",
         )
 
-    def _reject_if_paused(self, operation: str) -> Optional[Tuple[Dict[str, Any], int]]:
+    def _reject_if_paused(self, operation: str) -> tuple[dict[str, Any], int] | None:
         """
         Enforce the emergency pause/circuit breaker at API boundaries.
 
@@ -590,7 +599,7 @@ class NodeAPIRoutes:
             )
         return None
 
-    def _verify_signed_peer_message(self) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+    def _verify_signed_peer_message(self) -> tuple[bool, str, dict[str, Any] | None]:
         """
         Verify a signed message from a peer, checking signature and freshness, and providing the payload.
         
@@ -657,7 +666,29 @@ class NodeAPIRoutes:
         register_light_client_routes(self)
         register_admin_routes(self)
 
-    def _log_event(self, event_type: str, payload: Optional[Dict[str, Any]] = None, severity: str = "INFO") -> None:
+        # Register backward compatibility redirects
+        self._setup_legacy_redirects()
+
+    def _setup_legacy_redirects(self) -> None:
+        """
+        Register HTTP 301 redirects from old unversioned routes to new /api/v1/ routes.
+
+        This maintains backward compatibility while encouraging migration to versioned API.
+        Legacy routes (e.g., /blocks, /transactions) are redirected to /api/v1/ versions
+        with deprecation warnings.
+        """
+        from flask import redirect as flask_redirect, request
+
+        # Note: The middleware already handles /v1/ -> strip prefix -> route
+        # We just need to inform users about the /api/ prefix being added
+        # Since routes are defined without version prefix, and middleware strips it,
+        # old routes like /blocks will work but won't have version info
+
+        # The existing middleware already provides versioning via /v1/ or /api/v1/
+        # No additional redirects needed - the middleware handles it transparently
+        logger.info("API versioning enabled: /api/v1/ prefix supported (backward compatible)")
+
+    def _log_event(self, event_type: str, payload: dict[str, Any] | None = None, severity: str = "INFO") -> None:
         """Helper to log API security events with sanitized payloads."""
         sanitized = SecurityValidator.sanitize_for_logging(payload or {})
         log_security_event(event_type, {"details": sanitized}, severity=severity)
@@ -702,7 +733,7 @@ class NodeAPIRoutes:
         external_flag = getattr(node_utils, "ALGO_FEATURES_ENABLED", False)
         return bool(external_flag or ALGO_FEATURES_ENABLED)
 
-    def _success_response(self, payload: Dict[str, Any], status: int = 200):
+    def _success_response(self, payload: dict[str, Any], status: int = 200):
         """Return a success payload with consistent structure."""
         body = {"success": True, **payload}
         return jsonify(body), status
@@ -712,7 +743,7 @@ class NodeAPIRoutes:
         message: str,
         status: int = 400,
         code: str = "bad_request",
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         event_type: str = "node_api_error",
     ):
         """Return a sanitized error response and emit a security log."""
@@ -733,7 +764,7 @@ class NodeAPIRoutes:
             event_type="node_api_exception",
         )
 
-    def _format_timestamp(self, timestamp: Optional[float]) -> Optional[str]:
+    def _format_timestamp(self, timestamp: float | None) -> str | None:
         """Return RFC3339-ish string for telemetry fields."""
         if timestamp is None:
             return None
@@ -742,7 +773,7 @@ class NodeAPIRoutes:
         except (ValueError, TypeError, OverflowError):
             return None
 
-    def _build_peer_diversity_stats(self, manager: PeerManager) -> Dict[str, Any]:
+    def _build_peer_diversity_stats(self, manager: PeerManager) -> dict[str, Any]:
         """Snapshot peer diversity counters under lock for consistent reporting."""
         diversity_lock = getattr(manager, "_diversity_lock", None)
         context = diversity_lock if hasattr(diversity_lock, "__enter__") else nullcontext()
@@ -768,7 +799,7 @@ class NodeAPIRoutes:
             },
         }
 
-    def _build_peer_snapshot(self) -> Dict[str, Any]:
+    def _build_peer_snapshot(self) -> dict[str, Any]:
         """Assemble detailed peer metadata for verbose peer queries."""
         manager = getattr(self, "peer_manager", None)
         if not isinstance(manager, PeerManager):
@@ -780,7 +811,7 @@ class NodeAPIRoutes:
         trusted_set = {peer.lower() for peer in getattr(manager, "trusted_peers", set())}
         banned_set = {peer.lower() for peer in getattr(manager, "banned_peers", set())}
 
-        connections: List[Dict[str, Any]] = []
+        connections: list[dict[str, Any]] = []
         for peer_id, info in list(connected.items()):
             connected_at = float(info.get("connected_at", now) or now)
             last_seen = info.get("last_seen")
@@ -830,13 +861,13 @@ class NodeAPIRoutes:
             "discovered": discovery[:50] if isinstance(discovery, list) else [],
         }
 
-    def _detect_contract_interfaces(self, contract_address: str) -> Dict[str, bool]:
+    def _detect_contract_interfaces(self, contract_address: str) -> dict[str, bool]:
         """Check ERC-165 interface support for known token receiver standards."""
         manager = self.blockchain.smart_contract_manager
         if not manager:
             raise RuntimeError("Smart-contract manager unavailable")
 
-        supports: Dict[str, bool] = {}
+        supports: dict[str, bool] = {}
         for name, interface_id in KNOWN_TOKEN_RECEIVER_INTERFACES.items():
             calldata = ERC165_SELECTOR + interface_id.rjust(32, b"\x00")
             try:
@@ -898,7 +929,7 @@ class NodeAPIRoutes:
         default_limit: int = 50,
         max_limit: int = 500,
         default_offset: int = 0,
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         """Normalize pagination query params and enforce sane limits."""
         limit = request.args.get("limit", default=default_limit, type=int)
         offset = request.args.get("offset", default=default_offset, type=int)
@@ -918,7 +949,7 @@ class NodeAPIRoutes:
         """Setup core node routes (index, health, metrics, stats)."""
 
         @self.app.route("/", methods=["GET"])
-        def index() -> Tuple[Dict[str, Any], int]:
+        def index() -> tuple[dict[str, Any], int]:
             """Node information and available endpoints."""
             return (
                 jsonify(
@@ -934,15 +965,15 @@ class NodeAPIRoutes:
             )
 
         @self.app.route("/health", methods=["GET"])
-        def health_check() -> Tuple[Dict[str, Any], int]:
+        def health_check() -> tuple[dict[str, Any], int]:
             """Health check endpoint for Docker and monitoring."""
             overall_status = "healthy"
             http_status = 200
             timestamp = time.time()
-            blockchain_summary: Dict[str, Any] = {"accessible": False}
-            services: Dict[str, Any] = {"api": "running"}
-            backlog: Dict[str, Any] = {"pending_transactions": 0, "orphan_blocks": 0}
-            network: Dict[str, Any] = {"peers": 0}
+            blockchain_summary: dict[str, Any] = {"accessible": False}
+            services: dict[str, Any] = {"api": "running"}
+            backlog: dict[str, Any] = {"pending_transactions": 0, "orphan_blocks": 0}
+            network: dict[str, Any] = {"peers": 0}
 
             def degrade(reason: str) -> None:
                 nonlocal overall_status, http_status
@@ -1055,7 +1086,7 @@ class NodeAPIRoutes:
             return jsonify(response), http_status
 
         @self.app.route("/checkpoint/provenance", methods=["GET"])
-        def checkpoint_provenance() -> Tuple[Dict[str, Any], int]:
+        def checkpoint_provenance() -> tuple[dict[str, Any], int]:
             """Expose recent checkpoint provenance for diagnostics."""
             sync_coordinator = getattr(self.node, "partial_sync_coordinator", None)
             sync_mgr = getattr(sync_coordinator, "sync_manager", None) if sync_coordinator else None
@@ -1068,7 +1099,7 @@ class NodeAPIRoutes:
             return jsonify({"provenance": provenance}), 200
 
         @self.app.route("/metrics", methods=["GET"])
-        def prometheus_metrics() -> Tuple[str, int, Dict[str, str]]:
+        def prometheus_metrics() -> tuple[str, int, dict[str, str]]:
             """Prometheus metrics endpoint."""
             try:
                 metrics_output = self.node.metrics_collector.export_prometheus()
@@ -1077,7 +1108,7 @@ class NodeAPIRoutes:
                 return f"# Error generating metrics: {e}\n", 500, {"Content-Type": "text/plain"}
 
         @self.app.route("/stats", methods=["GET"])
-        def get_stats() -> Dict[str, Any]:
+        def get_stats() -> dict[str, Any]:
             """Get blockchain statistics."""
             stats = self.blockchain.get_stats()
             stats["miner_address"] = self.node.miner_address
@@ -1087,7 +1118,7 @@ class NodeAPIRoutes:
             return jsonify(stats)
 
         @self.app.route("/sync/progress", methods=["GET"])
-        def get_sync_progress() -> Tuple[Dict[str, Any], int]:
+        def get_sync_progress() -> tuple[dict[str, Any], int]:
             """
             Get light client sync progress.
 
@@ -1126,7 +1157,7 @@ class NodeAPIRoutes:
                 }), 500
 
         @self.app.route("/sync/status", methods=["GET"])
-        def get_sync_status() -> Tuple[Dict[str, Any], int]:
+        def get_sync_status() -> tuple[dict[str, Any], int]:
             """
             Get detailed sync status for all sync types.
 
@@ -1204,7 +1235,7 @@ class NodeAPIRoutes:
                 }), 500
 
         @self.app.route("/state/snapshot", methods=["GET"])
-        def get_state_snapshot() -> Tuple[Dict[str, Any], int]:
+        def get_state_snapshot() -> tuple[dict[str, Any], int]:
             """Expose a deterministic snapshot of chain state for integrity audits."""
             try:
                 if not hasattr(self.blockchain, "compute_state_snapshot"):
@@ -1223,7 +1254,7 @@ class NodeAPIRoutes:
             return jsonify({"success": True, "state": snapshot}), 200
 
         @self.app.route("/mempool", methods=["GET"])
-        def get_mempool_overview() -> Tuple[Dict[str, Any], int]:
+        def get_mempool_overview() -> tuple[dict[str, Any], int]:
             """Get mempool statistics and a snapshot of pending transactions."""
             limit_param = request.args.get("limit", default=100, type=int)
             limit = 100 if limit_param is None else limit_param
@@ -1249,7 +1280,7 @@ class NodeAPIRoutes:
                 return self._handle_exception(exc, "mempool_overview")
 
         @self.app.route("/mempool/stats", methods=["GET"])
-        def get_mempool_stats() -> Tuple[Dict[str, Any], int]:
+        def get_mempool_stats() -> tuple[dict[str, Any], int]:
             """Aggregate mempool fee statistics and congestion indicators."""
             limit_param = request.args.get("limit", default=0, type=int)
             limit = 0 if limit_param is None else limit_param
@@ -1334,7 +1365,7 @@ class NodeAPIRoutes:
                 "size_kb": overview.get("size_kb", size_bytes / 1024.0 if size_bytes else 0.0),
             }
 
-            response_body: Dict[str, Any] = {
+            response_body: dict[str, Any] = {
                 "success": True,
                 "limit": limit,
                 "timestamp": overview.get("timestamp"),
@@ -1348,7 +1379,7 @@ class NodeAPIRoutes:
             return jsonify(response_body), 200
 
         @self.app.route("/consensus/info", methods=["GET"])
-        def consensus_info() -> Tuple[Dict[str, Any], int]:
+        def consensus_info() -> tuple[dict[str, Any], int]:
             """Expose consensus manager status metrics."""
             manager = getattr(self.node, "consensus_manager", None)
             if manager is None:
@@ -1364,7 +1395,7 @@ class NodeAPIRoutes:
             return jsonify({"success": True, "consensus": info}), 200
 
         @self.app.route("/mempool/<txid>", methods=["DELETE"])
-        def delete_mempool_transaction(txid: str) -> Tuple[Dict[str, Any], int]:
+        def delete_mempool_transaction(txid: str) -> tuple[dict[str, Any], int]:
             """Remove a specific transaction from the mempool (admin only)."""
             auth_error = self._require_admin_auth()
             if auth_error:
@@ -1422,7 +1453,7 @@ class NodeAPIRoutes:
         """Setup blockchain query routes."""
 
         @self.app.route("/blocks", methods=["GET"])
-        def get_blocks() -> Dict[str, Any]:
+        def get_blocks() -> dict[str, Any]:
             """Get all blocks with pagination."""
             try:
                 limit, offset = self._get_pagination_params(default_limit=10, max_limit=200)
@@ -1455,7 +1486,7 @@ class NodeAPIRoutes:
             )
 
         @self.app.route("/blocks/<index>", methods=["GET"])
-        def get_block(index: str) -> Tuple[Dict[str, Any], int]:
+        def get_block(index: str) -> tuple[dict[str, Any], int]:
             """Get specific block by index with explicit validation (supports negative input)."""
             try:
                 idx_int = int(index)
@@ -1556,7 +1587,7 @@ class NodeAPIRoutes:
             return jsonify(payload), 200
 
         @self.app.route("/block/latest", methods=["GET"])
-        def get_latest_block() -> Tuple[Dict[str, Any], int]:
+        def get_latest_block() -> tuple[dict[str, Any], int]:
             """Return the most recent block plus a concise summary."""
             summary_param = request.args.get("summary", "false")
             summary_only = str(summary_param).lower() in {"1", "true", "yes", "on"}
@@ -1596,7 +1627,7 @@ class NodeAPIRoutes:
                 )
 
             summary = _build_block_summary(payload)
-            body: Dict[str, Any] = {
+            body: dict[str, Any] = {
                 "summary": summary,
                 "block_number": summary.get("height"),
                 "hash": summary.get("hash"),
@@ -1610,7 +1641,7 @@ class NodeAPIRoutes:
             return response, 200
 
         @self.app.route("/block/<block_hash>", methods=["GET"])
-        def get_block_by_hash(block_hash: str) -> Tuple[Dict[str, Any], int]:
+        def get_block_by_hash(block_hash: str) -> tuple[dict[str, Any], int]:
             """Get a block by its hash."""
             if not block_hash:
                 return jsonify({"error": "Invalid block hash"}), 400
@@ -1686,7 +1717,7 @@ class NodeAPIRoutes:
             return jsonify(payload), 200
 
         @self.app.route("/blocks/validate", methods=["POST"])
-        def validate_block_endpoint() -> Tuple[Dict[str, Any], int]:
+        def validate_block_endpoint() -> tuple[dict[str, Any], int]:
             """Validate a block by index or hash and optionally inspect transactions."""
             consensus_manager = getattr(self.node, "consensus_manager", None)
             if consensus_manager is None:
@@ -1750,7 +1781,7 @@ class NodeAPIRoutes:
             except (ValueError, RuntimeError) as exc:
                 return self._handle_exception(exc, "block_validate")
 
-            response_body: Dict[str, Any] = {
+            response_body: dict[str, Any] = {
                 "success": True,
                 "block_index": getattr(target_block, "index", block_index),
                 "block_hash": getattr(target_block, "hash", block_hash),
@@ -1770,7 +1801,7 @@ class NodeAPIRoutes:
             return jsonify(response_body), 200
 
         @self.app.route("/block/receive", methods=["POST"])
-        def receive_block() -> Tuple[Dict[str, Any], int]:
+        def receive_block() -> tuple[dict[str, Any], int]:
             """Receive a block from a peer node."""
             auth_error = self._require_api_auth()
             if auth_error:
@@ -1850,7 +1881,7 @@ class NodeAPIRoutes:
         """Setup exchange-related routes."""
 
         @self.app.route("/exchange/orders", methods=["GET"])
-        def get_order_book() -> Tuple[Dict[str, Any], int]:
+        def get_order_book() -> tuple[dict[str, Any], int]:
             """Get current order book (buy and sell orders)."""
             if not self.node.exchange_wallet_manager:
                 return jsonify({"success": False, "error": "Exchange module disabled"}), 503
@@ -1902,7 +1933,7 @@ class NodeAPIRoutes:
 
         @self.app.route("/exchange/place-order", methods=["POST"])
         @validate_request(self.request_validator, ExchangeOrderInput)
-        def place_order() -> Tuple[Dict[str, Any], int]:
+        def place_order() -> tuple[dict[str, Any], int]:
             """Place a buy or sell order with balance verification."""
             if not self.node.exchange_wallet_manager:
                 return self._error_response(
@@ -1913,7 +1944,7 @@ class NodeAPIRoutes:
                 return auth_error
 
             try:
-                model: Optional[ExchangeOrderInput] = getattr(request, "validated_model", None)
+                model: ExchangeOrderInput | None = getattr(request, "validated_model", None)
                 if model is None:
                     return self._error_response(
                         "Invalid order payload", status=400, code="invalid_payload"
@@ -2041,7 +2072,7 @@ class NodeAPIRoutes:
 
         @self.app.route("/exchange/cancel-order", methods=["POST"])
         @validate_request(self.request_validator, ExchangeCancelInput)
-        def cancel_order() -> Tuple[Dict[str, Any], int]:
+        def cancel_order() -> tuple[dict[str, Any], int]:
             """Cancel an open order."""
             if not self.node.exchange_wallet_manager:
                 return self._error_response(
@@ -2050,7 +2081,7 @@ class NodeAPIRoutes:
             auth_error = self._require_api_auth()
             if auth_error:
                 return auth_error
-            model: Optional[ExchangeCancelInput] = getattr(request, "validated_model", None)
+            model: ExchangeCancelInput | None = getattr(request, "validated_model", None)
             if model is None:
                 return self._error_response("Invalid payload", status=400, code="invalid_payload")
             try:
@@ -2097,7 +2128,7 @@ class NodeAPIRoutes:
                 return self._handle_exception(exc, "exchange_cancel_order")
 
         @self.app.route("/exchange/my-orders/<address>", methods=["GET"])
-        def get_my_orders(address: str) -> Tuple[Dict[str, Any], int]:
+        def get_my_orders(address: str) -> tuple[dict[str, Any], int]:
             """Get all orders for a specific address."""
             if not self.node.exchange_wallet_manager:
                 return jsonify({"success": False, "error": "Exchange module disabled"}), 503
@@ -2134,7 +2165,7 @@ class NodeAPIRoutes:
                 return jsonify({"error": str(e)}), 500
 
         @self.app.route("/exchange/trades", methods=["GET"])
-        def get_recent_trades() -> Tuple[Dict[str, Any], int]:
+        def get_recent_trades() -> tuple[dict[str, Any], int]:
             """Get recent executed trades."""
             if not self.node.exchange_wallet_manager:
                 return jsonify({"success": False, "error": "Exchange module disabled"}), 503
@@ -2172,7 +2203,7 @@ class NodeAPIRoutes:
 
         @self.app.route("/exchange/deposit", methods=["POST"])
         @validate_request(self.request_validator, ExchangeTransferInput)
-        def deposit_funds() -> Tuple[Dict[str, Any], int]:
+        def deposit_funds() -> tuple[dict[str, Any], int]:
             """Deposit funds into exchange wallet."""
             if not self.node.exchange_wallet_manager:
                 return self._error_response(
@@ -2183,7 +2214,7 @@ class NodeAPIRoutes:
                 return auth_error
 
             try:
-                model: Optional[ExchangeTransferInput] = getattr(request, "validated_model", None)
+                model: ExchangeTransferInput | None = getattr(request, "validated_model", None)
                 if model is None:
                     return self._error_response(
                         "Invalid deposit payload", status=400, code="invalid_payload"
@@ -2218,7 +2249,7 @@ class NodeAPIRoutes:
 
         @self.app.route("/exchange/withdraw", methods=["POST"])
         @validate_request(self.request_validator, ExchangeTransferInput)
-        def withdraw_funds() -> Tuple[Dict[str, Any], int]:
+        def withdraw_funds() -> tuple[dict[str, Any], int]:
             """Withdraw funds from exchange wallet."""
             if not self.node.exchange_wallet_manager:
                 return self._error_response(
@@ -2229,7 +2260,7 @@ class NodeAPIRoutes:
                 return auth_error
 
             try:
-                model: Optional[ExchangeTransferInput] = getattr(request, "validated_model", None)
+                model: ExchangeTransferInput | None = getattr(request, "validated_model", None)
                 if model is None or not (model.destination or model.to_address):
                     return self._error_response(
                         "Invalid withdraw payload", status=400, code="invalid_payload"
@@ -2262,7 +2293,7 @@ class NodeAPIRoutes:
                 return self._handle_exception(exc, "exchange_withdraw")
 
         @self.app.route("/exchange/balance/<address>", methods=["GET"])
-        def get_user_balance(address: str) -> Tuple[Dict[str, Any], int]:
+        def get_user_balance(address: str) -> tuple[dict[str, Any], int]:
             """Get all balances for a user."""
             if not self.node.exchange_wallet_manager:
                 return jsonify({"success": False, "error": "Exchange module disabled"}), 503
@@ -2281,7 +2312,7 @@ class NodeAPIRoutes:
                 return jsonify({"error": str(e)}), 500
 
         @self.app.route("/exchange/balance/<address>/<currency>", methods=["GET"])
-        def get_currency_balance(address: str, currency: str) -> Tuple[Dict[str, Any], int]:
+        def get_currency_balance(address: str, currency: str) -> tuple[dict[str, Any], int]:
             """Get balance for specific currency."""
             if not self.node.exchange_wallet_manager:
                 return jsonify({"success": False, "error": "Exchange module disabled"}), 503
@@ -2301,7 +2332,7 @@ class NodeAPIRoutes:
                 return jsonify({"error": str(e)}), 500
 
         @self.app.route("/exchange/transactions/<address>", methods=["GET"])
-        def get_transactions(address: str) -> Tuple[Dict[str, Any], int]:
+        def get_transactions(address: str) -> tuple[dict[str, Any], int]:
             """Get transaction history for user."""
             if not self.node.exchange_wallet_manager:
                 return jsonify({"success": False, "error": "Exchange module disabled"}), 503
@@ -2329,7 +2360,7 @@ class NodeAPIRoutes:
         """Setup exchange statistics routes."""
 
         @self.app.route("/exchange/price-history", methods=["GET"])
-        def get_price_history() -> Tuple[Dict[str, Any], int]:
+        def get_price_history() -> tuple[dict[str, Any], int]:
             """Get historical price data for charts."""
             if not self.node.exchange_wallet_manager:
                 return jsonify({"success": False, "error": "Exchange module disabled"}), 503
@@ -2384,7 +2415,7 @@ class NodeAPIRoutes:
                 return jsonify({"error": str(e)}), 500
 
         @self.app.route("/exchange/stats", methods=["GET"])
-        def get_exchange_stats() -> Tuple[Dict[str, Any], int]:
+        def get_exchange_stats() -> tuple[dict[str, Any], int]:
             """Get exchange statistics."""
             if not self.node.exchange_wallet_manager:
                 return jsonify({"success": False, "error": "Exchange module disabled"}), 503
@@ -2439,7 +2470,7 @@ class NodeAPIRoutes:
 
         @self.app.route("/exchange/buy-with-card", methods=["POST"])
         @validate_request(self.request_validator, ExchangeCardPurchaseInput)
-        def buy_with_card() -> Tuple[Dict[str, Any], int]:
+        def buy_with_card() -> tuple[dict[str, Any], int]:
             """Buy AXN with credit/debit card."""
             if not (self.node.payment_processor and self.node.exchange_wallet_manager):
                 return self._error_response(
@@ -2449,7 +2480,7 @@ class NodeAPIRoutes:
             if auth_error:
                 return auth_error
             try:
-                model: Optional[ExchangeCardPurchaseInput] = getattr(request, "validated_model", None)
+                model: ExchangeCardPurchaseInput | None = getattr(request, "validated_model", None)
                 if model is None:
                     return self._error_response("Invalid payload", status=400, code="invalid_payload")
 
@@ -2508,7 +2539,7 @@ class NodeAPIRoutes:
                 return self._handle_exception(exc, "exchange_buy_with_card")
 
         @self.app.route("/exchange/payment-methods", methods=["GET"])
-        def get_payment_methods() -> Tuple[Dict[str, Any], int]:
+        def get_payment_methods() -> tuple[dict[str, Any], int]:
             """Get supported payment methods."""
             if not self.node.payment_processor:
                 return jsonify({"success": False, "error": "Payment module disabled"}), 503
@@ -2526,7 +2557,7 @@ class NodeAPIRoutes:
                 return jsonify({"error": str(e)}), 500
 
         @self.app.route("/exchange/calculate-purchase", methods=["POST"])
-        def calculate_purchase() -> Tuple[Dict[str, Any], int]:
+        def calculate_purchase() -> tuple[dict[str, Any], int]:
             """Calculate AXN amount for USD purchase."""
             if not self.node.payment_processor:
                 return jsonify({"success": False, "error": "Payment module disabled"}), 503

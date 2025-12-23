@@ -1,16 +1,17 @@
+from __future__ import annotations
+
 """
 Blockchain Client for XAI SDK
 
 Handles blockchain querying and synchronization operations.
 """
 
-from typing import Optional, Dict, Any, List
 from datetime import datetime
+from typing import Any
 
+from ..exceptions import ValidationError, XAIError
 from ..http_client import HTTPClient
 from ..models import Block, BlockchainStats
-from ..exceptions import XAIError, ValidationError
-
 
 class BlockchainClient:
     """Client for blockchain operations."""
@@ -41,7 +42,7 @@ class BlockchainClient:
             raise ValidationError("block_number must be non-negative")
 
         try:
-            response = self.http_client.get(f"/blockchain/blocks/{block_number}")
+            response = self.http_client.get(f"/blocks/{block_number}")
 
             return Block(
                 number=response["number"],
@@ -55,10 +56,15 @@ class BlockchainClient:
                 transactions=response.get("transaction_count", 0),
                 transaction_hashes=response.get("transactions", []),
             )
-        except Exception as e:
-            raise XAIError(f"Failed to get block: {str(e)}")
+        except XAIError:
 
-    def list_blocks(self, limit: int = 20, offset: int = 0) -> Dict[str, Any]:
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise XAIError(f"Failed to get block: {str(e)}") from e
+
+    def list_blocks(self, limit: int = 20, offset: int = 0) -> dict[str, Any]:
         """
         List recent blocks.
 
@@ -77,7 +83,7 @@ class BlockchainClient:
 
         try:
             response = self.http_client.get(
-                "/blockchain/blocks",
+                "/blocks",
                 params={"limit": limit, "offset": offset},
             )
 
@@ -102,10 +108,15 @@ class BlockchainClient:
                 "limit": response.get("limit", limit),
                 "offset": response.get("offset", offset),
             }
-        except Exception as e:
-            raise XAIError(f"Failed to list blocks: {str(e)}")
+        except XAIError:
 
-    def get_block_transactions(self, block_number: int) -> List[Dict[str, Any]]:
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise XAIError(f"Failed to list blocks: {str(e)}") from e
+
+    def get_block_transactions(self, block_number: int) -> list[dict[str, Any]]:
         """
         Get transactions in a block.
 
@@ -123,13 +134,18 @@ class BlockchainClient:
 
         try:
             response = self.http_client.get(
-                f"/blockchain/blocks/{block_number}/transactions"
+                f"/blocks/{block_number}/transactions"
             )
             return response.get("transactions", [])
-        except Exception as e:
-            raise XAIError(f"Failed to get block transactions: {str(e)}")
+        except XAIError:
 
-    def get_sync_status(self) -> Dict[str, Any]:
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise XAIError(f"Failed to get block transactions: {str(e)}") from e
+
+    def get_sync_status(self) -> dict[str, Any]:
         """
         Get blockchain synchronization status.
 
@@ -140,9 +156,14 @@ class BlockchainClient:
             XAIError: If sync status retrieval fails
         """
         try:
-            return self.http_client.get("/blockchain/sync")
-        except Exception as e:
-            raise XAIError(f"Failed to get sync status: {str(e)}")
+            return self.http_client.get("/sync")
+        except XAIError:
+
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise XAIError(f"Failed to get sync status: {str(e)}") from e
 
     def is_synced(self) -> bool:
         """
@@ -157,8 +178,13 @@ class BlockchainClient:
         try:
             status = self.get_sync_status()
             return not status.get("syncing", False)
-        except Exception as e:
-            raise XAIError(f"Failed to check sync status: {str(e)}")
+        except XAIError:
+
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise XAIError(f"Failed to check sync status: {str(e)}") from e
 
     def get_stats(self) -> BlockchainStats:
         """
@@ -183,10 +209,15 @@ class BlockchainClient:
                 total_supply=response["total_supply"],
                 network=response.get("network", "mainnet"),
             )
-        except Exception as e:
-            raise XAIError(f"Failed to get blockchain stats: {str(e)}")
+        except XAIError:
 
-    def get_node_info(self) -> Dict[str, Any]:
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise XAIError(f"Failed to get blockchain stats: {str(e)}") from e
+
+    def get_node_info(self) -> dict[str, Any]:
         """
         Get blockchain node information.
 
@@ -198,10 +229,15 @@ class BlockchainClient:
         """
         try:
             return self.http_client.get("/")
-        except Exception as e:
-            raise XAIError(f"Failed to get node info: {str(e)}")
+        except XAIError:
 
-    def get_health(self) -> Dict[str, Any]:
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise XAIError(f"Failed to get node info: {str(e)}") from e
+
+    def get_health(self) -> dict[str, Any]:
         """
         Get node health status.
 
@@ -213,5 +249,10 @@ class BlockchainClient:
         """
         try:
             return self.http_client.get("/health")
-        except Exception as e:
-            raise XAIError(f"Failed to check node health: {str(e)}")
+        except XAIError:
+
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise XAIError(f"Failed to check node health: {str(e)}") from e

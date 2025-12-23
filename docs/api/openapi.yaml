@@ -15,12 +15,12 @@ info:
     name: MIT
     url: https://opensource.org/licenses/MIT
 servers:
-- url: http://localhost:12001
-  description: Local development
-- url: https://testnet-api.xai-blockchain.io
-  description: Testnet
-- url: https://api.xai-blockchain.io
-  description: Production
+- url: http://localhost:12001/api/v1
+  description: Local development (v1 API)
+- url: https://testnet-api.xai-blockchain.io/api/v1
+  description: Testnet (v1 API)
+- url: https://api.xai-blockchain.io/api/v1
+  description: Production (v1 API)
 tags:
 - name: Core
   description: Node metadata, health, and statistics

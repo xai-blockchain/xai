@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 HTTP Client for XAI SDK
 
@@ -5,28 +7,28 @@ Handles all HTTP communication with retry logic, connection pooling,
 and error handling.
 """
 
-import requests
-import time
 import logging
-from typing import Optional, Dict, Any, List
+import time
+from typing import Any
 from urllib.parse import urljoin
+
+import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
 from .exceptions import (
-    XAIError,
     AuthenticationError,
-    RateLimitError,
-    NetworkError,
-    TimeoutError,
-    NotFoundError,
-    ValidationError,
     InternalServerError,
+    NetworkError,
+    NotFoundError,
+    RateLimitError,
     ServiceUnavailableError,
+    TimeoutError,
+    ValidationError,
+    XAIError,
 )
 
 logger = logging.getLogger(__name__)
-
 
 class HTTPClient:
     """
@@ -43,12 +45,13 @@ class HTTPClient:
     def __init__(
         self,
         base_url: str,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         timeout: int = 30,
         max_retries: int = 3,
         backoff_factor: float = 0.5,
         pool_connections: int = 10,
         pool_maxsize: int = 10,
+        api_version: str = "v1",
     ) -> None:
         """
         Initialize HTTP client.
@@ -61,8 +64,10 @@ class HTTPClient:
             backoff_factor: Backoff factor for exponential backoff
             pool_connections: Number of connection pools
             pool_maxsize: Maximum size of connection pool
+            api_version: API version to use (default: v1)
         """
-        self.base_url = base_url
+        # Normalize base_url to include /api/vX/ prefix
+        self.base_url = self._normalize_base_url(base_url, api_version)
         self.api_key = api_key
         self.timeout = timeout
         self.max_retries = max_retries
@@ -72,6 +77,34 @@ class HTTPClient:
         self.session = requests.Session()
         self._setup_connection_pooling(pool_connections, pool_maxsize)
         self._setup_retry_strategy()
+
+    def _normalize_base_url(self, base_url: str, api_version: str) -> str:
+        """
+        Normalize base URL to include /api/vX/ prefix if not already present.
+
+        Args:
+            base_url: Original base URL
+            api_version: API version (e.g., 'v1')
+
+        Returns:
+            Normalized base URL with /api/vX/ prefix
+        """
+        # Remove trailing slash
+        url = base_url.rstrip("/")
+
+        # Check if URL already has /api/vX/ pattern
+        if f"/api/{api_version}" in url:
+            return url
+
+        # Check if URL has legacy /vX/ pattern (redirect will handle it)
+        if f"/{api_version}" in url and "/api/" not in url:
+            logger.warning(
+                f"Using legacy API URL pattern. Consider updating to /api/{api_version}/"
+            )
+            return url
+
+        # Add /api/vX/ prefix
+        return f"{url}/api/{api_version}"
 
     def _setup_connection_pooling(
         self, pool_connections: int, pool_maxsize: int
@@ -102,7 +135,7 @@ class HTTPClient:
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
 
-    def _get_headers(self, custom_headers: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    def _get_headers(self, custom_headers: dict[str, str] | None = None) -> dict[str, str]:
         """
         Get request headers with authentication.
 
@@ -125,7 +158,7 @@ class HTTPClient:
 
         return headers
 
-    def _handle_response(self, response: requests.Response) -> Dict[str, Any]:
+    def _handle_response(self, response: requests.Response) -> dict[str, Any]:
         """
         Handle API response and raise appropriate exceptions.
 
@@ -173,9 +206,9 @@ class HTTPClient:
     def get(
         self,
         endpoint: str,
-        params: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         """
         Make a GET request.
 
@@ -209,9 +242,9 @@ class HTTPClient:
     def post(
         self,
         endpoint: str,
-        data: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
+        data: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         """
         Make a POST request.
 
@@ -245,9 +278,9 @@ class HTTPClient:
     def put(
         self,
         endpoint: str,
-        data: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
+        data: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         """
         Make a PUT request.
 
@@ -281,9 +314,9 @@ class HTTPClient:
     def delete(
         self,
         endpoint: str,
-        params: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         """
         Make a DELETE request.
 

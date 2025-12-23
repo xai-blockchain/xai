@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI API Blueprints
 
@@ -9,21 +11,23 @@ Usage:
     register_blueprints(app, node, blockchain, peer_manager, api_auth, ...)
 """
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
+import logging
 
-from flask import Flask, g
+from flask import Flask, g, redirect, request
 
-from xai.core.api_blueprints.core_bp import core_bp
-from xai.core.api_blueprints.blockchain_bp import blockchain_bp
-from xai.core.api_blueprints.wallet_bp import wallet_bp
-from xai.core.api_blueprints.mining_bp import mining_bp
-from xai.core.api_blueprints.exchange_bp import exchange_bp
 from xai.core.api_blueprints.admin_bp import admin_bp
+from xai.core.api_blueprints.blockchain_bp import blockchain_bp
+from xai.core.api_blueprints.core_bp import core_bp
+from xai.core.api_blueprints.exchange_bp import exchange_bp
+from xai.core.api_blueprints.mining_bp import mining_bp
+from xai.core.api_blueprints.payment_bp import payment_bp
+from xai.core.api_blueprints.wallet_bp import wallet_bp
 
 if TYPE_CHECKING:
-    from xai.network.peer_manager import PeerManager
     from xai.core.api_auth import APIAuthManager, APIKeyStore
     from xai.core.error_handlers import ErrorHandlerRegistry
+    from xai.network.peer_manager import PeerManager
     from xai.wallet.spending_limits import SpendingLimitManager
 
 __all__ = [
@@ -33,9 +37,13 @@ __all__ = [
     "mining_bp",
     "exchange_bp",
     "admin_bp",
+    "payment_bp",
     "register_blueprints",
+    "register_legacy_redirects",
     "ALL_BLUEPRINTS",
 ]
+
+logger = logging.getLogger(__name__)
 
 ALL_BLUEPRINTS = [
     core_bp,
@@ -46,16 +54,15 @@ ALL_BLUEPRINTS = [
     # admin_bp has url_prefix="/admin", register separately
 ]
 
-
 def register_blueprints(
     app: Flask,
     node: Any,
     blockchain: Any,
-    peer_manager: Optional["PeerManager"] = None,
-    api_auth: Optional["APIAuthManager"] = None,
-    api_key_store: Optional["APIKeyStore"] = None,
-    error_registry: Optional["ErrorHandlerRegistry"] = None,
-    spending_limits: Optional["SpendingLimitManager"] = None,
+    peer_manager: "PeerManager" | None = None,
+    api_auth: "APIAuthManager" | None = None,
+    api_key_store: "APIKeyStore" | None = None,
+    error_registry: "ErrorHandlerRegistry" | None = None,
+    spending_limits: "SpendingLimitManager" | None = None,
 ) -> None:
     """
     Register all API blueprints with the Flask app.
@@ -90,10 +97,81 @@ def register_blueprints(
         """Inject API context into Flask's g object for blueprint access."""
         g.api_context = api_context
 
-    # Register blueprints without url_prefix
+    # Register blueprints without url_prefix (they define their own)
     for bp in ALL_BLUEPRINTS:
         app.register_blueprint(bp)
 
     # Register blueprints with url_prefix
     app.register_blueprint(exchange_bp)  # has url_prefix="/exchange"
     app.register_blueprint(admin_bp)  # has url_prefix="/admin"
+    app.register_blueprint(payment_bp)  # has url_prefix="/payment"
+
+
+def register_legacy_redirects(app: Flask) -> None:
+    """
+    Register HTTP 301 redirects from old unversioned routes to new /api/v1/ routes.
+
+    This maintains backward compatibility while encouraging migration to versioned API.
+    Redirects include deprecation warnings in response headers.
+
+    Args:
+        app: Flask application instance
+    """
+    # Define legacy routes that should redirect to /api/v1/
+    legacy_patterns = [
+        "/blocks",
+        "/blocks/<path:subpath>",
+        "/block/<path:subpath>",
+        "/transactions",
+        "/transaction/<path:subpath>",
+        "/wallet/<path:subpath>",
+        "/balance/<path:subpath>",
+        "/send",
+        "/mine",
+        "/peers",
+        "/stats",
+        "/health",
+        "/mempool",
+        "/mempool/<path:subpath>",
+        "/exchange/<path:subpath>",
+        "/admin/<path:subpath>",
+    ]
+
+    def create_redirect_handler(pattern: str):
+        """Factory to create redirect handlers for each pattern."""
+        def redirect_handler(**kwargs):
+            # Build new URL with /api/v1/ prefix
+            old_path = request.path
+            new_path = f"/api/v1{old_path}"
+
+            # Preserve query string
+            if request.query_string:
+                new_path = f"{new_path}?{request.query_string.decode('utf-8')}"
+
+            # Log deprecation warning
+            logger.warning(
+                "Deprecated API endpoint accessed (will be removed in future version)",
+                extra={
+                    "event": "api.deprecated_endpoint",
+                    "old_path": old_path,
+                    "new_path": new_path,
+                    "remote_addr": request.remote_addr,
+                }
+            )
+
+            # Create redirect response with deprecation headers
+            response = redirect(new_path, code=301)
+            response.headers["Deprecation"] = "true"
+            response.headers["X-API-Deprecated"] = "Use /api/v1/ prefix for all API calls"
+            response.headers["Link"] = '</api/v1>; rel="successor-version"'
+            return response
+
+        # Set a unique name for each redirect handler
+        redirect_handler.__name__ = f"legacy_redirect_{pattern.replace('/', '_').replace('<', '').replace('>', '')}"
+        return redirect_handler
+
+    # Register redirect routes
+    for pattern in legacy_patterns:
+        handler = create_redirect_handler(pattern)
+        # Use the same methods as the original endpoint would accept
+        app.add_url_rule(pattern, view_func=handler, methods=["GET", "POST", "PUT", "DELETE", "PATCH"])

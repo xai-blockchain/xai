@@ -37,7 +37,9 @@ jobs:
           ruff check src/ tests/ --output-format=github
 
       - name: Run MyPy
-        run: mypy src/
+        run: |
+          cd src
+          python3 -m mypy xai --show-error-codes --pretty
         continue-on-error: true
 
       - name: Run Flake8
