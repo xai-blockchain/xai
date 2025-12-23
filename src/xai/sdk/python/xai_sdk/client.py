@@ -16,6 +16,7 @@ from .clients import (
 )
 from .http_client import HTTPClient
 
+
 class XAIClient:
     """
     Main client for XAI blockchain operations.

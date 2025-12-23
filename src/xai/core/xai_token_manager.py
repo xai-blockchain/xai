@@ -12,6 +12,7 @@ from typing import Any
 from xai.core.structured_logger import StructuredLogger, get_structured_logger
 from xai.core.xai_token import XAIToken
 
+
 class XAITokenManager:
     """
     Manages the XAI token, its supply, and individual balances.

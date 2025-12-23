@@ -241,6 +241,7 @@ class Alert:
 
 from xai.core.blockchain_interface import BlockchainDataProvider
 
+
 class _LazyBlockchainProvider:
     """
     Adapter that fetches fresh blockchain stats on every call, whether provided

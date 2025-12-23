@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 
+
 class BiometricType(Enum):
     """Types of biometric authentication supported."""
     FACE_ID = "face_id"

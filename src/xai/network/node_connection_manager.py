@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 from xai.core.p2p_security import P2PSecurityConfig, P2PSecurityManager
 
+
 class NodeConnectionManager:
     def __init__(
         self,

@@ -13,6 +13,7 @@ from ..exceptions import ValidationError, WalletError
 from ..http_client import HTTPClient
 from ..models import Balance, Wallet, WalletType
 
+
 class WalletClient:
     """Client for wallet operations."""
 

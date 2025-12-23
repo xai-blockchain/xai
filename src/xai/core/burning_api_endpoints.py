@@ -22,6 +22,7 @@ from flask import Response, jsonify, request
 from xai.core.anonymous_treasury import AnonymousTreasury
 from xai.core.token_burning_engine import ServiceType, TokenBurningEngine
 
+
 def setup_burning_api(app: Any, node: Any) -> TokenBurningEngine:
     """
     Setup token burning API endpoints

@@ -5,6 +5,7 @@ from typing import Any
 
 import requests
 
+
 class NodeCheckError(RuntimeError):
     """Raised when a node or explorer endpoint cannot be queried."""
 

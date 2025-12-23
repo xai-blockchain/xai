@@ -21,6 +21,7 @@ from ecdsa import BadSignatureError, SECP256k1, VerifyingKey
 from .checkpoint_payload import CheckpointPayload
 from .chunked_sync import ChunkedStateSyncService, SyncProgress
 
+
 @dataclass
 class CheckpointMetadata:
     """Simple typed container for checkpoint metadata."""

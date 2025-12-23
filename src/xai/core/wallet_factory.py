@@ -15,6 +15,7 @@ from typing import Any
 from xai.core.structured_logger import StructuredLogger, get_structured_logger
 from xai.core.wallet import Wallet, WalletManager
 
+
 class CollisionResistance:
     """
     Collision resistance for wallet address generation.

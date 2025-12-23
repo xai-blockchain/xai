@@ -15,6 +15,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+
 class StorageManager:
     """
     Manages a persistent key-value store backed by a SQLite database.

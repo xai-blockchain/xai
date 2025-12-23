@@ -18,6 +18,7 @@ from collections import deque
 from enum import Enum
 from typing import Any, Callable
 
+
 class CircuitState(Enum):
     """Circuit breaker states for failure management."""
 

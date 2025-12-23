@@ -14,6 +14,7 @@ import requests
 
 from .spv_header_store import Header, SPVHeaderStore
 
+
 class SPVHeaderIngestor:
     """Validate linkage and ingest headers into SPVHeaderStore."""
 

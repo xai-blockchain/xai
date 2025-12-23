@@ -13,6 +13,7 @@ from ..exceptions import ValidationError, XAIError
 from ..http_client import HTTPClient
 from ..models import TradeOrder
 
+
 class TradingClient:
     """Client for trading operations."""
 

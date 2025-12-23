@@ -20,6 +20,7 @@ import os
 from datetime import datetime, timezone
 from enum import Enum
 
+
 class SpendingCategory(Enum):
     """Categories for treasury spending (public, anonymous)"""
 

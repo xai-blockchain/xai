@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from collections import defaultdict, deque
 
+
 class DDoSProtector:
     def __init__(
         self,

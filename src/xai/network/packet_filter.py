@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 class PacketFilter:
     def __init__(self, default_allowed_ports: list[int] = None):
         self.allowed_ports: set[int] = (

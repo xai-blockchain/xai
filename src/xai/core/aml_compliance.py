@@ -12,6 +12,7 @@ import time
 from enum import Enum
 from typing import Any
 
+
 class RiskLevel(Enum):
     """Risk level classifications"""
 

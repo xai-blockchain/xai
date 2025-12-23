@@ -17,6 +17,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Callable
 
+
 @dataclass
 class TransactionBatch:
     """Batch of transactions"""

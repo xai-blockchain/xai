@@ -201,6 +201,7 @@ def encrypt_wallet_data(wallet_data: dict[str, Any], password: str, kdf: str = "
 
 from dataclasses import dataclass
 
+
 @dataclass
 class DecryptionData:
     encrypted_data: bytes

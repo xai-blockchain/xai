@@ -8,6 +8,7 @@ logger = logging.getLogger("xai.blockchain.vesting_manager")
 
 from dataclasses import dataclass
 
+
 @dataclass
 class VestingScheduleData:
     recipient_address: str

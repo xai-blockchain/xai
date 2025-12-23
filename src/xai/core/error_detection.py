@@ -440,10 +440,10 @@ class CorruptionDetector:
                     except Exception as e:
                         # Catch signature verification errors
                         from xai.core.transaction import (
-                            SignatureVerificationError,
-                            MissingSignatureError,
                             InvalidSignatureError,
-                            SignatureCryptoError
+                            MissingSignatureError,
+                            SignatureCryptoError,
+                            SignatureVerificationError,
                         )
                         if isinstance(e, (SignatureVerificationError, MissingSignatureError, InvalidSignatureError, SignatureCryptoError)):
                             errors.append(f"Block {i}, tx {j}: Signature verification failed: {e}")

@@ -41,6 +41,7 @@ from xai.core.config import Config
 from xai.core.crypto_utils import sign_message_hex, verify_signature_hex
 from xai.core.wallet import WalletManager
 
+
 class SponsorSignatureError(RuntimeError):
     """Raised when sponsor signature generation fails."""
 

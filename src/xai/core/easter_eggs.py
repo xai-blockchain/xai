@@ -35,6 +35,7 @@ from xai.core.constants import (
 from xai.core.wallet import Wallet
 from xai.core.wallet_encryption import WalletEncryption
 
+
 class LuckyBlockSystem:
     """
     Random blocks get 2x reward

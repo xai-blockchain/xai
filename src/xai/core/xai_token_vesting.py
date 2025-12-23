@@ -12,6 +12,7 @@ from typing import Any
 from xai.core.structured_logger import StructuredLogger, get_structured_logger
 from xai.core.xai_token_manager import XAITokenManager, get_xai_token_manager
 
+
 class XAITokenVesting:
     """
     Manages vesting schedules for XAI tokens.

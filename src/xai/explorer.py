@@ -17,8 +17,8 @@ from threading import Lock
 import requests
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 
-from xai.core.process_sandbox import maybe_enable_process_sandbox
 from xai.core.flask_secret_manager import get_flask_secret_key
+from xai.core.process_sandbox import maybe_enable_process_sandbox
 
 app = Flask(__name__)
 # Use persistent secret key manager to prevent session invalidation on restart

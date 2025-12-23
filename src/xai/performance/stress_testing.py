@@ -51,6 +51,7 @@ class StressTestResult:
 
 from abc import ABC, abstractmethod
 
+
 class StressTest(ABC):
     """Base class for stress tests"""
 

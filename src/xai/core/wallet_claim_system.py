@@ -15,6 +15,7 @@ import time
 
 from xai.core.wallet import Wallet
 
+
 class WalletClaimSystem:
     """Manages automatic wallet distribution to early adopters"""
 

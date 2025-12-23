@@ -13,6 +13,7 @@ import importlib.util
 import sysconfig
 from pathlib import Path
 
+
 class ModuleAttachmentError(RuntimeError):
     """Raised when a module fails attachment validation."""
 

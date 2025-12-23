@@ -12,6 +12,7 @@ from ..exceptions import MiningError, ValidationError
 from ..http_client import HTTPClient
 from ..models import MiningStatus
 
+
 class MiningClient:
     """Client for mining operations."""
 

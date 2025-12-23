@@ -9,6 +9,7 @@ import time
 from decimal import Decimal
 from enum import Enum
 
+
 class RefundReason(Enum):
     """Reasons for payment refunds"""
     DUPLICATE_PAYMENT = "duplicate_payment"

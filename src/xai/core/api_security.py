@@ -12,6 +12,7 @@ from flask import request
 from xai.core.config import Config
 from xai.core.security_validation import ValidationError, validate_api_request
 
+
 class RateLimitExceeded(ValidationError):
     """Raise when a client exceeds the configured rate limits."""
 

@@ -14,6 +14,7 @@ Address Format:
 
 import hashlib
 
+
 def _keccak256(data: bytes) -> bytes:
     """Compute keccak256 hash (same as Ethereum)."""
     from Crypto.Hash import keccak

@@ -14,12 +14,12 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from xai.core.block_header import BlockHeader
+from xai.core.blockchain_exceptions import StorageError, ValidationError
 from xai.core.config import Config
 from xai.core.structured_logger import get_structured_logger
-from xai.core.blockchain_exceptions import ValidationError, StorageError
 
 if TYPE_CHECKING:
-    from xai.core.blockchain import Blockchain, Block
+    from xai.core.blockchain import Block, Blockchain
     from xai.core.transaction import Transaction
 
 class BlockProcessor:

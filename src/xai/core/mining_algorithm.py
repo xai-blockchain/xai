@@ -10,6 +10,7 @@ import json
 import time
 from decimal import Decimal
 
+
 class MiningAlgorithm:
     """
     XAI Mining Algorithm - Hybrid RandomX-Light

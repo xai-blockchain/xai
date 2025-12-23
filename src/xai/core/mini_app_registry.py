@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+
 @dataclass
 class MiniAppManifestEntry:
     """Definition of a mini-app as seen by the UI layer."""

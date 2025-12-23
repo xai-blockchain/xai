@@ -31,6 +31,7 @@ from xai.core.chunked_sync import (
 )
 from xai.core.structured_logger import get_structured_logger
 
+
 class SyncState(Enum):
     """State of the sync operation."""
     IDLE = "idle"

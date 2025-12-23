@@ -13,6 +13,7 @@ from ..exceptions import GovernanceError, ValidationError
 from ..http_client import HTTPClient
 from ..models import Proposal, ProposalStatus
 
+
 class GovernanceClient:
     """Client for governance operations."""
 

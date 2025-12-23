@@ -32,6 +32,7 @@ from typing import Any
 from xai.core.checkpoint_payload import CheckpointPayload
 from xai.core.structured_logger import get_structured_logger
 
+
 class ChunkPriority(Enum):
     """Priority levels for chunk download ordering."""
     CRITICAL = 0   # Account balances, UTXO set

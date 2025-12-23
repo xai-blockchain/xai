@@ -41,6 +41,7 @@ from xai.core.utxo_manager import UTXOManager
 from xai.core.vm.manager import SmartContractManager
 from xai.core.wallet_trade_manager_impl import WalletTradeManager
 
+
 def canonical_json(data: dict[str, Any]) -> str:
     """Produce deterministic JSON string for consensus-critical hashing.
 

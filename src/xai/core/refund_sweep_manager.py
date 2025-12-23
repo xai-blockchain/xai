@@ -10,6 +10,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
+
 class RefundSweepManager:
     """Identify swaps that should be refunded."""
 

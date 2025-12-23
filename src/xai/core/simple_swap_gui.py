@@ -16,6 +16,7 @@ import secrets
 import time
 from enum import Enum
 
+
 class SwapOrderType(Enum):
     """Type of swap order"""
 

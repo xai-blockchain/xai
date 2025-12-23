@@ -4,6 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, confloat, conint, constr
 
+
 class NodeTransactionInput(BaseModel):
     sender: str
     recipient: str

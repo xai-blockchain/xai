@@ -32,6 +32,7 @@ from enum import Enum
 
 from xai.core.ai_pool_with_strict_limits import AIProvider, StrictAIPoolManager
 
+
 class CollaborationStrategy(Enum):
     """How multiple AIs should collaborate"""
 

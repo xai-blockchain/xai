@@ -13,6 +13,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
+
 @dataclass
 class SimulatedTransaction:
     """Simulated transaction for fee market testing"""

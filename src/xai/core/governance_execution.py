@@ -11,6 +11,7 @@ import time
 from enum import Enum
 from typing import Any
 
+
 class ProposalType(Enum):
     """Core proposal types"""
 

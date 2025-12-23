@@ -32,6 +32,7 @@ from typing import Any
 
 from pythonjsonlogger import jsonlogger
 
+
 class CustomJsonFormatter(jsonlogger.JsonFormatter):
     """
     Enhanced JSON formatter with additional context fields.

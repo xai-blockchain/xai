@@ -8,6 +8,7 @@ Provides comprehensive error handling for SDK operations.
 
 from typing import Any
 
+
 class XAIError(Exception):
     """Base exception class for all XAI SDK errors."""
 

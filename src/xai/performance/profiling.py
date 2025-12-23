@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from functools import wraps
 from typing import Any, Callable
 
+
 @dataclass
 class MemorySnapshot:
     """Memory snapshot at a point in time"""

@@ -29,6 +29,7 @@ if CORE_DIR not in sys.path:
 from src.xai.core.ai_pool_with_strict_limits import AIProvider, StrictAIPoolManager
 from src.xai.core.secure_api_key_manager import SecureAPIKeyManager
 
+
 class AIModel(Enum):
     """Supported AI models for development"""
 

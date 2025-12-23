@@ -24,6 +24,7 @@ import time
 from dataclasses import dataclass
 from enum import Enum
 
+
 class VoteCheckpoint(Enum):
     """Multiple voting stages throughout project"""
 

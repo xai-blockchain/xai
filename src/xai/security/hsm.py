@@ -23,6 +23,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
+
 # Security-specific exceptions
 class HSMError(Exception):
     """Base exception for HSM operations"""

@@ -13,6 +13,7 @@ import time
 
 from xai.core.constants import GENESIS_TIMESTAMP, SECONDS_PER_DAY
 
+
 class TimeLockRelease:
     """Individual time-locked software release"""
 

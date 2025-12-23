@@ -6,6 +6,7 @@ from typing import Any
 # Assuming FeeAdjuster is available from a previous implementation
 from src.xai.network.fee_adjuster import FeeAdjuster
 
+
 class PriorityFeeManager:
     def __init__(self, fee_adjuster: FeeAdjuster, min_priority_fee: float = 0.0001):
         if not isinstance(fee_adjuster, FeeAdjuster):

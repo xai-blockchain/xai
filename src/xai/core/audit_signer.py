@@ -8,6 +8,7 @@ from pathlib import Path
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
+
 class AuditSigner:
     def __init__(self, data_dir: str):
         self.data_dir = Path(data_dir)

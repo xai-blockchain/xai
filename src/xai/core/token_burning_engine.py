@@ -24,6 +24,7 @@ import time
 from datetime import datetime, timezone
 from enum import Enum
 
+
 class ServiceType(Enum):
     """Types of services that consume XAI"""
 

@@ -205,13 +205,13 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
         # Initialize manager components for god class refactoring
         # These managers encapsulate specific areas of blockchain functionality
+        from xai.core.block_processor import BlockProcessor
+        from xai.core.chain_state import ChainState
         from xai.core.fork_manager import ForkManager
+        from xai.core.mining import MiningCoordinator
         from xai.core.mining_manager import MiningManager
         from xai.core.state_manager import StateManager
         from xai.core.validation_manager import ValidationManager
-        from xai.core.chain_state import ChainState
-        from xai.core.block_processor import BlockProcessor
-        from xai.core.mining import MiningCoordinator
 
         self.mining_manager = MiningManager(self)
         self.validation_manager = ValidationManager(self)

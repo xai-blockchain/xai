@@ -19,6 +19,7 @@ from xai.core.aixn_blockchain.atomic_swap_11_coins import (
 )
 from xai.core.htlc_deployer import compile_htlc_contract
 
+
 class AtomicSwapArtifactError(Exception):
     """Raised when artifact generation cannot be completed."""
 

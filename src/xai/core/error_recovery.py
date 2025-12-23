@@ -47,6 +47,7 @@ from xai.core.recovery_strategies import (
     StateRecovery,
 )
 
+
 class ErrorRecoveryManager:
     """
     Main error recovery and resilience manager.

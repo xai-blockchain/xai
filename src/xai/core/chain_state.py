@@ -10,11 +10,11 @@ from __future__ import annotations
 import copy
 from typing import TYPE_CHECKING, Any
 
-from xai.core.structured_logger import get_structured_logger
 from xai.core.blockchain_exceptions import ValidationError
+from xai.core.structured_logger import get_structured_logger
 
 if TYPE_CHECKING:
-    from xai.core.blockchain import Blockchain, Block
+    from xai.core.blockchain import Block, Blockchain
     from xai.core.transaction import Transaction
 
 class ChainState:

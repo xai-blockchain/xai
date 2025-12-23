@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+
 def _coerce_int(value: Any) -> int | None:
     if value is None or value == "":
         return None

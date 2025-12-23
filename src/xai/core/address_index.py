@@ -22,6 +22,7 @@ from typing import Any
 from xai.core.structured_logger import get_structured_logger
 from xai.core.transaction import Transaction
 
+
 class AddressTransactionIndex:
     """
     SQLite-based address transaction index for O(log n) lookups.

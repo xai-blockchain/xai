@@ -23,6 +23,7 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any
 
+
 class TxStatus(Enum):
     """Transaction lifecycle status."""
     UNSIGNED = "unsigned"

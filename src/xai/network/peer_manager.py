@@ -1016,6 +1016,7 @@ from datetime import datetime, timedelta
 
 import secp256k1
 
+
 class PeerEncryption:
     """Handle peer-to-peer encryption using TLS/SSL and message signing."""
 

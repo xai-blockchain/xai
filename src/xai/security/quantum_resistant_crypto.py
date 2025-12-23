@@ -56,6 +56,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 # For hybrid classical-quantum approach
 from cryptography.hazmat.primitives.asymmetric import ec
 
+
 class PQCAlgorithm(Enum):
     """Supported NIST Post-Quantum Cryptographic algorithms"""
     # ML-DSA (CRYSTALS-Dilithium) - NIST FIPS 204

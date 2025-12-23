@@ -10,6 +10,7 @@ Standard mechanism used in crypto governance systems
 import time
 from enum import Enum
 
+
 class ProposalType(Enum):
     """Types of governance proposals"""
 

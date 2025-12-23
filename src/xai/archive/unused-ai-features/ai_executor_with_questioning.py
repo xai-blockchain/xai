@@ -29,6 +29,7 @@ from xai.core.ai_node_operator_questioning import (
 )
 from xai.core.auto_switching_ai_executor import AutoSwitchingAIExecutor, TaskStatus
 
+
 class AIExecutorWithQuestioning(AutoSwitchingAIExecutor):
     """
     Enhanced AI executor that can pause and ask node operators questions

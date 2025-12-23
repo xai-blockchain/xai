@@ -28,8 +28,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from xai.sandbox.ast_validator import ASTValidator
+from xai.sandbox.ast_validator import SecurityError as ASTSecurityError
 from xai.security.module_attachment_guard import ModuleAttachmentError, ModuleAttachmentGuard
-from xai.sandbox.ast_validator import ASTValidator, SecurityError as ASTSecurityError
 
 logger = logging.getLogger(__name__)
 

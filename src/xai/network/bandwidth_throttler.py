@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
+
 class BandwidthThrottler:
     def __init__(
         self, max_upload_rate_kbps: float = 1000.0, max_download_rate_kbps: float = 1000.0

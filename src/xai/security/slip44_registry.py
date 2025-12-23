@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+
 class Slip44RegistrationError(RuntimeError):
     """Raised when a SLIP-0044 registration requirement is violated."""
 

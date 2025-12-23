@@ -11,6 +11,7 @@ import time
 from collections import OrderedDict
 from typing import Any
 
+
 class MobileCacheService:
     """
     Memoizes small snapshots for mobile dashboards with LRU eviction.

@@ -22,6 +22,7 @@ from xai.core.constants import (
     MIN_WITHDRAWAL_XAI,
 )
 
+
 class ExchangeWallet:
     """Manages multi-currency balances for a single user"""
 

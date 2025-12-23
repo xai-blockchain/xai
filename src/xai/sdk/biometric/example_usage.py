@@ -22,6 +22,7 @@ from xai.sdk.biometric.secure_key_derivation import (
     SecureKeyDerivation,
 )
 
+
 class WalletSecurityManager:
     """
     Example wallet security manager using biometric authentication.

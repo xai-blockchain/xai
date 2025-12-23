@@ -677,13 +677,13 @@ class NodeAPIRoutes:
         Legacy routes (e.g., /blocks, /transactions) are redirected to /api/v1/ versions
         with deprecation warnings.
         """
-        from flask import redirect as flask_redirect, request
+        from flask import redirect as flask_redirect
+        from flask import request
 
         # Note: The middleware already handles /v1/ -> strip prefix -> route
         # We just need to inform users about the /api/ prefix being added
         # Since routes are defined without version prefix, and middleware strips it,
         # old routes like /blocks will work but won't have version info
-
         # The existing middleware already provides versioning via /v1/ or /api/v1/
         # No additional redirects needed - the middleware handles it transparently
         logger.info("API versioning enabled: /api/v1/ prefix supported (backward compatible)")

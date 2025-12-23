@@ -10,6 +10,7 @@ and subsequent EIPs up to Shanghai/Cancun.
 from dataclasses import dataclass
 from enum import IntEnum
 
+
 class Opcode(IntEnum):
     """Complete EVM opcode enumeration."""
 

@@ -11,6 +11,7 @@ import time
 from collections import defaultdict
 from datetime import datetime, timezone
 
+
 class AnonymousRateLimiter:
     """
     Privacy-focused rate limiter using hashed tokens.

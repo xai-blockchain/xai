@@ -448,10 +448,10 @@ class ConsensusManager:
                 except Exception as e:
                     # Import signature verification exceptions
                     from xai.core.transaction import (
-                        SignatureVerificationError,
-                        MissingSignatureError,
                         InvalidSignatureError,
-                        SignatureCryptoError
+                        MissingSignatureError,
+                        SignatureCryptoError,
+                        SignatureVerificationError,
                     )
                     if isinstance(e, (SignatureVerificationError, MissingSignatureError, InvalidSignatureError, SignatureCryptoError)):
                         return False, f"Signature verification failed for transaction {i} ({tx.txid}): {e}"

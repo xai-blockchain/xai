@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+
 class ValidatorStake:
     def __init__(self, address: str, staked_amount: int):
         if not isinstance(address, str) or not address:

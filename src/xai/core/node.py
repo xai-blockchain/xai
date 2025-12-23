@@ -42,6 +42,7 @@ from xai.core.crypto_deposit_monitor import (
     CryptoDepositMonitor,
     create_deposit_source,
 )
+from xai.core.flask_secret_manager import get_flask_secret_key
 from xai.core.monitoring import MetricsCollector
 from xai.core.node_api import NodeAPIRoutes
 from xai.core.node_consensus import ConsensusManager
@@ -66,7 +67,7 @@ from xai.core.transaction import Transaction
 from xai.core.wallet import WalletManager
 from xai.core.withdrawal_processor import WithdrawalProcessor
 from xai.network.peer_manager import PeerManager
-from xai.core.flask_secret_manager import get_flask_secret_key
+
 
 class CORSPolicyManager:
     """Production-grade CORS policy management.
@@ -343,6 +344,7 @@ class _SecurityWebhookForwarder:
                 return None
 
 from xai.core.blockchain_interface import BlockchainDataProvider
+
 
 class BlockchainNode:
     """

@@ -4,6 +4,7 @@ import asyncio
 import time
 from typing import Any
 
+
 class GossipValidator:
     def __init__(self):
         print("GossipValidator initialized.")

@@ -8,6 +8,7 @@ import hashlib
 
 import bech32
 
+
 def redeem_script_to_p2wsh_address(redeem_script: bytes | str, hrp: str = "bc") -> str | None:
     """
     Convert a redeem script string to a P2WSH bech32 address.

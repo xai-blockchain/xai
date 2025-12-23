@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from enum import Enum
 from statistics import mean
 
+
 class Signal(Enum):
     """Indicator about the market direction."""
 

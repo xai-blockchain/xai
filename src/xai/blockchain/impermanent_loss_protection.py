@@ -5,6 +5,7 @@ import math
 import time
 from typing import Any, Callable
 
+
 class ImpermanentLossCalculator:
     def calculate_il(self, initial_price_ratio: float, current_price_ratio: float) -> float:
         """

@@ -14,6 +14,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+
 @dataclass
 class BlockHeader:
     """Lightweight block header for SPV clients"""

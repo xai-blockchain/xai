@@ -12,6 +12,7 @@ from enum import Enum
 
 from cryptography.fernet import Fernet
 
+
 class ProposalCategory(Enum):
     """Categories for AI development proposals"""
 

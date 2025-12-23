@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
+
 class ReorgSimulator:
     """Lightweight harness to drive chain reorg scenarios with integrity snapshots."""
 

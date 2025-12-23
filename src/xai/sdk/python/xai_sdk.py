@@ -11,6 +11,7 @@ from typing import Any
 
 import requests
 
+
 class XAISDK:
     def __init__(self, base_url: str, api_key: str | None = None, timeout: float = 10.0):
         self.base_url = base_url.rstrip("/")

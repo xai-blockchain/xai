@@ -20,6 +20,7 @@ from typing import Any
 
 import requests
 
+
 class PerplexityProvider:
     """
     Perplexity AI - Research specialist with real-time web access

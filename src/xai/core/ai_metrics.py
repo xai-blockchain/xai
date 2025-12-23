@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+
 class MetricsCollector:
     """Collect and track metrics for the blockchain and AI systems."""
 

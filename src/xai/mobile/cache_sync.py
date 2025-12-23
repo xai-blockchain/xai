@@ -15,6 +15,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Any
 
+
 @dataclass
 class SyncCheckpoint:
     """Checkpoint for tracking sync state"""

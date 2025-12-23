@@ -4,6 +4,7 @@ import hashlib
 import json
 from typing import Any
 
+
 def canonical_json(data: dict[str, Any]) -> str:
     """Produce deterministic JSON string for consensus-critical hashing.
 

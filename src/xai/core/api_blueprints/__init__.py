@@ -11,8 +11,8 @@ Usage:
     register_blueprints(app, node, blockchain, peer_manager, api_auth, ...)
 """
 
-from typing import TYPE_CHECKING, Any
 import logging
+from typing import TYPE_CHECKING, Any
 
 from flask import Flask, g, redirect, request
 

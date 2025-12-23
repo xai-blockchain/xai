@@ -25,6 +25,7 @@ from xai.core import htlc_deployer, htlc_p2wsh
 from xai.core.config import Config
 from xai.core.spv_header_ingestor import SPVHeaderIngestor
 
+
 class CoinType(Enum):
     """Supported coins for atomic swaps"""
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
+
 class BlockchainError(Exception):
     """Base exception for all blockchain-related errors.
 

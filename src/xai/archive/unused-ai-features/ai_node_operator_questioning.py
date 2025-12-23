@@ -31,6 +31,7 @@ from enum import Enum
 
 from xai.core.crypto_utils import verify_signature_hex
 
+
 class QuestionPriority(Enum):
     """Priority levels for AI questions"""
 

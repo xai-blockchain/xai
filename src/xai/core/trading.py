@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+
 class SwapOrderType(Enum):
     """Type of swap order"""
 

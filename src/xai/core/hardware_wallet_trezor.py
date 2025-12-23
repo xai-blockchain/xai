@@ -19,6 +19,7 @@ except ImportError as exc:  # pragma: no cover - optional dependency
 
 from xai.core.hardware_wallet import LEDGER_BIP32_PATH, HardwareWallet
 
+
 @dataclass
 class TrezorHardwareWallet(HardwareWallet):
     bip32_path: str = LEDGER_BIP32_PATH.replace("44'/22593'", "44'/22593'")

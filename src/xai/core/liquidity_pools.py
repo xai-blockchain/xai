@@ -16,6 +16,7 @@ from enum import Enum
 from xai.core.audit_signer import AuditSigner
 from xai.core.config import Config
 
+
 class PoolPair(Enum):
     """Supported liquidity pool pairs"""
 

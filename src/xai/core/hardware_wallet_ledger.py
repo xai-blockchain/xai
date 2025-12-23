@@ -25,6 +25,7 @@ except ImportError as exc:  # pragma: no cover - optional dependency
 
 from xai.core.hardware_wallet import HardwareWallet, _normalize_private_value
 
+
 def _parse_bip32_path(path: str) -> bytes:
     if not path.startswith("m/"):
         raise ValueError("BIP32 path must start with m/")

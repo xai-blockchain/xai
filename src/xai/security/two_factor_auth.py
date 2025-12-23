@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 import pyotp
 
+
 @dataclass
 class TwoFactorSetup:
     """2FA setup information"""

@@ -13,6 +13,7 @@ from xai.core.structured_logger import StructuredLogger, get_structured_logger
 from xai.core.wallet import Wallet
 from xai.core.xai_token_manager import XAITokenManager, get_xai_token_manager
 
+
 class XAITokenWallet(Wallet):
     """
     A wallet specifically designed to interact with XAI tokens.

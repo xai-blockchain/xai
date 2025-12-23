@@ -6,6 +6,7 @@ from typing import Any
 
 from xai.core.mining_bonuses import MiningBonusManager
 
+
 class MiningBonusSystem:
     """Facade used by API routes to access bonus data."""
 

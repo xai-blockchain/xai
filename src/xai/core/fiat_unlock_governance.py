@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from xai.config import Config
 from xai.core.anonymous_logger import log_info
 
+
 class FiatUnlockGovernance:
     def __init__(self, data_dir: str):
         self.data_dir = data_dir

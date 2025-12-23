@@ -13,6 +13,7 @@ from typing import Any
 
 from xai.security.two_factor_auth import TwoFactorAuthManager
 
+
 @dataclass
 class TwoFactorProfile:
     label: str
