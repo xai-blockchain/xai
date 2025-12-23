@@ -1,31 +1,35 @@
 # XAI Blockchain CODEOWNERS
+#
+# NOTE: GitHub teams referenced below need to be created in the organization.
+# Until teams are created, replace @xai-blockchain/* with actual GitHub usernames.
+# Example: * @MAINTAINER_USERNAME
 
 # Default owners
-* @xai-blockchain/core-team
+# * @xai-blockchain/core-team
 
 # Core blockchain
-/src/xai/core/ @xai-blockchain/core-team @xai-blockchain/security
+# /src/xai/core/ @xai-blockchain/core-team @xai-blockchain/security
 
 # Security-critical components
-/src/xai/crypto/ @xai-blockchain/security
-/src/xai/evm/ @xai-blockchain/security @xai-blockchain/core-team
-/src/xai/wallet/ @xai-blockchain/security
+# /src/xai/crypto/ @xai-blockchain/security
+# /src/xai/evm/ @xai-blockchain/security @xai-blockchain/core-team
+# /src/xai/wallet/ @xai-blockchain/security
 
 # AI components
-/src/xai/ai/ @xai-blockchain/ai-team @xai-blockchain/core-team
+# /src/xai/ai/ @xai-blockchain/ai-team @xai-blockchain/core-team
 
 # Trading/swaps
-/src/xai/atomic_swaps/ @xai-blockchain/trading-team @xai-blockchain/security
+# /src/xai/atomic_swaps/ @xai-blockchain/trading-team @xai-blockchain/security
 
 # Infrastructure
-/.github/ @xai-blockchain/devops
-/docker/ @xai-blockchain/devops
-/k8s/ @xai-blockchain/devops
+# /.github/ @xai-blockchain/devops
+# /docker/ @xai-blockchain/devops
+# /k8s/ @xai-blockchain/devops
 
 # Documentation
-/docs/ @xai-blockchain/docs-team
-README.md @xai-blockchain/core-team
-SECURITY.md @xai-blockchain/security
+# /docs/ @xai-blockchain/docs-team
+# README.md @xai-blockchain/core-team
+# SECURITY.md @xai-blockchain/security
 
 # Protect CODEOWNERS
-/.github/CODEOWNERS @xai-blockchain/admin
+# /.github/CODEOWNERS @xai-blockchain/admin

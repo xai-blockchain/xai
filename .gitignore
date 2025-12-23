@@ -37,6 +37,11 @@ htmlcov/
 .tox/
 .nox/
 
+# Test artifacts
+test_cleanup_*/
+test_*_data/
+soak_test_*.json
+
 # IDE
 .idea/
 .vscode/
