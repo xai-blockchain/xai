@@ -429,8 +429,8 @@ class P2PNetworkManager:
                 try:
                     hostname = socket.gethostname()
                     api_endpoint = f"http://{hostname}:{self.api_port}"
-                except Exception:
-                    # Fallback to localhost
+                except OSError:
+                    # Fallback to localhost on socket errors
                     api_endpoint = f"http://localhost:{self.api_port}"
 
         handshake_payload = {
@@ -580,7 +580,7 @@ class P2PNetworkManager:
             try:
                 discovered = await self.peer_manager.discover_peers()
                 peers_to_connect = set(discovered or [])
-            except Exception as exc:  # pragma: no cover - defensive logging
+            except (NetworkError, PeerError, OSError, TimeoutError, asyncio.TimeoutError) as exc:
                 logger.warning(
                     "Peer discovery failed during startup: %s",
                     type(exc).__name__,
@@ -750,7 +750,7 @@ class P2PNetworkManager:
                                 if hostname and hostname in peer_id:
                                     is_connected = True
                                     break
-                        except Exception:
+                        except (ValueError, AttributeError):
                             pass
 
                 # Reconnect if not connected
@@ -843,7 +843,8 @@ class P2PNetworkManager:
                             extra={"event": "p2p.periodic_sync_no_progress"}
                         )
 
-            except Exception as exc:
+            except (NetworkError, ValidationError, StorageError, DatabaseError, OSError,
+                    asyncio.TimeoutError, TimeoutError, ConnectionError) as exc:
                 logger.debug(
                     "Periodic sync encountered error: %s",
                     exc,
@@ -885,7 +886,8 @@ class P2PNetworkManager:
                 )
                 return
 
-            except Exception as exc:
+            except (NetworkError, PeerError, ConnectionError, OSError, WebSocketException,
+                    asyncio.TimeoutError, TimeoutError) as exc:
                 logger.debug(
                     "Reconnection attempt %d failed for %s: %s",
                     attempt,
@@ -1384,7 +1386,7 @@ class P2PNetworkManager:
             block_index = None
             try:
                 msg_type = (message_data or {}).get("type") or (message_data or {}).get("payload", {}).get("type")
-            except Exception:
+            except (TypeError, AttributeError, KeyError):
                 msg_type = None
             try:
                 parsed = message_data or json.loads(raw_bytes.decode("utf-8"))
@@ -1394,7 +1396,7 @@ class P2PNetworkManager:
                 if isinstance(block_payload, dict):
                     block_prev = block_payload.get("previous_hash")
                     block_index = block_payload.get("index")
-            except Exception:
+            except (json.JSONDecodeError, ValueError, TypeError, AttributeError, KeyError, UnicodeDecodeError):
                 block_prev = block_prev
             logger.error(
                 "Error handling message from peer %s: %s (%s) type=%s preview=%s prev=%s idx=%s",
