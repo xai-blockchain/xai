@@ -210,8 +210,9 @@ Remaining Items:
 
 #### Security Hardening
 
-- [ ] **Flask Secret Key Persistence** - `app.secret_key` regenerates on restart
+- [x] **Flask Secret Key Persistence** - `app.secret_key` regenerates on restart ✅ DONE (2025-12-23)
   - Fix: Load from environment variable, persist in secrets manager
+  - Implemented: FlaskSecretManager with env var fallback (XAI_SECRET_KEY/FLASK_SECRET_KEY), persistent storage in ~/.xai/.secret_key with 0600 permissions
 
 - [ ] **Sandbox AST Validation** - exec() in sandbox needs AST pre-validation
   - Add: Whitelist of allowed AST node types

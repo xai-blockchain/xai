@@ -67,6 +67,34 @@ class TestFlaskSecretManager:
         secret_file = tmp_path / ".secret_key"
         assert not secret_file.exists()
 
+    def test_flask_secret_key_fallback(self, tmp_path, monkeypatch):
+        """Test that FLASK_SECRET_KEY works as fallback."""
+        env_key = "b" * 64
+        monkeypatch.setenv("FLASK_SECRET_KEY", env_key)
+
+        manager = FlaskSecretManager(data_dir=str(tmp_path))
+        secret_key = manager.get_secret_key()
+
+        assert secret_key == env_key
+
+        # File should not be created when env var is set
+        secret_file = tmp_path / ".secret_key"
+        assert not secret_file.exists()
+
+    def test_xai_secret_key_precedence(self, tmp_path, monkeypatch):
+        """Test that XAI_SECRET_KEY takes precedence over FLASK_SECRET_KEY."""
+        xai_key = "c" * 64
+        flask_key = "d" * 64
+        monkeypatch.setenv("XAI_SECRET_KEY", xai_key)
+        monkeypatch.setenv("FLASK_SECRET_KEY", flask_key)
+
+        manager = FlaskSecretManager(data_dir=str(tmp_path))
+        secret_key = manager.get_secret_key()
+
+        # Should use XAI_SECRET_KEY, not FLASK_SECRET_KEY
+        assert secret_key == xai_key
+        assert secret_key != flask_key
+
     def test_corrupted_secret_file(self, tmp_path):
         """Test handling of corrupted secret key file."""
         secret_file = tmp_path / ".secret_key"

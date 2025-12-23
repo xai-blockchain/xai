@@ -3,7 +3,7 @@ Flask Secret Key Manager
 Secure persistence and retrieval of Flask secret keys.
 
 Implements:
-- Environment variable fallback (XAI_SECRET_KEY)
+- Environment variable fallback (XAI_SECRET_KEY or FLASK_SECRET_KEY)
 - Persistent storage in ~/.xai/.secret_key
 - Automatic generation with secure defaults
 - Proper file permissions (0600)
@@ -44,8 +44,9 @@ class FlaskSecretManager:
 
         Priority order:
         1. XAI_SECRET_KEY environment variable
-        2. Existing .secret_key file
-        3. Generate new key and persist to file
+        2. FLASK_SECRET_KEY environment variable (for compatibility)
+        3. Existing .secret_key file
+        4. Generate new key and persist to file
 
         Returns:
             64-character hex secret key
@@ -54,10 +55,11 @@ class FlaskSecretManager:
             PermissionError: If unable to set secure file permissions
             IOError: If unable to read/write secret key file
         """
-        # Check environment variable first
-        env_key = os.environ.get("XAI_SECRET_KEY")
+        # Check environment variables (XAI_SECRET_KEY takes precedence)
+        env_key = os.environ.get("XAI_SECRET_KEY") or os.environ.get("FLASK_SECRET_KEY")
         if env_key:
-            logger.info("Using Flask secret key from XAI_SECRET_KEY environment variable")
+            env_var_name = "XAI_SECRET_KEY" if "XAI_SECRET_KEY" in os.environ else "FLASK_SECRET_KEY"
+            logger.info("Using Flask secret key from %s environment variable", env_var_name)
             return env_key
 
         # Check for existing secret key file
@@ -81,7 +83,7 @@ class FlaskSecretManager:
             self._write_secret_key(secret_key)
             logger.warning(
                 "Generated new Flask secret key and saved to %s. "
-                "For production, set XAI_SECRET_KEY environment variable instead.",
+                "For production, set XAI_SECRET_KEY or FLASK_SECRET_KEY environment variable instead.",
                 self.secret_key_path
             )
         except Exception as e:
