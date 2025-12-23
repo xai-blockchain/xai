@@ -205,8 +205,9 @@ Remaining Items:
   - blockchain.py: TransactionValidator.validate_transaction reduced from CC 80 to 3 (commit e446858)
   - Remaining: Route files in api_routes/ (see complexity analysis in commit history)
 
-- [ ] **Temp Files in Repo** - `soak_test_baseline_*.json` committed
-  - Add to .gitignore, remove from history
+- [x] **Temp Files in Repo** - `soak_test_baseline_*.json` committed ✅ DONE
+  - Already in .gitignore (lines 43-44)
+  - No such files currently tracked in repo
 
 ### 🟡 IMPORTANT (P2) - Should Fix for Quality Release
 
@@ -216,14 +217,24 @@ Remaining Items:
   - Fix: Load from environment variable, persist in secrets manager
   - Implemented: FlaskSecretManager with env var fallback (XAI_SECRET_KEY/FLASK_SECRET_KEY), persistent storage in ~/.xai/.secret_key with 0600 permissions
 
-- [ ] **Sandbox AST Validation** - exec() in sandbox needs AST pre-validation
-  - Add: Whitelist of allowed AST node types
+- [x] **Sandbox AST Validation** - exec() in sandbox needs AST pre-validation ✅ DONE (2025-12-23)
+  - Implemented: Comprehensive AST validator with allowlist-based node type validation
+  - Location: src/xai/sandbox/ast_validator.py (429 lines)
+  - Features:
+    - Whitelisted safe AST node types (expressions, control flow, safe operations)
+    - Blocks all imports (Import, ImportFrom)
+    - Blocks dangerous functions (eval, exec, compile, open, __import__, getattr, etc.)
+    - Blocks dangerous node types (Global, Nonlocal, ClassDef, async operations, generators)
+    - Integrated into SecureExecutor for both RestrictedPython and subprocess execution paths
+    - Comprehensive logging of all security violations with structured events
+    - 55 unit tests covering safe operations, rejections, edge cases, and attack scenarios
+  - Security: Pre-execution validation prevents dangerous code before exec() is called
 
 - [ ] **JWT Blacklist Cleanup** - No automatic expiration of blacklisted tokens
   - Add: Background task to prune expired entries
 
-- [ ] **API Key Encryption** - Keys stored as hashes, should use encryption
-  - Migrate to: Fernet symmetric encryption with key rotation
+- [x] **API Key Encryption** - Keys stored as hashes, should use encryption ✅ DONE (commit c6e5402)
+  - Migrated to: Fernet symmetric encryption with key rotation
 
 #### Architecture Improvements
 
