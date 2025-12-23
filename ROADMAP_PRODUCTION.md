@@ -200,8 +200,10 @@ Remaining Items:
 - [ ] **God Object: blockchain.py** - 4295 lines, 35 imports
   - Refactor into: chain_state.py, block_processor.py, chain_validator.py, mining.py
 
-- [ ] **Cyclomatic Complexity** - Route functions with CC up to 119
-  - Max acceptable: 10-15, refactor with helper methods
+- [x] **Cyclomatic Complexity** - Route functions with CC up to 119 ✅ PARTIALLY DONE (2025-12-23)
+  - node_p2p.py: _process_single_message reduced from CC 25-30 to CC 15-18
+  - blockchain.py: TransactionValidator.validate_transaction reduced from CC 80 to 3 (commit e446858)
+  - Remaining: Route files in api_routes/ (see complexity analysis in commit history)
 
 - [ ] **Temp Files in Repo** - `soak_test_baseline_*.json` committed
   - Add to .gitignore, remove from history
@@ -242,8 +244,10 @@ Remaining Items:
 - [ ] **Import Organization** - Violations of isort/PEP 8 grouping
   - Run: `isort --profile black src/`
 
-- [ ] **Exception Handling** - Some broad `except Exception` blocks
-  - Replace with specific exception types
+- [x] **Exception Handling** - Some broad `except Exception` blocks ✅ PARTIALLY DONE (2025-12-23)
+  - node_p2p.py: Replaced 7 broad handlers with specific exception types
+  - blockchain.py, node_consensus.py: Core exception handling fixed (commit d5ea803)
+  - Remaining: 139 handlers in non-critical paths (sandbox, mobile, archive)
 
 - [ ] **mypy in CI** - Not currently running type checks
   - Add: mypy to CI pipeline with strict mode
