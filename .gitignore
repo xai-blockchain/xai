@@ -41,6 +41,13 @@ htmlcov/
 test_cleanup_*/
 test_*_data/
 soak_test_*.json
+soak_test_baseline_*.json
+
+# Temporary and backup files
+*.tmp
+*.tmp.*
+*.bak
+*.backup
 
 # IDE
 .idea/
