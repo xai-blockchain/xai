@@ -52,6 +52,10 @@ class UTXOManager:
         self._pending_utxos: Dict[tuple, float] = {}
         # Timeout for pending UTXO locks (5 minutes)
         self._pending_timeout = 300.0
+        # PERFORMANCE OPTIMIZATION: Hash-based index for O(1) UTXO lookups
+        # Maps "{txid}:{vout}" -> (address, utxo_dict) for constant-time access
+        # Eliminates O(n×m) scan through all addresses and UTXOs
+        self._utxo_index: Dict[str, tuple[str, Dict[str, Any]]] = {}
 
     def snapshot_digest(self) -> str:
         """
@@ -97,7 +101,9 @@ class UTXOManager:
 
     def add_utxo(self, address: str, txid: str, vout: int, amount: float, script_pubkey: str) -> None:
         """
-        Adds a new UTXO to the set.
+        Adds a new UTXO to the set and updates the hash index for O(1) lookups.
+
+        Performance: O(1) operation with hash-based indexing.
 
         Args:
             address: The address to which the UTXO belongs.
@@ -121,6 +127,11 @@ class UTXOManager:
                 "spent": False,  # Track if this UTXO has been spent
             }
             self.utxo_set[address].append(utxo)
+
+            # Update hash index for O(1) lookups
+            utxo_key = f"{txid}:{vout}"
+            self._utxo_index[utxo_key] = (address, utxo)
+
             self.total_utxos += 1
             self.total_value += validated_amount
             self.logger.debug(
@@ -133,7 +144,9 @@ class UTXOManager:
 
     def mark_utxo_spent(self, address: str, txid: str, vout: int) -> bool:
         """
-        Marks a specific UTXO as spent.
+        Marks a specific UTXO as spent using O(1) hash index lookup.
+
+        Performance: O(1) operation using hash-based indexing instead of O(m) scan.
 
         Args:
             address: The address that owned the UTXO.
@@ -144,22 +157,51 @@ class UTXOManager:
             True if the UTXO was found and marked as spent, False otherwise.
         """
         with self._lock:
-            if address in self.utxo_set:
-                for utxo in self.utxo_set[address]:
-                    if utxo["txid"] == txid and utxo["vout"] == vout and not utxo["spent"]:
-                        utxo["spent"] = True
-                        self.total_value -= utxo["amount"]
-                        if self.total_utxos > 0:
-                            self.total_utxos -= 1
-                        self.logger.debug(
-                            f"Marked UTXO: {txid}:{vout} for {address} as spent",
-                            address=address,
-                            txid=txid,
-                            vout=vout,
-                        )
-                        return True
+            # O(1) lookup using hash index
+            utxo_key = f"{txid}:{vout}"
+            if utxo_key in self._utxo_index:
+                indexed_address, utxo = self._utxo_index[utxo_key]
+
+                # Verify address matches (security check)
+                if indexed_address != address:
+                    self.logger.warn(
+                        f"Address mismatch for UTXO {txid}:{vout}: expected {indexed_address}, got {address}",
+                        address=address,
+                        indexed_address=indexed_address,
+                        txid=txid,
+                        vout=vout,
+                    )
+                    return False
+
+                # Check if already spent
+                if utxo["spent"]:
+                    self.logger.warn(
+                        f"Attempted to mark already spent UTXO: {txid}:{vout} for {address}",
+                        address=address,
+                        txid=txid,
+                        vout=vout,
+                    )
+                    return False
+
+                # Mark as spent
+                utxo["spent"] = True
+                self.total_value -= utxo["amount"]
+                if self.total_utxos > 0:
+                    self.total_utxos -= 1
+
+                # Remove from index to save memory
+                del self._utxo_index[utxo_key]
+
+                self.logger.debug(
+                    f"Marked UTXO: {txid}:{vout} for {address} as spent",
+                    address=address,
+                    txid=txid,
+                    vout=vout,
+                )
+                return True
+
             self.logger.warn(
-                f"Attempted to mark non-existent or already spent UTXO: {txid}:{vout} for {address}",
+                f"Attempted to mark non-existent UTXO: {txid}:{vout} for {address}",
                 address=address,
                 txid=txid,
                 vout=vout,
@@ -290,6 +332,9 @@ class UTXOManager:
         """
         Retrieves a specific unspent UTXO by its transaction ID and output index.
 
+        Performance: O(1) operation using hash-based indexing instead of O(n×m) scan
+        across all addresses and UTXOs.
+
         Args:
             txid: The transaction ID of the UTXO.
             vout: The output index of the UTXO within the transaction.
@@ -305,10 +350,14 @@ class UTXOManager:
                 if (txid, vout) in self._pending_utxos:
                     return None
 
-            for address_utxos in self.utxo_set.values():
-                for utxo in address_utxos:
-                    if utxo["txid"] == txid and utxo["vout"] == vout and not utxo["spent"]:
-                        return utxo
+            # O(1) lookup using hash index
+            utxo_key = f"{txid}:{vout}"
+            if utxo_key in self._utxo_index:
+                _, utxo = self._utxo_index[utxo_key]
+                # Double-check it's not spent (should always be true in index)
+                if not utxo["spent"]:
+                    return utxo
+
             return None
 
     def find_spendable_utxos(self, address: str, amount: float) -> List[Dict[str, Any]]:
@@ -469,12 +518,17 @@ class UTXOManager:
 
     def load_utxo_set(self, utxo_set_data: Dict[str, Any]) -> None:
         """
-        Loads the UTXO set from a dictionary.
+        Loads the UTXO set from a dictionary and rebuilds the hash index.
+
+        Performance: Rebuilds the O(1) lookup index during load to maintain
+        performance optimization.
         """
         with self._lock:
             self.utxo_set = defaultdict(list)
             self.total_utxos = 0
             self.total_value = 0.0
+            self._utxo_index = {}  # Rebuild index
+
             for address, utxos in utxo_set_data.items():
                 for utxo in utxos:
                     # Re-add UTXOs to correctly update total_utxos and total_value
@@ -489,12 +543,17 @@ class UTXOManager:
                             "spent": False,
                         }
                         self.utxo_set[address].append(utxo_entry)
+
+                        # Add to hash index for O(1) lookups
+                        utxo_key = f"{utxo['txid']}:{utxo['vout']}"
+                        self._utxo_index[utxo_key] = (address, utxo_entry)
+
                         self.total_utxos += 1
                         self.total_value += utxo["amount"]
                     else:
-                        # If spent, just add to the list without affecting totals
+                        # If spent, just add to the list without affecting totals or index
                         self.utxo_set[address].append(utxo)
-            self.logger.info("UTXO set loaded.")
+            self.logger.info(f"UTXO set loaded with {len(self._utxo_index)} unspent UTXOs indexed.")
 
     def get_total_unspent_value(self) -> float:
         """
@@ -530,6 +589,7 @@ class UTXOManager:
             self.total_utxos = 0
             self.total_value = 0.0
             self._pending_utxos = {}
+            self._utxo_index = {}  # Clear index
             self.logger.info("UTXO Manager reset.")
 
     def snapshot(self) -> Dict[str, Any]:
@@ -549,7 +609,7 @@ class UTXOManager:
 
     def restore(self, snapshot: Dict[str, Any]) -> None:
         """
-        Restores UTXO state from a snapshot.
+        Restores UTXO state from a snapshot and rebuilds the hash index.
         Thread-safe atomic operation for chain reorganization rollback.
 
         Args:
@@ -560,18 +620,25 @@ class UTXOManager:
             self.utxo_set = defaultdict(list)
             self.total_utxos = 0
             self.total_value = 0.0
+            self._utxo_index = {}  # Clear and rebuild index
 
             # Restore from snapshot
             utxo_data = snapshot.get("utxo_set", {})
             for address, utxos in utxo_data.items():
                 for utxo in utxos:
                     # Directly add without calling add_utxo to avoid double-counting
-                    self.utxo_set[address].append(utxo.copy())
+                    utxo_copy = utxo.copy()
+                    self.utxo_set[address].append(utxo_copy)
+
+                    # Rebuild index for unspent UTXOs
+                    if not utxo_copy.get("spent", False):
+                        utxo_key = f"{utxo_copy['txid']}:{utxo_copy['vout']}"
+                        self._utxo_index[utxo_key] = (address, utxo_copy)
 
             # Restore totals
             self.total_utxos = snapshot.get("total_utxos", 0)
             self.total_value = snapshot.get("total_value", 0.0)
-            self.logger.info("UTXO state restored from snapshot.")
+            self.logger.info(f"UTXO state restored from snapshot with {len(self._utxo_index)} UTXOs indexed.")
 
     def clear(self) -> None:
         """
@@ -583,6 +650,7 @@ class UTXOManager:
             self.total_utxos = 0
             self.total_value = 0.0
             self._pending_utxos = {}
+            self._utxo_index = {}  # Clear index
 
     def compact_utxo_set(self) -> int:
         """
@@ -590,6 +658,9 @@ class UTXOManager:
 
         This method maintains the spent flag history while freeing memory from
         fully spent outputs. Helps prevent unbounded memory growth over time.
+
+        Note: Spent UTXOs are already removed from the hash index when marked
+        as spent, so this only cleans up the list-based storage structure.
 
         Security note: We keep spent flags for recent UTXOs to prevent replay attacks
         and maintain audit trails, but remove very old spent outputs.

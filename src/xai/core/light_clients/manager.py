@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Dict, Optional, Any, List
 from enum import Enum
@@ -81,16 +82,25 @@ class LightClientManager:
     Provides unified interface for EVM and Cosmos light clients.
     """
 
-    def __init__(self):
-        """Initialize light client manager"""
+    def __init__(self, cache_max_size: int = 1000):
+        """
+        Initialize light client manager
+
+        Args:
+            cache_max_size: Maximum number of verification results to cache (default: 1000)
+        """
         self.evm_clients: Dict[str, EVMLightClient] = {}  # chain_id -> client
         self.cosmos_clients: Dict[str, CosmosLightClient] = {}  # chain_id -> client
 
-        # Cache for recent verifications
-        self.verification_cache: Dict[str, ProofVerificationResult] = {}
+        # LRU cache for recent verifications with size limit
+        self.verification_cache: OrderedDict[str, ProofVerificationResult] = OrderedDict()
         self.cache_ttl = 300  # 5 minutes
+        self.cache_max_size = cache_max_size
 
-        logger.info("Light client manager initialized")
+        logger.info("Light client manager initialized", extra={
+            "cache_max_size": cache_max_size,
+            "cache_ttl": self.cache_ttl
+        })
 
     def register_evm_chain(
         self,
@@ -508,6 +518,75 @@ class LightClientManager:
         self.verification_cache.clear()
         logger.info("Verification cache cleared")
 
+    def _evict_cache_if_needed(self) -> None:
+        """Evict LRU entries from cache when size or TTL limits are reached"""
+        now = int(time.time())
+
+        # First, remove expired entries
+        expired_keys = [
+            key for key, result in self.verification_cache.items()
+            if now - result.verified_at >= self.cache_ttl
+        ]
+        for key in expired_keys:
+            del self.verification_cache[key]
+
+        if expired_keys:
+            logger.debug(
+                f"Evicted {len(expired_keys)} expired verification cache entries",
+                extra={"event": "light_client.cache_ttl_eviction"}
+            )
+
+        # Then, enforce size limit with LRU eviction
+        while len(self.verification_cache) > self.cache_max_size:
+            evicted_key, _ = self.verification_cache.popitem(last=False)
+            logger.debug(
+                "Evicted LRU verification cache entry",
+                extra={
+                    "event": "light_client.cache_lru_eviction",
+                    "evicted_key": evicted_key,
+                }
+            )
+
+    def _cache_verification_result(self, cache_key: str, result: ProofVerificationResult) -> None:
+        """
+        Cache a verification result with LRU eviction
+
+        Args:
+            cache_key: Unique key for this verification
+            result: Verification result to cache
+        """
+        # Add to cache (moves to end if already exists)
+        self.verification_cache[cache_key] = result
+        self.verification_cache.move_to_end(cache_key)
+
+        # Evict if needed
+        self._evict_cache_if_needed()
+
+    def _get_cached_verification(self, cache_key: str) -> Optional[ProofVerificationResult]:
+        """
+        Get cached verification result if still valid
+
+        Args:
+            cache_key: Cache key to look up
+
+        Returns:
+            Cached result if valid, None otherwise
+        """
+        if cache_key not in self.verification_cache:
+            return None
+
+        result = self.verification_cache[cache_key]
+        now = int(time.time())
+
+        # Check if still valid
+        if now - result.verified_at >= self.cache_ttl:
+            del self.verification_cache[cache_key]
+            return None
+
+        # Move to end (LRU)
+        self.verification_cache.move_to_end(cache_key)
+        return result
+
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics"""
         now = int(time.time())
@@ -519,5 +598,6 @@ class LightClientManager:
         return {
             'total_entries': len(self.verification_cache),
             'valid_entries': valid_entries,
+            'max_size': self.cache_max_size,
             'ttl_seconds': self.cache_ttl,
         }

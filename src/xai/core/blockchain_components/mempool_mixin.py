@@ -51,6 +51,7 @@ class BlockchainMempoolMixin:
     - _mempool_rejected_sender_cap_total: int
     - _mempool_evicted_low_fee_total: int
     - _mempool_expired_total: int
+    - _spent_inputs: set[str]  # O(1) lookup for double-spend detection
     - utxo_manager: UTXOManager
     - transaction_validator: TransactionValidator
     - nonce_tracker: NonceTracker
@@ -60,11 +61,15 @@ class BlockchainMempoolMixin:
     def _prune_expired_mempool(self, current_time: float) -> int:
         """
         Expire old transactions and rebuild mempool indexes to keep counters accurate.
+
+        This method rebuilds all mempool tracking structures including the spent_inputs
+        set used for O(1) double-spend detection.
         """
         kept: List[Transaction] = []
         removed = 0
         sender_counts: dict[str, int] = defaultdict(int)
         seen_txids: set[str] = set()
+        spent_inputs: set[str] = set()
 
         for tx in self.pending_transactions:
             if current_time - tx.timestamp < self._mempool_max_age_seconds:
@@ -73,6 +78,11 @@ class BlockchainMempoolMixin:
                     seen_txids.add(tx.txid)
                 if tx.sender and tx.sender != "COINBASE":
                     sender_counts[tx.sender] += 1
+                # Rebuild spent_inputs set for kept transactions
+                if tx.tx_type != "coinbase" and tx.inputs:
+                    for inp in tx.inputs:
+                        input_key = f"{inp['txid']}:{inp['vout']}"
+                        spent_inputs.add(input_key)
             else:
                 # Unlock UTXOs for expired transaction
                 if tx.inputs:
@@ -90,6 +100,7 @@ class BlockchainMempoolMixin:
         self.pending_transactions = kept
         self.seen_txids = seen_txids
         self._sender_pending_count = defaultdict(int, sender_counts)
+        self._spent_inputs = spent_inputs
         if removed:
             self._mempool_expired_total += removed
         return removed
@@ -180,6 +191,37 @@ class BlockchainMempoolMixin:
                 }
         return active
 
+    def _check_double_spend(self, transaction: "Transaction") -> bool:
+        """
+        Check if transaction inputs are already spent in the mempool using O(1) lookup.
+
+        This is a performance-optimized double-spend check that uses a set-based
+        approach instead of nested loops. Instead of comparing every input against
+        every pending transaction (O(n²)), we maintain a _spent_inputs set that
+        tracks all inputs currently being spent, allowing O(1) lookup per input.
+
+        Args:
+            transaction: Transaction to check for double-spend
+
+        Returns:
+            True if double-spend detected, False otherwise
+
+        Performance:
+            - Old implementation: O(n²) where n = number of pending transactions
+            - New implementation: O(m) where m = number of inputs in transaction
+            - For a mempool with 1000 transactions, this is ~1000x faster
+        """
+        if transaction.tx_type == "coinbase" or not transaction.inputs:
+            return False
+
+        for tx_input in transaction.inputs:
+            input_key = f"{tx_input['txid']}:{tx_input['vout']}"
+            if input_key in self._spent_inputs:
+                # Don't fail if this is an RBF replacement attempt - handled separately
+                if not getattr(transaction, 'replaces_txid', None):
+                    return True
+        return False
+
     def remove_transaction_from_mempool(
         self,
         txid: str,
@@ -188,6 +230,9 @@ class BlockchainMempoolMixin:
     ) -> Tuple[bool, Dict[str, Any]]:
         """
         Remove a specific transaction from the mempool.
+
+        This method removes the transaction and cleans up all tracking structures,
+        including removing its inputs from the spent_inputs set for double-spend detection.
 
         Args:
             txid: Transaction ID to evict.
@@ -219,6 +264,11 @@ class BlockchainMempoolMixin:
                 if removed_tx.inputs:
                     utxo_keys = [(inp["txid"], inp["vout"]) for inp in removed_tx.inputs]
                     self.utxo_manager.unlock_utxos_by_keys(utxo_keys)
+                    # Remove inputs from spent_inputs set
+                    if removed_tx.tx_type != "coinbase":
+                        for inp in removed_tx.inputs:
+                            input_key = f"{inp['txid']}:{inp['vout']}"
+                            self._spent_inputs.discard(input_key)
 
                 self.seen_txids.discard(txid)
                 sender = eviction_metadata.get("sender")
@@ -389,28 +439,21 @@ class BlockchainMempoolMixin:
                     self.utxo_manager.unlock_utxos_by_keys(utxo_keys)
                 return False
 
-            # Double-spend detection: Check if any inputs are already spent in pending transactions
-            # This check is now atomic with validation - prevents TOCTOU race
-            if transaction.tx_type != "coinbase" and transaction.inputs:
-                for tx_input in transaction.inputs:
-                    input_key = f"{tx_input['txid']}:{tx_input['vout']}"
-
-                    # Check if this input is already used by a pending transaction
-                    for pending_tx in self.pending_transactions:
-                        if pending_tx.tx_type != "coinbase" and pending_tx.inputs:
-                            for pending_input in pending_tx.inputs:
-                                pending_key = f"{pending_input['txid']}:{pending_input['vout']}"
-                                if input_key == pending_key:
-                                    # Check if this is an RBF replacement attempt
-                                    if not getattr(transaction, 'replaces_txid', None):
-                                        self.logger.warn(f"Double-spend detected: Input {input_key} already used in mempool by tx {pending_tx.txid}")
-                                        self._record_invalid_sender_attempt(transaction.sender, current_time)
-                                        self._mempool_rejected_invalid_total += 1
-                                        # Unlock UTXOs since transaction rejected
-                                        if transaction.inputs:
-                                            utxo_keys = [(inp["txid"], inp["vout"]) for inp in transaction.inputs]
-                                            self.utxo_manager.unlock_utxos_by_keys(utxo_keys)
-                                        return False
+            # Double-spend detection: O(1) check using spent_inputs set
+            # This check is atomic with validation - prevents TOCTOU race
+            if self._check_double_spend(transaction):
+                self.logger.warn(
+                    "Double-spend detected: Transaction inputs already spent in mempool",
+                    txid=transaction.txid,
+                    sender=transaction.sender,
+                )
+                self._record_invalid_sender_attempt(transaction.sender, current_time)
+                self._mempool_rejected_invalid_total += 1
+                # Unlock UTXOs since transaction rejected
+                if transaction.inputs:
+                    utxo_keys = [(inp["txid"], inp["vout"]) for inp in transaction.inputs]
+                    self.utxo_manager.unlock_utxos_by_keys(utxo_keys)
+                return False
 
             # Handle Replace-By-Fee (RBF) if this transaction replaces another
             if hasattr(transaction, 'replaces_txid') and transaction.replaces_txid:
@@ -435,6 +478,11 @@ class BlockchainMempoolMixin:
                         try:
                             self.pending_transactions.remove(lowest)
                             self.seen_txids.discard(lowest.txid)
+                            # Remove evicted transaction's inputs from spent_inputs set
+                            if lowest.tx_type != "coinbase" and lowest.inputs:
+                                for inp in lowest.inputs:
+                                    input_key = f"{inp['txid']}:{inp['vout']}"
+                                    self._spent_inputs.discard(input_key)
                             if lowest.sender and lowest.sender != "COINBASE":
                                 self._sender_pending_count[lowest.sender] = max(
                                     0, self._sender_pending_count[lowest.sender] - 1
@@ -464,6 +512,11 @@ class BlockchainMempoolMixin:
             # This ensures no gap between validation and insertion
             self.pending_transactions.append(transaction)
             self.seen_txids.add(transaction.txid)
+            # Add transaction inputs to spent_inputs set for O(1) double-spend detection
+            if transaction.tx_type != "coinbase" and transaction.inputs:
+                for inp in transaction.inputs:
+                    input_key = f"{inp['txid']}:{inp['vout']}"
+                    self._spent_inputs.add(input_key)
             if transaction.sender and transaction.sender != "COINBASE":
                 self._sender_pending_count[transaction.sender] = self._sender_pending_count.get(transaction.sender, 0) + 1
                 self.nonce_tracker.reserve_nonce(transaction.sender, transaction.nonce)
@@ -560,6 +613,11 @@ class BlockchainMempoolMixin:
 
         del self.pending_transactions[original_index]
         self.seen_txids.discard(original_tx.txid)
+        # Remove original transaction's inputs from spent_inputs set
+        if original_tx.tx_type != "coinbase" and original_tx.inputs:
+            for inp in original_tx.inputs:
+                input_key = f"{inp['txid']}:{inp['vout']}"
+                self._spent_inputs.discard(input_key)
         if original_tx.sender and original_tx.sender != "COINBASE":
             self._sender_pending_count[original_tx.sender] -= 1
         return True
