@@ -617,22 +617,22 @@ origins:
 - Medium: $1,000 - $5,000
 - Low: $100 - $1,000
 
-**Contact:** security@blockchain-project.io
+**Contact:** See SECURITY.md in the project root for reporting procedures
 
 ## Security Resources
 
 - [Wallet Security Guide](wallets.md)
 - [Smart Contract Security](contracts.md)
 - [Audit Reports](audits.md)
-- [Security Announcements](https://security.blockchain-project.io)
+- Security announcements will be posted in project documentation
 
 ## Reporting Security Issues
 
 **DO NOT** open public GitHub issues for security vulnerabilities.
 
 **Instead:**
-1. Email: security@blockchain-project.io
-2. PGP Key: [Link to PGP key]
+1. Follow the security reporting procedures in SECURITY.md
+2. Use encrypted communication when possible
 3. Expected response: 24-48 hours
 
 ---

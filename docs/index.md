@@ -64,11 +64,12 @@ Run XAI on resource-constrained devices.
 - [Contributing Guidelines](../CONTRIBUTING.md)
 - [License](../LICENSE.md)
 
-## Additional Resources
+## Community (Coming Soon)
 
-- **Community Forum**: [Discussion Board](#)
-- **Discord**: [Join our Discord](#)
-- **Twitter**: [@project](#)
+Official community channels are being set up. Check back soon for:
+- Community Forum
+- Discord Server
+- Twitter/X Updates
 
 ## Documentation Versions
 
@@ -85,8 +86,8 @@ We welcome contributions to improve this documentation. Please see our [Document
 If you can't find what you're looking for:
 
 1. Check the [FAQ](user-guides/faq.md)
-3. Ask in our [Discord community](#)
-4. Contact support: support@blockchain-project.io
+2. Search through the documentation sections above
+3. File an issue on GitHub for technical questions
 
 ---
 

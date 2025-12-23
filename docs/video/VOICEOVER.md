@@ -100,7 +100,7 @@ This is the spoken narration for the quickstart video. Read in a friendly, conve
 
 ## Scene 8: Outro (15 sec)
 
-"And that's it! You're now ready to use the XAI Mobile Wallet. For more guides, check out our documentation at docs dot xai dot network. Join our community on Discord and Twitter to stay updated with the latest features and news."
+"And that's it! You're now ready to use the XAI Mobile Wallet. For more guides, check out the documentation in the project repository. Visit the GitHub page to explore the codebase and contribute to the project."
 
 **[Music swells]**
 

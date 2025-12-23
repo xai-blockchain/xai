@@ -15,8 +15,8 @@ XAI_PEER_NONCE_TTL_SECONDS=90
 XAI_PEER_CA_BUNDLE=/etc/ssl/certs/ca-bundle.crt
 XAI_TRUSTED_PEER_CERT_FPS_FILE=/etc/xai/p2p/cert_pins.txt
 XAI_TRUSTED_PEER_PUBKEYS_FILE=/etc/xai/p2p/peer_keys.txt
-XAI_P2P_DNS_SEEDS=seed1.xai-network.io,seed2.xai-network.io
-XAI_P2P_BOOTSTRAP_NODES=wss://node1.xai-network.io:8333,wss://node2.xai-network.io:8333
+XAI_P2P_DNS_SEEDS=seed1.example.com,seed2.example.com  # Replace with actual DNS seeds
+XAI_P2P_BOOTSTRAP_NODES=wss://node1.example.com:8333,wss://node2.example.com:8333  # Replace with actual bootstrap nodes
 ```
 
 ### Public Seeder / Edge

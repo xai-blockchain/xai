@@ -585,11 +585,9 @@ XAI is experimental software under active development. The network is provided a
 
 ## Contact
 
-- Website: https://xaiblockchain.com
-- GitHub: https://github.com/xai-blockchain
-- Discord: https://discord.gg/xai-blockchain
-- Twitter: @xaiblockchain
-- Email: contact@xaiblockchain.com
+- GitHub: Check project documentation for repository information
+- Documentation: See the docs/ directory for comprehensive guides
+- Community: Official channels being established
 
 ---
 

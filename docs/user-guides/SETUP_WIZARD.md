@@ -347,9 +347,8 @@ For testnet setups with new wallets:
 Testnet Faucet Information:
   Address: XAI1a3f2c8d9e1b4f7...
   Faucet URL: https://faucet.xai.network
-  Discord: https://discord.gg/xai-network
 
-Visit the faucet URL or ask in Discord for testnet tokens.
+Visit the faucet URL to request testnet tokens (limit: 100 XAI per day).
 ```
 
 ### Step 13: Setup Complete
@@ -733,10 +732,10 @@ chmod 600 .env
 ## Additional Resources
 
 - **Main Documentation**: https://docs.xai.network
-- **GitHub Repository**: https://github.com/xai-network/xai
-- **Discord Community**: https://discord.gg/xai-network
-- **Block Explorer**: https://explorer.xai.network
-- **Testnet Faucet**: https://faucet.xai.network
+- **GitHub Repository**: Check project documentation for repository link
+- **Block Explorer**: https://explorer.xai.network (coming soon)
+- **Testnet Faucet**: https://faucet.xai.network (coming soon)
+- **Community**: Official channels being established
 
 ## Support
 

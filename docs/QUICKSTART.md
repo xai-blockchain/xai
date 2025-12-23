@@ -119,7 +119,7 @@ curl -X POST https://faucet.xai.network/claim \
 - **Delivery Time:** Next block (~2 minutes)
 - **Testnet Only:** These tokens have no real value
 
-**Need more tokens?** Ask in our [Discord community](https://discord.gg/xai)
+**Need more tokens?** Check the faucet URL in the testnet output or wait 24 hours for automatic refill
 
 ---
 
@@ -407,16 +407,17 @@ Now that you're set up, explore XAI's advanced features:
 - **Troubleshooting:** [user-guides/troubleshooting.md](user-guides/troubleshooting.md)
 - **Technical Specs:** [../WHITEPAPER.md](../WHITEPAPER.md)
 
-### Community & Support
-- **Discord:** https://discord.gg/xai
-- **GitHub Issues:** https://github.com/your-org/xai/issues
-- **Documentation:** https://docs.xai.network
+### Community & Support (Coming Soon)
+Official community channels are being established. For now:
+- **GitHub Issues:** File technical issues and bug reports
+- **Documentation:** Browse the docs/ directory
 - **Security Issues:** See [SECURITY.md](../SECURITY.md)
 
-### Video Tutorials
-- **Getting Started:** https://youtube.com/xai-quickstart
-- **Mining Tutorial:** https://youtube.com/xai-mining
-- **Mobile Wallet:** https://youtube.com/xai-mobile
+### Video Tutorials (Coming Soon)
+Video tutorials are planned for:
+- Getting Started walkthrough
+- Mining setup guide
+- Mobile wallet usage
 
 ---
 
@@ -459,14 +460,14 @@ Now that you're set up, explore XAI's advanced features:
 - ✅ Knowledge of basic operations
 
 **Continue your journey:**
-1. Join the [Discord community](https://discord.gg/xai)
-2. Explore the [block explorer](https://explorer.xai.network/testnet)
-3. Try [mining](user-guides/mining.md) to earn rewards
-4. Build a [dApp](api/rest-api.md) on XAI
-5. Run a [light client](user-guides/light_client_mode.md) on Raspberry Pi
+1. Try [mining](user-guides/mining.md) to earn rewards
+2. Build a [dApp](api/rest-api.md) on XAI
+3. Run a [light client](user-guides/light_client_mode.md) on Raspberry Pi
+4. Explore advanced features in the documentation
+5. Contribute to the project on GitHub
 
-**Welcome to the XAI community!** 🚀
+**Welcome to XAI blockchain development!**
 
 ---
 
-*Last Updated: January 2025 | XAI Version: 0.2.0 | Questions? Ask in [Discord](https://discord.gg/xai)*
+*Last Updated: January 2025 | XAI Version: 0.2.0*

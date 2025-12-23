@@ -11,31 +11,25 @@ Choose your platform:
 === "Windows"
 
     ```bash
-    # Download installer
-    curl -O https://blockchain-project.io/downloads/installer-windows.exe
-
-    # Run installer
-    ./installer-windows.exe
+    # See project repository for installation instructions
+    # Install from source or binary release
     ```
 
 === "macOS"
 
     ```bash
-    # Using Homebrew
-    brew tap blockchain-project/tap
-    brew install blockchain-node
+    # Install from source or binary release
+    # See project documentation for details
     ```
 
 === "Linux"
 
     ```bash
-    # Using package manager (Ubuntu/Debian)
-    wget -qO- https://blockchain-project.io/install.sh | bash
+    # Install from source (recommended for development)
+    cd /path/to/xai
+    pip install -e .
 
-    # Or download binary
-    curl -O https://blockchain-project.io/downloads/blockchain-linux-amd64
-    chmod +x blockchain-linux-amd64
-    sudo mv blockchain-linux-amd64 /usr/local/bin/blockchain
+    # Or see project releases for binary downloads
     ```
 
 ### 2. Create Your First Wallet
@@ -239,10 +233,10 @@ Create `~/.blockchain/config.yaml`:
 ```yaml
 # Network settings
 network:
-  mainnet: true
+  mainnet: false  # Use testnet for development
   peers:
-    - node1.blockchain-project.io:8333
-    - node2.blockchain-project.io:8333
+    - localhost:18545  # Local testnet node
+    # Add additional peer addresses as needed
 
 # Wallet settings
 wallet:
@@ -332,16 +326,19 @@ Now that you're set up, explore more advanced features:
 - [Troubleshooting Guide](troubleshooting.md)
 - [API Reference](../api/rest-api.md)
 
-### Community
+### Community (Coming Soon)
 
-- Discord: [Join our server](https://discord.gg/blockchain)
-- Forum: [community.blockchain-project.io](https://community.blockchain-project.io)
-- Twitter: [@blockchain_project](https://twitter.com/blockchain_project)
+Official community channels are being established. Check back soon for:
+- Discord Server
+- Community Forum
+- Social Media Updates
 
 ### Support
 
-- Email: support@blockchain-project.io
-- Live Chat: Available on website during business hours
+For technical issues and questions:
+- File issues on GitHub
+- Check the documentation and FAQ
+- Review troubleshooting guides
 
 ## Glossary
 

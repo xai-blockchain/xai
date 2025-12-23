@@ -199,9 +199,9 @@ Visual descriptions for each scene in the quickstart video.
   - "Community" (chat icon)
   - "Support" (question mark icon)
 - Frame 4: Links display:
-  - docs.xai.network
-  - discord.gg/xai
-  - twitter.com/xai_network
+  - Documentation: See docs/ directory
+  - GitHub: Check project repository
+  - Community: Coming soon
 - Frame 5: Final tagline: "Join the XAI Revolution"
 - Frame 6: Subscribe/Follow buttons
 - Frame 7: Fade to black with logo watermark

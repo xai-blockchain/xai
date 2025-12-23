@@ -60,9 +60,9 @@ Target Audience: First-time blockchain users
 
 ## Scene 8: Outro (15 sec)
 - "You're ready to use XAI!"
-- Links to documentation: docs.xai.network
-- Community: Discord, Twitter, GitHub
-- "Join the XAI revolution"
+- Links to documentation in the docs/ directory
+- Community channels coming soon
+- "Start building with XAI blockchain"
 
 ## Total Runtime: ~3:35 minutes
 

@@ -560,8 +560,8 @@ load_dotenv()
 ## Getting Help
 
 - Check [FAQ](../user-guides/faq.md)
-- Join [Discord community](#)
-- Email: dev-support@blockchain-project.io
+- Review [Troubleshooting Guide](../user-guides/troubleshooting.md)
+- File issues on GitHub for technical problems
 
 ---
 
