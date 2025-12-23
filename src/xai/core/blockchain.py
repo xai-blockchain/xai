@@ -2166,6 +2166,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         self,
         chain: Optional[List[Union["Block", BlockHeader]]] = None,
         expected_genesis_hash: Optional[str] = None,
+        use_checkpoint: bool = True,
     ) -> Tuple[bool, Optional[str]]:
         """
         Validate the blockchain tip-to-genesis without mutating live state.
@@ -2173,6 +2174,15 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         Performs structural checks, PoW verification, signature validation,
         transaction validation against the authoritative UTXO manager,
         nonce progression, merkle root verification, and supply cap enforcement.
+
+        Performance optimization: When use_checkpoint=True (default), validation
+        starts from the latest checkpoint instead of genesis, reducing complexity
+        from O(n) to O(k) where k = blocks since last checkpoint.
+
+        Args:
+            chain: Optional chain to validate (defaults to current chain)
+            expected_genesis_hash: Optional expected genesis block hash
+            use_checkpoint: If True, use checkpoint for incremental validation
         """
         if chain is None:
             # Prefer the in-memory cache so we can detect tampering before hitting disk
@@ -2218,6 +2228,26 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             self.logger.warn("Chain validation failed: genesis hash mismatch")
             return False
 
+        # PERFORMANCE OPTIMIZATION: Use checkpoint for incremental validation
+        # Instead of rebuilding UTXO from genesis (O(n)), start from checkpoint (O(k))
+        checkpoint_start_idx = 0
+        checkpoint_utxo = None
+        checkpoint_supply = 0.0
+
+        if use_checkpoint and hasattr(self, 'checkpoint_manager'):
+            checkpoint = self.checkpoint_manager.load_latest_checkpoint()
+            if checkpoint and checkpoint.height < len(blocks):
+                # Verify checkpoint matches the block in our chain
+                checkpoint_block = blocks[checkpoint.height]
+                if checkpoint_block.header.hash == checkpoint.block_hash:
+                    checkpoint_utxo = checkpoint.utxo_snapshot
+                    checkpoint_supply = checkpoint.total_supply
+                    checkpoint_start_idx = checkpoint.height + 1
+                    self.logger.info(
+                        f"Using checkpoint at height {checkpoint.height} for incremental validation "
+                        f"(validating {len(blocks) - checkpoint_start_idx} blocks instead of {len(blocks)})"
+                    )
+
         # Snapshot state and rebuild using the authoritative managers
         utxo_snapshot = self.utxo_manager.snapshot()
         nonce_snapshot = (
@@ -2228,6 +2258,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         self.nonce_tracker.nonces = {}
         self.nonce_tracker.pending_nonces = {}
 
+        # If we have a checkpoint, load its UTXO state instead of starting empty
+        if checkpoint_utxo:
+            self.utxo_manager.load_utxo_set(checkpoint_utxo)
+
         validator = TransactionValidator(
             self,
             self.nonce_tracker,
@@ -2236,11 +2270,16 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         )
 
         seen_txids: set[str] = set()
-        current_supply = 0.0
+        current_supply = checkpoint_supply  # Start from checkpoint supply
         previous_timestamp: Optional[float] = None
 
+        # If using checkpoint, set previous_timestamp from checkpoint block
+        if checkpoint_start_idx > 0:
+            previous_timestamp = blocks[checkpoint_start_idx - 1].header.timestamp
+
         try:
-            for idx, block in enumerate(blocks):
+            # Start from checkpoint index (0 if no checkpoint, or checkpoint.height + 1)
+            for idx, block in enumerate(blocks[checkpoint_start_idx:], start=checkpoint_start_idx):
                 header = block.header
 
                 if idx > 0:
