@@ -230,8 +230,21 @@ Remaining Items:
     - 55 unit tests covering safe operations, rejections, edge cases, and attack scenarios
   - Security: Pre-execution validation prevents dangerous code before exec() is called
 
-- [ ] **JWT Blacklist Cleanup** - No automatic expiration of blacklisted tokens
-  - Add: Background task to prune expired entries
+- [x] **JWT Blacklist Cleanup** - No automatic expiration of blacklisted tokens ✅ DONE (2025-12-23)
+  - Implemented: Automatic background cleanup of expired JWT tokens from blacklist
+  - Locations:
+    - src/xai/core/api_auth.py (JWTAuthManager with background cleanup)
+    - src/xai/core/jwt_auth_manager.py (updated with background cleanup)
+  - Features:
+    - Background daemon thread runs periodic cleanup (default: 15 minutes, configurable)
+    - Thread-safe operations using threading.RLock for all blacklist access
+    - Graceful shutdown via atexit registration
+    - Manual cleanup method: cleanup_expired_tokens() / cleanup_revoked_tokens()
+    - Configurable via cleanup_enabled and cleanup_interval_seconds parameters
+    - Comprehensive structured logging with security event tracking
+    - Prevents memory growth from accumulating expired tokens
+  - Tests: 35 comprehensive unit tests (18 for api_auth, 17 for jwt_auth_manager)
+  - Configuration: src/xai/config/default.yaml (jwt_blacklist_cleanup_enabled, jwt_blacklist_cleanup_interval)
 
 - [x] **API Key Encryption** - Keys stored as hashes, should use encryption ✅ DONE (commit c6e5402)
   - Migrated to: Fernet symmetric encryption with key rotation

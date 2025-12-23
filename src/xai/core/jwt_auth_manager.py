@@ -10,11 +10,14 @@ Comprehensive authentication system with:
 - Token refresh mechanism
 - Secure key storage
 - Audit logging
+- Automatic JWT blacklist cleanup
 """
 
+import atexit
 import hashlib
 import logging
 import secrets
+import threading
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -80,7 +83,7 @@ class APIKey:
 
 class JWTAuthManager:
     """
-    Manages JWT token generation, validation, and revocation.
+    Manages JWT token generation, validation, and revocation with automatic cleanup.
     """
 
     def __init__(
@@ -89,6 +92,8 @@ class JWTAuthManager:
         algorithm: str = "HS256",
         token_expiration_hours: int = 24,
         refresh_token_expiration_days: int = 30,
+        cleanup_enabled: bool = True,
+        cleanup_interval_seconds: int = 900,
     ):
         """
         Initialize JWT authentication manager.
@@ -98,6 +103,8 @@ class JWTAuthManager:
             algorithm: JWT algorithm (HS256, RS256, etc.)
             token_expiration_hours: Access token expiration in hours
             refresh_token_expiration_days: Refresh token expiration in days
+            cleanup_enabled: Enable automatic blacklist cleanup (default: True)
+            cleanup_interval_seconds: Cleanup interval in seconds (default: 900 = 15 minutes)
         """
         self.secret_key = secret_key
         self.algorithm = algorithm
@@ -109,6 +116,20 @@ class JWTAuthManager:
 
         # Active sessions
         self.active_sessions: dict[str, Dict] = {}
+
+        # Background cleanup configuration
+        self._cleanup_enabled = cleanup_enabled
+        self._cleanup_interval = cleanup_interval_seconds
+        self._cleanup_thread: threading.Thread | None = None
+        self._cleanup_stop_event = threading.Event()
+        self._revoked_tokens_lock = threading.RLock()  # Thread-safe access to revoked_tokens
+
+        # Start background cleanup if enabled
+        if self._cleanup_enabled:
+            self._start_cleanup_thread()
+
+        # Register cleanup on exit
+        atexit.register(self._shutdown_cleanup)
 
     def generate_token(
         self,
@@ -166,7 +187,7 @@ class JWTAuthManager:
         - Clock skew tolerance (30 seconds)
         - Required claims validation (exp, iat, jti)
         - Signature verification
-        - Revocation list checking
+        - Revocation list checking (thread-safe)
 
         Args:
             token: JWT token to validate
@@ -189,9 +210,12 @@ class JWTAuthManager:
                 leeway=30  # 30 seconds clock skew tolerance
             )
 
-            # Check if token is revoked
+            # Check if token is revoked (thread-safe)
             jti = claims.get('jti')
-            if jti in self.revoked_tokens:
+            with self._revoked_tokens_lock:
+                is_revoked = jti in self.revoked_tokens
+
+            if is_revoked:
                 security_logger.warning(f"Revoked token access attempt: {jti}")
                 return False, None, "Token has been revoked"
 
@@ -238,6 +262,8 @@ class JWTAuthManager:
         decode and revoke even expired tokens to extract their JTI and expiration
         for proper blacklist management.
 
+        Thread-safe operation.
+
         Args:
             token: JWT token to revoke
 
@@ -257,7 +283,8 @@ class JWTAuthManager:
             exp = datetime.fromtimestamp(claims['exp'], tz=timezone.utc)
 
             if jti:
-                self.revoked_tokens[jti] = exp
+                with self._revoked_tokens_lock:
+                    self.revoked_tokens[jti] = exp
                 security_logger.info(f"Token revoked: {jti}")
                 return True
 
@@ -270,16 +297,104 @@ class JWTAuthManager:
         """
         Remove expired entries from revocation list.
 
+        Thread-safe operation that prevents memory growth from accumulating
+        expired tokens.
+
         Returns:
             int: Number of entries removed
         """
         now = datetime.now(timezone.utc)
-        expired = [jti for jti, exp in self.revoked_tokens.items() if exp < now]
 
-        for jti in expired:
-            del self.revoked_tokens[jti]
+        with self._revoked_tokens_lock:
+            expired = [jti for jti, exp in self.revoked_tokens.items() if exp < now]
+
+            for jti in expired:
+                del self.revoked_tokens[jti]
+
+            remaining = len(self.revoked_tokens)
+
+        # Log cleanup statistics
+        if expired:
+            security_logger.info(
+                f"JWT blacklist cleanup: removed {len(expired)} expired tokens, {remaining} remaining"
+            )
 
         return len(expired)
+
+    def _start_cleanup_thread(self) -> None:
+        """Start background thread for automatic blacklist cleanup.
+
+        The thread runs as a daemon and performs periodic cleanup of expired tokens.
+        """
+        if self._cleanup_thread is not None and self._cleanup_thread.is_alive():
+            security_logger.warning("Cleanup thread already running")
+            return
+
+        self._cleanup_stop_event.clear()
+        self._cleanup_thread = threading.Thread(
+            target=self._cleanup_worker,
+            name="JWT-Blacklist-Cleanup",
+            daemon=True
+        )
+        self._cleanup_thread.start()
+        security_logger.info(
+            f"JWT blacklist cleanup thread started (interval: {self._cleanup_interval} seconds)"
+        )
+
+    def _cleanup_worker(self) -> None:
+        """Background worker that periodically cleans up expired blacklist entries.
+
+        Runs in a daemon thread and stops when _cleanup_stop_event is set.
+        """
+        while not self._cleanup_stop_event.is_set():
+            # Wait for cleanup interval or stop event
+            if self._cleanup_stop_event.wait(timeout=self._cleanup_interval):
+                # Stop event was set
+                break
+
+            # Perform cleanup
+            try:
+                removed = self.cleanup_revoked_tokens()
+                security_logger.debug(
+                    f"Background cleanup completed: {removed} tokens removed"
+                )
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+                security_logger.error(
+                    f"Error during background cleanup: {type(e).__name__}",
+                    extra={"event": "jwt_auth.cleanup_error", "error": str(e)}
+                )
+
+        security_logger.info("JWT blacklist cleanup thread stopped")
+
+    def _shutdown_cleanup(self) -> None:
+        """Stop the cleanup thread gracefully.
+
+        Called automatically via atexit registration.
+        """
+        if self._cleanup_thread is not None and self._cleanup_thread.is_alive():
+            security_logger.info("Shutting down JWT blacklist cleanup thread...")
+            self._cleanup_stop_event.set()
+            self._cleanup_thread.join(timeout=5)
+            if self._cleanup_thread.is_alive():
+                security_logger.warning("Cleanup thread did not stop within timeout")
+
+    def stop_cleanup(self) -> None:
+        """Manually stop the background cleanup thread.
+
+        Useful for testing or manual control.
+        """
+        self._shutdown_cleanup()
+
+    def get_blacklist_size(self) -> int:
+        """Get current size of revocation blacklist.
+
+        Thread-safe operation.
+
+        Returns:
+            int: Number of tokens in revocation list
+        """
+        with self._revoked_tokens_lock:
+            return len(self.revoked_tokens)
 
 class APIKeyManager:
     """
