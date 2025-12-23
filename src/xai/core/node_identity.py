@@ -8,25 +8,21 @@ Exposes helpers to load/create identity and access public/private keys in hex.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import stat
-import logging
-from typing import Dict, Tuple
 
 from xai.core.crypto_utils import (
-    generate_secp256k1_keypair_hex,
     derive_public_key_hex,
+    generate_secp256k1_keypair_hex,
 )
 
-
 IDENTITY_FILENAME = "node_identity.json"
-
 
 def _identity_path(data_dir: str) -> str:
     return os.path.join(data_dir, IDENTITY_FILENAME)
 
-
-def load_or_create_identity(data_dir: str) -> Dict[str, str]:
+def load_or_create_identity(data_dir: str) -> dict[str, str]:
     """Load an existing node identity or create a new one.
 
     The identity file contains:
@@ -63,7 +59,6 @@ def load_or_create_identity(data_dir: str) -> Dict[str, str]:
         )
 
     return identity
-
 
 def _atomic_write_json(path: str, payload: Dict) -> None:
     tmp = f"{path}.tmp"

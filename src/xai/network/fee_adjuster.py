@@ -1,7 +1,7 @@
+from __future__ import annotations
+
 import time
 from collections import deque
-from typing import Deque, Tuple
-
 
 class FeeAdjuster:
     def __init__(
@@ -26,7 +26,7 @@ class FeeAdjuster:
         self.history_window_blocks = history_window_blocks
 
         # Stores historical network metrics: deque of (pending_tx_count, block_fullness)
-        self.network_metrics_history: Deque[Tuple[int, float]] = deque()
+        self.network_metrics_history: deque[tuple[int, float]] = deque()
 
         # Initialize with some default metrics
         self.update_network_metrics(0, 0.0)
@@ -81,7 +81,6 @@ class FeeAdjuster:
             f"Suggested fee: {suggested_fee:.4f} (Avg Pending TXs: {avg_pending_tx:.0f}, Avg Block Fullness: {avg_block_fullness:.2f})"
         )
         return suggested_fee
-
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

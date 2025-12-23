@@ -8,7 +8,7 @@ Contains the Block class which represents individual blocks in the blockchain.
 from __future__ import annotations
 
 import hashlib
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any
 
 from xai.core.block_header import BlockHeader, canonical_json
 from xai.core.config import Config
@@ -18,23 +18,22 @@ from xai.core.structured_logger import get_structured_logger
 if TYPE_CHECKING:
     from xai.core.transaction import Transaction
 
-
 class Block:
     """Blockchain block with real proof-of-work"""
 
     def __init__(
         self,
-        header: Union[BlockHeader, int, None] = None,
-        transactions: Optional[List["Transaction"]] = None,
-        previous_hash: Optional[str] = None,
-        difficulty: Optional[int] = None,
-        timestamp: Optional[float] = None,
+        header: BlockHeader | int | None = None,
+        transactions: list["Transaction"] | None = None,
+        previous_hash: str | None = None,
+        difficulty: int | None = None,
+        timestamp: float | None = None,
         nonce: int = 0,
-        merkle_root: Optional[str] = None,
-        signature: Optional[str] = None,
-        miner_pubkey: Optional[str] = None,
+        merkle_root: str | None = None,
+        signature: str | None = None,
+        miner_pubkey: str | None = None,
         *,
-        index: Optional[int] = None,
+        index: int | None = None,
     ) -> None:
         """
         Accept either a fully constructed BlockHeader or legacy positional fields
@@ -82,18 +81,18 @@ class Block:
 
         self.header = block_header
         self.transactions = transactions
-        self._miner: Optional[str] = None
+        self._miner: str | None = None
         self.logger = get_structured_logger()
         # Optional ancestry window for fast reorg sync; never persisted
-        self.lineage: Optional[List["Block"]] = None
+        self.lineage: list["Block"] | None = None
 
     @staticmethod
-    def _calculate_merkle_root_static(transactions: List["Transaction"]) -> str:
+    def _calculate_merkle_root_static(transactions: list["Transaction"]) -> str:
         """Calculate a merkle root from raw transactions without needing a Blockchain instance."""
         if not transactions:
             return hashlib.sha256(b"").hexdigest()
 
-        tx_hashes: List[str] = []
+        tx_hashes: list[str] = []
         for tx in transactions:
             if tx.txid is None:
                 tx.txid = tx.calculate_hash()
@@ -172,15 +171,15 @@ class Block:
         return self.header.merkle_root
 
     @property
-    def signature(self) -> Optional[str]:
+    def signature(self) -> str | None:
         return self.header.signature
 
     @property
-    def miner_pubkey(self) -> Optional[str]:
+    def miner_pubkey(self) -> str | None:
         return self.header.miner_pubkey
 
     @property
-    def miner(self) -> Optional[str]:
+    def miner(self) -> str | None:
         """Get the miner address.
 
         Returns the miner address from:
@@ -218,7 +217,7 @@ class Block:
             public_key, self.header.hash.encode(), self.header.signature
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary with flattened header fields for backward compatibility.
 
         The block dictionary has top-level fields for index, timestamp, previous_hash,
@@ -306,7 +305,7 @@ class Block:
 
         return tx_hashes[0]
 
-    def generate_merkle_proof(self, txid: str) -> List[Tuple[str, bool]]:
+    def generate_merkle_proof(self, txid: str) -> list[tuple[str, bool]]:
         """
         Generate a merkle proof for a transaction in this block.
 
@@ -342,7 +341,7 @@ class Block:
             raise ValueError(f"Transaction {txid} not found in block")
 
         # Build merkle tree proof
-        proof: List[Tuple[str, bool]] = []
+        proof: list[tuple[str, bool]] = []
         current_index = tx_index
         current_level = tx_hashes.copy()
 
@@ -381,7 +380,7 @@ class Block:
 
     @staticmethod
     def verify_merkle_proof(
-        txid: str, merkle_root: str, proof: List[Tuple[str, bool]]
+        txid: str, merkle_root: str, proof: list[tuple[str, bool]]
     ) -> bool:
         """
         Verify a merkle proof for a transaction.
@@ -405,7 +404,7 @@ class Block:
 
         return current_hash == merkle_root
 
-    def mine_block(self, difficulty: Optional[int] = None) -> str:
+    def mine_block(self, difficulty: int | None = None) -> str:
         """
         Mine this block by finding a valid proof-of-work nonce.
 

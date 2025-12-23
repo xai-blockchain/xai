@@ -1,12 +1,12 @@
 """Tests covering smart-contract persistence and governance gating."""
+from __future__ import annotations
 
 import time
-from typing import Any, Dict
+from typing import Any
 
 from xai.core.blockchain import Blockchain
 from xai.core.config import Config
 from xai.core.governance_execution import ProposalType
-
 
 def _save_contract_snapshot(blockchain: Blockchain) -> None:
     blockchain.storage.save_state_to_disk(
@@ -16,13 +16,12 @@ def _save_contract_snapshot(blockchain: Blockchain) -> None:
         blockchain.contract_receipts,
     )
 
-
 def test_contract_state_persistence(tmp_path):
     data_dir = str(tmp_path)
     blockchain = Blockchain(data_dir=data_dir)
 
     contract_address = "XAICONTRACT000000000000000000000000000000"
-    contract_entry: Dict[str, Any] = {
+    contract_entry: dict[str, Any] = {
         "creator": "XAI_CREATOR",
         "code": b"\x01\x02\x03\x04",
         "storage": {"counter": 7},
@@ -42,7 +41,6 @@ def test_contract_state_persistence(tmp_path):
     assert restored["storage"]["counter"] == contract_entry["storage"]["counter"]
     assert restored["code"] == contract_entry["code"]
     assert reloaded.contract_receipts[-1]["txid"] == "receipt-most-recent"
-
 
 def test_smart_contract_manager_governance_gate(tmp_path):
     data_dir = str(tmp_path)

@@ -27,24 +27,19 @@ import logging
 import time
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Optional, Dict, Any, Callable
+from typing import Any, Callable
 
 from xai.core.wallet import Wallet
 from xai.mobile.biometric_auth import (
     BiometricAuthManager,
+    BiometricError,
     BiometricResult,
     BiometricStrength,
     ProtectionLevel,
-    BiometricError
 )
-from xai.mobile.secure_enclave import (
-    SecureEnclaveManager,
-    KeyAlgorithm,
-    KeyProtection
-)
+from xai.mobile.secure_enclave import KeyAlgorithm, KeyProtection, SecureEnclaveManager
 
 logger = logging.getLogger(__name__)
-
 
 @dataclass
 class SecurityPolicy:
@@ -76,7 +71,6 @@ class SecurityPolicy:
     # Audit
     audit_sensitive_operations: bool = True
 
-
 @dataclass
 class OperationAudit:
     """Audit record for sensitive operations."""
@@ -85,28 +79,23 @@ class OperationAudit:
     success: bool
     timestamp: int = field(default_factory=lambda: int(time.time()))
     biometric_used: bool = False
-    error: Optional[str] = None
-
+    error: str | None = None
 
 class BiometricWalletError(Exception):
     """Base exception for biometric wallet errors."""
     pass
 
-
 class AuthenticationRequiredError(BiometricWalletError):
     """Raised when biometric authentication is required."""
     pass
-
 
 class AuthenticationFailedError(BiometricWalletError):
     """Raised when biometric authentication fails."""
     pass
 
-
 class WalletLockedError(BiometricWalletError):
     """Raised when wallet is locked due to failed attempts."""
     pass
-
 
 class BiometricWallet:
     """
@@ -138,8 +127,8 @@ class BiometricWallet:
         self,
         wallet: Wallet,
         biometric_manager: BiometricAuthManager,
-        policy: Optional[SecurityPolicy] = None,
-        secure_enclave: Optional[SecureEnclaveManager] = None
+        policy: SecurityPolicy | None = None,
+        secure_enclave: SecureEnclaveManager | None = None
     ):
         """
         Initialize biometric wallet.
@@ -156,7 +145,7 @@ class BiometricWallet:
         self._enclave = secure_enclave
 
         self._failed_attempts = 0
-        self._locked_until: Optional[float] = None
+        self._locked_until: float | None = None
         self._audit_log: list[OperationAudit] = []
 
         logger.info(
@@ -196,7 +185,7 @@ class BiometricWallet:
         self,
         operation: str,
         protection_level: ProtectionLevel,
-        prompt_message: Optional[str] = None
+        prompt_message: str | None = None
     ) -> BiometricResult:
         """
         Perform biometric authentication for operation.
@@ -257,7 +246,7 @@ class BiometricWallet:
 
         return result
 
-    def get_private_key(self, prompt_message: Optional[str] = None) -> str:
+    def get_private_key(self, prompt_message: str | None = None) -> str:
         """
         Get wallet private key (requires biometric authentication).
 
@@ -293,8 +282,8 @@ class BiometricWallet:
     def sign_message(
         self,
         message: str,
-        amount: Optional[Decimal] = None,
-        prompt_message: Optional[str] = None
+        amount: Decimal | None = None,
+        prompt_message: str | None = None
     ) -> str:
         """
         Sign message with biometric authentication based on amount.
@@ -349,7 +338,7 @@ class BiometricWallet:
 
     def _get_protection_level_for_amount(
         self,
-        amount: Optional[Decimal]
+        amount: Decimal | None
     ) -> ProtectionLevel:
         """Determine protection level based on transaction amount."""
         if amount is None:
@@ -368,9 +357,9 @@ class BiometricWallet:
 
     def export_wallet(
         self,
-        password: Optional[str] = None,
-        prompt_message: Optional[str] = None
-    ) -> Dict[str, Any]:
+        password: str | None = None,
+        prompt_message: str | None = None
+    ) -> dict[str, Any]:
         """
         Export wallet data (requires biometric authentication).
 
@@ -410,8 +399,8 @@ class BiometricWallet:
     def save_to_file(
         self,
         filename: str,
-        password: Optional[str] = None,
-        prompt_message: Optional[str] = None
+        password: str | None = None,
+        prompt_message: str | None = None
     ) -> None:
         """
         Save wallet to file (requires biometric for unencrypted).
@@ -490,7 +479,7 @@ class BiometricWallet:
             return time.time() < self._locked_until
         return False
 
-    def unlock(self, prompt_message: Optional[str] = None) -> bool:
+    def unlock(self, prompt_message: str | None = None) -> bool:
         """
         Manually unlock wallet (requires authentication).
 
@@ -520,7 +509,7 @@ class BiometricWallet:
         """Clear audit log."""
         self._audit_log.clear()
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get wallet status information."""
         return {
             "address": self.address,
@@ -532,7 +521,7 @@ class BiometricWallet:
             "audit_entries": len(self._audit_log)
         }
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Export public wallet data (no authentication required)."""
         return self._wallet.to_public_dict()
 
@@ -543,7 +532,6 @@ class BiometricWallet:
     def __str__(self) -> str:
         """Safe string representation."""
         return f"Biometric XAI Wallet {self.address[:16]}..."
-
 
 class BiometricWalletFactory:
     """
@@ -565,8 +553,8 @@ class BiometricWalletFactory:
     def __init__(
         self,
         biometric_manager: BiometricAuthManager,
-        default_policy: Optional[SecurityPolicy] = None,
-        secure_enclave: Optional[SecureEnclaveManager] = None
+        default_policy: SecurityPolicy | None = None,
+        secure_enclave: SecureEnclaveManager | None = None
     ):
         """
         Initialize wallet factory.
@@ -582,7 +570,7 @@ class BiometricWalletFactory:
 
     def create_wallet(
         self,
-        policy: Optional[SecurityPolicy] = None
+        policy: SecurityPolicy | None = None
     ) -> BiometricWallet:
         """
         Create new wallet with biometric protection.
@@ -599,7 +587,7 @@ class BiometricWalletFactory:
     def wrap_wallet(
         self,
         wallet: Wallet,
-        policy: Optional[SecurityPolicy] = None
+        policy: SecurityPolicy | None = None
     ) -> BiometricWallet:
         """
         Wrap existing wallet with biometric protection.
@@ -622,7 +610,7 @@ class BiometricWalletFactory:
         self,
         mnemonic: str,
         passphrase: str = "",
-        policy: Optional[SecurityPolicy] = None
+        policy: SecurityPolicy | None = None
     ) -> BiometricWallet:
         """
         Create wallet from BIP-39 mnemonic with biometric protection.
@@ -641,8 +629,8 @@ class BiometricWalletFactory:
     def load_from_file(
         self,
         filename: str,
-        password: Optional[str] = None,
-        policy: Optional[SecurityPolicy] = None
+        password: str | None = None,
+        policy: SecurityPolicy | None = None
     ) -> BiometricWallet:
         """
         Load wallet from file with biometric protection.

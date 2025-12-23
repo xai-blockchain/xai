@@ -9,11 +9,9 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Dict, Optional
 from threading import RLock
 
 logger = logging.getLogger(__name__)
-
 
 class NonceTracker:
     """
@@ -23,7 +21,7 @@ class NonceTracker:
     Transactions must have nonce = current_nonce + 1.
     """
 
-    def __init__(self, data_dir: Optional[str] = None) -> None:
+    def __init__(self, data_dir: str | None = None) -> None:
         """
         Initialize nonce tracker
 
@@ -37,8 +35,8 @@ class NonceTracker:
         os.makedirs(data_dir, exist_ok=True)
 
         self.nonce_file = os.path.join(data_dir, "nonces.json")
-        self.nonces: Dict[str, int] = {}
-        self.pending_nonces: Dict[str, int] = {}
+        self.nonces: dict[str, int] = {}
+        self.pending_nonces: dict[str, int] = {}
         self.lock = RLock()
 
         # Load existing nonces
@@ -133,7 +131,7 @@ class NonceTracker:
                 return
             self.pending_nonces[address] = nonce
 
-    def increment_nonce(self, address: str, nonce: Optional[int] = None) -> None:
+    def increment_nonce(self, address: str, nonce: int | None = None) -> None:
         """
         Increment nonce after successful transaction
 
@@ -203,7 +201,7 @@ class NonceTracker:
                 "total_transactions": sum(self.nonces.values()),
             }
 
-    def snapshot(self) -> Dict[str, any]:
+    def snapshot(self) -> dict[str, any]:
         """
         Create a complete snapshot of the current nonce state.
         Thread-safe atomic operation for chain reorganization rollback.
@@ -218,7 +216,7 @@ class NonceTracker:
                 "pending_nonces": copy.deepcopy(self.pending_nonces),
             }
 
-    def restore(self, snapshot: Dict[str, any]) -> None:
+    def restore(self, snapshot: dict[str, any]) -> None:
         """
         Restore nonce state from a snapshot.
         Thread-safe atomic operation for chain reorganization rollback.
@@ -244,10 +242,8 @@ class NonceTracker:
                 }
             )
 
-
 # Global nonce tracker instance
 _global_nonce_tracker = None
-
 
 def get_nonce_tracker() -> NonceTracker:
     """
@@ -260,7 +256,6 @@ def get_nonce_tracker() -> NonceTracker:
     if _global_nonce_tracker is None:
         _global_nonce_tracker = NonceTracker()
     return _global_nonce_tracker
-
 
 def validate_transaction_nonce(address: str, nonce: int) -> bool:
     """
@@ -276,8 +271,7 @@ def validate_transaction_nonce(address: str, nonce: int) -> bool:
     tracker = get_nonce_tracker()
     return tracker.validate_nonce(address, nonce)
 
-
-def increment_transaction_nonce(address: str, nonce: Optional[int] = None) -> None:
+def increment_transaction_nonce(address: str, nonce: int | None = None) -> None:
     """
     Convenience function to increment nonce
 
@@ -286,7 +280,6 @@ def increment_transaction_nonce(address: str, nonce: Optional[int] = None) -> No
     """
     tracker = get_nonce_tracker()
     tracker.increment_nonce(address, nonce)
-
 
 def get_next_nonce(address: str) -> int:
     """

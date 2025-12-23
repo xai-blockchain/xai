@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Mobile cache helpers for quick sync summaries.
 
@@ -7,8 +9,7 @@ mobile apps can cache locally and refresh periodically.
 
 import time
 from collections import OrderedDict
-from typing import Any, Dict, Optional
-
+from typing import Any
 
 class MobileCacheService:
     """
@@ -24,16 +25,16 @@ class MobileCacheService:
     def __init__(self, node):
         self.node = node
         # Global summary cache (single entry, TTL-based)
-        self._last_summary: Optional[Dict[str, Any]] = None
+        self._last_summary: dict[str, Any] | None = None
         self._last_built_at: float = 0.0
 
         # Per-address cache with LRU eviction
-        self._address_cache: OrderedDict[str, Dict[str, Any]] = OrderedDict()
-        self._address_cache_timestamps: Dict[str, float] = {}
+        self._address_cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
+        self._address_cache_timestamps: dict[str, float] = {}
 
     def build_summary(
-        self, address: Optional[str] = None, use_cache: bool = True
-    ) -> Dict[str, Any]:
+        self, address: str | None = None, use_cache: bool = True
+    ) -> dict[str, Any]:
         now = time.time()
 
         # Check global summary cache first
@@ -70,7 +71,7 @@ class MobileCacheService:
         summary["address_risk"] = snapshot
         return summary
 
-    def _fetch_and_cache_risk_profile(self, address: str, now: float) -> Optional[Dict[str, Any]]:
+    def _fetch_and_cache_risk_profile(self, address: str, now: float) -> dict[str, Any] | None:
         """
         Fetch address risk profile and cache it with LRU eviction
 
@@ -98,7 +99,7 @@ class MobileCacheService:
 
         return snapshot
 
-    def _build_fresh_summary(self) -> Dict[str, Any]:
+    def _build_fresh_summary(self) -> dict[str, Any]:
         blockchain = self.node.blockchain
         latest_block = blockchain.get_latest_block()
         wallet_tracker = getattr(self.node, "wallet_claiming_tracker", None)

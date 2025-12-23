@@ -11,14 +11,15 @@ Run from project root:
 
 import asyncio
 from pathlib import Path
+
 from xai.mobile import (
-    PushNotificationService,
-    DeviceRegistry,
     DevicePlatform,
-    NotificationType,
+    DeviceRegistry,
     NotificationPriority,
-    create_transaction_notification,
+    NotificationType,
+    PushNotificationService,
     create_security_notification,
+    create_transaction_notification,
 )
 
 

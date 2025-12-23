@@ -1,15 +1,16 @@
+from __future__ import annotations
+
 """
 Mining Client for XAI SDK
 
 Handles mining operations and reward management.
 """
 
-from typing import Optional, Dict, Any
+from typing import Any
 
+from ..exceptions import MiningError, ValidationError
 from ..http_client import HTTPClient
 from ..models import MiningStatus
-from ..exceptions import MiningError, ValidationError
-
 
 class MiningClient:
     """Client for mining operations."""
@@ -23,7 +24,7 @@ class MiningClient:
         """
         self.http_client = http_client
 
-    def start(self, threads: int = 1) -> Dict[str, Any]:
+    def start(self, threads: int = 1) -> dict[str, Any]:
         """
         Start mining.
 
@@ -42,10 +43,12 @@ class MiningClient:
         try:
             payload = {"threads": threads}
             return self.http_client.post("/mining/start", data=payload)
-        except Exception as e:
-            raise MiningError(f"Failed to start mining: {str(e)}")
+        except MiningError:
+            raise
+        except (KeyError, ValueError, TypeError) as e:
+            raise MiningError(f"Failed to start mining: {str(e)}") from e
 
-    def stop(self) -> Dict[str, Any]:
+    def stop(self) -> dict[str, Any]:
         """
         Stop mining.
 
@@ -57,8 +60,10 @@ class MiningClient:
         """
         try:
             return self.http_client.post("/mining/stop", data={})
-        except Exception as e:
-            raise MiningError(f"Failed to stop mining: {str(e)}")
+        except MiningError:
+            raise
+        except (KeyError, ValueError, TypeError) as e:
+            raise MiningError(f"Failed to stop mining: {str(e)}") from e
 
     def get_status(self) -> MiningStatus:
         """
@@ -82,10 +87,12 @@ class MiningClient:
                 uptime=response.get("uptime", 0),
                 last_block_time=response.get("last_block_time"),
             )
-        except Exception as e:
-            raise MiningError(f"Failed to get mining status: {str(e)}")
+        except MiningError:
+            raise
+        except (KeyError, ValueError, TypeError) as e:
+            raise MiningError(f"Failed to get mining status: {str(e)}") from e
 
-    def get_rewards(self, address: str) -> Dict[str, Any]:
+    def get_rewards(self, address: str) -> dict[str, Any]:
         """
         Get mining rewards for an address.
 
@@ -103,8 +110,10 @@ class MiningClient:
 
         try:
             return self.http_client.get("/mining/rewards", params={"address": address})
-        except Exception as e:
-            raise MiningError(f"Failed to get mining rewards: {str(e)}")
+        except MiningError:
+            raise
+        except (KeyError, ValueError, TypeError) as e:
+            raise MiningError(f"Failed to get mining rewards: {str(e)}") from e
 
     def is_mining(self) -> bool:
         """
@@ -119,5 +128,7 @@ class MiningClient:
         try:
             status = self.get_status()
             return status.mining
-        except Exception as e:
-            raise MiningError(f"Failed to check mining status: {str(e)}")
+        except MiningError:
+            raise
+        except (KeyError, ValueError, TypeError, AttributeError) as e:
+            raise MiningError(f"Failed to check mining status: {str(e)}") from e

@@ -1,17 +1,18 @@
+from __future__ import annotations
+
 import logging
 import time
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable
 
 logger = logging.getLogger("xai.blockchain.downtime_penalty")
-
 
 class DowntimePenaltyManager:
     def __init__(
         self,
-        initial_validators: Dict[str, float],
+        initial_validators: dict[str, float],
         grace_period_seconds: int = 300,
         penalty_rate_per_second: float = 0.00001,
-        time_provider: Optional[Callable[[], float]] = None,
+        time_provider: Callable[[], float] | None = None,
     ):
         """
         Initializes the DowntimePenaltyManager.
@@ -31,7 +32,7 @@ class DowntimePenaltyManager:
         self.grace_period_seconds = grace_period_seconds
         self.penalty_rate_per_second = penalty_rate_per_second
 
-        self.validators: Dict[str, Dict[str, Any]] = {}
+        self.validators: dict[str, dict[str, Any]] = {}
         self._time_provider = time_provider or time.time
         now = self._current_time()
         for v_id, staked_amount in initial_validators.items():
@@ -110,10 +111,9 @@ class DowntimePenaltyManager:
             else:
                 logger.debug("Validator %s active (%.2fs since last activity)", validator_id, time_since_last_activity)
 
-    def get_validator_status(self, validator_id: str) -> Dict[str, Any] | None:
+    def get_validator_status(self, validator_id: str) -> dict[str, Any] | None:
         """Returns the current status of a validator."""
         return self.validators.get(validator_id)
-
 
     def _current_time(self) -> float:
         return float(self._time_provider())

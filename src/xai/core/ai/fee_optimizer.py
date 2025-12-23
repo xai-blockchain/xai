@@ -1,19 +1,18 @@
+from __future__ import annotations
+
 """
 Lightweight fee optimizer that returns heuristic fee recommendations.
 """
-
-from typing import Dict, List
-
 
 class AIFeeOptimizer:
     """Simple fee optimizer that mimics EMA-based recommendations."""
 
     def __init__(self):
-        self.fee_history: List[float] = []
+        self.fee_history: list[float] = []
 
     def predict_optimal_fee(
         self, pending_tx_count: int, priority: str = "normal"
-    ) -> Dict[str, object]:
+    ) -> dict[str, object]:
         base_fee = 0.05
         priority = priority.lower()
 

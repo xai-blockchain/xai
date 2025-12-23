@@ -8,7 +8,6 @@ import logging
 import os
 from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
-from typing import Optional
 
 
 class AnonymousLogger:

@@ -9,28 +9,27 @@ and gamification processing.
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 from xai.core.blockchain_exceptions import (
-    StorageError,
     DatabaseError,
-    StateError,
-    ValidationError,
     MiningAbortedError,
+    StateError,
+    StorageError,
+    ValidationError,
 )
 
 if TYPE_CHECKING:
-    from xai.core.blockchain_components.block import Block
     from xai.core.block_header import BlockHeader
-    from xai.core.transaction import Transaction
+    from xai.core.blockchain_components.block import Block
     from xai.core.gamification import GamificationBlockchainInterface
-
+    from xai.core.transaction import Transaction
 
 def _record_mining_metrics(
     metric_name: str,
     value: float = 1.0,
     operation: str = "inc",
-    labels: Optional[Dict[str, Any]] = None
+    labels: dict[str, Any] | None = None
 ) -> None:
     """
     Record mining metrics to the metrics collector singleton.
@@ -64,7 +63,6 @@ def _record_mining_metrics(
         # Metrics not available - silent fail
         pass
 
-
 def _record_economic_metrics(
     base_reward: float,
     total_fees: float,
@@ -76,7 +74,6 @@ def _record_economic_metrics(
     _record_mining_metrics("xai_economic_fees_total", total_fees)
     _record_mining_metrics("xai_economic_streak_bonus_total", streak_bonus)
     _record_mining_metrics("xai_economic_coinbase_payout_total", coinbase_reward)
-
 
 class BlockchainMiningMixin:
     """
@@ -115,8 +112,8 @@ class BlockchainMiningMixin:
     """
 
     def mine_pending_transactions(
-        self, miner_address: str, node_identity: Optional[Dict[str, str]] = None
-    ) -> Optional["Block"]:
+        self, miner_address: str, node_identity: dict[str, str] | None = None
+    ) -> "Block" | None:
         """Mine a new block with pending transactions
 
         Implements block size limits to prevent DoS attacks and ensure network scalability.
@@ -132,8 +129,8 @@ class BlockchainMiningMixin:
         Raises:
             ValueError: If node_identity is not provided or block violates size limits
         """
-        from xai.core.blockchain_components.block import Block
         from xai.core.block_header import BlockHeader, canonical_json
+        from xai.core.blockchain_components.block import Block
         from xai.core.config import Config
         from xai.core.crypto_utils import sign_message_hex
         from xai.core.transaction import Transaction
@@ -190,10 +187,10 @@ class BlockchainMiningMixin:
         )
 
         # Enforce strict in-block nonce sequencing per sender
-        sender_next_nonce: Dict[str, int] = {}
+        sender_next_nonce: dict[str, int] = {}
 
         # Apply block size limits: Select transactions that fit within max block size
-        selected_txs: List["Transaction"] = []
+        selected_txs: list["Transaction"] = []
         current_block_size = 0
 
         for tx in prioritized_txs:
@@ -331,7 +328,7 @@ class BlockchainMiningMixin:
         pending_txs_backup = list(self.pending_transactions)
 
         # Track nonce changes to commit only after successful persistence
-        nonce_changes: List[Tuple[str, int]] = []
+        nonce_changes: list[tuple[str, int]] = []
 
         try:
             # Add to chain (cache)

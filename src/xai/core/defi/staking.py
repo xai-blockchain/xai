@@ -17,20 +17,19 @@ Security features:
 
 from __future__ import annotations
 
-import time
 import logging
+import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from ..vm.exceptions import VMExecutionError
-from .access_control import AccessControl, SignedRequest, RoleBasedAccessControl, Role
+from .access_control import AccessControl, Role, RoleBasedAccessControl, SignedRequest
 
 if TYPE_CHECKING:
     from ..blockchain import Blockchain
 
 logger = logging.getLogger(__name__)
-
 
 class ValidatorStatus(Enum):
     """Validator status."""
@@ -38,7 +37,6 @@ class ValidatorStatus(Enum):
     UNBONDING = "unbonding"
     JAILED = "jailed"
     INACTIVE = "inactive"
-
 
 @dataclass
 class Validator:
@@ -74,7 +72,6 @@ class Validator:
         """Check if validator is active."""
         return self.status == ValidatorStatus.ACTIVE
 
-
 @dataclass
 class Delegation:
     """Delegation from a staker to a validator."""
@@ -91,7 +88,6 @@ class Delegation:
 
     # Rewards tracking
     accumulated_rewards: int = 0  # Unclaimed delegator rewards
-
 
 @dataclass
 class StakingPool:
@@ -120,12 +116,12 @@ class StakingPool:
     staking_token: str = "XAI"
 
     # Validators
-    validators: Dict[str, Validator] = field(default_factory=dict)
+    validators: dict[str, Validator] = field(default_factory=dict)
     max_validators: int = 100
     min_self_stake: int = 10000 * 10**18  # Minimum self-stake to be validator
 
     # Delegations: delegator -> validator -> Delegation
-    delegations: Dict[str, Dict[str, Delegation]] = field(default_factory=dict)
+    delegations: dict[str, dict[str, Delegation]] = field(default_factory=dict)
 
     # Unbonding period (seconds)
     unbonding_period: int = 21 * 24 * 3600  # 21 days
@@ -151,7 +147,7 @@ class StakingPool:
 
     # Access control with signature verification
     access_control: AccessControl = field(default_factory=AccessControl)
-    rbac: Optional[RoleBasedAccessControl] = None
+    rbac: RoleBasedAccessControl | None = None
 
     def __post_init__(self) -> None:
         """Initialize pool."""
@@ -1125,7 +1121,7 @@ class StakingPool:
             "accumulated_rewards": delegation.accumulated_rewards,
         }
 
-    def get_all_validators(self) -> List[Dict]:
+    def get_all_validators(self) -> list[Dict]:
         """Get list of all validators."""
         return [
             self.get_validator_info(addr)
@@ -1226,7 +1222,7 @@ class StakingPool:
 
     def _get_delegation(
         self, delegator: str, validator: str
-    ) -> Optional[Delegation]:
+    ) -> Delegation | None:
         if delegator not in self.delegations:
             return None
         return self.delegations[delegator].get(validator)
@@ -1279,14 +1275,13 @@ class StakingPool:
             "total_rewards_distributed": self.total_rewards_distributed,
         }
 
-
 @dataclass
 class DelegationManager:
     """Helper for managing delegations across validators."""
 
     pool: StakingPool
 
-    def get_best_validator(self) -> Optional[str]:
+    def get_best_validator(self) -> str | None:
         """Get validator with best metrics (lowest commission, highest stake)."""
         best = None
         best_score = -1

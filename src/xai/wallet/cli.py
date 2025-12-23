@@ -19,40 +19,41 @@ import secrets
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Tuple, Optional, List
+from typing import Any
 
 import requests
+
 try:
     import qrcode
 except ImportError:  # pragma: no cover
     qrcode = None
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf import pbkdf2
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf import pbkdf2
 
+from xai.core.hardware_wallet import (
+    HARDWARE_WALLET_ENABLED,
+    HardwareWallet,
+    get_default_hardware_wallet,
+    get_hardware_wallet_manager,
+)
 from xai.core.wallet import Wallet
 from xai.core.watch_only_wallet import (
-    WatchOnlyWalletStore,
-    WatchOnlyWalletError,
     DuplicateWatchAddressError,
     WatchAddressNotFoundError,
+    WatchOnlyWalletError,
+    WatchOnlyWalletStore,
     XpubDerivationError,
 )
+from xai.security.two_factor_auth import TwoFactorAuthManager, TwoFactorSetup
 from xai.wallet.mnemonic_qr_backup import (
     MnemonicQRBackupGenerator,
     QRCodeUnavailableError,
 )
 from xai.wallet.multisig_wallet import MultiSigWallet
 from xai.wallet.two_factor_profile import TwoFactorProfile, TwoFactorProfileStore
-from xai.security.two_factor_auth import TwoFactorAuthManager, TwoFactorSetup
-from xai.core.hardware_wallet import (
-    get_default_hardware_wallet,
-    get_hardware_wallet_manager,
-    HardwareWallet,
-    HARDWARE_WALLET_ENABLED,
-)
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -69,7 +70,6 @@ ARGON2_PARALLELISM = 4
 SALT_SIZE = 32  # 256 bits
 NONCE_SIZE = 12  # 96 bits for AES-GCM
 KEY_SIZE = 32  # 256 bits for AES-256
-
 
 def _get_hardware_wallet(args: argparse.Namespace) -> HardwareWallet:
     """Get hardware wallet based on CLI args."""
@@ -100,7 +100,6 @@ def _get_hardware_wallet(args: argparse.Namespace) -> HardwareWallet:
     else:
         print("Specify --ledger or --trezor", file=sys.stderr)
         sys.exit(1)
-
 
 def _add_watch_add_arguments(parser: argparse.ArgumentParser) -> None:
     """Attach watch-only add options to a parser."""
@@ -138,7 +137,6 @@ def _add_watch_add_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON output instead of plaintext.")
 
-
 def derive_key_from_password(password: str, salt: bytes, kdf: str = "pbkdf2") -> bytes:
     """
     Derive encryption key from password using PBKDF2-HMAC-SHA256 or argon2id.
@@ -172,8 +170,7 @@ def derive_key_from_password(password: str, salt: bytes, kdf: str = "pbkdf2") ->
     )
     return kdf.derive(password.encode('utf-8'))
 
-
-def encrypt_wallet_data(wallet_data: Dict[str, Any], password: str, kdf: str = "pbkdf2") -> Tuple[bytes, bytes, bytes, bytes]:
+def encrypt_wallet_data(wallet_data: dict[str, Any], password: str, kdf: str = "pbkdf2") -> tuple[bytes, bytes, bytes, bytes]:
     """
     Encrypt wallet data using AES-256-GCM with PBKDF2 key derivation.
 
@@ -202,7 +199,6 @@ def encrypt_wallet_data(wallet_data: Dict[str, Any], password: str, kdf: str = "
 
     return ciphertext, salt, nonce, signature
 
-
 from dataclasses import dataclass
 
 @dataclass
@@ -214,7 +210,7 @@ class DecryptionData:
     password: str
     kdf: str = "pbkdf2"
 
-def decrypt_wallet_data(data: DecryptionData) -> Dict[str, Any]:
+def decrypt_wallet_data(data: DecryptionData) -> dict[str, Any]:
     """
     Decrypt wallet data and verify integrity.
 
@@ -247,9 +243,8 @@ def decrypt_wallet_data(data: DecryptionData) -> Dict[str, Any]:
     except json.JSONDecodeError as e:
         raise ValueError(f"Decryption succeeded but data is not valid JSON: {str(e)}") from e
 
-
 def get_private_key_secure(
-    keystore_path: Optional[str] = None,
+    keystore_path: str | None = None,
     allow_env: bool = False,
     prompt: str = "Enter private key"
 ) -> str:
@@ -373,12 +368,11 @@ def get_private_key_secure(
 
     return key_hex
 
-
 def create_keystore(
     address: str,
     private_key: str,
     public_key: str = "",
-    output_path: Optional[str] = None,
+    output_path: str | None = None,
     kdf: str = "pbkdf2"
 ) -> str:
     """
@@ -462,9 +456,7 @@ def create_keystore(
 
     return output_path
 
-
-
-def _format_response(data: Dict[str, Any], as_json: bool) -> str:
+def _format_response(data: dict[str, Any], as_json: bool) -> str:
     """Prepare CLI-friendly output."""
     if as_json:
         return json.dumps(data, indent=2, sort_keys=True)
@@ -480,7 +472,6 @@ def _format_response(data: Dict[str, Any], as_json: bool) -> str:
         return "\n".join(filter(None, lines))
 
     return f"Error: {data.get('error', 'Unknown error')}"
-
 
 def _request_faucet(args: argparse.Namespace) -> int:
     """Handle the request-faucet subcommand."""
@@ -509,7 +500,6 @@ def _request_faucet(args: argparse.Namespace) -> int:
     logger.info("Faucet request completed: success=%s", success)
     print(_format_response(data, args.json))
     return 0 if success else 1
-
 
 def _generate_address(args: argparse.Namespace) -> int:
     """Handle the generate-address subcommand.
@@ -616,7 +606,6 @@ def _generate_address(args: argparse.Namespace) -> int:
 
     return 0
 
-
 def _check_balance(args: argparse.Namespace) -> int:
     """Handle the check-balance subcommand."""
     endpoint = f"{args.base_url.rstrip('/')}/balance/{args.address}"
@@ -647,7 +636,6 @@ def _check_balance(args: argparse.Namespace) -> int:
         logger.error("Failed to check balance: %s", exc)
         print(f"Network error: {exc}", file=sys.stderr)
         return 2
-
 
 def _send_transaction(args: argparse.Namespace) -> int:
     """Handle the send-transaction subcommand.
@@ -724,7 +712,6 @@ def _send_transaction(args: argparse.Namespace) -> int:
         if 'private_key' in locals():
             del private_key
 
-
 def _wallet_history(args: argparse.Namespace) -> int:
     """Handle the wallet-history subcommand."""
     endpoint = f"{args.base_url.rstrip('/')}/history/{args.address}"
@@ -762,7 +749,6 @@ def _wallet_history(args: argparse.Namespace) -> int:
         logger.error("Failed to fetch wallet history: %s", exc)
         print(f"Network error: {exc}", file=sys.stderr)
         return 2
-
 
 def _export_wallet(args: argparse.Namespace) -> int:
     """Handle the export-wallet subcommand.
@@ -920,7 +906,6 @@ def _export_wallet(args: argparse.Namespace) -> int:
             del wallet_data
         return 1
 
-
 def _import_wallet(args: argparse.Namespace) -> int:
     """Handle the import-wallet subcommand."""
     logger.debug("Importing wallet from file: %s", args.file)
@@ -1005,7 +990,6 @@ def _import_wallet(args: argparse.Namespace) -> int:
         print(f"Import data error: {e}", file=sys.stderr)
         return 1
 
-
 def _read_mnemonic_from_args(args: argparse.Namespace) -> str:
     """Securely obtain mnemonic from CLI args or interactive prompt."""
     if args.mnemonic and args.mnemonic_file:
@@ -1031,7 +1015,6 @@ def _read_mnemonic_from_args(args: argparse.Namespace) -> str:
             raise ValueError("Mnemonic phrases did not match")
     return phrase.strip()
 
-
 def _mnemonic_qr_backup(args: argparse.Namespace) -> int:
     """Generate QR code backups for a mnemonic phrase."""
     logger.debug("Generating mnemonic QR backup")
@@ -1051,7 +1034,7 @@ def _mnemonic_qr_backup(args: argparse.Namespace) -> int:
         print(str(exc), file=sys.stderr)
         return 1
 
-    metadata: Dict[str, Any] = {}
+    metadata: dict[str, Any] = {}
     if args.metadata_address:
         metadata["address"] = args.metadata_address
     if args.note:
@@ -1122,7 +1105,6 @@ def _mnemonic_qr_backup(args: argparse.Namespace) -> int:
     print("Store the PNG/ASCII output offline. Anyone scanning it gains full access to your funds!")
     return 0
 
-
 def _watch_store_from_args(args: argparse.Namespace) -> WatchOnlyWalletStore:
     """Instantiate a watch-only store honoring CLI overrides."""
     store_path = getattr(args, "store", None)
@@ -1130,12 +1112,11 @@ def _watch_store_from_args(args: argparse.Namespace) -> WatchOnlyWalletStore:
         return WatchOnlyWalletStore(Path(store_path))
     return WatchOnlyWalletStore()
 
-
 def _watch_add(args: argparse.Namespace) -> int:
     """Add watch-only addresses manually or via xpub derivation."""
     store = _watch_store_from_args(args)
     tags = args.tags or []
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
     try:
         if args.xpub:
             added = store.add_from_xpub(
@@ -1178,7 +1159,6 @@ def _watch_add(args: argparse.Namespace) -> int:
                 print(f"Added watch-only address {entry['address']}{label}")
     return 0
 
-
 def _watch_list(args: argparse.Namespace) -> int:
     """List configured watch-only addresses."""
     store = _watch_store_from_args(args)
@@ -1196,7 +1176,6 @@ def _watch_list(args: argparse.Namespace) -> int:
                 print(f"{entry['address']}{label}{tags} - source={entry.get('source', 'manual')}")
     return 0
 
-
 def _watch_remove(args: argparse.Namespace) -> int:
     """Remove an address from the watch-only store."""
     store = _watch_store_from_args(args)
@@ -1211,7 +1190,6 @@ def _watch_remove(args: argparse.Namespace) -> int:
         label = f" ({entry.label})" if entry.label else ""
         print(f"Removed watch-only address {entry.address}{label}")
     return 0
-
 
 def _setup_two_factor(args: argparse.Namespace) -> int:
     """Provision a TOTP secret for the provided profile label."""
@@ -1266,7 +1244,6 @@ def _setup_two_factor(args: argparse.Namespace) -> int:
 
     return 0
 
-
 def _two_factor_status(args: argparse.Namespace) -> int:
     """Show metadata about a 2FA profile."""
     label = args.label.strip()
@@ -1288,7 +1265,6 @@ def _two_factor_status(args: argparse.Namespace) -> int:
         print(f"User email: {profile.metadata['user_email']}")
     return 0
 
-
 def _two_factor_disable(args: argparse.Namespace) -> int:
     """Delete a 2FA profile."""
     label = args.label.strip()
@@ -1309,8 +1285,7 @@ def _two_factor_disable(args: argparse.Namespace) -> int:
     print(f"2FA profile '{label}' removed.")
     return 0
 
-
-def _require_two_factor(profile_label: str, otp: Optional[str] = None) -> None:
+def _require_two_factor(profile_label: str, otp: str | None = None) -> None:
     """Prompt for and verify a 2FA code."""
     logger.debug("2FA verification required for profile: %s", profile_label)
     manager = TwoFactorAuthManager()
@@ -1326,7 +1301,6 @@ def _require_two_factor(profile_label: str, otp: Optional[str] = None) -> None:
 
     logger.info("2FA verification successful for profile: %s", profile_label)
     print(f"2FA verification successful ({message}).")
-
 
 def _hw_address(args: argparse.Namespace) -> int:
     """Get address from hardware wallet."""
@@ -1347,7 +1321,6 @@ def _hw_address(args: argparse.Namespace) -> int:
         logger.error("Hardware wallet error: %s", e)
         print(f"Error: {e}", file=sys.stderr)
         return 1
-
 
 def _hw_sign(args: argparse.Namespace) -> int:
     """Sign a message with hardware wallet."""
@@ -1382,7 +1355,6 @@ def _hw_sign(args: argparse.Namespace) -> int:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
-
 def _hw_verify(args: argparse.Namespace) -> int:
     """Verify hardware wallet address matches on-device display."""
     try:
@@ -1405,7 +1377,6 @@ def _hw_verify(args: argparse.Namespace) -> int:
         logger.error("Verification error: %s", e)
         print(f"Error: {e}", file=sys.stderr)
         return 1
-
 
 def _hw_send(args: argparse.Namespace) -> int:
     """Send transaction using hardware wallet."""
@@ -1482,12 +1453,12 @@ def _hw_send(args: argparse.Namespace) -> int:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
-
 def _multisig_create(args: argparse.Namespace) -> int:
     """Create a new multisig wallet configuration."""
     try:
-        from xai.core.crypto_utils import load_public_key_from_hex
         from cryptography.hazmat.primitives import serialization
+
+        from xai.core.crypto_utils import load_public_key_from_hex
 
         # Read public keys from file or args
         if args.keys_file:
@@ -1549,7 +1520,6 @@ def _multisig_create(args: argparse.Namespace) -> int:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
-
 def _multisig_sign(args: argparse.Namespace) -> int:
     """Add a signature to a multisig transaction."""
     try:
@@ -1565,8 +1535,13 @@ def _multisig_sign(args: argparse.Namespace) -> int:
         )
 
         # Derive public key from private key and convert to PEM format
-        from xai.core.crypto_utils import derive_public_key_hex, sign_message_hex, load_public_key_from_hex
         from cryptography.hazmat.primitives import serialization
+
+        from xai.core.crypto_utils import (
+            derive_public_key_hex,
+            load_public_key_from_hex,
+            sign_message_hex,
+        )
 
         public_key_hex = derive_public_key_hex(private_key)
         pub_key_obj = load_public_key_from_hex(public_key_hex)
@@ -1618,7 +1593,6 @@ def _multisig_sign(args: argparse.Namespace) -> int:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
-
 def _multisig_submit(args: argparse.Namespace) -> int:
     """Submit a fully-signed multisig transaction."""
     try:
@@ -1667,7 +1641,6 @@ def _multisig_submit(args: argparse.Namespace) -> int:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
-
 def _multisig_status(args: argparse.Namespace) -> int:
     """Check status of a multisig transaction file."""
     try:
@@ -1708,7 +1681,6 @@ def _multisig_status(args: argparse.Namespace) -> int:
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
-
 
 def build_parser() -> argparse.ArgumentParser:
     """Create the CLI argument parser."""
@@ -2255,7 +2227,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     return parser
 
-
 def main(argv: Any = None) -> int:
     """Program entry point."""
     parser = build_parser()
@@ -2266,7 +2237,6 @@ def main(argv: Any = None) -> int:
         return 0
 
     return args.func(args)
-
 
 if __name__ == "__main__":
     sys.exit(main())

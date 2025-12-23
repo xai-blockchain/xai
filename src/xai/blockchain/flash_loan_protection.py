@@ -1,13 +1,14 @@
-import logging
-from typing import Dict, Any
-import time
+from __future__ import annotations
 
-from .twap_oracle import TWAPOracle
-from .oracle_manipulation_detection import OracleManipulationDetector
+import logging
+import time
+from typing import Any
+
 from ..security.circuit_breaker import CircuitBreaker
+from .oracle_manipulation_detection import OracleManipulationDetector
+from .twap_oracle import TWAPOracle
 
 logger = logging.getLogger("xai.blockchain.flash_loan_protection")
-
 
 class FlashLoanProtectionManager:
     def __init__(
@@ -54,8 +55,8 @@ class FlashLoanProtectionManager:
 
     def check_transaction_for_flash_loan_risk(
         self,
-        transaction: Dict[str, Any],
-        current_oracle_prices: Dict[str, float],
+        transaction: dict[str, Any],
+        current_oracle_prices: dict[str, float],
         asset_liquidity: float,
         current_timestamp: int = None,
     ) -> bool:
@@ -63,8 +64,8 @@ class FlashLoanProtectionManager:
         Checks a transaction for potential flash loan attack indicators.
 
         Args:
-            transaction (Dict[str, Any]): The transaction details (e.g., {"type": "swap", "amount": 1000000, ...}).
-            current_oracle_prices (Dict[str, float]): Current prices from various oracles.
+            transaction (dict[str, Any]): The transaction details (e.g., {"type": "swap", "amount": 1000000, ...}).
+            current_oracle_prices (dict[str, float]): Current prices from various oracles.
             asset_liquidity (float): The total liquidity available for the asset being traded/manipulated.
             current_timestamp (int): The current timestamp.
 

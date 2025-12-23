@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Anonymous Treasury System
 
@@ -16,9 +18,7 @@ ANONYMITY PROTECTIONS:
 import json
 import os
 from datetime import datetime, timezone
-from typing import List, Dict, Optional
 from enum import Enum
-
 
 class SpendingCategory(Enum):
     """Categories for treasury spending (public, anonymous)"""
@@ -32,7 +32,6 @@ class SpendingCategory(Enum):
     LEGAL_COMPLIANCE = "legal_compliance"
     RESEARCH = "research"
     BOUNTIES = "bounties"
-
 
 class TreasuryTransaction:
     """
@@ -88,7 +87,6 @@ class TreasuryTransaction:
             ),
             "status": self.status,
         }
-
 
 class AnonymousTreasury:
     """
@@ -313,7 +311,7 @@ class AnonymousTreasury:
             ).strftime("%Y-%m-%d %H:%M:%S UTC"),
         }
 
-    def get_recent_transactions(self, limit: int = 50) -> List[dict]:
+    def get_recent_transactions(self, limit: int = 50) -> list[dict]:
         """
         Get recent anonymous treasury transactions
 

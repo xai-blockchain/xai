@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI AI Trading Bot - Personal AI for Automated Trading
 
@@ -25,16 +27,17 @@ Revenue Model:
 - Sustainable funding for blockchain development
 """
 
-import time
-import json
-import threading
-import logging
-from typing import Dict, List, Optional, Callable
-from dataclasses import dataclass, field
-from enum import Enum
 import hashlib
-from decimal import Decimal, InvalidOperation
+import json
+import logging
 import secrets
+import threading
+import time
+from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
+from enum import Enum
+from typing import Callable
+
 import anthropic
 import openai
 
@@ -51,7 +54,6 @@ INVALID_DEMO_KEYS = [
     "TEST_KEY",
     "PLACEHOLDER",
 ]
-
 
 def validate_api_key(api_key: str) -> bool:
     """
@@ -82,7 +84,6 @@ def validate_api_key(api_key: str) -> bool:
 
     return True
 
-
 class TradingStrategy(Enum):
     """Pre-built trading strategies"""
 
@@ -91,14 +92,12 @@ class TradingStrategy(Enum):
     AGGRESSIVE = "aggressive"  # High risk, high reward
     CUSTOM = "custom"  # User-defined
 
-
 class TradeAction(Enum):
     """Trading actions"""
 
     BUY = "buy"
     SELL = "sell"
     HOLD = "hold"
-
 
 @dataclass
 class TradingPair:
@@ -108,8 +107,7 @@ class TradingPair:
     to_coin: str  # e.g., "ADA"
     current_rate: float = 0.0
     last_updated: float = 0.0
-    price_history: List[float] = field(default_factory=list)
-
+    price_history: list[float] = field(default_factory=list)
 
 @dataclass
 class TradeExecution:
@@ -125,7 +123,6 @@ class TradeExecution:
     profit_loss: float = 0.0
     ai_reasoning: str = ""
 
-
 @dataclass
 class TradingPerformance:
     """Bot performance metrics"""
@@ -139,7 +136,6 @@ class TradingPerformance:
     win_rate: float = 0.0
     avg_profit_per_trade: float = 0.0
     roi: float = 0.0  # Return on investment
-
 
 class AITradingBot:
     """
@@ -156,7 +152,7 @@ class AITradingBot:
         config: Dict,
         blockchain,
         personal_ai,
-        market_data_provider: Optional[Callable[[str], Optional[float]]] = None,
+        market_data_provider: Callable[[str], float | None] | None = None,
     ):
         """
         Initialize AI trading bot
@@ -193,7 +189,7 @@ class AITradingBot:
 
         # Performance tracking
         self.performance = TradingPerformance()
-        self.trade_history: List[TradeExecution] = []
+        self.trade_history: list[TradeExecution] = []
 
         # Risk management
         self.max_trade_amount = config.get("max_trade_amount", 100)
@@ -222,7 +218,7 @@ class AITradingBot:
             },
         )
 
-    def _initialize_trading_pairs(self, pairs: List[str]) -> List[TradingPair]:
+    def _initialize_trading_pairs(self, pairs: list[str]) -> list[TradingPair]:
         """Initialize trading pairs from config"""
         trading_pairs = []
         for pair_str in pairs:
@@ -953,7 +949,6 @@ Return JSON:
                 for t in self.trade_history[-5:]
             ],
         }
-
 
 # Strategy templates
 STRATEGY_TEMPLATES = {

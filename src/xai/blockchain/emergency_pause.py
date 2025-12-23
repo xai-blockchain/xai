@@ -1,4 +1,6 @@
 # src/xai/blockchain/emergency_pause.py
+from __future__ import annotations
+
 """
 Manages the emergency pause functionality for the blockchain, with persistent state.
 """
@@ -6,17 +8,15 @@ Manages the emergency pause functionality for the blockchain, with persistent st
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable
 
 from ..database.storage_manager import StorageManager
 from ..security.circuit_breaker import CircuitBreaker, CircuitBreakerState
 
 logger = logging.getLogger("xai.blockchain.emergency_pause")
 
-
 AUTOMATED_CALLER = "0xAutomatedSystem"
 STATE_KEY = "emergency_pause_state"
-
 
 class EmergencyPauseManager:
     """
@@ -27,9 +27,9 @@ class EmergencyPauseManager:
     def __init__(
         self,
         authorized_pauser_address: str,
-        db_path: Optional[Path] = None,
-        circuit_breaker: Optional[CircuitBreaker] = None,
-        time_provider: Optional[Callable[[], int]] = None,
+        db_path: Path | None = None,
+        circuit_breaker: CircuitBreaker | None = None,
+        time_provider: Callable[[], int] | None = None,
     ):
         if not authorized_pauser_address:
             raise ValueError("Authorized pauser address cannot be empty.")
@@ -40,7 +40,7 @@ class EmergencyPauseManager:
         self.circuit_breaker = circuit_breaker  # Optional: for automatic pausing
         self._time_provider = time_provider or (lambda: int(datetime.now(timezone.utc).timestamp()))
 
-    def _get_state(self) -> Dict[str, Any]:
+    def _get_state(self) -> dict[str, Any]:
         """Retrieves the pause state from the database."""
         default_state = {
             "is_paused": False,
@@ -50,7 +50,7 @@ class EmergencyPauseManager:
         }
         return self.storage.get(STATE_KEY, default=default_state)
 
-    def _set_state(self, state: Dict[str, Any]):
+    def _set_state(self, state: dict[str, Any]):
         """Saves the pause state to the database."""
         self.storage.set(STATE_KEY, state)
 
@@ -130,7 +130,7 @@ class EmergencyPauseManager:
         # Then check the persistent state
         return self._get_state()["is_paused"]
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """
         Returns a dictionary with the current pause status, including data from the
         database and the circuit breaker.

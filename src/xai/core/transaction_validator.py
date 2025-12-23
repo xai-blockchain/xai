@@ -6,27 +6,27 @@ Validates incoming transactions against a set of rules to ensure network integri
 
 from __future__ import annotations
 
-from typing import Dict, Any, Optional, TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Transaction
 
+import json
+import time
+
 from xai.core.config import Config
-from xai.core.wallet import Wallet
-from xai.core.security_validation import SecurityValidator, ValidationError
-from xai.core.validation import validate_address, validate_amount, validate_fee
 from xai.core.nonce_tracker import NonceTracker, get_nonce_tracker
+from xai.core.security_validation import SecurityValidator, ValidationError
 from xai.core.structured_logger import StructuredLogger, get_structured_logger
 from xai.core.utxo_manager import UTXOManager, get_utxo_manager
-import time
-import json
+from xai.core.validation import validate_address, validate_amount, validate_fee
+from xai.core.wallet import Wallet
 
 # Security constants for transaction validation
 MAX_TRANSACTION_SIZE_BYTES = 100000  # 100 KB per transaction
 MAX_TRANSACTION_AGE_SECONDS = 3600  # 1 hour - reject transactions older than this
 MAX_TRANSACTION_FUTURE_SECONDS = 300  # 5 minutes - reject transactions too far in future
 TRANSACTION_EXPIRY_SECONDS = 86400  # 24 hours - transactions expire after this time
-
 
 class TransactionValidator:
     """
@@ -42,9 +42,9 @@ class TransactionValidator:
     def __init__(
         self,
         blockchain,
-        nonce_tracker: Optional[NonceTracker] = None,
-        logger: Optional[StructuredLogger] = None,
-        utxo_manager: Optional[UTXOManager] = None,
+        nonce_tracker: NonceTracker | None = None,
+        logger: StructuredLogger | None = None,
+        utxo_manager: UTXOManager | None = None,
     ):
         self.blockchain = blockchain
         self.nonce_tracker = nonce_tracker or get_nonce_tracker()
@@ -66,268 +66,342 @@ class TransactionValidator:
             True if the transaction is valid, False otherwise.
         """
         try:
-            # Import Transaction here to avoid circular import
             from xai.core.blockchain import Transaction as TransactionClass
 
-            # 1. Basic structural validation
-            if not isinstance(transaction, TransactionClass):
-                raise ValidationError("Invalid transaction object type.")
-            if not all(
-                hasattr(transaction, attr)
-                for attr in [
-                    "sender",
-                    "recipient",
-                    "amount",
-                    "fee",
-                    "timestamp",
-                    "signature",
-                    "txid",
-                    "inputs",
-                    "outputs",
-                    "tx_type",
-                ]
-            ):
-                raise ValidationError("Transaction is missing required fields.")
-
+            self._validate_structure(transaction, TransactionClass)
             is_settlement_receipt = transaction.tx_type == "trade_settlement"
 
-            # 2. Transaction size validation (DoS protection)
-            tx_size = len(json.dumps(transaction.to_dict()).encode('utf-8'))
-            if tx_size > MAX_TRANSACTION_SIZE_BYTES:
-                raise ValidationError(
-                    f"Transaction size ({tx_size} bytes) exceeds maximum allowed ({MAX_TRANSACTION_SIZE_BYTES} bytes)"
-                )
+            self._validate_size(transaction)
+            self._validate_timestamp_and_fee(transaction, is_mempool_check)
+            self._validate_data_formats(transaction)
+            self._validate_transaction_id(transaction)
+            self._validate_signature(transaction, is_settlement_receipt)
+            self._validate_utxo(transaction, is_settlement_receipt)
+            self._validate_nonce(transaction)
+            self._validate_transaction_type_specific(transaction)
 
-            # 3. Timestamp validation for replay attack protection
-            current_time = time.time()
-            tx_age = current_time - transaction.timestamp
-
-            # Skip timestamp checks for coinbase transactions
-            if transaction.sender != "COINBASE":
-                # Skip fee rate check for transaction types that don't require fees
-                if transaction.tx_type not in ["governance_vote"]:
-                    min_fee_rate = getattr(Config, "MEMPOOL_MIN_FEE_RATE", 0.0)
-                    fee_rate = transaction.get_fee_rate()
-                    if is_mempool_check and fee_rate < min_fee_rate:
-                        raise ValidationError(
-                            f"Fee rate too low for mempool admission ({fee_rate:.10f} < {min_fee_rate})"
-                        )
-
-                # Reject transactions that are too old (replay attack protection)
-                if tx_age > MAX_TRANSACTION_AGE_SECONDS:
-                    raise ValidationError(
-                        f"Transaction timestamp is too old ({tx_age:.0f}s > {MAX_TRANSACTION_AGE_SECONDS}s). "
-                        "Possible replay attack or clock skew."
-                    )
-
-                # Reject transactions with timestamps too far in the future
-                if tx_age < -MAX_TRANSACTION_FUTURE_SECONDS:
-                    raise ValidationError(
-                        f"Transaction timestamp is too far in the future ({-tx_age:.0f}s > {MAX_TRANSACTION_FUTURE_SECONDS}s). "
-                        "Possible clock skew."
-                    )
-
-            # 4. Data type and format validation using SecurityValidator
-            # Skip sender address validation for coinbase transactions
-            if transaction.sender != "COINBASE":
-                self.security_validator.validate_address(transaction.sender, "sender address")
-            # Recipient can be None for some transaction types (e.g., burn)
-            # Skip recipient validation for coinbase transactions (can have any address)
-            if transaction.recipient and transaction.sender != "COINBASE":
-                self.security_validator.validate_address(transaction.recipient, "recipient address")
-            # Skip amount validation for transaction types that allow zero amounts
-            if transaction.tx_type not in ["governance_vote"]:
-                self.security_validator.validate_amount(transaction.amount, "amount")
-            self.security_validator.validate_fee(transaction.fee)
-            self.security_validator.validate_timestamp(transaction.timestamp)
-
-            # Validate signature if present and not a coinbase transaction
-            if transaction.signature and transaction.sender != "COINBASE":
-                self.security_validator.validate_hex_string(
-                    transaction.signature, "signature", exact_length=128
-                )
-
-            # Validate transaction ID formatting
-            if transaction.txid:
-                self.security_validator.validate_hex_string(
-                    transaction.txid, "transaction ID", exact_length=64
-                )
-
-            # 5. Transaction ID (hash) verification
-            calculated_txid = transaction.calculate_hash()
-            if calculated_txid != transaction.txid:
-                if transaction.sender == "COINBASE":
-                    # Normalize legacy/static coinbase txids (e.g., genesis) to current hash derivation
-                    transaction.txid = calculated_txid
-                else:
-                    raise ValidationError(
-                        "Transaction ID mismatch. Transaction data has been tampered with."
-                    )
-
-            # 6. Signature verification (skip for coinbase transactions)
-            if transaction.sender != "COINBASE" and not is_settlement_receipt:
-                if not transaction.signature:
-                    raise ValidationError("Non-coinbase transaction must have a signature.")
-                # verify_signature() returns True/False
-                if not transaction.verify_signature():
-                    raise ValidationError("Signature verification failed")
-
-            # 7. UTXO-based validation (for non-coinbase transactions)
-            if transaction.tx_type != "coinbase" and not is_settlement_receipt:
-                input_sum = 0.0
-                output_sum = 0.0
-
-                # Validate inputs
-                if not transaction.inputs:
-                    raise ValidationError("Non-coinbase transaction must have inputs.")
-
-                for i, tx_input in enumerate(transaction.inputs):
-                    if not all(k in tx_input for k in ["txid", "vout"]):
-                        raise ValidationError(
-                            f"Transaction input {i} is missing required fields (txid, vout)."
-                        )
-
-                    # During validation, check if UTXO exists (don't exclude pending - that's for selection only)
-                    utxo = self.utxo_manager.get_unspent_output(tx_input["txid"], tx_input["vout"], exclude_pending=False)
-                    if not utxo and hasattr(self.blockchain, "pending_transactions"):
-                        # Allow spending outputs from pending transactions (intra-block chaining)
-                        for pending in self.blockchain.pending_transactions:
-                            if not pending.outputs or not pending.txid:
-                                continue
-                            if pending.txid == tx_input["txid"] and tx_input["vout"] < len(pending.outputs):
-                                output = pending.outputs[tx_input["vout"]]
-                                # Ensure this pending output is not already consumed by another pending tx
-                                already_consumed = any(
-                                    inp.get("txid") == tx_input["txid"]
-                                    and inp.get("vout") == tx_input["vout"]
-                                    for t in self.blockchain.pending_transactions
-                                    if t is not transaction and t.inputs
-                                    for inp in t.inputs
-                                )
-                                if not already_consumed:
-                                    utxo = {
-                                        "txid": tx_input["txid"],
-                                        "vout": tx_input["vout"],
-                                        "amount": output["amount"],
-                                        "script_pubkey": f"P2PKH {output.get('address', transaction.sender)}",
-                                    }
-                                break
-                    if not utxo:
-                        raise ValidationError(
-                            f"Transaction input {tx_input['txid']}:{tx_input['vout']} is not an unspent UTXO."
-                        )
-
-                    # Ensure the UTXO belongs to the sender
-                    # This check assumes the sender's address is implicitly linked to the UTXO's owner
-                    # A more robust check would involve verifying the script_pubkey of the UTXO
-                    # For now, we'll assume the UTXO's address matches the transaction sender
-                    if (
-                        utxo["script_pubkey"] != f"P2PKH {transaction.sender}"
-                    ):  # Assuming P2PKH format
-                        raise ValidationError(
-                            f"Transaction input {tx_input['txid']}:{tx_input['vout']} does not belong to sender {transaction.sender}."
-                        )
-
-                    input_sum += utxo["amount"]
-
-                # Validate outputs
-                if not transaction.outputs:
-                    raise ValidationError("Transaction must have outputs.")
-
-                for i, tx_output in enumerate(transaction.outputs):
-                    if not all(k in tx_output for k in ["address", "amount"]):
-                        raise ValidationError(
-                            f"Transaction output {i} is missing required fields (address, amount)."
-                        )
-                    self.security_validator.validate_address(
-                        tx_output["address"], f"output {i} address"
-                    )
-                    # Skip amount validation for transaction types that allow zero amounts
-                    if transaction.tx_type not in ["governance_vote"]:
-                        self.security_validator.validate_amount(
-                            tx_output["amount"], f"output {i} amount"
-                        )
-                    output_sum += tx_output["amount"]
-
-                # Verify input sum covers output sum + fee, allowing tiny float drift
-                if input_sum + 1e-9 < (output_sum + transaction.fee):
-                    raise ValidationError(
-                        f"Insufficient input funds. Input sum: {input_sum}, Output sum: {output_sum}, Fee: {transaction.fee}"
-                    )
-
-            # 8. Nonce validation (to prevent replay attacks) - skip for coinbase transactions
-            if transaction.sender != "COINBASE":
-                expected_nonce = self.nonce_tracker.get_next_nonce(transaction.sender)
-                if not self.nonce_tracker.validate_nonce(transaction.sender, transaction.nonce):
-                    # Backward-compatible allowance for first spend if tracker is uninitialized but expected nonce drifted
-                    if expected_nonce == 1 and transaction.nonce == 0 and self.nonce_tracker.get_nonce(transaction.sender) <= 0:
-                        pass
-                    else:
-                        # Allow nonces up to expected if not already used in pending pool (mempool ordering tolerance)
-                        duplicate_pending = any(
-                            getattr(tx, "sender", None) == transaction.sender and getattr(tx, "nonce", None) == transaction.nonce
-                            for tx in getattr(self.blockchain, "pending_transactions", [])
-                        )
-                        if transaction.nonce < 0 or transaction.nonce > expected_nonce or duplicate_pending:
-                            raise ValidationError(
-                                f"Invalid nonce for sender {transaction.sender}. Expected: {expected_nonce}, Got: {transaction.nonce}"
-                            )
-
-            # 9. Transaction-specific validations (e.g., time_capsule_lock, governance_vote)
-            contract_types = {"contract_call", "contract_deploy"}
-            if transaction.tx_type in contract_types:
-                metadata = transaction.metadata if isinstance(transaction.metadata, dict) else {}
-                payload = metadata.get("data")
-                if not payload:
-                    raise ValidationError("Contract transactions require a payload in metadata['data'].")
-                gas_limit = metadata.get("gas_limit")
-                if not isinstance(gas_limit, int):
-                    raise ValidationError("Contract transactions require an integer 'gas_limit'.")
-                if gas_limit <= 0 or gas_limit > getattr(Config, "MAX_CONTRACT_GAS", 20_000_000):
-                    raise ValidationError("Contract 'gas_limit' is outside allowed bounds.")
-                if isinstance(payload, str) and not payload.strip():
-                    raise ValidationError("Contract payload data cannot be empty.")
-                if isinstance(payload, (bytes, bytearray)) and len(payload) == 0:
-                    raise ValidationError("Contract payload data cannot be empty.")
-
-            if transaction.tx_type == "time_capsule_lock":
-                self._validate_time_capsule_lock(transaction)
-            elif transaction.tx_type == "governance_vote":
-                self._validate_governance_vote(transaction)
-            # Add other custom transaction type validations here
-
-            txid_str = str(transaction.txid)
-            txid_short = txid_str[:10] if len(txid_str) >= 10 else txid_str
-            self.logger.debug(
-                f"Transaction {txid_short}... is valid.", txid=transaction.txid
-            )
+            self._log_valid_transaction(transaction)
             return True
 
         except ValidationError as e:
-            txid = getattr(transaction, "txid", "UNKNOWN")
-            txid_str = str(txid)
-            txid_short = txid_str[:10] if txid and len(txid_str) >= 10 else txid_str
-            self.logger.warn(
-                f"Transaction validation failed for {txid_short}...: {e}",
-                txid=txid,
-                error=str(e),
-            )
+            self._log_validation_error(transaction, e)
             return False
         except (ValueError, KeyError, AttributeError, TypeError, Exception) as e:
-            # Catch unexpected errors during validation
-            txid = getattr(transaction, "txid", "UNKNOWN")
-            txid_str = str(txid)
-            txid_short = txid_str[:10] if txid and len(txid_str) >= 10 else txid_str
-            self.logger.error(
-                f"An unexpected error occurred during transaction validation for {txid_short}...: {e}",
-                exc_info=True,
-                extra={
-                    "txid": txid,
-                    "error": str(e),
-                    "error_type": type(e).__name__
-                }
-            )
+            self._log_unexpected_error(transaction, e)
             return False
+
+    def _validate_structure(self, transaction: "Transaction", transaction_class) -> None:
+        """Validate basic transaction structure and required fields."""
+        if not isinstance(transaction, transaction_class):
+            raise ValidationError("Invalid transaction object type.")
+
+        required_fields = [
+            "sender", "recipient", "amount", "fee", "timestamp",
+            "signature", "txid", "inputs", "outputs", "tx_type"
+        ]
+        if not all(hasattr(transaction, attr) for attr in required_fields):
+            raise ValidationError("Transaction is missing required fields.")
+
+    def _validate_size(self, transaction: "Transaction") -> None:
+        """Validate transaction size for DoS protection."""
+        tx_size = len(json.dumps(transaction.to_dict()).encode('utf-8'))
+        if tx_size > MAX_TRANSACTION_SIZE_BYTES:
+            raise ValidationError(
+                f"Transaction size ({tx_size} bytes) exceeds maximum allowed ({MAX_TRANSACTION_SIZE_BYTES} bytes)"
+            )
+
+    def _validate_timestamp_and_fee(self, transaction: "Transaction", is_mempool_check: bool) -> None:
+        """Validate timestamp for replay attack protection and fee rates."""
+        if transaction.sender == "COINBASE":
+            return
+
+        current_time = time.time()
+        tx_age = current_time - transaction.timestamp
+
+        self._check_fee_rate(transaction, is_mempool_check)
+        self._check_timestamp_age(tx_age)
+
+    def _check_fee_rate(self, transaction: "Transaction", is_mempool_check: bool) -> None:
+        """Check if fee rate meets minimum requirements."""
+        if transaction.tx_type in ["governance_vote"]:
+            return
+
+        min_fee_rate = getattr(Config, "MEMPOOL_MIN_FEE_RATE", 0.0)
+        fee_rate = transaction.get_fee_rate()
+        if is_mempool_check and fee_rate < min_fee_rate:
+            raise ValidationError(
+                f"Fee rate too low for mempool admission ({fee_rate:.10f} < {min_fee_rate})"
+            )
+
+    def _check_timestamp_age(self, tx_age: float) -> None:
+        """Check if timestamp is within acceptable bounds."""
+        if tx_age > MAX_TRANSACTION_AGE_SECONDS:
+            raise ValidationError(
+                f"Transaction timestamp is too old ({tx_age:.0f}s > {MAX_TRANSACTION_AGE_SECONDS}s). "
+                "Possible replay attack or clock skew."
+            )
+
+        if tx_age < -MAX_TRANSACTION_FUTURE_SECONDS:
+            raise ValidationError(
+                f"Transaction timestamp is too far in the future ({-tx_age:.0f}s > {MAX_TRANSACTION_FUTURE_SECONDS}s). "
+                "Possible clock skew."
+            )
+
+    def _validate_data_formats(self, transaction: "Transaction") -> None:
+        """Validate data types and format using SecurityValidator."""
+        is_coinbase = transaction.sender == "COINBASE"
+
+        if not is_coinbase:
+            self.security_validator.validate_address(transaction.sender, "sender address")
+
+        if transaction.recipient and not is_coinbase:
+            self.security_validator.validate_address(transaction.recipient, "recipient address")
+
+        if transaction.tx_type not in ["governance_vote"]:
+            self.security_validator.validate_amount(transaction.amount, "amount")
+
+        self.security_validator.validate_fee(transaction.fee)
+        self.security_validator.validate_timestamp(transaction.timestamp)
+
+        if transaction.signature and not is_coinbase:
+            self.security_validator.validate_hex_string(
+                transaction.signature, "signature", exact_length=128
+            )
+
+        if transaction.txid:
+            self.security_validator.validate_hex_string(
+                transaction.txid, "transaction ID", exact_length=64
+            )
+
+    def _validate_transaction_id(self, transaction: "Transaction") -> None:
+        """Verify transaction ID matches calculated hash."""
+        calculated_txid = transaction.calculate_hash()
+        if calculated_txid != transaction.txid:
+            if transaction.sender == "COINBASE":
+                transaction.txid = calculated_txid
+            else:
+                raise ValidationError(
+                    "Transaction ID mismatch. Transaction data has been tampered with."
+                )
+
+    def _validate_signature(self, transaction: "Transaction", is_settlement_receipt: bool) -> None:
+        """Verify transaction signature."""
+        if transaction.sender == "COINBASE" or is_settlement_receipt:
+            return
+
+        if not transaction.signature:
+            raise ValidationError("Non-coinbase transaction must have a signature.")
+
+        if not transaction.verify_signature():
+            raise ValidationError("Signature verification failed")
+
+    def _validate_utxo(self, transaction: "Transaction", is_settlement_receipt: bool) -> None:
+        """Validate UTXO inputs and outputs."""
+        if transaction.tx_type == "coinbase" or is_settlement_receipt:
+            return
+
+        if not transaction.inputs:
+            raise ValidationError("Non-coinbase transaction must have inputs.")
+
+        input_sum = self._validate_inputs(transaction)
+        output_sum = self._validate_outputs(transaction)
+
+        if input_sum + 1e-9 < (output_sum + transaction.fee):
+            raise ValidationError(
+                f"Insufficient input funds. Input sum: {input_sum}, Output sum: {output_sum}, Fee: {transaction.fee}"
+            )
+
+    def _validate_inputs(self, transaction: "Transaction") -> float:
+        """Validate transaction inputs and return total input sum."""
+        input_sum = 0.0
+
+        for i, tx_input in enumerate(transaction.inputs):
+            if not all(k in tx_input for k in ["txid", "vout"]):
+                raise ValidationError(
+                    f"Transaction input {i} is missing required fields (txid, vout)."
+                )
+
+            utxo = self._find_utxo(transaction, tx_input)
+            if not utxo:
+                raise ValidationError(
+                    f"Transaction input {tx_input['txid']}:{tx_input['vout']} is not an unspent UTXO."
+                )
+
+            if utxo["script_pubkey"] != f"P2PKH {transaction.sender}":
+                raise ValidationError(
+                    f"Transaction input {tx_input['txid']}:{tx_input['vout']} does not belong to sender {transaction.sender}."
+                )
+
+            input_sum += utxo["amount"]
+
+        return input_sum
+
+    def _find_utxo(self, transaction: "Transaction", tx_input: dict[str, Any]) -> dict[str, Any] | None:
+        """Find UTXO from confirmed or pending transactions."""
+        utxo = self.utxo_manager.get_unspent_output(
+            tx_input["txid"], tx_input["vout"], exclude_pending=False
+        )
+
+        if not utxo and hasattr(self.blockchain, "pending_transactions"):
+            utxo = self._find_pending_utxo(transaction, tx_input)
+
+        return utxo
+
+    def _find_pending_utxo(self, transaction: "Transaction", tx_input: dict[str, Any]) -> dict[str, Any] | None:
+        """Find UTXO in pending transactions."""
+        for pending in self.blockchain.pending_transactions:
+            if not pending.outputs or not pending.txid:
+                continue
+
+            if pending.txid == tx_input["txid"] and tx_input["vout"] < len(pending.outputs):
+                if self._is_pending_output_consumed(transaction, tx_input):
+                    continue
+
+                output = pending.outputs[tx_input["vout"]]
+                return {
+                    "txid": tx_input["txid"],
+                    "vout": tx_input["vout"],
+                    "amount": output["amount"],
+                    "script_pubkey": f"P2PKH {output.get('address', transaction.sender)}",
+                }
+
+        return None
+
+    def _is_pending_output_consumed(self, transaction: "Transaction", tx_input: dict[str, Any]) -> bool:
+        """Check if a pending output is already consumed by another transaction."""
+        return any(
+            inp.get("txid") == tx_input["txid"] and inp.get("vout") == tx_input["vout"]
+            for t in self.blockchain.pending_transactions
+            if t is not transaction and t.inputs
+            for inp in t.inputs
+        )
+
+    def _validate_outputs(self, transaction: "Transaction") -> float:
+        """Validate transaction outputs and return total output sum."""
+        if not transaction.outputs:
+            raise ValidationError("Transaction must have outputs.")
+
+        output_sum = 0.0
+        for i, tx_output in enumerate(transaction.outputs):
+            if not all(k in tx_output for k in ["address", "amount"]):
+                raise ValidationError(
+                    f"Transaction output {i} is missing required fields (address, amount)."
+                )
+
+            self.security_validator.validate_address(
+                tx_output["address"], f"output {i} address"
+            )
+
+            if transaction.tx_type not in ["governance_vote"]:
+                self.security_validator.validate_amount(
+                    tx_output["amount"], f"output {i} amount"
+                )
+
+            output_sum += tx_output["amount"]
+
+        return output_sum
+
+    def _validate_nonce(self, transaction: "Transaction") -> None:
+        """Validate transaction nonce to prevent replay attacks."""
+        if transaction.sender == "COINBASE":
+            return
+
+        expected_nonce = self.nonce_tracker.get_next_nonce(transaction.sender)
+        if not self.nonce_tracker.validate_nonce(transaction.sender, transaction.nonce):
+            if self._is_first_spend_backward_compatible(transaction, expected_nonce):
+                return
+
+            if self._has_duplicate_nonce_in_pending(transaction):
+                raise ValidationError(
+                    f"Invalid nonce for sender {transaction.sender}. Expected: {expected_nonce}, Got: {transaction.nonce}"
+                )
+
+            if transaction.nonce < 0 or transaction.nonce > expected_nonce:
+                raise ValidationError(
+                    f"Invalid nonce for sender {transaction.sender}. Expected: {expected_nonce}, Got: {transaction.nonce}"
+                )
+
+    def _is_first_spend_backward_compatible(self, transaction: "Transaction", expected_nonce: int) -> bool:
+        """Check if this is a backward-compatible first spend."""
+        return (
+            expected_nonce == 1 and
+            transaction.nonce == 0 and
+            self.nonce_tracker.get_nonce(transaction.sender) <= 0
+        )
+
+    def _has_duplicate_nonce_in_pending(self, transaction: "Transaction") -> bool:
+        """Check if nonce is duplicated in pending transactions."""
+        return any(
+            getattr(tx, "sender", None) == transaction.sender and
+            getattr(tx, "nonce", None) == transaction.nonce
+            for tx in getattr(self.blockchain, "pending_transactions", [])
+        )
+
+    def _validate_transaction_type_specific(self, transaction: "Transaction") -> None:
+        """Validate transaction type-specific requirements."""
+        contract_types = {"contract_call", "contract_deploy"}
+        if transaction.tx_type in contract_types:
+            self._validate_contract_transaction(transaction)
+        elif transaction.tx_type == "time_capsule_lock":
+            self._validate_time_capsule_lock(transaction)
+        elif transaction.tx_type == "governance_vote":
+            self._validate_governance_vote(transaction)
+
+    def _validate_contract_transaction(self, transaction: "Transaction") -> None:
+        """Validate contract call or deploy transaction."""
+        metadata = transaction.metadata if isinstance(transaction.metadata, dict) else {}
+
+        payload = metadata.get("data")
+        if not payload:
+            raise ValidationError("Contract transactions require a payload in metadata['data'].")
+
+        gas_limit = metadata.get("gas_limit")
+        if not isinstance(gas_limit, int):
+            raise ValidationError("Contract transactions require an integer 'gas_limit'.")
+
+        max_gas = getattr(Config, "MAX_CONTRACT_GAS", 20_000_000)
+        if gas_limit <= 0 or gas_limit > max_gas:
+            raise ValidationError("Contract 'gas_limit' is outside allowed bounds.")
+
+        if isinstance(payload, str) and not payload.strip():
+            raise ValidationError("Contract payload data cannot be empty.")
+
+        if isinstance(payload, (bytes, bytearray)) and len(payload) == 0:
+            raise ValidationError("Contract payload data cannot be empty.")
+
+    def _log_valid_transaction(self, transaction: "Transaction") -> None:
+        """Log successful transaction validation."""
+        txid_str = str(transaction.txid)
+        txid_short = txid_str[:10] if len(txid_str) >= 10 else txid_str
+        self.logger.debug(
+            f"Transaction {txid_short}... is valid.", txid=transaction.txid
+        )
+
+    def _log_validation_error(self, transaction: "Transaction", error: ValidationError) -> None:
+        """Log validation error."""
+        txid = getattr(transaction, "txid", "UNKNOWN")
+        txid_str = str(txid)
+        txid_short = txid_str[:10] if txid and len(txid_str) >= 10 else txid_str
+        self.logger.warn(
+            f"Transaction validation failed for {txid_short}...: {error}",
+            txid=txid,
+            error=str(error),
+        )
+
+    def _log_unexpected_error(self, transaction: "Transaction", error: Exception) -> None:
+        """Log unexpected error during validation."""
+        txid = getattr(transaction, "txid", "UNKNOWN")
+        txid_str = str(txid)
+        txid_short = txid_str[:10] if txid and len(txid_str) >= 10 else txid_str
+        self.logger.error(
+            f"An unexpected error occurred during transaction validation for {txid_short}...: {error}",
+            exc_info=True,
+            extra={
+                "txid": txid,
+                "error": str(error),
+                "error_type": type(error).__name__
+            }
+        )
 
     def _validate_time_capsule_lock(self, transaction: "Transaction") -> None:
         """
@@ -343,8 +417,6 @@ class TransactionValidator:
             raise ValidationError("Time capsule transaction missing valid unlock_time.")
         if transaction.metadata["unlock_time"] <= transaction.timestamp:
             raise ValidationError("Time capsule unlock_time must be in the future.")
-        # Further checks could involve ensuring the recipient is a valid capsule address
-        # and that the amount is positive.
 
     def _validate_governance_vote(self, transaction: "Transaction") -> None:
         """
@@ -360,18 +432,15 @@ class TransactionValidator:
             "abstain",
         ]:
             raise ValidationError("Governance vote missing valid vote ('yes', 'no', 'abstain').")
-        # Additional checks: ensure sender is a registered voter, proposal exists, etc.
-
 
 # Global instance for convenience
 _global_transaction_validator = None
 
-
 def get_transaction_validator(
     blockchain,
-    nonce_tracker: Optional[NonceTracker] = None,
-    logger: Optional[StructuredLogger] = None,
-    utxo_manager: Optional[UTXOManager] = None,
+    nonce_tracker: NonceTracker | None = None,
+    logger: StructuredLogger | None = None,
+    utxo_manager: UTXOManager | None = None,
 ) -> TransactionValidator:
     """
     Get global transaction validator instance.

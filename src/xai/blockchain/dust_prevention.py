@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 import logging
 import time
-from typing import Dict, Any, List
+from typing import Any
 
 logger = logging.getLogger("xai.blockchain.dust_prevention")
-
 
 class DustPreventionManager:
     def __init__(self, asset_symbol: str, dust_threshold_amount: float):
@@ -14,8 +15,8 @@ class DustPreventionManager:
 
         self.asset_symbol = asset_symbol
         self.dust_threshold_amount = dust_threshold_amount
-        self.wallet_balances: Dict[str, float] = {}  # {address: balance}
-        self.dust_transactions_log: List[Dict[str, Any]] = []
+        self.wallet_balances: dict[str, float] = {}  # {address: balance}
+        self.dust_transactions_log: list[dict[str, Any]] = []
 
     def is_dust_amount(self, amount: float) -> bool:
         """Checks if a given amount is below the dust threshold."""
@@ -64,7 +65,7 @@ class DustPreventionManager:
             )
             return True  # Indicate it was not dust
 
-    def consolidate_dust(self, main_address: str, addresses_to_consolidate: List[str]):
+    def consolidate_dust(self, main_address: str, addresses_to_consolidate: list[str]):
         """
         Simulates consolidating dust amounts from multiple addresses into a main address.
         """

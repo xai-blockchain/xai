@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Regression tests dedicated to CALL argument/return memory handling.
 
@@ -9,13 +11,11 @@ tests ensure the legacy path is restored while also keeping focused
 coverage on calldata/return buffer copying semantics.
 """
 
-from typing import Optional
 from unittest.mock import MagicMock
 
 from xai.core.vm.evm.context import BlockContext, CallContext, CallType, ExecutionContext
 from xai.core.vm.evm.interpreter import EVMInterpreter
 from xai.core.vm.evm.opcodes import Opcode
-
 
 def _make_block() -> BlockContext:
     return BlockContext(
@@ -28,7 +28,6 @@ def _make_block() -> BlockContext:
         chain_id=1,
     )
 
-
 def _make_context(blockchain: MagicMock) -> ExecutionContext:
     return ExecutionContext(
         block=_make_block(),
@@ -39,8 +38,7 @@ def _make_context(blockchain: MagicMock) -> ExecutionContext:
         blockchain=blockchain,
     )
 
-
-def _make_call(code: bytes, *, address: Optional[str] = None) -> CallContext:
+def _make_call(code: bytes, *, address: str | None = None) -> CallContext:
     return CallContext(
         call_type=CallType.CALL,
         depth=0,
@@ -53,7 +51,6 @@ def _make_call(code: bytes, *, address: Optional[str] = None) -> CallContext:
         calldata=b"",
         static=False,
     )
-
 
 def test_call_argument_buffer_is_copied_into_target_calldata():
     """Ensure CALL copies the specified args buffer into the callee's calldata."""
@@ -133,7 +130,6 @@ def test_call_argument_buffer_is_copied_into_target_calldata():
     # The callee should have persisted the calldata it observed
     callee_storage = context.get_storage(target_address)
     assert callee_storage.get_raw(1) == argument
-
 
 def test_call_return_buffer_respects_offsets_and_sizes():
     """Return data must land exactly at the caller-provided offset."""

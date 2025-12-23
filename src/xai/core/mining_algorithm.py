@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Mining Algorithm - RandomX-Light Inspired
 CPU-friendly, ASIC-resistant, browser-compatible
@@ -7,8 +9,6 @@ import hashlib
 import json
 import time
 from decimal import Decimal
-from typing import Dict, Optional, List
-
 
 class MiningAlgorithm:
     """
@@ -45,7 +45,7 @@ class MiningAlgorithm:
         self,
         block_height: int,
         previous_hash: str,
-        transactions: List[Dict],
+        transactions: list[Dict],
         miner_address: str,
         nonce: int,
     ) -> Dict:
@@ -61,7 +61,7 @@ class MiningAlgorithm:
             "difficulty": self.current_difficulty,
         }
 
-    def _merkle_root(self, transactions: List[Dict]) -> str:
+    def _merkle_root(self, transactions: list[Dict]) -> str:
         """Calculate Merkle root of transactions"""
         if not transactions:
             return "0" * 64
@@ -70,7 +70,7 @@ class MiningAlgorithm:
         tx_data = json.dumps(transactions, sort_keys=True)
         return hashlib.sha256(tx_data.encode()).hexdigest()
 
-    def mine_block(self, block_header: Dict, max_iterations: int = 1000000) -> Optional[Dict]:
+    def mine_block(self, block_header: Dict, max_iterations: int = 1000000) -> Dict | None:
         """
         Mine a block by finding a valid nonce
 
@@ -142,7 +142,7 @@ class MiningAlgorithm:
         target = (2**256) // difficulty
         return hash_int < target
 
-    def adjust_difficulty(self, blocks: List[Dict]) -> int:
+    def adjust_difficulty(self, blocks: list[Dict]) -> int:
         """
         Adjust difficulty based on recent block times
 
@@ -196,7 +196,6 @@ class MiningAlgorithm:
         if hashrate == 0:
             return float("inf")
         return difficulty / hashrate
-
 
 class BrowserMiningAdapter:
     """
@@ -255,7 +254,6 @@ class BrowserMiningAdapter:
             "reward_estimate": str(self.algorithm.BLOCK_REWARD / 1000),  # Share of block reward
             "timestamp": int(time.time()),
         }
-
 
 # Quick mining test
 if __name__ == "__main__":

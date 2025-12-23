@@ -4,7 +4,6 @@ import requests
 
 from xai.testnet.verification import NodeTarget, TestnetVerifier
 
-
 class FakeResponse:
     """Simple stand-in for requests.Response."""
 
@@ -18,7 +17,6 @@ class FakeResponse:
 
     def json(self) -> dict:
         return self._payload
-
 
 class FakeSession:
     """Fake requests.Session that returns canned responses."""
@@ -40,7 +38,6 @@ class FakeSession:
     def close(self) -> None:  # pragma: no cover - not closed during tests
         self.closed = True
 
-
 def _build_node(
     name: str,
     base_url: str,
@@ -58,7 +55,7 @@ def _build_node(
     stats_height = height if stats_height is None else stats_height
     stats_hash = block_hash if stats_hash is None else stats_hash
 
-    stats_payload: Dict[str, Any] = {}
+    stats_payload: dict[str, Any] = {}
     if stats_height is not None:
         stats_payload["chain_height"] = stats_height
     if stats_hash is not None:
@@ -89,7 +86,6 @@ def _build_node(
     }
     return NodeTarget(name=name, base_url=base_url, session=FakeSession(responses))
 
-
 def test_verifier_success_with_explorer() -> None:
     nodes = [
         _build_node("bootstrap", "http://node-a", height=42, block_hash="0xabc", peer_count=3),
@@ -113,7 +109,6 @@ def test_verifier_success_with_explorer() -> None:
     assert result.explorer_ok is True
     assert result.to_dict()["ok"] is True
 
-
 def test_verifier_detects_height_divergence() -> None:
     nodes = [
         _build_node("bootstrap", "http://node-a", height=10, block_hash="0xabc", peer_count=3),
@@ -125,7 +120,6 @@ def test_verifier_detects_height_divergence() -> None:
     assert result.consensus_ok is False
     assert any("diverged" in err for err in result.errors)
 
-
 def test_verifier_flags_low_peer_counts() -> None:
     nodes = [
         _build_node("bootstrap", "http://node-a", height=10, block_hash="0xabc", peer_count=1),
@@ -136,7 +130,6 @@ def test_verifier_flags_low_peer_counts() -> None:
 
     assert result.peer_counts_ok is False
     assert any("Peer counts below threshold" in err for err in result.errors)
-
 
 def test_verifier_records_http_failures() -> None:
     base_url = "http://node-a"

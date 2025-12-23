@@ -10,44 +10,41 @@ and provides comprehensive error handling and retry logic.
 """
 
 from __future__ import annotations
-from typing import Optional, Dict, Any, List
+
+import asyncio
+import json
 import logging
 import os
-import json
-import asyncio
-import aiohttp
 from dataclasses import dataclass
+from typing import Any
 
+import aiohttp
+
+from xai.notifications.device_registry import DeviceInfo, DevicePlatform, DeviceRegistry
 from xai.notifications.notification_types import NotificationPayload
-from xai.notifications.device_registry import DeviceRegistry, DeviceInfo, DevicePlatform
 
 logger = logging.getLogger(__name__)
-
 
 class NotificationError(Exception):
     """Base exception for notification delivery errors."""
     pass
 
-
 class InvalidTokenError(NotificationError):
     """Device token is invalid and should be removed."""
     pass
 
-
 class RateLimitError(NotificationError):
     """Rate limit exceeded for notification service."""
     pass
-
 
 @dataclass
 class DeliveryResult:
     """Result of notification delivery attempt."""
     success: bool
     device_token: str
-    error: Optional[str] = None
+    error: str | None = None
     should_retry: bool = False
     should_unregister: bool = False
-
 
 class PushNotificationService:
     """
@@ -74,8 +71,8 @@ class PushNotificationService:
     def __init__(
         self,
         device_registry: DeviceRegistry,
-        fcm_key: Optional[str] = None,
-        apns_config: Optional[Dict[str, str]] = None,
+        fcm_key: str | None = None,
+        apns_config: dict[str, str] | None = None,
         use_apns_sandbox: bool = True,
     ):
         """
@@ -105,7 +102,7 @@ class PushNotificationService:
                 "Set XAI_APNS_KEY_ID, XAI_APNS_TEAM_ID, and XAI_APNS_KEY_PATH environment variables."
             )
 
-    def _load_apns_config(self) -> Optional[Dict[str, str]]:
+    def _load_apns_config(self) -> dict[str, str] | None:
         """Load APNs configuration from environment variables."""
         key_id = os.getenv("XAI_APNS_KEY_ID")
         team_id = os.getenv("XAI_APNS_TEAM_ID")
@@ -124,8 +121,8 @@ class PushNotificationService:
         self,
         address: str,
         payload: NotificationPayload,
-        notification_type: Optional[str] = None,
-    ) -> List[DeliveryResult]:
+        notification_type: str | None = None,
+    ) -> list[DeliveryResult]:
         """
         Send notification to all devices registered to an address.
 
@@ -354,7 +351,7 @@ class PushNotificationService:
         from_address: str,
         to_address: str,
         is_incoming: bool,
-    ) -> List[DeliveryResult]:
+    ) -> list[DeliveryResult]:
         """
         Send transaction notification to an address.
 
@@ -387,7 +384,7 @@ class PushNotificationService:
         tx_hash: str,
         confirmations: int,
         required_confirmations: int = 6,
-    ) -> List[DeliveryResult]:
+    ) -> list[DeliveryResult]:
         """
         Send transaction confirmation notification.
 
@@ -416,7 +413,7 @@ class PushNotificationService:
         price: float,
         threshold: float,
         crossed_direction: str,
-    ) -> List[DeliveryResult]:
+    ) -> list[DeliveryResult]:
         """
         Send price alert notification.
 
@@ -445,7 +442,7 @@ class PushNotificationService:
         event_type: str,
         message: str,
         severity: str = "high",
-    ) -> List[DeliveryResult]:
+    ) -> list[DeliveryResult]:
         """
         Send security alert notification.
 
@@ -490,7 +487,11 @@ class PushNotificationService:
                 error="Device not registered",
             )
 
-        from xai.notifications.notification_types import NotificationPayload, NotificationType, NotificationPriority
+        from xai.notifications.notification_types import (
+            NotificationPayload,
+            NotificationPriority,
+            NotificationType,
+        )
 
         payload = NotificationPayload(
             notification_type=NotificationType.SECURITY,

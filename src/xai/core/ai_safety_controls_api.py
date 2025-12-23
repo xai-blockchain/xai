@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - AI Safety Controls API
 
@@ -6,15 +8,15 @@ Users can instantly cancel AI operations at multiple levels.
 """
 
 import logging
-from typing import Any, Dict, Tuple
+from typing import Any
 
-from flask import request, jsonify
-from xai.core.ai_safety_controls import StopReason, AISafetyLevel
+from flask import jsonify, request
+
+from xai.core.ai_safety_controls import AISafetyLevel, StopReason
 
 logger = logging.getLogger(__name__)
 
-
-def _json_body() -> Dict[str, Any]:
+def _json_body() -> dict[str, Any]:
     """
     Parse JSON body defensively and return a dict or raise ValueError.
     """
@@ -25,11 +27,9 @@ def _json_body() -> Dict[str, Any]:
         raise ValueError("Malformed JSON payload")
     return data
 
-
-def _server_error(exc: Exception, event: str) -> Tuple[Any, int]:
+def _server_error(exc: Exception, event: str) -> tuple[Any, int]:
     logger.exception("AI safety control failed: %s", exc, extra={"event": event})
     return jsonify({"error": str(exc)}), 500
-
 
 def add_safety_control_routes(app, node):
     """
@@ -45,7 +45,7 @@ def add_safety_control_routes(app, node):
     # ===== PERSONAL AI CONTROLS =====
 
     @app.route("/ai/cancel-request/<request_id>", methods=["POST"])
-    def cancel_personal_ai_request(request_id: str) -> Tuple[Any, int]:
+    def cancel_personal_ai_request(request_id: str) -> tuple[Any, int]:
         """
         Cancel a Personal AI request immediately
 
@@ -82,7 +82,7 @@ def add_safety_control_routes(app, node):
             return _server_error(exc, "ai.cancel_personal_ai_request_failed")
 
     @app.route("/ai/request-status/<request_id>", methods=["GET"])
-    def check_request_status(request_id: str) -> Tuple[Any, int]:
+    def check_request_status(request_id: str) -> tuple[Any, int]:
         """
         Check if a Personal AI request is cancelled
 
@@ -109,7 +109,7 @@ def add_safety_control_routes(app, node):
     # ===== TRADING BOT CONTROLS =====
 
     @app.route("/ai/emergency-stop/trading-bot", methods=["POST"])
-    def emergency_stop_trading_bot() -> Tuple[Any, int]:
+    def emergency_stop_trading_bot() -> tuple[Any, int]:
         """
         Emergency stop for trading bot (instant)
 
@@ -146,7 +146,7 @@ def add_safety_control_routes(app, node):
             return _server_error(exc, "ai.emergency_stop_trading_bot_failed")
 
     @app.route("/ai/stop-all-trading-bots", methods=["POST"])
-    def stop_all_trading_bots() -> Tuple[Any, int]:
+    def stop_all_trading_bots() -> tuple[Any, int]:
         """
         Stop ALL trading bots (emergency use only)
 
@@ -188,7 +188,7 @@ def add_safety_control_routes(app, node):
     # ===== GOVERNANCE AI CONTROLS =====
 
     @app.route("/ai/pause-governance-task/<task_id>", methods=["POST"])
-    def pause_governance_task(task_id: str) -> Tuple[Any, int]:
+    def pause_governance_task(task_id: str) -> tuple[Any, int]:
         """
         Pause a Governance AI task
 
@@ -224,7 +224,7 @@ def add_safety_control_routes(app, node):
             return _server_error(exc, "ai.pause_governance_task_failed")
 
     @app.route("/ai/resume-governance-task/<task_id>", methods=["POST"])
-    def resume_governance_task(task_id: str) -> Tuple[Any, int]:
+    def resume_governance_task(task_id: str) -> tuple[Any, int]:
         """
         Resume a paused Governance AI task
 
@@ -252,7 +252,7 @@ def add_safety_control_routes(app, node):
             return _server_error(exc, "ai.resume_governance_task_failed")
 
     @app.route("/ai/governance-task-status/<task_id>", methods=["GET"])
-    def check_governance_task_status(task_id: str) -> Tuple[Any, int]:
+    def check_governance_task_status(task_id: str) -> tuple[Any, int]:
         """
         Check if Governance AI task is paused
 
@@ -279,7 +279,7 @@ def add_safety_control_routes(app, node):
     # ===== GLOBAL EMERGENCY STOP =====
 
     @app.route("/ai/emergency-stop/global", methods=["POST"])
-    def activate_global_emergency_stop() -> Tuple[Any, int]:
+    def activate_global_emergency_stop() -> tuple[Any, int]:
         """
         🚨 GLOBAL EMERGENCY STOP - Halt ALL AI operations
 
@@ -334,7 +334,7 @@ def add_safety_control_routes(app, node):
             return _server_error(exc, "ai.emergency_stop_global_failed")
 
     @app.route("/ai/emergency-stop/deactivate", methods=["POST"])
-    def deactivate_global_emergency_stop() -> Tuple[Any, int]:
+    def deactivate_global_emergency_stop() -> tuple[Any, int]:
         """
         Deactivate global emergency stop
 
@@ -370,7 +370,7 @@ def add_safety_control_routes(app, node):
             return _server_error(exc, "ai.emergency_stop_deactivate_failed")
 
     @app.route("/ai/safety-level", methods=["POST"])
-    def set_safety_level() -> Tuple[Any, int]:
+    def set_safety_level() -> tuple[Any, int]:
         """
         Set global AI safety level
 
@@ -421,7 +421,7 @@ def add_safety_control_routes(app, node):
     # ===== STATUS & MONITORING =====
 
     @app.route("/ai/safety-status", methods=["GET"])
-    def get_safety_status() -> Tuple[Any, int]:
+    def get_safety_status() -> tuple[Any, int]:
         """
         Get current AI safety status
 
@@ -451,7 +451,7 @@ def add_safety_control_routes(app, node):
             return _server_error(exc, "ai.safety_status_failed")
 
     @app.route("/ai/active-operations", methods=["GET"])
-    def get_active_operations() -> Tuple[Any, int]:
+    def get_active_operations() -> tuple[Any, int]:
         """
         Get list of all active AI operations
 
@@ -480,7 +480,7 @@ def add_safety_control_routes(app, node):
             return _server_error(exc, "ai.active_operations_failed")
 
     @app.route("/ai/safety-callers", methods=["GET"])
-    def list_safety_callers() -> Tuple[Any, int]:
+    def list_safety_callers() -> tuple[Any, int]:
         """List all authorized safety-level callers"""
 
         try:
@@ -498,7 +498,7 @@ def add_safety_control_routes(app, node):
             return _server_error(exc, "ai.list_safety_callers_failed")
 
     @app.route("/ai/safety-callers", methods=["POST"])
-    def add_safety_caller() -> Tuple[Any, int]:
+    def add_safety_caller() -> tuple[Any, int]:
         """Authorize a new safety-level caller"""
 
         try:
@@ -524,7 +524,7 @@ def add_safety_control_routes(app, node):
             return _server_error(exc, "ai.add_safety_caller_failed")
 
     @app.route("/ai/safety-callers/<identifier>", methods=["DELETE"])
-    def remove_safety_caller(identifier: str) -> Tuple[Any, int]:
+    def remove_safety_caller(identifier: str) -> tuple[Any, int]:
         """Revoke a safety-level caller"""
 
         try:

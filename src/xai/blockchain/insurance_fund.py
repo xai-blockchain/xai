@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 import logging
-from typing import Dict, Any
 from datetime import datetime, timezone
+from typing import Any
 
 from .bridge_fees_insurance import BridgeFeeManager
 
 logger = logging.getLogger("xai.blockchain.insurance_fund")
-
 
 class InsuranceFundManager:
     def __init__(self, bridge_fee_manager: BridgeFeeManager, authorized_payout_address: str):
@@ -16,7 +17,7 @@ class InsuranceFundManager:
 
         self.bridge_fee_manager = bridge_fee_manager
         self.authorized_payout_address = authorized_payout_address
-        self.claims: Dict[str, Dict[str, Any]] = {}  # Stores pending/approved claims
+        self.claims: dict[str, dict[str, Any]] = {}  # Stores pending/approved claims
         self._claim_counter = 0
 
     @property

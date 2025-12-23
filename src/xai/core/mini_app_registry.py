@@ -1,6 +1,7 @@
-from dataclasses import dataclass, field
-from typing import Dict, List, Any
+from __future__ import annotations
 
+from dataclasses import dataclass, field
+from typing import Any
 
 @dataclass
 class MiniAppManifestEntry:
@@ -12,10 +13,10 @@ class MiniAppManifestEntry:
     app_type: str
     embed_url: str
     risk_focus: str  # low, medium, high
-    triggers: List[str]
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    triggers: list[str]
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self, risk_level: str, recommended_flow: str) -> Dict[str, Any]:
+    def to_dict(self, risk_level: str, recommended_flow: str) -> dict[str, Any]:
         """Serialize the entry while injecting runtime recommendations."""
         data = {
             "id": self.id,
@@ -32,7 +33,6 @@ class MiniAppManifestEntry:
         data.update(self.metadata.get("extras", {}))
         return data
 
-
 class MiniAppRegistry:
     """Registry of embedded mini-apps driven by the personal AI + AML stack."""
 
@@ -40,7 +40,7 @@ class MiniAppRegistry:
     MEDIUM_RISK_LEVELS = {"medium"}
 
     def __init__(self):
-        self._apps: List[MiniAppManifestEntry] = [
+        self._apps: list[MiniAppManifestEntry] = [
             MiniAppManifestEntry(
                 id="community-pulse",
                 name="Community Pulse Poll",
@@ -115,7 +115,7 @@ class MiniAppRegistry:
             return "balanced"
         return "open"
 
-    def build_manifest(self, risk_context: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def build_manifest(self, risk_context: dict[str, Any]) -> list[dict[str, Any]]:
         """Return the manifest containing AML-aware recommendations."""
         risk_level = (risk_context.get("risk_level") or "clean").lower()
         risk_score = risk_context.get("risk_score", 0)

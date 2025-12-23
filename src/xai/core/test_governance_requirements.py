@@ -8,13 +8,14 @@ Verifies that the blockchain enforces:
 - 50% of original voters must approve implementation
 """
 
-import sys
-import os
 import logging
+import os
+import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 
 from blockchain import Blockchain
+
 from xai.core.logging_config import setup_logging
 
 # Setup structured logging for governance testing

@@ -1,12 +1,13 @@
+from __future__ import annotations
+
 """
 Tests for HTLC generation logic in atomic_swap_11_coins.
 """
 
 from decimal import Decimal
-from typing import Any, Dict
+from typing import Any
 
 from xai.core.aixn_blockchain.atomic_swap_11_coins import AtomicSwapHTLC, CoinType
-
 
 def test_utxo_htlc_includes_hash_and_timelock():
     htlc = AtomicSwapHTLC(CoinType.BTC)
@@ -17,7 +18,6 @@ def test_utxo_htlc_includes_hash_and_timelock():
     assert contract["secret_hash"] in contract["script_template"]
     assert "recommended_fee" in contract
     assert contract["recommended_fee"]["unit"] == "BTC"
-
 
 def test_eth_htlc_contains_hash_and_recipient():
     htlc = AtomicSwapHTLC(CoinType.ETH)
@@ -31,14 +31,12 @@ def test_eth_htlc_contains_hash_and_recipient():
     assert "recommended_gas" in contract
     assert contract["recommended_gas"]["gas_limit"] > 0
 
-
 def test_hash_parity_is_sha256_across_protocols():
     """Expose a single canonical SHA-256 hash for both BTC and ETH legs."""
     htlc_eth = AtomicSwapHTLC(CoinType.ETH)
     contract = htlc_eth.create_swap_contract(axn_amount=1, other_coin_amount=0.2, counterparty_address="0xRecipient", timelock_hours=1)
     assert "secret_hash" in contract
     assert "secret_hash_keccak" not in contract
-
 
 def test_verify_swap_claim_checks_secret_and_timelock(monkeypatch):
     htlc = AtomicSwapHTLC(CoinType.BTC)
@@ -60,11 +58,10 @@ def test_verify_swap_claim_checks_secret_and_timelock(monkeypatch):
     assert valid is False
     assert "Timelock expired" in msg
 
-
 def test_utxo_deployment_includes_redeem_script():
     """UTXO deployment config should yield concrete P2WSH details."""
     htlc = AtomicSwapHTLC(CoinType.BTC)
-    deployment_cfg: Dict[str, Any] = {
+    deployment_cfg: dict[str, Any] = {
         "utxo": {
             "sender_pubkey": "02" + "11" * 32,
             "recipient_pubkey": "03" + "22" * 32,
@@ -84,7 +81,6 @@ def test_utxo_deployment_includes_redeem_script():
     assert "redeem_script_hex" in contract
     assert isinstance(contract["funding_amount_sats"], int)
 
-
 def test_ethereum_deployment_invokes_deployer(monkeypatch):
     """Ethereum deployment config should call deploy_htlc with expected params."""
     htlc = AtomicSwapHTLC(CoinType.ETH)
@@ -95,7 +91,7 @@ def test_ethereum_deployment_invokes_deployer(monkeypatch):
     class DummyWeb3:
         eth = DummyEth()
 
-    captured: Dict[str, Any] = {}
+    captured: dict[str, Any] = {}
 
     class DummyContract:
         address = "0xdeadbeef"

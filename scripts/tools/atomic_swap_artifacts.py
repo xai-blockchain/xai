@@ -9,7 +9,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from xai.core.htlc_deployer import refund_htlc
 from xai.tools.atomic_swap_cli import (

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Address Checksum - EIP-55 Style Mixed-Case Encoding
 
@@ -11,8 +13,6 @@ Address Format:
 """
 
 import hashlib
-from typing import Tuple
-
 
 def _keccak256(data: bytes) -> bytes:
     """Compute keccak256 hash (same as Ethereum)."""
@@ -21,11 +21,9 @@ def _keccak256(data: bytes) -> bytes:
     k.update(data)
     return k.digest()
 
-
 def _sha3_256_fallback(data: bytes) -> bytes:
     """Fallback using hashlib sha3_256 if pycryptodome unavailable."""
     return hashlib.sha3_256(data).digest()
-
 
 def _get_hash_function():
     """Get best available hash function."""
@@ -35,7 +33,6 @@ def _get_hash_function():
     except ImportError:
         # sha3_256 is close enough for checksum purposes
         return _sha3_256_fallback
-
 
 def to_checksum_address(address: str) -> str:
     """
@@ -91,7 +88,6 @@ def to_checksum_address(address: str) -> str:
 
     return prefix + ''.join(checksummed)
 
-
 def is_checksum_valid(address: str) -> bool:
     """
     Verify if address has valid checksum.
@@ -122,8 +118,7 @@ def is_checksum_valid(address: str) -> bool:
     except ValueError:
         return False
 
-
-def validate_address(address: str, require_checksum: bool = False) -> Tuple[bool, str]:
+def validate_address(address: str, require_checksum: bool = False) -> tuple[bool, str]:
     """
     Validate XAI address format and optionally checksum.
 
@@ -165,7 +160,6 @@ def validate_address(address: str, require_checksum: bool = False) -> Tuple[bool
 
     # Return checksummed version
     return True, to_checksum_address(address)
-
 
 def normalize_address(address: str) -> str:
     """

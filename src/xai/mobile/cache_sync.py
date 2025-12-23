@@ -8,13 +8,12 @@ using differential updates to minimize bandwidth usage.
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import time
-from typing import Dict, Any, List, Optional, Set
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
-
+from typing import Any
 
 @dataclass
 class SyncCheckpoint:
@@ -23,13 +22,13 @@ class SyncCheckpoint:
     block_hash: str
     timestamp: float
     transaction_count: int
-    balance_snapshot: Dict[str, float]
+    balance_snapshot: dict[str, float]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> SyncCheckpoint:
+    def from_dict(cls, data: dict[str, Any]) -> SyncCheckpoint:
         return cls(**data)
 
     def calculate_hash(self) -> str:
@@ -37,21 +36,19 @@ class SyncCheckpoint:
         data = json.dumps(self.to_dict(), sort_keys=True)
         return hashlib.sha256(data.encode()).hexdigest()
 
-
 @dataclass
 class DiffUpdate:
     """Differential update for mobile clients"""
     update_type: str  # 'new_block', 'new_tx', 'balance_change', 'utxo_update'
     timestamp: float
-    data: Dict[str, Any]
+    data: dict[str, Any]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> DiffUpdate:
+    def from_dict(cls, data: dict[str, Any]) -> DiffUpdate:
         return cls(**data)
-
 
 class MobileCacheSyncManager:
     """
@@ -65,11 +62,11 @@ class MobileCacheSyncManager:
 
     def __init__(self, blockchain=None):
         self.blockchain = blockchain
-        self.checkpoints: List[SyncCheckpoint] = []
-        self.updates_cache: Dict[str, List[DiffUpdate]] = {}  # checkpoint_hash -> updates
+        self.checkpoints: list[SyncCheckpoint] = []
+        self.updates_cache: dict[str, list[DiffUpdate]] = {}  # checkpoint_hash -> updates
         self.max_checkpoint_age = 86400  # 24 hours
 
-    def create_checkpoint(self, addresses: List[str]) -> SyncCheckpoint:
+    def create_checkpoint(self, addresses: list[str]) -> SyncCheckpoint:
         """
         Create a sync checkpoint for mobile client
 
@@ -111,8 +108,8 @@ class MobileCacheSyncManager:
     def get_differential_updates(
         self,
         checkpoint_hash: str,
-        addresses: List[str]
-    ) -> List[DiffUpdate]:
+        addresses: list[str]
+    ) -> list[DiffUpdate]:
         """
         Get differential updates since checkpoint
 
@@ -190,7 +187,7 @@ class MobileCacheSyncManager:
 
         return updates
 
-    def _create_lightweight_tx(self, tx: Any, addresses: List[str]) -> Dict[str, Any]:
+    def _create_lightweight_tx(self, tx: Any, addresses: list[str]) -> dict[str, Any]:
         """Create lightweight transaction data for mobile client"""
         is_sender = tx.sender in addresses
         is_recipient = tx.recipient in addresses
@@ -206,14 +203,14 @@ class MobileCacheSyncManager:
             "confirmed": True  # If in blockchain, it's confirmed
         }
 
-    def _find_checkpoint(self, checkpoint_hash: str) -> Optional[SyncCheckpoint]:
+    def _find_checkpoint(self, checkpoint_hash: str) -> SyncCheckpoint | None:
         """Find checkpoint by hash"""
         for cp in self.checkpoints:
             if cp.calculate_hash() == checkpoint_hash:
                 return cp
         return None
 
-    def compress_updates(self, updates: List[DiffUpdate]) -> bytes:
+    def compress_updates(self, updates: list[DiffUpdate]) -> bytes:
         """
         Compress updates for bandwidth optimization
 
@@ -231,7 +228,7 @@ class MobileCacheSyncManager:
         # Compress
         return gzip.compress(data.encode())
 
-    def decompress_updates(self, compressed_data: bytes) -> List[DiffUpdate]:
+    def decompress_updates(self, compressed_data: bytes) -> list[DiffUpdate]:
         """
         Decompress updates
 
@@ -251,7 +248,6 @@ class MobileCacheSyncManager:
 
         return [DiffUpdate.from_dict(u) for u in updates_data]
 
-
 class IncrementalSyncProtocol:
     """
     Protocol for incremental sync between mobile and full node
@@ -265,10 +261,10 @@ class IncrementalSyncProtocol:
 
     @staticmethod
     def create_sync_request(
-        last_checkpoint_hash: Optional[str],
-        addresses: List[str],
+        last_checkpoint_hash: str | None,
+        addresses: list[str],
         max_updates: int = 100
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Create sync request from mobile client
 
@@ -291,9 +287,9 @@ class IncrementalSyncProtocol:
     @staticmethod
     def create_sync_response(
         checkpoint: SyncCheckpoint,
-        updates: List[DiffUpdate],
+        updates: list[DiffUpdate],
         has_more: bool = False
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Create sync response from full node
 
@@ -316,7 +312,7 @@ class IncrementalSyncProtocol:
         }
 
     @staticmethod
-    def validate_sync_response(response: Dict[str, Any]) -> bool:
+    def validate_sync_response(response: dict[str, Any]) -> bool:
         """
         Validate sync response
 
@@ -338,7 +334,6 @@ class IncrementalSyncProtocol:
 
         return True
 
-
 class MobileCacheStorage:
     """Local storage for mobile cache"""
 
@@ -355,7 +350,7 @@ class MobileCacheStorage:
         with open(self.checkpoint_file, 'w') as f:
             json.dump(checkpoint.to_dict(), f, indent=2)
 
-    def load_checkpoint(self) -> Optional[SyncCheckpoint]:
+    def load_checkpoint(self) -> SyncCheckpoint | None:
         """Load checkpoint from disk"""
         try:
             with open(self.checkpoint_file, 'r') as f:
@@ -364,12 +359,12 @@ class MobileCacheStorage:
         except FileNotFoundError:
             return None
 
-    def save_cache(self, cache_data: Dict[str, Any]) -> None:
+    def save_cache(self, cache_data: dict[str, Any]) -> None:
         """Save cache data"""
         with open(self.cache_file, 'w') as f:
             json.dump(cache_data, f, indent=2)
 
-    def load_cache(self) -> Dict[str, Any]:
+    def load_cache(self) -> dict[str, Any]:
         """Load cache data"""
         try:
             with open(self.cache_file, 'r') as f:
@@ -377,7 +372,7 @@ class MobileCacheStorage:
         except FileNotFoundError:
             return {}
 
-    def apply_updates(self, updates: List[DiffUpdate]) -> None:
+    def apply_updates(self, updates: list[DiffUpdate]) -> None:
         """Apply differential updates to cache"""
         cache = self.load_cache()
 
@@ -402,7 +397,7 @@ class MobileCacheStorage:
 
         self.save_cache(cache)
 
-    def get_transactions(self, address: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_transactions(self, address: str | None = None) -> list[dict[str, Any]]:
         """Get transactions from cache"""
         cache = self.load_cache()
         transactions = cache.get("transactions", [])
@@ -420,7 +415,6 @@ class MobileCacheStorage:
         cache = self.load_cache()
         balances = cache.get("balances", {})
         return balances.get(address, 0.0)
-
 
 class BandwidthOptimizer:
     """Optimize bandwidth usage for mobile sync"""

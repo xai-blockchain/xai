@@ -1,15 +1,16 @@
+from __future__ import annotations
+
 """
 AI Task service - Monitors and tracks AI compute tasks
 """
 import asyncio
 import logging
-from typing import Set
+
 from datetime import datetime
 from fastapi import WebSocket
 import httpx
 
 logger = logging.getLogger(__name__)
-
 
 class AITaskService:
     """
@@ -22,7 +23,7 @@ class AITaskService:
         self.node_url = node_url
         self.running = False
         self.monitoring_task = None
-        self.websockets: Set[WebSocket] = set()
+        self.websockets: set[WebSocket] = set()
 
     async def start(self):
         """Start AI task monitoring"""

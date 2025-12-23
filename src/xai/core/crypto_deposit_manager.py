@@ -10,11 +10,9 @@ import logging
 import os
 import threading
 import time
-from typing import Any, Dict, List, Optional
-
+from typing import Any
 
 logger = logging.getLogger(__name__)
-
 
 class CryptoDepositManager:
     """
@@ -36,11 +34,11 @@ class CryptoDepositManager:
         self.data_dir = os.path.abspath(data_dir)
         self.state_path = os.path.join(self.data_dir, self.STATE_FILE)
         self.monitoring_active = False
-        self.deposit_addresses: Dict[str, List[Dict[str, Any]]] = {}
-        self.pending_deposits: List[Dict[str, Any]] = []
-        self.confirmed_deposits: List[Dict[str, Any]] = []
-        self._pending_by_tx: Dict[str, Dict[str, Any]] = {}
-        self._confirmed_by_tx: Dict[str, Dict[str, Any]] = {}
+        self.deposit_addresses: dict[str, list[dict[str, Any]]] = {}
+        self.pending_deposits: list[dict[str, Any]] = []
+        self.confirmed_deposits: list[dict[str, Any]] = []
+        self._pending_by_tx: dict[str, dict[str, Any]] = {}
+        self._confirmed_by_tx: dict[str, dict[str, Any]] = {}
         self._lock = threading.RLock()
         os.makedirs(self.data_dir, exist_ok=True)
         self._load_state()
@@ -104,7 +102,7 @@ class CryptoDepositManager:
     def _default_confirmations(self, currency: str) -> int:
         return self.DEFAULT_CONFIRMATIONS.get(currency.upper(), 12)
 
-    def generate_deposit_address(self, user_address: str, currency: str) -> Dict[str, Any]:
+    def generate_deposit_address(self, user_address: str, currency: str) -> dict[str, Any]:
         """Generate and persist a deposit address for a user."""
         normalized_currency = currency.upper()
         address = self._build_address(user_address, normalized_currency)
@@ -127,15 +125,15 @@ class CryptoDepositManager:
             "message": "Deposit address generated",
         }
 
-    def get_user_deposit_addresses(self, user_address: str) -> List[Dict[str, Any]]:
+    def get_user_deposit_addresses(self, user_address: str) -> list[dict[str, Any]]:
         with self._lock:
             return [entry.copy() for entry in self.deposit_addresses.get(user_address, [])]
 
-    def list_addresses_by_currency(self, currency: str) -> List[Dict[str, Any]]:
+    def list_addresses_by_currency(self, currency: str) -> list[dict[str, Any]]:
         """Return all address entries registered for the given currency."""
         normalized = currency.upper()
         with self._lock:
-            entries: List[Dict[str, Any]] = []
+            entries: list[dict[str, Any]] = []
             for user_entries in self.deposit_addresses.values():
                 for entry in user_entries:
                     if entry.get("currency") == normalized:
@@ -145,7 +143,7 @@ class CryptoDepositManager:
     # ===== Deposit Tracking =====
     def _find_address_entry(
         self, user_address: str, deposit_address: str, currency: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         addresses = self.deposit_addresses.get(user_address, [])
         for entry in addresses:
             if (
@@ -164,8 +162,8 @@ class CryptoDepositManager:
         deposit_address: str,
         *,
         confirmations: int = 0,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Record a new on-chain deposit detection.
 
@@ -222,7 +220,7 @@ class CryptoDepositManager:
                 "confirmations": deposit["confirmations"],
             }
 
-    def update_confirmations(self, tx_hash: str, new_confirmations: int) -> Dict[str, Any]:
+    def update_confirmations(self, tx_hash: str, new_confirmations: int) -> dict[str, Any]:
         """Update confirmation count for a previously detected deposit."""
         if new_confirmations < 0:
             return {"success": False, "error": "INVALID_CONFIRMATIONS"}
@@ -250,7 +248,7 @@ class CryptoDepositManager:
                 "confirmations": deposit["confirmations"],
             }
 
-    def _transition_to_confirmed(self, deposit: Dict[str, Any]) -> None:
+    def _transition_to_confirmed(self, deposit: dict[str, Any]) -> None:
         """Mark deposit as confirmed and credit funds."""
         if deposit["tx_hash"] in self._pending_by_tx:
             self.pending_deposits = [
@@ -275,7 +273,7 @@ class CryptoDepositManager:
         self.confirmed_deposits.append(deposit)
         self._confirmed_by_tx[deposit["tx_hash"]] = deposit
 
-    def _credit_exchange_wallet(self, deposit: Dict[str, Any]) -> Dict[str, Any]:
+    def _credit_exchange_wallet(self, deposit: dict[str, Any]) -> dict[str, Any]:
         """Credit the user's exchange wallet and capture structured errors."""
         try:
             return self.exchange_wallet_manager.deposit(
@@ -290,14 +288,14 @@ class CryptoDepositManager:
             return {"success": False, "error": str(exc)}
 
     # ===== Public Query APIs =====
-    def get_pending_deposits(self, user_address: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_pending_deposits(self, user_address: str | None = None) -> list[dict[str, Any]]:
         with self._lock:
             source = self.pending_deposits
             if user_address:
                 source = [entry for entry in source if entry.get("user_address") == user_address]
             return [entry.copy() for entry in source]
 
-    def get_deposit_history(self, user_address: str, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_deposit_history(self, user_address: str, limit: int = 50) -> list[dict[str, Any]]:
         with self._lock:
             history = [
                 entry
@@ -306,7 +304,7 @@ class CryptoDepositManager:
             ]
             return [entry.copy() for entry in history[:limit]]
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         with self._lock:
             total_addresses = sum(len(v) for v in self.deposit_addresses.values())
             total_pending = len(self.pending_deposits)

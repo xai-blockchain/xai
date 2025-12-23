@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Standalone test for DDoS Memory Limits functionality.
 Tests the core algorithm without requiring full dependencies.
@@ -6,8 +8,6 @@ Tests the core algorithm without requiring full dependencies.
 
 import time
 from collections import defaultdict, deque
-from typing import Dict, Deque
-
 
 class DDoSProtectorTest:
     """Simplified DDoS protector for testing"""
@@ -24,9 +24,9 @@ class DDoSProtectorTest:
         self.max_tracked_ips = max_tracked_ips
         self.max_connections_per_ip = max_connections_per_ip
 
-        self.request_timestamps: Dict[str, Deque[int]] = defaultdict(deque)
-        self.active_connections: Dict[str, int] = defaultdict(int)
-        self.last_activity: Dict[str, int] = {}
+        self.request_timestamps: dict[str, deque[int]] = defaultdict(deque)
+        self.active_connections: dict[str, int] = defaultdict(int)
+        self.last_activity: dict[str, int] = {}
 
     def _clean_old_requests(self, ip_address: str, current_time: int):
         """Remove old timestamps"""
@@ -113,7 +113,6 @@ class DDoSProtectorTest:
 
             if self.active_connections[ip_address] == 0:
                 del self.active_connections[ip_address]
-
 
 def test_ddos_protector():
     """Test DDoS protector functionality"""
@@ -273,7 +272,6 @@ def test_ddos_protector():
     print("✅ ALL DDOS MEMORY LIMIT TESTS PASSED!")
     print("=" * 70)
     return True
-
 
 if __name__ == "__main__":
     import sys

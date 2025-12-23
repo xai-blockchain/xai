@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain API Extensions
 
@@ -19,13 +21,14 @@ These extend the base node API with functionality needed for:
 """
 
 import logging
-from typing import Dict, Any
-from xai.core.config import Config
-from xai.core.api_mining import MiningAPIHandler
-from xai.core.api_governance import GovernanceAPIHandler
-from xai.core.api_wallet import WalletAPIHandler
+from typing import Any
+
 from xai.core.api_ai import AIAPIHandler
+from xai.core.api_governance import GovernanceAPIHandler
+from xai.core.api_mining import MiningAPIHandler
+from xai.core.api_wallet import WalletAPIHandler
 from xai.core.api_websocket import WebSocketAPIHandler
+from xai.core.config import Config
 from xai.security.module_attachment_guard import ModuleAttachmentError, ModuleAttachmentGuard
 
 logger = logging.getLogger(__name__)
@@ -51,7 +54,6 @@ except ModuleAttachmentError as exc:  # pragma: no cover - defensive startup gua
     )
     raise
 
-
 class APIExtensions:
     """
     Extended API endpoints coordinator.
@@ -70,7 +72,7 @@ class APIExtensions:
         self.app = node.app
 
         # Initialize trade peers for wallet API
-        self.trade_peers: Dict[str, float] = {}
+        self.trade_peers: dict[str, float] = {}
         for peer in Config.WALLET_TRADE_PEERS:
             self._register_trade_peer(peer)
 
@@ -107,7 +109,7 @@ class APIExtensions:
         logger.info(f"Registered wallet-trade peer {normalized}")
 
     # Expose WebSocket broadcast for backward compatibility
-    def broadcast_ws(self, message: Dict[str, Any]) -> None:
+    def broadcast_ws(self, message: dict[str, Any]) -> None:
         """
         Broadcast message to WebSocket clients.
 
@@ -118,15 +120,14 @@ class APIExtensions:
 
     # Expose mining stats for backward compatibility
     @property
-    def mining_threads(self) -> Dict[str, Dict[str, Any]]:
+    def mining_threads(self) -> dict[str, dict[str, Any]]:
         """Get mining threads dictionary."""
         return self.mining_handler.mining_threads
 
     @property
-    def mining_stats(self) -> Dict[str, Dict[str, Any]]:
+    def mining_stats(self) -> dict[str, dict[str, Any]]:
         """Get mining stats dictionary."""
         return self.mining_handler.mining_stats
-
 
 # Integration with existing node
 def extend_node_api(node: Any) -> APIExtensions:
@@ -147,7 +148,6 @@ def extend_node_api(node: Any) -> APIExtensions:
     logger.info("   - AI API (/personal-ai/*, /questioning/*)")
     logger.info("   - WebSocket API (/ws)")
     return extensions
-
 
 # Usage in node.py:
 # from xai.core.api_extensions import extend_node_api

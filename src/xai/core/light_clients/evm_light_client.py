@@ -22,14 +22,13 @@ import hashlib
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Tuple
 from enum import Enum
+from typing import Any
 
-from eth_utils import keccak, to_bytes, to_hex
 import rlp
+from eth_utils import keccak, to_bytes, to_hex
 
 logger = logging.getLogger(__name__)
-
 
 class ConsensusType(Enum):
     """EVM consensus mechanism types"""
@@ -37,7 +36,6 @@ class ConsensusType(Enum):
     POS = "proof_of_stake"
     CLIQUE = "clique"  # PoA used by some testnets
     UNKNOWN = "unknown"
-
 
 @dataclass
 class EVMChainConfig:
@@ -97,7 +95,6 @@ class EVMChainConfig:
             epoch_length=256,
         )
 
-
 @dataclass
 class EVMBlockHeader:
     """
@@ -120,7 +117,7 @@ class EVMBlockHeader:
     extra_data: bytes
     mix_hash: bytes
     nonce: bytes
-    base_fee_per_gas: Optional[int] = None  # EIP-1559 (London fork)
+    base_fee_per_gas: int | None = None  # EIP-1559 (London fork)
 
     def hash(self) -> bytes:
         """Calculate block hash using RLP encoding and Keccak-256"""
@@ -156,7 +153,7 @@ class EVMBlockHeader:
         return rlp.encode(fields)
 
     @classmethod
-    def from_rpc(cls, header_data: Dict[str, Any]) -> EVMBlockHeader:
+    def from_rpc(cls, header_data: dict[str, Any]) -> EVMBlockHeader:
         """Create header from JSON-RPC response"""
         return cls(
             parent_hash=to_bytes(hexstr=header_data['parentHash']),
@@ -177,7 +174,7 @@ class EVMBlockHeader:
             base_fee_per_gas=int(header_data['baseFeePerGas'], 16) if 'baseFeePerGas' in header_data else None,
         )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization"""
         result = {
             'parent_hash': to_hex(self.parent_hash),
@@ -201,7 +198,6 @@ class EVMBlockHeader:
             result['base_fee_per_gas'] = self.base_fee_per_gas
         return result
 
-
 @dataclass
 class EVMStateProof:
     """
@@ -214,10 +210,10 @@ class EVMStateProof:
     nonce: int
     code_hash: bytes
     storage_hash: bytes
-    account_proof: List[bytes]  # Merkle-Patricia proof nodes
-    storage_proofs: Dict[bytes, List[bytes]] = field(default_factory=dict)  # key -> proof
+    account_proof: list[bytes]  # Merkle-Patricia proof nodes
+    storage_proofs: dict[bytes, list[bytes]] = field(default_factory=dict)  # key -> proof
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             'address': to_hex(self.address),
@@ -231,7 +227,6 @@ class EVMStateProof:
                 for key, proof in self.storage_proofs.items()
             },
         }
-
 
 class EVMLightClient:
     """
@@ -249,7 +244,7 @@ class EVMLightClient:
             chain_config: Chain-specific configuration
         """
         self.config = chain_config
-        self.headers: Dict[int, EVMBlockHeader] = {}  # height -> header
+        self.headers: dict[int, EVMBlockHeader] = {}  # height -> header
         self.latest_verified_height = 0
         self.finalized_height = 0  # For PoS chains
 
@@ -515,7 +510,7 @@ class EVMLightClient:
         root_hash: bytes,
         key: bytes,
         value: bytes,
-        proof_nodes: List[bytes]
+        proof_nodes: list[bytes]
     ) -> bool:
         """
         Verify Merkle-Patricia trie proof
@@ -600,7 +595,7 @@ class EVMLightClient:
 
         return False
 
-    def _to_nibbles(self, data: bytes) -> List[int]:
+    def _to_nibbles(self, data: bytes) -> list[int]:
         """Convert bytes to nibbles (4-bit values)"""
         nibbles = []
         for byte in data:
@@ -608,7 +603,7 @@ class EVMLightClient:
             nibbles.append(byte & 0x0F)
         return nibbles
 
-    def _decode_compact(self, compact: bytes) -> List[int]:
+    def _decode_compact(self, compact: bytes) -> list[int]:
         """Decode compact encoding used in trie paths"""
         if not compact:
             return []
@@ -624,17 +619,17 @@ class EVMLightClient:
 
         return nibbles
 
-    def get_header(self, height: int) -> Optional[EVMBlockHeader]:
+    def get_header(self, height: int) -> EVMBlockHeader | None:
         """Get header at specific height"""
         return self.headers.get(height)
 
-    def get_latest_header(self) -> Optional[EVMBlockHeader]:
+    def get_latest_header(self) -> EVMBlockHeader | None:
         """Get latest verified header"""
         if not self.headers:
             return None
         return self.headers.get(self.latest_verified_height)
 
-    def sync_headers(self, headers: List[EVMBlockHeader]) -> Tuple[int, int]:
+    def sync_headers(self, headers: list[EVMBlockHeader]) -> tuple[int, int]:
         """
         Sync multiple headers
 
@@ -691,7 +686,7 @@ class EVMLightClient:
             extra={'event': 'evm_light_client.finalized_update'}
         )
 
-    def export_headers(self, start: int = 0, end: Optional[int] = None) -> List[Dict[str, Any]]:
+    def export_headers(self, start: int = 0, end: int | None = None) -> list[dict[str, Any]]:
         """Export headers for storage"""
         if end is None:
             end = self.latest_verified_height

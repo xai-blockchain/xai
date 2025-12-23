@@ -1,19 +1,17 @@
 """Blockchain ↔ AI bridge implementation."""
+from __future__ import annotations
 
 import hashlib
 import logging
 import os
 import sys
 import time
-from typing import Dict, List, Optional, Set
-
 
 from xai.core.ai_development_pool import AIDevelopmentPool
 from xai.core.ai_metrics import metrics
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
-
 
 class BlockchainAIBridge:
     """Glue between funded governance proposals and the AI development pool."""
@@ -62,16 +60,16 @@ class BlockchainAIBridge:
     }
 
     def __init__(
-        self, blockchain, governance_dao, development_pool: Optional[AIDevelopmentPool] = None
+        self, blockchain, governance_dao, development_pool: AIDevelopmentPool | None = None
     ):
         """Initialize bridge with blockchain, DAO, and AI pool."""
         self.blockchain = blockchain
         self.governance_dao = governance_dao
         self.development_pool = development_pool or AIDevelopmentPool()
-        self.proposal_task_map: Dict[str, str] = {}
-        self.queued_proposals: Set[str] = set()
+        self.proposal_task_map: dict[str, str] = {}
+        self.queued_proposals: set[str] = set()
 
-    def sync_full_proposals(self) -> List[Dict[str, Optional[str]]]:
+    def sync_full_proposals(self) -> list[dict[str, str | None]]:
         """Queue fully funded proposals and update completed statuses."""
         created_tasks = []
         self._update_completed_proposals()
@@ -97,7 +95,7 @@ class BlockchainAIBridge:
 
         return proposal.proposal_id not in self.proposal_task_map
 
-    def _queue_proposal(self, proposal) -> Dict[str, Optional[str]]:
+    def _queue_proposal(self, proposal) -> dict[str, str | None]:
         category = getattr(proposal.category, "value", "other")
         task_type = self.TASK_TYPE_MAP.get(category, "code_generation")
         priority = self.PRIORITY_MAP.get(category, 5)

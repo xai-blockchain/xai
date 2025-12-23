@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Monitoring and Metrics System
 
@@ -9,21 +11,22 @@ Comprehensive monitoring with:
 - Real-time metrics collection
 """
 
-import time
-import threading
-import psutil
-import os
 import json
 import logging
-from typing import Dict, Any, List, Optional, Callable, Tuple
+import os
+import threading
+import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from enum import Enum
+from typing import Any, Callable
+
+import psutil
+
 from xai.core.config import Config
 from xai.core.security_validation import SecurityEventRouter
 
 logger = logging.getLogger(__name__)
-
 
 class MetricType(Enum):
     """Metric types"""
@@ -33,7 +36,6 @@ class MetricType(Enum):
     HISTOGRAM = "histogram"
     SUMMARY = "summary"
 
-
 class AlertLevel(Enum):
     """Alert severity levels"""
 
@@ -41,12 +43,11 @@ class AlertLevel(Enum):
     WARNING = "warning"
     CRITICAL = "critical"
 
-
 class Metric:
     """Base metric class"""
 
     def __init__(
-        self, name: str, description: str, metric_type: MetricType, labels: Dict[str, str] = None
+        self, name: str, description: str, metric_type: MetricType, labels: dict[str, str] = None
     ):
         """
         Initialize metric
@@ -81,11 +82,10 @@ class Metric:
         ]
         return "\n".join(lines)
 
-
 class Counter(Metric):
     """Counter metric - monotonically increasing value"""
 
-    def __init__(self, name: str, description: str, labels: Dict[str, str] = None):
+    def __init__(self, name: str, description: str, labels: dict[str, str] = None):
         super().__init__(name, description, MetricType.COUNTER, labels)
 
     def inc(self, amount: float = 1.0):
@@ -98,11 +98,10 @@ class Counter(Metric):
         self.value = 0
         self.timestamp = time.time()
 
-
 class Gauge(Metric):
     """Gauge metric - can go up or down"""
 
-    def __init__(self, name: str, description: str, labels: Dict[str, str] = None):
+    def __init__(self, name: str, description: str, labels: dict[str, str] = None):
         super().__init__(name, description, MetricType.GAUGE, labels)
 
     def set(self, value: float):
@@ -120,7 +119,6 @@ class Gauge(Metric):
         self.value -= amount
         self.timestamp = time.time()
 
-
 class Histogram(Metric):
     """Histogram metric - tracks distribution of values"""
 
@@ -128,8 +126,8 @@ class Histogram(Metric):
         self,
         name: str,
         description: str,
-        buckets: List[float] = None,
-        labels: Dict[str, str] = None,
+        buckets: list[float] = None,
+        labels: dict[str, str] = None,
     ):
         super().__init__(name, description, MetricType.HISTOGRAM, labels)
         self.buckets = buckets or [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
@@ -138,12 +136,12 @@ class Histogram(Metric):
         self.count = 0
 
         # Optional per-label series (keyed by sorted label tuples)
-        self._labeled_series: Dict[Tuple[Tuple[str, str], ...], Dict[str, Any]] = {}
+        self._labeled_series: dict[tuple[tuple[str, str], ...], dict[str, Any]] = {}
 
-    def observe(self, value: float, labels: Optional[Dict[str, Any]] = None):
+    def observe(self, value: float, labels: dict[str, Any] | None = None):
         """Observe a value, optionally tracking per-label buckets."""
 
-        def _record(target_buckets: Dict[float, int], series: Dict[str, Any]) -> None:
+        def _record(target_buckets: dict[float, int], series: dict[str, Any]) -> None:
             for bucket in self.buckets:
                 if value <= bucket:
                     target_buckets[bucket] += 1
@@ -174,7 +172,7 @@ class Histogram(Metric):
         """Convert histogram to Prometheus format"""
         lines = [f"# HELP {self.name} {self.description}", f"# TYPE {self.name} histogram"]
 
-        def _emit_series(label_map: Dict[str, Any], bucket_counts: Dict[float, int], count: int, total_sum: float) -> None:
+        def _emit_series(label_map: dict[str, Any], bucket_counts: dict[float, int], count: int, total_sum: float) -> None:
             normalized_labels = {str(k): str(v) for k, v in label_map.items() if v != ""}
             label_str = ",".join([f'{k}="{v}"' for k, v in normalized_labels.items()])
             base_labels = f"{{{label_str}}}" if label_str else ""
@@ -195,7 +193,6 @@ class Histogram(Metric):
             _emit_series(series["labels"], series["bucket_counts"], series["count"], series["sum"])
 
         return "\n".join(lines)
-
 
 class Alert:
     """Alert representation"""
@@ -229,7 +226,7 @@ class Alert:
         self.timestamp = datetime.now(timezone.utc)
         self.active = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert alert to dictionary"""
         return {
             "name": self.name,
@@ -242,9 +239,7 @@ class Alert:
             "active": self.active,
         }
 
-
 from xai.core.blockchain_interface import BlockchainDataProvider
-
 
 class _LazyBlockchainProvider:
     """
@@ -255,7 +250,7 @@ class _LazyBlockchainProvider:
     def __init__(self, source: Any):
         self._source = source
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Return up-to-date blockchain stats."""
         if hasattr(self._source, "get_blockchain_data_provider"):
             try:
@@ -299,10 +294,10 @@ class MetricsCollector:
         self.update_interval = update_interval
 
         # Metrics registry
-        self.metrics: Dict[str, Metric] = {}
+        self.metrics: dict[str, Metric] = {}
 
         # Alert system
-        self.alerts: List[Alert] = []
+        self.alerts: list[Alert] = []
         self.alert_rules = []
         self.max_alerts = 100
         self._last_mempool_rejected_invalid = 0
@@ -583,8 +578,8 @@ class MetricsCollector:
     @classmethod
     def instance(
         cls,
-        blockchain_data_provider: Optional[Any] = None,
-        blockchain: Optional[Any] = None,
+        blockchain_data_provider: Any | None = None,
+        blockchain: Any | None = None,
         update_interval: int = 5,
     ) -> "MetricsCollector":
         """
@@ -601,14 +596,14 @@ class MetricsCollector:
         return cls._instance
 
     def register_counter(
-        self, name: str, description: str, labels: Dict[str, str] = None
+        self, name: str, description: str, labels: dict[str, str] = None
     ) -> Counter:
         """Register a counter metric"""
         counter = Counter(name, description, labels)
         self.metrics[name] = counter
         return counter
 
-    def register_gauge(self, name: str, description: str, labels: Dict[str, str] = None) -> Gauge:
+    def register_gauge(self, name: str, description: str, labels: dict[str, str] = None) -> Gauge:
         """Register a gauge metric"""
         gauge = Gauge(name, description, labels)
         self.metrics[name] = gauge
@@ -618,15 +613,15 @@ class MetricsCollector:
         self,
         name: str,
         description: str,
-        buckets: List[float] = None,
-        labels: Dict[str, str] = None,
+        buckets: list[float] = None,
+        labels: dict[str, str] = None,
     ) -> Histogram:
         """Register a histogram metric"""
         histogram = Histogram(name, description, buckets, labels)
         self.metrics[name] = histogram
         return histogram
 
-    def get_metric(self, name: str) -> Optional[Metric]:
+    def get_metric(self, name: str) -> Metric | None:
         """Get metric by name"""
         return self.metrics.get(name)
 
@@ -662,7 +657,7 @@ class MetricsCollector:
         if isinstance(metric, Counter):
             metric.inc()
 
-    def _process_mempool_alert_state(self, stats: Dict[str, Any]) -> None:
+    def _process_mempool_alert_state(self, stats: dict[str, Any]) -> None:
         """
         Derive alert conditions from mempool rejection/ban metrics.
         """
@@ -701,7 +696,7 @@ class MetricsCollector:
                 )
             self._last_active_bans_alert_value = active_bans
 
-    def _resolve_blockchain_provider(self, provider: Optional[Any]) -> tuple[Optional[Any], Optional[Any]]:
+    def _resolve_blockchain_provider(self, provider: Any | None) -> tuple[Any | None, Any | None]:
         """
         Normalize blockchain provider inputs and keep a reference to the original
         blockchain (when available) to satisfy callers expecting a .blockchain attribute.
@@ -888,7 +883,7 @@ class MetricsCollector:
             metric.inc()
 
     def record_withdrawal(
-        self, user_address: str, amount: float, timestamp: Optional[int] = None
+        self, user_address: str, amount: float, timestamp: int | None = None
     ) -> int:
         """Record an approved withdrawal and return the rolling per-minute rate."""
         counter = self.get_metric("xai_withdrawals_daily_total")
@@ -913,7 +908,7 @@ class MetricsCollector:
         if gauge:
             gauge.set(pending_backlog)
 
-    def record_withdrawal_processor_stats(self, stats: Dict[str, Any], queue_depth: int) -> None:
+    def record_withdrawal_processor_stats(self, stats: dict[str, Any], queue_depth: int) -> None:
         """Record counters and gauges emitted by the withdrawal processor."""
         if not stats:
             return
@@ -930,7 +925,7 @@ class MetricsCollector:
         if queue_gauge:
             queue_gauge.set(queue_depth)
 
-    def record_crypto_deposit_stats(self, stats: Dict[str, Any]) -> None:
+    def record_crypto_deposit_stats(self, stats: dict[str, Any]) -> None:
         """Ingest crypto deposit monitor statistics into metrics."""
         if not stats:
             return
@@ -954,7 +949,7 @@ class MetricsCollector:
             errors_counter.inc(errors)
 
     def record_security_event(
-        self, event_type: str, severity: str, payload: Optional[Dict[str, Any]] = None
+        self, event_type: str, severity: str, payload: dict[str, Any] | None = None
     ) -> None:
         """Record security events for alerting/metrics."""
         total = self.get_metric("xai_security_events_total")
@@ -1037,7 +1032,7 @@ class MetricsCollector:
                 extra={"event": "monitoring.withdrawal_log_failed"},
             )
 
-    def get_recent_withdrawals(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_recent_withdrawals(self, limit: int = 10) -> list[dict[str, Any]]:
         """Return the most recent withdrawal events for alert context."""
         return list(list(self.recent_withdrawal_events)[:limit])
 
@@ -1102,7 +1097,7 @@ class MetricsCollector:
             # Avoid alert-path failures breaking monitoring
             logger.debug(f"Failed to dispatch alert event: {e}")
 
-    def get_active_alerts(self) -> List[Dict[str, Any]]:
+    def get_active_alerts(self) -> list[dict[str, Any]]:
         """Get active alerts"""
         return [alert.to_dict() for alert in self.alerts if alert.active]
 
@@ -1126,7 +1121,7 @@ class MetricsCollector:
 
         return "\n".join(output)
 
-    def get_health_status(self) -> Dict[str, Any]:
+    def get_health_status(self) -> dict[str, Any]:
         """
         Get health check status
 
@@ -1178,7 +1173,7 @@ class MetricsCollector:
 
         return status
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get monitoring statistics"""
         stats = {
             "metrics_count": len(self.metrics),
@@ -1216,7 +1211,6 @@ class MetricsCollector:
         self.monitoring_active = False
         if self.monitor_thread.is_alive():
             self.monitor_thread.join(timeout=5)
-
 
 # Example usage and testing
 if __name__ == "__main__":

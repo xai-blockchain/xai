@@ -8,7 +8,7 @@ Extracted from node_api.py as part of god class refactoring.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from flask import Blueprint, jsonify, request
 
@@ -25,9 +25,8 @@ logger = logging.getLogger(__name__)
 
 mining_bp = Blueprint("mining", __name__)
 
-
 @mining_bp.route("/mine", methods=["POST"])
-def mine_block() -> Tuple[Dict[str, Any], int]:
+def mine_block() -> tuple[dict[str, Any], int]:
     """Mine pending transactions."""
     node = get_node()
     blockchain = get_blockchain()
@@ -126,9 +125,8 @@ def mine_block() -> Tuple[Dict[str, Any], int]:
         )
         return jsonify({"error": str(e)}), 500
 
-
 @mining_bp.route("/auto-mine/start", methods=["POST"])
-def start_auto_mining() -> Dict[str, str]:
+def start_auto_mining() -> dict[str, str]:
     """Start automatic mining."""
     node = get_node()
 
@@ -141,9 +139,8 @@ def start_auto_mining() -> Dict[str, str]:
     node.start_mining()
     return jsonify({"message": "Auto-mining started"})
 
-
 @mining_bp.route("/auto-mine/stop", methods=["POST"])
-def stop_auto_mining() -> Dict[str, str]:
+def stop_auto_mining() -> dict[str, str]:
     """Stop automatic mining."""
     node = get_node()
 
@@ -156,21 +153,19 @@ def stop_auto_mining() -> Dict[str, str]:
     node.stop_mining()
     return jsonify({"message": "Auto-mining stopped"})
 
-
 @mining_bp.route("/peers", methods=["GET"])
-def get_peers() -> Dict[str, Any]:
+def get_peers() -> dict[str, Any]:
     """Get connected peers."""
     node = get_node()
     verbose = request.args.get("verbose", "false")
     verbose_requested = str(verbose).lower() in {"1", "true", "yes", "on"}
-    payload: Dict[str, Any] = {"count": len(node.peers), "peers": list(node.peers), "verbose": verbose_requested}
+    payload: dict[str, Any] = {"count": len(node.peers), "peers": list(node.peers), "verbose": verbose_requested}
     if verbose_requested:
         payload.update(build_peer_snapshot())
     return jsonify(payload)
 
-
 @mining_bp.route("/peers/add", methods=["POST"])
-def add_peer() -> Tuple[Dict[str, str], int]:
+def add_peer() -> tuple[dict[str, str], int]:
     """Add peer node."""
     node = get_node()
 
@@ -186,9 +181,8 @@ def add_peer() -> Tuple[Dict[str, str], int]:
     node.add_peer(url)
     return success_response({"message": f"Peer {url} added"})
 
-
 @mining_bp.route("/sync", methods=["POST"])
-def sync_blockchain() -> Dict[str, Any]:
+def sync_blockchain() -> dict[str, Any]:
     """Synchronize blockchain with peers."""
     node = get_node()
     blockchain = get_blockchain()

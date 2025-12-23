@@ -12,18 +12,17 @@ Tracks mobile-specific performance metrics for optimization:
 
 from __future__ import annotations
 
-import time
-import json
 import hashlib
+import json
 import logging
-from typing import Dict, Any, List, Optional, Tuple
-from dataclasses import dataclass, asdict, field
-from datetime import datetime, timedelta
+import time
 from collections import defaultdict
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
 from threading import Lock
+from typing import Any
 
 logger = logging.getLogger(__name__)
-
 
 @dataclass
 class TelemetryEvent:
@@ -42,26 +41,26 @@ class TelemetryEvent:
     latency_ms: float = 0   # Network latency
 
     # Battery metrics
-    battery_level_start: Optional[float] = None  # 0-100
-    battery_level_end: Optional[float] = None
+    battery_level_start: float | None = None  # 0-100
+    battery_level_end: float | None = None
 
     # Resource metrics
-    memory_mb: Optional[float] = None
-    storage_mb: Optional[float] = None
+    memory_mb: float | None = None
+    storage_mb: float | None = None
 
     # Connectivity
-    connection_type: Optional[str] = None  # 'wifi', 'cellular', 'offline'
-    signal_strength: Optional[int] = None  # 0-5 bars
+    connection_type: str | None = None  # 'wifi', 'cellular', 'offline'
+    signal_strength: int | None = None  # 0-5 bars
 
     # Operation-specific metadata
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation"""
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> TelemetryEvent:
+    def from_dict(cls, data: dict[str, Any]) -> TelemetryEvent:
         """Create from dictionary"""
         # Handle metadata separately
         metadata = data.pop('metadata', {})
@@ -69,7 +68,7 @@ class TelemetryEvent:
         event.metadata = metadata
         return event
 
-    def battery_drain(self) -> Optional[float]:
+    def battery_drain(self) -> float | None:
         """Calculate battery drain percentage"""
         if self.battery_level_start is not None and self.battery_level_end is not None:
             return self.battery_level_start - self.battery_level_end
@@ -84,7 +83,6 @@ class TelemetryEvent:
         if self.duration_ms > 0:
             return (self.total_bytes() * 1000) / self.duration_ms
         return 0.0
-
 
 @dataclass
 class AggregatedStats:
@@ -111,20 +109,19 @@ class AggregatedStats:
     avg_storage_mb: float = 0
 
     # Connection breakdown
-    connection_types: Dict[str, int] = field(default_factory=dict)
+    connection_types: dict[str, int] = field(default_factory=dict)
 
     # Event type breakdown
-    event_types: Dict[str, int] = field(default_factory=dict)
+    event_types: dict[str, int] = field(default_factory=dict)
 
     # Performance percentiles
     latency_p50: float = 0
     latency_p95: float = 0
     latency_p99: float = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation"""
         return asdict(self)
-
 
 class MobileTelemetryCollector:
     """
@@ -138,7 +135,7 @@ class MobileTelemetryCollector:
     - Network quality impact on performance
     """
 
-    def __init__(self, storage_path: Optional[str] = None, max_events: int = 10000):
+    def __init__(self, storage_path: str | None = None, max_events: int = 10000):
         """
         Initialize telemetry collector.
 
@@ -150,15 +147,15 @@ class MobileTelemetryCollector:
         self.max_events = max_events
 
         # Event storage
-        self._events: List[TelemetryEvent] = []
+        self._events: list[TelemetryEvent] = []
         self._lock = Lock()
 
         # Aggregated statistics cache
-        self._cached_stats: Dict[str, AggregatedStats] = {}
+        self._cached_stats: dict[str, AggregatedStats] = {}
         self._cache_lock = Lock()
 
         # Event counters by type
-        self._event_counters: Dict[str, int] = defaultdict(int)
+        self._event_counters: dict[str, int] = defaultdict(int)
 
         logger.info(f"MobileTelemetryCollector initialized (max_events={max_events})")
 
@@ -201,8 +198,8 @@ class MobileTelemetryCollector:
         duration_ms: float,
         connection_type: str,
         blocks_synced: int = 0,
-        battery_start: Optional[float] = None,
-        battery_end: Optional[float] = None
+        battery_start: float | None = None,
+        battery_end: float | None = None
     ) -> None:
         """
         Record a sync operation event.
@@ -332,9 +329,9 @@ class MobileTelemetryCollector:
 
     def get_stats(
         self,
-        time_window_hours: Optional[int] = None,
-        event_type: Optional[str] = None,
-        connection_type: Optional[str] = None
+        time_window_hours: int | None = None,
+        event_type: str | None = None,
+        connection_type: str | None = None
     ) -> AggregatedStats:
         """
         Get aggregated statistics with optional filters.
@@ -384,7 +381,7 @@ class MobileTelemetryCollector:
 
         return stats
 
-    def _calculate_stats(self, events: List[TelemetryEvent]) -> AggregatedStats:
+    def _calculate_stats(self, events: list[TelemetryEvent]) -> AggregatedStats:
         """Calculate aggregated statistics from event list"""
 
         total_bytes_sent = sum(e.bytes_sent for e in events)
@@ -416,13 +413,13 @@ class MobileTelemetryCollector:
         avg_storage = sum(storage_values) / len(storage_values) if storage_values else 0
 
         # Connection type breakdown
-        connection_types: Dict[str, int] = defaultdict(int)
+        connection_types: dict[str, int] = defaultdict(int)
         for e in events:
             if e.connection_type:
                 connection_types[e.connection_type] += 1
 
         # Event type breakdown
-        event_types: Dict[str, int] = defaultdict(int)
+        event_types: dict[str, int] = defaultdict(int)
         for e in events:
             event_types[e.event_type] += 1
 
@@ -445,14 +442,14 @@ class MobileTelemetryCollector:
             latency_p99=latency_p99
         )
 
-    def get_bandwidth_by_operation(self) -> Dict[str, Dict[str, int]]:
+    def get_bandwidth_by_operation(self) -> dict[str, dict[str, int]]:
         """
         Get bandwidth usage breakdown by operation type.
 
         Returns:
             Dict mapping event_type to {bytes_sent, bytes_received, total}
         """
-        breakdown: Dict[str, Dict[str, int]] = defaultdict(
+        breakdown: dict[str, dict[str, int]] = defaultdict(
             lambda: {'bytes_sent': 0, 'bytes_received': 0, 'total': 0}
         )
 
@@ -464,14 +461,14 @@ class MobileTelemetryCollector:
 
         return dict(breakdown)
 
-    def get_battery_impact_by_operation(self) -> Dict[str, Dict[str, float]]:
+    def get_battery_impact_by_operation(self) -> dict[str, dict[str, float]]:
         """
         Get battery impact breakdown by operation type.
 
         Returns:
             Dict mapping event_type to {total_drain, avg_drain, event_count}
         """
-        breakdown: Dict[str, List[float]] = defaultdict(list)
+        breakdown: dict[str, list[float]] = defaultdict(list)
 
         with self._lock:
             for event in self._events:
@@ -493,7 +490,7 @@ class MobileTelemetryCollector:
         self,
         hours: int = 24,
         bucket_size_minutes: int = 60
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Get performance trends over time.
 
@@ -514,7 +511,7 @@ class MobileTelemetryCollector:
             return []
 
         # Group events into time buckets
-        buckets: Dict[int, List[TelemetryEvent]] = defaultdict(list)
+        buckets: dict[int, list[TelemetryEvent]] = defaultdict(list)
         for event in events:
             bucket_id = int(event.timestamp / bucket_size_seconds)
             buckets[bucket_id].append(event)
@@ -553,7 +550,7 @@ class MobileTelemetryCollector:
         logger.info(f"Cleared {count} telemetry events")
         return count
 
-    def export_events(self, max_events: Optional[int] = None) -> List[Dict[str, Any]]:
+    def export_events(self, max_events: int | None = None) -> list[dict[str, Any]]:
         """
         Export events as dictionaries.
 
@@ -567,7 +564,7 @@ class MobileTelemetryCollector:
             events = self._events[-max_events:] if max_events else self._events
             return [e.to_dict() for e in events]
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """
         Get comprehensive telemetry summary.
 

@@ -9,7 +9,6 @@ import pytest
 import random
 import threading
 import time
-from typing import List
 
 from xai.core.blockchain import Blockchain, Block
 from xai.core.node import BlockchainNode

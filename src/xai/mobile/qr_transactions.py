@@ -8,12 +8,12 @@ and mobile wallet integration.
 
 from __future__ import annotations
 
-import json
 import base64
 import binascii
+import json
 import logging
-from typing import Dict, Any, Optional
 from io import BytesIO
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -24,16 +24,15 @@ try:
 except ImportError:
     QRCODE_AVAILABLE = False
 
-
 class TransactionQRGenerator:
     """Generate QR codes for transactions and payment requests"""
 
     @staticmethod
     def generate_payment_request_qr(
         address: str,
-        amount: Optional[float] = None,
-        label: Optional[str] = None,
-        message: Optional[str] = None,
+        amount: float | None = None,
+        label: str | None = None,
+        message: str | None = None,
         return_format: str = "base64"
     ) -> str:
         """
@@ -69,7 +68,7 @@ class TransactionQRGenerator:
         return TransactionQRGenerator._generate_qr_code(uri, return_format)
 
     @staticmethod
-    def generate_transaction_qr(transaction_data: Dict[str, Any], return_format: str = "base64") -> str:
+    def generate_transaction_qr(transaction_data: dict[str, Any], return_format: str = "base64") -> str:
         """
         Generate QR code for a signed transaction
 
@@ -148,7 +147,7 @@ class TransactionQRGenerator:
             return qr_bytes
 
     @staticmethod
-    def parse_payment_uri(uri: str) -> Dict[str, Any]:
+    def parse_payment_uri(uri: str) -> dict[str, Any]:
         """
         Parse a payment URI from QR code
 
@@ -193,7 +192,7 @@ class TransactionQRGenerator:
         return result
 
     @staticmethod
-    def parse_transaction_qr(qr_data: str) -> Dict[str, Any]:
+    def parse_transaction_qr(qr_data: str) -> dict[str, Any]:
         """
         Parse transaction data from QR code
 
@@ -217,15 +216,14 @@ class TransactionQRGenerator:
             logger.debug("Base64 decode failed, trying direct JSON: %s", e)
             return json.loads(tx_data)
 
-
 class MobilePaymentEncoder:
     """Encode payment information for mobile wallets"""
 
     @staticmethod
     def create_payment_link(
         address: str,
-        amount: Optional[float] = None,
-        memo: Optional[str] = None
+        amount: float | None = None,
+        memo: str | None = None
     ) -> str:
         """
         Create a payment deep link for mobile apps
@@ -252,7 +250,7 @@ class MobilePaymentEncoder:
         return link
 
     @staticmethod
-    def create_transaction_share_data(tx_data: Dict[str, Any]) -> Dict[str, Any]:
+    def create_transaction_share_data(tx_data: dict[str, Any]) -> dict[str, Any]:
         """
         Create shareable transaction data for mobile
 
@@ -278,7 +276,6 @@ class MobilePaymentEncoder:
         }
 
         return share_data
-
 
 class QRCodeValidator:
     """Validate QR code data for security"""

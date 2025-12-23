@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Mining Bonus and Reward Tracking System for AXN Blockchain
 Manages early adopter bonuses, achievements, referrals, and social bonuses
@@ -11,13 +13,12 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable
 
 from xai.core.blockchain_security import BlockchainSecurityConfig
 from xai.core.config import Config
 
 logger = logging.getLogger(__name__)
-
 
 class BonusSupplyExceededError(RuntimeError):
     """Raised when awarding a bonus would exceed the configured supply cap."""
@@ -30,35 +31,34 @@ class BonusSupplyExceededError(RuntimeError):
         self.remaining = remaining
         self.cap = cap
 
-
-DEFAULT_EARLY_ADOPTER_TIERS: Dict[int, float] = {
+DEFAULT_EARLY_ADOPTER_TIERS: dict[int, float] = {
     100: 100,  # First 100 miners: 100 AXN
     1000: 50,  # First 1,000 miners: 50 AXN
     10000: 10,  # First 10,000 miners: 10 AXN
 }
 
-DEFAULT_ACHIEVEMENT_BONUSES: Dict[str, float] = {
+DEFAULT_ACHIEVEMENT_BONUSES: dict[str, float] = {
     "first_block": 5,
     "10_blocks": 25,
     "100_blocks": 250,
     "7day_streak": 100,
 }
 
-DEFAULT_REFERRAL_BONUSES: Dict[str, float] = {
+DEFAULT_REFERRAL_BONUSES: dict[str, float] = {
     "refer_friend": 10,  # Per referral
     "friend_10_blocks": 25,  # When referred friend mines 10 blocks
 }
 
-DEFAULT_SOCIAL_BONUSES: Dict[str, float] = {
+DEFAULT_SOCIAL_BONUSES: dict[str, float] = {
     "tweet_verification": 5,
     "discord_join": 2,
 }
 
-DEFAULT_PROGRESS_REWARDS: Dict[str, float] = {
+DEFAULT_PROGRESS_REWARDS: dict[str, float] = {
     "registration": 150.0,
 }
 
-XP_CONTEXT_MULTIPLIERS: Dict[str, float] = {
+XP_CONTEXT_MULTIPLIERS: dict[str, float] = {
     "early_adopter": 1.15,
     "achievement": 3.5,
     "referral": 2.5,
@@ -67,7 +67,6 @@ XP_CONTEXT_MULTIPLIERS: Dict[str, float] = {
     "default": 1.0,
 }
 
-
 @dataclass(frozen=True)
 class AchievementDefinition:
     """Structured definition for a gamified achievement milestone."""
@@ -75,13 +74,13 @@ class AchievementDefinition:
     id: str
     description: str
     category: str
-    condition: Dict[str, Any]
+    condition: dict[str, Any]
     bonus: float = 0.0
     xp: float = 0.0
-    tags: Tuple[str, ...] = field(default_factory=tuple)
-    reward_badge: Optional[str] = None
+    tags: tuple[str, ...] = field(default_factory=tuple)
+    reward_badge: str | None = None
 
-    def serialize(self) -> Dict[str, Any]:
+    def serialize(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "description": self.description,
@@ -93,7 +92,7 @@ class AchievementDefinition:
             "reward_badge": self.reward_badge,
         }
 
-PROGRESSION_ENGINE_DEFAULTS: Dict[str, float] = {
+PROGRESSION_ENGINE_DEFAULTS: dict[str, float] = {
     "base_xp_per_level": 150.0,
     "level_growth_rate": 1.18,
     "max_xp_per_level": 4000.0,
@@ -106,7 +105,7 @@ REFERRAL_DAILY_LIMIT = 25
 RECENT_REFERRAL_WINDOW_SECONDS = 120
 RECENT_REFERRAL_BURST_LIMIT = 3
 
-DAILY_CHALLENGE_CATALOG: List[Dict[str, Any]] = [
+DAILY_CHALLENGE_CATALOG: list[dict[str, Any]] = [
     {
         "id": "daily_blocks_5",
         "description": "Mine 5 blocks today",
@@ -141,7 +140,7 @@ DAILY_CHALLENGE_CATALOG: List[Dict[str, Any]] = [
     },
 ]
 
-TROPHY_DEFINITIONS: List[Dict[str, Any]] = [
+TROPHY_DEFINITIONS: list[dict[str, Any]] = [
     {
         "id": "triple_crown",
         "description": "Hold gold_pickaxe, eternal_flame, and alliance_seal badges",
@@ -159,15 +158,14 @@ TROPHY_DEFINITIONS: List[Dict[str, Any]] = [
     },
 ]
 
-
 class MiningBonusManager:
     """Manages all mining bonuses, rewards, and referral system"""
 
     def __init__(
         self,
         data_dir: str = "mining_data",
-        max_bonus_supply: Optional[float] = None,
-        time_provider: Optional[Callable[[], datetime]] = None,
+        max_bonus_supply: float | None = None,
+        time_provider: Callable[[], datetime] | None = None,
     ):
         """Initialize the mining bonus manager
 
@@ -254,7 +252,7 @@ class MiningBonusManager:
         self.referral_guardian.setdefault("referrers", {})
         self._refresh_daily_challenges_if_needed()
 
-    def _load_bonus_configuration(self) -> Dict[str, Any]:
+    def _load_bonus_configuration(self) -> dict[str, Any]:
         """Load optional bonus configuration overrides from disk."""
         if not os.path.exists(self.config_file):
             return {}
@@ -272,13 +270,13 @@ class MiningBonusManager:
             )
             return {}
 
-    def _configure_early_adopter_tiers(self, overrides: Optional[Dict[str, Any]]) -> Dict[int, float]:
+    def _configure_early_adopter_tiers(self, overrides: dict[str, Any] | None) -> dict[int, float]:
         """Build sanitized early adopter tier configuration."""
-        tiers: Dict[int, float] = dict(DEFAULT_EARLY_ADOPTER_TIERS)
+        tiers: dict[int, float] = dict(DEFAULT_EARLY_ADOPTER_TIERS)
         if not overrides:
             return tiers
 
-        parsed: Dict[int, float] = {}
+        parsed: dict[int, float] = {}
         for raw_key, raw_value in overrides.items():
             try:
                 tier_cap = int(raw_key)
@@ -292,7 +290,7 @@ class MiningBonusManager:
 
         # Merge overrides and ensure ordering
         tiers.update(parsed)
-        ordered: Dict[int, float] = {}
+        ordered: dict[int, float] = {}
         previous_cap = 0
         for tier_cap in sorted(tiers):
             if tier_cap <= previous_cap:
@@ -303,10 +301,10 @@ class MiningBonusManager:
 
     def _configure_bonus_map(
         self,
-        overrides: Optional[Dict[str, Any]],
-        defaults: Dict[str, float],
+        overrides: dict[str, Any] | None,
+        defaults: dict[str, float],
         category: str,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Return sanitized bonus definitions for non-tier categories."""
         values = dict(defaults)
         if not overrides:
@@ -316,7 +314,7 @@ class MiningBonusManager:
             values[str(key)] = bonus_amount
         return values
 
-    def _configure_progression_rewards(self, overrides: Optional[Dict[str, Any]]) -> Dict[str, float]:
+    def _configure_progression_rewards(self, overrides: dict[str, Any] | None) -> dict[str, float]:
         """Sanitize optional XP rewards for non-bonus events (e.g., registration)."""
         rewards = dict(DEFAULT_PROGRESS_REWARDS)
         if not overrides:
@@ -331,7 +329,7 @@ class MiningBonusManager:
             rewards[str(key)] = value
         return rewards
 
-    def _configure_progression_settings(self, overrides: Optional[Dict[str, Any]]) -> None:
+    def _configure_progression_settings(self, overrides: dict[str, Any] | None) -> None:
         """Apply optional progression engine overrides."""
         if not overrides or not isinstance(overrides, dict):
             return
@@ -353,9 +351,9 @@ class MiningBonusManager:
                     raise ValueError(f"Invalid progression config {key}: {raw_value}") from exc
                 self.progression_config[key] = max(10, int_value)
 
-    def _load_achievement_definitions(self) -> Dict[str, AchievementDefinition]:
+    def _load_achievement_definitions(self) -> dict[str, AchievementDefinition]:
         """Load structured achievement rules from disk or fall back to defaults."""
-        payload: List[Dict[str, Any]] = []
+        payload: list[dict[str, Any]] = []
         if os.path.exists(self.achievement_rules_file):
             data = self._load_json(self.achievement_rules_file)
             if isinstance(data, dict):
@@ -363,7 +361,7 @@ class MiningBonusManager:
         if not payload:
             payload = self._default_achievement_payloads()
 
-        definitions: Dict[str, AchievementDefinition] = {}
+        definitions: dict[str, AchievementDefinition] = {}
         for entry in payload:
             try:
                 definition = AchievementDefinition(
@@ -381,7 +379,7 @@ class MiningBonusManager:
             definitions[definition.id] = definition
         return definitions
 
-    def _default_achievement_payloads(self) -> List[Dict[str, Any]]:
+    def _default_achievement_payloads(self) -> list[dict[str, Any]]:
         """Return built-in achievements when no overrides are provided."""
         return [
             {
@@ -530,7 +528,7 @@ class MiningBonusManager:
         """Persist the referral guardian/anti-sybil state."""
         self._save_json(self.referral_guardian_file, self.referral_guardian)
 
-    def _get_badge_record(self, address: str) -> Dict[str, Any]:
+    def _get_badge_record(self, address: str) -> dict[str, Any]:
         """Return mutable badge/trophy record for an address."""
         record = self.badges.get(address)
         if record is None:
@@ -558,12 +556,12 @@ class MiningBonusManager:
         }
         self._save_daily_challenges()
 
-    def _generate_daily_challenges(self, date_key: str) -> List[Dict[str, Any]]:
+    def _generate_daily_challenges(self, date_key: str) -> list[dict[str, Any]]:
         """Generate deterministic daily challenges based on the date."""
         if not DAILY_CHALLENGE_CATALOG:
             return []
 
-        selected: List[Dict[str, Any]] = []
+        selected: list[dict[str, Any]] = []
         used_indices: set = set()
         target_count = min(3, len(DAILY_CHALLENGE_CATALOG))
 
@@ -578,7 +576,7 @@ class MiningBonusManager:
                 break
         return selected
 
-    def _get_daily_completion_book(self, address: str) -> Dict[str, Any]:
+    def _get_daily_completion_book(self, address: str) -> dict[str, Any]:
         """Return completion tracking dictionary for address."""
         self.daily_challenges_state.setdefault("completions", {})
         state = self.daily_challenges_state["completions"]
@@ -593,7 +591,7 @@ class MiningBonusManager:
         address: str,
         badge_name: str,
         source: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """Assign a badge to an address if not already granted."""
         record = self._get_badge_record(address)
@@ -673,9 +671,9 @@ class MiningBonusManager:
 
     def _is_challenge_completed(
         self,
-        challenge: Dict[str, Any],
-        metrics: Dict[str, Any],
-        daily_activity: Dict[str, Any],
+        challenge: dict[str, Any],
+        metrics: dict[str, Any],
+        daily_activity: dict[str, Any],
     ) -> bool:
         """Evaluate whether a challenge condition is met."""
         condition = challenge.get("condition", {})
@@ -693,7 +691,7 @@ class MiningBonusManager:
         self,
         address: str,
         challenge_id: str,
-        daily_book: Dict[str, Any],
+        daily_book: dict[str, Any],
     ) -> bool:
         """Record completion for a challenge; return True if newly completed."""
         today = self._current_date_str()
@@ -716,7 +714,7 @@ class MiningBonusManager:
             entry["dates"] = entry["dates"][-30:]
         self._save_badges()
 
-    def _extract_identity_hash(self, metadata: Optional[Dict[str, Any]]) -> Optional[str]:
+    def _extract_identity_hash(self, metadata: dict[str, Any] | None) -> str | None:
         """Return sanitized identity hash metadata used for anti-sybil checks."""
         if not metadata:
             return None
@@ -732,8 +730,8 @@ class MiningBonusManager:
         self,
         referrer_address: str,
         new_address: str,
-        metadata: Optional[Dict[str, Any]],
-    ) -> Optional[Dict[str, Any]]:
+        metadata: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
         """Validate referral to mitigate Sybil attacks."""
         if referrer_address == new_address:
             return {
@@ -784,7 +782,7 @@ class MiningBonusManager:
     def _record_referral_activity(
         self,
         referrer_address: str,
-        metadata: Optional[Dict[str, Any]],
+        metadata: dict[str, Any] | None,
         new_address: str,
     ) -> None:
         """Persist anti-sybil tracking metadata after a referral."""
@@ -807,9 +805,9 @@ class MiningBonusManager:
     def _evaluate_daily_challenges(
         self,
         address: str,
-        metrics: Dict[str, Any],
-        daily_activity: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        metrics: dict[str, Any],
+        daily_activity: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Evaluate active daily challenges for the user."""
         self._refresh_daily_challenges_if_needed()
         state = self.daily_challenges_state
@@ -817,7 +815,7 @@ class MiningBonusManager:
         book = self._get_daily_completion_book(address)
         daily_activity = daily_activity or {}
 
-        completions: List[Dict[str, Any]] = []
+        completions: list[dict[str, Any]] = []
         for challenge in challenges:
             challenge_id = challenge.get("id")
             if not challenge_id:
@@ -873,7 +871,7 @@ class MiningBonusManager:
             "active_challenges": challenges,
         }
 
-    def _get_progression_record(self, address: str) -> Dict[str, Any]:
+    def _get_progression_record(self, address: str) -> dict[str, Any]:
         """Ensure a progression record exists for the given address."""
         record = self.progression.get(address)
         if record is None:
@@ -888,7 +886,7 @@ class MiningBonusManager:
             self.progression[address] = record
         return record
 
-    def _calculate_level_state(self, total_xp: float) -> Dict[str, float]:
+    def _calculate_level_state(self, total_xp: float) -> dict[str, float]:
         """Derive level, xp progress, and next threshold based on total XP."""
         base = self.progression_config["base_xp_per_level"]
         growth = self.progression_config["level_growth_rate"]
@@ -923,9 +921,9 @@ class MiningBonusManager:
         address: str,
         xp_amount: float,
         reason: str,
-        context: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        context: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Award XP to an address and track level progression."""
         xp = max(0.0, float(xp_amount))
         if xp == 0:
@@ -970,7 +968,7 @@ class MiningBonusManager:
         metadata = {"bonus_amount": float(amount), "bonus_type": bonus_type, "context": context}
         self._award_xp(address, xp_amount, reason=context.split(":", 1)[0] if context else "bonus", context=context, metadata=metadata)
 
-    def get_progression_summary(self, address: str) -> Dict[str, Any]:
+    def get_progression_summary(self, address: str) -> dict[str, Any]:
         """Return XP/level summary for a miner."""
         record = self._get_progression_record(address)
         state = self._calculate_level_state(record.get("total_xp", 0.0))
@@ -989,7 +987,7 @@ class MiningBonusManager:
             "recent_events": recent_events,
         }
 
-    def get_badges_summary(self, address: str) -> Dict[str, Any]:
+    def get_badges_summary(self, address: str) -> dict[str, Any]:
         """Return badges and trophies for an address."""
         record = self._get_badge_record(address)
         return {
@@ -998,7 +996,7 @@ class MiningBonusManager:
             "daily_challenge_counts": dict(record.get("daily_challenge_counts", {})),
         }
 
-    def _build_progression_stats(self) -> Dict[str, Any]:
+    def _build_progression_stats(self) -> dict[str, Any]:
         """Aggregate progression metrics for stats endpoint."""
         if not self.progression:
             return {
@@ -1029,8 +1027,8 @@ class MiningBonusManager:
         address: str,
         blocks_mined: int,
         streak_days: int,
-        overrides: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        overrides: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Collect metrics required to evaluate available achievements."""
         record = self.progression.get(address) or {}
         referral_data = self.referrals.get(address, {})
@@ -1051,7 +1049,7 @@ class MiningBonusManager:
         return metrics
 
     def _achievement_condition_met(
-        self, definition: AchievementDefinition, metrics: Dict[str, Any]
+        self, definition: AchievementDefinition, metrics: dict[str, Any]
     ) -> bool:
         """Check if a metric snapshot satisfies an achievement definition."""
         condition = definition.condition or {}
@@ -1090,11 +1088,11 @@ class MiningBonusManager:
             return False
         return False
 
-    def get_achievement_catalog(self) -> List[Dict[str, Any]]:
+    def get_achievement_catalog(self) -> list[dict[str, Any]]:
         """Expose the configured achievement catalog."""
         return [definition.serialize() for definition in self.achievement_definitions.values()]
 
-    def get_daily_challenges_status(self, address: str) -> Dict[str, Any]:
+    def get_daily_challenges_status(self, address: str) -> dict[str, Any]:
         """Return the user's view of current daily challenges."""
         self._refresh_daily_challenges_if_needed()
         state = self.daily_challenges_state
@@ -1102,7 +1100,7 @@ class MiningBonusManager:
         today = self._current_date_str()
         today_status = book.get(today, {})
 
-        challenges_view: List[Dict[str, Any]] = []
+        challenges_view: list[dict[str, Any]] = []
         for challenge in state.get("challenges", []):
             challenge_id = challenge.get("id")
             entry = dict(challenge)
@@ -1189,7 +1187,7 @@ class MiningBonusManager:
         address: str,
         blocks_mined: int,
         streak_days: int,
-        extra_metrics: Optional[Dict[str, Any]] = None,
+        extra_metrics: dict[str, Any] | None = None,
     ) -> Dict:
         """Evaluate and award achievements for the given miner."""
         if address not in self.miners:
@@ -1206,7 +1204,7 @@ class MiningBonusManager:
             "referrals_today": guardian_entry.get("daily_counts", {}).get(self._current_date_str(), 0),
         }
         earned_types = {achievement.get("type") for achievement in record["earned"]}
-        newly_earned: List[Dict[str, Any]] = []
+        newly_earned: list[dict[str, Any]] = []
         total_new_bonus = 0.0
         total_new_xp = 0.0
 
@@ -1414,7 +1412,7 @@ class MiningBonusManager:
             "bonus_when_friend_mines_10": self.referral_bonuses["friend_10_blocks"],
         }
 
-    def use_referral_code(self, new_address: str, referral_code: str, metadata: Optional[Dict[str, Any]] = None) -> Dict:
+    def use_referral_code(self, new_address: str, referral_code: str, metadata: dict[str, Any] | None = None) -> Dict:
         """Use a referral code when registering
 
         Args:
@@ -1664,7 +1662,7 @@ class MiningBonusManager:
             )
             self._bonus_alert_emitted = True
 
-    def get_leaderboard(self, limit: int = 10) -> List[Dict]:
+    def get_leaderboard(self, limit: int = 10) -> list[Dict]:
         """Get bonus leaderboard
 
         Args:
@@ -1690,10 +1688,10 @@ class MiningBonusManager:
 
         return leaderboard_data[:limit]
 
-    def get_unified_leaderboard(self, metric: str = "composite", limit: int = 10) -> List[Dict[str, Any]]:
+    def get_unified_leaderboard(self, metric: str = "composite", limit: int = 10) -> list[dict[str, Any]]:
         """Return a leaderboard that blends XP, bonuses, and referrals."""
         metric = (metric or "composite").lower()
-        leaderboard: List[Dict[str, Any]] = []
+        leaderboard: list[dict[str, Any]] = []
 
         for address, miner in self.miners.items():
             progression = self.progression.get(address, {})
@@ -1805,7 +1803,7 @@ class MiningBonusManager:
         amount: float,
         description: str,
         context: str,
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         try:
             self._award_bonus(address, bonus_type, amount, description)
             self._record_progression_event(address, context, amount, bonus_type)
@@ -1852,7 +1850,6 @@ class MiningBonusManager:
                 self.miners[address]["max_streak"] = streak_days
 
             self._save_json(self.miners_file, self.miners)
-
 
 if __name__ == "__main__":
     # Example usage

@@ -6,17 +6,16 @@ including device tokens, platform information, and notification preferences.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Dict, List, Optional, Set
-from datetime import datetime
-import sqlite3
+
 import json
 import logging
+import sqlite3
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
-
 
 class DevicePlatform(Enum):
     """Mobile platform types."""
@@ -24,7 +23,6 @@ class DevicePlatform(Enum):
     IOS = "ios"
     ANDROID = "android"
     WEB = "web"
-
 
 @dataclass
 class DeviceInfo:
@@ -45,15 +43,15 @@ class DeviceInfo:
     device_token: str
     platform: DevicePlatform
     user_address: str
-    device_id: Optional[str] = None
+    device_id: str | None = None
     last_active: datetime = field(default_factory=datetime.utcnow)
     enabled: bool = True
-    notification_types: Set[str] = field(default_factory=lambda: {
+    notification_types: set[str] = field(default_factory=lambda: {
         "transaction", "confirmation", "security", "governance"
     })
-    metadata: Dict[str, str] = field(default_factory=dict)
+    metadata: dict[str, str] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, any]:
+    def to_dict(self) -> dict[str, any]:
         """Convert to dictionary for storage."""
         return {
             "device_token": self.device_token,
@@ -67,7 +65,7 @@ class DeviceInfo:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, any]) -> DeviceInfo:
+    def from_dict(cls, data: dict[str, any]) -> DeviceInfo:
         """Create DeviceInfo from dictionary."""
         return cls(
             device_token=data["device_token"],
@@ -80,7 +78,6 @@ class DeviceInfo:
             metadata=data.get("metadata", {}),
         )
 
-
 class DeviceRegistry:
     """
     Device registration and management system.
@@ -91,7 +88,7 @@ class DeviceRegistry:
     Thread-safe for concurrent access from multiple API requests.
     """
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, db_path: Path | None = None):
         """
         Initialize device registry.
 
@@ -137,9 +134,9 @@ class DeviceRegistry:
         user_address: str,
         device_token: str,
         platform: str,
-        device_id: Optional[str] = None,
-        notification_types: Optional[Set[str]] = None,
-        metadata: Optional[Dict[str, str]] = None,
+        device_id: str | None = None,
+        notification_types: set[str] | None = None,
+        metadata: dict[str, str] | None = None,
     ) -> DeviceInfo:
         """
         Register a device for push notifications.
@@ -233,7 +230,7 @@ class DeviceRegistry:
 
         return deleted
 
-    def get_device(self, device_token: str) -> Optional[DeviceInfo]:
+    def get_device(self, device_token: str) -> DeviceInfo | None:
         """
         Get device information by token.
 
@@ -256,7 +253,7 @@ class DeviceRegistry:
 
         return self._row_to_device_info(row)
 
-    def get_devices_for_address(self, address: str) -> List[DeviceInfo]:
+    def get_devices_for_address(self, address: str) -> list[DeviceInfo]:
         """
         Get all devices registered to an address.
 
@@ -298,8 +295,8 @@ class DeviceRegistry:
     def update_notification_settings(
         self,
         device_token: str,
-        enabled: Optional[bool] = None,
-        notification_types: Optional[Set[str]] = None,
+        enabled: bool | None = None,
+        notification_types: set[str] | None = None,
     ) -> bool:
         """
         Update notification settings for a device.
@@ -336,7 +333,7 @@ class DeviceRegistry:
             conn.commit()
             return cursor.rowcount > 0
 
-    def get_devices_by_platform(self, platform: str) -> List[DeviceInfo]:
+    def get_devices_by_platform(self, platform: str) -> list[DeviceInfo]:
         """
         Get all enabled devices for a specific platform.
 
@@ -400,7 +397,7 @@ class DeviceRegistry:
             metadata=json.loads(row["metadata"]),
         )
 
-    def get_stats(self) -> Dict[str, any]:
+    def get_stats(self) -> dict[str, any]:
         """
         Get registry statistics.
 

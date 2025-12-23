@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import hashlib
 import logging
 import secrets
-from typing import List, Dict, Any, Tuple, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +13,6 @@ logger = logging.getLogger(__name__)
 # Its purpose is to illustrate the concept of distributed key generation and threshold signing.
 # DO NOT use this for any production or security-sensitive applications.
 
-
 class ThresholdSignatureScheme:
     def __init__(self, n_participants: int, t_threshold: int):
         if not (1 <= t_threshold <= n_participants):
@@ -19,9 +20,9 @@ class ThresholdSignatureScheme:
 
         self.n_participants = n_participants
         self.t_threshold = t_threshold
-        self.private_key_shares: Dict[int, int] = {}  # {participant_id: share_value}
+        self.private_key_shares: dict[int, int] = {}  # {participant_id: share_value}
         self.public_key: int = 0  # Conceptual public key
-        self.message_signatures: Dict[str, Dict[int, int]] = (
+        self.message_signatures: dict[str, dict[int, int]] = (
             {}
         )  # {message_hash: {participant_id: signature_share}}
 
@@ -71,7 +72,7 @@ class ThresholdSignatureScheme:
             },
         )
 
-    def sign_share(self, participant_id: int, message: str) -> Optional[int]:
+    def sign_share(self, participant_id: int, message: str) -> int | None:
         """
         Simulates a participant signing a message with their private key share.
         In a real TSS, this involves complex cryptographic operations.
@@ -89,7 +90,7 @@ class ThresholdSignatureScheme:
         self.message_signatures.setdefault(message, {})[participant_id] = signature_share
         return signature_share
 
-    def combine_shares(self, message: str, signed_shares: Dict[int, int]) -> Optional[int]:
+    def combine_shares(self, message: str, signed_shares: dict[int, int]) -> int | None:
         """
         Simulates combining 't' valid signature shares to reconstruct the full signature.
         In a real TSS, this involves Lagrange interpolation or similar techniques.
@@ -132,7 +133,6 @@ class ThresholdSignatureScheme:
             },
         )
         return combined_signature
-
 
 if __name__ == "__main__":
     raise SystemExit("ThresholdSignatureScheme demo removed; use unit tests instead.")

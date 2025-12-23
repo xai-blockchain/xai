@@ -8,16 +8,17 @@ This module provides REST API endpoints for managing push notifications:
 """
 
 from __future__ import annotations
-import logging
-from typing import TYPE_CHECKING, Dict, Any, Tuple
-from flask import jsonify, request
+
 import asyncio
+import logging
+from typing import TYPE_CHECKING, Any
+
+from flask import jsonify, request
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
 
 logger = logging.getLogger(__name__)
-
 
 def register_notification_routes(routes: "NodeAPIRoutes") -> None:
     """
@@ -36,6 +37,7 @@ def register_notification_routes(routes: "NodeAPIRoutes") -> None:
     if not notification_service or not device_registry:
         # Initialize notification components lazily
         from pathlib import Path
+
         from xai.notifications.device_registry import DeviceRegistry
         from xai.notifications.push_service import PushNotificationService
 
@@ -55,7 +57,7 @@ def register_notification_routes(routes: "NodeAPIRoutes") -> None:
         logger.info("Initialized push notification service")
 
     @app.route("/notifications/register", methods=["POST"])
-    def register_device() -> Tuple[Dict[str, Any], int]:
+    def register_device() -> tuple[dict[str, Any], int]:
         """
         Register a device for push notifications.
 
@@ -164,7 +166,7 @@ def register_notification_routes(routes: "NodeAPIRoutes") -> None:
             )
 
     @app.route("/notifications/unregister", methods=["DELETE"])
-    def unregister_device() -> Tuple[Dict[str, Any], int]:
+    def unregister_device() -> tuple[dict[str, Any], int]:
         """
         Unregister a device from push notifications.
 
@@ -226,7 +228,7 @@ def register_notification_routes(routes: "NodeAPIRoutes") -> None:
             )
 
     @app.route("/notifications/settings/<device_token>", methods=["GET"])
-    def get_notification_settings(device_token: str) -> Tuple[Dict[str, Any], int]:
+    def get_notification_settings(device_token: str) -> tuple[dict[str, Any], int]:
         """
         Get notification settings for a device.
 
@@ -260,7 +262,7 @@ def register_notification_routes(routes: "NodeAPIRoutes") -> None:
         }), 200
 
     @app.route("/notifications/settings/<device_token>", methods=["PUT"])
-    def update_notification_settings(device_token: str) -> Tuple[Dict[str, Any], int]:
+    def update_notification_settings(device_token: str) -> tuple[dict[str, Any], int]:
         """
         Update notification settings for a device.
 
@@ -337,7 +339,7 @@ def register_notification_routes(routes: "NodeAPIRoutes") -> None:
             )
 
     @app.route("/notifications/test", methods=["POST"])
-    def send_test_notification() -> Tuple[Dict[str, Any], int]:
+    def send_test_notification() -> tuple[dict[str, Any], int]:
         """
         Send a test notification to verify device registration.
 
@@ -414,7 +416,7 @@ def register_notification_routes(routes: "NodeAPIRoutes") -> None:
             )
 
     @app.route("/notifications/devices/<address>", methods=["GET"])
-    def get_devices_for_address(address: str) -> Tuple[Dict[str, Any], int]:
+    def get_devices_for_address(address: str) -> tuple[dict[str, Any], int]:
         """
         Get all devices registered to an address.
 
@@ -457,7 +459,7 @@ def register_notification_routes(routes: "NodeAPIRoutes") -> None:
         }), 200
 
     @app.route("/notifications/stats", methods=["GET"])
-    def get_notification_stats() -> Dict[str, Any]:
+    def get_notification_stats() -> dict[str, Any]:
         """
         Get push notification system statistics.
 

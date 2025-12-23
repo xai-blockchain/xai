@@ -4,18 +4,18 @@ Extracted from Blockchain god class for better separation of concerns
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional, List, Dict, Any, Tuple
+
 import json
 import os
 import time
+from typing import TYPE_CHECKING, Any
 
 from xai.core.block_header import BlockHeader
-from xai.core.transaction import Transaction
 from xai.core.structured_logger import get_structured_logger
+from xai.core.transaction import Transaction
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Block, Blockchain
-
 
 class StateManager:
     """
@@ -312,7 +312,7 @@ class StateManager:
             # Don't fail operations due to snapshot errors
             self.logger.debug(f"Failed to record state snapshot: {e}", extra={"error_type": type(e).__name__})
 
-    def compute_state_snapshot(self) -> Dict[str, Any]:
+    def compute_state_snapshot(self) -> dict[str, Any]:
         """
         Compute comprehensive state snapshot.
 
@@ -343,7 +343,7 @@ class StateManager:
         )
         return total_bytes / 1024.0
 
-    def get_mempool_overview(self, limit: int = 100) -> Dict[str, Any]:
+    def get_mempool_overview(self, limit: int = 100) -> dict[str, Any]:
         """
         Get detailed mempool overview.
 
@@ -375,7 +375,7 @@ class StateManager:
                 "orphan_count": len(self.blockchain.orphan_transactions),
             }
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """
         Get comprehensive blockchain statistics.
 

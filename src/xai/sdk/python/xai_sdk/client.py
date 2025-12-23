@@ -1,20 +1,20 @@
+from __future__ import annotations
+
 """
 XAI SDK Main Client
 
 Provides unified interface to all blockchain operations.
 """
 
-from typing import Optional
-from .http_client import HTTPClient
 from .clients import (
-    WalletClient,
-    TransactionClient,
     BlockchainClient,
-    MiningClient,
     GovernanceClient,
+    MiningClient,
     TradingClient,
+    TransactionClient,
+    WalletClient,
 )
-
+from .http_client import HTTPClient
 
 class XAIClient:
     """
@@ -33,7 +33,7 @@ class XAIClient:
     def __init__(
         self,
         base_url: str = "http://localhost:12001",
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         timeout: int = 30,
         max_retries: int = 3,
     ) -> None:

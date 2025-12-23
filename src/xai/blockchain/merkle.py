@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 import hashlib
 import json
-from typing import List, Tuple, Any, Dict
+from typing import Any
 
-
-def canonical_json(data: Dict[str, Any]) -> str:
+def canonical_json(data: dict[str, Any]) -> str:
     """Produce deterministic JSON string for consensus-critical hashing.
 
     Uses canonical serialization to ensure identical hashes across all nodes:
@@ -24,9 +25,8 @@ def canonical_json(data: Dict[str, Any]) -> str:
         ensure_ascii=True
     )
 
-
 class MerkleTree:
-    def __init__(self, data_leaves: List[Any]):
+    def __init__(self, data_leaves: list[Any]):
         if not data_leaves:
             raise ValueError("Merkle tree requires at least one data leaf.")
         self.original_leaves = list(data_leaves)
@@ -70,7 +70,7 @@ class MerkleTree:
     def get_root(self):
         return self.root
 
-    def generate_merkle_proof(self, leaf_data) -> List[Tuple[str, str]]:
+    def generate_merkle_proof(self, leaf_data) -> list[tuple[str, str]]:
         leaf_hash = self._hash_leaf(leaf_data)
         if leaf_hash not in self.data_leaves:
             raise ValueError("Leaf data not found in the Merkle tree.")

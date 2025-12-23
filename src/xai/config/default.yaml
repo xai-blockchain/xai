@@ -37,6 +37,10 @@ security:
   max_transaction_size: 102400  # 100KB
   max_mempool_size: 10000  # maximum pending transactions
 
+  # JWT Blacklist Cleanup Configuration
+  jwt_blacklist_cleanup_enabled: true  # Enable automatic cleanup of expired blacklist entries
+  jwt_blacklist_cleanup_interval: 900  # Cleanup interval in seconds (default: 15 minutes)
+
 # Storage Configuration
 storage:
   data_dir: "data"

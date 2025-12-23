@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Governance API Handler
 
@@ -8,16 +10,17 @@ Handles all governance-related API endpoints including:
 - Fiat unlock governance
 """
 
-import time
 import hashlib
 import logging
-from typing import Dict, Any, Tuple
+import time
+from typing import Any
+
 from flask import Flask, jsonify, request
+
 from xai.core.security_validation import ValidationError
 
 logger = logging.getLogger(__name__)
 ATTACHMENT_SAFE = True
-
 
 class GovernanceAPIHandler:
     """Handles all governance-related API endpoints."""
@@ -40,36 +43,36 @@ class GovernanceAPIHandler:
         """Register all governance routes."""
 
         @self.app.route("/governance/proposals/submit", methods=["POST"])
-        def submit_proposal() -> Tuple[Dict[str, Any], int]:
+        def submit_proposal() -> tuple[dict[str, Any], int]:
             """Submit AI development proposal."""
             return self.submit_proposal_handler()
 
         @self.app.route("/governance/proposals", methods=["GET"])
-        def get_proposals() -> Tuple[Dict[str, Any], int]:
+        def get_proposals() -> tuple[dict[str, Any], int]:
             """Get proposals by status."""
             return self.get_proposals_handler()
 
         @self.app.route("/governance/vote", methods=["POST"])
-        def submit_vote() -> Tuple[Dict[str, Any], int]:
+        def submit_vote() -> tuple[dict[str, Any], int]:
             """Vote on proposal."""
             return self.submit_vote_handler()
 
         @self.app.route("/governance/voting-power/<address>", methods=["GET"])
-        def get_voting_power(address: str) -> Tuple[Dict[str, Any], int]:
+        def get_voting_power(address: str) -> tuple[dict[str, Any], int]:
             """Calculate voting power."""
             return self.get_voting_power_handler(address)
 
         @self.app.route("/governance/fiat-unlock/vote", methods=["POST"])
-        def governance_fiat_unlock_vote() -> Tuple[Dict[str, Any], int]:
+        def governance_fiat_unlock_vote() -> tuple[dict[str, Any], int]:
             """Vote on fiat unlock governance."""
             return self.fiat_unlock_vote_handler()
 
         @self.app.route("/governance/fiat-unlock/status", methods=["GET"])
-        def governance_fiat_unlock_status() -> Tuple[Dict[str, Any], int]:
+        def governance_fiat_unlock_status() -> tuple[dict[str, Any], int]:
             """Get fiat unlock governance status."""
             return self.fiat_unlock_status_handler()
 
-    def submit_proposal_handler(self) -> Tuple[Dict[str, Any], int]:
+    def submit_proposal_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle proposal submission.
 
@@ -94,7 +97,7 @@ class GovernanceAPIHandler:
             200,
         )
 
-    def get_proposals_handler(self) -> Tuple[Dict[str, Any], int]:
+    def get_proposals_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle proposal retrieval.
 
@@ -108,7 +111,7 @@ class GovernanceAPIHandler:
         # For now, return sample data
         return jsonify({"count": 0, "proposals": []}), 200
 
-    def submit_vote_handler(self) -> Tuple[Dict[str, Any], int]:
+    def submit_vote_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle vote submission.
 
@@ -135,7 +138,7 @@ class GovernanceAPIHandler:
             200,
         )
 
-    def get_voting_power_handler(self, address: str) -> Tuple[Dict[str, Any], int]:
+    def get_voting_power_handler(self, address: str) -> tuple[dict[str, Any], int]:
         """
         Handle voting power calculation.
 
@@ -166,7 +169,7 @@ class GovernanceAPIHandler:
             200,
         )
 
-    def fiat_unlock_vote_handler(self) -> Tuple[Dict[str, Any], int]:
+    def fiat_unlock_vote_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle fiat unlock governance vote.
 
@@ -215,7 +218,7 @@ class GovernanceAPIHandler:
 
         return jsonify({"success": True, "status": status}), 200
 
-    def fiat_unlock_status_handler(self) -> Tuple[Dict[str, Any], int]:
+    def fiat_unlock_status_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle fiat unlock governance status retrieval.
 

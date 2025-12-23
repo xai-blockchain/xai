@@ -1,6 +1,6 @@
 import json
-import os
 import logging
+import os
 from functools import wraps
 
 RBAC_CONFIG_FILE = "rbac_config.json"

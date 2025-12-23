@@ -18,24 +18,24 @@ Security features:
 
 from __future__ import annotations
 
+import logging
 import math
 import time
-import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
-from decimal import Decimal, ROUND_DOWN
+from decimal import ROUND_DOWN, Decimal
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from ..vm.exceptions import VMExecutionError
 from .safe_math import (
-    SafeMath,
-    MAX_SUPPLY,
-    MAX_DEBT,
     MAX_COLLATERAL,
+    MAX_DEBT,
     MAX_PRICE,
+    MAX_SUPPLY,
+    SafeMath,
+    assert_health_factor_valid,
     assert_supply_debt_invariant,
     assert_utilization_in_bounds,
-    assert_health_factor_valid,
 )
 
 if TYPE_CHECKING:
@@ -43,12 +43,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
 class InterestRateModel(Enum):
     """Interest rate model types."""
     STABLE = "stable"
     VARIABLE = "variable"
-
 
 @dataclass
 class AssetConfig:
@@ -86,7 +84,6 @@ class AssetConfig:
     # Reserve factor (basis points - portion of interest to protocol)
     reserve_factor: int = 1000  # 10%
 
-
 @dataclass
 class UserPosition:
     """
@@ -103,18 +100,17 @@ class UserPosition:
     user: str
 
     # Supplied collateral by asset (aToken amounts - scaled principal)
-    supplied: Dict[str, int] = field(default_factory=dict)
+    supplied: dict[str, int] = field(default_factory=dict)
 
     # Borrowed principal amounts by asset (in underlying tokens)
-    borrowed: Dict[str, int] = field(default_factory=dict)
+    borrowed: dict[str, int] = field(default_factory=dict)
 
     # Interest rate mode per borrowed asset
-    interest_mode: Dict[str, InterestRateModel] = field(default_factory=dict)
+    interest_mode: dict[str, InterestRateModel] = field(default_factory=dict)
 
     # Borrow index snapshot at time of borrow (for each asset)
     # Used to calculate accrued interest: debt = principal * (current_index / borrow_index)
-    borrow_index: Dict[str, int] = field(default_factory=dict)
-
+    borrow_index: dict[str, int] = field(default_factory=dict)
 
 @dataclass
 class PoolState:
@@ -139,7 +135,6 @@ class PoolState:
     # Current rates (basis points per year)
     current_supply_rate: int = 0
     current_borrow_rate: int = 0
-
 
 @dataclass
 class LendingPool:
@@ -166,17 +161,17 @@ class LendingPool:
     owner: str = ""
 
     # Supported assets
-    assets: Dict[str, AssetConfig] = field(default_factory=dict)
+    assets: dict[str, AssetConfig] = field(default_factory=dict)
 
     # Pool state per asset
-    pool_states: Dict[str, PoolState] = field(default_factory=dict)
+    pool_states: dict[str, PoolState] = field(default_factory=dict)
 
     # User positions
-    positions: Dict[str, UserPosition] = field(default_factory=dict)
+    positions: dict[str, UserPosition] = field(default_factory=dict)
 
     # Price oracle reference
     oracle_address: str = ""
-    _price_cache: Dict[str, Tuple[int, float]] = field(default_factory=dict)
+    _price_cache: dict[str, tuple[int, float]] = field(default_factory=dict)
 
     # Protocol parameters
     close_factor: int = 5000  # 50% max liquidation per tx (basis points)
@@ -244,7 +239,7 @@ class LendingPool:
         caller: str,
         asset: str,
         amount: int,
-        on_behalf_of: Optional[str] = None,
+        on_behalf_of: str | None = None,
     ) -> int:
         """
         Supply (deposit) assets to the pool.
@@ -617,7 +612,7 @@ class LendingPool:
         caller: str,
         asset: str,
         amount: int,
-        on_behalf_of: Optional[str] = None,
+        on_behalf_of: str | None = None,
     ) -> int:
         """
         Repay borrowed assets.
@@ -686,7 +681,7 @@ class LendingPool:
         debt_asset: str,
         collateral_asset: str,
         debt_to_cover: int,
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         """
         Liquidate an unhealthy position.
 
@@ -1023,8 +1018,8 @@ class LendingPool:
     def _calculate_health_factor_with_changes(
         self,
         position: UserPosition,
-        supplied: Dict[str, int],
-        borrowed: Dict[str, int],
+        supplied: dict[str, int],
+        borrowed: dict[str, int],
     ) -> int:
         """Calculate health factor with hypothetical changes."""
         total_collateral_threshold = 0
@@ -1288,7 +1283,7 @@ class LendingPool:
         if asset not in self.assets:
             raise VMExecutionError(f"Asset {asset} not supported")
 
-    def _get_position(self, user: str) -> Optional[UserPosition]:
+    def _get_position(self, user: str) -> UserPosition | None:
         return self.positions.get(self._normalize(user))
 
     def _get_or_create_position(self, user: str) -> UserPosition:
@@ -1353,7 +1348,6 @@ class LendingPool:
             "paused": self.paused,
         }
 
-
 class CollateralManager:
     """Helper for managing collateral across lending pools."""
 
@@ -1375,13 +1369,12 @@ class CollateralManager:
         """Check if user can be liquidated."""
         return self.pool.get_health_factor(user) < self.pool.RAY
 
-
 class LendingFactory:
     """Factory for creating lending pools."""
 
-    def __init__(self, blockchain: Optional["Blockchain"] = None) -> None:
+    def __init__(self, blockchain: "Blockchain" | None = None) -> None:
         self.blockchain = blockchain
-        self.pools: Dict[str, LendingPool] = {}
+        self.pools: dict[str, LendingPool] = {}
 
     def create_pool(
         self,
@@ -1419,6 +1412,6 @@ class LendingFactory:
 
         return pool
 
-    def get_pool(self, address: str) -> Optional[LendingPool]:
+    def get_pool(self, address: str) -> LendingPool | None:
         """Get a lending pool by address."""
         return self.pools.get(address.lower())

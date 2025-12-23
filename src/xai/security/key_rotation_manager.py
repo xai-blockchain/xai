@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 import logging
-from os import urandom
 import time
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
+from os import urandom
+from typing import Any
 
 logger = logging.getLogger(__name__)
-
 
 class KeyRotationManager:
     def __init__(self, key_length_bytes: int = 32, rotation_interval_days: int = 30):
@@ -16,11 +17,11 @@ class KeyRotationManager:
 
         self.key_length_bytes = key_length_bytes
         self.rotation_interval_days = rotation_interval_days
-        self.active_key: Optional[bytes] = None
-        self.active_key_id: Optional[str] = None
-        self.last_rotation_timestamp: Optional[int] = None
+        self.active_key: bytes | None = None
+        self.active_key_id: str | None = None
+        self.last_rotation_timestamp: int | None = None
         # Stores historical keys: {key_id: {"key": bytes, "rotation_timestamp": int, "deactivation_timestamp": int}}
-        self.historical_keys: Dict[str, Dict[str, Any]] = {}
+        self.historical_keys: dict[str, dict[str, Any]] = {}
         self._key_id_counter = 0
 
         # Initialize with a first key
@@ -95,7 +96,7 @@ class KeyRotationManager:
             raise RuntimeError("No active key available. Initialize KeyRotationManager first.")
         return self.active_key
 
-    def get_key_by_id(self, key_id: str) -> Optional[bytes]:
+    def get_key_by_id(self, key_id: str) -> bytes | None:
         """Retrieves a key (active or historical) by its ID."""
         if key_id == self.active_key_id:
             return self.active_key
@@ -105,10 +106,9 @@ class KeyRotationManager:
             return historical_entry["key"]
         return None
 
-    def get_historical_keys(self) -> Dict[str, Dict[str, Any]]:
+    def get_historical_keys(self) -> dict[str, dict[str, Any]]:
         """Returns all historical keys."""
         return self.historical_keys
-
 
 # Example Usage (for testing purposes)
 # Example usage is intentionally omitted in production modules.

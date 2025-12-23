@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Comprehensive Network Stress Tests for XAI Blockchain
 
@@ -24,7 +26,7 @@ import psutil
 import os
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Dict, Any, Tuple
+from typing import Any
 from unittest.mock import Mock, patch
 from collections import defaultdict
 
@@ -32,19 +34,17 @@ from xai.core.blockchain import Blockchain, Transaction, Block
 from xai.core.wallet import Wallet
 from xai.core.node_p2p import P2PNetworkManager
 
-
 # Performance baselines (for assertions)
 BASELINE_TPS_CREATION = 100
 BASELINE_TPS_VALIDATION = 50
 BASELINE_BLOCK_PROPAGATION_MS = 2000
 BASELINE_MEMORY_PER_1000_BLOCKS_MB = 100
 
-
 class PerformanceMetrics:
     """Track and report performance metrics"""
 
     def __init__(self):
-        self.metrics: Dict[str, Any] = {}
+        self.metrics: dict[str, Any] = {}
         self.start_time = None
         self.end_time = None
 
@@ -66,13 +66,12 @@ class PerformanceMetrics:
         """Record a metric"""
         self.metrics[key] = value
 
-    def report(self) -> Dict[str, Any]:
+    def report(self) -> dict[str, Any]:
         """Get full metrics report"""
         return {
             "duration_seconds": self.duration(),
             **self.metrics,
         }
-
 
 @pytest.mark.slow
 class TestTransactionThroughputStress:
@@ -306,7 +305,6 @@ class TestTransactionThroughputStress:
         assert mempool_size > 0, "Mempool should contain transactions"
         assert add_rate > 50, "Should add to mempool at >50 TPS"
 
-
 @pytest.mark.slow
 class TestBlockPropagationStress:
     """Test block propagation performance under stress"""
@@ -400,7 +398,6 @@ class TestBlockPropagationStress:
         assert len(blockchain.chain) == main_chain_length + 5
 
         print(f"\n[Orphan Block Test] Chain length: {len(blockchain.chain)}")
-
 
 @pytest.mark.slow
 class TestNetworkResilienceStress:
@@ -595,7 +592,6 @@ class TestNetworkResilienceStress:
 
         # Note: If flood_count == max_flood_attempts, system has no DDoS protection
         # This is a baseline measurement for future improvement
-
 
 @pytest.mark.slow
 class TestConcurrentOperationsStress:
@@ -838,7 +834,6 @@ class TestConcurrentOperationsStress:
         # Should handle race conditions gracefully
         assert len(blocks_mined) <= 5, "Should not create more blocks than miners"
 
-
 @pytest.mark.slow
 class TestMemoryAndResourceStress:
     """Test memory usage and resource management under stress"""
@@ -1016,7 +1011,6 @@ class TestMemoryAndResourceStress:
         memory_growth = final_memory - initial_memory
         assert memory_growth < 200, "Memory growth too high - possible leak"
 
-
 @pytest.mark.slow
 class TestChainReorganizationStress:
     """Test chain reorganization under stress conditions"""
@@ -1148,7 +1142,6 @@ class TestChainReorganizationStress:
 
         assert utxo_count > 0, "Should have UTXOs"
         assert blockchain.validate_chain(), "Chain should be valid"
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s", "--tb=short"])

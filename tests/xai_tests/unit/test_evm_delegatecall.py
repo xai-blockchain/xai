@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Restored delegatecall-specific regression tests.
 
@@ -6,13 +8,11 @@ The test logic was previously folded into other suites, so these cases reintrodu
 dedicated module while keeping meaningful delegatecall coverage.
 """
 
-from typing import Optional
 from unittest.mock import MagicMock
 
 from xai.core.vm.evm.context import BlockContext, CallContext, CallType, ExecutionContext
 from xai.core.vm.evm.interpreter import EVMInterpreter
 from xai.core.vm.evm.opcodes import Opcode
-
 
 def _make_block() -> BlockContext:
     return BlockContext(
@@ -25,7 +25,6 @@ def _make_block() -> BlockContext:
         chain_id=1,
     )
 
-
 def _make_context(blockchain: MagicMock) -> ExecutionContext:
     return ExecutionContext(
         block=_make_block(),
@@ -36,8 +35,7 @@ def _make_context(blockchain: MagicMock) -> ExecutionContext:
         blockchain=blockchain,
     )
 
-
-def _make_call(code: bytes, *, address: Optional[str] = None) -> CallContext:
+def _make_call(code: bytes, *, address: str | None = None) -> CallContext:
     return CallContext(
         call_type=CallType.CALL,
         depth=0,
@@ -50,7 +48,6 @@ def _make_call(code: bytes, *, address: Optional[str] = None) -> CallContext:
         calldata=b"",
         static=False,
     )
-
 
 def test_delegatecall_writes_through_proxy_storage():
     impl_address = "0x" + "1" * 40
@@ -120,7 +117,6 @@ def test_delegatecall_writes_through_proxy_storage():
 
     proxy_storage = context.get_storage(proxy_address)
     assert proxy_storage.get_raw(0) == set_value
-
 
 def test_delegatecall_failure_bubbles_without_touching_storage():
     impl_address = "0x" + "3" * 40

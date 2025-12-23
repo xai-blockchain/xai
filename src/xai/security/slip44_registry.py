@@ -8,12 +8,9 @@ type and provides simple helpers for validating SLIP-0044 assignments.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional
-
 
 class Slip44RegistrationError(RuntimeError):
     """Raised when a SLIP-0044 registration requirement is violated."""
-
 
 @dataclass(frozen=True)
 class Slip44Entry:
@@ -25,7 +22,6 @@ class Slip44Entry:
     reference: str
     notes: str = ""
 
-
 class Slip44Registry:
     """
     Minimal SLIP-0044 registry abstraction.
@@ -34,13 +30,13 @@ class Slip44Registry:
     enforces uniqueness of both symbols and coin type identifiers.
     """
 
-    def __init__(self, entries: Optional[Iterable[Slip44Entry]] = None):
+    def __init__(self, entries: Iterable[Slip44Entry] | None = None):
         base_entries = list(entries) if entries is not None else list(self._default_entries())
         if not base_entries:
             raise Slip44RegistrationError("SLIP-0044 registry cannot be empty")
 
-        self._entries: Dict[str, Slip44Entry] = {}
-        used_coin_types: Dict[int, str] = {}
+        self._entries: dict[str, Slip44Entry] = {}
+        used_coin_types: dict[int, str] = {}
 
         for entry in base_entries:
             symbol_key = entry.symbol.upper()
@@ -135,10 +131,9 @@ class Slip44Registry:
                 f"Registered value is {entry.coin_type}"
             )
 
-    def list_entries(self) -> List[Slip44Entry]:
+    def list_entries(self) -> list[Slip44Entry]:
         """Return all registry entries, sorted alphabetically by symbol."""
         return [self._entries[s] for s in sorted(self._entries)]
-
 
 __all__ = [
     "Slip44Entry",

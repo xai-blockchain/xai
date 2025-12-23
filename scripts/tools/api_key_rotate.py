@@ -11,7 +11,6 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import List, Optional
 
 from xai.core.api_auth import APIAuthManager, APIKeyStore
 from xai.core.config import Config
@@ -21,8 +20,7 @@ RATE_WINDOW_SEC = 60
 RATE_LIMIT = 20
 RATE_STATE_PATH = Path(os.getenv("XAI_API_KEY_RATE_PATH", Path.home() / ".xai" / "api_key_cli_rate.json"))
 
-
-def _load_rate_state() -> List[float]:
+def _load_rate_state() -> list[float]:
     try:
         RATE_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
         if RATE_STATE_PATH.exists():
@@ -31,13 +29,11 @@ def _load_rate_state() -> List[float]:
         return []
     return []
 
-
-def _persist_rate_state(stamps: List[float]) -> None:
+def _persist_rate_state(stamps: list[float]) -> None:
     try:
         RATE_STATE_PATH.write_text(json.dumps(stamps))
     except Exception:
         pass
-
 
 def enforce_rate_limit(now: float) -> None:
     stamps = _load_rate_state()
@@ -47,13 +43,11 @@ def enforce_rate_limit(now: float) -> None:
     stamps.append(now)
     _persist_rate_state(stamps)
 
-
 def default_store_path() -> str:
     return os.getenv(
         "XAI_API_KEY_STORE_PATH",
         getattr(Config, "API_KEY_STORE_PATH", os.path.join(os.getcwd(), "secure_keys", "api_keys.json")),
     )
-
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Manage API keys (issue/rotate/revoke) with audit logging.")
@@ -81,8 +75,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     return parser
 
-
-def main(argv: List[str]) -> int:
+def main(argv: list[str]) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
@@ -96,7 +89,7 @@ def main(argv: List[str]) -> int:
     )
     manager = APIAuthManager(required=False, store=store)
 
-    def ttl_seconds_from_args(ttl_days: Optional[float], ttl_hours: Optional[float]) -> Optional[int]:
+    def ttl_seconds_from_args(ttl_days: float | None, ttl_hours: float | None) -> int | None:
         if ttl_days is not None:
             return max(1, int(ttl_days * 86400))
         if ttl_hours is not None:
@@ -152,7 +145,6 @@ def main(argv: List[str]) -> int:
 
     parser.print_help()
     return 1
-
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))

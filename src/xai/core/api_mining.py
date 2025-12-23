@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Mining API Handler
 
@@ -7,10 +9,11 @@ Handles all mining-related API endpoints including:
 - Real-time mining updates via WebSocket
 """
 
-import time
-import threading
 import logging
-from typing import Dict, Any, Optional, Tuple
+import threading
+import time
+from typing import Any
+
 from flask import Flask, jsonify, request
 from prometheus_client import Gauge
 
@@ -18,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 miner_active_gauge = Gauge("xai_miner_active_count", "Number of miners currently running")
 ATTACHMENT_SAFE = True
-
 
 class MiningAPIHandler:
     """Handles all mining-related API endpoints."""
@@ -37,8 +39,8 @@ class MiningAPIHandler:
         self.broadcast_ws = broadcast_callback
 
         # Mining state
-        self.mining_threads: Dict[str, Dict[str, Any]] = {}  # miner_address -> thread info
-        self.mining_stats: Dict[str, Dict[str, Any]] = {}  # miner_address -> stats
+        self.mining_threads: dict[str, dict[str, Any]] = {}  # miner_address -> thread info
+        self.mining_stats: dict[str, dict[str, Any]] = {}  # miner_address -> stats
 
         # Register routes
         self._register_routes()
@@ -47,21 +49,21 @@ class MiningAPIHandler:
         """Register all mining routes."""
 
         @self.app.route("/mining/start", methods=["POST"])
-        def start_mining() -> Tuple[Dict[str, Any], int]:
+        def start_mining() -> tuple[dict[str, Any], int]:
             """Start continuous mining."""
             return self.start_mining_handler()
 
         @self.app.route("/mining/stop", methods=["POST"])
-        def stop_mining() -> Tuple[Dict[str, Any], int]:
+        def stop_mining() -> tuple[dict[str, Any], int]:
             """Stop mining."""
             return self.stop_mining_handler()
 
         @self.app.route("/mining/status", methods=["GET"])
-        def mining_status() -> Tuple[Dict[str, Any], int]:
+        def mining_status() -> tuple[dict[str, Any], int]:
             """Get mining status."""
             return self.mining_status_handler()
 
-    def start_mining_handler(self) -> Tuple[Dict[str, Any], int]:
+    def start_mining_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle mining start request.
 
@@ -141,7 +143,7 @@ class MiningAPIHandler:
             200,
         )
 
-    def stop_mining_handler(self) -> Tuple[Dict[str, Any], int]:
+    def stop_mining_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle mining stop request.
 
@@ -189,7 +191,7 @@ class MiningAPIHandler:
             200,
         )
 
-    def mining_status_handler(self) -> Tuple[Dict[str, Any], int]:
+    def mining_status_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle mining status request.
 

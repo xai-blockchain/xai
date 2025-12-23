@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Persistent Storage System
 
@@ -9,26 +11,25 @@ Provides secure, reliable blockchain persistence with:
 - Checkpoint system every 1000 blocks
 """
 
-import json
 import hashlib
-import os
-import time
-import shutil
+import json
 import logging
-from typing import Dict, List, Optional, Tuple
+import os
+import shutil
+import time
 from datetime import datetime
 from threading import Lock
 
-from .blockchain_exceptions import (
-    DatabaseError,
-    StorageError,
-    CorruptedDataError,
-    ValidationError,
-)
 from xai.core.monitoring import MetricsCollector
 
-logger = logging.getLogger(__name__)
+from .blockchain_exceptions import (
+    CorruptedDataError,
+    DatabaseError,
+    StorageError,
+    ValidationError,
+)
 
+logger = logging.getLogger(__name__)
 
 class BlockchainStorageConfig:
     """Configuration for blockchain storage"""
@@ -49,7 +50,6 @@ class BlockchainStorageConfig:
 
     # Auto-save interval (blocks)
     AUTO_SAVE_INTERVAL = 1
-
 
 class BlockchainStorage:
     """
@@ -89,7 +89,7 @@ class BlockchainStorage:
 
         # Thread safety
         self.lock = Lock()
-        self._metrics: Optional[MetricsCollector | bool] = None
+        self._metrics: MetricsCollector | bool | None = None
 
         # Metadata file
         self.metadata_file = os.path.join(self.data_dir, "blockchain_metadata.json")
@@ -120,7 +120,7 @@ class BlockchainStorage:
         actual_checksum = self._calculate_checksum(data)
         return actual_checksum == expected_checksum
 
-    def _get_metrics_collector(self) -> Optional[MetricsCollector]:
+    def _get_metrics_collector(self) -> MetricsCollector | None:
         """Lazily acquire the shared metrics collector without breaking storage flow on errors."""
         if self._metrics is False:
             return None
@@ -212,7 +212,7 @@ class BlockchainStorage:
         if hasattr(histogram, "observe") and duration_seconds:
             histogram.observe(duration_seconds)
 
-    def save_to_disk(self, blockchain_data: dict, create_backup: bool = True) -> Tuple[bool, str]:
+    def save_to_disk(self, blockchain_data: dict, create_backup: bool = True) -> tuple[bool, str]:
         """
         Save blockchain to disk with atomic write
 
@@ -296,7 +296,7 @@ class BlockchainStorage:
                 )
                 return False, f"Failed to save blockchain: {str(e)}"
 
-    def load_from_disk(self) -> Tuple[bool, Optional[dict], str]:
+    def load_from_disk(self) -> tuple[bool, dict | None, str]:
         """
         Load blockchain from disk with integrity checks
 
@@ -466,7 +466,7 @@ class BlockchainStorage:
             )
             print(f"Warning: Failed to create checkpoint: {e}")
 
-    def _attempt_recovery(self) -> Tuple[bool, Optional[dict], str]:
+    def _attempt_recovery(self) -> tuple[bool, dict | None, str]:
         """
         Attempt to recover blockchain from backups or checkpoints
 
@@ -493,7 +493,7 @@ class BlockchainStorage:
         # All recovery attempts failed
         return False, None, "Recovery failed - no valid backup or checkpoint found"
 
-    def _recover_from_backup(self) -> Optional[dict]:
+    def _recover_from_backup(self) -> dict | None:
         """
         Recover from most recent valid backup
 
@@ -571,7 +571,7 @@ class BlockchainStorage:
             print(f"Failed to recover from backups: {e}")
             return None
 
-    def _recover_from_checkpoint(self) -> Optional[dict]:
+    def _recover_from_checkpoint(self) -> dict | None:
         """
         Recover from most recent valid checkpoint
 
@@ -644,7 +644,7 @@ class BlockchainStorage:
             print(f"Failed to recover from checkpoints: {e}")
             return None
 
-    def restore_from_backup(self, backup_filename: str) -> Tuple[bool, Optional[dict], str]:
+    def restore_from_backup(self, backup_filename: str) -> tuple[bool, dict | None, str]:
         """
         Manually restore from specific backup file
 
@@ -699,7 +699,7 @@ class BlockchainStorage:
                 )
                 return False, None, f"Failed to restore from backup: {str(e)}"
 
-    def list_backups(self) -> List[dict]:
+    def list_backups(self) -> list[dict]:
         """
         List all available backups
 
@@ -755,7 +755,7 @@ class BlockchainStorage:
             print(f"Failed to list backups: {e}")
             return []
 
-    def list_checkpoints(self) -> List[dict]:
+    def list_checkpoints(self) -> list[dict]:
         """
         List all available checkpoints
 
@@ -811,7 +811,7 @@ class BlockchainStorage:
             print(f"Failed to list checkpoints: {e}")
             return []
 
-    def get_metadata(self) -> Optional[dict]:
+    def get_metadata(self) -> dict | None:
         """
         Get blockchain metadata
 
@@ -835,7 +835,7 @@ class BlockchainStorage:
             print(f"Failed to read metadata: {e}")
             return None
 
-    def verify_integrity(self) -> Tuple[bool, str]:
+    def verify_integrity(self) -> tuple[bool, str]:
         """
         Verify blockchain file integrity
 

@@ -17,10 +17,10 @@ Security features:
 from __future__ import annotations
 
 import hashlib
-import time
 import logging
+import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from ..vm.exceptions import VMExecutionError
 
@@ -28,7 +28,6 @@ if TYPE_CHECKING:
     from ..blockchain import Blockchain
 
 logger = logging.getLogger(__name__)
-
 
 # Event signatures
 TRANSFER_SINGLE_EVENT = hashlib.sha3_256(
@@ -42,7 +41,6 @@ APPROVAL_FOR_ALL_EVENT = hashlib.sha3_256(
 ).digest()
 URI_EVENT = hashlib.sha3_256(b"URI(string,uint256)").digest()
 
-
 @dataclass
 class TokenType:
     """Metadata for a token type."""
@@ -55,7 +53,6 @@ class TokenType:
     uri: str = ""
     metadata: Dict = field(default_factory=dict)
 
-
 @dataclass
 class MultiTokenEvent:
     """ERC1155 event."""
@@ -64,10 +61,9 @@ class MultiTokenEvent:
     operator: str
     from_address: str
     to_address: str
-    ids: List[int]
-    values: List[int]
+    ids: list[int]
+    values: list[int]
     timestamp: float = field(default_factory=time.time)
-
 
 @dataclass
 class ERC1155Token:
@@ -94,20 +90,20 @@ class ERC1155Token:
     base_uri: str = ""
 
     # Balances: token_id -> address -> amount
-    balances: Dict[int, Dict[str, int]] = field(default_factory=dict)
+    balances: dict[int, dict[str, int]] = field(default_factory=dict)
 
     # Operator approvals: owner -> operator -> approved
-    operator_approvals: Dict[str, Dict[str, bool]] = field(default_factory=dict)
+    operator_approvals: dict[str, dict[str, bool]] = field(default_factory=dict)
 
     # Token types
-    token_types: Dict[int, TokenType] = field(default_factory=dict)
+    token_types: dict[int, TokenType] = field(default_factory=dict)
     next_token_id: int = 1
 
     # Total supply per token
-    total_supply: Dict[int, int] = field(default_factory=dict)
+    total_supply: dict[int, int] = field(default_factory=dict)
 
     # Events
-    events: List[MultiTokenEvent] = field(default_factory=list)
+    events: list[MultiTokenEvent] = field(default_factory=list)
 
     # Pause state
     paused: bool = False
@@ -136,8 +132,8 @@ class ERC1155Token:
         return self.balances.get(token_id, {}).get(account_norm, 0)
 
     def balance_of_batch(
-        self, accounts: List[str], token_ids: List[int]
-    ) -> List[int]:
+        self, accounts: list[str], token_ids: list[int]
+    ) -> list[int]:
         """
         Get balances for multiple account/token pairs.
 
@@ -313,8 +309,8 @@ class ERC1155Token:
         caller: str,
         from_addr: str,
         to_addr: str,
-        token_ids: List[int],
-        amounts: List[int],
+        token_ids: list[int],
+        amounts: list[int],
         data: bytes = b"",
     ) -> bool:
         """
@@ -382,7 +378,7 @@ class ERC1155Token:
         max_supply: int = 0,
         is_fungible: bool = True,
         uri: str = "",
-        metadata: Optional[Dict] = None,
+        metadata: Dict | None = None,
     ) -> int:
         """
         Create a new token type.
@@ -487,8 +483,8 @@ class ERC1155Token:
         self,
         caller: str,
         to: str,
-        token_ids: List[int],
-        amounts: List[int],
+        token_ids: list[int],
+        amounts: list[int],
         data: bytes = b"",
     ) -> bool:
         """
@@ -601,8 +597,8 @@ class ERC1155Token:
         self,
         caller: str,
         from_addr: str,
-        token_ids: List[int],
-        amounts: List[int],
+        token_ids: list[int],
+        amounts: list[int],
     ) -> bool:
         """
         Batch burn multiple token types.
@@ -717,8 +713,8 @@ class ERC1155Token:
         operator: str,
         from_address: str,
         to_address: str,
-        ids: List[int],
-        values: List[int],
+        ids: list[int],
+        values: list[int],
     ) -> None:
         """Emit an event."""
         self.events.append(

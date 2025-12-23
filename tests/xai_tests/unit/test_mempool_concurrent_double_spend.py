@@ -8,7 +8,6 @@ transactions spending the same UTXO and both add them to the mempool.
 
 import threading
 import time
-from typing import List
 import pytest
 
 from xai.core.blockchain import Blockchain

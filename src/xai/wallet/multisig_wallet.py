@@ -1,14 +1,15 @@
+from __future__ import annotations
+
 import json
 import logging
 import time
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.serialization import load_pem_public_key, load_pem_private_key
+from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_pem_public_key
 
 logger = logging.getLogger(__name__)
-
 
 class MultiSigWallet:
     """
@@ -16,7 +17,7 @@ class MultiSigWallet:
     Supports partial signature collection and aggregation (TASK 210)
     """
 
-    def __init__(self, public_keys: List[str], threshold: int, max_signers: int = 15):
+    def __init__(self, public_keys: list[str], threshold: int, max_signers: int = 15):
         """
         Initialize multisig wallet.
 
@@ -51,18 +52,18 @@ class MultiSigWallet:
         self.max_signers = max_signers
 
         # TASK 210: Storage for partial signatures
-        self.pending_transactions: Dict[str, Dict[str, Any]] = {}
+        self.pending_transactions: dict[str, dict[str, Any]] = {}
 
         # Nonce/sequence tracking to prevent replay attacks
         self._next_nonce: int = 0
         self._sequence_counter: int = 0
-        self._consumed_nonces: Set[int] = set()
+        self._consumed_nonces: set[int] = set()
 
     def _allocate_nonce_and_sequence(
         self,
-        provided_nonce: Optional[int],
-        provided_sequence: Optional[int],
-    ) -> Tuple[int, int]:
+        provided_nonce: int | None,
+        provided_sequence: int | None,
+    ) -> tuple[int, int]:
         """
         Allocate a nonce/sequence pair for a new transaction.
 
@@ -95,7 +96,7 @@ class MultiSigWallet:
         return nonce, sequence
 
     @staticmethod
-    def _serialize_for_signing(tx: Dict[str, Any]) -> bytes:
+    def _serialize_for_signing(tx: dict[str, Any]) -> bytes:
         """
         Build canonical payload for signature binding.
 
@@ -110,7 +111,7 @@ class MultiSigWallet:
         }
         return json.dumps(envelope, sort_keys=True, separators=(",", ":")).encode()
 
-    def verify_signatures(self, message: bytes, signatures: Dict[str, str]) -> bool:
+    def verify_signatures(self, message: bytes, signatures: dict[str, str]) -> bool:
         """
         Verify M-of-N signatures meet threshold (TASK 26).
 
@@ -218,8 +219,8 @@ class MultiSigWallet:
         self,
         tx_id: str,
         tx_data: Dict,
-        nonce: Optional[int] = None,
-        sequence: Optional[int] = None,
+        nonce: int | None = None,
+        sequence: int | None = None,
     ) -> Dict:
         """
         Create a new pending transaction for signature collection.
@@ -325,7 +326,7 @@ class MultiSigWallet:
             "is_ready": tx["status"] == "ready",
         }
 
-    def get_transaction_status(self, tx_id: str) -> Optional[Dict]:
+    def get_transaction_status(self, tx_id: str) -> Dict | None:
         """
         Get status of a pending transaction.
 

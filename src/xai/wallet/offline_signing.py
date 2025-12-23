@@ -11,7 +11,7 @@ import hashlib
 import json
 import time
 from hmac import compare_digest
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from xai.core.crypto_utils import derive_public_key_hex, sign_message_hex, verify_signature_hex
 from xai.core.transaction import Transaction, TransactionValidationError
@@ -19,8 +19,7 @@ from xai.core.transaction import Transaction, TransactionValidationError
 # Minimum number of characters of the signing digest a user must acknowledge
 _ACK_MIN_PREFIX = 8
 
-
-def _build_transaction(tx: Dict[str, Any]) -> Tuple[Transaction, Dict[str, Any]]:
+def _build_transaction(tx: dict[str, Any]) -> tuple[Transaction, dict[str, Any]]:
     """
     Build a canonical Transaction instance from a loose dict without mutating the caller's data.
 
@@ -50,7 +49,7 @@ def _build_transaction(tx: Dict[str, Any]) -> Tuple[Transaction, Dict[str, Any]]
         raise ValueError(f"Invalid transaction payload: {exc}") from exc
 
     tx_obj.timestamp = timestamp
-    canonical_payload: Dict[str, Any] = {
+    canonical_payload: dict[str, Any] = {
         "sender": tx_obj.sender,
         "recipient": tx_obj.recipient,
         "amount": tx_obj.amount,
@@ -64,8 +63,7 @@ def _build_transaction(tx: Dict[str, Any]) -> Tuple[Transaction, Dict[str, Any]]
     }
     return tx_obj, canonical_payload
 
-
-def signing_preview(tx: Dict[str, Any]) -> Tuple[str, str, Dict[str, Any]]:
+def signing_preview(tx: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
     """
     Produce a deterministic preview for user acknowledgement.
 
@@ -79,7 +77,6 @@ def signing_preview(tx: Dict[str, Any]) -> Tuple[str, str, Dict[str, Any]]:
     tx_hash = tx_obj.calculate_hash()
     return payload_str, tx_hash, canonical_payload
 
-
 def _validate_acknowledgement(tx_hash: str, acknowledged_prefix: str) -> None:
     """Ensure the user explicitly acknowledged the signing hash."""
     if not acknowledged_prefix or len(acknowledged_prefix) < _ACK_MIN_PREFIX:
@@ -90,8 +87,7 @@ def _validate_acknowledgement(tx_hash: str, acknowledged_prefix: str) -> None:
     if not tx_hash.lower().startswith(normalized_ack):
         raise ValueError("Acknowledgement hash prefix does not match the transaction hash")
 
-
-def sign_offline(tx: Dict[str, Any], private_key_hex: str, *, acknowledged_digest: str) -> Dict[str, Any]:
+def sign_offline(tx: dict[str, Any], private_key_hex: str, *, acknowledged_digest: str) -> dict[str, Any]:
     """
     Sign a transaction payload offline and return signed payload.
 
@@ -112,8 +108,7 @@ def sign_offline(tx: Dict[str, Any], private_key_hex: str, *, acknowledged_diges
     signed["payload_preview"] = payload_str
     return signed
 
-
-def verify_offline_signature(tx: Dict[str, Any]) -> bool:
+def verify_offline_signature(tx: dict[str, Any]) -> bool:
     """Verify an offline-signed transaction dict with public_key/signature included."""
     pub = tx.get("public_key")
     sig = tx.get("signature")

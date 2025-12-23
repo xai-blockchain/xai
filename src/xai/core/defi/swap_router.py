@@ -17,14 +17,14 @@ Security features:
 
 from __future__ import annotations
 
-import time
-import logging
 import hashlib
 import heapq
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Set, Any, TYPE_CHECKING
-from enum import Enum
+import logging
+import time
 from collections import defaultdict
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import TYPE_CHECKING, Any
 
 from ..vm.exceptions import VMExecutionError
 
@@ -32,7 +32,6 @@ if TYPE_CHECKING:
     from ..blockchain import Blockchain
 
 logger = logging.getLogger(__name__)
-
 
 class OrderStatus(Enum):
     """Status of a limit order."""
@@ -42,16 +41,14 @@ class OrderStatus(Enum):
     CANCELLED = "cancelled"
     EXPIRED = "expired"
 
-
 @dataclass
 class SwapPath:
     """A path through multiple pools for a swap."""
-    pools: List[str]  # Pool addresses in order
-    tokens: List[str]  # Token path (len = len(pools) + 1)
+    pools: list[str]  # Pool addresses in order
+    tokens: list[str]  # Token path (len = len(pools) + 1)
     expected_output: int = 0
     price_impact: int = 0  # Basis points
     gas_estimate: int = 0
-
 
 @dataclass
 class LimitOrder:
@@ -116,7 +113,6 @@ class LimitOrder:
             self.nonce.to_bytes(32, 'big')
         )
         return hashlib.sha3_256(data).digest()
-
 
 @dataclass
 class PoolInfo:
@@ -198,7 +194,6 @@ class PoolInfo:
             return self.token0
         raise VMExecutionError(f"Token {token} not in pool")
 
-
 @dataclass
 class SwapRouter:
     """
@@ -219,16 +214,16 @@ class SwapRouter:
     chain_id: int = 1
 
     # Pool registry: pool_address -> PoolInfo
-    pools: Dict[str, PoolInfo] = field(default_factory=dict)
+    pools: dict[str, PoolInfo] = field(default_factory=dict)
 
     # Token -> pools mapping for path finding
-    token_to_pools: Dict[str, List[str]] = field(default_factory=lambda: defaultdict(list))
+    token_to_pools: dict[str, list[str]] = field(default_factory=lambda: defaultdict(list))
 
     # Limit orders: order_id -> LimitOrder
-    orders: Dict[str, LimitOrder] = field(default_factory=dict)
+    orders: dict[str, LimitOrder] = field(default_factory=dict)
 
     # User nonces for limit orders
-    user_nonces: Dict[str, int] = field(default_factory=dict)
+    user_nonces: dict[str, int] = field(default_factory=dict)
 
     # Reentrancy guard
     _in_swap: bool = False
@@ -241,7 +236,7 @@ class SwapRouter:
 
     # Statistics
     total_swaps: int = 0
-    total_volume: Dict[str, int] = field(default_factory=dict)
+    total_volume: dict[str, int] = field(default_factory=dict)
     total_orders_filled: int = 0
 
     def __post_init__(self) -> None:
@@ -321,8 +316,8 @@ class SwapRouter:
         token_in: str,
         token_out: str,
         amount_in: int,
-        max_hops: Optional[int] = None,
-    ) -> Optional[SwapPath]:
+        max_hops: int | None = None,
+    ) -> SwapPath | None:
         """
         Find the optimal swap path from token_in to token_out.
 
@@ -364,7 +359,7 @@ class SwapRouter:
         token_in: str,
         token_out: str,
         amount_in: int,
-    ) -> Optional[SwapPath]:
+    ) -> SwapPath | None:
         """Find direct single-hop path."""
         for pool_addr in self.token_to_pools.get(token_in, []):
             pool = self.pools[pool_addr]
@@ -386,7 +381,7 @@ class SwapRouter:
         token_out: str,
         amount_in: int,
         max_hops: int,
-    ) -> List[SwapPath]:
+    ) -> list[SwapPath]:
         """Find all valid paths up to max_hops."""
         paths = []
 
@@ -490,7 +485,7 @@ class SwapRouter:
         amount_in: int,
         min_amount_out: int,
         deadline: float,
-        path: Optional[List[str]] = None,
+        path: list[str] | None = None,
     ) -> int:
         """
         Swap exact input amount for maximum output.
@@ -738,8 +733,8 @@ class SwapRouter:
         self,
         caller: str,
         order_id: str,
-        amount_to_fill: Optional[int] = None,
-    ) -> Tuple[int, int]:
+        amount_to_fill: int | None = None,
+    ) -> tuple[int, int]:
         """
         Fill a limit order (partially or fully).
 
@@ -851,7 +846,7 @@ class SwapRouter:
         token_in: str,
         token_out: str,
         limit: int = 100,
-    ) -> List[LimitOrder]:
+    ) -> list[LimitOrder]:
         """Get all fillable orders for a token pair."""
         token_in = token_in.upper()
         token_out = token_out.upper()
@@ -874,8 +869,8 @@ class SwapRouter:
 
     def detect_sandwich_attack(
         self,
-        pending_swaps: List[Tuple[str, str, int]],
-    ) -> List[Tuple[str, str]]:
+        pending_swaps: list[tuple[str, str, int]],
+    ) -> list[tuple[str, str]]:
         """
         Detect potential sandwich attacks in pending swaps.
 
@@ -888,7 +883,7 @@ class SwapRouter:
         suspicious_pairs = []
 
         # Group by token pair
-        swaps_by_pair: Dict[str, List] = defaultdict(list)
+        swaps_by_pair: dict[str, List] = defaultdict(list)
         for caller, path, amount in pending_swaps:
             swaps_by_pair[path].append((caller, amount))
 
@@ -950,8 +945,8 @@ class SwapRouter:
     def get_amounts_out(
         self,
         amount_in: int,
-        path: List[str],  # Token path
-    ) -> List[int]:
+        path: list[str],  # Token path
+    ) -> list[int]:
         """
         Calculate output amounts for each hop in path.
 
@@ -984,11 +979,11 @@ class SwapRouter:
 
     # ==================== View Functions ====================
 
-    def get_pools_for_token(self, token: str) -> List[str]:
+    def get_pools_for_token(self, token: str) -> list[str]:
         """Get all pools containing a token."""
         return self.token_to_pools.get(token.upper(), [])
 
-    def get_order(self, order_id: str) -> Optional[Dict]:
+    def get_order(self, order_id: str) -> Dict | None:
         """Get order details."""
         order = self.orders.get(order_id)
         if not order:
@@ -1057,8 +1052,9 @@ class SwapRouter:
         - Derives address and compares to expected signer
         - Prevents signature spoofing attacks
         """
-        from xai.core.crypto_utils import verify_signature_hex, derive_public_key_hex
         import hashlib
+
+        from xai.core.crypto_utils import derive_public_key_hex, verify_signature_hex
 
         # Validate signature format
         if not signature or len(signature) < 64:
@@ -1118,7 +1114,7 @@ class SwapRouter:
             public_key: User's public key (hex encoded)
         """
         if not hasattr(self, '_public_key_registry'):
-            self._public_key_registry: Dict[str, str] = {}
+            self._public_key_registry: dict[str, str] = {}
         self._public_key_registry[address] = public_key
 
     # ==================== Input Validation ====================

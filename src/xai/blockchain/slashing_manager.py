@@ -1,21 +1,21 @@
 # src/xai/blockchain/slashing_manager.py
+from __future__ import annotations
+
 """
 Manages validator slashing for misbehavior, with persistent state.
 """
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from ..database.storage_manager import StorageManager
 
 logger = logging.getLogger("xai.blockchain.slashing_manager")
 
-
 def get_validator_key(validator_id: str) -> str:
     """Returns the database key for a given validator ID."""
     return f"validator:{validator_id}"
-
 
 class SlashingManager:
     """
@@ -32,20 +32,20 @@ class SlashingManager:
     }
     OFFENSE_PENALTIES = MISBEHAVIOR_PENALTIES
 
-    def __init__(self, db_path: Path, initial_validators: Optional[Dict[str, float]] = None):
+    def __init__(self, db_path: Path, initial_validators: dict[str, float] | None = None):
         """
         Initializes the SlashingManager with a persistent database.
 
         Args:
             db_path (Path): The path to the SQLite database file.
-            initial_validators (Optional[Dict[str, float]]): A dictionary of validators
+            initial_validators (dict[str, float] | None): A dictionary of validators
                 and their staked amounts to seed the database on first run.
         """
         self.storage = StorageManager(db_path)
         if initial_validators:
             self._seed_initial_validators(initial_validators)
 
-    def _seed_initial_validators(self, initial_validators: Dict[str, float]):
+    def _seed_initial_validators(self, initial_validators: dict[str, float]):
         """Seeds the database with initial validators if they don't already exist."""
         for validator_id, staked_amount in initial_validators.items():
             if not isinstance(validator_id, str) or not validator_id:
@@ -93,7 +93,6 @@ class SlashingManager:
         # This can be expanded with specific structural checks for each type.
         logger.info("Evidence for %s is present.", misbehavior_type)
         return True
-
 
     def report_misbehavior(
         self, reporter_id: str, validator_id: str, misbehavior_type: str, evidence: Any = None
@@ -170,7 +169,7 @@ class SlashingManager:
         """
         return self.report_misbehavior("system", validator_id, misbehavior_type, evidence)
 
-    def get_validator_status(self, validator_id: str) -> Optional[Dict[str, Any]]:
+    def get_validator_status(self, validator_id: str) -> dict[str, Any] | None:
         """Returns the current status of a validator from the database."""
         return self.storage.get(get_validator_key(validator_id))
 

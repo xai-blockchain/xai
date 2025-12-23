@@ -14,13 +14,12 @@ import argparse
 import json
 import os
 import sys
-from typing import Any, Dict
+from typing import Any
 
 from xai.core.checkpoints import CheckpointManager
 from xai.core.checkpoint_payload import CheckpointPayload
 
-
-def _build_payload_dict(checkpoint: Any) -> Dict[str, Any]:
+def _build_payload_dict(checkpoint: Any) -> dict[str, Any]:
     data = {
         "utxo_snapshot": getattr(checkpoint, "utxo_snapshot", {}),
         "timestamp": getattr(checkpoint, "timestamp", None),
@@ -41,7 +40,6 @@ def _build_payload_dict(checkpoint: Any) -> Dict[str, Any]:
         "data": data,
     }
 
-
 def main() -> int:
     parser = argparse.ArgumentParser(description="Export latest checkpoint payload.")
     parser.add_argument("--data-dir", required=True, help="Blockchain data directory containing checkpoints/")
@@ -60,7 +58,6 @@ def main() -> int:
         json.dump(payload, f, indent=2, sort_keys=True)
     print(f"Wrote checkpoint payload to {args.output}")
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

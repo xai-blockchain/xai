@@ -8,15 +8,14 @@ Comprehensive stress testing framework for blockchain performance testing.
 from __future__ import annotations
 
 import logging
-import time
 import random  # OK for test data generation in performance simulation
 import threading
-from typing import List, Dict, Any, Callable, Optional
-from dataclasses import dataclass, field
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
-
 
 @dataclass
 class StressTestResult:
@@ -30,9 +29,9 @@ class StressTestResult:
     average_latency: float
     min_latency: float
     max_latency: float
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get test summary"""
         return {
             "test_name": self.test_name,
@@ -50,19 +49,17 @@ class StressTestResult:
             "error_count": len(self.errors)
         }
 
-
 from abc import ABC, abstractmethod
-
 
 class StressTest(ABC):
     """Base class for stress tests"""
 
     def __init__(self, name: str):
         self.name = name
-        self.results: List[float] = []
-        self.errors: List[str] = []
-        self.start_time: Optional[float] = None
-        self.end_time: Optional[float] = None
+        self.results: list[float] = []
+        self.errors: list[str] = []
+        self.start_time: float | None = None
+        self.end_time: float | None = None
 
     def setup(self) -> None:
         """Setup before test"""
@@ -155,7 +152,6 @@ class StressTest(ABC):
             self.errors.append(str(e))
             return latency, False
 
-
 class TransactionStressTest(StressTest):
     """Stress test for transaction processing"""
 
@@ -178,7 +174,6 @@ class TransactionStressTest(StressTest):
         except Exception as e:
             logger.debug("Transaction stress test failed: %s", e)
             return False
-
 
 class MiningStressTest(StressTest):
     """Stress test for mining operations"""
@@ -209,7 +204,6 @@ class MiningStressTest(StressTest):
             logger.debug("Mining stress test failed: %s", e)
             return False
 
-
 class NetworkStressTest(StressTest):
     """Stress test for network operations"""
 
@@ -226,7 +220,6 @@ class NetworkStressTest(StressTest):
         except Exception as e:
             logger.debug("Network stress test failed: %s", e)
             return False
-
 
 class ConcurrencyStressTest(StressTest):
     """Test concurrent access to shared resources"""
@@ -248,7 +241,6 @@ class ConcurrencyStressTest(StressTest):
             logger.debug("Concurrency stress test failed: %s", e)
             return False
 
-
 class LoadGenerator:
     """Generate realistic load patterns"""
 
@@ -260,16 +252,16 @@ class LoadGenerator:
             'wave': self._wave_load
         }
 
-    def _constant_load(self, duration: int, rate: int) -> List[int]:
+    def _constant_load(self, duration: int, rate: int) -> list[int]:
         """Constant load pattern"""
         return [rate] * duration
 
-    def _ramp_load(self, duration: int, start_rate: int, end_rate: int) -> List[int]:
+    def _ramp_load(self, duration: int, start_rate: int, end_rate: int) -> list[int]:
         """Gradually increasing load"""
         step = (end_rate - start_rate) / duration
         return [int(start_rate + step * i) for i in range(duration)]
 
-    def _spike_load(self, duration: int, base_rate: int, spike_rate: int, spike_duration: int) -> List[int]:
+    def _spike_load(self, duration: int, base_rate: int, spike_rate: int, spike_duration: int) -> list[int]:
         """Load with sudden spikes"""
         pattern = [base_rate] * duration
         spike_start = duration // 2
@@ -277,7 +269,7 @@ class LoadGenerator:
             pattern[i] = spike_rate
         return pattern
 
-    def _wave_load(self, duration: int, min_rate: int, max_rate: int) -> List[int]:
+    def _wave_load(self, duration: int, min_rate: int, max_rate: int) -> list[int]:
         """Sinusoidal load pattern"""
         import math
         pattern = []
@@ -286,24 +278,23 @@ class LoadGenerator:
             pattern.append(int(rate))
         return pattern
 
-    def generate(self, pattern: str, **kwargs) -> List[int]:
+    def generate(self, pattern: str, **kwargs) -> list[int]:
         """Generate load pattern"""
         generator = self.patterns.get(pattern, self._constant_load)
         return generator(**kwargs)
-
 
 class StressTestSuite:
     """Suite of stress tests"""
 
     def __init__(self):
-        self.tests: List[StressTest] = []
-        self.results: List[StressTestResult] = []
+        self.tests: list[StressTest] = []
+        self.results: list[StressTestResult] = []
 
     def add_test(self, test: StressTest) -> None:
         """Add test to suite"""
         self.tests.append(test)
 
-    def run_all(self, iterations_per_test: int = 1000) -> List[StressTestResult]:
+    def run_all(self, iterations_per_test: int = 1000) -> list[StressTestResult]:
         """Run all tests in suite"""
         self.results.clear()
 
@@ -315,7 +306,7 @@ class StressTestSuite:
 
         return self.results
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get summary of all test results"""
         if not self.results:
             return {}
@@ -331,18 +322,17 @@ class StressTestSuite:
             "tests": [r.get_summary() for r in self.results]
         }
 
-
 class PerformanceBaseline:
     """Establish performance baselines"""
 
     def __init__(self):
-        self.baselines: Dict[str, float] = {}
+        self.baselines: dict[str, float] = {}
 
     def record_baseline(self, test_name: str, ops_per_second: float) -> None:
         """Record baseline performance"""
         self.baselines[test_name] = ops_per_second
 
-    def compare(self, test_name: str, current_ops_per_second: float) -> Dict[str, Any]:
+    def compare(self, test_name: str, current_ops_per_second: float) -> dict[str, Any]:
         """Compare current performance to baseline"""
         baseline = self.baselines.get(test_name)
 
@@ -365,13 +355,12 @@ class PerformanceBaseline:
             "difference_percent": diff_percent
         }
 
-
 class ResourceMonitor:
     """Monitor resource usage during stress tests"""
 
     def __init__(self):
-        self.cpu_samples: List[float] = []
-        self.memory_samples: List[int] = []
+        self.cpu_samples: list[float] = []
+        self.memory_samples: list[int] = []
         self.monitoring = False
 
     def start_monitoring(self) -> None:
@@ -381,8 +370,9 @@ class ResourceMonitor:
         self.memory_samples.clear()
 
         def monitor():
-            import psutil
             import os
+
+            import psutil
 
             process = psutil.Process(os.getpid())
 
@@ -393,7 +383,7 @@ class ResourceMonitor:
 
         threading.Thread(target=monitor, daemon=True).start()
 
-    def stop_monitoring(self) -> Dict[str, Any]:
+    def stop_monitoring(self) -> dict[str, Any]:
         """Stop monitoring and get results"""
         self.monitoring = False
         time.sleep(1)  # Wait for last sample

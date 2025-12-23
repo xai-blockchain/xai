@@ -1,7 +1,7 @@
+from __future__ import annotations
+
 import time
 from collections import defaultdict, deque
-from typing import Dict, Deque, Tuple
-
 
 class DDoSProtector:
     def __init__(
@@ -33,13 +33,13 @@ class DDoSProtector:
         self.adaptive_rate_limiting = adaptive_rate_limiting
 
         # Stores requests: {ip_address: deque of timestamps}
-        self.request_timestamps: Dict[str, Deque[int]] = defaultdict(deque)
+        self.request_timestamps: dict[str, deque[int]] = defaultdict(deque)
 
         # Track active connections per IP
-        self.active_connections: Dict[str, int] = defaultdict(int)
+        self.active_connections: dict[str, int] = defaultdict(int)
 
         # Track last activity time for each IP (for cleanup)
-        self.last_activity: Dict[str, int] = {}
+        self.last_activity: dict[str, int] = {}
 
         # Adaptive rate limiting state
         self.total_requests_in_window = 0
@@ -257,7 +257,6 @@ class DDoSProtector:
             # Clean up completely if no more connections
             if self.active_connections[ip_address] == 0:
                 del self.active_connections[ip_address]
-
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

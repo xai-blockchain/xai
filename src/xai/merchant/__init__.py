@@ -11,8 +11,8 @@ This package provides merchant-focused tools for XAI payment processing:
 from xai.merchant.payment_processor import (
     MerchantPaymentProcessor,
     PaymentStatus,
-    WebhookEvent,
     WebhookDeliveryStatus,
+    WebhookEvent,
 )
 
 __all__ = [

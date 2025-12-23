@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI AI Development Pool - Autonomous Blockchain Development
 Miners donate AI API credits to fund autonomous development
@@ -12,22 +14,20 @@ Revolutionary Concept:
 """
 
 import hashlib
+import json
 import os
+import secrets
 import sys
 import time
-import json
-from typing import Dict, List, Optional, Tuple
 from enum import Enum
-import secrets
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CORE_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "core"))
 if CORE_DIR not in sys.path:
     sys.path.insert(0, CORE_DIR)
 
-from src.xai.core.ai_pool_with_strict_limits import StrictAIPoolManager, AIProvider
+from src.xai.core.ai_pool_with_strict_limits import AIProvider, StrictAIPoolManager
 from src.xai.core.secure_api_key_manager import SecureAPIKeyManager
-
 
 class AIModel(Enum):
     """Supported AI models for development"""
@@ -54,7 +54,6 @@ class AIModel(Enum):
     MISTRAL_LARGE = "mistral-large"
     COHERE_COMMAND = "command-r-plus"
     DEEPSEEK_CODER = "deepseek-coder"
-
 
 # Cost per million tokens (approximate USD)
 MODEL_COSTS = {
@@ -85,7 +84,6 @@ MODEL_SPECIALIZATIONS = {
     "testing": [AIModel.CLAUDE_SONNET, AIModel.GPT4_TURBO, AIModel.DEEPSEEK_CODER],
 }
 
-
 MODEL_PROVIDER_MAP = {
     AIModel.CLAUDE_OPUS: AIProvider.ANTHROPIC,
     AIModel.CLAUDE_SONNET: AIProvider.ANTHROPIC,
@@ -103,7 +101,6 @@ MODEL_PROVIDER_MAP = {
     AIModel.COHERE_COMMAND: AIProvider.ANTHROPIC,
     AIModel.DEEPSEEK_CODER: AIProvider.ANTHROPIC,
 }
-
 
 class AIDonation:
     """Represents a single AI credit donation"""
@@ -146,7 +143,6 @@ class AIDonation:
             "tasks_completed": self.tasks_completed,
         }
 
-
 class DevelopmentTask:
     """A task that AI will autonomously complete"""
 
@@ -178,23 +174,22 @@ class DevelopmentTask:
             "tokens_used": self.tokens_used,
         }
 
-
 class AIDevelopmentPool:
     """
     Manages AI credit donations and autonomous development
     """
 
     def __init__(self, blockchain_seed: str = "xai_genesis_block_hash"):
-        self.donations: List[AIDonation] = []
-        self.task_queue: List[DevelopmentTask] = []
-        self.completed_tasks: List[DevelopmentTask] = []
+        self.donations: list[AIDonation] = []
+        self.task_queue: list[DevelopmentTask] = []
+        self.completed_tasks: list[DevelopmentTask] = []
         self.key_manager = SecureAPIKeyManager(blockchain_seed)
         self.strict_pool = StrictAIPoolManager(self.key_manager)
 
         # Leaderboards
-        self.donor_leaderboard: Dict[str, int] = {}  # address -> total tokens
-        self.model_leaderboard: Dict[AIModel, int] = {}  # model -> total tokens
-        self.model_task_count: Dict[AIModel, int] = {}  # model -> tasks completed
+        self.donor_leaderboard: dict[str, int] = {}  # address -> total tokens
+        self.model_leaderboard: dict[AIModel, int] = {}  # model -> total tokens
+        self.model_task_count: dict[AIModel, int] = {}  # model -> tasks completed
 
     def donate_ai_credits(
         self, donor_address: str, ai_model: AIModel, api_key: str, token_amount: int
@@ -404,7 +399,7 @@ class AIDevelopmentPool:
             "output": f"Task {task.task_id} completed by {model.value}",
         }
 
-    def get_donor_leaderboard(self, top_n: int = 10) -> List[Dict]:
+    def get_donor_leaderboard(self, top_n: int = 10) -> list[Dict]:
         """Get top donors by tokens contributed"""
 
         sorted_donors = sorted(self.donor_leaderboard.items(), key=lambda x: x[1], reverse=True)[
@@ -428,7 +423,7 @@ class AIDevelopmentPool:
 
         return leaderboard
 
-    def get_model_leaderboard(self) -> List[Dict]:
+    def get_model_leaderboard(self) -> list[Dict]:
         """Get AI model competition leaderboard"""
 
         sorted_models = sorted(self.model_leaderboard.items(), key=lambda x: x[1], reverse=True)
@@ -501,7 +496,6 @@ class AIDevelopmentPool:
             ),
         }
 
-
 # Integration with blockchain transaction
 class AIDonationTransaction:
     """Special transaction type for AI donations"""
@@ -539,7 +533,6 @@ class AIDonationTransaction:
             "usd_value": self.usd_value,
             "timestamp": self.timestamp,
         }
-
 
 # Example usage and demonstration
 if __name__ == "__main__":

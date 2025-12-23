@@ -1,9 +1,10 @@
 import ipaddress
-import logging
-from functools import wraps
-from flask import request, abort
 import json
+import logging
 import os
+from functools import wraps
+
+from flask import abort, request
 
 IP_WHITELIST_CONFIG_FILE = "ip_whitelist.json"
 logger = logging.getLogger(__name__)

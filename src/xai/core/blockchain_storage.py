@@ -14,15 +14,15 @@ import logging
 import os
 import shutil
 import time
-from typing import List, Dict, Optional, TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any
+
 from xai.core.block_index import BlockIndex
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from xai.core.blockchain import Block, Transaction
     from xai.core.block_header import BlockHeader
-
+    from xai.core.blockchain import Block, Transaction
 
 MAX_BLOCK_FILE_SIZE = 16 * 1024 * 1024  # 16 MB
 COMPRESSION_THRESHOLD = 1000  # Compress blocks older than this many blocks from tip
@@ -244,7 +244,6 @@ class BlockchainStorage:
         else:
             self.block_index = None
 
-
     def _should_compress_block(self, block_index: int) -> bool:
         """
         Determine if a block should be compressed based on its age.
@@ -423,9 +422,9 @@ class BlockchainStorage:
     def save_state_to_disk(
         self,
         utxo_manager: Any,
-        pending_transactions: List[Transaction],
-        contracts: Optional[Dict[str, Dict[str, Any]]] = None,
-        receipts: Optional[List[Dict[str, Any]]] = None,
+        pending_transactions: list[Transaction],
+        contracts: dict[str, dict[str, Any]] | None = None,
+        receipts: list[dict[str, Any]] | None = None,
     ) -> None:
         """Save the blockchain state (UTXO set and pending transactions) to disk."""
         # Save UTXO set (atomic)
@@ -511,7 +510,7 @@ class BlockchainStorage:
         with open(self.journal_file, "w", encoding="utf-8") as jf:
             jf.truncate(0)
 
-    def load_block_from_disk(self, block_index: int) -> Optional[Block]:
+    def load_block_from_disk(self, block_index: int) -> Block | None:
         """
         Load a single block from disk using O(1) index lookup.
 
@@ -524,8 +523,8 @@ class BlockchainStorage:
         Returns:
             Block object or None if not found
         """
-        from xai.core.blockchain import Block, Transaction
         from xai.core.block_header import BlockHeader
+        from xai.core.blockchain import Block, Transaction
 
         # Try index lookup first (O(1))
         if self.block_index:
@@ -575,7 +574,7 @@ class BlockchainStorage:
         # Fallback: sequential scan (legacy mode or index miss)
         return self._load_block_fallback(block_index)
 
-    def _parse_block_data(self, block_data: Dict[str, Any]) -> Optional[Block]:
+    def _parse_block_data(self, block_data: dict[str, Any]) -> Block | None:
         """
         Parse block data dictionary into Block object.
 
@@ -588,8 +587,8 @@ class BlockchainStorage:
         Returns:
             Block object or None on parse error
         """
-        from xai.core.blockchain import Block, Transaction
         from xai.core.block_header import BlockHeader
+        from xai.core.blockchain import Block, Transaction
 
         try:
             # Support both nested header format and flattened format
@@ -652,7 +651,7 @@ class BlockchainStorage:
             )
             return None
 
-    def _load_block_fallback(self, block_index: int) -> Optional[Block]:
+    def _load_block_fallback(self, block_index: int) -> Block | None:
         """
         Legacy sequential scan fallback for loading blocks.
 
@@ -666,8 +665,8 @@ class BlockchainStorage:
         Returns:
             Block object or None if not found
         """
-        from xai.core.blockchain import Block, Transaction
         from xai.core.block_header import BlockHeader
+        from xai.core.blockchain import Block, Transaction
 
         # First, check for individual compressed block file (fast path for old blocks)
         compressed_path = os.path.join(self.blocks_dir, f"block_{block_index}.json.gz")
@@ -718,7 +717,7 @@ class BlockchainStorage:
             key=lambda x: int(x.split("_")[1].split(".")[0]),
         )
 
-        found_block: Optional[Block] = None
+        found_block: Block | None = None
         for block_file in block_files:
             with open(os.path.join(self.blocks_dir, block_file), "r", encoding="utf-8") as f:
                 for line in f:
@@ -749,13 +748,13 @@ class BlockchainStorage:
         return found_block
 
     # Legacy alias for tests that reference the previous private API name
-    def _load_block_from_disk(self, block_index: int) -> Optional[Block]:
+    def _load_block_from_disk(self, block_index: int) -> Block | None:
         return self.load_block_from_disk(block_index)
 
-    def load_chain_from_disk(self) -> List[Block]:
+    def load_chain_from_disk(self) -> list[Block]:
         """Load the entire blockchain (all blocks) from disk."""
-        from xai.core.blockchain import Block, Transaction
         from xai.core.block_header import BlockHeader
+        from xai.core.blockchain import Block, Transaction
         
         block_files = sorted(
             [
@@ -766,7 +765,7 @@ class BlockchainStorage:
             key=lambda x: int(x.split("_")[1].split(".")[0]),
         )
 
-        chain_map: Dict[int, Block] = {}
+        chain_map: dict[int, Block] = {}
         for block_file in block_files:
             with open(os.path.join(self.blocks_dir, block_file), "r") as f:
                 for line in f:
@@ -822,10 +821,10 @@ class BlockchainStorage:
                         return []
         return [chain_map[idx] for idx in sorted(chain_map.keys())]
 
-    def get_latest_block_from_disk(self) -> Optional[Block]:
+    def get_latest_block_from_disk(self) -> Block | None:
         """Get the last block in the chain by loading it from disk."""
-        from xai.core.blockchain import Block, Transaction
         from xai.core.block_header import BlockHeader
+        from xai.core.blockchain import Block, Transaction
         
         block_files = sorted(
             [
@@ -889,7 +888,7 @@ class BlockchainStorage:
         block = Block(header, transactions)
         return block
     
-    def load_state_from_disk(self) -> Dict[str, Any]:
+    def load_state_from_disk(self) -> dict[str, Any]:
         """Load the blockchain state (UTXO set and pending transactions) from disk."""
         from xai.core.blockchain import Transaction
 
@@ -966,7 +965,7 @@ class BlockchainStorage:
             except (json.JSONDecodeError, KeyError):
                 contracts_state = {}
 
-        receipts: List[Dict[str, Any]] = []
+        receipts: list[dict[str, Any]] = []
         if os.path.exists(self.receipts_file):
             try:
                 with open(self.receipts_file, "r") as f:
@@ -1002,7 +1001,7 @@ class BlockchainStorage:
                 }
             )
 
-    def get_index_stats(self) -> Dict[str, Any]:
+    def get_index_stats(self) -> dict[str, Any]:
         """
         Get block index statistics.
 

@@ -1,16 +1,17 @@
+from __future__ import annotations
+
 """
 Governance Client for XAI SDK
 
 Handles governance and voting operations.
 """
 
-from typing import Optional, Dict, Any, List
 from datetime import datetime
+from typing import Any
 
+from ..exceptions import GovernanceError, ValidationError
 from ..http_client import HTTPClient
 from ..models import Proposal, ProposalStatus
-from ..exceptions import GovernanceError, ValidationError
-
 
 class GovernanceClient:
     """Client for governance operations."""
@@ -26,10 +27,10 @@ class GovernanceClient:
 
     def list_proposals(
         self,
-        status: Optional[str] = None,
+        status: str | None = None,
         limit: int = 20,
         offset: int = 0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         List governance proposals.
 
@@ -48,7 +49,7 @@ class GovernanceClient:
             limit = 100
 
         try:
-            params: Dict[str, Any] = {"limit": limit, "offset": offset}
+            params: dict[str, Any] = {"limit": limit, "offset": offset}
             if status:
                 params["status"] = status
 
@@ -78,8 +79,13 @@ class GovernanceClient:
                 "limit": response.get("limit", limit),
                 "offset": response.get("offset", offset),
             }
-        except Exception as e:
-            raise GovernanceError(f"Failed to list proposals: {str(e)}")
+        except GovernanceError:
+
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise GovernanceError(f"Failed to list proposals: {str(e)}") from e
 
     def get_proposal(self, proposal_id: int) -> Proposal:
         """
@@ -117,16 +123,21 @@ class GovernanceClient:
                 votes_against=response.get("votes_against", 0),
                 votes_abstain=response.get("votes_abstain", 0),
             )
-        except Exception as e:
-            raise GovernanceError(f"Failed to get proposal: {str(e)}")
+        except GovernanceError:
+
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise GovernanceError(f"Failed to get proposal: {str(e)}") from e
 
     def create_proposal(
         self,
         title: str,
         description: str,
         proposer: str,
-        duration: Optional[int] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        duration: int | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> Proposal:
         """
         Create a governance proposal.
@@ -173,10 +184,15 @@ class GovernanceClient:
             )
         except GovernanceError:
             raise
-        except Exception as e:
-            raise GovernanceError(f"Failed to create proposal: {str(e)}")
+        except GovernanceError:
 
-    def vote(self, proposal_id: int, voter: str, choice: str) -> Dict[str, Any]:
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise GovernanceError(f"Failed to create proposal: {str(e)}") from e
+
+    def vote(self, proposal_id: int, voter: str, choice: str) -> dict[str, Any]:
         """
         Vote on a proposal.
 
@@ -209,10 +225,15 @@ class GovernanceClient:
             return self.http_client.post(
                 f"/governance/proposals/{proposal_id}/vote", data=payload
             )
-        except Exception as e:
-            raise GovernanceError(f"Failed to vote: {str(e)}")
+        except GovernanceError:
 
-    def get_active_proposals(self) -> List[Proposal]:
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise GovernanceError(f"Failed to vote: {str(e)}") from e
+
+    def get_active_proposals(self) -> list[Proposal]:
         """
         Get active proposals.
 
@@ -225,10 +246,15 @@ class GovernanceClient:
         try:
             result = self.list_proposals(status="active")
             return result["proposals"]
-        except Exception as e:
-            raise GovernanceError(f"Failed to get active proposals: {str(e)}")
+        except GovernanceError:
 
-    def get_proposal_votes(self, proposal_id: int) -> Dict[str, Any]:
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise GovernanceError(f"Failed to get active proposals: {str(e)}") from e
+
+    def get_proposal_votes(self, proposal_id: int) -> dict[str, Any]:
         """
         Get vote details for a proposal.
 
@@ -250,5 +276,10 @@ class GovernanceClient:
                 "votes_abstain": proposal.votes_abstain,
                 "total_votes": proposal.total_votes,
             }
-        except Exception as e:
-            raise GovernanceError(f"Failed to get proposal votes: {str(e)}")
+        except GovernanceError:
+
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise GovernanceError(f"Failed to get proposal votes: {str(e)}") from e

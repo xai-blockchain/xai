@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI On-Chain Governance Transactions
 
@@ -10,12 +12,11 @@ All governance actions are blockchain transactions:
 - Rollback changes (on-chain)
 """
 
-import time
 import hashlib
 import json
-from typing import Dict, Optional, List, Tuple, Any
+import time
 from enum import Enum
-
+from typing import Any
 
 class GovernanceTxType(Enum):
     """Governance transaction types"""
@@ -30,7 +31,6 @@ class GovernanceTxType(Enum):
     CANCEL_PROPOSAL = "cancel_proposal"
     DELEGATE_VOTE = "delegate_vote"
     REVOKE_DELEGATION = "revoke_delegation"
-
 
 class GovernanceTransaction:
     """
@@ -84,7 +84,6 @@ class GovernanceTransaction:
         tx.txid = data["txid"]
         return tx
 
-
 class OnChainProposal:
     """
     Proposal stored on blockchain
@@ -99,7 +98,7 @@ class OnChainProposal:
         proposal_type: str,
         submitter: str,
         submitter_voting_power: float,
-        proposal_payload: Optional[Dict[str, Any]] = None,
+        proposal_payload: dict[str, Any] | None = None,
     ):
         self.proposal_id = proposal_id
         self.title = title
@@ -140,7 +139,6 @@ class OnChainProposal:
             "status": self.status,
             "payload": self.payload,
         }
-
 
 class GovernanceState:
     """
@@ -639,7 +637,7 @@ class GovernanceState:
             "rollback_txid": tx.txid,
         }
 
-    def _check_proposal_approved(self, proposal_id: str) -> Tuple[bool, str, Dict]:
+    def _check_proposal_approved(self, proposal_id: str) -> tuple[bool, str, Dict]:
         """Check if proposal has enough votes to be approved"""
 
         if proposal_id not in self.votes:
@@ -699,7 +697,7 @@ class GovernanceState:
 
         return True, f"Approved with {voter_count} voters ({approval_pct:.1f}% approval)", details
 
-    def _check_implementation_approved(self, proposal_id: str) -> Tuple[bool, str, Dict]:
+    def _check_implementation_approved(self, proposal_id: str) -> tuple[bool, str, Dict]:
         """Check if 50% of original voters approved implementation"""
 
         original_voters_set = self.original_voters.get(proposal_id, set())
@@ -728,7 +726,7 @@ class GovernanceState:
         else:
             return False, f"Need {required_yes} yes votes, have {yes_count}", details
 
-    def get_proposal_state(self, proposal_id: str) -> Optional[Dict]:
+    def get_proposal_state(self, proposal_id: str) -> Dict | None:
         """Get current state of proposal"""
 
         if proposal_id not in self.proposals:
@@ -737,7 +735,7 @@ class GovernanceState:
         proposal = self.proposals[proposal_id]
         return proposal.to_dict()
 
-    def reconstruct_from_blockchain(self, governance_transactions: List[GovernanceTransaction]):
+    def reconstruct_from_blockchain(self, governance_transactions: list[GovernanceTransaction]):
         """
         Rebuild governance state from blockchain
         Replay all governance transactions in order
@@ -758,7 +756,6 @@ class GovernanceState:
                 self.execute_proposal(tx)
             elif tx_type == GovernanceTxType.ROLLBACK_CHANGE:
                 self.rollback_change(tx)
-
 
 # Example usage
 if __name__ == "__main__":

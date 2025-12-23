@@ -4,19 +4,20 @@ Tests for Biometric Authentication Framework
 Run with: pytest test_biometric_auth.py -v
 """
 
-import pytest
 import secrets
 
+import pytest
+
 from xai.sdk.biometric.biometric_auth import (
-    BiometricType,
-    BiometricError,
     BiometricCapability,
+    BiometricError,
+    BiometricType,
     MockBiometricProvider,
 )
 from xai.sdk.biometric.secure_key_derivation import (
-    SecureKeyDerivation,
-    EncryptedWalletKey,
     BiometricTokenCache,
+    EncryptedWalletKey,
+    SecureKeyDerivation,
 )
 
 

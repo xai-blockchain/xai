@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 EVM Execution Context.
 
@@ -6,8 +8,8 @@ including caller information, call data, gas tracking, and state access.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Any, TYPE_CHECKING
 from enum import Enum
+from typing import TYPE_CHECKING, Any
 
 from .memory import EVMMemory
 from .stack import EVMStack
@@ -15,7 +17,6 @@ from .storage import EVMStorage, TransientStorage
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Blockchain
-
 
 class CallType(Enum):
     """Type of contract call."""
@@ -27,15 +28,13 @@ class CallType(Enum):
     CREATE = "CREATE"
     CREATE2 = "CREATE2"
 
-
 @dataclass
 class Log:
     """EVM log entry (event)."""
 
     address: str
-    topics: List[int]
+    topics: list[int]
     data: bytes
-
 
 @dataclass
 class CallContext:
@@ -78,7 +77,7 @@ class CallContext:
 
     # Output
     output: bytes = b""
-    logs: List[Log] = field(default_factory=list)
+    logs: list[Log] = field(default_factory=list)
 
     # Execution status
     halted: bool = False
@@ -122,7 +121,6 @@ class CallContext:
         """Get remaining gas."""
         return self.gas
 
-
 @dataclass
 class BlockContext:
     """
@@ -156,7 +154,6 @@ class BlockContext:
         # Will be implemented via blockchain reference
         return 0
 
-
 @dataclass
 class ExecutionContext:
     """
@@ -179,37 +176,37 @@ class ExecutionContext:
     tx_value: int  # Value sent
 
     # Blockchain reference
-    blockchain: Optional["Blockchain"] = None
+    blockchain: "Blockchain" | None = None
 
     # Call stack
-    call_stack: List[CallContext] = field(default_factory=list)
+    call_stack: list[CallContext] = field(default_factory=list)
     max_call_depth: int = 1024
 
     # Storage (contract address -> storage)
-    storage: Dict[str, EVMStorage] = field(default_factory=dict)
+    storage: dict[str, EVMStorage] = field(default_factory=dict)
     transient_storage: TransientStorage = field(default_factory=TransientStorage)
 
     # Account state changes
-    balance_changes: Dict[str, int] = field(default_factory=dict)
-    created_accounts: Set[str] = field(default_factory=set)
-    destroyed_accounts: Set[str] = field(default_factory=set)
+    balance_changes: dict[str, int] = field(default_factory=dict)
+    created_accounts: set[str] = field(default_factory=set)
+    destroyed_accounts: set[str] = field(default_factory=set)
 
     # Gas accounting
     gas_used: int = 0
     gas_refund: int = 0
 
     # Logs (events)
-    logs: List[Log] = field(default_factory=list)
+    logs: list[Log] = field(default_factory=list)
 
     # Access lists (EIP-2929)
-    accessed_addresses: Set[str] = field(default_factory=set)
-    accessed_storage_keys: Dict[str, Set[int]] = field(default_factory=dict)
+    accessed_addresses: set[str] = field(default_factory=set)
+    accessed_storage_keys: dict[str, set[int]] = field(default_factory=dict)
 
     # State snapshots for revert
-    snapshots: List[Dict[str, Any]] = field(default_factory=list)
+    snapshots: list[dict[str, Any]] = field(default_factory=list)
 
     @property
-    def current_call(self) -> Optional[CallContext]:
+    def current_call(self) -> CallContext | None:
         """Get current call context."""
         return self.call_stack[-1] if self.call_stack else None
 
@@ -233,7 +230,7 @@ class ExecutionContext:
         self.call_stack.append(call)
         return True
 
-    def pop_call(self) -> Optional[CallContext]:
+    def pop_call(self) -> CallContext | None:
         """
         Pop the current call from the stack.
 

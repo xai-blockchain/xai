@@ -11,7 +11,6 @@ from pathlib import Path
 
 import pytest
 
-
 from xai.core.blockchain_persistence import BlockchainStorage
 
 

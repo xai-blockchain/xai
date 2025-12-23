@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Node Operator Consensus Questioning System
 
@@ -21,15 +23,13 @@ Use Cases:
 - Implementation choices: "Which database should I use for this feature?"
 """
 
-import time
 import hashlib
 import json
-from typing import Dict, List, Optional, Tuple
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 
 from xai.core.crypto_utils import verify_signature_hex
-
 
 class QuestionPriority(Enum):
     """Priority levels for AI questions"""
@@ -39,7 +39,6 @@ class QuestionPriority(Enum):
     MEDIUM = "medium"  # Nice to have guidance
     LOW = "low"  # Optional input
 
-
 class QuestionType(Enum):
     """Types of questions AI can ask"""
 
@@ -48,7 +47,6 @@ class QuestionType(Enum):
     NUMERIC = "numeric"  # Number value (fees, timeouts, etc.)
     FREE_FORM = "free_form"  # Open-ended text response
     RANKED_CHOICE = "ranked_choice"  # Rank options in order
-
 
 class QuestionStatus(Enum):
     """Lifecycle of a question"""
@@ -60,7 +58,6 @@ class QuestionStatus(Enum):
     TIMEOUT = "timeout"  # Not enough votes in time
     ANSWERED = "answered"  # AI received answer and continued
 
-
 @dataclass
 class AnswerOption:
     """A possible answer to a question"""
@@ -68,9 +65,8 @@ class AnswerOption:
     option_id: str
     option_text: str
     votes: int = 0
-    voters: List[str] = field(default_factory=list)  # Node operator addresses
+    voters: list[str] = field(default_factory=list)  # Node operator addresses
     vote_weight: float = 0.0  # Weighted by stake + reputation
-
 
 @dataclass
 class NodeOperatorAnswer:
@@ -83,10 +79,10 @@ class NodeOperatorAnswer:
     question_id: str = "" # Added to allow hashing with question context
 
     # Vote details
-    selected_option_id: Optional[str] = None  # For multiple choice
-    numeric_value: Optional[float] = None  # For numeric
-    free_form_text: Optional[str] = None  # For free-form
-    ranked_options: Optional[List[str]] = None  # For ranked choice
+    selected_option_id: str | None = None  # For multiple choice
+    numeric_value: float | None = None  # For numeric
+    free_form_text: str | None = None  # For free-form
+    ranked_options: list[str] | None = None  # For ranked choice
 
     # Weight (stake + reputation)
     xai_stake: float = 0.0
@@ -126,7 +122,7 @@ class AIQuestion:
     context: str  # Why AI is asking, what it's working on
 
     # Options (for multiple choice/ranked)
-    options: List[AnswerOption] = field(default_factory=list)
+    options: list[AnswerOption] = field(default_factory=list)
 
     # Constraints
     min_node_operators: int = 25  # Minimum required
@@ -136,22 +132,21 @@ class AIQuestion:
     # Lifecycle
     status: QuestionStatus = QuestionStatus.SUBMITTED
     submitted_at: float = field(default_factory=time.time)
-    voting_opened_at: Optional[float] = None
-    voting_closed_at: Optional[float] = None
+    voting_opened_at: float | None = None
+    voting_closed_at: float | None = None
 
     # Answers
-    answers: Dict[str, NodeOperatorAnswer] = field(default_factory=dict)  # node_address -> answer
+    answers: dict[str, NodeOperatorAnswer] = field(default_factory=dict)  # node_address -> answer
     total_vote_weight: float = 0.0
 
     # Result
-    consensus_answer: Optional[str] = None  # The final answer AI receives
+    consensus_answer: str | None = None  # The final answer AI receives
     consensus_confidence: float = 0.0  # How confident (0-1)
-    consensus_reached_at: Optional[float] = None
+    consensus_reached_at: float | None = None
 
     # AI continuation
     ai_acknowledged: bool = False
-    ai_acknowledged_at: Optional[float] = None
-
+    ai_acknowledged_at: float | None = None
 
 class AINodeOperatorQuestioning:
     """
@@ -170,10 +165,10 @@ class AINodeOperatorQuestioning:
         self.governance_dao = governance_dao
 
         # Active questions
-        self.questions: Dict[str, AIQuestion] = {}  # question_id -> AIQuestion
+        self.questions: dict[str, AIQuestion] = {}  # question_id -> AIQuestion
 
         # Node operator reputation
-        self.node_reputation: Dict[str, float] = {}  # node_address -> reputation (0-100)
+        self.node_reputation: dict[str, float] = {}  # node_address -> reputation (0-100)
 
         # Configuration
         self.min_node_operators = 25
@@ -195,9 +190,9 @@ class AINodeOperatorQuestioning:
         question_type: QuestionType,
         priority: QuestionPriority,
         context: str,
-        options: Optional[List[str]] = None,
-        min_operators: Optional[int] = None,
-        timeout_seconds: Optional[int] = None,
+        options: list[str] | None = None,
+        min_operators: int | None = None,
+        timeout_seconds: int | None = None,
     ) -> str:
         """
         AI submits a question during task execution
@@ -284,10 +279,10 @@ class AINodeOperatorQuestioning:
         node_address: str,
         public_key: str, # Node operator's public key
         signature: str,  # Signature of the answer
-        selected_option_id: Optional[str] = None,
-        numeric_value: Optional[float] = None,
-        free_form_text: Optional[str] = None,
-        ranked_options: Optional[List[str]] = None,
+        selected_option_id: str | None = None,
+        numeric_value: float | None = None,
+        free_form_text: str | None = None,
+        ranked_options: list[str] | None = None,
     ) -> Dict:
         """
         Node operator submits an answer to a question
@@ -641,7 +636,7 @@ class AINodeOperatorQuestioning:
 
         return False
 
-    def _get_leading_answer(self, question: AIQuestion) -> Optional[str]:
+    def _get_leading_answer(self, question: AIQuestion) -> str | None:
         """Get current leading answer (even if consensus not reached)"""
 
         if question.question_type in [QuestionType.MULTIPLE_CHOICE, QuestionType.YES_NO]:
@@ -715,7 +710,6 @@ class AINodeOperatorQuestioning:
         print(f"   {current:.1f} → {new_reputation:.1f} ({delta:+.1f})")
         print(f"   Reason: {reason}")
 
-
 # Example usage and demonstration
 if __name__ == "__main__":
     print("=" * 80)
@@ -765,7 +759,6 @@ if __name__ == "__main__":
         pub = f"pubkey_{i}"
         priv = f"privkey_{i}"
         node_wallets[addr] = MockWallet(addr, pub, priv)
-
 
     # Initialize questioning system
     questioning = AINodeOperatorQuestioning(blockchain, dao)

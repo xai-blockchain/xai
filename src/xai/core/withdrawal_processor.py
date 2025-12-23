@@ -9,7 +9,7 @@ import os
 import time
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from xai.core.exchange_wallet import ExchangeWalletManager
 
@@ -17,17 +17,15 @@ logger = logging.getLogger(__name__)
 
 STATE_FILE = "processor_state.json"
 
-
 @dataclass
 class WithdrawalDecision:
     """Structured decision returned by the withdrawal processor."""
 
     status: str
-    reason: Optional[str] = None
-    settlement_txid: Optional[str] = None
-    release_timestamp: Optional[float] = None
+    reason: str | None = None
+    settlement_txid: str | None = None
+    release_timestamp: float | None = None
     risk_score: float = 0.0
-
 
 class WithdrawalProcessor:
     """Evaluates and settles pending withdrawals with layered safety checks."""
@@ -42,7 +40,7 @@ class WithdrawalProcessor:
         max_withdrawal_per_tx: float = 250_000.0,
         max_daily_volume: float = 1_000_000.0,
         manual_review_threshold: float = 0.65,
-        blocked_destinations: Optional[Set[str]] = None,
+        blocked_destinations: set[str] | None = None,
     ) -> None:
         self.wallet_manager = wallet_manager
         self.data_dir = data_dir
@@ -53,8 +51,8 @@ class WithdrawalProcessor:
         self.manual_review_threshold = manual_review_threshold
         self.blocked_destinations = {dest.lower() for dest in blocked_destinations or set()}
         self.state_path = os.path.join(self.data_dir, STATE_FILE)
-        self.daily_totals: Dict[str, Dict[str, float]] = {}
-        self.processed_withdrawals: Dict[str, Dict[str, Any]] = {}
+        self.daily_totals: dict[str, dict[str, float]] = {}
+        self.processed_withdrawals: dict[str, dict[str, Any]] = {}
         self._load_state()
 
     # ------------------------------------------------------------------
@@ -88,7 +86,7 @@ class WithdrawalProcessor:
     # ------------------------------------------------------------------
     # Core processing
     # ------------------------------------------------------------------
-    def process_queue(self, current_timestamp: Optional[float] = None) -> Dict[str, Any]:
+    def process_queue(self, current_timestamp: float | None = None) -> dict[str, Any]:
         """Process all pending withdrawals and return structured statistics."""
         now = current_timestamp or time.time()
         pending = self.wallet_manager.list_pending_withdrawals()
@@ -173,7 +171,7 @@ class WithdrawalProcessor:
         self._save_state()
         return stats
 
-    def _evaluate_withdrawal(self, tx: Dict[str, Any], now: float) -> WithdrawalDecision:
+    def _evaluate_withdrawal(self, tx: dict[str, Any], now: float) -> WithdrawalDecision:
         """Return the action that should be applied to a pending withdrawal."""
         try:
             amount = Decimal(str(tx["amount"]))
@@ -237,7 +235,7 @@ class WithdrawalProcessor:
     # ------------------------------------------------------------------
     # Risk & compliance helpers
     # ------------------------------------------------------------------
-    def _calculate_risk_score(self, tx: Dict[str, Any], amount: Decimal) -> float:
+    def _calculate_risk_score(self, tx: dict[str, Any], amount: Decimal) -> float:
         """Derive a deterministic risk score between 0 and 1."""
         score = 0.15
 
@@ -303,7 +301,7 @@ class WithdrawalProcessor:
         window["amount"] = float(float(window["amount"]) + float(amount))
         self.daily_totals[user] = window
 
-    def _simulate_settlement(self, tx: Dict[str, Any], now: float) -> str:
+    def _simulate_settlement(self, tx: dict[str, Any], now: float) -> str:
         """Generate deterministic settlement identifiers for auditability."""
         payload = f"{tx['id']}|{tx['user_address']}|{tx['currency']}|{tx['amount']}|{now}"
         digest = hashlib.sha256(payload.encode()).hexdigest()

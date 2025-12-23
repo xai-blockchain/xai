@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 from decimal import Decimal
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import pytest
 
 from xai.core.aixn_blockchain.atomic_swap_11_coins import CrossChainVerifier
 from xai.core.spv_header_store import SPVHeaderStore, Header
-
 
 class FixtureVerifier(CrossChainVerifier):
     """
@@ -14,22 +15,21 @@ class FixtureVerifier(CrossChainVerifier):
     we never hit external networks in unit tests.
     """
 
-    def __init__(self, fixtures: Dict[Tuple[str, Optional[Tuple[Tuple[str, Any], ...]]], Dict[str, Any]]):
+    def __init__(self, fixtures: dict[tuple[str, tuple[tuple[str, Any], ...] | None], dict[str, Any]]):
         super().__init__()
         self.fixtures = fixtures
 
     def _http_get_json(
         self,
         url: str,
-        params: Optional[Dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
         *,
         timeout: float = CrossChainVerifier.DEFAULT_TIMEOUT,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         key = (url, tuple(sorted(params.items())) if params else None)
         if key not in self.fixtures:
             raise AssertionError(f"Unexpected HTTP request for key {key}")
         return self.fixtures[key]
-
 
 def test_verify_utxo_transaction_success():
     tx_hash = "a" * 64
@@ -61,7 +61,6 @@ def test_verify_utxo_transaction_success():
     assert data["confirmations"] == 5  # 800004 - 800000 + 1
     assert data["amount_to_recipient"] == pytest.approx(1.25)
 
-
 def test_verify_utxo_transaction_insufficient_confirmations():
     tx_hash = "b" * 64
     recipient = "bc1qrecipient0000000000000000000000000000"
@@ -88,7 +87,6 @@ def test_verify_utxo_transaction_insufficient_confirmations():
     assert "Insufficient confirmations" in message
     assert data["confirmations"] == 1
 
-
 def test_verify_utxo_transaction_recipient_mismatch():
     tx_hash = "c" * 64
 
@@ -113,7 +111,6 @@ def test_verify_utxo_transaction_recipient_mismatch():
     assert valid is False
     assert "Amount mismatch" in message
     assert data["amount_to_recipient"] == 0
-
 
 def test_verify_account_chain_transaction_success():
     tx_hash = "d" * 64
@@ -154,7 +151,6 @@ def test_verify_account_chain_transaction_success():
     assert data["confirmations"] == int(tip_hex, 16) - int(block_number_hex, 16) + 1
     assert data["amount_to_recipient"] == pytest.approx(1.0)
 
-
 def test_invalid_tx_hash_rejected():
     verifier = FixtureVerifier({})
     valid, message, data = verifier.verify_transaction_on_chain(
@@ -169,7 +165,6 @@ def test_invalid_tx_hash_rejected():
     assert "Invalid transaction hash" in message
     assert data is None
 
-
 def test_unsupported_coin_rejected():
     verifier = FixtureVerifier({})
     valid, message, data = verifier.verify_transaction_on_chain(
@@ -182,7 +177,6 @@ def test_unsupported_coin_rejected():
     assert valid is False
     assert "Unsupported coin" in message
     assert data is None
-
 
 def test_cached_result_returned():
     tx_hash = "f" * 64
@@ -217,7 +211,6 @@ def test_cached_result_returned():
     assert valid2 is True
     assert data2 == data
 
-
 def test_header_store_overrides_confirmations(monkeypatch):
     store = SPVHeaderStore()
     genesis = Header(height=0, block_hash="00" * 16, prev_hash="", bits=0x1f00ffff)
@@ -251,7 +244,6 @@ def test_header_store_overrides_confirmations(monkeypatch):
     assert valid is True
     assert data["confirmations"] >= 11  # from header store best tip
 
-
 def test_ingest_headers_validates_pow():
     store = SPVHeaderStore()
     verifier = CrossChainVerifier(header_store=store)
@@ -262,7 +254,6 @@ def test_ingest_headers_validates_pow():
     assert added == 1
     assert rejected == ["ff" * 16]
     assert store.get_best_tip().block_hash == "00" * 16
-
 
 def test_verify_minimum_confirmations_uses_spv_store():
     store = SPVHeaderStore()

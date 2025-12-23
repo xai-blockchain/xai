@@ -1,14 +1,16 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - XAI Token Manager
 
 Manages the core XAI token functionalities, including supply, balances, and vesting.
 """
 
-from typing import Dict, Any, Optional
 import time
+from typing import Any
+
 from xai.core.structured_logger import StructuredLogger, get_structured_logger
 from xai.core.xai_token import XAIToken
-
 
 class XAITokenManager:
     """
@@ -19,7 +21,7 @@ class XAITokenManager:
         self,
         initial_supply: float = 0,
         supply_cap: float = 121_000_000,
-        logger: Optional[StructuredLogger] = None,
+        logger: StructuredLogger | None = None,
     ):
         self.xai_token = XAIToken(initial_supply, supply_cap)
         self.logger = logger or get_structured_logger()
@@ -125,7 +127,7 @@ class XAITokenManager:
         """
         return self.xai_token.supply_cap
 
-    def get_token_metrics(self) -> Dict[str, Any]:
+    def get_token_metrics(self) -> dict[str, Any]:
         """
         Returns key metrics of the XAI token.
         """
@@ -150,21 +152,19 @@ class XAITokenManager:
             )
             return False
 
-    def get_vesting_status(self, address: str) -> Optional[Dict[str, Any]]:
+    def get_vesting_status(self, address: str) -> dict[str, Any] | None:
         """
         Retrieves the vesting status for an address.
         """
         return self.xai_token.vesting_schedules.get(address)
 
-
 # Global instance for convenience
 _global_xai_token_manager = None
-
 
 def get_xai_token_manager(
     initial_supply: float = 0,
     supply_cap: float = 121_000_000,
-    logger: Optional[StructuredLogger] = None,
+    logger: StructuredLogger | None = None,
 ) -> XAITokenManager:
     """
     Get global XAITokenManager instance.

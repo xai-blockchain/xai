@@ -9,10 +9,9 @@ from __future__ import annotations
 
 import random  # OK for simulation and test data generation
 import time
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass
 from collections import defaultdict
-
+from dataclasses import dataclass
+from typing import Any
 
 @dataclass
 class SimulatedTransaction:
@@ -23,8 +22,7 @@ class SimulatedTransaction:
     priority: str  # 'low', 'medium', 'high'
     timestamp: float
     confirmed: bool = False
-    confirmation_time: Optional[float] = None
-
+    confirmation_time: float | None = None
 
 class FeeMarketSimulator:
     """
@@ -45,14 +43,14 @@ class FeeMarketSimulator:
         self.block_time = block_time
         self.block_size_limit = block_size_limit
 
-        self.pending_transactions: List[SimulatedTransaction] = []
-        self.confirmed_transactions: List[SimulatedTransaction] = []
+        self.pending_transactions: list[SimulatedTransaction] = []
+        self.confirmed_transactions: list[SimulatedTransaction] = []
         self.current_block_number = 0
         self.simulation_time = 0.0
 
         # Fee statistics
-        self.fee_history: List[float] = []
-        self.block_utilization: List[float] = []
+        self.fee_history: list[float] = []
+        self.block_utilization: list[float] = []
 
     def add_transaction(
         self,
@@ -82,7 +80,7 @@ class FeeMarketSimulator:
         self.pending_transactions.append(tx)
         return tx
 
-    def simulate_block(self) -> Dict[str, Any]:
+    def simulate_block(self) -> dict[str, Any]:
         """
         Simulate block production
 
@@ -171,7 +169,7 @@ class FeeMarketSimulator:
         else:
             return min(recent_fees) * 1.05
 
-    def get_mempool_stats(self) -> Dict[str, Any]:
+    def get_mempool_stats(self) -> dict[str, Any]:
         """Get mempool statistics"""
         if not self.pending_transactions:
             return {
@@ -192,7 +190,7 @@ class FeeMarketSimulator:
             "max_fee": max(fees)
         }
 
-    def get_simulation_stats(self) -> Dict[str, Any]:
+    def get_simulation_stats(self) -> dict[str, Any]:
         """Get overall simulation statistics"""
         return {
             "blocks_simulated": self.current_block_number,
@@ -203,7 +201,6 @@ class FeeMarketSimulator:
             "average_fee": sum(self.fee_history) / max(1, len(self.fee_history))
         }
 
-
 class DynamicFeeEstimator:
     """
     Dynamic fee estimator based on market conditions
@@ -212,7 +209,7 @@ class DynamicFeeEstimator:
     """
 
     def __init__(self):
-        self.fee_samples: List[float] = []
+        self.fee_samples: list[float] = []
         self.max_samples = 100
         self.min_fee = 0.0001
         self.max_fee = 1.0
@@ -267,7 +264,7 @@ class DynamicFeeEstimator:
 
         return fee
 
-    def get_fee_range(self) -> Dict[str, float]:
+    def get_fee_range(self) -> dict[str, float]:
         """Get current fee range"""
         if not self.fee_samples:
             return {
@@ -282,13 +279,12 @@ class DynamicFeeEstimator:
             "average": sum(self.fee_samples) / len(self.fee_samples)
         }
 
-
 class CongestionMonitor:
     """Monitor network congestion for fee estimation"""
 
     def __init__(self):
-        self.mempool_sizes: List[int] = []
-        self.block_utilizations: List[float] = []
+        self.mempool_sizes: list[int] = []
+        self.block_utilizations: list[float] = []
         self.max_history = 20
 
     def update(self, mempool_size: int, block_utilization: float) -> None:

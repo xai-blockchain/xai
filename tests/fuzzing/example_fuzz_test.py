@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Example Fuzzing Tests for XAI Blockchain
 
@@ -21,14 +23,13 @@ Usage:
 import json
 import random
 import string
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from hypothesis import given, strategies as st, settings, Phase
 
 # Note: These imports would be adjusted based on actual XAI implementation
 # For demonstration, we use placeholder implementations
-
 
 # ============================================================================
 # FUZZING HELPERS
@@ -39,8 +40,7 @@ def generate_random_string(min_length: int = 0, max_length: int = 1000) -> str:
     length = random.randint(min_length, max_length)
     return ''.join(random.choices(string.printable, k=length))
 
-
-def generate_random_json(max_depth: int = 5) -> Dict[str, Any]:
+def generate_random_json(max_depth: int = 5) -> dict[str, Any]:
     """Generate random JSON structure for fuzzing."""
     if max_depth == 0:
         # Base case: return primitive value
@@ -67,7 +67,6 @@ def generate_random_json(max_depth: int = 5) -> Dict[str, Any]:
     else:
         return generate_random_json(0)
 
-
 def generate_malicious_sql_patterns() -> list:
     """Generate SQL injection patterns for fuzzing."""
     return [
@@ -83,7 +82,6 @@ def generate_malicious_sql_patterns() -> list:
         "' AND '1'='1",
     ]
 
-
 def generate_xss_patterns() -> list:
     """Generate XSS attack patterns for fuzzing."""
     return [
@@ -96,7 +94,6 @@ def generate_xss_patterns() -> list:
         "<<SCRIPT>alert('XSS');//<</SCRIPT>",
         "<SCRIPT SRC=http://evil.com/xss.js></SCRIPT>",
     ]
-
 
 def generate_command_injection_patterns() -> list:
     """Generate command injection patterns for fuzzing."""
@@ -111,7 +108,6 @@ def generate_command_injection_patterns() -> list:
         "&& cat /etc/shadow",
     ]
 
-
 def generate_path_traversal_patterns() -> list:
     """Generate path traversal patterns for fuzzing."""
     return [
@@ -123,7 +119,6 @@ def generate_path_traversal_patterns() -> list:
         "../../../../../../../../../../etc/passwd",
         "%252e%252e%252f",
     ]
-
 
 # ============================================================================
 # API ENDPOINT FUZZING TESTS
@@ -342,7 +337,6 @@ class TestAPIFuzzing:
                 "body": {"error": "Invalid request"}
             }
 
-
 # ============================================================================
 # TRANSACTION FUZZING TESTS
 # ============================================================================
@@ -474,7 +468,6 @@ class TestTransactionFuzzing:
             "error": "Invalid signature" if not valid else None
         }
 
-
 # ============================================================================
 # INPUT VALIDATION FUZZING TESTS
 # ============================================================================
@@ -550,7 +543,6 @@ class TestInputValidationFuzzing:
         """Mock binary data processing."""
         return {"length": len(data), "data": data[:10]}
 
-
 # ============================================================================
 # NETWORK PROTOCOL FUZZING TESTS
 # ============================================================================
@@ -625,7 +617,6 @@ class TestNetworkFuzzing:
         valid = msg_type <= 100 and length < 100000
 
         return {"valid": valid, "type": msg_type, "length": length}
-
 
 # ============================================================================
 # FUZZING TEST CONFIGURATION

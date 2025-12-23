@@ -7,7 +7,6 @@ Measures transactions per second under various load conditions
 import pytest
 import time
 import threading
-from typing import List
 
 from xai.core.blockchain import Blockchain
 from xai.core.wallet import Wallet

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain Configuration Manager
 
@@ -10,14 +12,15 @@ Centralized configuration management system supporting:
 - Type checking
 """
 
-import os
 import json
 import logging
-import yaml
-from typing import Any, Dict, Optional, Union
-from pathlib import Path
-from dataclasses import dataclass, field, asdict
+import os
+from dataclasses import asdict, dataclass, field
 from enum import Enum
+from pathlib import Path
+from typing import Any
+
+import yaml
 
 logger = logging.getLogger(__name__)
 try:
@@ -26,9 +29,7 @@ try:
 except ImportError:
     HAS_DOTENV = False
 
-
 DEFAULT_CONFIG_DIR = Path(__file__).resolve().parent / "config"
-
 
 class Environment(Enum):
     """Environment types"""
@@ -38,13 +39,11 @@ class Environment(Enum):
     PRODUCTION = "production"
     TESTNET = "testnet"
 
-
 class NetworkType(Enum):
     """Network types"""
 
     TESTNET = "testnet"
     MAINNET = "mainnet"
-
 
 @dataclass
 class NetworkConfig:
@@ -88,7 +87,6 @@ class NetworkConfig:
         if self.sync_interval < 1:
             raise ValueError(f"Invalid sync_interval: {self.sync_interval}. Must be >= 1")
 
-
 @dataclass
 class BlockchainConfig:
     """Blockchain configuration settings"""
@@ -131,7 +129,6 @@ class BlockchainConfig:
                 f"Invalid transaction_fee_percent: {self.transaction_fee_percent}. Must be 0-100"
             )
 
-
 @dataclass
 class SecurityConfig:
     """Security configuration settings"""
@@ -161,7 +158,6 @@ class SecurityConfig:
         if self.max_mempool_size < 1:
             raise ValueError(f"Invalid max_mempool_size: {self.max_mempool_size}. Must be >= 1")
 
-
 @dataclass
 class StorageConfig:
     """Storage configuration settings"""
@@ -186,7 +182,6 @@ class StorageConfig:
         if self.backup_retention < 1:
             raise ValueError(f"Invalid backup_retention: {self.backup_retention}. Must be >= 1")
 
-
 @dataclass
 class LoggingConfig:
     """Logging configuration settings"""
@@ -208,7 +203,6 @@ class LoggingConfig:
         if self.max_log_size < 1024:
             raise ValueError(f"Invalid max_log_size: {self.max_log_size}. Must be >= 1024")
 
-
 @dataclass
 class GenesisConfig:
     """Genesis block configuration"""
@@ -227,7 +221,6 @@ class GenesisConfig:
         if not self.address_prefix:
             raise ValueError("address_prefix cannot be empty")
 
-
 class ConfigManager:
     """
     Configuration Manager for XAI Blockchain
@@ -243,9 +236,9 @@ class ConfigManager:
 
     def __init__(
         self,
-        environment: Optional[str] = None,
-        config_dir: Optional[str] = None,
-        cli_overrides: Optional[Dict[str, Any]] = None,
+        environment: str | None = None,
+        config_dir: str | None = None,
+        cli_overrides: dict[str, Any] | None = None,
     ):
         """
         Initialize Configuration Manager
@@ -272,12 +265,12 @@ class ConfigManager:
         self.genesis: GenesisConfig = None
 
         # Raw config data
-        self._raw_config: Dict[str, Any] = {}
+        self._raw_config: dict[str, Any] = {}
 
         # Load configuration
         self._load_configuration()
 
-    def _determine_environment(self, environment: Optional[str]) -> Environment:
+    def _determine_environment(self, environment: str | None) -> Environment:
         """
         Determine the environment to use
 
@@ -332,7 +325,7 @@ class ConfigManager:
         # 7. Validate all configurations
         self._validate_configuration()
 
-    def _load_config_file(self, filename: str) -> Dict[str, Any]:
+    def _load_config_file(self, filename: str) -> dict[str, Any]:
         """
         Load configuration from YAML or JSON file
 
@@ -357,7 +350,7 @@ class ConfigManager:
         # File not found - return empty dict
         return {}
 
-    def _merge_configs(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    def _merge_configs(self, base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
         """
         Deep merge two configuration dictionaries
 
@@ -378,7 +371,7 @@ class ConfigManager:
 
         return result
 
-    def _apply_env_variables(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _apply_env_variables(self, config: dict[str, Any]) -> dict[str, Any]:
         """
         Apply environment variable overrides (XAI_*)
 
@@ -420,7 +413,7 @@ class ConfigManager:
 
         return result
 
-    def _parse_env_value(self, value: str) -> Union[str, int, float, bool]:
+    def _parse_env_value(self, value: str) -> str | int | float | bool:
         """
         Parse environment variable value to appropriate type
 
@@ -453,7 +446,7 @@ class ConfigManager:
         # String
         return value
 
-    def _apply_cli_overrides(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _apply_cli_overrides(self, config: dict[str, Any]) -> dict[str, Any]:
         """
         Apply command-line argument overrides
 
@@ -479,7 +472,7 @@ class ConfigManager:
 
         return result
 
-    def _parse_configuration(self, config: Dict[str, Any]):
+    def _parse_configuration(self, config: dict[str, Any]):
         """
         Parse configuration into typed objects
 
@@ -541,7 +534,7 @@ class ConfigManager:
 
         return value
 
-    def get_section(self, section: str) -> Optional[Dict[str, Any]]:
+    def get_section(self, section: str) -> dict[str, Any] | None:
         """
         Get entire configuration section
 
@@ -553,7 +546,7 @@ class ConfigManager:
         """
         return self._raw_config.get(section)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """
         Export configuration to dictionary
 
@@ -570,7 +563,7 @@ class ConfigManager:
             "genesis": asdict(self.genesis),
         }
 
-    def get_public_config(self) -> Dict[str, Any]:
+    def get_public_config(self) -> dict[str, Any]:
         """
         Get public (non-sensitive) configuration for API exposure
 
@@ -605,15 +598,13 @@ class ConfigManager:
     def __repr__(self) -> str:
         return f"ConfigManager(environment={self.environment.value})"
 
-
 # Singleton instance
-_config_manager: Optional[ConfigManager] = None
-
+_config_manager: ConfigManager | None = None
 
 def get_config_manager(
-    environment: Optional[str] = None,
-    config_dir: Optional[str] = None,
-    cli_overrides: Optional[Dict[str, Any]] = None,
+    environment: str | None = None,
+    config_dir: str | None = None,
+    cli_overrides: dict[str, Any] | None = None,
     force_reload: bool = False,
 ) -> ConfigManager:
     """

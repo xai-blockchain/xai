@@ -26,28 +26,26 @@ Security features:
 
 from __future__ import annotations
 
-import time
-import logging
 import hashlib
+import logging
+import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Callable, Any, TYPE_CHECKING
 from enum import Enum
+from typing import TYPE_CHECKING, Any, Callable
 
-from ..vm.exceptions import VMExecutionError
 from ..crypto_utils import verify_signature_hex
+from ..vm.exceptions import VMExecutionError
 
 if TYPE_CHECKING:
     from ..blockchain import Blockchain
 
 logger = logging.getLogger(__name__)
 
-
 # ==================== Signature Verification Exceptions ====================
 
 class SignatureError(VMExecutionError):
     """Base exception for signature verification failures."""
     pass
-
 
 class MalformedSignatureError(SignatureError):
     """
@@ -59,7 +57,6 @@ class MalformedSignatureError(SignatureError):
     """
     pass
 
-
 class InvalidSignatureError(SignatureError):
     """
     Raised when signature does not match the claimed signer.
@@ -70,7 +67,6 @@ class InvalidSignatureError(SignatureError):
     """
     pass
 
-
 class MissingPublicKeyError(SignatureError):
     """
     Raised when public key required for verification is not registered.
@@ -79,7 +75,6 @@ class MissingPublicKeyError(SignatureError):
     for signature verification. This error indicates the key is missing.
     """
     pass
-
 
 # ERC-4337 Constants
 VALIDATION_SUCCESS = 0
@@ -91,14 +86,12 @@ SIG_VALIDATION_SUCCESS = 0
 MAX_VERIFICATION_GAS = 150_000
 MAX_CALL_GAS = 500_000
 
-
 class AccountType(Enum):
     """Types of smart accounts."""
     SIMPLE = "simple"
     MULTI_SIG = "multisig"
     SOCIAL_RECOVERY = "social_recovery"
     SESSION_KEY = "session_key"
-
 
 @dataclass
 class UserOperation:
@@ -160,7 +153,6 @@ class UserOperation:
 
         return hashlib.sha3_256(full_data).digest()
 
-
 @dataclass
 class ValidationResult:
     """Result of UserOp validation."""
@@ -170,14 +162,12 @@ class ValidationResult:
     sig_failed: bool = False
     prefund: int = 0  # Required prefund
 
-
 @dataclass
 class ExecutionResult:
     """Result of UserOp execution."""
     success: bool
     actual_gas_used: int
     return_data: bytes = b""
-
 
 @dataclass
 class SmartAccount:
@@ -286,10 +276,10 @@ class SmartAccount:
 
     def execute_batch(
         self,
-        dests: List[str],
-        values: List[int],
-        datas: List[bytes],
-    ) -> List[bytes]:
+        dests: list[str],
+        values: list[int],
+        datas: list[bytes],
+    ) -> list[bytes]:
         """
         Execute multiple calls in a batch.
 
@@ -483,7 +473,6 @@ class SmartAccount:
         if caller.lower() != self.entry_point.lower():
             raise VMExecutionError("Caller is not entry point")
 
-
 @dataclass
 class MultiSigAccount(SmartAccount):
     """
@@ -499,8 +488,8 @@ class MultiSigAccount(SmartAccount):
         - Each signature is 64 bytes (r || s)
     """
 
-    owners: List[str] = field(default_factory=list)
-    owner_public_keys: Dict[str, str] = field(default_factory=dict)  # owner_address -> public_key
+    owners: list[str] = field(default_factory=list)
+    owner_public_keys: dict[str, str] = field(default_factory=dict)  # owner_address -> public_key
     threshold: int = 1
 
     def __post_init__(self) -> None:
@@ -680,7 +669,7 @@ class MultiSigAccount(SmartAccount):
 
             # Try to verify against each owner's public key
             sig_valid = False
-            last_error: Optional[Exception] = None
+            last_error: Exception | None = None
 
             for owner in self.owners:
                 owner_lower = owner.lower()
@@ -799,7 +788,6 @@ class MultiSigAccount(SmartAccount):
         if caller.lower() not in [o.lower() for o in self.owners]:
             raise VMExecutionError("Caller is not an owner")
 
-
 @dataclass
 class SocialRecoveryAccount(SmartAccount):
     """
@@ -808,12 +796,12 @@ class SocialRecoveryAccount(SmartAccount):
     Allows guardians to recover the account if owner loses access.
     """
 
-    guardians: List[str] = field(default_factory=list)
+    guardians: list[str] = field(default_factory=list)
     guardian_threshold: int = 2
     recovery_period: int = 86400  # 24 hours
 
     # Pending recovery
-    pending_recovery: Optional[str] = None
+    pending_recovery: str | None = None
     recovery_initiated_at: float = 0
 
     def __post_init__(self) -> None:
@@ -859,7 +847,7 @@ class SocialRecoveryAccount(SmartAccount):
         self,
         caller: str,
         new_owner: str,
-        guardian_signatures: List[bytes],
+        guardian_signatures: list[bytes],
     ) -> bool:
         """
         Initiate account recovery.
@@ -956,7 +944,6 @@ class SocialRecoveryAccount(SmartAccount):
 
         return True
 
-
 @dataclass
 class SessionKeyAccount(SmartAccount):
     """
@@ -970,7 +957,7 @@ class SessionKeyAccount(SmartAccount):
     """
 
     # Session key address -> permissions
-    session_keys: Dict[str, "SessionKeyPermissions"] = field(default_factory=dict)
+    session_keys: dict[str, "SessionKeyPermissions"] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Initialize session key account."""
@@ -1065,16 +1052,14 @@ class SessionKeyAccount(SmartAccount):
 
         return True
 
-
 @dataclass
 class SessionKeyPermissions:
     """Permissions for a session key."""
 
     valid_until: float = 0  # Timestamp, 0 = no expiry
     spending_limit: int = 0  # Max value per tx, 0 = no limit
-    allowed_targets: List[str] = field(default_factory=list)  # Allowed contracts
-    allowed_selectors: List[bytes] = field(default_factory=list)  # Allowed functions
-
+    allowed_targets: list[str] = field(default_factory=list)  # Allowed contracts
+    allowed_selectors: list[bytes] = field(default_factory=list)  # Allowed functions
 
 @dataclass
 class Paymaster:
@@ -1095,10 +1080,10 @@ class Paymaster:
     deposit: int = 0
 
     # Sponsored accounts (whitelist mode)
-    sponsored_accounts: Dict[str, bool] = field(default_factory=dict)
+    sponsored_accounts: dict[str, bool] = field(default_factory=dict)
 
     # Token payment settings
-    accepted_tokens: Dict[str, int] = field(default_factory=dict)  # token -> rate
+    accepted_tokens: dict[str, int] = field(default_factory=dict)  # token -> rate
 
     # Statistics
     total_sponsored: int = 0
@@ -1119,7 +1104,7 @@ class Paymaster:
         user_op: UserOperation,
         user_op_hash: bytes,
         max_cost: int,
-    ) -> Tuple[bytes, int]:
+    ) -> tuple[bytes, int]:
         """
         Validate UserOp and agree to pay.
 
@@ -1231,7 +1216,6 @@ class Paymaster:
         if caller.lower() != self.owner.lower():
             raise VMExecutionError("Caller is not owner")
 
-
 @dataclass
 class EntryPoint:
     """
@@ -1250,18 +1234,18 @@ class EntryPoint:
     chain_id: int = 1
 
     # Deposits (for gas prepayment)
-    deposits: Dict[str, int] = field(default_factory=dict)
+    deposits: dict[str, int] = field(default_factory=dict)
 
     # Account nonces
-    nonces: Dict[str, int] = field(default_factory=dict)
+    nonces: dict[str, int] = field(default_factory=dict)
 
     # Statistics
     total_ops_processed: int = 0
     total_gas_used: int = 0
 
     # Registry of known accounts/paymasters
-    accounts: Dict[str, SmartAccount] = field(default_factory=dict)
-    paymasters: Dict[str, Paymaster] = field(default_factory=dict)
+    accounts: dict[str, SmartAccount] = field(default_factory=dict)
+    paymasters: dict[str, Paymaster] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Initialize EntryPoint."""
@@ -1273,9 +1257,9 @@ class EntryPoint:
 
     def handle_ops(
         self,
-        ops: List[UserOperation],
+        ops: list[UserOperation],
         beneficiary: str,
-    ) -> List[ExecutionResult]:
+    ) -> list[ExecutionResult]:
         """
         Handle a batch of UserOperations.
 
@@ -1617,7 +1601,6 @@ class EntryPoint:
             "paymasters_registered": len(self.paymasters),
         }
 
-
 @dataclass
 class AccountFactory:
     """
@@ -1630,7 +1613,7 @@ class AccountFactory:
     entry_point: str = ""
 
     # Deployed accounts
-    accounts: Dict[str, SmartAccount] = field(default_factory=dict)
+    accounts: dict[str, SmartAccount] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Initialize factory."""
@@ -1690,10 +1673,10 @@ class AccountFactory:
 
     def create_multisig_account(
         self,
-        owners: List[str],
+        owners: list[str],
         threshold: int,
         salt: int,
-        owner_public_keys: Optional[Dict[str, str]] = None,
+        owner_public_keys: dict[str, str] | None = None,
     ) -> MultiSigAccount:
         """
         Create a multi-sig account.
@@ -1713,7 +1696,7 @@ class AccountFactory:
         address = f"0x{addr_hash[-20:].hex()}"
 
         # Normalize public keys dict
-        normalized_keys: Dict[str, str] = {}
+        normalized_keys: dict[str, str] = {}
         if owner_public_keys:
             for addr, pubkey in owner_public_keys.items():
                 normalized_keys[addr.lower()] = pubkey
@@ -1733,7 +1716,7 @@ class AccountFactory:
     def create_social_recovery_account(
         self,
         owner: str,
-        guardians: List[str],
+        guardians: list[str],
         threshold: int,
         salt: int,
     ) -> SocialRecoveryAccount:

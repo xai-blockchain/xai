@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Production-Grade Threshold Signature Scheme (TSS)
 
@@ -13,7 +15,6 @@ import hashlib
 import logging
 import secrets
 from dataclasses import dataclass
-from typing import List, Tuple
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
@@ -26,9 +27,7 @@ from cryptography.hazmat.primitives.serialization import (
     PublicFormat,
 )
 
-
 logger = logging.getLogger(__name__)
-
 
 @dataclass
 class SecretShare:
@@ -36,7 +35,6 @@ class SecretShare:
     index: int
     value: int
     prime: int
-
 
 @dataclass
 class TSSKeyShare:
@@ -46,7 +44,6 @@ class TSSKeyShare:
     private_share: int  # Secret share of private key
     public_key: bytes  # Combined public key (same for all participants)
     verification_point: bytes  # Verification point for this share
-
 
 class ShamirSecretSharing:
     """
@@ -60,7 +57,7 @@ class ShamirSecretSharing:
     PRIME = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
 
     @staticmethod
-    def _evaluate_polynomial(coefficients: List[int], x: int, prime: int) -> int:
+    def _evaluate_polynomial(coefficients: list[int], x: int, prime: int) -> int:
         """Evaluate polynomial at point x in field Z_prime using Horner's method"""
         if not coefficients:
             return 0
@@ -76,7 +73,7 @@ class ShamirSecretSharing:
         return pow(a, prime - 2, prime)
 
     @classmethod
-    def _lagrange_interpolate(cls, shares: List[SecretShare], x: int = 0) -> int:
+    def _lagrange_interpolate(cls, shares: list[SecretShare], x: int = 0) -> int:
         """
         Lagrange interpolation to recover secret from shares.
 
@@ -114,7 +111,7 @@ class ShamirSecretSharing:
         return result % prime
 
     @classmethod
-    def split_secret(cls, secret: int, threshold: int, num_shares: int) -> List[SecretShare]:
+    def split_secret(cls, secret: int, threshold: int, num_shares: int) -> list[SecretShare]:
         """
         Split a secret into shares using Shamir's Secret Sharing.
 
@@ -152,7 +149,7 @@ class ShamirSecretSharing:
         return shares
 
     @classmethod
-    def reconstruct_secret(cls, shares: List[SecretShare]) -> int:
+    def reconstruct_secret(cls, shares: list[SecretShare]) -> int:
         """
         Reconstruct secret from threshold or more shares.
 
@@ -168,8 +165,8 @@ class ShamirSecretSharing:
         return cls._lagrange_interpolate(shares, x=0)
 
     @classmethod
-    def verify_share(cls, share: SecretShare, other_shares: List[SecretShare],
-                    original_shares: List[SecretShare]) -> bool:
+    def verify_share(cls, share: SecretShare, other_shares: list[SecretShare],
+                    original_shares: list[SecretShare]) -> bool:
         """
         Verify that a share is consistent with others (Feldman VSS).
 
@@ -203,7 +200,6 @@ class ShamirSecretSharing:
             logging.debug("TSS share verification failed: %s", exc)
             return False
 
-
 class ProductionTSS:
     """
     Production-grade Threshold Signature Scheme using ECDSA and Shamir's Secret Sharing.
@@ -221,7 +217,7 @@ class ProductionTSS:
         self.curve = curve
         self.sss = ShamirSecretSharing()
 
-    def generate_distributed_keys(self, num_participants: int, threshold: int) -> Tuple[List[TSSKeyShare], bytes]:
+    def generate_distributed_keys(self, num_participants: int, threshold: int) -> tuple[list[TSSKeyShare], bytes]:
         """
         Generate distributed key shares for threshold signing.
 
@@ -271,7 +267,7 @@ class ProductionTSS:
 
         return key_shares, master_public_bytes
 
-    def create_partial_signature(self, key_share: TSSKeyShare, message: bytes) -> Tuple[int, int]:
+    def create_partial_signature(self, key_share: TSSKeyShare, message: bytes) -> tuple[int, int]:
         """
         Create a partial signature using a key share.
 
@@ -304,7 +300,7 @@ class ProductionTSS:
 
         return (r, s_partial)
 
-    def combine_partial_signatures(self, partial_sigs: List[Tuple[int, TSSKeyShare, Tuple[int, int]]],
+    def combine_partial_signatures(self, partial_sigs: list[tuple[int, TSSKeyShare, tuple[int, int]]],
                                    threshold: int) -> bytes:
         """
         Combine partial signatures into final threshold signature.
@@ -378,7 +374,6 @@ class ProductionTSS:
         except (ValueError, InvalidSignature):
             # Signature verification failed
             return False
-
 
 if __name__ == "__main__":
     logger.warning("Production TSS demo disabled; run unit tests instead.")

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Security Audit Script: Private Key Exposure Detection
 
@@ -17,15 +19,13 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import List, Tuple
-
 
 class PrivateKeyExposureAuditor:
     """Audit codebase for private key exposure vulnerabilities"""
 
     def __init__(self, root_dir: str):
         self.root_dir = Path(root_dir)
-        self.issues: List[Tuple[str, int, str, str]] = []
+        self.issues: list[tuple[str, int, str, str]] = []
         self.checked_files = 0
 
     def scan_file(self, filepath: Path) -> None:
@@ -81,7 +81,7 @@ class PrivateKeyExposureAuditor:
         except Exception as e:
             print(f"Error scanning {filepath}: {e}", file=sys.stderr)
 
-    def scan_directory(self, directory: Path, exclude_patterns: List[str]) -> None:
+    def scan_directory(self, directory: Path, exclude_patterns: list[str]) -> None:
         """Recursively scan directory for Python files"""
         for filepath in directory.rglob("*.py"):
             # Skip excluded patterns
@@ -174,7 +174,6 @@ class PrivateKeyExposureAuditor:
             print("Private key exposure is a CRITICAL security vulnerability.")
             return 1
 
-
 def main():
     """Main entry point"""
     # Determine project root (3 levels up from this script)
@@ -185,7 +184,6 @@ def main():
     exit_code = auditor.run_audit()
 
     sys.exit(exit_code)
-
 
 if __name__ == "__main__":
     main()

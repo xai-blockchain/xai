@@ -1,16 +1,17 @@
+from __future__ import annotations
+
 """
 Wallet Client for XAI SDK
 
 Handles all wallet-related operations.
 """
 
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Any
 
+from ..exceptions import ValidationError, WalletError
 from ..http_client import HTTPClient
-from ..models import Wallet, Balance, WalletType
-from ..exceptions import WalletError, ValidationError
-
+from ..models import Balance, Wallet, WalletType
 
 class WalletClient:
     """Client for wallet operations."""
@@ -27,7 +28,7 @@ class WalletClient:
     def create(
         self,
         wallet_type: WalletType = WalletType.STANDARD,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> Wallet:
         """
         Create a new wallet.
@@ -58,8 +59,10 @@ class WalletClient:
                 wallet_type=WalletType(response.get("wallet_type", "standard")),
                 private_key=response.get("private_key"),
             )
-        except Exception as e:
-            raise WalletError(f"Failed to create wallet: {str(e)}")
+        except WalletError:
+            raise
+        except (KeyError, ValueError, TypeError) as e:
+            raise WalletError(f"Failed to create wallet: {str(e)}") from e
 
     def get(self, address: str) -> Wallet:
         """
@@ -86,8 +89,10 @@ class WalletClient:
                 wallet_type=WalletType(response.get("wallet_type", "standard")),
                 nonce=response.get("nonce", 0),
             )
-        except Exception as e:
-            raise WalletError(f"Failed to get wallet: {str(e)}")
+        except WalletError:
+            raise
+        except (KeyError, ValueError, TypeError) as e:
+            raise WalletError(f"Failed to get wallet: {str(e)}") from e
 
     def get_balance(self, address: str) -> Balance:
         """
@@ -114,15 +119,17 @@ class WalletClient:
                 available_balance=response.get("available_balance", response["balance"]),
                 nonce=response.get("nonce", 0),
             )
-        except Exception as e:
-            raise WalletError(f"Failed to get balance: {str(e)}")
+        except WalletError:
+            raise
+        except (KeyError, ValueError, TypeError) as e:
+            raise WalletError(f"Failed to get balance: {str(e)}") from e
 
     def get_transactions(
         self,
         address: str,
         limit: int = 50,
         offset: int = 0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Get wallet transaction history.
 
@@ -154,15 +161,17 @@ class WalletClient:
                 "limit": response.get("limit", limit),
                 "offset": response.get("offset", offset),
             }
-        except Exception as e:
-            raise WalletError(f"Failed to get transactions: {str(e)}")
+        except WalletError:
+            raise
+        except (KeyError, ValueError, TypeError) as e:
+            raise WalletError(f"Failed to get transactions: {str(e)}") from e
 
     def create_embedded(
         self,
         app_id: str,
         user_id: str,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Create an embedded wallet.
 
@@ -189,10 +198,12 @@ class WalletClient:
                 payload["metadata"] = metadata
 
             return self.http_client.post("/wallet/embedded/create", data=payload)
-        except Exception as e:
-            raise WalletError(f"Failed to create embedded wallet: {str(e)}")
+        except WalletError:
+            raise
+        except (KeyError, ValueError, TypeError) as e:
+            raise WalletError(f"Failed to create embedded wallet: {str(e)}") from e
 
-    def login_embedded(self, wallet_id: str, password: str) -> Dict[str, Any]:
+    def login_embedded(self, wallet_id: str, password: str) -> dict[str, Any]:
         """
         Login to an embedded wallet.
 
@@ -215,5 +226,7 @@ class WalletClient:
                 "password": password,
             }
             return self.http_client.post("/wallet/embedded/login", data=payload)
-        except Exception as e:
-            raise WalletError(f"Failed to login to embedded wallet: {str(e)}")
+        except WalletError:
+            raise
+        except (KeyError, ValueError, TypeError) as e:
+            raise WalletError(f"Failed to login to embedded wallet: {str(e)}") from e

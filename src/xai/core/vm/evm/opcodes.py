@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 EVM Opcode Definitions.
 
@@ -5,10 +7,8 @@ Complete implementation of all EVM opcodes as defined in the Ethereum Yellow Pap
 and subsequent EIPs up to Shanghai/Cancun.
 """
 
-from enum import IntEnum
 from dataclasses import dataclass
-from typing import Dict, Optional
-
+from enum import IntEnum
 
 class Opcode(IntEnum):
     """Complete EVM opcode enumeration."""
@@ -184,7 +184,6 @@ class Opcode(IntEnum):
     INVALID = 0xFE
     SELFDESTRUCT = 0xFF
 
-
 @dataclass
 class OpcodeInfo:
     """Metadata for an opcode including gas costs and stack effects."""
@@ -201,9 +200,8 @@ class OpcodeInfo:
         """Net change in stack size."""
         return self.stack_output - self.stack_input
 
-
 # Complete opcode information table
-OPCODE_INFO: Dict[int, OpcodeInfo] = {
+OPCODE_INFO: dict[int, OpcodeInfo] = {
     # Stop and Arithmetic
     0x00: OpcodeInfo(0x00, "STOP", 0, 0, 0, "Halts execution"),
     0x01: OpcodeInfo(0x01, "ADD", 2, 1, 3, "Addition operation"),
@@ -327,33 +325,27 @@ for i in range(1, 17):
         opcode, f"SWAP{i}", i + 1, i + 1, 3, f"Exchange 1st and {i + 1}th stack items"
     )
 
-
 def get_push_size(opcode: int) -> int:
     """Get number of bytes to read for PUSH opcodes."""
     if 0x60 <= opcode <= 0x7F:
         return opcode - 0x5F
     return 0
 
-
 def is_push(opcode: int) -> bool:
     """Check if opcode is a PUSH instruction."""
     return 0x5F <= opcode <= 0x7F
-
 
 def is_dup(opcode: int) -> bool:
     """Check if opcode is a DUP instruction."""
     return 0x80 <= opcode <= 0x8F
 
-
 def is_swap(opcode: int) -> bool:
     """Check if opcode is a SWAP instruction."""
     return 0x90 <= opcode <= 0x9F
 
-
 def is_log(opcode: int) -> bool:
     """Check if opcode is a LOG instruction."""
     return 0xA0 <= opcode <= 0xA4
-
 
 def get_log_topic_count(opcode: int) -> int:
     """Get number of topics for LOG opcodes."""
@@ -361,11 +353,9 @@ def get_log_topic_count(opcode: int) -> int:
         return opcode - 0xA0
     return 0
 
-
 def is_jump(opcode: int) -> bool:
     """Check if opcode is a jump instruction."""
     return opcode in (0x56, 0x57)  # JUMP, JUMPI
-
 
 def is_terminating(opcode: int) -> bool:
     """Check if opcode terminates execution."""

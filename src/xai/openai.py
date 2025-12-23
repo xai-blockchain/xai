@@ -1,41 +1,38 @@
+from __future__ import annotations
+
 """
 Production OpenAI API client with real HTTP implementation.
 Includes retry logic, timeout handling, and rate limiting.
 """
 
-import time
 import json
-from typing import Any, Dict, Optional, List
-import urllib.request
-import urllib.error
 import logging
+import time
+import urllib.error
+import urllib.request
+from typing import Any
 
 logger = logging.getLogger(__name__)
-
 
 class OpenAIError(Exception):
     """Base exception for OpenAI API errors."""
 
-    def __init__(self, message: str, status_code: Optional[int] = None, response_body: Optional[str] = None):
+    def __init__(self, message: str, status_code: int | None = None, response_body: str | None = None):
         super().__init__(message)
         self.status_code = status_code
         self.response_body = response_body
-
 
 class RateLimitError(OpenAIError):
     """Raised when rate limit is exceeded."""
     pass
 
-
 class TimeoutError(OpenAIError):
     """Raised when request times out."""
     pass
 
-
 class InvalidRequestError(OpenAIError):
     """Raised when request parameters are invalid."""
     pass
-
 
 class OpenAI:
     """
@@ -58,7 +55,7 @@ class OpenAI:
         api_key: str,
         timeout: int = DEFAULT_TIMEOUT,
         max_retries: int = MAX_RETRIES,
-        organization: Optional[str] = None
+        organization: str | None = None
     ):
         """
         Initialize the OpenAI client.
@@ -83,9 +80,9 @@ class OpenAI:
         self,
         endpoint: str,
         method: str = "POST",
-        data: Optional[Dict[str, Any]] = None,
+        data: dict[str, Any] | None = None,
         retry_count: int = 0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Make HTTP request to OpenAI API with retry logic.
 
@@ -216,9 +213,9 @@ class OpenAI:
     def ChatCompletion(
         self,
         model: str = "gpt-3.5-turbo",
-        messages: Optional[List[Dict[str, str]]] = None,
+        messages: list[dict[str, str]] | None = None,
         temperature: float = 1.0,
-        max_tokens: Optional[int] = None,
+        max_tokens: int | None = None,
         **kwargs: Any
     ) -> Any:
         """
@@ -263,7 +260,7 @@ class OpenAI:
     def Completion(
         self,
         model: str = "gpt-3.5-turbo-instruct",
-        prompt: Optional[str] = None,
+        prompt: str | None = None,
         temperature: float = 1.0,
         max_tokens: int = 16,
         **kwargs: Any
@@ -301,11 +298,10 @@ class OpenAI:
 
         return CompletionResponse(response_dict)
 
-
 class ChatCompletionResponse:
     """Wrapper for chat completion response with attribute access."""
 
-    def __init__(self, data: Dict[str, Any]):
+    def __init__(self, data: dict[str, Any]):
         self._data = data
         self.choices = data.get("choices", [])
         self.usage = data.get("usage", {})
@@ -319,11 +315,10 @@ class ChatCompletionResponse:
     def get(self, key: str, default: Any = None) -> Any:
         return self._data.get(key, default)
 
-
 class CompletionResponse:
     """Wrapper for completion response with attribute access."""
 
-    def __init__(self, data: Dict[str, Any]):
+    def __init__(self, data: dict[str, Any]):
         self._data = data
         self.choices = data.get("choices", [])
         self.usage = data.get("usage", {})

@@ -21,11 +21,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from xai.merchant import MerchantPaymentProcessor, WebhookEvent
-from xai.mobile.qr_transactions import TransactionQRGenerator, QRCODE_AVAILABLE
+from xai.mobile.qr_transactions import QRCODE_AVAILABLE, TransactionQRGenerator
 
 if QRCODE_AVAILABLE:
-    from PIL import Image
     from io import BytesIO
+
+    from PIL import Image
 
 
 def display_qr_code(qr_bytes: bytes):

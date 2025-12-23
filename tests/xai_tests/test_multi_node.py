@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Comprehensive Multi-Node Network Tests for XAI Blockchain
 Phase 3.1 & 3.2 of LOCAL_TESTING_PLAN.md
@@ -16,19 +18,18 @@ import pytest
 import time
 import threading
 import tempfile
-from typing import List, Tuple
+
 from pathlib import Path
 
 from xai.core.blockchain import Blockchain, Block, Transaction
 from xai.core.wallet import Wallet
 from xai.core.advanced_consensus import AdvancedConsensusManager
 
-
 class TestMultiNodeBaseline:
     """Test basic multi-node network functionality"""
 
     @pytest.fixture
-    def three_node_network(self, tmp_path) -> List[Blockchain]:
+    def three_node_network(self, tmp_path) -> list[Blockchain]:
         """Create 3 independent blockchain nodes"""
         nodes = []
         for i in range(3):
@@ -39,7 +40,7 @@ class TestMultiNodeBaseline:
         return nodes
 
     @pytest.fixture
-    def five_node_network(self, tmp_path) -> List[Blockchain]:
+    def five_node_network(self, tmp_path) -> list[Blockchain]:
         """Create 5 independent blockchain nodes"""
         nodes = []
         for i in range(5):
@@ -111,12 +112,11 @@ class TestMultiNodeBaseline:
         assert len(nodes[1].chain) == 1
         assert len(nodes[2].chain) == 1
 
-
 class TestBlockPropagation:
     """Test block propagation between nodes"""
 
     @pytest.fixture
-    def two_node_network(self, tmp_path) -> Tuple[Blockchain, Blockchain]:
+    def two_node_network(self, tmp_path) -> tuple[Blockchain, Blockchain]:
         """Create 2-node network"""
         node1_dir = tmp_path / "node1"
         node2_dir = tmp_path / "node2"
@@ -245,7 +245,6 @@ class TestBlockPropagation:
         result = node2.add_block(block)
         assert result is False
 
-
 class TestOrphanBlocks:
     """Test orphan block handling (Phase 3.3)"""
 
@@ -337,12 +336,11 @@ class TestOrphanBlocks:
         # Just verify chain continues validly
         assert len(node.chain) == 4  # Genesis + 3 mined blocks
 
-
 class TestChainReorganization:
     """Test chain reorganization across network"""
 
     @pytest.fixture
-    def three_nodes(self, tmp_path) -> List[Blockchain]:
+    def three_nodes(self, tmp_path) -> list[Blockchain]:
         """Create 3-node network"""
         nodes = []
         for i in range(3):
@@ -412,12 +410,11 @@ class TestChainReorganization:
         # Node 3 should have adopted longer chain
         assert len(node3.chain) == len(node1.chain)
 
-
 class TestNetworkPartitions:
     """Test network partitioning and healing"""
 
     @pytest.fixture
-    def partitioned_network(self, tmp_path) -> Tuple[List[Blockchain], List[Blockchain]]:
+    def partitioned_network(self, tmp_path) -> tuple[list[Blockchain], list[Blockchain]]:
         """Create two partitions of 2 nodes each"""
         partition1 = []
         partition2 = []
@@ -489,12 +486,11 @@ class TestNetworkPartitions:
         # But should recognize the longer valid chain exists
         assert len(partition2[0].chain) >= 4  # At least kept its own chain
 
-
 class TestConcurrentMining:
     """Test concurrent mining scenarios"""
 
     @pytest.fixture
-    def nodes(self, tmp_path) -> List[Blockchain]:
+    def nodes(self, tmp_path) -> list[Blockchain]:
         """Create 3 nodes"""
         nodes = []
         for i in range(3):
@@ -543,12 +539,11 @@ class TestConcurrentMining:
         assert all(result is not None for result in results)
         assert all(len(node.chain) == 2 for node in nodes)
 
-
 class TestTransactionPropagation:
     """Test transaction propagation across network"""
 
     @pytest.fixture
-    def network(self, tmp_path) -> List[Blockchain]:
+    def network(self, tmp_path) -> list[Blockchain]:
         """Create 3-node network"""
         nodes = []
         for i in range(3):
@@ -637,7 +632,6 @@ class TestTransactionPropagation:
             for node in nodes:
                 valid = node.validate_transaction(tx2)
                 # tx2 should be rejected
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

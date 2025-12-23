@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+from __future__ import annotations
+
 """
 XAI Blockchain - Monitoring Verification Script
 
@@ -15,7 +17,6 @@ import argparse
 import json
 import subprocess
 import shlex
-from typing import List, Optional
 
 # Set UTF-8 encoding for Windows console
 if sys.platform == "win32":
@@ -23,7 +24,6 @@ if sys.platform == "win32":
 
     sys.stdout = codecs.getwriter("utf-8")(sys.stdout.buffer, "strict")
     sys.stderr = codecs.getwriter("utf-8")(sys.stderr.buffer, "strict")
-
 
 class Colors:
     """ANSI color codes"""
@@ -36,32 +36,26 @@ class Colors:
     RESET = "\033[0m"
     BOLD = "\033[1m"
 
-
 def print_header(text):
     """Print a colored header"""
     print(f"\n{Colors.CYAN}{Colors.BOLD}{text}{Colors.RESET}")
     print("=" * 60)
 
-
 def print_success(text):
     """Print success message"""
     print(f"{Colors.GREEN}✓{Colors.RESET} {text}")
-
 
 def print_warning(text):
     """Print warning message"""
     print(f"{Colors.YELLOW}⚠{Colors.RESET} {text}")
 
-
 def print_error(text):
     """Print error message"""
     print(f"{Colors.RED}✗{Colors.RESET} {text}")
 
-
 def print_info(text):
     """Print info message"""
     print(f"{Colors.BLUE}ℹ{Colors.RESET} {text}")
-
 
 def check_python_packages():
     """Check if required Python packages are installed"""
@@ -85,7 +79,6 @@ def check_python_packages():
             all_installed = False
 
     return all_installed
-
 
 def check_file_structure():
     """Check if monitoring files exist"""
@@ -116,7 +109,6 @@ def check_file_structure():
             all_exist = False
 
     return all_exist
-
 
 def check_metrics_endpoint(port=8000, timeout=2):
     """Check if metrics endpoint is accessible"""
@@ -169,7 +161,6 @@ def check_metrics_endpoint(port=8000, timeout=2):
         print_error(f"Error checking metrics endpoint: {e}")
         return False
 
-
 def check_prometheus(port=9090):
     """Check if Prometheus is running"""
     print_header("Checking Prometheus")
@@ -202,7 +193,6 @@ def check_prometheus(port=9090):
         print_error(f"Error checking Prometheus: {e}")
         return False
 
-
 def check_grafana(port=3000):
     """Check if Grafana is running"""
     print_header("Checking Grafana")
@@ -228,7 +218,6 @@ def check_grafana(port=3000):
         print_error(f"Error checking Grafana: {e}")
         return False
 
-
 def check_alertmanager(port=9093):
     """Check if Alertmanager is running"""
     print_header("Checking Alertmanager")
@@ -252,8 +241,7 @@ def check_alertmanager(port=9093):
         print_error(f"Error checking Alertmanager: {e}")
         return False
 
-
-def check_withdrawal_history(env: str, history_path: Path, max_entries: int, loki_url: Optional[str], loki_token: Optional[str]) -> bool:
+def check_withdrawal_history(env: str, history_path: Path, max_entries: int, loki_url: str | None, loki_token: str | None) -> bool:
     """Check that withdrawal threshold history is populated and, optionally, query Loki."""
     print_header("Checking Withdrawal Threshold History")
     if not history_path.exists():
@@ -308,11 +296,10 @@ def check_withdrawal_history(env: str, history_path: Path, max_entries: int, lok
             print_warning(f"Unable to query Loki: {exc}")
     return True
 
-
 def check_remote_withdrawal_history(
-    hosts: List[str],
+    hosts: list[str],
     user: str,
-    ssh_key: Optional[str],
+    ssh_key: str | None,
     remote_path: str,
     max_entries: int,
     timeout: int,
@@ -387,7 +374,6 @@ def check_remote_withdrawal_history(
             )
 
     return overall_success
-
 
 def main():
     """Main verification function"""
@@ -509,7 +495,6 @@ def main():
     else:
         print_error("Some checks failed. Please review the errors above.")
         return 1
-
 
 if __name__ == "__main__":
     try:

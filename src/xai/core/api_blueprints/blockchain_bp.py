@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from flask import Blueprint, jsonify, make_response, request
 
@@ -29,9 +29,8 @@ logger = logging.getLogger(__name__)
 
 blockchain_bp = Blueprint("blockchain", __name__)
 
-
 @blockchain_bp.route("/blocks", methods=["GET"])
-def get_blocks() -> Dict[str, Any]:
+def get_blocks() -> dict[str, Any]:
     """Get all blocks with pagination."""
     blockchain = get_blockchain()
     try:
@@ -64,9 +63,8 @@ def get_blocks() -> Dict[str, Any]:
         }
     )
 
-
 @blockchain_bp.route("/blocks/<index>", methods=["GET"])
-def get_block(index: str) -> Tuple[Dict[str, Any], int]:
+def get_block(index: str) -> tuple[dict[str, Any], int]:
     """Get specific block by index with explicit validation (supports negative input)."""
     blockchain = get_blockchain()
     try:
@@ -144,9 +142,8 @@ def get_block(index: str) -> Tuple[Dict[str, Any], int]:
 
     return jsonify(payload), 200
 
-
 @blockchain_bp.route("/block/<block_hash>", methods=["GET"])
-def get_block_by_hash(block_hash: str) -> Tuple[Dict[str, Any], int]:
+def get_block_by_hash(block_hash: str) -> tuple[dict[str, Any], int]:
     """Get a block by its hash."""
     blockchain = get_blockchain()
     if not block_hash:
@@ -213,9 +210,8 @@ def get_block_by_hash(block_hash: str) -> Tuple[Dict[str, Any], int]:
 
     return jsonify(payload), 200
 
-
 @blockchain_bp.route("/block/receive", methods=["POST"])
-def receive_block() -> Tuple[Dict[str, Any], int]:
+def receive_block() -> tuple[dict[str, Any], int]:
     """Receive a block from a peer node."""
     blockchain = get_blockchain()
     ctx = get_api_context()
@@ -329,9 +325,8 @@ def receive_block() -> Tuple[Dict[str, Any], int]:
         code="block_rejected",
     )
 
-
 @blockchain_bp.route("/transactions", methods=["GET"])
-def get_pending_transactions() -> Dict[str, Any]:
+def get_pending_transactions() -> dict[str, Any]:
     """Get pending transactions in the mempool."""
     blockchain = get_blockchain()
     return jsonify(
@@ -342,9 +337,8 @@ def get_pending_transactions() -> Dict[str, Any]:
         }
     )
 
-
 @blockchain_bp.route("/transaction/<txid>", methods=["GET"])
-def get_transaction(txid: str) -> Tuple[Dict[str, Any], int]:
+def get_transaction(txid: str) -> tuple[dict[str, Any], int]:
     """Get a specific transaction by ID."""
     blockchain = get_blockchain()
     if not txid:

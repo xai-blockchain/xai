@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 EVM Storage Implementation.
 
@@ -6,10 +8,9 @@ are 256-bit words. Storage operations have complex gas pricing based on
 EIP-2200 and EIP-2929 (warm/cold access).
 """
 
-from typing import Dict, Set, Optional, Tuple
 from dataclasses import dataclass, field
-from ..exceptions import VMExecutionError
 
+from ..exceptions import VMExecutionError
 
 # Storage gas constants (EIP-2200, EIP-2929)
 SLOAD_COLD = 2100  # Cold storage read
@@ -20,7 +21,6 @@ SSTORE_CLEAR_REFUND = 4800  # Refund for clearing storage
 SSTORE_RESET_REFUND = 2800  # Refund for resetting original value
 ACCESS_LIST_STORAGE_KEY = 1900  # EIP-2930 access list storage key
 
-
 @dataclass
 class StorageSlot:
     """Represents a single storage slot with original and current values."""
@@ -28,7 +28,6 @@ class StorageSlot:
     original: int  # Value at start of transaction
     current: int  # Current value
     warm: bool = False  # Whether slot has been accessed this transaction
-
 
 @dataclass
 class EVMStorage:
@@ -50,12 +49,12 @@ class EVMStorage:
 
     address: str  # Contract address
     max_size: int = 10 * 1024 * 1024  # 10 MB default limit
-    _slots: Dict[int, StorageSlot] = field(default_factory=dict)
-    _accessed_keys: Set[int] = field(default_factory=set)
+    _slots: dict[int, StorageSlot] = field(default_factory=dict)
+    _accessed_keys: set[int] = field(default_factory=set)
     _pending_refund: int = 0
     _size_bytes: int = 0
 
-    def load(self, key: int) -> Tuple[int, int]:
+    def load(self, key: int) -> tuple[int, int]:
         """
         Load a value from storage (SLOAD).
 
@@ -82,7 +81,7 @@ class EVMStorage:
         slot.warm = True
         return slot.current, gas_cost
 
-    def store(self, key: int, value: int) -> Tuple[int, int]:
+    def store(self, key: int, value: int) -> tuple[int, int]:
         """
         Store a value to storage (SSTORE).
 
@@ -141,7 +140,7 @@ class EVMStorage:
 
     def _calculate_sstore_gas(
         self, original: int, current: int, new: int, is_cold: bool
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         """
         Calculate SSTORE gas cost and refund per EIP-2200.
 
@@ -285,7 +284,7 @@ class EVMStorage:
         else:
             self._slots[key] = StorageSlot(original=value, current=value, warm=False)
 
-    def to_dict(self) -> Dict[str, int]:
+    def to_dict(self) -> dict[str, int]:
         """
         Export storage as dictionary for serialization.
 
@@ -299,7 +298,7 @@ class EVMStorage:
         }
 
     @classmethod
-    def from_dict(cls, address: str, data: Dict[str, int]) -> "EVMStorage":
+    def from_dict(cls, address: str, data: dict[str, int]) -> "EVMStorage":
         """
         Import storage from dictionary.
 
@@ -320,7 +319,6 @@ class EVMStorage:
         """Return string representation."""
         return f"EVMStorage(address={self.address}, slots={self.slot_count}, size={self._size_bytes})"
 
-
 class TransientStorage:
     """
     EIP-1153 Transient Storage implementation.
@@ -337,9 +335,9 @@ class TransientStorage:
 
     def __init__(self) -> None:
         """Initialize empty transient storage."""
-        self._data: Dict[str, Dict[int, int]] = {}
+        self._data: dict[str, dict[int, int]] = {}
 
-    def load(self, address: str, key: int) -> Tuple[int, int]:
+    def load(self, address: str, key: int) -> tuple[int, int]:
         """
         Load from transient storage (TLOAD).
 

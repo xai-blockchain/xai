@@ -1,15 +1,17 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - XAI Token Metrics
 
 Provides real-time and historical data on XAI token supply, distribution, and other key metrics.
 """
 
-from typing import Dict, Any, Optional, List
 import time
 from collections import defaultdict
+from typing import Any
+
 from xai.core.structured_logger import StructuredLogger, get_structured_logger
 from xai.core.xai_token_manager import XAITokenManager, get_xai_token_manager
-
 
 class XAITokenMetrics:
     """
@@ -18,12 +20,12 @@ class XAITokenMetrics:
 
     def __init__(
         self,
-        token_manager: Optional[XAITokenManager] = None,
-        logger: Optional[StructuredLogger] = None,
+        token_manager: XAITokenManager | None = None,
+        logger: StructuredLogger | None = None,
     ):
         self.token_manager = token_manager or get_xai_token_manager()
         self.logger = logger or get_structured_logger()
-        self.historical_data: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        self.historical_data: dict[str, list[dict[str, Any]]] = defaultdict(list)
         self.snapshot_interval = 3600  # 1 hour
         self.last_snapshot_time = 0
         self.logger.info("XAITokenMetrics initialized.")
@@ -39,7 +41,7 @@ class XAITokenMetrics:
         self.logger.debug("Token metrics snapshot taken.", metrics=metrics)
         self.last_snapshot_time = current_time
 
-    def get_current_metrics(self) -> Dict[str, Any]:
+    def get_current_metrics(self) -> dict[str, Any]:
         """
         Returns the most current token metrics.
         """
@@ -47,7 +49,7 @@ class XAITokenMetrics:
 
     def get_historical_metrics(
         self, metric_type: str = "supply_metrics", limit: int = 100
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Returns historical token metrics.
 
@@ -57,7 +59,7 @@ class XAITokenMetrics:
         """
         return self.historical_data.get(metric_type, [])[-limit:]
 
-    def get_distribution_data(self) -> Dict[str, float]:
+    def get_distribution_data(self) -> dict[str, float]:
         """
         Returns data on token distribution across addresses.
         """
@@ -66,7 +68,7 @@ class XAITokenMetrics:
         # For now, we'll use the balances from the XAIToken object.
         return self.token_manager.xai_token.balances
 
-    def get_top_holders(self, count: int = 10) -> List[Dict[str, Any]]:
+    def get_top_holders(self, count: int = 10) -> list[dict[str, Any]]:
         """
         Returns a list of top token holders.
         """
@@ -82,13 +84,11 @@ class XAITokenMetrics:
         if time.time() - self.last_snapshot_time >= self.snapshot_interval:
             self.take_snapshot()
 
-
 # Global instance for convenience
 _global_xai_token_metrics = None
 
-
 def get_xai_token_metrics(
-    token_manager: Optional[XAITokenManager] = None, logger: Optional[StructuredLogger] = None
+    token_manager: XAITokenManager | None = None, logger: StructuredLogger | None = None
 ) -> XAITokenMetrics:
     """
     Get global XAITokenMetrics instance.

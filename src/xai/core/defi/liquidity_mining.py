@@ -17,12 +17,12 @@ Security features:
 
 from __future__ import annotations
 
-import time
-import logging
 import hashlib
+import logging
+import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from ..vm.exceptions import VMExecutionError
 
@@ -31,17 +31,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
 # Precision for reward calculations
 REWARD_PRECISION = 10**18
-
 
 class FarmStatus(Enum):
     """Status of a liquidity farm."""
     ACTIVE = "active"
     PAUSED = "paused"
     ENDED = "ended"
-
 
 @dataclass
 class RewardToken:
@@ -54,7 +51,6 @@ class RewardToken:
     total_distributed: int = 0
     remaining_rewards: int = 0
 
-
 @dataclass
 class UserPosition:
     """User's position in a farm."""
@@ -62,10 +58,10 @@ class UserPosition:
     staked_amount: int = 0
 
     # Reward debt per token (for accurate reward calculation)
-    reward_debt: Dict[str, int] = field(default_factory=dict)
+    reward_debt: dict[str, int] = field(default_factory=dict)
 
     # Pending rewards per token
-    pending_rewards: Dict[str, int] = field(default_factory=dict)
+    pending_rewards: dict[str, int] = field(default_factory=dict)
 
     # Boost multiplier (1x = 10000)
     boost_multiplier: int = 10000
@@ -74,9 +70,8 @@ class UserPosition:
     lock_until: float = 0.0
 
     # Stats
-    total_claimed: Dict[str, int] = field(default_factory=dict)
+    total_claimed: dict[str, int] = field(default_factory=dict)
     staked_at: float = field(default_factory=time.time)
-
 
 @dataclass
 class LiquidityFarm:
@@ -103,10 +98,10 @@ class LiquidityFarm:
     pool_address: str = ""
 
     # Reward tokens
-    reward_tokens: Dict[str, RewardToken] = field(default_factory=dict)
+    reward_tokens: dict[str, RewardToken] = field(default_factory=dict)
 
     # User positions
-    positions: Dict[str, UserPosition] = field(default_factory=dict)
+    positions: dict[str, UserPosition] = field(default_factory=dict)
 
     # Total staked
     total_staked: int = 0
@@ -403,8 +398,8 @@ class LiquidityFarm:
     def claim_rewards(
         self,
         caller: str,
-        token_address: Optional[str] = None,
-    ) -> Dict[str, int]:
+        token_address: str | None = None,
+    ) -> dict[str, int]:
         """
         Claim pending rewards.
 
@@ -458,7 +453,7 @@ class LiquidityFarm:
         finally:
             self._in_operation = False
 
-    def _claim_all_rewards(self, position: UserPosition) -> Dict[str, int]:
+    def _claim_all_rewards(self, position: UserPosition) -> dict[str, int]:
         """Claim all pending rewards for a position."""
         claimed = {}
 
@@ -568,7 +563,7 @@ class LiquidityFarm:
 
     # ==================== View Functions ====================
 
-    def get_pending_rewards(self, user: str) -> Dict[str, int]:
+    def get_pending_rewards(self, user: str) -> dict[str, int]:
         """Get pending rewards for a user."""
         position = self.positions.get(user)
         if not position:
@@ -604,7 +599,7 @@ class LiquidityFarm:
 
         return pending
 
-    def get_position(self, user: str) -> Optional[Dict]:
+    def get_position(self, user: str) -> Dict | None:
         """Get user position details."""
         position = self.positions.get(user)
         if not position:
@@ -713,7 +708,6 @@ class LiquidityFarm:
         if self._in_operation:
             raise VMExecutionError("Reentrancy detected")
 
-
 @dataclass
 class FarmFactory:
     """Factory for deploying liquidity farms."""
@@ -722,10 +716,10 @@ class FarmFactory:
     owner: str = ""
 
     # Deployed farms
-    farms: Dict[str, LiquidityFarm] = field(default_factory=dict)
+    farms: dict[str, LiquidityFarm] = field(default_factory=dict)
 
     # Farms by LP token
-    farms_by_lp: Dict[str, List[str]] = field(default_factory=dict)
+    farms_by_lp: dict[str, list[str]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Initialize factory."""
@@ -792,16 +786,16 @@ class FarmFactory:
 
         return farm
 
-    def get_farm(self, address: str) -> Optional[LiquidityFarm]:
+    def get_farm(self, address: str) -> LiquidityFarm | None:
         """Get farm by address."""
         return self.farms.get(address)
 
-    def get_farms_for_lp(self, lp_token: str) -> List[LiquidityFarm]:
+    def get_farms_for_lp(self, lp_token: str) -> list[LiquidityFarm]:
         """Get all farms for an LP token."""
         addresses = self.farms_by_lp.get(lp_token, [])
         return [self.farms[addr] for addr in addresses if addr in self.farms]
 
-    def get_all_active_farms(self) -> List[Dict]:
+    def get_all_active_farms(self) -> list[Dict]:
         """Get info for all active farms."""
         return [
             farm.get_farm_info()

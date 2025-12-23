@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Token Burning Engine
 
@@ -20,9 +22,7 @@ import json
 import os
 import time
 from datetime import datetime, timezone
-from typing import Dict, Optional, List
 from enum import Enum
-
 
 class ServiceType(Enum):
     """Types of services that consume XAI"""
@@ -48,7 +48,6 @@ class ServiceType(Enum):
     TIME_CAPSULE_FEE = "time_capsule_fee"
     TRANSACTION_FEE = "transaction_fee"
 
-
 # Service pricing in USD (converted to XAI dynamically)
 SERVICE_PRICES_USD = {
     # AI Services (affordable for all users)
@@ -69,7 +68,6 @@ SERVICE_PRICES_USD = {
     ServiceType.TIME_CAPSULE_FEE: 10.00,  # $10 protocol fee
     ServiceType.TRANSACTION_FEE: 0.24,  # 0.24% of transaction
 }
-
 
 class BurnTransaction:
     """
@@ -125,7 +123,6 @@ class BurnTransaction:
                 "%Y-%m-%d %H:%M:%S UTC"
             ),
         }
-
 
 class TokenBurningEngine:
     """
@@ -229,7 +226,7 @@ class TokenBurningEngine:
         return xai_cost
 
     def consume_service(
-        self, wallet_address: str, service_type: ServiceType, custom_amount: Optional[float] = None
+        self, wallet_address: str, service_type: ServiceType, custom_amount: float | None = None
     ) -> dict:
         """
         Consume XAI for service usage
@@ -345,7 +342,7 @@ class TokenBurningEngine:
             ).strftime("%Y-%m-%d %H:%M:%S UTC"),
         }
 
-    def get_recent_burns(self, limit: int = 100) -> List[dict]:
+    def get_recent_burns(self, limit: int = 100) -> list[dict]:
         """
         Get recent anonymous burn transactions
 

@@ -1,31 +1,33 @@
+from __future__ import annotations
+
 """
 AXN Exchange Wallet Manager - Multi-Currency Custody System
 Handles deposits, withdrawals, and balance management for all supported currencies
 """
 
+import hashlib
 import json
 import os
-import time
 import threading
+import time
 from decimal import Decimal
-from typing import Dict, List, Optional, Any, Iterable
-import hashlib
+from typing import Any
+
 from xai.core.constants import (
-    MIN_WITHDRAWAL_USD,
-    MIN_WITHDRAWAL_XAI,
+    MAX_TRANSACTION_HISTORY_SIZE,
     MIN_WITHDRAWAL_BTC,
     MIN_WITHDRAWAL_ETH,
+    MIN_WITHDRAWAL_USD,
     MIN_WITHDRAWAL_USDT,
-    MAX_TRANSACTION_HISTORY_SIZE,
+    MIN_WITHDRAWAL_XAI,
 )
-
 
 class ExchangeWallet:
     """Manages multi-currency balances for a single user"""
 
     def __init__(self, user_address: str):
         self.user_address = user_address
-        self.balances: Dict[str, Decimal] = {
+        self.balances: dict[str, Decimal] = {
             "USD": Decimal("0"),
             "AXN": Decimal("0"),
             "BTC": Decimal("0"),
@@ -34,7 +36,7 @@ class ExchangeWallet:
             "LTC": Decimal("0"),
             "BNB": Decimal("0"),
         }
-        self.locked_balances: Dict[str, Decimal] = {
+        self.locked_balances: dict[str, Decimal] = {
             "USD": Decimal("0"),
             "AXN": Decimal("0"),
             "BTC": Decimal("0"),
@@ -112,7 +114,6 @@ class ExchangeWallet:
             },
         }
 
-
 class ExchangeWalletManager:
     """Manages all user wallets and handles custody"""
 
@@ -120,9 +121,9 @@ class ExchangeWalletManager:
 
     def __init__(self, data_dir: str = "exchange_data"):
         self.data_dir = data_dir
-        self.wallets: Dict[str, ExchangeWallet] = {}
-        self.transactions: List[dict] = []
-        self.pending_withdrawals: Dict[str, dict] = {}
+        self.wallets: dict[str, ExchangeWallet] = {}
+        self.transactions: list[dict] = []
+        self.pending_withdrawals: dict[str, dict] = {}
         self.lock = threading.RLock()
         self.load_wallets()
         self._refresh_pending_withdrawals()
@@ -151,7 +152,7 @@ class ExchangeWalletManager:
         currency: str,
         amount: float,
         deposit_type: str = "manual",
-        tx_hash: Optional[str] = None,
+        tx_hash: str | None = None,
     ) -> dict:
         """Deposit funds into user's exchange wallet"""
         amount_decimal = Decimal(str(amount))
@@ -188,7 +189,7 @@ class ExchangeWalletManager:
         amount: float,
         destination: str,
         *,
-        compliance_metadata: Optional[Dict[str, Any]] = None,
+        compliance_metadata: dict[str, Any] | None = None,
     ) -> dict:
         """Withdraw funds from user's exchange wallet"""
         min_withdrawals = {
@@ -311,7 +312,7 @@ class ExchangeWalletManager:
             wallet = self.get_wallet(user_address)
             return wallet.to_dict()
 
-    def get_transaction_history(self, user_address: str, limit: int = 50) -> List[dict]:
+    def get_transaction_history(self, user_address: str, limit: int = 50) -> list[dict]:
         """Get transaction history for user"""
         with self.lock:
             user_txs = [
@@ -329,7 +330,7 @@ class ExchangeWalletManager:
         with self.lock:
             return len(self.pending_withdrawals)
 
-    def list_pending_withdrawals(self) -> List[dict]:
+    def list_pending_withdrawals(self) -> list[dict]:
         """Return all pending withdrawal transactions."""
         with self.lock:
             pending = sorted(
@@ -337,7 +338,7 @@ class ExchangeWalletManager:
             )
             return [tx.copy() for tx in pending]
 
-    def get_withdrawal_counts(self) -> Dict[str, int]:
+    def get_withdrawal_counts(self) -> dict[str, int]:
         """Return counts of withdrawals grouped by status."""
         with self.lock:
             counts = {
@@ -355,7 +356,7 @@ class ExchangeWalletManager:
             counts["total"] = sum(counts.values())
             return counts
 
-    def get_withdrawals_by_status(self, status: str, limit: int = 50) -> List[dict]:
+    def get_withdrawals_by_status(self, status: str, limit: int = 50) -> list[dict]:
         """Return withdrawals that match a status ordered by recency."""
         normalized = status.lower()
         if normalized not in self._WITHDRAWAL_STATUSES:
@@ -372,7 +373,7 @@ class ExchangeWalletManager:
             sorted_items = sorted(items, key=lambda tx: tx["timestamp"], reverse=True)
             return [tx.copy() for tx in sorted_items[: max(1, limit)]]
 
-    def get_pending_withdrawal(self, tx_id: str) -> Optional[dict]:
+    def get_pending_withdrawal(self, tx_id: str) -> dict | None:
         """Fetch a pending withdrawal by transaction id."""
         with self.lock:
             tx = self.pending_withdrawals.get(tx_id)
@@ -461,7 +462,7 @@ class ExchangeWalletManager:
         """Get exchange statistics"""
         with self.lock:
             total_users = len(self.wallets)
-            total_volume: Dict[str, float] = {}
+            total_volume: dict[str, float] = {}
             for tx in self.transactions:
                 if tx.get("type") == "trade":
                     currency = tx["quote_currency"]

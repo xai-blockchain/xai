@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Account abstraction helpers and embedded wallet management.
 Task 178: Gas sponsorship for account abstraction
@@ -23,47 +25,43 @@ Security Considerations:
 - Blacklist/whitelist support for access control
 """
 
+import hashlib
 import json
 import logging
 import os
-import hashlib
 import secrets
 import time
-from pathlib import Path
-from typing import Dict, Optional, List, Tuple, TYPE_CHECKING, Deque
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
-from collections import deque
+from pathlib import Path
+from typing import TYPE_CHECKING
 
-from xai.core.wallet import WalletManager
 from xai.core.config import Config
 from xai.core.crypto_utils import sign_message_hex, verify_signature_hex
-
+from xai.core.wallet import WalletManager
 
 class SponsorSignatureError(RuntimeError):
     """Raised when sponsor signature generation fails."""
 
-    def __init__(self, message: str, *, sponsor: Optional[str] = None):
+    def __init__(self, message: str, *, sponsor: str | None = None):
         super().__init__(message)
         self.sponsor = sponsor
-
 
 class SponsorSignatureVerificationError(SponsorSignatureError):
     """Raised when sponsor signature verification fails due to malformed data."""
 
 if TYPE_CHECKING:
-    from xai.core.transaction import Transaction
     from xai.core.blockchain import Blockchain
+    from xai.core.transaction import Transaction
 
 logger = logging.getLogger(__name__)
-
 
 class TransactionStatus(Enum):
     """Status of a sponsored transaction"""
     PENDING = "pending"
     CONFIRMED = "confirmed"
     FAILED = "failed"
-
 
 @dataclass
 class RateLimitConfig:
@@ -87,7 +85,6 @@ class RateLimitConfig:
     # Per-transaction limits
     max_gas_per_transaction: float = 0.1  # Max gas per single transaction
     max_cost_per_transaction: float = 1.0 # Max XAI cost per transaction
-
 
 class SlidingWindowRateLimiter:
     """
@@ -126,7 +123,7 @@ class SlidingWindowRateLimiter:
             config: Rate limit configuration
         """
         self.config = config
-        self.requests: Deque[Tuple[float, float]] = deque()  # (timestamp, gas_amount)
+        self.requests: deque[tuple[float, float]] = deque()  # (timestamp, gas_amount)
 
     def is_allowed(self, gas_amount: float = 0.0) -> bool:
         """
@@ -330,7 +327,7 @@ class SlidingWindowRateLimiter:
 
         return 0.0
 
-    def get_current_usage(self) -> Dict[str, any]:
+    def get_current_usage(self) -> dict[str, any]:
         """
         Get current usage statistics.
 
@@ -369,7 +366,6 @@ class SlidingWindowRateLimiter:
             }
         }
 
-
 @dataclass
 class SponsoredTransaction:
     """Record of a sponsored transaction"""
@@ -379,8 +375,7 @@ class SponsoredTransaction:
     timestamp: float
     sponsor_address: str
     status: str = "pending"  # TransactionStatus value
-    blockchain_txid: Optional[str] = None  # Final confirmed txid
-
+    blockchain_txid: str | None = None  # Final confirmed txid
 
 class GasSponsor:
     """
@@ -402,7 +397,7 @@ class GasSponsor:
         sponsor_address: str,
         budget: float,
         rate_limit: int = 10,
-        rate_limit_config: Optional[RateLimitConfig] = None
+        rate_limit_config: RateLimitConfig | None = None
     ):
         """
         Initialize gas sponsor
@@ -455,18 +450,18 @@ class GasSponsor:
         self.global_rate_limiter = SlidingWindowRateLimiter(global_limit_config)
 
         # Per-address rate limiters (isolates users from each other)
-        self.user_rate_limiters: Dict[str, SlidingWindowRateLimiter] = {}
+        self.user_rate_limiters: dict[str, SlidingWindowRateLimiter] = {}
 
         # Transaction tracking
-        self.sponsored_transactions: List[SponsoredTransaction] = []
-        self._txid_map: Dict[str, SponsoredTransaction] = {}  # preliminary_txid -> transaction
+        self.sponsored_transactions: list[SponsoredTransaction] = []
+        self._txid_map: dict[str, SponsoredTransaction] = {}  # preliminary_txid -> transaction
 
         # Legacy tracking (kept for backwards compatibility)
-        self.user_daily_usage: Dict[str, List[float]] = {}  # user -> timestamps
+        self.user_daily_usage: dict[str, list[float]] = {}  # user -> timestamps
 
         # Access control
-        self.whitelist: List[str] = []  # Whitelisted user addresses
-        self.blacklist: List[str] = []  # Blacklisted user addresses
+        self.whitelist: list[str] = []  # Whitelisted user addresses
+        self.blacklist: list[str] = []  # Blacklisted user addresses
 
         # Limits
         self.min_balance_required = 0.0  # Minimum balance user must have
@@ -493,7 +488,7 @@ class GasSponsor:
         data = f"{user_address}:{gas_amount}:{timestamp}:{self.sponsor_address}".encode()
         return hashlib.sha256(data).hexdigest()
 
-    def sponsor_transaction(self, user_address: str, gas_amount: float) -> Optional[str]:
+    def sponsor_transaction(self, user_address: str, gas_amount: float) -> str | None:
         """
         Sponsor a transaction for a user.
 
@@ -765,7 +760,7 @@ class GasSponsor:
         )
         return False
 
-    def get_transaction_by_preliminary_txid(self, preliminary_txid: str) -> Optional[SponsoredTransaction]:
+    def get_transaction_by_preliminary_txid(self, preliminary_txid: str) -> SponsoredTransaction | None:
         """
         Get transaction by preliminary txid.
 
@@ -777,7 +772,7 @@ class GasSponsor:
         """
         return self._txid_map.get(preliminary_txid)
 
-    def get_transaction_by_blockchain_txid(self, blockchain_txid: str) -> Optional[SponsoredTransaction]:
+    def get_transaction_by_blockchain_txid(self, blockchain_txid: str) -> SponsoredTransaction | None:
         """
         Get transaction by blockchain txid.
 
@@ -814,11 +809,11 @@ class GasSponsor:
         self.total_budget += amount
         self.remaining_budget += amount
 
-    def set_whitelist(self, addresses: List[str]) -> None:
+    def set_whitelist(self, addresses: list[str]) -> None:
         """Set whitelist of allowed users"""
         self.whitelist = addresses
 
-    def set_blacklist(self, addresses: List[str]) -> None:
+    def set_blacklist(self, addresses: list[str]) -> None:
         """Set blacklist of denied users"""
         self.blacklist = addresses
 
@@ -877,7 +872,7 @@ class GasSponsor:
         """Disable sponsorship"""
         self.enabled = False
 
-    def get_stats(self) -> Dict[str, any]:
+    def get_stats(self) -> dict[str, any]:
         """Get comprehensive sponsorship statistics"""
         total_sponsored = sum(tx.gas_amount for tx in self.sponsored_transactions)
         unique_users = len(set(tx.user_address for tx in self.sponsored_transactions))
@@ -910,7 +905,7 @@ class GasSponsor:
             "active_users": len(self.user_rate_limiters)
         }
 
-    def get_user_usage(self, user_address: str) -> Dict[str, any]:
+    def get_user_usage(self, user_address: str) -> dict[str, any]:
         """Get usage stats for a specific user"""
         user_txs = [
             tx for tx in self.sponsored_transactions
@@ -941,7 +936,7 @@ class GasSponsor:
             "rate_limit_usage": user_usage  # New multi-tier stats
         }
 
-    def get_retry_after(self, user_address: Optional[str] = None) -> float:
+    def get_retry_after(self, user_address: str | None = None) -> float:
         """
         Get time until next request would be allowed (in seconds).
 
@@ -962,7 +957,6 @@ class GasSponsor:
 
         return global_retry
 
-
 class EmbeddedWalletRecord:
     def __init__(self, alias: str, contact: str, wallet_name: str, address: str, secret_hash: str):
         self.alias = alias
@@ -971,7 +965,7 @@ class EmbeddedWalletRecord:
         self.address = address
         self.secret_hash = secret_hash
 
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> dict[str, str]:
         return {
             "alias": self.alias,
             "contact": self.contact,
@@ -981,7 +975,7 @@ class EmbeddedWalletRecord:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, str]) -> "EmbeddedWalletRecord":
+    def from_dict(cls, data: dict[str, str]) -> "EmbeddedWalletRecord":
         return cls(
             alias=data["alias"],
             contact=data["contact"],
@@ -990,18 +984,17 @@ class EmbeddedWalletRecord:
             secret_hash=data["secret_hash"],
         )
 
-
 class AccountAbstractionManager:
     """Manage embedded wallets that map to social/email identities."""
 
-    def __init__(self, wallet_manager: WalletManager, storage_path: Optional[str] = None):
+    def __init__(self, wallet_manager: WalletManager, storage_path: str | None = None):
         self.wallet_manager = wallet_manager
         self.storage_path = storage_path or Config.EMBEDDED_WALLET_DIR
         os.makedirs(self.storage_path, exist_ok=True)
         self.records_file = os.path.join(self.storage_path, "embedded_wallets.json")
-        self.records: Dict[str, EmbeddedWalletRecord] = {}
-        self.sessions: Dict[str, str] = {}
-        self.gas_sponsors: Dict[str, 'GasSponsor'] = {}  # Task 178: Gas sponsorship
+        self.records: dict[str, EmbeddedWalletRecord] = {}
+        self.sessions: dict[str, str] = {}
+        self.gas_sponsors: dict[str, 'GasSponsor'] = {}  # Task 178: Gas sponsorship
         self._load()
 
     def _hash_secret(self, secret: str) -> str:
@@ -1043,7 +1036,7 @@ class AccountAbstractionManager:
         self._save()
         return record
 
-    def authenticate(self, alias: str, secret: str) -> Optional[str]:
+    def authenticate(self, alias: str, secret: str) -> str | None:
         record = self.records.get(alias)
         if not record:
             return None
@@ -1053,13 +1046,13 @@ class AccountAbstractionManager:
         self.sessions[alias] = token
         return token
 
-    def get_session_token(self, alias: str) -> Optional[str]:
+    def get_session_token(self, alias: str) -> str | None:
         return self.sessions.get(alias)
 
-    def get_session(self, alias: str) -> Optional[str]:
+    def get_session(self, alias: str) -> str | None:
         return self.sessions.get(alias)
 
-    def get_record(self, alias: str) -> Optional[EmbeddedWalletRecord]:
+    def get_record(self, alias: str) -> EmbeddedWalletRecord | None:
         return self.records.get(alias)
 
     def add_gas_sponsor(self, sponsor_address: str, budget: float, rate_limit: int = 10) -> 'GasSponsor':
@@ -1078,7 +1071,7 @@ class AccountAbstractionManager:
         self.gas_sponsors[sponsor_address] = sponsor
         return sponsor
 
-    def get_gas_sponsor(self, sponsor_address: str) -> Optional['GasSponsor']:
+    def get_gas_sponsor(self, sponsor_address: str) -> 'GasSponsor' | None:
         """Get gas sponsor by address"""
         return self.gas_sponsors.get(sponsor_address)
 
@@ -1087,7 +1080,7 @@ class AccountAbstractionManager:
         user_address: str,
         sponsor_address: str,
         gas_amount: float
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Request sponsored gas for a transaction
 
@@ -1104,7 +1097,6 @@ class AccountAbstractionManager:
             return None
 
         return sponsor.sponsor_transaction(user_address, gas_amount)
-
 
 class SponsorshipResult(Enum):
     """Result of sponsorship validation"""
@@ -1123,16 +1115,14 @@ class SponsorshipResult(Enum):
     FEE_TOO_HIGH = "fee_too_high"
     COST_TOO_HIGH = "cost_too_high"
 
-
 @dataclass
 class SponsorshipValidation:
     """Result of sponsorship validation"""
     result: SponsorshipResult
-    sponsor_address: Optional[str] = None
+    sponsor_address: str | None = None
     fee_amount: float = 0.0
     message: str = ""
     retry_after: float = 0.0  # Seconds until retry allowed (for rate limiting)
-
 
 class SponsoredTransactionProcessor:
     """
@@ -1170,9 +1160,9 @@ class SponsoredTransactionProcessor:
 
     def __init__(self):
         """Initialize the sponsored transaction processor"""
-        self.sponsors: Dict[str, GasSponsor] = {}
-        self.sponsor_keys: Dict[str, str] = {}  # sponsor_address -> public_key
-        self._persistence_path: Optional[str] = None
+        self.sponsors: dict[str, GasSponsor] = {}
+        self.sponsor_keys: dict[str, str] = {}  # sponsor_address -> public_key
+        self._persistence_path: str | None = None
 
     def register_sponsor(
         self,
@@ -1181,9 +1171,9 @@ class SponsoredTransactionProcessor:
         budget: float,
         rate_limit: int = 50,
         max_fee_per_tx: float = 0.1,
-        whitelist: Optional[List[str]] = None,
-        blacklist: Optional[List[str]] = None,
-        rate_limit_config: Optional[RateLimitConfig] = None,
+        whitelist: list[str] | None = None,
+        blacklist: list[str] | None = None,
+        rate_limit_config: RateLimitConfig | None = None,
     ) -> GasSponsor:
         """
         Register a new gas sponsor.
@@ -1534,7 +1524,7 @@ class SponsoredTransactionProcessor:
     def deduct_sponsor_fee(
         self,
         transaction: "Transaction",
-        preliminary_txid: Optional[str] = None
+        preliminary_txid: str | None = None
     ) -> bool:
         """
         Deduct the fee from sponsor's budget after transaction is processed.
@@ -1622,11 +1612,11 @@ class SponsoredTransactionProcessor:
 
         return True
 
-    def get_sponsor(self, sponsor_address: str) -> Optional[GasSponsor]:
+    def get_sponsor(self, sponsor_address: str) -> GasSponsor | None:
         """Get a registered sponsor by address"""
         return self.sponsors.get(sponsor_address)
 
-    def get_all_sponsors(self) -> Dict[str, Dict]:
+    def get_all_sponsors(self) -> dict[str, Dict]:
         """Get stats for all registered sponsors"""
         return {
             addr: sponsor.get_stats()
@@ -1637,10 +1627,8 @@ class SponsoredTransactionProcessor:
         """Check if a transaction has gas sponsorship"""
         return bool(transaction.gas_sponsor)
 
-
 # Global processor instance for integration with blockchain
-_global_processor: Optional[SponsoredTransactionProcessor] = None
-
+_global_processor: SponsoredTransactionProcessor | None = None
 
 def get_sponsored_transaction_processor() -> SponsoredTransactionProcessor:
     """
@@ -1657,11 +1645,10 @@ def get_sponsored_transaction_processor() -> SponsoredTransactionProcessor:
         _global_processor = SponsoredTransactionProcessor()
     return _global_processor
 
-
 def process_sponsored_transaction(
     transaction: "Transaction",
-    blockchain: Optional["Blockchain"] = None
-) -> Tuple[bool, str]:
+    blockchain: "Blockchain" | None = None
+) -> tuple[bool, str]:
     """
     Process a sponsored transaction through the full pipeline.
 

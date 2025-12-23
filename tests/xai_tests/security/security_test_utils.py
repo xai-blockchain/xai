@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Security Testing Utilities
 
@@ -8,16 +10,15 @@ Provides attack simulation, malicious input generation, and security assertion h
 import random
 import string
 import time
-from typing import List, Dict, Any
+from typing import Any
 from xai.core.wallet import Wallet
 from xai.core.blockchain import Transaction, Blockchain
-
 
 class AttackSimulator:
     """Simulates various attack scenarios for testing"""
 
     @staticmethod
-    def generate_sql_injection_payloads() -> List[str]:
+    def generate_sql_injection_payloads() -> list[str]:
         """Generate SQL injection attack payloads"""
         return [
             "'; DROP TABLE users; --",
@@ -31,7 +32,7 @@ class AttackSimulator:
         ]
 
     @staticmethod
-    def generate_xss_payloads() -> List[str]:
+    def generate_xss_payloads() -> list[str]:
         """Generate XSS attack payloads"""
         return [
             "<script>alert('xss')</script>",
@@ -43,7 +44,7 @@ class AttackSimulator:
         ]
 
     @staticmethod
-    def generate_command_injection_payloads() -> List[str]:
+    def generate_command_injection_payloads() -> list[str]:
         """Generate command injection attack payloads"""
         return [
             "; rm -rf /",
@@ -55,7 +56,7 @@ class AttackSimulator:
         ]
 
     @staticmethod
-    def generate_path_traversal_payloads() -> List[str]:
+    def generate_path_traversal_payloads() -> list[str]:
         """Generate path traversal attack payloads"""
         return [
             "../../../etc/passwd",
@@ -66,7 +67,7 @@ class AttackSimulator:
         ]
 
     @staticmethod
-    def generate_buffer_overflow_payloads() -> List[str]:
+    def generate_buffer_overflow_payloads() -> list[str]:
         """Generate buffer overflow attack payloads"""
         return [
             "A" * 10000,
@@ -76,7 +77,7 @@ class AttackSimulator:
         ]
 
     @staticmethod
-    def generate_format_string_payloads() -> List[str]:
+    def generate_format_string_payloads() -> list[str]:
         """Generate format string attack payloads"""
         return [
             "%s%s%s%s",
@@ -86,7 +87,7 @@ class AttackSimulator:
         ]
 
     @staticmethod
-    def generate_overflow_amounts() -> List[float]:
+    def generate_overflow_amounts() -> list[float]:
         """Generate amounts designed to cause overflow"""
         return [
             float('inf'),
@@ -99,7 +100,7 @@ class AttackSimulator:
         ]
 
     @staticmethod
-    def generate_invalid_addresses() -> List[str]:
+    def generate_invalid_addresses() -> list[str]:
         """Generate invalid blockchain addresses"""
         return [
             "",  # Empty
@@ -111,7 +112,6 @@ class AttackSimulator:
             "XAI<script>alert('xss')</script>" + "a" * 20,  # XSS
         ]
 
-
 class MaliciousInputGenerator:
     """Generates various types of malicious inputs for testing"""
 
@@ -121,7 +121,7 @@ class MaliciousInputGenerator:
         return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
     @staticmethod
-    def generate_unicode_exploits() -> List[str]:
+    def generate_unicode_exploits() -> list[str]:
         """Generate Unicode-based exploits"""
         return [
             "\u0000" * 10,  # Null bytes
@@ -132,7 +132,7 @@ class MaliciousInputGenerator:
         ]
 
     @staticmethod
-    def generate_special_characters() -> List[str]:
+    def generate_special_characters() -> list[str]:
         """Generate strings with special characters"""
         return [
             "!@#$%^&*()",
@@ -142,7 +142,7 @@ class MaliciousInputGenerator:
         ]
 
     @staticmethod
-    def generate_edge_case_numbers() -> List[Any]:
+    def generate_edge_case_numbers() -> list[Any]:
         """Generate edge case numeric values"""
         return [
             0,
@@ -158,7 +158,7 @@ class MaliciousInputGenerator:
         ]
 
     @staticmethod
-    def generate_malformed_json() -> List[str]:
+    def generate_malformed_json() -> list[str]:
         """Generate malformed JSON payloads"""
         return [
             "{",
@@ -169,12 +169,11 @@ class MaliciousInputGenerator:
             '{"__proto__": {"isAdmin": true}}',
         ]
 
-
 class SecurityAssertions:
     """Custom assertions for security testing"""
 
     @staticmethod
-    def assert_injection_prevented(function, payloads: List[str], *args, **kwargs):
+    def assert_injection_prevented(function, payloads: list[str], *args, **kwargs):
         """Assert that all injection payloads are prevented"""
         for payload in payloads:
             try:
@@ -203,7 +202,7 @@ class SecurityAssertions:
             "Rate limit not enforced"
 
     @staticmethod
-    def assert_overflow_prevented(validator, amounts: List[float]):
+    def assert_overflow_prevented(validator, amounts: list[float]):
         """Assert that overflow amounts are prevented"""
         for amount in amounts:
             try:
@@ -216,7 +215,7 @@ class SecurityAssertions:
                 pass
 
     @staticmethod
-    def assert_sanitized_for_logging(sanitizer, sensitive_data: Dict[str, Any]):
+    def assert_sanitized_for_logging(sanitizer, sensitive_data: dict[str, Any]):
         """Assert that sensitive data is sanitized for logging"""
         result = sanitizer(sensitive_data)
 
@@ -232,7 +231,6 @@ class SecurityAssertions:
                     assert value not in result_str or "..." in result_str, \
                         f"Sensitive data '{key}' not sanitized"
 
-
 class TestWalletFactory:
     """Factory for creating test wallets with various properties"""
 
@@ -244,7 +242,7 @@ class TestWalletFactory:
         return wallet
 
     @staticmethod
-    def create_multiple_funded_wallets(blockchain: Blockchain, count: int) -> List[Wallet]:
+    def create_multiple_funded_wallets(blockchain: Blockchain, count: int) -> list[Wallet]:
         """Create multiple funded wallets"""
         wallets = []
         for _ in range(count):
@@ -256,7 +254,6 @@ class TestWalletFactory:
     def create_attacker_wallet(blockchain: Blockchain) -> Wallet:
         """Create wallet representing an attacker"""
         return TestWalletFactory.create_funded_wallet(blockchain, amount=1000.0)
-
 
 class TestTransactionFactory:
     """Factory for creating test transactions"""
@@ -303,7 +300,6 @@ class TestTransactionFactory:
         tx.signature = "0" * 128
         return tx
 
-
 class PerformanceTimer:
     """Timer for measuring performance of security operations"""
 
@@ -330,7 +326,6 @@ class PerformanceTimer:
         elapsed = self.elapsed()
         assert elapsed <= max_seconds, \
             f"{self.name} took {elapsed:.3f}s, expected <= {max_seconds}s"
-
 
 class MockAttacker:
     """Mock attacker for simulating attack scenarios"""
@@ -361,13 +356,13 @@ class MockAttacker:
         self.attempts.append(("replay", original_tx))
         return original_tx
 
-    def attempt_sybil_attack(self, count: int) -> List[Wallet]:
+    def attempt_sybil_attack(self, count: int) -> list[Wallet]:
         """Create multiple wallets for Sybil attack"""
         sybil_wallets = [Wallet() for _ in range(count)]
         self.attempts.append(("sybil", count))
         return sybil_wallets
 
-    def attempt_dust_attack(self, blockchain: Blockchain, victims: List[Wallet]) -> List[Transaction]:
+    def attempt_dust_attack(self, blockchain: Blockchain, victims: list[Wallet]) -> list[Transaction]:
         """Attempt dust attack on multiple victims"""
         from xai.core.blockchain_security import BlockchainSecurityConfig
 
@@ -383,7 +378,6 @@ class MockAttacker:
         self.attempts.append(("dust", len(victims)))
 
         return dust_transactions
-
 
 # Export all utilities
 __all__ = [

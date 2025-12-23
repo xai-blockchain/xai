@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 """
 AI Tasks API endpoints - Revolutionary AI-blockchain explorer features
 """
 from fastapi import APIRouter, Query, HTTPException, Depends
-from typing import Optional, List
+
 from datetime import datetime, timedelta
 import httpx
 import logging
@@ -13,13 +15,12 @@ logger = logging.getLogger(__name__)
 # XAI Node connection
 node_url = "http://localhost:12001"
 
-
 @router.get("/tasks")
 async def get_ai_tasks(
-    status: Optional[str] = None,
-    task_type: Optional[str] = None,
-    ai_model: Optional[str] = None,
-    provider: Optional[str] = None,
+    status: str | None = None,
+    task_type: str | None = None,
+    ai_model: str | None = None,
+    provider: str | None = None,
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100)
 ):
@@ -77,7 +78,6 @@ async def get_ai_tasks(
         logger.error(f"Error fetching AI tasks: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.get("/tasks/{task_id}")
 async def get_ai_task_detail(task_id: str):
     """
@@ -119,7 +119,6 @@ async def get_ai_task_detail(task_id: str):
     except Exception as e:
         logger.error(f"Error fetching AI task {task_id}: {e}")
         raise HTTPException(status_code=404, detail="Task not found")
-
 
 @router.get("/models")
 async def get_ai_models():
@@ -171,7 +170,6 @@ async def get_ai_models():
     except Exception as e:
         logger.error(f"Error fetching AI models: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.get("/stats")
 async def get_ai_stats():

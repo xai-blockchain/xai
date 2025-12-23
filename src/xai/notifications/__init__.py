@@ -14,19 +14,19 @@ Components:
 - push_service: FCM and APNs integration for sending notifications
 """
 
-from xai.notifications.notification_types import (
-    NotificationType,
-    NotificationPayload,
-    NotificationPriority,
-)
 from xai.notifications.device_registry import (
-    DeviceRegistry,
     DeviceInfo,
     DevicePlatform,
+    DeviceRegistry,
+)
+from xai.notifications.notification_types import (
+    NotificationPayload,
+    NotificationPriority,
+    NotificationType,
 )
 from xai.notifications.push_service import (
-    PushNotificationService,
     NotificationError,
+    PushNotificationService,
 )
 
 __all__ = [

@@ -8,15 +8,15 @@ candidate to accelerate sync without full chain download.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import hashlib
 import json
 import os
 import time
-from typing import Any, Dict, Optional, Callable, List
+from dataclasses import dataclass
+from typing import Any, Callable
 
 import requests
-from ecdsa import SECP256k1, VerifyingKey, BadSignatureError
-import hashlib
+from ecdsa import BadSignatureError, SECP256k1, VerifyingKey
 
 from .checkpoint_payload import CheckpointPayload
 from .chunked_sync import ChunkedStateSyncService, SyncProgress
@@ -27,11 +27,11 @@ class CheckpointMetadata:
 
     height: int
     block_hash: str
-    timestamp: Optional[float] = None
+    timestamp: float | None = None
     source: str = "unknown"
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "CheckpointMetadata":
+    def from_dict(cls, data: dict[str, Any]) -> "CheckpointMetadata":
         return cls(
             height=int(data["height"]),
             block_hash=str(data["block_hash"]),
@@ -39,14 +39,13 @@ class CheckpointMetadata:
             source=data.get("source", "unknown"),
         )
 
-
 class CheckpointSyncManager:
     """Coordinate checkpoint discovery and selection for partial sync."""
 
     def __init__(
         self,
         blockchain: Any,
-        p2p_manager: Optional[Any] = None,
+        p2p_manager: Any | None = None,
         enable_chunked_sync: bool = False,
         chunk_size: int = 1_000_000,
     ):
@@ -73,7 +72,7 @@ class CheckpointSyncManager:
 
         # Chunked sync support
         self.enable_chunked_sync = enable_chunked_sync
-        self.chunked_service: Optional[ChunkedStateSyncService] = None
+        self.chunked_service: ChunkedStateSyncService | None = None
         if enable_chunked_sync:
             storage_dir = os.path.join(
                 getattr(blockchain, "base_dir", "."),
@@ -86,7 +85,7 @@ class CheckpointSyncManager:
             )
 
         # Progress tracking
-        self._sync_progress: Dict[str, Any] = {
+        self._sync_progress: dict[str, Any] = {
             "stage": "idle",
             "bytes_downloaded": 0,
             "total_bytes": 0,
@@ -96,9 +95,9 @@ class CheckpointSyncManager:
             "started_at": None,
             "estimated_completion": None,
         }
-        self._progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None
+        self._progress_callback: Callable[[dict[str, Any]], None] | None = None
 
-    def _local_checkpoint_metadata(self) -> Optional[Dict[str, Any]]:
+    def _local_checkpoint_metadata(self) -> dict[str, Any] | None:
         """Return latest local checkpoint metadata if available."""
         cm = self.checkpoint_manager
         if not cm:
@@ -121,7 +120,7 @@ class CheckpointSyncManager:
             "source": "local",
         }
 
-    def _p2p_checkpoint_metadata(self) -> Optional[Dict[str, Any]]:
+    def _p2p_checkpoint_metadata(self) -> dict[str, Any] | None:
         """Return checkpoint metadata reported by peers, if available."""
         mgr = self.p2p_manager
         if not mgr or not hasattr(mgr, "_get_checkpoint_metadata"):
@@ -132,7 +131,7 @@ class CheckpointSyncManager:
         meta["source"] = "p2p"
         return meta
 
-    def get_best_checkpoint_metadata(self) -> Optional[Dict[str, Any]]:
+    def get_best_checkpoint_metadata(self) -> dict[str, Any] | None:
         """
         Pick a checkpoint candidate from P2P (preferred) or local store.
 
@@ -153,7 +152,7 @@ class CheckpointSyncManager:
                 return chosen
         return None
 
-    def apply_local_checkpoint(self, height: Optional[int] = None) -> Optional[Any]:
+    def apply_local_checkpoint(self, height: int | None = None) -> Any | None:
         """
         Attempt to load a checkpoint and return it to the caller for application.
 
@@ -274,7 +273,7 @@ class CheckpointSyncManager:
 
         return result
 
-    def request_checkpoint_from_peers(self) -> Optional[CheckpointPayload]:
+    def request_checkpoint_from_peers(self) -> CheckpointPayload | None:
         """
         Ask P2P manager to request checkpoint payloads and return the first valid payload.
         """
@@ -305,7 +304,7 @@ class CheckpointSyncManager:
 
         # Inspect cached peer features for received payload hints with quorum logic
         features = getattr(self.p2p_manager, "peer_features", {}) or {}
-        candidates: Dict[str, Dict[str, Any]] = {}
+        candidates: dict[str, dict[str, Any]] = {}
         for peer_id, info in features.items():
             payload_data = info.get("checkpoint_payload") if isinstance(info, dict) else None
             if not payload_data:
@@ -349,7 +348,7 @@ class CheckpointSyncManager:
         self._log_provenance(payload, payload_data, source="p2p")
         return payload
 
-    def _build_payload(self, payload_data: Dict[str, Any]) -> Optional[CheckpointPayload]:
+    def _build_payload(self, payload_data: dict[str, Any]) -> CheckpointPayload | None:
         try:
             payload = CheckpointPayload(
                 height=int(payload_data["height"]),
@@ -363,7 +362,7 @@ class CheckpointSyncManager:
             return None
         return payload
 
-    def _validate_payload_signature(self, payload_data: Dict[str, Any]) -> bool:
+    def _validate_payload_signature(self, payload_data: dict[str, Any]) -> bool:
         """
         Validate optional signature using trusted checkpoint signers.
         If no trusted pubkeys are configured, accept unsigned payloads (test/dev).
@@ -383,7 +382,7 @@ class CheckpointSyncManager:
             return False
 
     @staticmethod
-    def _checkpoint_digest(payload_data: Dict[str, Any]) -> bytes:
+    def _checkpoint_digest(payload_data: dict[str, Any]) -> bytes:
         """
         Compute deterministic digest of critical checkpoint fields for signing.
         """
@@ -396,7 +395,7 @@ class CheckpointSyncManager:
         blob = json.dumps(material, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(blob).digest()
 
-    def _validate_work(self, payload_data: Dict[str, Any]) -> bool:
+    def _validate_work(self, payload_data: dict[str, Any]) -> bool:
         """
         Validate that advertised cumulative work meets a minimum threshold and is non-decreasing.
         """
@@ -414,7 +413,7 @@ class CheckpointSyncManager:
             return False
         return True
 
-    def _log_provenance(self, payload: CheckpointPayload, raw: Dict[str, Any], source: str) -> None:
+    def _log_provenance(self, payload: CheckpointPayload, raw: dict[str, Any], source: str) -> None:
         """Record accepted checkpoint metadata for audit/metrics."""
         entry = {
             "height": payload.height,
@@ -493,7 +492,7 @@ class CheckpointSyncManager:
         return applied
 
     @staticmethod
-    def load_payload_from_file(path: str) -> Optional[CheckpointPayload]:
+    def load_payload_from_file(path: str) -> CheckpointPayload | None:
         """
         Load a checkpoint payload from a JSON file.
         """
@@ -512,7 +511,7 @@ class CheckpointSyncManager:
         except (FileNotFoundError, KeyError, ValueError, TypeError, json.JSONDecodeError):
             return None
 
-    def fetch_payload(self, meta: Dict[str, Any]) -> Optional[CheckpointPayload]:
+    def fetch_payload(self, meta: dict[str, Any]) -> CheckpointPayload | None:
         """
         Fetch a checkpoint payload using metadata hints.
 
@@ -552,9 +551,8 @@ class CheckpointSyncManager:
 
         return None
 
-
     @staticmethod
-    def choose_newer_metadata(*candidates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def choose_newer_metadata(*candidates: dict[str, Any]) -> dict[str, Any] | None:
         """
         Choose the highest-height valid checkpoint metadata from provided candidates.
         """
@@ -564,7 +562,7 @@ class CheckpointSyncManager:
         return max(valid, key=lambda m: m.get("height", -1))
 
     @staticmethod
-    def _is_metadata_complete(meta: Dict[str, Any]) -> bool:
+    def _is_metadata_complete(meta: dict[str, Any]) -> bool:
         try:
             height = int(meta.get("height"))
         except (TypeError, ValueError):
@@ -576,7 +574,7 @@ class CheckpointSyncManager:
             return False
         return True
 
-    def set_progress_callback(self, callback: Callable[[Dict[str, Any]], None]) -> None:
+    def set_progress_callback(self, callback: Callable[[dict[str, Any]], None]) -> None:
         """
         Set a callback function to be called when sync progress updates.
 
@@ -585,7 +583,7 @@ class CheckpointSyncManager:
         """
         self._progress_callback = callback
 
-    def get_checkpoint_sync_progress(self) -> Dict[str, Any]:
+    def get_checkpoint_sync_progress(self) -> dict[str, Any]:
         """
         Get current checkpoint sync progress.
 
@@ -602,7 +600,7 @@ class CheckpointSyncManager:
         """
         return dict(self._sync_progress)
 
-    def _update_progress(self, updates: Dict[str, Any]) -> None:
+    def _update_progress(self, updates: dict[str, Any]) -> None:
         """
         Update sync progress and notify callback if set.
 
@@ -638,8 +636,8 @@ class CheckpointSyncManager:
     def fetch_chunked_payload(
         self,
         snapshot_id: str,
-        progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
-    ) -> Optional[CheckpointPayload]:
+        progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    ) -> CheckpointPayload | None:
         """
         Fetch checkpoint payload using chunked download with resume support.
 
@@ -797,7 +795,7 @@ class CheckpointSyncManager:
 
         return payload
 
-    def _download_chunk(self, snapshot_id: str, chunk_index: int) -> Optional['SyncChunk']:
+    def _download_chunk(self, snapshot_id: str, chunk_index: int) -> 'SyncChunk' | None:
         """
         Download a single chunk from local storage or remote peer.
 
@@ -822,7 +820,7 @@ class CheckpointSyncManager:
         self,
         height: int,
         payload: CheckpointPayload,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Create a chunked snapshot from a checkpoint payload.
 
@@ -856,7 +854,7 @@ class CheckpointSyncManager:
             )
             return None
 
-    def list_available_snapshots(self) -> List[Dict[str, Any]]:
+    def list_available_snapshots(self) -> list[dict[str, Any]]:
         """
         List all available chunked snapshots.
 

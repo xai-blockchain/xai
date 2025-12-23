@@ -4,17 +4,17 @@ Extracted from Blockchain god class for better separation of concerns
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional, Tuple, List, Dict, Any, Union
+
 import time
+from typing import TYPE_CHECKING, Any
 
 from xai.core.block_header import BlockHeader
-from xai.core.transaction import Transaction
-from xai.core.structured_logger import get_structured_logger
 from xai.core.blockchain_security import BlockSizeValidator
+from xai.core.structured_logger import get_structured_logger
+from xai.core.transaction import Transaction
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Block, Blockchain
-
 
 class ValidationManager:
     """
@@ -50,7 +50,7 @@ class ValidationManager:
         """
         return self.blockchain.transaction_validator.validate(transaction)
 
-    def validate_coinbase_reward(self, block: 'Block') -> Tuple[bool, Optional[str]]:
+    def validate_coinbase_reward(self, block: 'Block') -> tuple[bool, str | None]:
         """
         Validate coinbase transaction reward amount.
 
@@ -100,9 +100,9 @@ class ValidationManager:
 
     def validate_chain(
         self,
-        chain: Optional[List[BlockHeader]] = None,
+        chain: list[BlockHeader] | None = None,
         full_validation: bool = False,
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """
         Validate chain structure and consistency.
 
@@ -193,8 +193,8 @@ class ValidationManager:
     def _validate_block_timestamp(
         self,
         block: BlockHeader,
-        previous_blocks: List[BlockHeader],
-    ) -> Tuple[bool, Optional[str]]:
+        previous_blocks: list[BlockHeader],
+    ) -> tuple[bool, str | None]:
         """
         Validate block timestamp against consensus rules.
 
@@ -246,7 +246,7 @@ class ValidationManager:
         self,
         current: BlockHeader,
         previous: BlockHeader,
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """
         Validate difficulty adjustment.
 
@@ -284,8 +284,8 @@ class ValidationManager:
 
     def _validate_chain_transactions(
         self,
-        chain: List[BlockHeader],
-    ) -> Tuple[bool, Optional[str]]:
+        chain: list[BlockHeader],
+    ) -> tuple[bool, str | None]:
         """
         Validate all transactions in the chain.
 

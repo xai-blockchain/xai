@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Example Usage of XAI Biometric Authentication Framework
 
@@ -7,20 +9,18 @@ into a mobile wallet application.
 
 import asyncio
 import json
-from typing import Optional
 
 from xai.sdk.biometric.biometric_auth import (
     BiometricAuthProvider,
-    BiometricType,
     BiometricError,
+    BiometricType,
     MockBiometricProvider,
 )
 from xai.sdk.biometric.secure_key_derivation import (
-    SecureKeyDerivation,
-    EncryptedWalletKey,
     BiometricTokenCache,
+    EncryptedWalletKey,
+    SecureKeyDerivation,
 )
-
 
 class WalletSecurityManager:
     """
@@ -50,7 +50,7 @@ class WalletSecurityManager:
         self.key_derivation = SecureKeyDerivation(device_id)
         self.token_cache = BiometricTokenCache(validity_seconds=60)
 
-    def setup_wallet_security(self, wallet_id: str, private_key: bytes) -> Optional[dict]:
+    def setup_wallet_security(self, wallet_id: str, private_key: bytes) -> dict | None:
         """
         Set up biometric security for a wallet.
 
@@ -115,8 +115,8 @@ class WalletSecurityManager:
         self,
         wallet_id: str,
         encrypted_data: dict,
-        transaction_details: Optional[str] = None,
-    ) -> Optional[bytes]:
+        transaction_details: str | None = None,
+    ) -> bytes | None:
         """
         Unlock wallet to sign a transaction.
 
@@ -183,7 +183,7 @@ class WalletSecurityManager:
             print("   Biometric authentication may have changed")
             return None
 
-    def invalidate_authentication(self, wallet_id: Optional[str] = None):
+    def invalidate_authentication(self, wallet_id: str | None = None):
         """
         Invalidate cached authentication tokens.
 
@@ -205,7 +205,7 @@ class WalletSecurityManager:
         # Mock implementation for testing
         return SecureKeyDerivation.generate_biometric_token_mock()
 
-    def _handle_auth_error(self, error_code: Optional[BiometricError]):
+    def _handle_auth_error(self, error_code: BiometricError | None):
         """Handle authentication errors with appropriate user feedback."""
         if error_code == BiometricError.USER_CANCEL:
             print("   User cancelled authentication")
@@ -239,7 +239,6 @@ class WalletSecurityManager:
             device_id_hash=bytes.fromhex(data["device_id_hash"]),
             algorithm=data["algorithm"],
         )
-
 
 def demo_wallet_flow():
     """Demonstrate complete wallet security flow."""
@@ -335,7 +334,6 @@ def demo_wallet_flow():
     print("Demo Complete")
     print("=" * 70)
 
-
 def demo_error_handling():
     """Demonstrate error handling scenarios."""
     print("\n" + "=" * 70)
@@ -368,7 +366,6 @@ def demo_error_handling():
         print("✓ Correctly detected missing biometric enrollment")
 
     print("\n" + "=" * 70)
-
 
 if __name__ == "__main__":
     demo_wallet_flow()

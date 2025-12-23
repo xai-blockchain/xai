@@ -1,17 +1,19 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Wallet Factory
 
 Provides methods for creating, loading, and managing different types of wallets.
 """
 
-from typing import Optional, Dict, Set, Any
 import hashlib
-import secrets
 import os
+import secrets
 import threading
-from xai.core.wallet import Wallet, WalletManager
-from xai.core.structured_logger import StructuredLogger, get_structured_logger
+from typing import Any
 
+from xai.core.structured_logger import StructuredLogger, get_structured_logger
+from xai.core.wallet import Wallet, WalletManager
 
 class CollisionResistance:
     """
@@ -27,15 +29,15 @@ class CollisionResistance:
             min_entropy_bits: Minimum entropy bits for address generation
         """
         self.min_entropy_bits = min_entropy_bits
-        self.created_addresses: Set[str] = set()
-        self.address_hashes: Dict[str, str] = {}  # address -> creation_hash
+        self.created_addresses: set[str] = set()
+        self.address_hashes: dict[str, str] = {}  # address -> creation_hash
         self._lock = threading.RLock()
 
         # Track collision attempts
         self.collision_attempts = 0
         self.total_generations = 0
 
-    def validate_entropy(self, entropy_source: bytes) -> Dict[str, Any]:
+    def validate_entropy(self, entropy_source: bytes) -> dict[str, Any]:
         """
         Validate entropy source meets minimum requirements.
 
@@ -72,7 +74,7 @@ class CollisionResistance:
             "unique_bytes": unique_bytes
         }
 
-    def check_address_uniqueness(self, address: str, creation_context: Optional[Dict] = None) -> Dict[str, Any]:
+    def check_address_uniqueness(self, address: str, creation_context: Dict | None = None) -> dict[str, Any]:
         """
         Check if address is unique (birthday attack prevention).
 
@@ -134,7 +136,7 @@ class CollisionResistance:
 
         return entropy
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get collision resistance statistics."""
         with self._lock:
             return {
@@ -145,19 +147,18 @@ class CollisionResistance:
                 "uniqueness_rate": (self.total_generations - self.collision_attempts) / self.total_generations if self.total_generations > 0 else 1.0
             }
 
-
 class WalletFactory:
     """
     Factory class for creating and managing Wallet instances with collision resistance.
     """
 
-    def __init__(self, data_dir: Optional[str] = None, logger: Optional[StructuredLogger] = None):
+    def __init__(self, data_dir: str | None = None, logger: StructuredLogger | None = None):
         self.wallet_manager = WalletManager(data_dir=data_dir)
         self.logger = logger or get_structured_logger()
         self.collision_resistance = CollisionResistance()
         self.logger.info("WalletFactory initialized with collision resistance.", data_dir=str(self.wallet_manager.data_dir))
 
-    def create_new_wallet(self, name: str, password: Optional[str] = None) -> Wallet:
+    def create_new_wallet(self, name: str, password: str | None = None) -> Wallet:
         """
         Creates a new wallet and saves it.
 
@@ -176,7 +177,7 @@ class WalletFactory:
             self.logger.error(f"Failed to create new wallet '{name}': {e}", error=str(e))
             raise
 
-    def load_existing_wallet(self, name: str, password: Optional[str] = None) -> Wallet:
+    def load_existing_wallet(self, name: str, password: str | None = None) -> Wallet:
         """
         Loads an existing wallet from file.
 
@@ -205,7 +206,7 @@ class WalletFactory:
             )
             raise
 
-    def get_wallet_by_name(self, name: str) -> Optional[Wallet]:
+    def get_wallet_by_name(self, name: str) -> Wallet | None:
         """
         Retrieves a loaded wallet by its name.
 
@@ -217,7 +218,7 @@ class WalletFactory:
         """
         return self.wallet_manager.get_wallet(name)
 
-    def list_available_wallets(self) -> Dict[str, str]:
+    def list_available_wallets(self) -> dict[str, str]:
         """
         Lists all wallet files found in the data directory.
 
@@ -231,7 +232,7 @@ class WalletFactory:
         self.logger.debug(f"Found {len(available_wallets)} available wallet files.")
         return available_wallets
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """
         Returns statistics about the managed wallets.
         """
@@ -241,13 +242,11 @@ class WalletFactory:
             "wallet_data_directory": str(self.wallet_manager.data_dir),
         }
 
-
 # Global instance for convenience
 _global_wallet_factory = None
 
-
 def get_wallet_factory(
-    data_dir: Optional[str] = None, logger: Optional[StructuredLogger] = None
+    data_dir: str | None = None, logger: StructuredLogger | None = None
 ) -> WalletFactory:
     """
     Get global WalletFactory instance.

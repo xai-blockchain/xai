@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import logging
 import time
-from typing import Dict, List, Any
+from typing import Any
+
 from ..security.circuit_breaker import CircuitBreaker, CircuitBreakerState
 
 logger = logging.getLogger("xai.blockchain.wash_trading_detector")
-
 
 class WashTradingDetector:
     def __init__(self, circuit_breaker: CircuitBreaker, round_trip_time_window_seconds: int = 300):
@@ -19,7 +21,7 @@ class WashTradingDetector:
         self.circuit_breaker = circuit_breaker
         self.round_trip_time_window_seconds = round_trip_time_window_seconds
         # Stores trades: {trade_id: {"buyer": str, "seller": str, "asset": str, "amount": float, "price": float, "timestamp": int}}
-        self.trade_history: List[Dict[str, Any]] = []
+        self.trade_history: list[dict[str, Any]] = []
         self._trade_id_counter = 0
 
     def record_trade(
@@ -77,7 +79,7 @@ class WashTradingDetector:
         current_time = int(time.time())
 
         # Group trades by asset and then by participant
-        asset_trades: Dict[str, List[Dict[str, Any]]] = {}
+        asset_trades: dict[str, list[dict[str, Any]]] = {}
         for trade in self.trade_history:
             asset_trades.setdefault(trade["asset"], []).append(trade)
 

@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 import logging
+
 logger = logging.getLogger(__name__)
 
+from typing import TYPE_CHECKING, Any
 
-from typing import TYPE_CHECKING, Dict, Optional, Tuple, Any
-
-from flask import request, jsonify
+from flask import jsonify, request
 from pydantic import ValidationError as PydanticValidationError
 
-from xai.core.input_validation_schemas import FaucetClaimInput
 from xai.core.config import Config, NetworkType
+from xai.core.input_validation_schemas import FaucetClaimInput
+
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
-
 
 def register_faucet_routes(
     routes: "NodeAPIRoutes",
@@ -24,7 +24,7 @@ def register_faucet_routes(
     app = routes.app
 
     @app.route("/faucet/claim", methods=["POST"])
-    def claim_faucet() -> Tuple[Dict[str, Any], int]:
+    def claim_faucet() -> tuple[dict[str, Any], int]:
         auth_error = routes._require_api_auth()
         if auth_error:
             return auth_error

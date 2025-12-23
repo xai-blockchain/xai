@@ -9,16 +9,15 @@ Comprehensive profiling tools for performance optimization.
 from __future__ import annotations
 
 import cProfile
-import pstats
 import io
-import time
-import tracemalloc
 import linecache
 import os
-from typing import Dict, Any, List, Optional, Callable
+import pstats
+import time
+import tracemalloc
 from dataclasses import dataclass
 from functools import wraps
-
+from typing import Any, Callable
 
 @dataclass
 class MemorySnapshot:
@@ -26,8 +25,7 @@ class MemorySnapshot:
     timestamp: float
     current_mb: float
     peak_mb: float
-    top_allocations: List[tuple]
-
+    top_allocations: list[tuple]
 
 class MemoryProfiler:
     """
@@ -38,8 +36,8 @@ class MemoryProfiler:
 
     def __init__(self):
         self.is_profiling = False
-        self.snapshots: List[MemorySnapshot] = []
-        self.start_snapshot: Optional[Any] = None
+        self.snapshots: list[MemorySnapshot] = []
+        self.start_snapshot: Any | None = None
 
     def start(self) -> None:
         """Start memory profiling"""
@@ -87,7 +85,7 @@ class MemoryProfiler:
         self.snapshots.append(memory_snapshot)
         return memory_snapshot
 
-    def compare_snapshots(self, snapshot1_idx: int = 0, snapshot2_idx: int = -1) -> List[str]:
+    def compare_snapshots(self, snapshot1_idx: int = 0, snapshot2_idx: int = -1) -> list[str]:
         """
         Compare two snapshots to find memory growth
 
@@ -117,7 +115,7 @@ class MemoryProfiler:
 
         return differences
 
-    def get_memory_stats(self) -> Dict[str, Any]:
+    def get_memory_stats(self) -> dict[str, Any]:
         """Get current memory statistics"""
         if not self.is_profiling:
             return {"error": "Profiler not running"}
@@ -130,7 +128,7 @@ class MemoryProfiler:
             "snapshot_count": len(self.snapshots)
         }
 
-    def find_memory_leaks(self, threshold_mb: float = 1.0) -> List[str]:
+    def find_memory_leaks(self, threshold_mb: float = 1.0) -> list[str]:
         """
         Analyze snapshots to find potential memory leaks
 
@@ -157,7 +155,6 @@ class MemoryProfiler:
 
         return leaks if leaks else ["No significant memory leaks detected"]
 
-
 class CPUProfiler:
     """
     CPU profiling tools (Task 270)
@@ -166,7 +163,7 @@ class CPUProfiler:
     """
 
     def __init__(self):
-        self.profiler: Optional[cProfile.Profile] = None
+        self.profiler: cProfile.Profile | None = None
         self.is_profiling = False
 
     def start(self) -> None:
@@ -208,7 +205,7 @@ class CPUProfiler:
         if self.profiler:
             self.profiler.dump_stats(filename)
 
-    def get_hotspots(self, top_n: int = 10) -> List[Dict[str, Any]]:
+    def get_hotspots(self, top_n: int = 10) -> list[dict[str, Any]]:
         """
         Get CPU hotspots (most time-consuming functions)
 
@@ -243,7 +240,6 @@ class CPUProfiler:
 
         return hotspots
 
-
 def profile_memory(func: Callable) -> Callable:
     """
     Decorator to profile memory usage of a function
@@ -274,7 +270,6 @@ def profile_memory(func: Callable) -> Callable:
 
     return wrapper
 
-
 def profile_cpu(func: Callable) -> Callable:
     """
     Decorator to profile CPU usage of a function
@@ -300,7 +295,6 @@ def profile_cpu(func: Callable) -> Callable:
 
     return wrapper
 
-
 class PerformanceMonitor:
     """
     Real-time performance monitoring
@@ -319,7 +313,7 @@ class PerformanceMonitor:
         self.cpu_profiler.start()
         self.monitoring = True
 
-    def stop(self) -> Dict[str, Any]:
+    def stop(self) -> dict[str, Any]:
         """Stop monitoring and get results"""
         if not self.monitoring:
             return {}
@@ -338,12 +332,11 @@ class PerformanceMonitor:
             "cpu_hotspots": self.cpu_profiler.get_hotspots(top_n=5)
         }
 
-
 class ResourceTracker:
     """Track resource usage over time"""
 
     def __init__(self):
-        self.samples: List[Dict[str, Any]] = []
+        self.samples: list[dict[str, Any]] = []
         self.tracking = False
 
     def start_tracking(self, interval: float = 1.0) -> None:
@@ -353,9 +346,10 @@ class ResourceTracker:
         Args:
             interval: Sampling interval in seconds
         """
-        import threading
-        import psutil
         import os
+        import threading
+
+        import psutil
 
         self.tracking = True
         self.samples.clear()
@@ -375,7 +369,7 @@ class ResourceTracker:
 
         threading.Thread(target=track, daemon=True).start()
 
-    def stop_tracking(self) -> Dict[str, Any]:
+    def stop_tracking(self) -> dict[str, Any]:
         """Stop tracking and get summary"""
         self.tracking = False
         time.sleep(1)  # Wait for last sample
@@ -408,12 +402,11 @@ class ResourceTracker:
         with open(filename, 'w') as f:
             json.dump(self.samples, f, indent=2)
 
-
 class ProfilingReport:
     """Generate comprehensive profiling report"""
 
     def __init__(self):
-        self.sections: Dict[str, Any] = {}
+        self.sections: dict[str, Any] = {}
 
     def add_memory_profile(self, profiler: MemoryProfiler) -> None:
         """Add memory profiling results"""
@@ -425,7 +418,7 @@ class ProfilingReport:
         hotspots = profiler.get_hotspots()
         self.sections["cpu"] = {"hotspots": hotspots}
 
-    def add_custom_section(self, name: str, data: Dict[str, Any]) -> None:
+    def add_custom_section(self, name: str, data: dict[str, Any]) -> None:
         """Add custom section to report"""
         self.sections[name] = data
 

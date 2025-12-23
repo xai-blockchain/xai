@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 WebSocket API Handler
 
@@ -8,13 +10,14 @@ Handles all WebSocket-related functionality including:
 - Background stats updates
 """
 
-import time
-import json
 import hashlib
-import threading
+import json
 import logging
-from typing import Dict, List, Any, Tuple, Optional
+import threading
+import time
 from collections import defaultdict, deque
+from typing import Any
+
 from flask import Flask, request
 from flask_sock import Sock
 
@@ -23,7 +26,6 @@ from xai.core.security_validation import log_security_event
 
 logger = logging.getLogger(__name__)
 ATTACHMENT_SAFE = True
-
 
 class WebSocketLimiter:
     """WebSocket connection and rate limiting.
@@ -34,10 +36,10 @@ class WebSocketLimiter:
 
     def __init__(self):
         """Initialize WebSocket limiter with default limits."""
-        self.connections_per_ip: Dict[str, int] = defaultdict(int)
+        self.connections_per_ip: dict[str, int] = defaultdict(int)
         self.total_connections: int = 0
-        self.last_message_time: Dict[str, deque] = defaultdict(lambda: deque(maxlen=100))
-        self.connection_times: Dict[str, float] = {}
+        self.last_message_time: dict[str, deque] = defaultdict(lambda: deque(maxlen=100))
+        self.connection_times: dict[str, float] = {}
 
         # Limits (configurable)
         self.MAX_CONNECTIONS_PER_IP = 10
@@ -46,7 +48,7 @@ class WebSocketLimiter:
         self.MESSAGE_SIZE_LIMIT = 1_048_576  # 1 MB
         self.MESSAGE_RATE_LIMIT = 100  # per minute
 
-    def can_connect(self, ip_address: str) -> Tuple[bool, Optional[str]]:
+    def can_connect(self, ip_address: str) -> tuple[bool, str | None]:
         """Check if new connection is allowed.
 
         Args:
@@ -91,7 +93,7 @@ class WebSocketLimiter:
         if client_id in self.last_message_time:
             del self.last_message_time[client_id]
 
-    def check_message_rate(self, client_id: str) -> Tuple[bool, Optional[str]]:
+    def check_message_rate(self, client_id: str) -> tuple[bool, str | None]:
         """Check if client is within message rate limit.
 
         Args:
@@ -113,7 +115,7 @@ class WebSocketLimiter:
         messages.append(now)
         return True, None
 
-    def validate_message_size(self, message: str) -> Tuple[bool, Optional[str]]:
+    def validate_message_size(self, message: str) -> tuple[bool, str | None]:
         """Validate message size.
 
         Args:
@@ -151,7 +153,7 @@ class WebSocketLimiter:
         if client_id in self.connection_times:
             self.connection_times[client_id] = time.time()
 
-    def cleanup_stale_connections(self) -> List[str]:
+    def cleanup_stale_connections(self) -> list[str]:
         """Find and return list of stale connection IDs.
 
         Returns:
@@ -166,7 +168,7 @@ class WebSocketLimiter:
 
         return stale
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get current limiter statistics.
 
         Returns:
@@ -184,11 +186,10 @@ class WebSocketLimiter:
             }
         }
 
-
 class WebSocketAPIHandler:
     """Handles all WebSocket-related API endpoints and functionality."""
 
-    def __init__(self, node: Any, app: Flask, api_auth: Optional[APIAuthManager] = None):
+    def __init__(self, node: Any, app: Flask, api_auth: APIAuthManager | None = None):
         """
         Initialize WebSocket API Handler.
 
@@ -202,8 +203,8 @@ class WebSocketAPIHandler:
 
         # WebSocket support
         self.sock = Sock(self.app)
-        self.ws_clients: List[Dict[str, Any]] = []  # Connected WebSocket clients
-        self.ws_subscriptions: Dict[str, List[str]] = {}  # client_id -> [channels]
+        self.ws_clients: list[dict[str, Any]] = []  # Connected WebSocket clients
+        self.ws_subscriptions: dict[str, list[str]] = {}  # client_id -> [channels]
 
         # WebSocket limiter (Task 66)
         self.limiter = WebSocketLimiter()
@@ -300,7 +301,7 @@ class WebSocketAPIHandler:
                 del self.ws_subscriptions[client_id]
             logger.info(f"WebSocket client {client_id} disconnected")
 
-    def _authenticate_ws_request(self) -> Tuple[bool, Optional[str]]:
+    def _authenticate_ws_request(self) -> tuple[bool, str | None]:
         """Authenticate incoming WebSocket upgrade request if API auth is enabled."""
 
         if not self.api_auth or not self.api_auth.is_enabled():
@@ -359,7 +360,7 @@ class WebSocketAPIHandler:
                     extra={"event": "ws.close_failed"}
                 )
 
-    def _handle_ws_message(self, client_id: str, ws: Any, data: Dict[str, Any]) -> None:
+    def _handle_ws_message(self, client_id: str, ws: Any, data: dict[str, Any]) -> None:
         """
         Handle WebSocket message from client.
 
@@ -387,7 +388,7 @@ class WebSocketAPIHandler:
                         json.dumps({"success": True, "message": f"Unsubscribed from {channel}"})
                     )
 
-    def broadcast_ws(self, message: Dict[str, Any]) -> None:
+    def broadcast_ws(self, message: dict[str, Any]) -> None:
         """
         Broadcast message to subscribed WebSocket clients.
 
@@ -428,7 +429,7 @@ class WebSocketAPIHandler:
 
                         logger.info(f"Closed stale connection: {client_id}")
 
-    def broadcast_sync_progress(self, progress_data: Dict[str, Any]) -> None:
+    def broadcast_sync_progress(self, progress_data: dict[str, Any]) -> None:
         """
         Broadcast sync progress update to WebSocket clients subscribed to 'sync' channel.
 

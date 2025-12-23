@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Integration tests for transaction propagation across network.
 
@@ -11,18 +13,16 @@ Tests are skipped where peer block acceptance is required.
 import pytest
 import threading
 import time
-from typing import List
 
 from xai.core.blockchain import Blockchain, Transaction
 from xai.core.node import BlockchainNode
 from xai.core.wallet import Wallet
 
-
 class TestTransactionPropagation:
     """Test transaction propagation across network"""
 
     @pytest.fixture
-    def four_node_network(self, tmp_path) -> List[BlockchainNode]:
+    def four_node_network(self, tmp_path) -> list[BlockchainNode]:
         """Create 4-node network"""
         nodes = []
         for i in range(4):
@@ -373,7 +373,6 @@ class TestTransactionPropagation:
         # Invalid should be rejected
         # (depends on validation implementation)
 
-
 class TestTransactionPropagationEdgeCases:
     """Test edge cases in transaction propagation"""
 
@@ -460,7 +459,6 @@ class TestTransactionPropagationEdgeCases:
 
         # Node2 should accept all
         assert len(bc2.pending_transactions) == len(bc1.pending_transactions)
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

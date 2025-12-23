@@ -8,10 +8,9 @@ Extracted from node_api.py as part of god class refactoring.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from flask import Blueprint, jsonify, request
-
 from pydantic import ValidationError as PydanticValidationError
 
 from xai.core.api_blueprints.base import (
@@ -25,24 +24,22 @@ from xai.core.api_blueprints.base import (
     success_response,
 )
 from xai.core.config import Config, NetworkType
-from xai.core.rate_limiter import get_rate_limiter
 from xai.core.input_validation_schemas import FaucetClaimInput
+from xai.core.rate_limiter import get_rate_limiter
 
 logger = logging.getLogger(__name__)
 
 wallet_bp = Blueprint("wallet", __name__)
 
-
 @wallet_bp.route("/balance/<address>", methods=["GET"])
-def get_balance(address: str) -> Dict[str, Any]:
+def get_balance(address: str) -> dict[str, Any]:
     """Get address balance."""
     blockchain = get_blockchain()
     balance = blockchain.get_balance(address)
     return jsonify({"address": address, "balance": balance})
 
-
 @wallet_bp.route("/address/<address>/nonce", methods=["GET"])
-def get_address_nonce(address: str) -> Tuple[Dict[str, Any], int]:
+def get_address_nonce(address: str) -> tuple[dict[str, Any], int]:
     """Return confirmed and next nonce for an address."""
     blockchain = get_blockchain()
     tracker = getattr(blockchain, "nonce_tracker", None)
@@ -96,9 +93,8 @@ def get_address_nonce(address: str) -> Tuple[Dict[str, Any], int]:
         200,
     )
 
-
 @wallet_bp.route("/history/<address>", methods=["GET"])
-def get_history(address: str) -> Dict[str, Any]:
+def get_history(address: str) -> dict[str, Any]:
     """Get transaction history for address."""
     blockchain = get_blockchain()
     try:
@@ -147,7 +143,6 @@ def get_history(address: str) -> Dict[str, Any]:
         }
     )
 
-
 def _record_faucet_metric(success: bool) -> None:
     """Update faucet metrics without failing requests if monitoring is unavailable."""
     node = get_node()
@@ -159,9 +154,8 @@ def _record_faucet_metric(success: bool) -> None:
     if callable(record):
         record(success)
 
-
 @wallet_bp.route("/faucet/claim", methods=["POST"])
-def claim_faucet() -> Tuple[Dict[str, Any], int]:
+def claim_faucet() -> tuple[dict[str, Any], int]:
     """Queue a faucet transaction for the provided testnet address."""
     node = get_node()
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Comprehensive Phase 5: Advanced State, Economics & Upgrades Tests
 Phase 5 of LOCAL_TESTING_PLAN.md
@@ -16,12 +18,11 @@ import pickle
 import hashlib
 import tempfile
 import os
-from typing import List, Dict, Any, Tuple, Optional
+from typing import Any
 from pathlib import Path
 
 from xai.core.blockchain import Blockchain, Block, Transaction
 from xai.core.wallet import Wallet
-
 
 class TestUTXOSnapshotAndRestore:
     """Test 5.1: UTXO snapshot creation and node bootstrapping"""
@@ -248,7 +249,6 @@ class TestUTXOSnapshotAndRestore:
         # For this test, verify current snapshot is valid
         assert state_snapshot["tip"] == bc.chain[-1].hash
 
-
 class TestStatePruning:
     """Test 5.2: Block data pruning while retaining UTXO set"""
 
@@ -418,7 +418,6 @@ class TestStatePruning:
 
         assert len(retained) >= MIN_RETENTION
 
-
 class TestFeeMarketAndPrioritization:
     """Test 5.3: Fee market dynamics and transaction prioritization"""
 
@@ -428,7 +427,7 @@ class TestFeeMarketAndPrioritization:
         return Blockchain(data_dir=str(tmp_path))
 
     @pytest.fixture
-    def funded_wallets(self, blockchain) -> List[Wallet]:
+    def funded_wallets(self, blockchain) -> list[Wallet]:
         """Create wallets with funds"""
         wallets = [Wallet() for _ in range(5)]
 
@@ -687,7 +686,6 @@ class TestFeeMarketAndPrioritization:
         if len(sorted_by_rate) > 1:
             assert sorted_by_rate[0].get_fee_rate() >= sorted_by_rate[-1].get_fee_rate()
 
-
 class TestHardForkUpgrade:
     """Test 5.4: Hard fork and consensus rule upgrades"""
 
@@ -914,7 +912,6 @@ class TestHardForkUpgrade:
         # For this test, just verify both nodes can process their own blocks
         assert len(old_node.chain) == FORK_HEIGHT
         assert len(new_node.chain) == FORK_HEIGHT + 1
-
 
 # Integration test combining multiple Phase 5 features
 class TestPhase5Integration:

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Comprehensive tests for node_p2p.py - P2P Network Manager
 
@@ -12,13 +14,12 @@ This test file achieves 98%+ coverage of node_p2p.py by testing:
 
 import asyncio
 import time
-from typing import Any, Dict, List
+from typing import Any
 import pytest
 from unittest.mock import Mock, MagicMock, patch, AsyncMock
 import requests
 
 from xai.core.p2p_security import P2PSecurityConfig
-
 
 class TestPeerManagement:
     """Test peer management functionality."""
@@ -103,7 +104,6 @@ class TestPeerManagement:
         assert peers_copy == original_peers
         # Verify it's a copy, not the original
         assert peers_copy is not p2p_manager.peers
-
 
 class TestTransactionBroadcasting:
     """Test transaction broadcasting functionality."""
@@ -198,7 +198,6 @@ class TestTransactionBroadcasting:
         # No calls should be made
         assert mock_post.call_count == 0
 
-
 class TestBlockBroadcasting:
     """Test block broadcasting functionality."""
 
@@ -280,7 +279,6 @@ class TestBlockBroadcasting:
         p2p_manager.broadcast_block(mock_block)
 
         assert mock_post.call_count == 3
-
 
 class TestBlockchainSynchronization:
     """Test blockchain synchronization functionality."""
@@ -438,7 +436,7 @@ class TestBlockchainSynchronization:
             {"peer": "http://peer2:5000", "total": 4},
         ]
 
-        def fake_chunk(_peer: str, start: int, end: int, _total: int) -> List[Dict[str, Any]]:
+        def fake_chunk(_peer: str, start: int, end: int, _total: int) -> list[dict[str, Any]]:
             return [{"header": {"index": idx}} for idx in range(start, end)]
 
         with patch.object(manager, "_download_block_chunk", side_effect=fake_chunk):
@@ -485,7 +483,6 @@ class TestBlockchainSynchronization:
         assert result is True
         fake_sync.fetch_validate_apply.assert_called_once()
         mock_run.assert_called_once()
-
 
 class TestNetworkErrorHandling:
     """Test error handling in network operations."""
@@ -538,7 +535,6 @@ class TestNetworkErrorHandling:
             mock_get.side_effect = error
             result = p2p_manager.sync_with_network()
             assert result == False
-
 
 class TestP2PIntegration:
     """Integration tests for P2P functionality."""
@@ -600,7 +596,6 @@ class TestP2PIntegration:
         assert mock_post.call_count == 2  # tx + block
         assert mock_get.call_count == 1
 
-
 class TestEdgeCases:
     """Test edge cases and boundary conditions."""
 
@@ -656,7 +651,6 @@ class TestEdgeCases:
 
             p2p_manager.remove_peer(peer)
             assert peer not in p2p_manager.peers
-
 
 class TestMessageDeduplication:
     """Ensure duplicate transactions/blocks are dropped to prevent floods."""

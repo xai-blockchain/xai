@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 HD Wallet - Production BIP-32/BIP-44 Implementation (TASK 27)
 Hierarchical Deterministic Wallet with proper derivation paths
@@ -7,24 +9,24 @@ Includes gap limit scanning (TASK 99)
 import hashlib
 import hmac
 import logging
-from typing import List, Tuple, Optional, Dict, Any
+from typing import Any
+
 import base58
 from bip_utils import (
-    Bip39SeedGenerator,
+    Bip32KeyIndex,
+    Bip32Slip10Secp256k1,
     Bip39MnemonicGenerator,
+    Bip39SeedGenerator,
     Bip39WordsNum,
     Bip44,
-    Bip44Coins,
     Bip44Changes,
-    Bip32Slip10Secp256k1,
-    Bip32KeyIndex,
+    Bip44Coins,
 )
 from mnemonic import Mnemonic
 
 from xai.security.slip44_registry import Slip44Registry
 
 logger = logging.getLogger(__name__)
-
 
 class HDWallet:
     """
@@ -46,7 +48,7 @@ class HDWallet:
     # BIP-44 gap limit - stop scanning after N consecutive empty addresses
     GAP_LIMIT = 20
 
-    def __init__(self, mnemonic: Optional[str] = None, passphrase: str = ""):
+    def __init__(self, mnemonic: str | None = None, passphrase: str = ""):
         """
         Initialize HD wallet from mnemonic or generate new one.
 
@@ -75,8 +77,8 @@ class HDWallet:
         self.master_key = Bip32Slip10Secp256k1.FromSeed(self.seed)
 
         # Track derived accounts
-        self.accounts: Dict[int, Dict[str, Any]] = {}
-        self.address_cache: Dict[str, Dict] = {}
+        self.accounts: dict[int, dict[str, Any]] = {}
+        self.address_cache: dict[str, Dict] = {}
         self.selected_account: int = 0
         self.next_account_index: int = 0
 
@@ -89,7 +91,7 @@ class HDWallet:
         """
         return self.mnemonic
 
-    def derive_account(self, account_index: int = 0) -> Dict[str, Any]:
+    def derive_account(self, account_index: int = 0) -> dict[str, Any]:
         """
         Derive an account using BIP-44 path: m/44'/coin'/account' (TASK 27)
 
@@ -135,7 +137,7 @@ class HDWallet:
         change: int = 0,
         address_index: int = 0,
         hardened: bool = False,
-    ) -> Dict[str, str]:
+    ) -> dict[str, str]:
         """
         Derive address using BIP-44 path (TASK 27).
 
@@ -215,7 +217,7 @@ class HDWallet:
 
         return result
 
-    def derive_receiving_address(self, account_index: int = 0, index: int = 0) -> Dict[str, str]:
+    def derive_receiving_address(self, account_index: int = 0, index: int = 0) -> dict[str, str]:
         """
         Derive external (receiving) address.
 
@@ -231,7 +233,7 @@ class HDWallet:
             index = account["receiving_index"]
         return self.derive_address(account_index=account_index, change=0, address_index=index)
 
-    def derive_change_address(self, account_index: int = 0, index: int = 0) -> Dict[str, str]:
+    def derive_change_address(self, account_index: int = 0, index: int = 0) -> dict[str, str]:
         """
         Derive internal (change) address.
 
@@ -253,9 +255,9 @@ class HDWallet:
         self,
         account_index: int = 0,
         change: int = 0,
-        check_balance_func: Optional[callable] = None,
+        check_balance_func: callable | None = None,
         max_scan: int = 1000,
-    ) -> List[Dict]:
+    ) -> list[Dict]:
         """
         Scan for used addresses following BIP-44 gap limit (TASK 99).
 
@@ -307,7 +309,7 @@ class HDWallet:
         self,
         check_balance_func: callable,
         accounts_to_scan: int = 5,
-    ) -> Dict[str, List[Dict]]:
+    ) -> dict[str, list[Dict]]:
         """
         Recover all wallet addresses by scanning with gap limit (TASK 99).
 
@@ -411,7 +413,7 @@ class HDWallet:
         change: int = 0,
         start_index: int = 0,
         count: int = 10,
-    ) -> List[Dict[str, str]]:
+    ) -> list[dict[str, str]]:
         """
         Derive multiple sequential addresses efficiently.
 
@@ -435,7 +437,7 @@ class HDWallet:
 
         return addresses
 
-    def create_account(self, account_name: Optional[str] = None) -> Dict[str, Any]:
+    def create_account(self, account_name: str | None = None) -> dict[str, Any]:
         """
         Allocate the next unused account following BIP-44 rules.
 
@@ -453,13 +455,13 @@ class HDWallet:
 
         return account_info
 
-    def list_accounts(self) -> List[Dict[str, Any]]:
+    def list_accounts(self) -> list[dict[str, Any]]:
         """
         Return all derived accounts with balance indexes.
         """
         return [self.derive_account(idx) for idx in sorted(self.accounts)]
 
-    def select_account(self, account_index: int) -> Dict[str, Any]:
+    def select_account(self, account_index: int) -> dict[str, Any]:
         """
         Mark the active account for helper accessors.
         """
@@ -467,13 +469,13 @@ class HDWallet:
         self.selected_account = account_index
         return account_info
 
-    def get_selected_account(self) -> Dict[str, Any]:
+    def get_selected_account(self) -> dict[str, Any]:
         """
         Return metadata for the currently selected account.
         """
         return self.derive_account(self.selected_account)
 
-    def derive_next_receiving(self, account_index: Optional[int] = None) -> Dict[str, str]:
+    def derive_next_receiving(self, account_index: int | None = None) -> dict[str, str]:
         """
         Convenience helper for sequential receiving addresses.
         """
@@ -481,14 +483,13 @@ class HDWallet:
         account = self.derive_account(idx)
         return self.derive_receiving_address(idx, index=account["receiving_index"])
 
-    def derive_next_change(self, account_index: Optional[int] = None) -> Dict[str, str]:
+    def derive_next_change(self, account_index: int | None = None) -> dict[str, str]:
         """
         Convenience helper for sequential change addresses.
         """
         idx = self.selected_account if account_index is None else account_index
         account = self.derive_account(idx)
         return self.derive_change_address(idx, index=account["change_index"])
-
 
 # Example Usage (for development/testing only)
 if __name__ == "__main__":

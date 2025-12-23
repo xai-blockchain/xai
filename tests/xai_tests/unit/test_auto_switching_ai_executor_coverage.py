@@ -16,7 +16,6 @@ Target: 80%+ coverage (242+ statements of 303 total)
 import pytest
 import time
 from unittest.mock import Mock, MagicMock, patch, call
-from typing import Dict, List
 from enum import Enum
 
 from xai.core.auto_switching_ai_executor import (

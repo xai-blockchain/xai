@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
-
 
 PRIORITY_MULTIPLIERS = {
     "slow": 0.75,
@@ -21,7 +19,6 @@ PRIORITY_QUANTILES = {
     "urgent": 0.9,
 }
 
-
 @dataclass
 class FeeRecommendation:
     fee_per_byte: float
@@ -30,10 +27,9 @@ class FeeRecommendation:
     pending_transactions: int
     mempool_bytes: int = 0
     congestion_level: str = "low"
-    percentiles: Dict[str, float] = field(default_factory=dict)
+    percentiles: dict[str, float] = field(default_factory=dict)
     backlog_ratio: float = 0.0
     block_capacity: int = 0
-
 
 class FeeOptimizer:
     """Derives fee guidance from mempool pressure and fee rate percentiles."""
@@ -46,10 +42,10 @@ class FeeOptimizer:
         pending_tx_count: int,
         priority: str = "normal",
         *,
-        fee_rates: Optional[List[float]] = None,
-        mempool_bytes: Optional[int] = None,
+        fee_rates: list[float] | None = None,
+        mempool_bytes: int | None = None,
         avg_block_capacity: int = 500,
-    ) -> Dict[str, object]:
+    ) -> dict[str, object]:
         priority_key = priority.lower()
         multiplier = PRIORITY_MULTIPLIERS.get(priority_key, PRIORITY_MULTIPLIERS["normal"])
         quantile = PRIORITY_QUANTILES.get(priority_key, PRIORITY_QUANTILES["normal"])
@@ -107,8 +103,8 @@ class FeeOptimizer:
         }
 
     @staticmethod
-    def _sanitize_rates(fee_rates: Optional[List[float]]) -> List[float]:
-        sanitized: List[float] = []
+    def _sanitize_rates(fee_rates: list[float] | None) -> list[float]:
+        sanitized: list[float] = []
         if not fee_rates:
             return sanitized
         for raw in fee_rates:
@@ -122,7 +118,7 @@ class FeeOptimizer:
         sanitized.sort()
         return sanitized
 
-    def _build_percentiles(self, sorted_rates: List[float]) -> Dict[str, float]:
+    def _build_percentiles(self, sorted_rates: list[float]) -> dict[str, float]:
         if not sorted_rates:
             return {}
         return {
@@ -133,7 +129,7 @@ class FeeOptimizer:
         }
 
     @staticmethod
-    def _percentile(sorted_values: List[float], quantile: float) -> float:
+    def _percentile(sorted_values: list[float], quantile: float) -> float:
         if not sorted_values:
             return 0.0
         quantile = min(max(float(quantile), 0.0), 1.0)
@@ -162,6 +158,5 @@ class FeeOptimizer:
         if backlog_ratio < 2.0:
             return "high"
         return "critical"
-
 
 __all__ = ["FeeOptimizer", "FeeRecommendation"]

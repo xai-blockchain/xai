@@ -1,9 +1,8 @@
+from __future__ import annotations
+
 """
 Minimal fraud detector that operates on simple heuristics.
 """
-
-from typing import Dict, List
-
 
 class AIFraudDetector:
     """Heuristic fraud detector used by the XAI node."""
@@ -12,10 +11,10 @@ class AIFraudDetector:
         self.address_history: set[str] = set()
         self.flagged_addresses: set[str] = set()
 
-    def analyze_transaction(self, data: Dict[str, object]) -> Dict[str, object]:
+    def analyze_transaction(self, data: dict[str, object]) -> dict[str, object]:
         sender = data.get("sender", "")
         amount = float(data.get("amount", 0) or 0)
-        reasons: List[str] = []
+        reasons: list[str] = []
         score = 0.0
 
         if amount >= 1000:

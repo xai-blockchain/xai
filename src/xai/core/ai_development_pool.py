@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 """
 AI Development Pool Module Stub
 
 This module provides the AIDevelopmentPool class for managing AI development tasks.
 """
 
-from typing import Dict, Any, List
-
+from typing import Any
 
 class DevelopmentTask:
     """Represents a development task with its metadata."""
@@ -20,7 +21,6 @@ class DevelopmentTask:
         self.result = None
         self.status = "queued"
 
-
 class AIDevelopmentPool:
     """
     Manages a pool of AI development tasks and resources.
@@ -28,7 +28,7 @@ class AIDevelopmentPool:
 
     def __init__(self):
         self.tasks = []
-        self.completed_tasks: List[DevelopmentTask] = []
+        self.completed_tasks: list[DevelopmentTask] = []
         self.resources = {}
 
     def create_development_task(
@@ -37,7 +37,7 @@ class AIDevelopmentPool:
         description: str,
         estimated_tokens: int = 1000,
         priority: int = 5
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Create a new development task.
 
@@ -59,7 +59,7 @@ class AIDevelopmentPool:
             "task_type": task_type
         }
 
-    def add_task(self, task: Dict[str, Any]) -> str:
+    def add_task(self, task: dict[str, Any]) -> str:
         """
         Add a new development task to the pool.
 
@@ -74,7 +74,7 @@ class AIDevelopmentPool:
         self.tasks.append(task)
         return task_id
 
-    def get_task(self, task_id: str) -> Dict[str, Any]:
+    def get_task(self, task_id: str) -> dict[str, Any]:
         """
         Get a task by ID.
 
@@ -92,7 +92,7 @@ class AIDevelopmentPool:
                 return task
         return None
 
-    def list_tasks(self) -> List[Dict[str, Any]]:
+    def list_tasks(self) -> list[dict[str, Any]]:
         """
         List all tasks in the pool.
 

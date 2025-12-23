@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Advanced Rate Limiter
 
@@ -11,32 +13,30 @@ Sophisticated rate limiting implementation with:
 - Distributed rate limiting support (Redis-ready)
 """
 
-import time
 import hashlib
 import logging
-from typing import Dict, List, Optional, Tuple, Callable
+import time
 from collections import defaultdict
-from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from enum import Enum
-from threading import Lock
 from functools import wraps
-from flask import request, jsonify, Response
+from threading import Lock
+from typing import Callable
+
+from flask import Response, jsonify, request
 
 security_logger = logging.getLogger('xai.security')
-
 
 class RateLimitExceeded(Exception):
     """Raised when rate limit is exceeded"""
     pass
-
 
 class LimitSeverity(Enum):
     """Severity levels for rate limit violations"""
     INFO = "info"
     WARNING = "warning"
     CRITICAL = "critical"
-
 
 @dataclass
 class RateLimitConfig:
@@ -50,7 +50,6 @@ class RateLimitConfig:
     def __str__(self):
         return f"{self.max_requests} requests per {self.window_seconds}s"
 
-
 @dataclass
 class RateLimitEntry:
     """Entry in the rate limit log"""
@@ -59,7 +58,6 @@ class RateLimitEntry:
     identifier: str = ""
     ip_address: str = ""
 
-
 @dataclass
 class RateLimitStats:
     """Statistics for rate limiting"""
@@ -67,16 +65,15 @@ class RateLimitStats:
     rejected_requests: int = 0
     current_violations: int = 0
     peak_requests_per_second: float = 0.0
-    last_violation: Optional[datetime] = None
-    violations_by_ip: Dict[str, int] = field(default_factory=dict)
-    violations_by_endpoint: Dict[str, int] = field(default_factory=dict)
-
+    last_violation: datetime | None = None
+    violations_by_ip: dict[str, int] = field(default_factory=dict)
+    violations_by_endpoint: dict[str, int] = field(default_factory=dict)
 
 class RateLimitBucket:
     """Thread-safe bucket for tracking request timestamps"""
 
     def __init__(self):
-        self.requests: List[float] = []
+        self.requests: list[float] = []
         self.lock = Lock()
 
     def add_request(self, timestamp: float) -> None:
@@ -99,7 +96,6 @@ class RateLimitBucket:
             cutoff = time.time() - window_seconds
             self.requests = [ts for ts in self.requests if ts > cutoff]
 
-
 class AdvancedRateLimiter:
     """
     Advanced rate limiter with multiple strategies and DDoS detection.
@@ -116,11 +112,11 @@ class AdvancedRateLimiter:
     def __init__(self):
         """Initialize the advanced rate limiter"""
         # Bucket storage: {identifier: RateLimitBucket}
-        self.buckets: Dict[str, RateLimitBucket] = defaultdict(RateLimitBucket)
+        self.buckets: dict[str, RateLimitBucket] = defaultdict(RateLimitBucket)
         self.lock = Lock()
 
         # TASK 63: Configuration for endpoints with read/write differentiation
-        self.endpoint_configs: Dict[str, RateLimitConfig] = {
+        self.endpoint_configs: dict[str, RateLimitConfig] = {
             # Default limits - differentiated by method
             "default": RateLimitConfig(200, 60, per_ip=True),
             "default_read": RateLimitConfig(300, 60, per_ip=True),  # Higher for reads
@@ -189,14 +185,14 @@ class AdvancedRateLimiter:
         self.ddos_window = 60
 
         # Blocked IPs due to DDoS
-        self.blocked_ips: Dict[str, float] = {}  # {ip: unblock_timestamp}
+        self.blocked_ips: dict[str, float] = {}  # {ip: unblock_timestamp}
         self.block_duration = 3600  # 1 hour block
 
         # Cleanup task (periodic cleanup of old buckets)
         self.last_cleanup = time.time()
         self.cleanup_interval = 300  # 5 minutes
 
-    def _get_identifier(self, endpoint: str) -> Tuple[str, str]:
+    def _get_identifier(self, endpoint: str) -> tuple[str, str]:
         """
         Get the identifier for rate limiting.
 
@@ -204,7 +200,7 @@ class AdvancedRateLimiter:
             endpoint: API endpoint
 
         Returns:
-            Tuple[str, str]: (primary_id, secondary_id) for per_ip and per_user
+            tuple[str, str]: (primary_id, secondary_id) for per_ip and per_user
         """
         # Get IP address (handle proxies)
         ip = request.headers.get('X-Forwarded-For')
@@ -223,7 +219,7 @@ class AdvancedRateLimiter:
 
         return ip, user_id
 
-    def _check_ddos_pattern(self, ip: str) -> Tuple[bool, Optional[str]]:
+    def _check_ddos_pattern(self, ip: str) -> tuple[bool, str | None]:
         """
         Detect DDoS patterns from a single IP.
 
@@ -231,7 +227,7 @@ class AdvancedRateLimiter:
             ip: IP address to check
 
         Returns:
-            Tuple[bool, Optional[str]]: (is_safe, error_message)
+            tuple[bool, str | None]: (is_safe, error_message)
         """
         bucket_key = f"ddos:{ip}"
         bucket = self.buckets[bucket_key]
@@ -268,7 +264,7 @@ class AdvancedRateLimiter:
 
             self.last_cleanup = current_time
 
-    def check_rate_limit(self, endpoint: str) -> Tuple[bool, Optional[str]]:
+    def check_rate_limit(self, endpoint: str) -> tuple[bool, str | None]:
         """
         Check if request is allowed under rate limit.
 
@@ -276,7 +272,7 @@ class AdvancedRateLimiter:
             endpoint: API endpoint
 
         Returns:
-            Tuple[bool, Optional[str]]: (allowed, error_message)
+            tuple[bool, str | None]: (allowed, error_message)
         """
         # Perform periodic cleanup
         self._cleanup_old_buckets()
@@ -411,10 +407,8 @@ class AdvancedRateLimiter:
             return True
         return False
 
-
 # Global instance
 _global_rate_limiter = None
-
 
 def get_rate_limiter() -> AdvancedRateLimiter:
     """Get global rate limiter instance"""
@@ -422,7 +416,6 @@ def get_rate_limiter() -> AdvancedRateLimiter:
     if _global_rate_limiter is None:
         _global_rate_limiter = AdvancedRateLimiter()
     return _global_rate_limiter
-
 
 def rate_limit(endpoint: str = None) -> Callable:
     """

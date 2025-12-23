@@ -9,14 +9,14 @@ This module provides different node operation modes for various use cases.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
-import json
-import hashlib
 import time
-from typing import Dict, Any, List, Optional, Set
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from enum import Enum
+from typing import Any
 
 try:
     from xai.core import config
@@ -31,7 +31,6 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-
 class NodeMode(Enum):
     """Node operation modes"""
     FULL = "full"  # Full node with complete blockchain
@@ -39,23 +38,22 @@ class NodeMode(Enum):
     ARCHIVAL = "archival"  # Archival node (full history + indices)
     LIGHT = "light"  # Light client (headers only)
 
-
 @dataclass
 class StateSnapshot:
     """State snapshot for fast sync"""
     block_height: int
     block_hash: str
     timestamp: float
-    account_states: Dict[str, float]  # address -> balance
-    utxo_set: List[Dict[str, Any]]
+    account_states: dict[str, float]  # address -> balance
+    utxo_set: list[dict[str, Any]]
     total_supply: float
     snapshot_hash: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> StateSnapshot:
+    def from_dict(cls, data: dict[str, Any]) -> StateSnapshot:
         return cls(**data)
 
     def calculate_hash(self) -> str:
@@ -69,7 +67,6 @@ class StateSnapshot:
         }
         return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
-
 class PrunedNode:
     """
     Pruned node mode (Task 261)
@@ -78,7 +75,7 @@ class PrunedNode:
     Suitable for resource-constrained devices.
     """
 
-    def __init__(self, blockchain, keep_blocks: Optional[int] = None):
+    def __init__(self, blockchain, keep_blocks: int | None = None):
         """
         Initialize pruned node
 
@@ -165,7 +162,7 @@ class PrunedNode:
 
         return blocks_to_remove
 
-    def get_pruned_stats(self) -> Dict[str, Any]:
+    def get_pruned_stats(self) -> dict[str, Any]:
         """Get pruning statistics"""
         chain_length = len(self.blockchain.chain)
         kept_blocks = chain_length - self.pruned_height
@@ -190,7 +187,6 @@ class PrunedNode:
         """Set number of blocks to keep"""
         self.keep_blocks = max(100, count)  # Minimum 100 blocks
 
-
 class ArchivalNode:
     """
     Archival node mode (Task 262)
@@ -212,9 +208,9 @@ class ArchivalNode:
         os.makedirs(storage_path, exist_ok=True)
 
         # Additional indices for archival node
-        self.tx_index: Dict[str, int] = {}  # txid -> block_height
-        self.address_index: Dict[str, List[str]] = {}  # address -> [txids]
-        self.block_index: Dict[int, str] = {}  # height -> block_hash
+        self.tx_index: dict[str, int] = {}  # txid -> block_height
+        self.address_index: dict[str, list[str]] = {}  # address -> [txids]
+        self.block_index: dict[int, str] = {}  # height -> block_hash
 
         self._build_indices()
 
@@ -236,7 +232,7 @@ class ArchivalNode:
                     self.address_index[tx.recipient] = []
                 self.address_index[tx.recipient].append(tx.txid)
 
-    def get_transaction_by_id(self, txid: str) -> Optional[Dict[str, Any]]:
+    def get_transaction_by_id(self, txid: str) -> dict[str, Any] | None:
         """Get transaction by ID from anywhere in history"""
         block_height = self.tx_index.get(txid)
         if block_height is None:
@@ -252,9 +248,9 @@ class ArchivalNode:
     def get_address_history(
         self,
         address: str,
-        limit: Optional[int] = None,
+        limit: int | None = None,
         offset: int = 0
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get complete transaction history for address"""
         txids = self.address_index.get(address, [])
 
@@ -272,7 +268,7 @@ class ArchivalNode:
 
         return transactions
 
-    def get_block_by_hash(self, block_hash: str) -> Optional[Dict[str, Any]]:
+    def get_block_by_hash(self, block_hash: str) -> dict[str, Any] | None:
         """Get block by hash"""
         for block in self.blockchain.chain:
             if block.hash == block_hash:
@@ -288,7 +284,7 @@ class ArchivalNode:
 
         return None
 
-    def get_archival_stats(self) -> Dict[str, Any]:
+    def get_archival_stats(self) -> dict[str, Any]:
         """Get archival node statistics"""
         return {
             "mode": "archival",
@@ -323,7 +319,6 @@ class ArchivalNode:
         except FileNotFoundError:
             return False
 
-
 class FastSyncManager:
     """
     Fast sync with state snapshots (Task 263)
@@ -335,9 +330,9 @@ class FastSyncManager:
     def __init__(self, blockchain):
         self.blockchain = blockchain
         self.snapshot_interval = 1000  # Create snapshot every N blocks
-        self.snapshots: Dict[int, StateSnapshot] = {}
+        self.snapshots: dict[int, StateSnapshot] = {}
 
-    def create_snapshot(self, height: Optional[int] = None) -> StateSnapshot:
+    def create_snapshot(self, height: int | None = None) -> StateSnapshot:
         """
         Create state snapshot at current or specified height
 
@@ -383,7 +378,7 @@ class FastSyncManager:
 
         return snapshot
 
-    def _get_all_addresses(self) -> Set[str]:
+    def _get_all_addresses(self) -> set[str]:
         """Get all addresses that have ever transacted"""
         addresses = set()
 
@@ -394,7 +389,7 @@ class FastSyncManager:
 
         return addresses
 
-    def get_latest_snapshot(self) -> Optional[StateSnapshot]:
+    def get_latest_snapshot(self) -> StateSnapshot | None:
         """Get the most recent snapshot"""
         if not self.snapshots:
             return None
@@ -424,7 +419,7 @@ class FastSyncManager:
 
         return True
 
-    def fast_sync(self, snapshot: StateSnapshot, blocks_since_snapshot: List[Any]) -> bool:
+    def fast_sync(self, snapshot: StateSnapshot, blocks_since_snapshot: list[Any]) -> bool:
         """
         Perform fast sync using snapshot + recent blocks
 
@@ -456,7 +451,7 @@ class FastSyncManager:
         latest_snapshot_height = max(self.snapshots.keys())
         return height - latest_snapshot_height >= self.snapshot_interval
 
-    def get_sync_stats(self) -> Dict[str, Any]:
+    def get_sync_stats(self) -> dict[str, Any]:
         """Get fast sync statistics"""
         return {
             "snapshot_count": len(self.snapshots),
@@ -476,7 +471,7 @@ class FastSyncManager:
 
         return True
 
-    def import_snapshot(self, filepath: str) -> Optional[StateSnapshot]:
+    def import_snapshot(self, filepath: str) -> StateSnapshot | None:
         """Import snapshot from file"""
         try:
             with open(filepath, 'r') as f:
@@ -494,7 +489,6 @@ class FastSyncManager:
             logger.debug("Failed to load state snapshot: %s", e)
             return None
 
-
 class NodeModeManager:
     """Manage node operation mode"""
 
@@ -508,10 +502,10 @@ class NodeModeManager:
         """
         self.blockchain = blockchain
         self.mode = NodeMode.FULL
-        self.pruned_node: Optional[PrunedNode] = None
-        self.archival_node: Optional[ArchivalNode] = None
-        self.fast_sync: Optional[FastSyncManager] = None
-        self.pruning_manager: Optional[Any] = None  # BlockPruningManager instance
+        self.pruned_node: PrunedNode | None = None
+        self.archival_node: ArchivalNode | None = None
+        self.fast_sync: FastSyncManager | None = None
+        self.pruning_manager: Any | None = None  # BlockPruningManager instance
 
         # Auto-configure from environment
         if auto_configure and config:
@@ -630,7 +624,7 @@ class NodeModeManager:
                     }
                 )
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get mode-specific statistics"""
         if self.mode == NodeMode.PRUNED and self.pruned_node:
             return self.pruned_node.get_pruned_stats()

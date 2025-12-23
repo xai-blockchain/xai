@@ -11,19 +11,19 @@ Medium Priority Security/Robustness Features:
 
 from __future__ import annotations
 
-import time
 import hashlib
 import logging
-from typing import Dict, List, Optional, Tuple, Any, TYPE_CHECKING
+import time
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Block, Transaction, Blockchain
+
 from collections import defaultdict, deque
 from enum import Enum
 
 # Configure logging
 logger = logging.getLogger(__name__)
-
 
 class BlockStatus(Enum):
     """Block validation status"""
@@ -32,7 +32,6 @@ class BlockStatus(Enum):
     ORPHAN = "orphan"
     INVALID = "invalid"
     PENDING = "pending"
-
 
 class BlockPropagationMonitor:
     """
@@ -93,7 +92,7 @@ class BlockPropagationMonitor:
                 }
             )
 
-    def get_peer_performance(self, peer_url: str) -> Dict[str, Any]:
+    def get_peer_performance(self, peer_url: str) -> dict[str, Any]:
         """
         Get performance metrics for a peer
 
@@ -119,7 +118,7 @@ class BlockPropagationMonitor:
             "performance_score": performance_score,
         }
 
-    def get_network_stats(self) -> Dict[str, Any]:
+    def get_network_stats(self) -> dict[str, Any]:
         """Get overall network propagation statistics"""
         if not self.propagation_history:
             return {"avg_propagation_time": 0, "total_blocks_tracked": 0, "active_peers": 0}
@@ -133,7 +132,6 @@ class BlockPropagationMonitor:
             "total_blocks_tracked": len(self.block_first_seen),
             "active_peers": len(self.peer_latency),
         }
-
 
 class OrphanBlockPool:
     """
@@ -150,7 +148,7 @@ class OrphanBlockPool:
         self.orphan_timestamps = {}  # block_hash -> timestamp
         self.orphan_timeout = max_orphan_age
 
-    def add_orphan(self, block: 'Block', parent_hash: Optional[str] = None) -> bool:
+    def add_orphan(self, block: 'Block', parent_hash: str | None = None) -> bool:
         """
         Add orphan block to pool
 
@@ -176,7 +174,7 @@ class OrphanBlockPool:
 
         return True
 
-    def get_orphans_by_parent(self, parent_hash: str) -> List[Block]:
+    def get_orphans_by_parent(self, parent_hash: str) -> list[Block]:
         """
         Get orphan blocks that depend on a specific parent
 
@@ -188,15 +186,15 @@ class OrphanBlockPool:
         """
         return self.orphan_by_parent.get(parent_hash, [])
 
-    def get_orphan(self, block_hash: str) -> Optional[Block]:
+    def get_orphan(self, block_hash: str) -> Block | None:
         """Get a specific orphan block"""
         return self.orphan_blocks.get(block_hash)
 
-    def get_orphans_by_previous(self, previous_hash: str) -> List[Block]:
+    def get_orphans_by_previous(self, previous_hash: str) -> list[Block]:
         """Get orphans indexed by previous hash (legacy alias)"""
         return self.get_orphans_by_parent(previous_hash)
 
-    def remove_orphan(self, block_hash: str) -> Optional[Block]:
+    def remove_orphan(self, block_hash: str) -> Block | None:
         """Remove orphan block from pool"""
         if block_hash in self.orphan_blocks:
             block = self.orphan_blocks[block_hash]
@@ -235,7 +233,7 @@ class OrphanBlockPool:
         for block_hash in expired:
             self.remove_orphan(block_hash)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get orphan pool statistics"""
         return {
             "total_orphans": len(self.orphan_blocks),
@@ -243,12 +241,10 @@ class OrphanBlockPool:
             "parents_tracked": len(self.orphan_by_parent),
         }
 
-
 class OrphanBlockManager(OrphanBlockPool):
     """Alias used by legacy tests and integrations."""
 
     pass
-
 
 class TransactionOrdering:
     """
@@ -259,7 +255,7 @@ class TransactionOrdering:
     """
 
     @staticmethod
-    def order_transactions(transactions: List[Transaction]) -> List[Transaction]:
+    def order_transactions(transactions: list[Transaction]) -> list[Transaction]:
         """
         Order transactions deterministically with nonce sequencing
 
@@ -315,7 +311,7 @@ class TransactionOrdering:
         return coinbase + regular
 
     @staticmethod
-    def validate_transaction_order(transactions: List[Transaction]) -> bool:
+    def validate_transaction_order(transactions: list[Transaction]) -> bool:
         """
         Validate that transactions are in correct order
 
@@ -370,8 +366,8 @@ class TransactionOrdering:
             seen_txids.add(txid)
 
         # Rule 3: Validate nonce ordering per sender
-        sender_nonces: Dict[str, int] = {}
-        sender_last_tx: Dict[str, int] = {}  # Track last transaction index per sender
+        sender_nonces: dict[str, int] = {}
+        sender_last_tx: dict[str, int] = {}  # Track last transaction index per sender
 
         for i, tx in enumerate(transactions):
             # Skip coinbase and special transactions
@@ -462,21 +458,19 @@ class TransactionOrdering:
 
         return True
 
-
 class TransactionOrderingRules:
     """Simple ordering helpers used by the unit tests."""
 
     @staticmethod
-    def order_by_fee(transactions: List[Transaction]) -> List[Transaction]:
+    def order_by_fee(transactions: list[Transaction]) -> list[Transaction]:
         return sorted(transactions, key=lambda tx: tx.fee, reverse=True)
 
     @staticmethod
-    def order_by_timestamp(transactions: List[Transaction]) -> List[Transaction]:
+    def order_by_timestamp(transactions: list[Transaction]) -> list[Transaction]:
         return sorted(transactions, key=lambda tx: tx.timestamp)
 
-    def prioritize(self, transactions: List[Transaction]) -> List[Transaction]:
+    def prioritize(self, transactions: list[Transaction]) -> list[Transaction]:
         return sorted(transactions, key=lambda tx: (-tx.fee, tx.timestamp))
-
 
 class FinalityTracker:
     """
@@ -494,7 +488,7 @@ class FinalityTracker:
 
         self.finalized_blocks = set()  # Blocks with hard finality
 
-    def get_block_finality(self, block_index: int, chain_height: int) -> Dict[str, Any]:
+    def get_block_finality(self, block_index: int, chain_height: int) -> dict[str, Any]:
         """
         Get finality status of a block
 
@@ -542,7 +536,7 @@ class FinalityTracker:
         """Check if block has hard finality"""
         return block_index in self.finalized_blocks
 
-    def get_finality_stats(self, blockchain: 'Blockchain') -> Dict[str, Any]:
+    def get_finality_stats(self, blockchain: 'Blockchain') -> dict[str, Any]:
         """Get overall finality statistics"""
         chain_height = len(blockchain.chain)
 
@@ -562,7 +556,6 @@ class FinalityTracker:
             "pending": max(0, chain_height - self.FINALITY_SOFT),
         }
 
-
 class FinalityMechanism:
     """Lightweight finality helper required by the test suite."""
 
@@ -577,7 +570,6 @@ class FinalityMechanism:
         if self.confirmation_depth == 0:
             return 1.0
         return min(1.0, confirmations / self.confirmation_depth)
-
 
 class DynamicDifficultyAdjustment:
     """
@@ -604,14 +596,14 @@ class DynamicDifficultyAdjustment:
         # Minimal forward step (seconds) used to sanitize non-monotonic timestamps
         self._min_timestamp_step = max(0.001, self.target_block_time * 0.01)
 
-    def _sanitize_block_timestamps(self, blocks: List["Block"]) -> List[float]:
+    def _sanitize_block_timestamps(self, blocks: list["Block"]) -> list[float]:
         """
         Ensure block timestamps are monotonic to avoid pathological difficulty swings
         when a block has a lower timestamp than its predecessor (e.g., test fixtures
         that rewrite timestamps).
         """
-        sanitized: List[float] = []
-        last_ts: Optional[float] = None
+        sanitized: list[float] = []
+        last_ts: float | None = None
         for block in blocks:
             ts = block.timestamp
             if last_ts is not None and ts <= last_ts:
@@ -690,7 +682,7 @@ class DynamicDifficultyAdjustment:
         # After mining adjustment_window blocks, chain_length = adjustment_window + 1
         return chain_length > 1 and (chain_length - 1) % self.adjustment_window == 0
 
-    def get_difficulty_stats(self, blockchain: 'Blockchain') -> Dict[str, Any]:
+    def get_difficulty_stats(self, blockchain: 'Blockchain') -> dict[str, Any]:
         """
         Get difficulty adjustment statistics
 
@@ -733,7 +725,6 @@ class DynamicDifficultyAdjustment:
             "recommended_difficulty": self.calculate_new_difficulty(blockchain),
         }
 
-
 class DifficultyAdjustment:
     """Compatibility wrapper providing a simpler adjustment interface."""
 
@@ -743,7 +734,7 @@ class DifficultyAdjustment:
         self.min_difficulty = 0.1
         self.max_difficulty = 100.0
 
-    def calculate_difficulty(self, chain: List[Block], current_difficulty: float) -> float:
+    def calculate_difficulty(self, chain: list[Block], current_difficulty: float) -> float:
         if len(chain) < 2:
             return max(1.0, current_difficulty)
 
@@ -758,7 +749,6 @@ class DifficultyAdjustment:
         ratio = self.target_block_time / avg_time if avg_time > 0 else 1.0
         new_difficulty = current_difficulty * ratio
         return max(0.1, new_difficulty)
-
 
 class AdvancedConsensusManager:
     """
@@ -779,7 +769,7 @@ class AdvancedConsensusManager:
         self.finality_tracker = FinalityTracker()
         self.difficulty_adjuster = DynamicDifficultyAdjustment()
 
-    def process_new_block(self, block: 'Block', from_peer: Optional[str] = None) -> Tuple[bool, str]:
+    def process_new_block(self, block: 'Block', from_peer: str | None = None) -> tuple[bool, str]:
         """
         Process newly received block with orphan handling
 
@@ -831,7 +821,7 @@ class AdvancedConsensusManager:
                 # Check for more orphans depending on this one
                 self.process_orphans_after_block(orphan.hash)
 
-    def order_pending_transactions(self) -> List[Transaction]:
+    def order_pending_transactions(self) -> list[Transaction]:
         """
         Order pending transactions for next block
 
@@ -859,7 +849,7 @@ class AdvancedConsensusManager:
             if not self.finality_tracker.is_finalized(i):
                 self.finality_tracker.mark_finalized(i)
 
-    def get_consensus_stats(self) -> Dict[str, Any]:
+    def get_consensus_stats(self) -> dict[str, Any]:
         """Get comprehensive consensus statistics"""
         return {
             "propagation": self.propagation_monitor.get_network_stats(),
@@ -867,7 +857,6 @@ class AdvancedConsensusManager:
             "finality": self.finality_tracker.get_finality_stats(self.blockchain),
             "difficulty": self.difficulty_adjuster.get_difficulty_stats(self.blockchain),
         }
-
 
 # Maintain compatibility with older imports
 AdvancedConsensus = AdvancedConsensusManager

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Block Explorer - Local Testing Interface
 
@@ -15,7 +17,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from functools import lru_cache
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
 import yaml
@@ -31,7 +33,6 @@ logger = logging.getLogger(__name__)
 # Cache configuration
 CACHE_TTL = int(os.getenv("XAI_CACHE_TTL", "60"))  # seconds
 CACHE_SIZE = int(os.getenv("XAI_CACHE_SIZE", "128"))  # max cached items
-
 
 class SimpleCache:
     """
@@ -60,9 +61,9 @@ class SimpleCache:
 
         self.ttl = ttl
         self.max_size = max_size
-        self.cache: Dict[str, tuple[Any, float]] = {}
+        self.cache: dict[str, tuple[Any, float]] = {}
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """
         Get a cached value if it exists and is not expired.
 
@@ -110,13 +111,11 @@ class SimpleCache:
 
         self.cache[key] = (value, datetime.now().timestamp())
 
-
 # Global cache instance
 response_cache = SimpleCache()
 
-
 @lru_cache(maxsize=1)
-def get_allowed_origins() -> List[str]:
+def get_allowed_origins() -> list[str]:
     """
     Get allowed origins from config file (cached).
 
@@ -133,7 +132,6 @@ def get_allowed_origins() -> List[str]:
             return cors_config.get("origins", [])
     return []
 
-
 app = Flask(__name__)
 allowed_origins = get_allowed_origins()
 CORS(app, origins=allowed_origins)
@@ -141,8 +139,7 @@ CORS(app, origins=allowed_origins)
 # Configuration
 NODE_URL = os.getenv("XAI_NODE_URL", "http://localhost:12001")
 
-
-def get_from_node(endpoint: str, use_cache: bool = True) -> Optional[Dict[str, Any]]:
+def get_from_node(endpoint: str, use_cache: bool = True) -> dict[str, Any] | None:
     """
     Fetch data from XAI node with optional caching.
 
@@ -195,8 +192,7 @@ def get_from_node(endpoint: str, use_cache: bool = True) -> Optional[Dict[str, A
         )
         return None
 
-
-def post_to_node(endpoint: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def post_to_node(endpoint: str, data: dict[str, Any]) -> dict[str, Any] | None:
     """
     Post data to XAI node.
 
@@ -232,8 +228,7 @@ def post_to_node(endpoint: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]
         )
         return None
 
-
-def format_timestamp(timestamp: Optional[float]) -> str:
+def format_timestamp(timestamp: float | None) -> str:
     """
     Convert timestamp to readable UTC format.
 
@@ -248,8 +243,7 @@ def format_timestamp(timestamp: Optional[float]) -> str:
         return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
     return "N/A"
 
-
-def format_amount(amount: Optional[float]) -> str:
+def format_amount(amount: float | None) -> str:
     """
     Format XAI amount.
 
@@ -260,7 +254,6 @@ def format_amount(amount: Optional[float]) -> str:
         Formatted amount string with 4 decimal places
     """
     return f"{amount:,.4f}" if amount else "0.0000"
-
 
 @app.route("/")
 def index():
@@ -280,7 +273,6 @@ def index():
         format_amount=format_amount,
     )
 
-
 @app.route("/blocks")
 def blocks():
     """View all blocks"""
@@ -299,7 +291,6 @@ def blocks():
         format_timestamp=format_timestamp,
     )
 
-
 @app.route("/block/<int:index>")
 def block_detail(index):
     """View specific block"""
@@ -309,7 +300,6 @@ def block_detail(index):
         "block.html", block=block, format_timestamp=format_timestamp, format_amount=format_amount
     )
 
-
 @app.route("/transaction/<txid>")
 def transaction_detail(txid):
     """View specific transaction"""
@@ -318,7 +308,6 @@ def transaction_detail(txid):
     return render_template(
         "transaction.html", tx=tx, format_timestamp=format_timestamp, format_amount=format_amount
     )
-
 
 @app.route("/address/<address>")
 def address_detail(address):
@@ -338,7 +327,6 @@ def address_detail(address):
         format_timestamp=format_timestamp,
         format_amount=format_amount,
     )
-
 
 @app.route("/search", methods=["POST"])
 def search():
@@ -360,13 +348,11 @@ def search():
     # Assume it's a transaction ID
     return render_template("search.html", redirect=f"/transaction/{query}")
 
-
 @app.route("/api/stats")
 def api_stats():
     """API endpoint for stats (for auto-refresh)"""
     stats = get_from_node("/stats")
     return jsonify(stats) if stats else jsonify({"error": "Could not fetch stats"})
-
 
 if __name__ == "__main__":
     # User-facing startup banner (CLI output - keep print)

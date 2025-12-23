@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Governance Execution Engine
 
@@ -6,9 +8,8 @@ Includes meta-governance for expanding governance capabilities.
 """
 
 import time
-from typing import Dict, Any, Optional, List
 from enum import Enum
-
+from typing import Any
 
 class ProposalType(Enum):
     """Core proposal types"""
@@ -22,7 +23,6 @@ class ProposalType(Enum):
     ADD_PARAMETER = "add_parameter"
     MODIFY_GOVERNANCE_RULES = "modify_governance_rules"
 
-
 class ParameterType(Enum):
     """Parameter value types"""
 
@@ -31,7 +31,6 @@ class ParameterType(Enum):
     BOOLEAN = "boolean"
     STRING = "string"
     ADDRESS = "address"
-
 
 class GovernanceCapabilityRegistry:
     """
@@ -214,7 +213,7 @@ class GovernanceCapabilityRegistry:
         return True
 
     def add_proposal_type(
-        self, type_name: str, description: str, required_fields: List[str]
+        self, type_name: str, description: str, required_fields: list[str]
     ) -> bool:
         """
         Add new proposal type (via governance)
@@ -274,7 +273,6 @@ class GovernanceCapabilityRegistry:
             return False
 
         return True
-
 
 class GovernanceExecutionEngine:
     """
@@ -661,7 +659,7 @@ class GovernanceExecutionEngine:
             }
         )
 
-    def get_execution_history(self, limit: int = 100) -> List[Dict]:
+    def get_execution_history(self, limit: int = 100) -> list[Dict]:
         """Get recent execution history"""
         return self.execution_history[-limit:]
 
@@ -669,7 +667,7 @@ class GovernanceExecutionEngine:
         """Check if feature is enabled"""
         return self.capability_registry.active_features.get(feature_name, False)
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         """
         Create a complete snapshot of the current governance state.
         Thread-safe atomic operation for chain reorganization rollback.
@@ -688,7 +686,7 @@ class GovernanceExecutionEngine:
             },
         }
 
-    def restore(self, snapshot: Dict[str, Any]) -> None:
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """
         Restore governance state from a snapshot.
         Thread-safe atomic operation for chain reorganization rollback.
@@ -697,6 +695,7 @@ class GovernanceExecutionEngine:
             snapshot: Snapshot created by snapshot() method
         """
         import copy
+
         from xai.core.governance_transactions import GovernanceState
 
         # Restore governance state

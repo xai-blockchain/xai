@@ -10,7 +10,6 @@ import time
 import hashlib
 import os
 import json
-from typing import List, Tuple
 
 from xai.core.blockchain import Blockchain
 from xai.core.wallet import Wallet

@@ -18,14 +18,14 @@ Security features:
 
 from __future__ import annotations
 
-import time
-import logging
 import hashlib
+import logging
 import math
+import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Callable, TYPE_CHECKING
-from enum import Enum
 from decimal import Decimal, getcontext
+from enum import Enum
+from typing import TYPE_CHECKING, Callable
 
 from ..vm.exceptions import VMExecutionError
 from .access_control import AccessControl, SignedRequest
@@ -42,7 +42,6 @@ getcontext().prec = 50
 # WAD precision constant (10^18) for fixed-point arithmetic
 WAD = Decimal(10**18)
 
-
 class VestingCurveType(Enum):
     """Types of vesting curves."""
     LINEAR = "linear"  # Constant rate
@@ -52,14 +51,12 @@ class VestingCurveType(Enum):
     STEP = "step"  # Discrete unlock steps
     CUSTOM = "custom"  # User-defined curve
 
-
 class VestingStatus(Enum):
     """Status of a vesting schedule."""
     ACTIVE = "active"
     FULLY_VESTED = "fully_vested"
     REVOKED = "revoked"
     EARLY_UNLOCKED = "early_unlocked"
-
 
 @dataclass
 class VestingCurve:
@@ -82,7 +79,7 @@ class VestingCurve:
     step_count: int = 4  # Number of steps
 
     # Custom curve: list of (time_fraction, amount_fraction) points
-    custom_points: List[Tuple[float, float]] = field(default_factory=list)
+    custom_points: list[tuple[float, float]] = field(default_factory=list)
 
     def calculate_vested_fraction(self, elapsed_fraction: float) -> float:
         """
@@ -227,7 +224,6 @@ class VestingCurve:
 
         return 1.0
 
-
 @dataclass
 class VestingSchedule:
     """
@@ -280,7 +276,7 @@ class VestingSchedule:
 
     # ==================== Vesting Calculations ====================
 
-    def get_vested_amount(self, at_time: Optional[float] = None) -> int:
+    def get_vested_amount(self, at_time: float | None = None) -> int:
         """
         Calculate total vested amount at a given time.
 
@@ -317,12 +313,12 @@ class VestingSchedule:
 
         return int(self.total_amount * vested_fraction)
 
-    def get_claimable_amount(self, at_time: Optional[float] = None) -> int:
+    def get_claimable_amount(self, at_time: float | None = None) -> int:
         """Get amount that can be claimed now."""
         vested = self.get_vested_amount(at_time)
         return max(0, vested - self.claimed_amount)
 
-    def get_unvested_amount(self, at_time: Optional[float] = None) -> int:
+    def get_unvested_amount(self, at_time: float | None = None) -> int:
         """Get amount not yet vested."""
         vested = self.get_vested_amount(at_time)
         return self.total_amount - vested
@@ -355,7 +351,6 @@ class VestingSchedule:
             "curve_type": self.curve.curve_type.value,
         }
 
-
 @dataclass
 class VestingVault:
     """
@@ -375,10 +370,10 @@ class VestingVault:
     token: str = ""  # Token being vested
 
     # All vesting schedules
-    schedules: Dict[str, VestingSchedule] = field(default_factory=dict)
+    schedules: dict[str, VestingSchedule] = field(default_factory=dict)
 
     # Schedules by beneficiary
-    beneficiary_schedules: Dict[str, List[str]] = field(default_factory=dict)
+    beneficiary_schedules: dict[str, list[str]] = field(default_factory=dict)
 
     # Total amounts
     total_locked: int = 0
@@ -413,7 +408,7 @@ class VestingVault:
         allow_early_unlock: bool = False,
         early_unlock_penalty: int = 5000,
         revocable: bool = False,
-        start_time: Optional[float] = None,
+        start_time: float | None = None,
     ) -> str:
         """
         Create a new vesting schedule.
@@ -537,7 +532,7 @@ class VestingVault:
         amount: int,
         cliff_duration: int,
         vesting_duration: int,
-        curve_points: List[Tuple[float, float]],
+        curve_points: list[tuple[float, float]],
         revocable: bool = False,
     ) -> str:
         """
@@ -591,12 +586,12 @@ class VestingVault:
     def create_batch_schedules(
         self,
         caller: str,
-        beneficiaries: List[str],
-        amounts: List[int],
+        beneficiaries: list[str],
+        amounts: list[int],
         cliff_duration: int,
         vesting_duration: int,
         curve_type: VestingCurveType = VestingCurveType.LINEAR,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Create multiple vesting schedules at once.
 
@@ -719,7 +714,7 @@ class VestingVault:
         caller: str,
         schedule_id: str,
         amount: int,
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         """
         Early unlock unvested tokens with penalty.
 
@@ -882,7 +877,7 @@ class VestingVault:
         allow_early_unlock: bool = False,
         early_unlock_penalty: int = 5000,
         revocable: bool = False,
-        start_time: Optional[float] = None,
+        start_time: float | None = None,
     ) -> str:
         """
         Create a new vesting schedule with signature verification.
@@ -1003,14 +998,14 @@ class VestingVault:
 
     # ==================== View Functions ====================
 
-    def get_schedule(self, schedule_id: str) -> Optional[Dict]:
+    def get_schedule(self, schedule_id: str) -> Dict | None:
         """Get schedule details."""
         schedule = self.schedules.get(schedule_id)
         if not schedule:
             return None
         return schedule.get_vesting_info()
 
-    def get_beneficiary_schedules(self, beneficiary: str) -> List[Dict]:
+    def get_beneficiary_schedules(self, beneficiary: str) -> list[Dict]:
         """Get all schedules for a beneficiary."""
         schedule_ids = self.beneficiary_schedules.get(beneficiary, [])
         return [

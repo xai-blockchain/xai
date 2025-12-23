@@ -1,22 +1,21 @@
+from __future__ import annotations
+
 """
 API security helpers for rate limiting and validated payloads across all HTTP endpoints.
 """
 
 from collections import defaultdict
 from time import time
-from typing import Dict
 
 from flask import request
-from xai.core.security_validation import ValidationError, validate_api_request
 
 from xai.core.config import Config
-
+from xai.core.security_validation import ValidationError, validate_api_request
 
 class RateLimitExceeded(ValidationError):
     """Raise when a client exceeds the configured rate limits."""
 
     pass
-
 
 class SimpleRateLimiter:
     """Basic sliding-window rate limiter keyed by IP/identifier."""
@@ -24,7 +23,7 @@ class SimpleRateLimiter:
     def __init__(self, max_requests: int = 120, window_seconds: int = 60):
         self.max_requests = max_requests
         self.window_seconds = window_seconds
-        self.calls: Dict[str, list[float]] = defaultdict(list)
+        self.calls: dict[str, list[float]] = defaultdict(list)
 
     def allow(self, key: str) -> bool:
         now = time()
@@ -36,7 +35,6 @@ class SimpleRateLimiter:
             return False
         self.calls[key].append(now)
         return True
-
 
 class APISecurityManager:
     """Wraps rate limiting and request validation for Flask apps."""

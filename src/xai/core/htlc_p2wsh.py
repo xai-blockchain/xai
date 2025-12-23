@@ -5,10 +5,8 @@ HTLC helpers for Bitcoin-style P2WSH contracts.
 from __future__ import annotations
 
 import hashlib
-from typing import Dict, Tuple
 
 from .utxo_address import redeem_script_to_p2wsh_address
-
 
 OP_IF = "63"
 OP_ELSE = "67"
@@ -19,7 +17,6 @@ OP_CHECKSIG = "ac"
 OP_CHECKLOCKTIMEVERIFY = "b1"
 OP_DROP = "75"
 
-
 def _encode_push(data_hex: str) -> str:
     """Encode data push (single-byte length prefix for simplicity)."""
     if len(data_hex) % 2 != 0:
@@ -29,7 +26,6 @@ def _encode_push(data_hex: str) -> str:
         raise ValueError("push too long for single-byte length")
     return f"{length:02x}{data_hex}"
 
-
 def _encode_timelock(timelock: int) -> str:
     # Minimal encoding little-endian
     raw = timelock.to_bytes((timelock.bit_length() + 7) // 8 or 1, "little")
@@ -38,10 +34,8 @@ def _encode_timelock(timelock: int) -> str:
         raw += b"\x00"
     return _encode_push(raw.hex())
 
-
 def _pubkey_push(pubkey_hex: str) -> str:
     return _encode_push(pubkey_hex)
-
 
 def build_utxo_contract(
     secret_hash_hex: str,
@@ -50,7 +44,7 @@ def build_utxo_contract(
     sender_pubkey: str,
     *,
     hrp: str = "bc",
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """
     Build canonical HTLC redeem script and derived P2WSH address.
     Script (hex):
@@ -89,16 +83,14 @@ def build_utxo_contract(
         "script_pubkey": f"0020{witness_program.hex()}",
     }
 
-
-def build_claim_witness(secret_hex: str, recipient_sig_hex: str, redeem_script_hex: str) -> Tuple[str, str, str, str]:
+def build_claim_witness(secret_hex: str, recipient_sig_hex: str, redeem_script_hex: str) -> tuple[str, str, str, str]:
     """
     Build witness stack for claim path: [sig, secret, 1, redeem_script]
     Returns tuple of hex elements (sig, secret, selector, redeem_script_hex).
     """
     return recipient_sig_hex, secret_hex, "01", redeem_script_hex
 
-
-def build_refund_witness(sender_sig_hex: str, redeem_script_hex: str) -> Tuple[str, str, str]:
+def build_refund_witness(sender_sig_hex: str, redeem_script_hex: str) -> tuple[str, str, str]:
     """
     Build witness stack for refund path: [sig, 0, redeem_script]
     Returns tuple of hex elements (sig, selector, redeem_script_hex).

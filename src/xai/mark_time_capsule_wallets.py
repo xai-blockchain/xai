@@ -14,10 +14,10 @@ SECURITY NOTE:
 - Previous version used random.seed(42) which was deterministic and insecure
 """
 
-import json
-import secrets
-import os
 import hashlib
+import json
+import os
+import secrets
 from datetime import datetime
 
 

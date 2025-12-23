@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Security Validation Module
 
@@ -11,13 +13,12 @@ Protects against:
 - Malformed data
 """
 
-import re
-import logging
 import json
+import logging
 import os
-from typing import Any, Union, Dict, Callable, List
+import re
 from datetime import datetime, timezone
-
+from typing import Any, Callable
 
 # Security logger setup
 security_logger = logging.getLogger("xai.security")
@@ -33,20 +34,19 @@ if not security_logger.handlers:
     handler.setFormatter(formatter)
     security_logger.addHandler(handler)
 
-
 class SecurityEventRouter:
     """Dispatches security events to registered sinks (metrics, alerting, etc.)."""
 
-    _sinks: List[Callable[[str, Dict[str, Any], str], None]] = []
+    _sinks: list[Callable[[str, dict[str, Any], str], None]] = []
 
     @classmethod
-    def register_sink(cls, sink: Callable[[str, Dict[str, Any], str], None]) -> None:
+    def register_sink(cls, sink: Callable[[str, dict[str, Any], str], None]) -> None:
         """Register a callable sink to receive security events."""
         if sink and sink not in cls._sinks:
             cls._sinks.append(sink)
 
     @classmethod
-    def dispatch(cls, event_type: str, details: Dict[str, Any], severity: str) -> None:
+    def dispatch(cls, event_type: str, details: dict[str, Any], severity: str) -> None:
         """
         Dispatch a security event to all registered sinks unless disabled via env.
         """
@@ -60,8 +60,7 @@ class SecurityEventRouter:
                     "SecurityEventRouter sink failure: %s", exc, exc_info=True
                 )
 
-
-def log_security_event(event_type: str, details: Dict[str, Any], severity: str = "INFO"):
+def log_security_event(event_type: str, details: dict[str, Any], severity: str = "INFO"):
     """
     Log security-related events in structured format
 
@@ -90,12 +89,10 @@ def log_security_event(event_type: str, details: Dict[str, Any], severity: str =
 
     SecurityEventRouter.dispatch(event_type, details, severity)
 
-
 class ValidationError(Exception):
     """Validation error - safe to expose to users"""
 
     pass
-
 
 class SecurityValidator:
     """
@@ -395,9 +392,7 @@ class SecurityValidator:
         else:
             return str(data)
 
-
 # Convenience functions for common validations
-
 
 def validate_transaction_data(data: dict) -> dict:
     """
@@ -437,7 +432,6 @@ def validate_transaction_data(data: dict) -> dict:
         )
 
     return validated
-
 
 def validate_api_request(data: dict, max_size: int = SecurityValidator.MAX_JSON_SIZE) -> dict:
     """

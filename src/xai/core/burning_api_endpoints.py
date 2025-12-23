@@ -15,11 +15,12 @@ ANONYMITY GUARANTEES:
 
 from __future__ import annotations
 
-from typing import Any, Tuple
-from flask import jsonify, request, Response
-from xai.core.token_burning_engine import TokenBurningEngine, ServiceType
-from xai.core.anonymous_treasury import AnonymousTreasury
+from typing import Any
 
+from flask import Response, jsonify, request
+
+from xai.core.anonymous_treasury import AnonymousTreasury
+from xai.core.token_burning_engine import ServiceType, TokenBurningEngine
 
 def setup_burning_api(app: Any, node: Any) -> TokenBurningEngine:
     """
@@ -39,7 +40,7 @@ def setup_burning_api(app: Any, node: Any) -> TokenBurningEngine:
     )
 
     @app.route("/burn/consume-service", methods=["POST"])
-    def consume_service() -> Tuple[Response, int] | Response:
+    def consume_service() -> tuple[Response, int] | Response:
         """
         Consume XAI for service usage
 
@@ -137,7 +138,7 @@ def setup_burning_api(app: Any, node: Any) -> TokenBurningEngine:
         return jsonify({"burns": burns, "count": len(burns)})
 
     @app.route("/burn/service/<service_type>", methods=["GET"])
-    def get_service_burn_stats(service_type: str) -> Tuple[Response, int] | Response:
+    def get_service_burn_stats(service_type: str) -> tuple[Response, int] | Response:
         """
         Get anonymous burn statistics for specific service
 
@@ -158,7 +159,7 @@ def setup_burning_api(app: Any, node: Any) -> TokenBurningEngine:
         return jsonify(stats)
 
     @app.route("/burn/price/<service_type>", methods=["GET"])
-    def get_service_price(service_type: str) -> Tuple[Response, int] | Response:
+    def get_service_price(service_type: str) -> tuple[Response, int] | Response:
         """
         Get current XAI price for service (dynamic, USD-pegged)
 

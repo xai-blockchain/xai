@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 AI Executor with Node Operator Questioning Integration
 
@@ -18,15 +20,14 @@ Use Cases:
 """
 
 import time
-from typing import Dict, Optional
-from xai.core.auto_switching_ai_executor import AutoSwitchingAIExecutor, TaskStatus
+
 from xai.core.ai_node_operator_questioning import (
     AINodeOperatorQuestioning,
-    QuestionType,
     QuestionPriority,
     QuestionStatus,
+    QuestionType,
 )
-
+from xai.core.auto_switching_ai_executor import AutoSwitchingAIExecutor, TaskStatus
 
 class AIExecutorWithQuestioning(AutoSwitchingAIExecutor):
     """
@@ -49,7 +50,7 @@ class AIExecutorWithQuestioning(AutoSwitchingAIExecutor):
         self.questioning = AINodeOperatorQuestioning(blockchain, governance_dao)
 
         # Track questions asked during tasks
-        self.task_questions: Dict[str, list] = {}  # task_id -> [question_ids]
+        self.task_questions: dict[str, list] = {}  # task_id -> [question_ids]
 
         print("✅ AI Executor with Node Operator Questioning initialized")
         print(f"   Minimum {self.questioning.min_node_operators} operators required for consensus")
@@ -62,9 +63,9 @@ class AIExecutorWithQuestioning(AutoSwitchingAIExecutor):
         question_type: QuestionType,
         priority: QuestionPriority,
         context: str,
-        options: Optional[list] = None,
-        min_operators: Optional[int] = None,
-        timeout_seconds: Optional[int] = None,
+        options: list | None = None,
+        min_operators: int | None = None,
+        timeout_seconds: int | None = None,
         poll_interval: int = 60,  # Check for answer every 60 seconds
     ) -> Dict:
         """
@@ -228,7 +229,7 @@ class AIExecutorWithQuestioning(AutoSwitchingAIExecutor):
         context: str,
         priority: QuestionPriority = QuestionPriority.HIGH,
         timeout_seconds: int = 86400,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Multiple choice question helper
 
@@ -269,7 +270,7 @@ class AIExecutorWithQuestioning(AutoSwitchingAIExecutor):
         context: str,
         priority: QuestionPriority = QuestionPriority.MEDIUM,
         timeout_seconds: int = 86400,
-    ) -> Optional[float]:
+    ) -> float | None:
         """
         Numeric question helper
 
@@ -401,7 +402,7 @@ Continue with the implementation. Ask questions when needed.
         """
         return self.task_questions.get(task_id, [])
 
-    def get_question_details(self, question_id: str) -> Optional[Dict]:
+    def get_question_details(self, question_id: str) -> Dict | None:
         """
         Get full details of a question
 
@@ -430,15 +431,14 @@ Continue with the implementation. Ask questions when needed.
             }
         return None
 
-
 # Example usage
 if __name__ == "__main__":
     print("=" * 80)
     print("AI EXECUTOR WITH NODE OPERATOR QUESTIONING - DEMONSTRATION")
     print("=" * 80)
 
-    from secure_api_key_manager import SecureAPIKeyManager, AIProvider
     from ai_pool_with_strict_limits import StrictAIPoolManager
+    from secure_api_key_manager import AIProvider, SecureAPIKeyManager
 
     # Mock components
     class MockBlockchain:

@@ -2,19 +2,18 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING, Dict, Optional, Tuple, Any
+from typing import TYPE_CHECKING, Any
 
 from flask import jsonify, request
 
 from xai.core.input_validation_schemas import NodeTransactionInput
-from xai.core.request_validator_middleware import validate_request
 from xai.core.monitoring import MetricsCollector
+from xai.core.request_validator_middleware import validate_request
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
-
 
 def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
     """Setup transaction-related routes."""
@@ -22,7 +21,7 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
     blockchain = routes.blockchain
 
     @app.route("/transactions", methods=["GET"])
-    def get_pending_transactions() -> Dict[str, Any]:
+    def get_pending_transactions() -> dict[str, Any]:
         """Get pending transactions."""
         try:
             limit, offset = routes._get_pagination_params(default_limit=50, max_limit=500)
@@ -48,7 +47,7 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
         )
 
     @app.route("/transaction/<txid>", methods=["GET"])
-    def get_transaction(txid: str) -> Tuple[Dict[str, Any], int]:
+    def get_transaction(txid: str) -> tuple[dict[str, Any], int]:
         """Get transaction by ID."""
         chain = getattr(blockchain, "chain", [])
         chain_length = len(chain) if hasattr(chain, "__len__") else 0
@@ -121,7 +120,7 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/send", methods=["POST"])
     @validate_request(routes.request_validator, NodeTransactionInput)
-    def send_transaction() -> Tuple[Dict[str, Any], int]:
+    def send_transaction() -> tuple[dict[str, Any], int]:
         """Submit new transaction with strict validation and sanitized errors."""
         auth_error = routes._require_api_auth()
         if auth_error:
@@ -158,7 +157,7 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
                 code="rate_limiter_unavailable",
             )
 
-        model: Optional[NodeTransactionInput] = getattr(request, "validated_model", None)
+        model: NodeTransactionInput | None = getattr(request, "validated_model", None)
         if model is None:
             payload = request.get_json(silent=True) or {}
             return routes._error_response(
@@ -236,10 +235,10 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
             except Exception as e:
                 # Import signature verification exceptions
                 from xai.core.transaction import (
-                    SignatureVerificationError,
-                    MissingSignatureError,
                     InvalidSignatureError,
-                    SignatureCryptoError
+                    MissingSignatureError,
+                    SignatureCryptoError,
+                    SignatureVerificationError,
                 )
 
                 if isinstance(e, MissingSignatureError):
@@ -306,7 +305,7 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "send_transaction")
 
     @app.route("/transaction/receive", methods=["POST"])
-    def receive_transaction() -> Tuple[Dict[str, Any], int]:
+    def receive_transaction() -> tuple[dict[str, Any], int]:
         """Receive a broadcasted transaction from a peer node."""
         auth_error = routes._require_api_auth()
         if auth_error:

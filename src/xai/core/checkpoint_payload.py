@@ -9,18 +9,17 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
-
+from typing import Any
 
 @dataclass
 class CheckpointPayload:
     height: int
     block_hash: str
     state_hash: str
-    data: Dict[str, Any]
-    work: Optional[int] = None
-    signature: Optional[str] = None
-    pubkey: Optional[str] = None
+    data: dict[str, Any]
+    work: int | None = None
+    signature: str | None = None
+    pubkey: str | None = None
 
     def verify_integrity(self) -> bool:
         """Verify state hash against serialized data."""
@@ -30,7 +29,7 @@ class CheckpointPayload:
         digest = hashlib.sha256(serialized).hexdigest()
         return digest == self.state_hash
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         payload = {
             "height": self.height,
             "block_hash": self.block_hash,

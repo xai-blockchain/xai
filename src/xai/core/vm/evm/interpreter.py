@@ -8,33 +8,32 @@ all opcodes including arithmetic, stack, memory, storage, and control flow.
 from __future__ import annotations
 
 import logging
-logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
 
 import hashlib
 import time
-from typing import Optional, Callable, Dict, Set, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
-from .opcodes import (
-    Opcode,
-    OPCODE_INFO,
-    get_push_size,
-    is_push,
-    is_dup,
-    is_swap,
-    is_log,
-    get_log_topic_count,
-    is_terminating,
-)
-from .stack import EVMStack, to_signed, to_unsigned, sign_extend, UINT256_MAX
-from .memory import EVMMemory
-from .context import ExecutionContext, CallContext, CallType, Log
 from ..exceptions import VMExecutionError
 from . import interpreter_helpers
+from .context import CallContext, CallType, ExecutionContext, Log
+from .memory import EVMMemory
+from .opcodes import (
+    OPCODE_INFO,
+    Opcode,
+    get_log_topic_count,
+    get_push_size,
+    is_dup,
+    is_log,
+    is_push,
+    is_swap,
+    is_terminating,
+)
+from .stack import UINT256_MAX, EVMStack, sign_extend, to_signed, to_unsigned
 
 if TYPE_CHECKING:
     from .storage import EVMStorage
-
 
 # Constants
 UINT256_CEILING = 2**256
@@ -42,7 +41,6 @@ UINT256_CEILING = 2**256
 # Jump destination cache configuration
 JUMP_DEST_CACHE_SIZE = 256  # Maximum cached contracts
 JUMP_DEST_CACHE_EVICTION_SIZE = 128  # Evict to this size when full
-
 
 class EVMInterpreter:
     """
@@ -77,7 +75,7 @@ class EVMInterpreter:
 
     # Class-level cache shared across all interpreter instances
     # This allows multiple executions of the same contract to benefit from caching
-    _jump_dest_cache: Dict[str, Set[int]] = {}
+    _jump_dest_cache: dict[str, set[int]] = {}
     _cache_stats = {"hits": 0, "misses": 0}
 
     def __init__(self, context: ExecutionContext) -> None:
@@ -92,7 +90,7 @@ class EVMInterpreter:
         self._start_time = 0.0
 
         # Opcode handlers
-        self._handlers: Dict[int, Callable[[CallContext], None]] = {
+        self._handlers: dict[int, Callable[[CallContext], None]] = {
             # Stop and Arithmetic
             Opcode.STOP: self._op_stop,
             Opcode.ADD: self._op_add,
@@ -281,7 +279,7 @@ class EVMInterpreter:
                 f"Instruction limit exceeded: {self._instruction_count} > {self.MAX_INSTRUCTIONS}"
             )
 
-    def _compute_jump_destinations(self, code: bytes) -> Set[int]:
+    def _compute_jump_destinations(self, code: bytes) -> set[int]:
         """
         Pre-compute valid JUMPDEST locations with caching.
 
@@ -344,7 +342,7 @@ class EVMInterpreter:
         return jump_dests
 
     @classmethod
-    def get_cache_stats(cls) -> Dict[str, int]:
+    def get_cache_stats(cls) -> dict[str, int]:
         """
         Get jump destination cache statistics.
 
@@ -1408,7 +1406,7 @@ class EVMInterpreter:
         gas: int,
         depth: int,
         static: bool,
-        code_address: Optional[str] = None,
+        code_address: str | None = None,
     ) -> tuple[bool, bytes]:
         """
         Execute a subcall (CALL, DELEGATECALL, STATICCALL).

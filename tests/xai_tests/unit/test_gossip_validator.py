@@ -37,32 +37,36 @@ def _valid_block():
     }
 
 
-def test_validate_transaction_happy_path():
+@pytest.mark.asyncio
+async def test_validate_transaction_happy_path():
     validator = GossipValidator()
-    assert validator.validate_transaction_message(_valid_tx()) is True
+    assert await validator.validate_transaction_message(_valid_tx()) is True
 
 
-def test_validate_transaction_missing_field():
+@pytest.mark.asyncio
+async def test_validate_transaction_missing_field():
     validator = GossipValidator()
     bad = _valid_tx()
     bad.pop("signature")
-    assert validator.validate_transaction_message(bad) is False
+    assert await validator.validate_transaction_message(bad) is False
 
 
-def test_validate_block_height_and_signature():
+@pytest.mark.asyncio
+async def test_validate_block_height_and_signature():
     validator = GossipValidator()
     block = _valid_block()
-    assert validator.validate_block_message(block) is True
+    assert await validator.validate_block_message(block) is True
 
     bad_block = _valid_block()
     bad_block["height"] = -1
-    assert validator.validate_block_message(bad_block) is False
+    assert await validator.validate_block_message(bad_block) is False
 
     missing_sig = _valid_block()
     missing_sig.pop("signature")
-    assert validator.validate_block_message(missing_sig) is False
+    assert await validator.validate_block_message(missing_sig) is False
 
 
-def test_process_gossip_unknown_type():
+@pytest.mark.asyncio
+async def test_process_gossip_unknown_type():
     validator = GossipValidator()
-    assert validator.process_gossip_message("unknown", {}) is False
+    assert await validator.process_gossip_message("unknown", {}) is False

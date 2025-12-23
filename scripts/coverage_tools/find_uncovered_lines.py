@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Find uncovered lines in Python code from coverage.json reports.
 
@@ -18,21 +20,19 @@ Examples:
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+
 from dataclasses import dataclass
 from collections import defaultdict
 import argparse
-
 
 @dataclass
 class UncoveredLine:
     """Information about an uncovered line."""
     line_number: int
-    code: Optional[str]
+    code: str | None
     file_path: str
-    context_before: List[str]
-    context_after: List[str]
-
+    context_before: list[str]
+    context_after: list[str]
 
 @dataclass
 class FileReport:
@@ -40,10 +40,9 @@ class FileReport:
     file_path: str
     total_lines: int
     covered_lines: int
-    uncovered_lines: List[int]
+    uncovered_lines: list[int]
     coverage_percentage: float
     uncovered_count: int
-
 
 def read_coverage_json(coverage_file: Path) -> Dict:
     """Read coverage.json file."""
@@ -54,8 +53,7 @@ def read_coverage_json(coverage_file: Path) -> Dict:
     with open(coverage_file, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-
-def get_line_context(file_path: Path, line_number: int, context_size: int = 2) -> Tuple[List[str], str, List[str]]:
+def get_line_context(file_path: Path, line_number: int, context_size: int = 2) -> tuple[list[str], str, list[str]]:
     """Get code context around a line."""
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -72,8 +70,7 @@ def get_line_context(file_path: Path, line_number: int, context_size: int = 2) -
     except Exception as e:
         return [], f"# Error reading file: {e}", []
 
-
-def analyze_coverage_json(coverage_data: Dict, base_path: Optional[Path] = None) -> List[FileReport]:
+def analyze_coverage_json(coverage_data: Dict, base_path: Path | None = None) -> list[FileReport]:
     """Analyze coverage.json and generate file reports."""
     reports = []
     files = coverage_data.get('files', {})
@@ -109,8 +106,7 @@ def analyze_coverage_json(coverage_data: Dict, base_path: Optional[Path] = None)
     reports.sort(key=lambda r: (r.coverage_percentage, -r.uncovered_count))
     return reports
 
-
-def prioritize_files(reports: List[FileReport]) -> List[FileReport]:
+def prioritize_files(reports: list[FileReport]) -> list[FileReport]:
     """Prioritize files by importance for testing."""
     # Scoring logic: files with lower coverage and more uncovered lines are higher priority
     priority_scores = []
@@ -135,8 +131,7 @@ def prioritize_files(reports: List[FileReport]) -> List[FileReport]:
     priority_scores.sort(key=lambda x: -x[0])
     return [report for _, report in priority_scores]
 
-
-def generate_text_report(reports: List[FileReport], min_uncovered: int = 0, show_code: bool = False) -> str:
+def generate_text_report(reports: list[FileReport], min_uncovered: int = 0, show_code: bool = False) -> str:
     """Generate text report of uncovered lines."""
     output = []
     output.append("=" * 80)
@@ -208,8 +203,7 @@ def generate_text_report(reports: List[FileReport], min_uncovered: int = 0, show
 
     return "\n".join(output)
 
-
-def generate_json_report(reports: List[FileReport]) -> Dict:
+def generate_json_report(reports: list[FileReport]) -> Dict:
     """Generate JSON report of uncovered lines."""
     return {
         'timestamp': str(Path.cwd()),
@@ -230,7 +224,6 @@ def generate_json_report(reports: List[FileReport]) -> Dict:
             for r in reports
         ]
     }
-
 
 def main():
     """Main entry point."""
@@ -305,7 +298,6 @@ Examples:
         print(f"Report written to: {args.output}")
     else:
         print(report_content)
-
 
 if __name__ == "__main__":
     main()

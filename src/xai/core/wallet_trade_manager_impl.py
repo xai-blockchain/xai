@@ -2,24 +2,23 @@
 
 from __future__ import annotations
 
-import json
-import os
-import time
-import uuid
-import secrets
-import threading
-import hmac
 import hashlib
+import hmac
+import json
 import logging
 import math
+import os
+import secrets
+import threading
+import time
+import uuid
 from collections import defaultdict, deque
-from dataclasses import dataclass, asdict, field
-from typing import Dict, Any, Tuple, Optional, List, Sequence
+from dataclasses import asdict, dataclass, field
+from typing import Any
 
-from xai.core.trading import SwapOrderType, TradeMatchStatus
-from xai.core.nonce_tracker import NonceTracker
 from xai.core.margin_engine import MarginEngine, MarginException, Position
-
+from xai.core.nonce_tracker import NonceTracker
+from xai.core.trading import SwapOrderType, TradeMatchStatus
 
 DATA_DIR_DEFAULT = os.path.join(os.path.dirname(__file__), "..", "data", "wallet_trades")
 STATE_FILE = "state.json"
@@ -27,15 +26,12 @@ AUDIT_SECRET_FILE = "audit_secret"
 MAX_HISTORY = 500
 MATCH_STATUS_OPEN = "open"
 
-
 def _ensure_directory(path: str) -> str:
     os.makedirs(path, exist_ok=True)
     return path
 
-
 def _now() -> float:
     return time.time()
-
 
 @dataclass
 class WalletTradeOrder:
@@ -49,11 +45,11 @@ class WalletTradeOrder:
     amount_requested: float
     price: float
     order_type: SwapOrderType
-    stop_price: Optional[float] = None
-    max_slippage_bps: Optional[int] = None
-    trail_amount: Optional[float] = None
-    iceberg_total: Optional[float] = None
-    iceberg_peak: Optional[float] = None
+    stop_price: float | None = None
+    max_slippage_bps: int | None = None
+    trail_amount: float | None = None
+    iceberg_total: float | None = None
+    iceberg_peak: float | None = None
     status: str = MATCH_STATUS_OPEN
     remaining_offered: float = field(default=0.0)
     remaining_requested: float = field(default=0.0)
@@ -61,8 +57,8 @@ class WalletTradeOrder:
     created_at: float = field(default_factory=_now)
     updated_at: float = field(default_factory=_now)
     stop_triggered: bool = field(default=True, init=False)
-    highest_price_seen: Optional[float] = field(default=None, init=False)
-    lowest_price_seen: Optional[float] = field(default=None, init=False)
+    highest_price_seen: float | None = field(default=None, init=False)
+    lowest_price_seen: float | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         if self.amount_offered <= 0:
@@ -144,7 +140,7 @@ class WalletTradeOrder:
                 replenish = min(self.iceberg_peak, self.remaining_offered)
                 self.displayed_offered = replenish
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "order_id": self.order_id,
             "maker_address": self.maker_address,
@@ -169,7 +165,7 @@ class WalletTradeOrder:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WalletTradeOrder":
+    def from_dict(cls, data: dict[str, Any]) -> "WalletTradeOrder":
         order = cls(
             order_id=data["order_id"],
             maker_address=data["maker_address"],
@@ -196,7 +192,6 @@ class WalletTradeOrder:
         order.lowest_price_seen = data.get("lowest_price_seen")
         return order
 
-
 @dataclass
 class WalletTradeMatch:
     """Represents a matched trade awaiting settlement."""
@@ -211,7 +206,7 @@ class WalletTradeMatch:
     secret: str
     status: TradeMatchStatus = TradeMatchStatus.MATCHED
     created_at: float = field(default_factory=_now)
-    settled_at: Optional[float] = None
+    settled_at: float | None = None
     maker_fee: float = 0.0
     taker_fee: float = 0.0
     maker_net_amount: float = 0.0
@@ -219,7 +214,7 @@ class WalletTradeMatch:
     maker_fee_bps: int = 0
     taker_fee_bps: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "match_id": self.match_id,
             "maker_order_id": self.maker_order_id,
@@ -241,7 +236,7 @@ class WalletTradeMatch:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "WalletTradeMatch":
+    def from_dict(cls, data: dict[str, Any]) -> "WalletTradeMatch":
         return cls(
             match_id=data["match_id"],
             maker_order_id=data["maker_order_id"],
@@ -262,11 +257,10 @@ class WalletTradeMatch:
             taker_fee_bps=int(data.get("taker_fee_bps", 0)),
         )
 
-
 class SettlementResult(dict):
     """Dictionary-like response that exposes settlement status as an attribute."""
 
-    def __init__(self, payload: Dict[str, Any], status: TradeMatchStatus):
+    def __init__(self, payload: dict[str, Any], status: TradeMatchStatus):
         super().__init__(payload)
         self._status = status
 
@@ -274,18 +268,17 @@ class SettlementResult(dict):
     def status(self) -> TradeMatchStatus:
         return self._status
 
-
 class AuditSigner:
     """Provides deterministic signing for gossip batches."""
 
-    def __init__(self, secret: Optional[str] = None):
+    def __init__(self, secret: str | None = None):
         self._secret = secret or secrets.token_hex(32)
         self._public = hashlib.sha256(self._secret.encode()).hexdigest()
 
     def public_key(self) -> str:
         return self._public
 
-    def sign(self, payload: Dict[str, Any]) -> str:
+    def sign(self, payload: dict[str, Any]) -> str:
         message = json.dumps(payload, sort_keys=True).encode()
         digest = hmac.new(self._secret.encode(), message, hashlib.sha256).hexdigest()
         return digest
@@ -306,20 +299,18 @@ class AuditSigner:
             handle.write(signer.serialize())
         return signer
 
-
 class OrderRateLimitError(Exception):
     """Raised when a wallet exceeds the configured order submission rate."""
-
 
 class WalletTradeManager:
     """Stateful trade manager used by wallet APIs."""
 
     def __init__(
         self,
-        exchange_wallet_manager: Optional[Any] = None,
-        data_dir: Optional[str] = None,
-        nonce_tracker: Optional[NonceTracker] = None,
-        margin_engine: Optional[MarginEngine] = None,
+        exchange_wallet_manager: Any | None = None,
+        data_dir: str | None = None,
+        nonce_tracker: NonceTracker | None = None,
+        margin_engine: MarginEngine | None = None,
         *,
         maker_fee_bps: int = 10,
         taker_fee_bps: int = 20,
@@ -344,13 +335,13 @@ class WalletTradeManager:
             raise ValueError("order_limit_per_minute must be non-negative")
         if self.order_limit_window_seconds <= 0:
             raise ValueError("order_limit_window_seconds must be positive")
-        self.orders: Dict[str, WalletTradeOrder] = {}
-        self.matches: Dict[str, WalletTradeMatch] = {}
-        self.event_log: List[Dict[str, Any]] = []
-        self.handshakes: Dict[str, Dict[str, Any]] = {}
-        self.sessions: Dict[str, Dict[str, Any]] = {}
-        self.twap_schedules: Dict[str, Dict[str, Any]] = {}
-        self._order_activity: Dict[str, deque] = defaultdict(deque)
+        self.orders: dict[str, WalletTradeOrder] = {}
+        self.matches: dict[str, WalletTradeMatch] = {}
+        self.event_log: list[dict[str, Any]] = []
+        self.handshakes: dict[str, dict[str, Any]] = {}
+        self.sessions: dict[str, dict[str, Any]] = {}
+        self.twap_schedules: dict[str, dict[str, Any]] = {}
+        self._order_activity: dict[str, deque] = defaultdict(deque)
         self.lock = threading.RLock()
         self._load_state()
 
@@ -411,7 +402,7 @@ class WalletTradeManager:
     # ------------------------------------------------------------------
     # Session / handshake lifecycle
     # ------------------------------------------------------------------
-    def begin_walletconnect_handshake(self, wallet_address: str) -> Dict[str, Any]:
+    def begin_walletconnect_handshake(self, wallet_address: str) -> dict[str, Any]:
         with self.lock:
             handshake_id = str(uuid.uuid4())
             uri_key = secrets.token_hex(16)
@@ -427,7 +418,7 @@ class WalletTradeManager:
 
     def complete_walletconnect_handshake(
         self, handshake_id: str, wallet_address: str, client_public: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         with self.lock:
             record = self.handshakes.get(handshake_id)
             if not record or record["wallet_address"] != wallet_address:
@@ -446,7 +437,7 @@ class WalletTradeManager:
             self._save_state()
             return {"success": True, **session}
 
-    def register_session(self, wallet_address: str) -> Dict[str, Any]:
+    def register_session(self, wallet_address: str) -> dict[str, Any]:
         with self.lock:
             session_token = secrets.token_urlsafe(24)
             session = {
@@ -479,12 +470,12 @@ class WalletTradeManager:
         amount_requested: float,
         price: float,
         order_type: SwapOrderType,
-        stop_price: Optional[float] = None,
-        max_slippage_bps: Optional[int] = None,
-        trail_amount: Optional[float] = None,
-        iceberg_total: Optional[float] = None,
-        iceberg_peak: Optional[float] = None,
-    ) -> Tuple[WalletTradeOrder, List[WalletTradeMatch]]:
+        stop_price: float | None = None,
+        max_slippage_bps: int | None = None,
+        trail_amount: float | None = None,
+        iceberg_total: float | None = None,
+        iceberg_peak: float | None = None,
+    ) -> tuple[WalletTradeOrder, list[WalletTradeMatch]]:
         order = WalletTradeOrder(
             order_id=str(uuid.uuid4()),
             maker_address=maker_address,
@@ -500,7 +491,7 @@ class WalletTradeManager:
             iceberg_total=iceberg_total,
             iceberg_peak=iceberg_peak,
         )
-        matches: List[WalletTradeMatch] = []
+        matches: list[WalletTradeMatch] = []
         with self.lock:
             self._enforce_rate_limit(order.maker_address)
             self.orders[order.order_id] = order
@@ -528,8 +519,8 @@ class WalletTradeManager:
             raise OrderRateLimitError("order_rate_limit_exceeded")
         activity.append(now)
 
-    def _match_order(self, taker_order: WalletTradeOrder) -> List[WalletTradeMatch]:
-        matched: List[WalletTradeMatch] = []
+    def _match_order(self, taker_order: WalletTradeOrder) -> list[WalletTradeMatch]:
+        matched: list[WalletTradeMatch] = []
         for candidate in self.orders.values():
             if candidate.order_id == taker_order.order_id:
                 continue
@@ -620,7 +611,7 @@ class WalletTradeManager:
         reciprocal = 1 / taker_rate
         return abs(maker_rate - reciprocal) <= tolerance
 
-    def _slippage_respected(self, order: WalletTradeOrder, execution_price: Optional[float]) -> bool:
+    def _slippage_respected(self, order: WalletTradeOrder, execution_price: float | None) -> bool:
         if order.max_slippage_bps is None:
             return True
         if execution_price is None or not math.isfinite(execution_price):
@@ -632,7 +623,7 @@ class WalletTradeManager:
         observed_bps = (delta / reference) * 10000
         return observed_bps <= order.max_slippage_bps
 
-    def _ensure_stop_triggered(self, order: WalletTradeOrder, observed_price: Optional[float]) -> bool:
+    def _ensure_stop_triggered(self, order: WalletTradeOrder, observed_price: float | None) -> bool:
         if order.stop_price is None:
             return True
         if order.stop_triggered:
@@ -673,7 +664,7 @@ class WalletTradeManager:
         except (TypeError, ValueError):
             return value
 
-    def _serialize_margin_position(self, position: Position) -> Dict[str, Any]:
+    def _serialize_margin_position(self, position: Position) -> dict[str, Any]:
         return {
             "asset": position.asset,
             "size": self._decimal_to_float(position.size),
@@ -684,10 +675,10 @@ class WalletTradeManager:
             "realized_pnl": self._decimal_to_float(position.realized_pnl),
         }
 
-    def _serialize_margin_overview(self, overview: Dict[str, Any]) -> Dict[str, Any]:
+    def _serialize_margin_overview(self, overview: dict[str, Any]) -> dict[str, Any]:
         return {key: self._decimal_to_float(val) for key, val in overview.items()}
 
-    def margin_deposit(self, account_id: str, amount: float) -> Dict[str, Any]:
+    def margin_deposit(self, account_id: str, amount: float) -> dict[str, Any]:
         with self.lock:
             try:
                 engine = self._require_margin_engine()
@@ -705,7 +696,7 @@ class WalletTradeManager:
                 )
                 return {"success": False, "error": str(exc)}
 
-    def margin_withdraw(self, account_id: str, amount: float) -> Dict[str, Any]:
+    def margin_withdraw(self, account_id: str, amount: float) -> dict[str, Any]:
         with self.lock:
             try:
                 engine = self._require_margin_engine()
@@ -730,9 +721,9 @@ class WalletTradeManager:
         size: float,
         *,
         isolated: bool = False,
-        leverage: Optional[float] = None,
-        mark_price: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        leverage: float | None = None,
+        mark_price: float | None = None,
+    ) -> dict[str, Any]:
         with self.lock:
             try:
                 engine = self._require_margin_engine()
@@ -763,9 +754,9 @@ class WalletTradeManager:
         self,
         account_id: str,
         asset: str,
-        size: Optional[float] = None,
-        mark_price: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        size: float | None = None,
+        mark_price: float | None = None,
+    ) -> dict[str, Any]:
         with self.lock:
             try:
                 engine = self._require_margin_engine()
@@ -790,7 +781,7 @@ class WalletTradeManager:
                 )
                 return {"success": False, "error": str(exc)}
 
-    def get_margin_overview(self, account_id: str) -> Dict[str, Any]:
+    def get_margin_overview(self, account_id: str) -> dict[str, Any]:
         with self.lock:
             try:
                 engine = self._require_margin_engine()
@@ -815,7 +806,7 @@ class WalletTradeManager:
                 )
                 return {"success": False, "error": str(exc)}
 
-    def perform_margin_liquidations(self) -> Dict[str, Any]:
+    def perform_margin_liquidations(self) -> dict[str, Any]:
         with self.lock:
             try:
                 engine = self._require_margin_engine()
@@ -847,9 +838,9 @@ class WalletTradeManager:
         *,
         slice_count: int,
         duration_seconds: float,
-        stop_price: Optional[float] = None,
-        max_slippage_bps: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        stop_price: float | None = None,
+        max_slippage_bps: int | None = None,
+    ) -> dict[str, Any]:
         if slice_count <= 0:
             raise ValueError("slice_count must be positive")
         if duration_seconds <= 0:
@@ -881,8 +872,8 @@ class WalletTradeManager:
             self._save_state()
         return {"success": True, "schedule_id": schedule_id, "remaining_slices": slice_count}
 
-    def process_twap_schedules(self, limit: Optional[int] = None) -> List[str]:
-        due_slices: List[Dict[str, Any]] = []
+    def process_twap_schedules(self, limit: int | None = None) -> list[str]:
+        due_slices: list[dict[str, Any]] = []
         with self.lock:
             now = _now()
             scheduled_ids = sorted(
@@ -923,7 +914,7 @@ class WalletTradeManager:
                     schedule["next_execution"] = schedule["next_execution"] + schedule["interval_seconds"]
             self._save_state()
 
-        executed_order_ids: List[str] = []
+        executed_order_ids: list[str] = []
         for payload in due_slices:
             order, _matches = self.place_order(**payload)
             executed_order_ids.append(order.order_id)
@@ -938,10 +929,10 @@ class WalletTradeManager:
         amount_requested: float,
         *,
         order_type: SwapOrderType,
-        volume_profile: Sequence[Dict[str, float]],
-        stop_price: Optional[float] = None,
-        max_slippage_bps: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        volume_profile: Sequence[dict[str, float]],
+        stop_price: float | None = None,
+        max_slippage_bps: int | None = None,
+    ) -> dict[str, Any]:
         if not volume_profile:
             raise ValueError("volume_profile required for VWAP order")
         weights = [entry.get("weight") or entry.get("volume") for entry in volume_profile]
@@ -949,8 +940,8 @@ class WalletTradeManager:
         if total_weight <= 0:
             raise ValueError("volume_profile weights must be positive")
 
-        order_ids: List[str] = []
-        matches: List[str] = []
+        order_ids: list[str] = []
+        matches: list[str] = []
         for entry, raw_weight in zip(volume_profile, weights):
             if not raw_weight or raw_weight <= 0:
                 continue
@@ -974,19 +965,19 @@ class WalletTradeManager:
             matches.extend(match.match_id for match in order_matches)
         return {"success": True, "orders": order_ids, "matches": matches}
 
-    def get_order(self, order_id: str) -> Optional[WalletTradeOrder]:
+    def get_order(self, order_id: str) -> WalletTradeOrder | None:
         return self.orders.get(order_id)
 
-    def get_match(self, match_id: str) -> Optional[WalletTradeMatch]:
+    def get_match(self, match_id: str) -> WalletTradeMatch | None:
         return self.matches.get(match_id)
 
-    def list_orders(self) -> List[WalletTradeOrder]:
+    def list_orders(self) -> list[WalletTradeOrder]:
         return sorted(self.orders.values(), key=lambda o: o.created_at, reverse=True)
 
-    def list_matches(self) -> List[WalletTradeMatch]:
+    def list_matches(self) -> list[WalletTradeMatch]:
         return sorted(self.matches.values(), key=lambda m: m.created_at, reverse=True)
 
-    def settle_match(self, match_id: str, secret: str) -> Dict[str, Any]:
+    def settle_match(self, match_id: str, secret: str) -> dict[str, Any]:
         with self.lock:
             match = self.matches.get(match_id)
             if not match:
@@ -1072,7 +1063,7 @@ class WalletTradeManager:
     # ------------------------------------------------------------------
     # Gossip & diagnostics
     # ------------------------------------------------------------------
-    def ingest_gossip(self, event: Dict[str, Any]) -> Dict[str, Any]:
+    def ingest_gossip(self, event: dict[str, Any]) -> dict[str, Any]:
         with self.lock:
             normalized = {
                 "received_at": _now(),
@@ -1083,7 +1074,7 @@ class WalletTradeManager:
             self._save_state()
         return {"success": True, "message": "event_ingested"}
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         with self.lock:
             return {
                 "orders": [order.to_dict() for order in self.list_orders()],
@@ -1092,7 +1083,7 @@ class WalletTradeManager:
                 "pending_handshakes": len(self.handshakes),
             }
 
-    def signed_event_batch(self, limit: int) -> List[Dict[str, Any]]:
+    def signed_event_batch(self, limit: int) -> list[dict[str, Any]]:
         with self.lock:
             events = self.event_log[-limit:]
             batches = []
@@ -1107,7 +1098,7 @@ class WalletTradeManager:
                 )
             return batches
 
-    def _record_event(self, event_type: str, details: Dict[str, Any]) -> None:
+    def _record_event(self, event_type: str, details: dict[str, Any]) -> None:
         entry = {"type": event_type, "details": details, "timestamp": _now()}
         self.event_log.append({"event": entry, "received_at": _now()})
         self.event_log = self.event_log[-MAX_HISTORY:]
@@ -1117,9 +1108,9 @@ class WalletTradeManager:
     # ------------------------------------------------------------------
     def initiate_atomic_swap(
         self,
-        participants: List[Dict[str, Any]],
+        participants: list[dict[str, Any]],
         timeout_seconds: int = 3600
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Initiate a multi-party atomic swap with state synchronization.
 
@@ -1187,7 +1178,7 @@ class WalletTradeManager:
         participant_address: str,
         hash_lock: str,
         signature: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Participant commits to atomic swap by creating hash lock.
 
@@ -1267,7 +1258,7 @@ class WalletTradeManager:
         swap_id: str,
         participant_address: str,
         secret: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Reveal secret to complete atomic swap.
 
@@ -1344,8 +1335,8 @@ class WalletTradeManager:
         self,
         swap_id: str,
         reason: str,
-        initiator_address: Optional[str] = None
-    ) -> Dict[str, Any]:
+        initiator_address: str | None = None
+    ) -> dict[str, Any]:
         """
         Rollback atomic swap on failure.
 
@@ -1405,11 +1396,11 @@ class WalletTradeManager:
                 "participants_refunded": len(swap_state["participants"])
             }
 
-    def _timeout_swap(self, swap_id: str, reason: str) -> Dict[str, Any]:
+    def _timeout_swap(self, swap_id: str, reason: str) -> dict[str, Any]:
         """Internal method to handle swap timeout."""
         return self.rollback_swap(swap_id, f"timeout: {reason}", initiator_address="system")
 
-    def get_swap_status(self, swap_id: str) -> Dict[str, Any]:
+    def get_swap_status(self, swap_id: str) -> dict[str, Any]:
         """Get current status of atomic swap."""
         with self.lock:
             swap_key = f"atomic_swap_{swap_id}"

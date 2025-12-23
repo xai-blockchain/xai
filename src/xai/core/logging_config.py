@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Structured Logging Configuration
 
@@ -19,16 +21,16 @@ Usage:
     logger.info("Block validated", height=100, transactions=50)
 """
 
+import json
 import logging
 import logging.handlers
-import json
 import os
 import sys
-from pathlib import Path
 from datetime import datetime
-from typing import Optional, Dict, Any
-from pythonjsonlogger import jsonlogger
+from pathlib import Path
+from typing import Any
 
+from pythonjsonlogger import jsonlogger
 
 class CustomJsonFormatter(jsonlogger.JsonFormatter):
     """
@@ -41,7 +43,7 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         self,
         fmt: str = "%(timestamp)s %(level)s %(name)s %(message)s",
         timestamp: bool = True,
-        environment: Optional[str] = None,
+        environment: str | None = None,
         service_name: str = "xai",
     ):
         """
@@ -60,9 +62,9 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
 
     def add_fields(
         self,
-        log_record: Dict[str, Any],
+        log_record: dict[str, Any],
         record: logging.LogRecord,
-        message_dict: Dict[str, Any],
+        message_dict: dict[str, Any],
     ) -> None:
         """Add custom fields to log record."""
         super().add_fields(log_record, record, message_dict)
@@ -90,10 +92,9 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
             "line": record.lineno,
         }
 
-
 def setup_logging(
     name: str = "xai",
-    log_file: Optional[str] = None,
+    log_file: str | None = None,
     level: str = "INFO",
     environment: str = "production",
     enable_console: bool = True,
@@ -167,10 +168,9 @@ def setup_logging(
 
     return logger
 
-
 def get_logger(
     name: str,
-    log_file: Optional[str] = None,
+    log_file: str | None = None,
     level: str = "INFO",
 ) -> logging.Logger:
     """
@@ -192,7 +192,6 @@ def get_logger(
 
     return logger
 
-
 # ==================== LOGGING CONFIGURATION PRESETS ====================
 
 def setup_blockchain_logging(environment: str = "production") -> logging.Logger:
@@ -204,7 +203,6 @@ def setup_blockchain_logging(environment: str = "production") -> logging.Logger:
         environment=environment,
     )
 
-
 def setup_api_logging(environment: str = "production") -> logging.Logger:
     """Setup logging for API operations."""
     return setup_logging(
@@ -213,7 +211,6 @@ def setup_api_logging(environment: str = "production") -> logging.Logger:
         level="INFO",
         environment=environment,
     )
-
 
 def setup_network_logging(environment: str = "production") -> logging.Logger:
     """Setup logging for network operations."""
@@ -224,7 +221,6 @@ def setup_network_logging(environment: str = "production") -> logging.Logger:
         environment=environment,
     )
 
-
 def setup_mining_logging(environment: str = "production") -> logging.Logger:
     """Setup logging for mining operations."""
     return setup_logging(
@@ -234,14 +230,13 @@ def setup_mining_logging(environment: str = "production") -> logging.Logger:
         environment=environment,
     )
 
-
 # ==================== LOG AGGREGATION CONFIGURATIONS ====================
 
 class LogAggregationConfig:
     """Configurations for common log aggregation platforms."""
 
     @staticmethod
-    def elk_config() -> Dict[str, Any]:
+    def elk_config() -> dict[str, Any]:
         """
         Configuration for ELK Stack (Elasticsearch, Logstash, Kibana).
 
@@ -267,7 +262,7 @@ class LogAggregationConfig:
         }
 
     @staticmethod
-    def loki_config() -> Dict[str, Any]:
+    def loki_config() -> dict[str, Any]:
         """
         Configuration for Grafana Loki.
 
@@ -309,7 +304,7 @@ class LogAggregationConfig:
         }
 
     @staticmethod
-    def datadog_config() -> Dict[str, Any]:
+    def datadog_config() -> dict[str, Any]:
         """
         Configuration for Datadog logging.
 
@@ -333,7 +328,6 @@ class LogAggregationConfig:
                 }
             ],
         }
-
 
 # ==================== USAGE EXAMPLES ====================
 

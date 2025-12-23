@@ -5,17 +5,17 @@ Examples and test scenarios for error recovery system.
 """
 
 from xai.core.error_recovery import (
-    ErrorRecoveryManager,
-    create_recovery_manager,
     CircuitBreaker,
-    RetryStrategy,
     CorruptionDetector,
+    ErrorRecoveryManager,
+    RetryStrategy,
+    create_recovery_manager,
 )
 from xai.core.error_recovery_integration import (
-    integrate_recovery_with_blockchain,
-    add_recovery_to_node,
     RecoveryEnabledBlockchain,
     RecoveryScheduler,
+    add_recovery_to_node,
+    integrate_recovery_with_blockchain,
 )
 
 
@@ -154,8 +154,9 @@ def example_health_monitoring():
     """
     Health monitoring example
     """
-    from xai.core.blockchain import Blockchain
     import time
+
+    from xai.core.blockchain import Blockchain
 
     # Create blockchain
     blockchain = Blockchain()

@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:  # pragma: no cover - runtime imports deferred
-    from xai.core.blockchain import Blockchain, Block
-
+    from xai.core.blockchain import Block, Blockchain
 
 @dataclass
 class AccountState:
@@ -18,8 +17,7 @@ class AccountState:
     nonce: int
     balance: int
     code: bytes = b""
-    storage_root: Optional[str] = None
-
+    storage_root: str | None = None
 
 @dataclass
 class EVMState:
@@ -32,7 +30,7 @@ class EVMState:
 
     blockchain: "Blockchain"
     block: "Block"
-    caches: Dict[str, AccountState] = field(default_factory=dict)
+    caches: dict[str, AccountState] = field(default_factory=dict)
 
     def get_account(self, address: str) -> AccountState:
         if address in self.caches:

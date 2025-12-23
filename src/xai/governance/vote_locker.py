@@ -1,10 +1,11 @@
-import time
+from __future__ import annotations
+
 import logging
 import threading
-from typing import Dict, Any, Optional, List
+import time
+from typing import Any
 
 logger = logging.getLogger(__name__)
-
 
 class VoteLocker:
     def __init__(self, base_duration: int = 86400, early_unlock_penalty_percentage: float = 10.0):
@@ -16,7 +17,7 @@ class VoteLocker:
             early_unlock_penalty_percentage: Penalty for early unlock (default: 10%)
         """
         # Stores locked tokens: {voter_address: [{"amount": float, "lock_until": int, "lock_duration": int, "id": int}]}
-        self.locked_tokens: Dict[str, list] = {}
+        self.locked_tokens: dict[str, list] = {}
         self.base_duration = base_duration
         self.early_unlock_penalty_percentage = early_unlock_penalty_percentage
         self._lock_id_counter = 0
@@ -76,7 +77,7 @@ class VoteLocker:
 
             return lock_id
 
-    def get_voting_power(self, voter_address: str, current_time: Optional[int] = None) -> float:
+    def get_voting_power(self, voter_address: str, current_time: int | None = None) -> float:
         """
         Calculates the total voting power for a voter based on their locked tokens.
         Voting power formula: power = amount * (time_remaining / base_duration)
@@ -105,7 +106,7 @@ class VoteLocker:
 
             return total_voting_power
 
-    def get_lock_details(self, voter_address: str, current_time: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_lock_details(self, voter_address: str, current_time: int | None = None) -> list[dict[str, Any]]:
         """Get detailed information about all locks for a voter."""
         if current_time is None:
             current_time = int(time.time())
@@ -138,7 +139,7 @@ class VoteLocker:
 
             return details
 
-    def early_unlock(self, voter_address: str, lock_id: int, current_time: Optional[int] = None) -> Dict[str, float]:
+    def early_unlock(self, voter_address: str, lock_id: int, current_time: int | None = None) -> dict[str, float]:
         """
         Allow early unlock with penalty.
 
@@ -191,7 +192,7 @@ class VoteLocker:
                 "total_locked": lock_entry["amount"]
             }
 
-    def withdraw_tokens(self, voter_address: str, current_time: Optional[int] = None) -> float:
+    def withdraw_tokens(self, voter_address: str, current_time: int | None = None) -> float:
         """
         Allows a voter to withdraw tokens that have passed their lock-up period.
         Returns the total amount withdrawn.
@@ -232,7 +233,6 @@ class VoteLocker:
                 logger.debug(f"No tokens available for withdrawal for {voter_address}")
 
             return withdrawable_amount
-
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

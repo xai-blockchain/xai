@@ -18,15 +18,15 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 import os
+import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-from xai.core.pruning import BlockPruningManager, PruningPolicy, PruneMode
+from xai.core.pruning import BlockPruningManager, PruneMode, PruningPolicy
 
 
 def format_bytes(num_bytes: int) -> str:
@@ -118,7 +118,7 @@ def run_prune(manager: BlockPruningManager, args: argparse.Namespace) -> int:
 
     # Override policy if arguments provided
     if args.keep_blocks or args.keep_days:
-        from xai.core.pruning import PruningPolicy, PruneMode
+        from xai.core.pruning import PruneMode, PruningPolicy
 
         mode = PruneMode.BOTH if (args.keep_blocks and args.keep_days) else (
             PruneMode.BLOCKS if args.keep_blocks else PruneMode.DAYS

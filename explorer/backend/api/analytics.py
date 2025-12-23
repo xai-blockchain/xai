@@ -2,7 +2,6 @@
 Analytics API endpoints - Network and AI usage analytics
 """
 from fastapi import APIRouter, Query, HTTPException
-from typing import Optional
 from datetime import datetime, timedelta
 import httpx
 import logging

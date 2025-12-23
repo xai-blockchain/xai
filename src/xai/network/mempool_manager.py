@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 import heapq
 import time
-from typing import Dict, Any, Tuple, Optional, Set, List
-
+from typing import Any
 
 class MempoolManager:
     """
@@ -44,23 +45,23 @@ class MempoolManager:
 
         # For FIFO: {tx_id: {"timestamp": int, "details": Any}}
         # For lowest_fee: min-heap of (fee, timestamp, tx_id)
-        self.pending_transactions: Dict[str, Dict[str, Any]] = {}
-        self.transaction_queue: list[Tuple[float, int, str]] = []  # For lowest_fee policy
+        self.pending_transactions: dict[str, dict[str, Any]] = {}
+        self.transaction_queue: list[tuple[float, int, str]] = []  # For lowest_fee policy
         self._transaction_id_counter = 0
         self.last_expiry_check = time.time()
 
         # Lazy deletion optimization for heap operations
         # Track deleted transaction IDs without rebuilding heap
-        self._deleted_tx_ids: Set[str] = set()
+        self._deleted_tx_ids: set[str] = set()
         self._compaction_threshold = 0.5  # Compact when >50% deleted
 
         # Double-spend detection: track spent UTXOs in mempool
         # Set of "txid:vout" strings representing UTXOs being spent by pending transactions
-        self.spent_utxos: Set[str] = set()
+        self.spent_utxos: set[str] = set()
 
         # Orphan transaction pool: transactions waiting for parent transactions
-        # {txid: {"transaction": details, "timestamp": int, "missing_parents": Set[str]}}
-        self.orphan_pool: Dict[str, Dict[str, Any]] = {}
+        # {txid: {"transaction": details, "timestamp": int, "missing_parents": set[str]}}
+        self.orphan_pool: dict[str, dict[str, Any]] = {}
         self.max_orphan_pool_size = 100  # Limit orphan pool size
 
         print(
@@ -70,8 +71,8 @@ class MempoolManager:
         )
 
     def add_transaction(
-        self, transaction_details: Any, fee: float = 0.0, inputs: Optional[List[Dict[str, Any]]] = None
-    ) -> Dict[str, Any]:
+        self, transaction_details: Any, fee: float = 0.0, inputs: list[dict[str, Any]] | None = None
+    ) -> dict[str, Any]:
         """
         Adds a transaction to the mempool with double-spend detection.
 
@@ -231,7 +232,7 @@ class MempoolManager:
                 f"{len(self.transaction_queue)} entries (removed {deleted_count} deleted)"
             )
 
-    def _pop_lowest_fee_transaction(self) -> Optional[Tuple[float, int, str]]:
+    def _pop_lowest_fee_transaction(self) -> tuple[float, int, str] | None:
         """
         Pop the lowest fee transaction from the heap, skipping deleted entries.
 
@@ -257,7 +258,7 @@ class MempoolManager:
 
         return None
 
-    def batch_remove_transactions(self, tx_ids: List[str]):
+    def batch_remove_transactions(self, tx_ids: list[str]):
         """
         Efficiently remove multiple transactions at once.
 
@@ -309,7 +310,7 @@ class MempoolManager:
         """Returns the current number of transactions in the mempool."""
         return len(self.pending_transactions)
 
-    def get_heap_statistics(self) -> Dict[str, Any]:
+    def get_heap_statistics(self) -> dict[str, Any]:
         """
         Get statistics about heap efficiency for monitoring and debugging.
 
@@ -372,7 +373,7 @@ class MempoolManager:
 
         return len(expired_tx_ids)
 
-    def get_transactions(self, limit: Optional[int] = None) -> list:
+    def get_transactions(self, limit: int | None = None) -> list:
         """
         Get transactions from the mempool.
 
@@ -387,7 +388,7 @@ class MempoolManager:
             return txs[:limit]
         return txs
 
-    def get_top_transactions_by_fee(self, limit: Optional[int] = None) -> list:
+    def get_top_transactions_by_fee(self, limit: int | None = None) -> list:
         """
         Get top transactions ordered by fee (highest first).
 
@@ -408,7 +409,7 @@ class MempoolManager:
 
         return sorted_txs
 
-    def get_transactions_by_fee_rate(self, limit: Optional[int] = None) -> list:
+    def get_transactions_by_fee_rate(self, limit: int | None = None) -> list:
         """
         Get transactions ordered by fee rate (highest first).
 
@@ -431,8 +432,8 @@ class MempoolManager:
         return [(tx_id, tx_data) for tx_id, tx_data in sorted_txs]
 
     def add_orphan_transaction(
-        self, transaction_details: Any, missing_parent_txids: List[str]
-    ) -> Dict[str, Any]:
+        self, transaction_details: Any, missing_parent_txids: list[str]
+    ) -> dict[str, Any]:
         """
         Add a transaction to the orphan pool when parent transactions are missing.
 
@@ -482,7 +483,7 @@ class MempoolManager:
             "missing_parents": list(missing_parent_txids),
         }
 
-    def process_orphan_transactions(self, newly_added_txid: str) -> List[str]:
+    def process_orphan_transactions(self, newly_added_txid: str) -> list[str]:
         """
         Process orphan pool when a new transaction is added to mempool.
         Check if any orphan transactions can now be moved to main mempool.
@@ -562,7 +563,7 @@ class MempoolManager:
 
         return promoted_count
 
-    def get_orphan_pool_status(self) -> Dict[str, Any]:
+    def get_orphan_pool_status(self) -> dict[str, Any]:
         """
         Get status information about the orphan transaction pool.
 
@@ -581,7 +582,6 @@ class MempoolManager:
             "average_orphan_age_seconds": sum(orphan_ages) / len(orphan_ages) if orphan_ages else 0,
             "orphan_transactions": list(self.orphan_pool.keys()),
         }
-
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

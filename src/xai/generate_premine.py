@@ -17,19 +17,20 @@ Total: 26,853,368 XAI across 37,336 wallets
 RUN ONCE ONLY - generates genesis block and all pre-mine wallets
 """
 
-import sys
-import os
 import json
+import os
 import random  # Used for deterministic seed-based time capsule selection (line 288)
 import secrets  # Used for cryptographically secure wallet amount randomization
+import sys
 from datetime import datetime, timezone
+
+from src.xai.audit_signer import AuditSigner
+from src.xai.core.blockchain import Block, Transaction
+from src.xai.core.config import Config
 
 # Add core directory to path
 from src.xai.core.wallet import Wallet
-from src.xai.core.blockchain import Block, Transaction
 from src.xai.core.wallet_encryption import WalletEncryption
-from src.xai.audit_signer import AuditSigner
-from src.xai.core.config import Config
 
 # Timestamps
 GENESIS_TIMESTAMP = 1704067200.0  # Jan 1, 2024 00:00:00 UTC

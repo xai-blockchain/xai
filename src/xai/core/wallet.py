@@ -4,34 +4,36 @@ AXN Wallet - Real cryptocurrency wallet with secp256k1 cryptography.
 
 from __future__ import annotations
 
+import base64
 import hashlib
+import hmac
 import json
+import logging
 import os
-from pathlib import Path
 from copy import deepcopy
-from typing import Optional, Dict, Tuple, Any, List
+from pathlib import Path
+from typing import Any
 
-from xai.core.hardware_wallet import HardwareWallet, HARDWARE_WALLET_ENABLED, get_default_hardware_wallet
-from xai.core.crypto_utils import (
-    generate_secp256k1_keypair_hex,
-    derive_public_key_hex,
-    sign_message_hex,
-    verify_signature_hex,
-)
-from xai.core.address_checksum import to_checksum_address
+from cryptography.fernet import Fernet
 
 # BIP-39 mnemonic support
 from mnemonic import Mnemonic
 
-import base64
-import logging
-from cryptography.fernet import Fernet
-import hmac
-
+from xai.core.address_checksum import to_checksum_address
+from xai.core.crypto_utils import (
+    derive_public_key_hex,
+    generate_secp256k1_keypair_hex,
+    sign_message_hex,
+    verify_signature_hex,
+)
+from xai.core.hardware_wallet import (
+    HARDWARE_WALLET_ENABLED,
+    HardwareWallet,
+    get_default_hardware_wallet,
+)
 from xai.security.hd_wallet import HDWallet
 
 logger = logging.getLogger(__name__)
-
 
 class Wallet:
     """Real cryptocurrency wallet with public/private key cryptography.
@@ -44,9 +46,9 @@ class Wallet:
 
     def __init__(
         self,
-        private_key: Optional[str] = None,
-        hardware_wallet: Optional[HardwareWallet] = None,
-        hd_metadata: Optional[Dict[str, Any]] = None,
+        private_key: str | None = None,
+        hardware_wallet: HardwareWallet | None = None,
+        hd_metadata: dict[str, Any] | None = None,
     ) -> None:
         """Initialize wallet with cryptographic keys and optional hardware wallet support.
 
@@ -65,15 +67,15 @@ class Wallet:
         self._init_hardware(hardware_wallet)
         self._init_crypto(private_key)
 
-    def _init_metadata(self, hd_metadata: Optional[Dict[str, Any]]) -> None:
+    def _init_metadata(self, hd_metadata: dict[str, Any] | None) -> None:
         """Initialize HD wallet metadata.
 
         Args:
             hd_metadata: Optional derivation metadata for HD wallets
         """
-        self._hd_metadata: Optional[Dict[str, Any]] = deepcopy(hd_metadata) if hd_metadata else None
+        self._hd_metadata: dict[str, Any] | None = deepcopy(hd_metadata) if hd_metadata else None
 
-    def _init_hardware(self, hardware_wallet: Optional[HardwareWallet]) -> None:
+    def _init_hardware(self, hardware_wallet: HardwareWallet | None) -> None:
         """Initialize hardware wallet support.
 
         Args:
@@ -83,7 +85,7 @@ class Wallet:
             get_default_hardware_wallet() if HARDWARE_WALLET_ENABLED else None
         )
 
-    def _init_crypto(self, private_key: Optional[str]) -> None:
+    def _init_crypto(self, private_key: str | None) -> None:
         """Initialize cryptographic keys using hardware wallet, existing key, or new generation.
 
         This method handles three initialization paths:
@@ -141,7 +143,7 @@ class Wallet:
             extra={"event": "wallet.created", "address": self.address[:16] + "..."}
         )
 
-    def _generate_keypair(self) -> Tuple[str, str]:
+    def _generate_keypair(self) -> tuple[str, str]:
         """
         Generates a new ECDSA keypair using the SECP256k1 curve.
 
@@ -246,7 +248,7 @@ class Wallet:
             )
             return False
 
-    def save_to_file(self, filename: str, password: Optional[str] = None) -> None:
+    def save_to_file(self, filename: str, password: str | None = None) -> None:
         """Save wallet to encrypted file with HMAC integrity protection.
 
         Security:
@@ -335,9 +337,9 @@ class Wallet:
         Returns:
             32-byte HMAC key
         """
+        from cryptography.hazmat.backends import default_backend
         from cryptography.hazmat.primitives import hashes
         from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-        from cryptography.hazmat.backends import default_backend
 
         # Use different info string to derive independent key from encryption
         kdf = PBKDF2HMAC(
@@ -352,9 +354,9 @@ class Wallet:
     @staticmethod
     def _derive_hmac_key_static(password: str, salt: bytes) -> bytes:
         """Static version of _derive_hmac_key for use in load_from_file."""
+        from cryptography.hazmat.backends import default_backend
         from cryptography.hazmat.primitives import hashes
         from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-        from cryptography.hazmat.backends import default_backend
 
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
@@ -525,7 +527,7 @@ class Wallet:
                 )
             return False
 
-    def _encrypt(self, data: str, password: str) -> Dict[str, str]:
+    def _encrypt(self, data: str, password: str) -> dict[str, str]:
         """
         Encrypt an arbitrary string with AES-GCM using strong PBKDF2-derived keys.
 
@@ -554,16 +556,17 @@ class Wallet:
 
         return self._decrypt_payload(payload_dict, password)
 
-    def _encrypt_payload(self, data: str, password: str) -> Dict[str, str]:
+    def _encrypt_payload(self, data: str, password: str) -> dict[str, str]:
         """
         Encrypt data and return a dictionary with ciphertext, nonce, and salt.
         This method uses AES-GCM for encryption.
         """
         import os
-        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-        from cryptography.hazmat.primitives import hashes
-        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
         from cryptography.hazmat.backends import default_backend
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
         # Generate random salt and nonce
         salt = os.urandom(16)
@@ -589,15 +592,15 @@ class Wallet:
             "salt": base64.b64encode(salt).decode("utf-8"),
         }
 
-    def _decrypt_payload(self, payload: Dict[str, str], password: str) -> str:
+    def _decrypt_payload(self, payload: dict[str, str], password: str) -> str:
         """
         Decrypt a payload dictionary created by _encrypt_payload.
         """
-        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-        from cryptography.hazmat.primitives import hashes
-        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-        from cryptography.hazmat.backends import default_backend
         from cryptography.exceptions import InvalidTag
+        from cryptography.hazmat.backends import default_backend
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
         try:
             # Decode components
@@ -641,7 +644,7 @@ class Wallet:
     @staticmethod
     def load_from_file(
         filename: str,
-        password: Optional[str] = None,
+        password: str | None = None,
         *,
         allow_legacy: bool = False,
     ) -> "Wallet":
@@ -820,11 +823,11 @@ class Wallet:
     @staticmethod
     def _decrypt_payload_static(payload: dict, password: str) -> str:
         """Static method to decrypt payload format"""
-        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-        from cryptography.hazmat.primitives import hashes
-        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-        from cryptography.hazmat.backends import default_backend
         from cryptography.exceptions import InvalidTag
+        from cryptography.hazmat.backends import default_backend
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+        from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
         try:
             # Decode components
@@ -865,18 +868,18 @@ class Wallet:
             )
             raise ValueError(f"Decryption failed: invalid password or corrupted data - authentication failed") from e
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Export public wallet data only (alias for to_public_dict)."""
         return self.to_public_dict()
 
-    def to_public_dict(self) -> Dict[str, Any]:
+    def to_public_dict(self) -> dict[str, Any]:
         """Export public wallet data only"""
-        data: Dict[str, Any] = {"address": self.address, "public_key": self.public_key}
+        data: dict[str, Any] = {"address": self.address, "public_key": self.public_key}
         if self._hd_metadata:
             data["derivation_metadata"] = deepcopy(self._hd_metadata)
         return data
 
-    def to_full_dict_unsafe(self) -> Dict[str, str]:
+    def to_full_dict_unsafe(self) -> dict[str, str]:
         """
         Export full wallet data including the private key.
         WARNING: This method exposes the private key and should be used with extreme caution.
@@ -887,7 +890,7 @@ class Wallet:
             "private_key": self.private_key,
         }
 
-    def get_derivation_metadata(self) -> Optional[Dict[str, Any]]:
+    def get_derivation_metadata(self) -> dict[str, Any] | None:
         """
         Return derivation metadata for HD wallets.
 
@@ -914,7 +917,7 @@ class Wallet:
         """
         return f"XAI Wallet {self.address[:16]}..."
 
-    def __getstate__(self) -> Dict[str, Any]:
+    def __getstate__(self) -> dict[str, Any]:
         """
         Custom pickle serialization - warns about private key exposure.
 
@@ -930,7 +933,7 @@ class Wallet:
         )
         return self.__dict__
 
-    def __setstate__(self, state: Dict[str, Any]) -> None:
+    def __setstate__(self, state: dict[str, Any]) -> None:
         """Custom pickle deserialization."""
         self.__dict__.update(state)
 
@@ -1055,7 +1058,7 @@ class Wallet:
         }
         return Wallet(private_key=address_info["private_key"], hd_metadata=metadata)
 
-    def export_mnemonic_backup(self, mnemonic_phrase: str, password: Optional[str] = None) -> Dict[str, str]:
+    def export_mnemonic_backup(self, mnemonic_phrase: str, password: str | None = None) -> dict[str, str]:
         """
         Export wallet with mnemonic backup.
 
@@ -1083,7 +1086,7 @@ class Wallet:
 
     # ===== WALLET EXPORT/IMPORT METHODS (TASK 25) =====
 
-    def export_to_json(self, include_private: bool = False, password: Optional[str] = None) -> Dict[str, Any]:
+    def export_to_json(self, include_private: bool = False, password: str | None = None) -> dict[str, Any]:
         """
         Export wallet to JSON format.
 
@@ -1184,7 +1187,7 @@ class Wallet:
         return Wallet(private_key=private_key_hex)
 
     @staticmethod
-    def import_from_json(json_data: Dict[str, Any], password: Optional[str] = None) -> "Wallet":
+    def import_from_json(json_data: dict[str, Any], password: str | None = None) -> "Wallet":
         """
         Import wallet from JSON format.
 
@@ -1217,7 +1220,7 @@ class Wallet:
 
         return Wallet(private_key=private_key, hd_metadata=json_data.get("derivation_metadata"))
 
-    def export_hardware_compatible(self) -> Dict[str, str]:
+    def export_hardware_compatible(self) -> dict[str, str]:
         """
         Export public wallet data in hardware wallet compatible format.
 
@@ -1272,20 +1275,19 @@ class Wallet:
         except (ValueError, TypeError, AttributeError) as e:
             raise ValueError(f"Invalid base58 string: {type(e).__name__} - {e}") from e
 
-
 class WalletManager:
     """Manage multiple wallets"""
 
-    def __init__(self, data_dir: Optional[str] = None) -> None:
+    def __init__(self, data_dir: str | None = None) -> None:
         if data_dir is None:
             self.data_dir = Path.home() / ".xai" / "wallets"
         else:
             self.data_dir = Path(data_dir)
 
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.wallets: Dict[str, Wallet] = {}
+        self.wallets: dict[str, Wallet] = {}
 
-    def create_wallet(self, name: str, password: Optional[str] = None) -> Wallet:
+    def create_wallet(self, name: str, password: str | None = None) -> Wallet:
         """Create new wallet"""
         wallet = Wallet()
         self.wallets[name] = wallet
@@ -1296,7 +1298,7 @@ class WalletManager:
 
         return wallet
 
-    def load_wallet(self, name: str, password: Optional[str] = None) -> Wallet:
+    def load_wallet(self, name: str, password: str | None = None) -> Wallet:
         """Load wallet from file"""
         filename = self.data_dir / f"{name}.wallet"
 
@@ -1308,14 +1310,13 @@ class WalletManager:
 
         return wallet
 
-    def list_wallets(self) -> List[str]:
+    def list_wallets(self) -> list[str]:
         """List all wallet files"""
         return [f.stem for f in self.data_dir.glob("*.wallet")]
 
-    def get_wallet(self, name: str) -> Optional[Wallet]:
+    def get_wallet(self, name: str) -> Wallet | None:
         """Get loaded wallet"""
         return self.wallets.get(name)
-
 
 # Example usage (for development/testing only)
 if __name__ == "__main__":

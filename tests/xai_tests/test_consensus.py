@@ -15,7 +15,6 @@ Tests Proof-of-Work consensus mechanisms:
 import pytest
 import time
 import hashlib
-from typing import List
 
 from xai.core.blockchain import Blockchain, Block, Transaction
 from xai.core.wallet import Wallet

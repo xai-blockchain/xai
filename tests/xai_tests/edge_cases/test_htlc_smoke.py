@@ -10,7 +10,6 @@ import pytest
 import hashlib
 import time
 import os
-from typing import Optional
 
 # Check if blockchain testing dependencies are available
 try:

@@ -1,11 +1,11 @@
+from __future__ import annotations
+
 import hashlib
 import logging
-from typing import Tuple
 
 from src.xai.security.csprng import CSPRNG
 
 logger = logging.getLogger(__name__)
-
 
 class SaltedHashManager:
     def __init__(self, salt_length_bytes: int = 16):
@@ -22,7 +22,7 @@ class SaltedHashManager:
         """Generates a cryptographically secure random salt."""
         return self.csprng.generate_bytes(self.salt_length_bytes)
 
-    def hash_with_salt(self, data: str) -> Tuple[str, str]:
+    def hash_with_salt(self, data: str) -> tuple[str, str]:
         """
         Hashes the given data with a newly generated unique salt.
         Returns the salted hash (hex string) and the salt (hex string).
@@ -56,6 +56,5 @@ class SaltedHashManager:
         computed_hash = hashlib.sha256(salted_data).hexdigest()
 
         return computed_hash == stored_hash
-
 
 # Example usage is intentionally omitted in production modules.

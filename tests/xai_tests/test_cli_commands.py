@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Comprehensive CLI Command Verification Tests (Phase 2.3)
 
@@ -19,21 +21,19 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 import pytest
-
 
 class CLITestHelper:
     """Helper class for CLI testing"""
 
     @staticmethod
     def run_command(
-        cmd: List[str],
-        input_data: Optional[str] = None,
-        env: Optional[dict] = None,
+        cmd: list[str],
+        input_data: str | None = None,
+        env: dict | None = None,
         expect_failure: bool = False,
-    ) -> Tuple[int, str, str]:
+    ) -> tuple[int, str, str]:
         """
         Run a CLI command and return (returncode, stdout, stderr)
 
@@ -79,11 +79,9 @@ class CLITestHelper:
         except (json.JSONDecodeError, ValueError):
             return False
 
-
 # ==============================================================================
 # Enhanced CLI (xai) - Main Entry Point Tests
 # ==============================================================================
-
 
 class TestEnhancedCLIMain:
     """Test main xai CLI entry point"""
@@ -118,11 +116,9 @@ class TestEnhancedCLIMain:
         )
         assert returncode == 0
 
-
 # ==============================================================================
 # Wallet Commands (Enhanced CLI)
 # ==============================================================================
-
 
 class TestEnhancedWalletCommands:
     """Test xai wallet subcommands"""
@@ -201,11 +197,9 @@ class TestEnhancedWalletCommands:
         assert returncode == 0
         assert "portfolio" in stdout.lower()
 
-
 # ==============================================================================
 # Blockchain Commands (Enhanced CLI)
 # ==============================================================================
-
 
 class TestEnhancedBlockchainCommands:
     """Test xai blockchain subcommands"""
@@ -247,11 +241,9 @@ class TestEnhancedBlockchainCommands:
         assert returncode == 0
         assert "mempool" in stdout.lower()
 
-
 # ==============================================================================
 # Mining Commands (Enhanced CLI)
 # ==============================================================================
-
 
 class TestEnhancedMiningCommands:
     """Test xai mining subcommands"""
@@ -300,11 +292,9 @@ class TestEnhancedMiningCommands:
         assert returncode == 0
         assert "--address" in stdout
 
-
 # ==============================================================================
 # Network Commands (Enhanced CLI)
 # ==============================================================================
-
 
 class TestEnhancedNetworkCommands:
     """Test xai network subcommands"""
@@ -329,11 +319,9 @@ class TestEnhancedNetworkCommands:
         )
         assert returncode == 0
 
-
 # ==============================================================================
 # AI Commands (Enhanced CLI)
 # ==============================================================================
-
 
 class TestEnhancedAICommands:
     """Test xai ai subcommands"""
@@ -422,11 +410,9 @@ class TestEnhancedAICommands:
         )
         assert returncode == 0
 
-
 # ==============================================================================
 # Legacy Wallet CLI (xai-wallet) Tests
 # ==============================================================================
-
 
 class TestLegacyWalletCLI:
     """Test legacy xai-wallet CLI (argparse-based)"""
@@ -576,11 +562,9 @@ class TestLegacyWalletCLI:
         assert returncode == 0
         assert "--label" in stdout
 
-
 # ==============================================================================
 # Parameter Validation Tests
 # ==============================================================================
-
 
 class TestParameterValidation:
     """Test parameter validation and error messages"""
@@ -644,11 +628,9 @@ class TestParameterValidation:
         # Should still show help even with bad URL
         assert returncode == 0
 
-
 # ==============================================================================
 # Output Format Tests
 # ==============================================================================
-
 
 class TestOutputFormats:
     """Test different output formats"""
@@ -676,11 +658,9 @@ class TestOutputFormats:
         # Should not be JSON
         assert not CLITestHelper.is_json(stdout)
 
-
 # ==============================================================================
 # Error Message Quality Tests
 # ==============================================================================
-
 
 class TestErrorMessages:
     """Test that error messages are clear and helpful"""
@@ -715,11 +695,9 @@ class TestErrorMessages:
         assert "--recipient" in stdout
         assert "--amount" in stdout
 
-
 # ==============================================================================
 # Integration: Keystore Operations
 # ==============================================================================
-
 
 class TestKeystoreOperations:
     """Test keystore file operations"""
@@ -748,11 +726,9 @@ class TestKeystoreOperations:
         assert returncode == 0
         assert "--kdf" in stdout or "pbkdf2" in stdout.lower() or "argon2" in stdout.lower()
 
-
 # ==============================================================================
 # Flag Combinations
 # ==============================================================================
-
 
 class TestFlagCombinations:
     """Test valid and invalid flag combinations"""
@@ -779,11 +755,9 @@ class TestFlagCombinations:
         )
         assert returncode == 0
 
-
 # ==============================================================================
 # Legacy Mode Tests
 # ==============================================================================
-
 
 class TestLegacyMode:
     """Test --legacy flag functionality"""
@@ -795,11 +769,9 @@ class TestLegacyMode:
         # Should work regardless of which CLI it uses
         assert returncode == 0
 
-
 # ==============================================================================
 # Node URL Configuration
 # ==============================================================================
-
 
 class TestNodeURLConfiguration:
     """Test node URL configuration"""
@@ -823,11 +795,9 @@ class TestNodeURLConfiguration:
         )
         assert returncode == 0
 
-
 # ==============================================================================
 # Command Listing Test
 # ==============================================================================
-
 
 def test_all_commands_have_help():
     """Meta-test: Ensure all commands have help text"""
@@ -846,11 +816,9 @@ def test_all_commands_have_help():
         assert returncode == 0, f"Help failed for: {' '.join(cmd)}"
         assert len(stdout) > 0, f"No help output for: {' '.join(cmd)}"
 
-
 # ==============================================================================
 # Summary Test
 # ==============================================================================
-
 
 def test_cli_test_summary():
     """Print summary of CLI test coverage"""

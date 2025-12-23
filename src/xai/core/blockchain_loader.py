@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Enhanced Loader with Validation
 
@@ -5,19 +7,16 @@ Loads blockchain from disk and performs comprehensive validation.
 Provides automatic recovery options if validation fails.
 """
 
-import os
-import sys
 import json
 import logging
-from typing import Tuple, Optional
+import os
+import sys
 from datetime import datetime
 
-
 from xai.core.blockchain_persistence import BlockchainStorage
-from xai.core.chain_validator import validate_blockchain_on_startup, ValidationReport
+from xai.core.chain_validator import ValidationReport, validate_blockchain_on_startup
 
 logger = logging.getLogger(__name__)
-
 
 class BlockchainLoader:
     """
@@ -35,7 +34,7 @@ class BlockchainLoader:
         self,
         data_dir: str = None,
         max_supply: float = 121000000.0,
-        expected_genesis_hash: Optional[str] = None,
+        expected_genesis_hash: str | None = None,
     ):
         """
         Initialize blockchain loader
@@ -50,7 +49,7 @@ class BlockchainLoader:
         self.expected_genesis_hash = expected_genesis_hash
         self.validation_report = None
 
-    def load_and_validate(self, verbose: bool = True) -> Tuple[bool, Optional[dict], str]:
+    def load_and_validate(self, verbose: bool = True) -> tuple[bool, dict | None, str]:
         """
         Load blockchain from disk and validate
 
@@ -122,7 +121,7 @@ class BlockchainLoader:
             # Attempt recovery
             return self._attempt_recovery(verbose)
 
-    def _attempt_recovery(self, verbose: bool = True) -> Tuple[bool, Optional[dict], str]:
+    def _attempt_recovery(self, verbose: bool = True) -> tuple[bool, dict | None, str]:
         """
         Attempt to recover blockchain from backups or checkpoints
 
@@ -300,7 +299,7 @@ class BlockchainLoader:
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.warning("Failed to save validation report", extra={"error": str(e)})
 
-    def get_validation_report(self) -> Optional[ValidationReport]:
+    def get_validation_report(self) -> ValidationReport | None:
         """
         Get the last validation report
 
@@ -309,13 +308,12 @@ class BlockchainLoader:
         """
         return self.validation_report
 
-
 def load_blockchain_with_validation(
     data_dir: str = None,
     max_supply: float = 121000000.0,
-    expected_genesis_hash: Optional[str] = None,
+    expected_genesis_hash: str | None = None,
     verbose: bool = True,
-) -> Tuple[bool, Optional[dict], str]:
+) -> tuple[bool, dict | None, str]:
     """
     Convenience function to load and validate blockchain
 

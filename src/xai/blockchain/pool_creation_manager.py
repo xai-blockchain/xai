@@ -1,16 +1,17 @@
+from __future__ import annotations
+
 import logging
 import time
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable
 
 logger = logging.getLogger("xai.blockchain.pool_creation_manager")
-
 
 class PoolCreationManager:
     def __init__(
         self,
         min_initial_liquidity: float = 1000.0,
-        whitelisted_tokens: Optional[List[str]] = None,
-        time_provider: Optional[Callable[[], int]] = None,
+        whitelisted_tokens: list[str] | None = None,
+        time_provider: Callable[[], int] | None = None,
     ):
         if not isinstance(min_initial_liquidity, (int, float)) or min_initial_liquidity <= 0:
             raise ValueError("Minimum initial liquidity must be a positive number.")
@@ -21,7 +22,7 @@ class PoolCreationManager:
 
         self.min_initial_liquidity = min_initial_liquidity
         # Stores pools: {pool_id: {"token_a": str, "token_b": str, "initial_liquidity": float, "creator": str, "timestamp": int}}
-        self.pools: Dict[str, Dict[str, Any]] = {}
+        self.pools: dict[str, dict[str, Any]] = {}
         self._pool_id_counter = 0
         self._time_provider = time_provider or (lambda: int(time.time()))
         logger.info(
@@ -92,11 +93,11 @@ class PoolCreationManager:
         )
         return pool_id
 
-    def get_existing_pools(self) -> Dict[str, Dict[str, Any]]:
+    def get_existing_pools(self) -> dict[str, dict[str, Any]]:
         """Returns a dictionary of all existing pools."""
         return self.pools
 
-    def get_pool_info(self, token_a: str, token_b: str) -> Dict[str, Any]:
+    def get_pool_info(self, token_a: str, token_b: str) -> dict[str, Any]:
         """Returns information for a specific pool."""
         pool_id = self._generate_pool_id(token_a, token_b)
         return self.pools.get(pool_id)

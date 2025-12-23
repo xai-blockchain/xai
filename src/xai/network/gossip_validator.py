@@ -1,12 +1,14 @@
-from typing import Dict, Any
-import time
+from __future__ import annotations
 
+import asyncio
+import time
+from typing import Any
 
 class GossipValidator:
     def __init__(self):
         print("GossipValidator initialized.")
 
-    def _verify_signature(self, message: Dict[str, Any]) -> bool:
+    async def _verify_signature(self, message: dict[str, Any]) -> bool:
         """
         Simulates cryptographic signature verification for a message.
         In a real system, this would involve actual crypto operations.
@@ -18,10 +20,12 @@ class GossipValidator:
         # Conceptual verification: assume signature is valid if present
         # In reality, you'd use a crypto library to verify message["signature"]
         # against message["payload"] using message["sender"]'s public key.
+        # Simulate async I/O operation (crypto verification could be async)
+        await asyncio.sleep(0)
         print(f"Signature for message from {message['sender']} verified (conceptually).")
         return True
 
-    def validate_transaction_message(self, transaction_message: Dict[str, Any]) -> bool:
+    async def validate_transaction_message(self, transaction_message: dict[str, Any]) -> bool:
         """
         Validates the structure and content of a transaction message.
         """
@@ -41,14 +45,14 @@ class GossipValidator:
             print("Transaction message validation failed: Invalid amount.")
             return False
 
-        if not self._verify_signature(transaction_message):
+        if not await self._verify_signature(transaction_message):
             print("Transaction message validation failed: Invalid signature.")
             return False
 
         print(f"Transaction message from {transaction_message['sender']} validated successfully.")
         return True
 
-    def validate_block_message(self, block_message: Dict[str, Any]) -> bool:
+    async def validate_block_message(self, block_message: dict[str, Any]) -> bool:
         """
         Validates the structure and content of a block message.
         """
@@ -81,28 +85,27 @@ class GossipValidator:
         # In a real system, you'd also validate each transaction within the block
         # and verify the block_hash against its content.
 
-        if not self._verify_signature(block_message):
+        if not await self._verify_signature(block_message):
             print("Block message validation failed: Invalid signature.")
             return False
 
         print(f"Block message from validator {block_message['validator']} validated successfully.")
         return True
 
-    def process_gossip_message(self, message_type: str, message_data: Dict[str, Any]) -> bool:
+    async def process_gossip_message(self, message_type: str, message_data: dict[str, Any]) -> bool:
         """
         Orchestrates the validation of different types of gossip messages.
         """
         if message_type == "transaction":
-            return self.validate_transaction_message(message_data)
+            return await self.validate_transaction_message(message_data)
         elif message_type == "block":
-            return self.validate_block_message(message_data)
+            return await self.validate_block_message(message_data)
         else:
             print(f"Unknown gossip message type: {message_type}. Validation failed.")
             return False
 
-
 # Example Usage (for testing purposes)
-if __name__ == "__main__":
+async def main():
     validator = GossipValidator()
 
     # Simulate a valid transaction message
@@ -150,12 +153,15 @@ if __name__ == "__main__":
     }
 
     print("\n--- Validating Transaction Messages ---")
-    validator.process_gossip_message("transaction", valid_tx)
-    validator.process_gossip_message("transaction", invalid_tx_missing_field)
+    await validator.process_gossip_message("transaction", valid_tx)
+    await validator.process_gossip_message("transaction", invalid_tx_missing_field)
 
     print("\n--- Validating Block Messages ---")
-    validator.process_gossip_message("block", valid_block)
-    validator.process_gossip_message("block", invalid_block_height)
+    await validator.process_gossip_message("block", valid_block)
+    await validator.process_gossip_message("block", invalid_block_height)
 
     print("\n--- Validating Unknown Message Type ---")
-    validator.process_gossip_message("unknown_type", {"data": "some_data"})
+    await validator.process_gossip_message("unknown_type", {"data": "some_data"})
+
+if __name__ == "__main__":
+    asyncio.run(main())

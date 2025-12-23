@@ -4,12 +4,13 @@ Test suite for XAI Blockchain Peer Discovery System
 
 import time
 import unittest
+
 from peer_discovery import (
-    PeerInfo,
     BootstrapNodes,
+    PeerDiscoveryManager,
     PeerDiscoveryProtocol,
     PeerDiversityManager,
-    PeerDiscoveryManager,
+    PeerInfo,
 )
 
 

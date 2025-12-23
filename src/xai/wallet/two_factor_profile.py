@@ -9,21 +9,20 @@ import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from xai.security.two_factor_auth import TwoFactorAuthManager
-
 
 @dataclass
 class TwoFactorProfile:
     label: str
     secret: str
-    backup_codes: List[str]
+    backup_codes: list[str]
     issuer: str
     created_at: float = field(default_factory=lambda: time.time())
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "label": self.label,
             "secret": self.secret,
@@ -34,7 +33,7 @@ class TwoFactorProfile:
         }
 
     @staticmethod
-    def from_dict(data: Dict[str, Any]) -> "TwoFactorProfile":
+    def from_dict(data: dict[str, Any]) -> "TwoFactorProfile":
         return TwoFactorProfile(
             label=data["label"],
             secret=data["secret"],
@@ -44,11 +43,10 @@ class TwoFactorProfile:
             metadata=data.get("metadata", {}),
         )
 
-
 class TwoFactorProfileStore:
     """Filesystem-based persistence for 2FA profiles."""
 
-    def __init__(self, base_dir: Optional[Path] = None):
+    def __init__(self, base_dir: Path | None = None):
         self.base_dir = base_dir or (Path.home() / ".xai" / "2fa_profiles")
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
@@ -82,8 +80,8 @@ class TwoFactorProfileStore:
         self,
         label: str,
         code: str,
-        manager: Optional[TwoFactorAuthManager] = None,
-    ) -> Tuple[bool, Optional[str]]:
+        manager: TwoFactorAuthManager | None = None,
+    ) -> tuple[bool, str | None]:
         """
         Verify a TOTP or backup code against the stored profile.
 

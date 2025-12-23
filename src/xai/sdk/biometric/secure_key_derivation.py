@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Secure Key Derivation for Biometric-Protected Wallet Keys
 
@@ -16,12 +18,10 @@ import hmac
 import os
 import secrets
 from dataclasses import dataclass
-from typing import Optional
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-
 
 @dataclass
 class DerivedKey:
@@ -30,7 +30,6 @@ class DerivedKey:
     salt: bytes
     iterations: int
     algorithm: str
-
 
 @dataclass
 class EncryptedWalletKey:
@@ -41,7 +40,6 @@ class EncryptedWalletKey:
     iterations: int
     device_id_hash: bytes  # Hash of device ID used
     algorithm: str = "AES-256-GCM"
-
 
 class SecureKeyDerivation:
     """
@@ -79,9 +77,9 @@ class SecureKeyDerivation:
     def derive_key(
         self,
         biometric_token: bytes,
-        salt: Optional[bytes] = None,
-        iterations: Optional[int] = None,
-        additional_context: Optional[str] = None
+        salt: bytes | None = None,
+        iterations: int | None = None,
+        additional_context: str | None = None
     ) -> DerivedKey:
         """
         Derive an encryption key from biometric token and device ID.
@@ -145,8 +143,8 @@ class SecureKeyDerivation:
         self,
         wallet_private_key: bytes,
         biometric_token: bytes,
-        wallet_id: Optional[str] = None,
-        iterations: Optional[int] = None
+        wallet_id: str | None = None,
+        iterations: int | None = None
     ) -> EncryptedWalletKey:
         """
         Encrypt a wallet private key using biometric-derived key.
@@ -196,7 +194,7 @@ class SecureKeyDerivation:
         self,
         encrypted: EncryptedWalletKey,
         biometric_token: bytes,
-        wallet_id: Optional[str] = None
+        wallet_id: str | None = None
     ) -> bytes:
         """
         Decrypt a wallet private key using biometric-derived key.
@@ -263,7 +261,6 @@ class SecureKeyDerivation:
         """
         return hmac.compare_digest(encrypted.device_id_hash, self.device_id_hash)
 
-
 class BiometricTokenCache:
     """
     Secure in-memory cache for biometric tokens.
@@ -290,7 +287,7 @@ class BiometricTokenCache:
         import time
         self._cache[key] = (token, time.time())
 
-    def retrieve(self, key: str) -> Optional[bytes]:
+    def retrieve(self, key: str) -> bytes | None:
         """
         Retrieve a cached token if still valid.
 
@@ -308,7 +305,7 @@ class BiometricTokenCache:
 
         return token
 
-    def invalidate(self, key: Optional[str] = None) -> None:
+    def invalidate(self, key: str | None = None) -> None:
         """Invalidate cached tokens."""
         if key:
             self._cache.pop(key, None)

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Blockchain indexer service - Indexes blocks, transactions, and AI tasks
 """
@@ -5,7 +7,7 @@ import asyncio
 import json
 import logging
 import os
-from typing import Set, Optional, Dict, Any
+from typing import Any
 from datetime import datetime
 from urllib.parse import urlparse
 
@@ -14,7 +16,6 @@ import httpx
 import websockets
 
 logger = logging.getLogger(__name__)
-
 
 class BlockchainIndexer:
     """
@@ -34,11 +35,11 @@ class BlockchainIndexer:
         self.running = False
         self.indexing_task = None
         self.websocket_task = None
-        self.websockets: Set[WebSocket] = set()
+        self.websockets: set[WebSocket] = set()
         self.start_time = None
-        self.last_indexed_height: Optional[int] = None
+        self.last_indexed_height: int | None = None
 
-        self._api_headers: Dict[str, str] = {}
+        self._api_headers: dict[str, str] = {}
         api_key = os.getenv("XAI_NODE_API_KEY")
         if api_key:
             self._api_headers["X-API-Key"] = api_key
@@ -163,7 +164,7 @@ class BlockchainIndexer:
             self.websockets.discard(ws)
 
     # ------------------------------------------------------------------ helpers
-    async def _http_get(self, path: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    async def _http_get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any] | None:
         """Perform HTTP GET against node API with optional params."""
         url = self._build_url(path)
         async with httpx.AsyncClient() as client:
@@ -178,13 +179,13 @@ class BlockchainIndexer:
         suffix = path if path.startswith("/") else f"/{path}"
         return f"{self._http_base}{self._base_path}{suffix}"
 
-    async def _fetch_block(self, identifier: Any) -> Optional[Dict[str, Any]]:
+    async def _fetch_block(self, identifier: Any) -> dict[str, Any] | None:
         """Fetch a specific block by index/hash."""
         if identifier is None:
             return None
         return await self._http_get(f"/blocks/{identifier}")
 
-    async def _process_block_event(self, block_summary: Dict[str, Any], *, fetch_full: bool = True) -> None:
+    async def _process_block_event(self, block_summary: dict[str, Any], *, fetch_full: bool = True) -> None:
         """Persist and broadcast a block event."""
         if not block_summary:
             return

@@ -1,20 +1,21 @@
+from __future__ import annotations
+
 """
 Database connection management for XAI Explorer
 """
 import asyncpg
-from typing import Optional, List, Dict, Any, Sequence
+from typing import Any
 import json
 import logging
 
 logger = logging.getLogger(__name__)
-
 
 class Database:
     """Async PostgreSQL database connection manager"""
 
     def __init__(self, database_url: str):
         self.database_url = database_url
-        self.pool: Optional[asyncpg.Pool] = None
+        self.pool: asyncpg.Pool | None = None
 
     async def connect(self):
         """Establish database connection pool"""
@@ -47,13 +48,13 @@ class Database:
         except Exception:
             return False
 
-    async def fetch_one(self, query: str, *args) -> Optional[Dict[str, Any]]:
+    async def fetch_one(self, query: str, *args) -> dict[str, Any] | None:
         """Fetch single row"""
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(query, *args)
             return dict(row) if row else None
 
-    async def fetch_all(self, query: str, *args) -> List[Dict[str, Any]]:
+    async def fetch_all(self, query: str, *args) -> list[dict[str, Any]]:
         """Fetch multiple rows"""
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(query, *args)
@@ -162,7 +163,7 @@ class Database:
             await self.execute(statement)
         logger.info("Explorer migrations executed successfully")
 
-    async def upsert_block(self, block: Dict[str, Any]) -> None:
+    async def upsert_block(self, block: dict[str, Any]) -> None:
         """Persist or update a block record."""
         if not block:
             return
@@ -191,7 +192,7 @@ class Database:
         if txs:
             await self.upsert_transactions(txs, block.get("index") or block.get("height"))
 
-    async def upsert_transactions(self, transactions: List[Dict[str, Any]], block_height: Any = None) -> None:
+    async def upsert_transactions(self, transactions: list[dict[str, Any]], block_height: Any = None) -> None:
         """Persist transactions in bulk."""
         if not transactions:
             return
@@ -223,7 +224,7 @@ class Database:
         """
         await self.execute_many(query, args)
 
-    async def upsert_ai_task(self, task: Dict[str, Any]) -> None:
+    async def upsert_ai_task(self, task: dict[str, Any]) -> None:
         """Persist AI task metadata for explorer analytics."""
         if not task:
             return
@@ -259,7 +260,7 @@ class Database:
             json.dumps(task),
         )
 
-    async def upsert_mempool_transactions(self, transactions: List[Dict[str, Any]]) -> None:
+    async def upsert_mempool_transactions(self, transactions: list[dict[str, Any]]) -> None:
         """Persist pending mempool transactions with rolling updates."""
         if not transactions:
             await self.execute(
@@ -306,7 +307,7 @@ class Database:
             "DELETE FROM mempool_transactions WHERE last_updated < timezone('utc', now()) - interval '2 hours';"
         )
 
-    async def record_mempool_snapshot(self, stats: Dict[str, Any], overview: Optional[Dict[str, Any]] = None) -> None:
+    async def record_mempool_snapshot(self, stats: dict[str, Any], overview: dict[str, Any] | None = None) -> None:
         """Record mempool congestion snapshot for analytics."""
         if not stats and not overview:
             return
@@ -343,7 +344,7 @@ class Database:
             "DELETE FROM mempool_stats WHERE captured_at < timezone('utc', now()) - interval '24 hours';"
         )
 
-    async def get_recent_mempool_transactions(self, limit: int = 50) -> List[Dict[str, Any]]:
+    async def get_recent_mempool_transactions(self, limit: int = 50) -> list[dict[str, Any]]:
         """Return most recently updated mempool transactions."""
         query = """
         SELECT txid, sender, recipient, amount, fee, fee_rate, size_bytes, nonce, tx_type,
@@ -354,7 +355,7 @@ class Database:
         """
         return await self.fetch_all(query, limit)
 
-    async def get_latest_mempool_stats(self) -> Optional[Dict[str, Any]]:
+    async def get_latest_mempool_stats(self) -> dict[str, Any] | None:
         """Return the latest mempool snapshot."""
         query = """
         SELECT captured_at, tx_count, size_bytes, total_fees, total_value, pressure, fees, raw

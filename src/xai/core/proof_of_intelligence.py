@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Proof of Intelligence Mining System with Adaptive Difficulty
 
@@ -15,15 +17,13 @@ Features:
 """
 
 import hashlib
+import logging
 import secrets
 import time
-import logging
-from typing import Dict, List, Optional
 from enum import Enum
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 class ChallengeType(Enum):
     """Different types of AI challenges"""
@@ -32,7 +32,6 @@ class ChallengeType(Enum):
     OPTIMIZATION = "optimization"
     NATURAL_LANGUAGE = "natural_language"
     CODE_GENERATION = "code_generation"
-
 
 class ProofOfIntelligence:
     """
@@ -53,19 +52,19 @@ class ProofOfIntelligence:
 
         # Difficulty adjustment
         self.adjustment_interval = 100  # Adjust every 100 blocks
-        self.solve_times: List[float] = []
+        self.solve_times: list[float] = []
 
         # Anti-gaming
-        self.recent_solvers: Dict[str, List[float]] = {}  # miner -> solve times
+        self.recent_solvers: dict[str, list[float]] = {}  # miner -> solve times
         self.max_solves_per_hour = 10
 
         # Challenge tracking
-        self.active_challenges: Dict[str, Dict] = {}
-        self.challenge_types_used: List[ChallengeType] = []
+        self.active_challenges: dict[str, Dict] = {}
+        self.challenge_types_used: list[ChallengeType] = []
 
         logger.info(f"PoI initialized with difficulty={difficulty}, target={target_solve_time}s")
 
-    def generate_ai_task(self, difficulty: Optional[int] = None, challenge_type: Optional[ChallengeType] = None) -> Dict:
+    def generate_ai_task(self, difficulty: int | None = None, challenge_type: ChallengeType | None = None) -> Dict:
         """
         Generates an AI challenge task with specified difficulty and type
 
@@ -117,7 +116,7 @@ class ProofOfIntelligence:
         }
         return descriptions.get(challenge_type, "Generic AI challenge")
 
-    def check_anti_gaming(self, miner_address: str) -> tuple[bool, Optional[str]]:
+    def check_anti_gaming(self, miner_address: str) -> tuple[bool, str | None]:
         """
         Check for gaming attempts
 
@@ -138,7 +137,7 @@ class ProofOfIntelligence:
 
         return True, None
 
-    def simulate_ai_computation(self, task: Dict, miner_address: str) -> Optional[Dict]:
+    def simulate_ai_computation(self, task: Dict, miner_address: str) -> Dict | None:
         """
         Simulates the process of solving the AI task
 

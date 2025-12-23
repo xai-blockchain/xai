@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Generate pytest scaffolds for modules to accelerate coverage work.
 
@@ -14,28 +16,24 @@ import importlib
 import inspect
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
-
 
 @dataclass
 class FunctionInfo:
     name: str
-    docstring: Optional[str]
+    docstring: str | None
     is_async: bool
     is_private: bool
-
 
 @dataclass
 class ClassInfo:
     name: str
-    docstring: Optional[str]
-    methods: List[FunctionInfo]
+    docstring: str | None
+    methods: list[FunctionInfo]
 
-
-def analyze_module(file_path: Path) -> (List[ClassInfo], List[FunctionInfo]):
+def analyze_module(file_path: Path) -> (list[ClassInfo], list[FunctionInfo]):
     tree = ast.parse(file_path.read_text())
-    classes: List[ClassInfo] = []
-    functions: List[FunctionInfo] = []
+    classes: list[ClassInfo] = []
+    functions: list[FunctionInfo] = []
 
     for node in tree.body:
         if isinstance(node, ast.ClassDef):
@@ -58,7 +56,6 @@ def analyze_module(file_path: Path) -> (List[ClassInfo], List[FunctionInfo]):
             ))
 
     return classes, functions
-
 
 def generate_function_test_scaffold(func: FunctionInfo, module_alias: str) -> str:
     lines = []
@@ -93,7 +90,6 @@ def generate_function_test_scaffold(func: FunctionInfo, module_alias: str) -> st
 
     return '\n'.join(lines)
 
-
 def generate_class_test_scaffold(cls: ClassInfo, module_alias: str) -> str:
     lines = []
     lines.append(f'class Test{cls.name}:')
@@ -121,7 +117,6 @@ def generate_class_test_scaffold(cls: ClassInfo, module_alias: str) -> str:
         lines.append('')
 
     return '\n'.join(lines)
-
 
 def generate_test_scaffold(file_path: Path) -> str:
     classes, functions = analyze_module(file_path)
@@ -157,7 +152,6 @@ def generate_test_scaffold(file_path: Path) -> str:
 
     return '\n'.join(lines)
 
-
 def main():
     parser = argparse.ArgumentParser(description='Generate pytest scaffold for a module.')
     parser.add_argument('module', type=Path, help='Target module path')
@@ -169,7 +163,6 @@ def main():
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(content)
     print(f'Scaffold written to {output_path}')
-
 
 if __name__ == '__main__':
     main()

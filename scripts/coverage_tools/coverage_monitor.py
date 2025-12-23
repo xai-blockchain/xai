@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Monitor test coverage over time and across branches.
 
@@ -22,11 +24,10 @@ import json
 import sys
 import subprocess
 from pathlib import Path
-from typing import Dict, Optional, List
+
 from dataclasses import dataclass, asdict
 from datetime import datetime
 import argparse
-
 
 @dataclass
 class CoverageSnapshot:
@@ -41,17 +42,15 @@ class CoverageSnapshot:
     executed: int
     missing: int
 
-
 @dataclass
 class CoverageTrend:
     """Coverage trend analysis."""
     branch: str
-    snapshots: List[CoverageSnapshot]
+    snapshots: list[CoverageSnapshot]
     avg_coverage: float
     trend: str  # 'up', 'down', 'stable'
     change_percentage: float
     change_color: str  # 'green', 'red', 'yellow'
-
 
 class CoverageMonitor:
     """Monitor and track test coverage."""
@@ -59,7 +58,7 @@ class CoverageMonitor:
     def __init__(self, data_file: Path = Path(".coverage_history.json")):
         """Initialize coverage monitor."""
         self.data_file = data_file
-        self.snapshots: List[CoverageSnapshot] = []
+        self.snapshots: list[CoverageSnapshot] = []
         self.load_history()
 
     def load_history(self) -> None:
@@ -77,7 +76,7 @@ class CoverageMonitor:
         with open(self.data_file, 'w') as f:
             json.dump([asdict(s) for s in self.snapshots], f, indent=2)
 
-    def get_current_coverage(self, coverage_file: Path = Path("coverage.json")) -> Optional[CoverageSnapshot]:
+    def get_current_coverage(self, coverage_file: Path = Path("coverage.json")) -> CoverageSnapshot | None:
         """Extract coverage metrics from coverage.json."""
         if not coverage_file.exists():
             print(f"Error: Coverage file not found: {coverage_file}", file=sys.stderr)
@@ -199,7 +198,7 @@ class CoverageMonitor:
             return "No coverage history available"
 
         # Group by branch
-        branch_history: Dict[str, List[CoverageSnapshot]] = {}
+        branch_history: dict[str, list[CoverageSnapshot]] = {}
         for snap in self.snapshots:
             if snap.branch not in branch_history:
                 branch_history[snap.branch] = []
@@ -237,7 +236,7 @@ class CoverageMonitor:
     def generate_html_report(self, output_file: Path) -> None:
         """Generate HTML coverage trend report."""
         # Group by branch
-        branch_history: Dict[str, List[CoverageSnapshot]] = {}
+        branch_history: dict[str, list[CoverageSnapshot]] = {}
         for snap in self.snapshots:
             if snap.branch not in branch_history:
                 branch_history[snap.branch] = []
@@ -320,7 +319,6 @@ class CoverageMonitor:
 
         output_file.write_text(html)
         print(f"HTML report written to: {output_file}")
-
 
 def main():
     """Main entry point."""
@@ -410,7 +408,6 @@ Examples:
     # Default: show report
     print(monitor.generate_report())
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

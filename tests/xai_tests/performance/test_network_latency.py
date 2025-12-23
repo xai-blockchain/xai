@@ -13,7 +13,7 @@ import time
 import statistics
 import tempfile
 import ssl
-from typing import List, Dict, Any, Optional
+from typing import Any
 from unittest.mock import Mock, AsyncMock
 
 from xai.core.blockchain import Blockchain

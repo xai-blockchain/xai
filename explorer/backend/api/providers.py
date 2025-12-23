@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 """
 AI Providers API endpoints - Compute provider dashboard and stats
 """
 from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
+
 from datetime import datetime, timedelta
 import httpx
 import logging
@@ -12,10 +14,9 @@ logger = logging.getLogger(__name__)
 
 node_url = "http://localhost:12001"
 
-
 @router.get("")
 async def get_providers(
-    status: Optional[str] = None,
+    status: str | None = None,
     sort_by: str = Query("reputation", regex="^(reputation|earnings|tasks)$"),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100)
@@ -55,7 +56,6 @@ async def get_providers(
     except Exception as e:
         logger.error(f"Error fetching providers: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.get("/{provider_address}")
 async def get_provider_dashboard(provider_address: str):
@@ -140,7 +140,6 @@ async def get_provider_dashboard(provider_address: str):
         logger.error(f"Error fetching provider {provider_address}: {e}")
         raise HTTPException(status_code=404, detail="Provider not found")
 
-
 @router.get("/leaderboard")
 async def get_provider_leaderboard(
     metric: str = Query("reputation", regex="^(reputation|earnings|tasks|uptime)$"),
@@ -179,7 +178,6 @@ async def get_provider_leaderboard(
     except Exception as e:
         logger.error(f"Error fetching leaderboard: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.get("/{provider_address}/earnings")
 async def get_provider_earnings(

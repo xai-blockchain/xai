@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Integration tests for network partition scenarios.
 
@@ -11,18 +13,16 @@ Tests are skipped where peer block acceptance is required.
 import pytest
 import threading
 import time
-from typing import List, Tuple
 
 from xai.core.blockchain import Blockchain
 from xai.core.node import BlockchainNode
 from xai.core.wallet import Wallet
 
-
 class TestNetworkPartition:
     """Test network partition handling"""
 
     @pytest.fixture
-    def three_node_network(self, tmp_path) -> Tuple[BlockchainNode, BlockchainNode, BlockchainNode]:
+    def three_node_network(self, tmp_path) -> tuple[BlockchainNode, BlockchainNode, BlockchainNode]:
         """Create 3-node network for partition testing"""
         nodes = []
         for i in range(3):
@@ -315,7 +315,6 @@ class TestNetworkPartition:
             heights = [len(n.blockchain.chain) for n in [node1, node2, node3]]
             assert heights[0] == heights[1] == heights[2], f"Cycle {cycle}: nodes not synced"
 
-
 class TestNetworkPartitionEdgeCases:
     """Test edge cases in network partitions"""
 
@@ -365,7 +364,6 @@ class TestNetworkPartitionEdgeCases:
 
         # Should still be valid
         assert bc2.validate_chain()
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -8,17 +8,16 @@ empty or explicitly requested, wiring in SPV-backed checkpoint validation.
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from .checkpoint_sync import CheckpointSyncManager
 
 logger = logging.getLogger(__name__)
 
-
 class PartialSyncCoordinator:
     """Orchestrates checkpoint-based partial sync prior to full block download."""
 
-    def __init__(self, blockchain: Any, p2p_manager: Optional[Any] = None):
+    def __init__(self, blockchain: Any, p2p_manager: Any | None = None):
         self.blockchain = blockchain
         self.p2p_manager = p2p_manager
         self.sync_manager = CheckpointSyncManager(blockchain, p2p_manager=p2p_manager)

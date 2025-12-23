@@ -1,14 +1,15 @@
-from typing import List, Dict, Any, Optional
+from __future__ import annotations
+
 import hashlib
 import logging
 import threading
 import time
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
-
 class MultiSigTreasury:
-    def __init__(self, owners: List[str], threshold: int, require_signatures: bool = True):
+    def __init__(self, owners: list[str], threshold: int, require_signatures: bool = True):
         """
         Initialize M-of-N multisig treasury with signature collection.
 
@@ -30,14 +31,14 @@ class MultiSigTreasury:
         self.balance = 0.0  # Conceptual balance
 
         # Stores pending transactions with signature data
-        self.pending_transactions: Dict[str, Dict[str, Any]] = {}
+        self.pending_transactions: dict[str, dict[str, Any]] = {}
         self._transaction_id_counter = 0
 
         # Track executed transactions for fund tracking
-        self.executed_transactions: List[Dict[str, Any]] = []
+        self.executed_transactions: list[dict[str, Any]] = []
 
         # Fund tracking by category
-        self.fund_allocations: Dict[str, float] = {
+        self.fund_allocations: dict[str, float] = {
             "development": 0.0,
             "marketing": 0.0,
             "operations": 0.0,
@@ -79,7 +80,7 @@ class MultiSigTreasury:
         """Returns the current treasury balance."""
         return self.balance
 
-    def get_fund_breakdown(self) -> Dict[str, float]:
+    def get_fund_breakdown(self) -> dict[str, float]:
         """Get detailed fund allocation breakdown."""
         with self._lock:
             return {
@@ -148,7 +149,7 @@ class MultiSigTreasury:
 
             return tx_id
 
-    def approve_transaction(self, approver: str, tx_id: str, signature: Optional[str] = None):
+    def approve_transaction(self, approver: str, tx_id: str, signature: str | None = None):
         """
         Approve a pending transaction with signature collection.
 
@@ -190,7 +191,7 @@ class MultiSigTreasury:
             if len(transaction["approvals"]) >= self.threshold:
                 logger.info(f"Transaction {tx_id} reached threshold, ready for execution")
 
-    def get_transaction_status(self, tx_id: str) -> Dict[str, Any]:
+    def get_transaction_status(self, tx_id: str) -> dict[str, Any]:
         """Get detailed status of a transaction."""
         with self._lock:
             transaction = self.pending_transactions.get(tx_id)
@@ -285,7 +286,7 @@ class MultiSigTreasury:
                 f"New balance: {self.balance:.2f}"
             )
 
-    def get_pending_transactions(self) -> List[Dict[str, Any]]:
+    def get_pending_transactions(self) -> list[dict[str, Any]]:
         """Get all pending transactions."""
         with self._lock:
             return [
@@ -300,11 +301,10 @@ class MultiSigTreasury:
                 for tx_id, tx in self.pending_transactions.items()
             ]
 
-    def get_executed_transactions(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_executed_transactions(self, limit: int = 100) -> list[dict[str, Any]]:
         """Get recently executed transactions."""
         with self._lock:
             return self.executed_transactions[-limit:]
-
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

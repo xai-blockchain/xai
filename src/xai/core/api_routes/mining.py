@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Callable, Optional, Tuple, Dict, Any
+from typing import TYPE_CHECKING, Any, Callable
 
 from flask import jsonify, request
 
@@ -10,11 +10,10 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
 
-
 def register_mining_routes(
     routes: "NodeAPIRoutes",
     *,
-    advanced_rate_limiter_getter: Optional[Callable[[], Any]] = None,
+    advanced_rate_limiter_getter: Callable[[], Any] | None = None,
 ) -> None:
     """Expose mining control endpoints."""
     app = routes.app
@@ -30,7 +29,7 @@ def register_mining_routes(
         return limiter
 
     @app.route("/mine", methods=["POST"])
-    def mine_block() -> Tuple[Dict[str, Any], int]:
+    def mine_block() -> tuple[dict[str, Any], int]:
         """Mine a single block with pending transactions.
 
         Mines one block containing pending transactions and broadcasts it to the
@@ -103,7 +102,7 @@ def register_mining_routes(
             return routes._handle_exception(exc, "mine_block")
 
     @app.route("/auto-mine/start", methods=["POST"])
-    def start_auto_mining() -> Dict[str, str]:
+    def start_auto_mining() -> dict[str, str]:
         """Start automatic continuous mining.
 
         Enables auto-mining mode where the node continuously mines blocks
@@ -130,7 +129,7 @@ def register_mining_routes(
         return jsonify({"message": "Auto-mining started"})
 
     @app.route("/auto-mine/stop", methods=["POST"])
-    def stop_auto_mining() -> Dict[str, str]:
+    def stop_auto_mining() -> dict[str, str]:
         """Stop automatic continuous mining.
 
         Disables auto-mining mode, halting continuous block mining.

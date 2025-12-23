@@ -6,16 +6,16 @@ Production-grade command-line interface with rich terminal UX
 
 from __future__ import annotations
 
-import sys
+import importlib.resources as importlib_resources
 import json
 import logging
 import os
+import sys
 import time
-from typing import Optional, Dict, Any, List, Tuple
-from pathlib import Path
-from datetime import datetime
 from copy import deepcopy
-import importlib.resources as importlib_resources
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 try:
     import click
@@ -23,36 +23,36 @@ try:
         from click.shell_completion import get_completion_script as _click_completion_script
     except ImportError:
         _click_completion_script = None
+    from rich import box
     from rich.console import Console
-    from rich.table import Table
+    from rich.layout import Layout
+    from rich.live import Live
     from rich.panel import Panel
     from rich.progress import Progress, SpinnerColumn, TextColumn
     from rich.prompt import Confirm, Prompt
     from rich.syntax import Syntax
-    from rich import box
+    from rich.table import Table
     from rich.tree import Tree
-    from rich.live import Live
-    from rich.layout import Layout
 except ImportError:
     print("ERROR: Required packages not installed. Install with:")
     print("  pip install click rich")
     sys.exit(1)
 
 import requests
-from xai.wallet.offline_signing import sign_offline, signing_preview
+import yaml
+
+from xai.config_manager import DEFAULT_CONFIG_DIR as CONFIG_DEFAULT_DIR
 from xai.config_manager import (
     ConfigManager,
-    Environment as ConfigEnvironment,
-    DEFAULT_CONFIG_DIR as CONFIG_DEFAULT_DIR,
 )
-import yaml
+from xai.config_manager import Environment as ConfigEnvironment
+from xai.wallet.offline_signing import sign_offline, signing_preview
 
 # Configure module logger
 logger = logging.getLogger(__name__)
 
 # Rich console for beautiful output
 console = Console()
-
 
 def _cli_fail(exc: Exception, exit_code: int = 1) -> None:
     """Centralized CLI error handler for consistent messaging."""
@@ -65,7 +65,6 @@ DEFAULT_NODE_URL = "http://localhost:12001"
 DEFAULT_TIMEOUT = 30.0
 DEFAULT_DATA_DIR = Path(os.getenv("XAI_DATA_DIR", os.path.expanduser("~/.xai"))).expanduser()
 
-
 class XAIClient:
     """Client for interacting with XAI blockchain node"""
 
@@ -73,13 +72,13 @@ class XAIClient:
         self,
         node_url: str = DEFAULT_NODE_URL,
         timeout: float = DEFAULT_TIMEOUT,
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
     ):
         self.node_url = node_url.rstrip('/')
         self.timeout = timeout
         self.api_key = api_key
 
-    def _request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
+    def _request(self, method: str, endpoint: str, **kwargs) -> dict[str, Any]:
         """Make HTTP request to node"""
         url = f"{self.node_url}/{endpoint.lstrip('/')}"
         logger.debug("Node request: %s %s", method, url)
@@ -95,35 +94,35 @@ class XAIClient:
             logger.error("Node communication error: %s", e)
             raise click.ClickException(f"Node communication error: {e}")
 
-    def get_balance(self, address: str) -> Dict[str, Any]:
+    def get_balance(self, address: str) -> dict[str, Any]:
         """Get wallet balance"""
         return self._request("GET", f"/balance/{address}")
 
-    def get_transaction_history(self, address: str, limit: int = 10, offset: int = 0) -> Dict[str, Any]:
+    def get_transaction_history(self, address: str, limit: int = 10, offset: int = 0) -> dict[str, Any]:
         """Get transaction history"""
         return self._request("GET", f"/history/{address}", params={"limit": limit, "offset": offset})
 
-    def get_block(self, block_id: str) -> Dict[str, Any]:
+    def get_block(self, block_id: str) -> dict[str, Any]:
         """Get block by index or hash"""
         return self._request("GET", f"/block/{block_id}")
 
-    def get_blockchain_info(self) -> Dict[str, Any]:
+    def get_blockchain_info(self) -> dict[str, Any]:
         """Get blockchain information"""
         return self._request("GET", "/info")
 
-    def get_network_info(self) -> Dict[str, Any]:
+    def get_network_info(self) -> dict[str, Any]:
         """Get network information"""
         return self._request("GET", "/network/info")
 
-    def get_peers(self) -> Dict[str, Any]:
+    def get_peers(self) -> dict[str, Any]:
         """Get connected peers"""
         return self._request("GET", "/peers")
 
-    def get_mining_status(self) -> Dict[str, Any]:
+    def get_mining_status(self) -> dict[str, Any]:
         """Get mining status"""
         return self._request("GET", "/mining/status")
 
-    def start_mining(self, address: str, threads: int = 1, intensity: int = 1) -> Dict[str, Any]:
+    def start_mining(self, address: str, threads: int = 1, intensity: int = 1) -> dict[str, Any]:
         """Start mining"""
         return self._request("POST", "/mining/start", json={
             "miner_address": address,
@@ -131,71 +130,69 @@ class XAIClient:
             "intensity": intensity
         })
 
-    def stop_mining(self) -> Dict[str, Any]:
+    def stop_mining(self) -> dict[str, Any]:
         """Stop mining"""
         return self._request("POST", "/mining/stop")
 
-    def submit_transaction(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    def submit_transaction(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """Deprecated: use submit_signed_transaction to avoid transmitting private keys."""
         raise RuntimeError("submit_transaction is disabled. Use submit_signed_transaction with a pre-signed payload.")
 
-    def submit_signed_transaction(self, signed_payload: Dict[str, Any]) -> Dict[str, Any]:
+    def submit_signed_transaction(self, signed_payload: dict[str, Any]) -> dict[str, Any]:
         """Submit a fully signed transaction (no private keys transmitted)."""
         return self._request("POST", "/send", json=signed_payload)
 
-    def get_address_nonce(self, address: str) -> Dict[str, Any]:
+    def get_address_nonce(self, address: str) -> dict[str, Any]:
         """Fetch confirmed and next nonce for an address."""
         return self._request("GET", f"/address/{address}/nonce")
 
-    def get_sync_status(self) -> Dict[str, Any]:
+    def get_sync_status(self) -> dict[str, Any]:
         """Get header sync status"""
         return self._request("GET", "/api/v1/sync/headers/status")
 
-    def get_sync_progress(self) -> Dict[str, Any]:
+    def get_sync_progress(self) -> dict[str, Any]:
         """Get detailed header sync progress"""
         return self._request("GET", "/api/v1/sync/headers/progress")
 
-    def get_mempool(self) -> Dict[str, Any]:
+    def get_mempool(self) -> dict[str, Any]:
         """Get mempool transactions"""
         return self._request("GET", "/mempool")
 
-    def get_state_snapshot(self) -> Dict[str, Any]:
+    def get_state_snapshot(self) -> dict[str, Any]:
         """Retrieve deterministic state snapshot."""
         return self._request("GET", "/state/snapshot")
 
     def validate_block(
         self,
         *,
-        index: Optional[int] = None,
-        block_hash: Optional[str] = None,
+        index: int | None = None,
+        block_hash: str | None = None,
         include_transactions: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Validate a block by index or hash."""
-        payload: Dict[str, Any] = {"include_transactions": include_transactions}
+        payload: dict[str, Any] = {"include_transactions": include_transactions}
         if index is not None:
             payload["index"] = index
         if block_hash:
             payload["hash"] = block_hash
         return self._request("POST", "/blocks/validate", json=payload)
 
-    def delete_mempool_transaction(self, txid: str, ban_sender: bool = False) -> Dict[str, Any]:
+    def delete_mempool_transaction(self, txid: str, ban_sender: bool = False) -> dict[str, Any]:
         """Remove a transaction from the mempool."""
         params = {"ban_sender": "true" if ban_sender else "false"}
         return self._request("DELETE", f"/mempool/{txid}", params=params)
 
-    def get_consensus_info(self) -> Dict[str, Any]:
+    def get_consensus_info(self) -> dict[str, Any]:
         """Fetch consensus manager status."""
         return self._request("GET", "/consensus/info")
-
 
 # ============================================================================
 # Configuration helpers
 # ============================================================================
 
-def _config_env_choices() -> List[str]:
+def _config_env_choices() -> list[str]:
     """Return list of valid environment option strings."""
     return [env.value for env in ConfigEnvironment]
-
 
 def _parse_config_value(raw_value: str, value_type: str) -> Any:
     """Parse CLI string into the requested value type."""
@@ -249,8 +246,7 @@ def _parse_config_value(raw_value: str, value_type: str) -> Any:
             pass
     return raw_value
 
-
-def _read_yaml_config(path: Path) -> Dict[str, Any]:
+def _read_yaml_config(path: Path) -> dict[str, Any]:
     """Load YAML config into dict."""
     if not path.exists():
         return {}
@@ -260,15 +256,13 @@ def _read_yaml_config(path: Path) -> Dict[str, Any]:
             raise click.ClickException(f"Config file {path} must contain a mapping.")
         return data
 
-
-def _write_yaml_config(path: Path, data: Dict[str, Any]) -> None:
+def _write_yaml_config(path: Path, data: dict[str, Any]) -> None:
     """Persist config dict to YAML."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(data, handle, sort_keys=False, allow_unicode=False)
 
-
-def _set_nested_value(target: Dict[str, Any], parts: List[str], value: Any) -> None:
+def _set_nested_value(target: dict[str, Any], parts: list[str], value: Any) -> None:
     """Set nested dictionary value creating intermediate dicts as needed."""
     cursor = target
     for part in parts[:-1]:
@@ -277,8 +271,7 @@ def _set_nested_value(target: Dict[str, Any], parts: List[str], value: Any) -> N
         cursor = cursor[part]
     cursor[parts[-1]] = value
 
-
-def _resolve_config_file_path(environment: str, config_dir: Path, explicit_file: Optional[Path]) -> Tuple[Path, str]:
+def _resolve_config_file_path(environment: str, config_dir: Path, explicit_file: Path | None) -> tuple[Path, str]:
     """Determine which config file should be edited."""
     if explicit_file:
         return explicit_file, environment
@@ -288,8 +281,7 @@ def _resolve_config_file_path(environment: str, config_dir: Path, explicit_file:
     # fall back to default
     return config_dir / "default.yaml", "default"
 
-
-def _emit_config_payload(ctx: click.Context, payload: Dict[str, Any], output_format: str = "auto") -> None:
+def _emit_config_payload(ctx: click.Context, payload: dict[str, Any], output_format: str = "auto") -> None:
     """Render config payload respecting CLI formatting preferences."""
     want_json = ctx.obj.get("json_output") or output_format == "json"
     if want_json:
@@ -311,8 +303,7 @@ def _emit_config_payload(ctx: click.Context, payload: Dict[str, Any], output_for
     else:
         console.print(Panel.fit(str(payload)))
 
-
-def _determine_data_dir(path: Optional[Path], *, require_exists: bool = False) -> Path:
+def _determine_data_dir(path: Path | None, *, require_exists: bool = False) -> Path:
     """Resolve a blockchain data directory, optionally ensuring it exists."""
     resolved = (path or DEFAULT_DATA_DIR).expanduser()
     if require_exists and not resolved.exists():
@@ -323,10 +314,9 @@ def _determine_data_dir(path: Optional[Path], *, require_exists: bool = False) -
         resolved.mkdir(parents=True, exist_ok=True)
     return resolved
 
-
-def _load_genesis_file(override_path: Optional[Path]) -> Tuple[Dict[str, Any], Path]:
+def _load_genesis_file(override_path: Path | None) -> tuple[dict[str, Any], Path]:
     """Load genesis configuration from explicit path/env/package."""
-    candidate_paths: List[Path] = []
+    candidate_paths: list[Path] = []
     if override_path:
         candidate_paths.append(override_path.expanduser())
     env_path = os.getenv("XAI_GENESIS_PATH")
@@ -347,7 +337,6 @@ def _load_genesis_file(override_path: Optional[Path]) -> Tuple[Dict[str, Any], P
     raise click.ClickException(
         "Unable to locate genesis.json. Provide --genesis-path or set XAI_GENESIS_PATH."
     )
-
 
 def _validate_genesis_path(path: Path) -> None:
     """Ensure genesis path is not world-writable and lives in a trusted location."""
@@ -372,15 +361,14 @@ def _validate_genesis_path(path: Path) -> None:
         if parent_mode & 0o002:
             raise click.ClickException(f"Genesis path parent is world-writable: {parent}")
 
-
-def _compute_genesis_hash(genesis_data: Dict[str, Any]) -> Tuple[str, str]:
+def _compute_genesis_hash(genesis_data: dict[str, Any]) -> tuple[str, str]:
     """Recompute declared vs actual genesis block hash."""
-    from xai.core.transaction import Transaction
     from xai.core.block_header import BlockHeader
     from xai.core.blockchain_components.block import Block
     from xai.core.config import Config
+    from xai.core.transaction import Transaction
 
-    transactions: List[Transaction] = []
+    transactions: list[Transaction] = []
     for tx_data in genesis_data.get("transactions", []):
         outputs = tx_data.get("outputs") or [
             {"address": tx_data.get("recipient", ""), "amount": tx_data.get("amount", 0.0)}
@@ -413,8 +401,7 @@ def _compute_genesis_hash(genesis_data: Dict[str, Any]) -> Tuple[str, str]:
     actual_hash = header.calculate_hash()
     return genesis_data.get("hash", ""), actual_hash
 
-
-def _emit_admin_payload(ctx: click.Context, payload: Dict[str, Any], title: str) -> None:
+def _emit_admin_payload(ctx: click.Context, payload: dict[str, Any], title: str) -> None:
     """Emit blockchain admin payload honoring global formatting flags."""
     if ctx.obj.get("json_output"):
         click.echo(json.dumps(payload, indent=2))
@@ -425,13 +412,11 @@ def _emit_admin_payload(ctx: click.Context, payload: Dict[str, Any], title: str)
         table.add_row(f"[bold cyan]{key.replace('_', ' ').title()}[/]", str(value))
     console.print(Panel(table, border_style="cyan"))
 
-
 def _create_blockchain_instance(data_dir: Path):
     """Instantiate a Blockchain for the given data dir."""
     from xai.core.blockchain import Blockchain
 
     return Blockchain(data_dir=str(data_dir))
-
 
 class LocalNodeClient:
     """
@@ -443,7 +428,7 @@ class LocalNodeClient:
 
     def __init__(self, data_dir: Path, mempool_limit: int = 200) -> None:
         self.data_dir = Path(data_dir).expanduser()
-        self.api_key: Optional[str] = None  # parity with XAIClient attribute
+        self.api_key: str | None = None  # parity with XAIClient attribute
         self._mempool_limit = max(1, mempool_limit)
         self._blockchain = None
 
@@ -458,7 +443,7 @@ class LocalNodeClient:
         return self._blockchain
 
     @staticmethod
-    def _block_to_dict(block: Any) -> Dict[str, Any]:
+    def _block_to_dict(block: Any) -> dict[str, Any]:
         if hasattr(block, "to_dict") and callable(getattr(block, "to_dict")):
             return block.to_dict()
         if isinstance(block, dict):
@@ -472,13 +457,13 @@ class LocalNodeClient:
             "Reconnect via HTTP (default) for live node capabilities."
         )
 
-    def _estimate_hashrate(self, difficulty: Optional[float]) -> str:
+    def _estimate_hashrate(self, difficulty: float | None) -> str:
         if not difficulty:
             return "unknown"
         try:
             from xai.core.config import Config
             target = getattr(Config, "BLOCK_TIME_TARGET", 120) or 120
-        except Exception:
+        except (ImportError, AttributeError, ValueError):
             target = 120
         hashrate = max(float(difficulty) / max(target, 1.0), 0.0)
         if hashrate >= 1e12:
@@ -491,7 +476,7 @@ class LocalNodeClient:
             return f"{hashrate / 1e3:.2f} kH/s"
         return f"{hashrate:.2f} H/s"
 
-    def get_blockchain_info(self) -> Dict[str, Any]:
+    def get_blockchain_info(self) -> dict[str, Any]:
         chain = self._require_blockchain()
         stats = chain.get_stats()
         return {
@@ -505,7 +490,7 @@ class LocalNodeClient:
             "data_dir": str(self.data_dir),
         }
 
-    def get_block(self, block_id: str) -> Dict[str, Any]:
+    def get_block(self, block_id: str) -> dict[str, Any]:
         chain = self._require_blockchain()
         block_obj = None
         try:
@@ -520,7 +505,7 @@ class LocalNodeClient:
             raise click.ClickException(f"Block '{block_id}' not found in {self.data_dir}.")
         return {"block": self._block_to_dict(block_obj)}
 
-    def get_balance(self, address: str) -> Dict[str, Any]:
+    def get_balance(self, address: str) -> dict[str, Any]:
         chain = self._require_blockchain()
         balance = chain.get_balance(address)
         return {
@@ -530,7 +515,7 @@ class LocalNodeClient:
             "pending_outgoing": 0.0,
         }
 
-    def get_transaction_history(self, address: str, limit: int = 10, offset: int = 0) -> Dict[str, Any]:
+    def get_transaction_history(self, address: str, limit: int = 10, offset: int = 0) -> dict[str, Any]:
         chain = self._require_blockchain()
         window, total = chain.get_transaction_history_window(address, limit, offset)
         return {
@@ -541,7 +526,7 @@ class LocalNodeClient:
             "transactions": window,
         }
 
-    def get_address_nonce(self, address: str) -> Dict[str, Any]:
+    def get_address_nonce(self, address: str) -> dict[str, Any]:
         chain = self._require_blockchain()
         tracker = getattr(chain, "nonce_tracker", None)
         if tracker is None:
@@ -556,46 +541,45 @@ class LocalNodeClient:
             "pending_nonce": pending_nonce,
         }
 
-    def get_mempool(self) -> Dict[str, Any]:
+    def get_mempool(self) -> dict[str, Any]:
         chain = self._require_blockchain()
         overview = chain.get_mempool_overview(self._mempool_limit)
         transactions = overview.get("transactions", []) if isinstance(overview, dict) else []
         return {"transactions": transactions, "overview": overview, "limit": self._mempool_limit}
 
-    def get_state_snapshot(self) -> Dict[str, Any]:
+    def get_state_snapshot(self) -> dict[str, Any]:
         chain = self._require_blockchain()
         if not hasattr(chain, "compute_state_snapshot"):
             raise click.ClickException("State snapshots unavailable in this build.")
         snapshot = chain.compute_state_snapshot()
         return {"success": True, "state": snapshot}
 
-    def validate_block(self, **kwargs: Any) -> Dict[str, Any]:
+    def validate_block(self, **kwargs: Any) -> dict[str, Any]:
         self._unsupported("Block validation")
 
-    def get_consensus_info(self) -> Dict[str, Any]:
+    def get_consensus_info(self) -> dict[str, Any]:
         self._unsupported("Consensus metrics")
 
-    def delete_mempool_transaction(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    def delete_mempool_transaction(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         self._unsupported("Mempool eviction")
 
-    def start_mining(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    def start_mining(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         self._unsupported("Mining control")
 
-    def stop_mining(self) -> Dict[str, Any]:
+    def stop_mining(self) -> dict[str, Any]:
         self._unsupported("Mining control")
 
-    def get_mining_status(self) -> Dict[str, Any]:
+    def get_mining_status(self) -> dict[str, Any]:
         self._unsupported("Mining status")
 
-    def submit_signed_transaction(self, signed_payload: Dict[str, Any]) -> Dict[str, Any]:
+    def submit_signed_transaction(self, signed_payload: dict[str, Any]) -> dict[str, Any]:
         self._unsupported("Transaction submission")
 
-    def get_network_info(self) -> Dict[str, Any]:
+    def get_network_info(self) -> dict[str, Any]:
         self._unsupported("Network diagnostics")
 
-    def get_peers(self) -> Dict[str, Any]:
+    def get_peers(self) -> dict[str, Any]:
         self._unsupported("Peer listing")
-
 
 # ============================================================================
 # CLI Groups
@@ -646,9 +630,9 @@ def cli(
     node_url: str,
     timeout: float,
     json_output: bool,
-    api_key: Optional[str],
+    api_key: str | None,
     transport: str,
-    local_data_dir: Optional[Path],
+    local_data_dir: Path | None,
     local_mempool_limit: int,
 ):
     """
@@ -672,7 +656,6 @@ def cli(
     ctx.obj['json_output'] = json_output
     ctx.obj['api_key'] = effective_api_key
     ctx.obj['transport'] = transport
-
 
 def _generate_completion_script(prog_name: str, shell: str) -> str:
     """
@@ -699,7 +682,6 @@ _{prog_name}_completion "$@"
 """
     raise click.ClickException("Unsupported shell for completion")
 
-
 @cli.command("completion")
 @click.option(
     "--shell",
@@ -715,11 +697,9 @@ def completion(ctx: click.Context, shell: str):
     script = _generate_completion_script(prog_name, shell)
     click.echo(script)
 
-
 # ============================================================================
 # Config management group
 # ============================================================================
-
 
 @cli.group("config")
 @click.option(
@@ -742,7 +722,7 @@ def completion(ctx: click.Context, shell: str):
     help="Optional explicit config file path to inspect/edit.",
 )
 @click.pass_context
-def config_group(ctx: click.Context, environment: str, config_dir: Path, config_file: Optional[Path]):
+def config_group(ctx: click.Context, environment: str, config_dir: Path, config_file: Path | None):
     """Manage node configuration files with validation and safe editing."""
     ctx.ensure_object(dict)
     ctx.obj["config_ctx"] = {
@@ -751,14 +731,12 @@ def config_group(ctx: click.Context, environment: str, config_dir: Path, config_
         "config_file": config_file,
     }
 
-
-def _config_context(ctx: click.Context) -> Dict[str, Any]:
+def _config_context(ctx: click.Context) -> dict[str, Any]:
     """Fetch configuration CLI context."""
     config_ctx = ctx.obj.get("config_ctx")
     if not config_ctx:
         raise click.ClickException("Configuration context unavailable.")
     return config_ctx
-
 
 def _create_config_manager(ctx: click.Context) -> ConfigManager:
     """Instantiate ConfigManager respecting CLI context."""
@@ -767,7 +745,6 @@ def _create_config_manager(ctx: click.Context) -> ConfigManager:
         environment=config_ctx["environment"],
         config_dir=str(config_ctx["config_dir"]),
     )
-
 
 @config_group.command("show")
 @click.option("--section", help="Return only a specific configuration section.")
@@ -780,7 +757,7 @@ def _create_config_manager(ctx: click.Context) -> ConfigManager:
     show_default=True,
 )
 @click.pass_context
-def config_show(ctx: click.Context, section: Optional[str], key: Optional[str], output_format: str):
+def config_show(ctx: click.Context, section: str | None, key: str | None, output_format: str):
     """Display current configuration for the selected environment."""
     manager = _create_config_manager(ctx)
     if key:
@@ -797,7 +774,6 @@ def config_show(ctx: click.Context, section: Optional[str], key: Optional[str], 
         payload = {"environment": manager.environment.value, "config": manager.to_dict()}
     _emit_config_payload(ctx, payload, output_format)
 
-
 @config_group.command("get")
 @click.argument("key")
 @click.pass_context
@@ -808,7 +784,6 @@ def config_get(ctx: click.Context, key: str):
     if value is None:
         raise click.ClickException(f"Configuration key '{key}' not found.")
     _emit_config_payload(ctx, {"key": key, "value": value, "environment": manager.environment.value}, "json")
-
 
 @config_group.command("set")
 @click.argument("key")
@@ -844,7 +819,7 @@ def config_set(ctx: click.Context, key: str, value: str, value_type: str):
         _write_yaml_config(config_file, updated)
         # validation via ConfigManager; raises on invalid configuration
         ConfigManager(environment=config_ctx["environment"], config_dir=str(config_ctx["config_dir"]))
-    except Exception as exc:  # broad to rollback on any failure
+    except (ValueError, TypeError, KeyError, OSError, IOError, RuntimeError) as exc:  # Rollback on config failure
         if previous_text is not None:
             config_file.write_text(previous_text, encoding="utf-8")
         else:
@@ -856,7 +831,6 @@ def config_set(ctx: click.Context, key: str, value: str, value_type: str):
         f"(environment={config_ctx['environment']})"
     )
 
-
 # ============================================================================
 # Wallet Commands
 # ============================================================================
@@ -866,14 +840,13 @@ def wallet():
     """Wallet management commands"""
     pass
 
-
 @wallet.command('create')
 @click.option('--save-keystore', is_flag=True, help='Save to encrypted keystore')
 @click.option('--keystore-output', type=click.Path(), help='Keystore output path')
 @click.option('--kdf', type=click.Choice(['pbkdf2', 'argon2id']), default='pbkdf2',
               help='Key derivation function')
 @click.pass_context
-def wallet_create(ctx: click.Context, save_keystore: bool, keystore_output: Optional[str], kdf: str):
+def wallet_create(ctx: click.Context, save_keystore: bool, keystore_output: str | None, kdf: str):
     """Create a new wallet"""
     from xai.core.wallet import Wallet
     from xai.wallet.cli import create_keystore
@@ -911,7 +884,6 @@ def wallet_create(ctx: click.Context, save_keystore: bool, keystore_output: Opti
     else:
         console.print("\n[yellow]⚠[/] Private key not saved. Use --save-keystore to encrypt and save.")
 
-
 @wallet.command('balance')
 @click.argument('address')
 @click.pass_context
@@ -945,7 +917,6 @@ def wallet_balance(ctx: click.Context, address: str):
 
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
-
 
 @wallet.command('history')
 @click.argument('address')
@@ -996,7 +967,6 @@ def wallet_history(ctx: click.Context, address: str, limit: int, offset: int):
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
 
-
 @wallet.command('send')
 @click.option('--sender', required=True, help='Sender address')
 @click.option('--recipient', required=True, help='Recipient address')
@@ -1005,7 +975,7 @@ def wallet_history(ctx: click.Context, address: str, limit: int, offset: int):
 @click.option('--keystore', type=click.Path(exists=True), help='Keystore file path')
 @click.pass_context
 def wallet_send(ctx: click.Context, sender: str, recipient: str, amount: float,
-                fee: float, keystore: Optional[str]):
+                fee: float, keystore: str | None):
     """Send XAI to another address"""
     from xai.wallet.cli import get_private_key_secure
 
@@ -1098,7 +1068,6 @@ def wallet_send(ctx: click.Context, sender: str, recipient: str, amount: float,
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
 
-
 @wallet.command('portfolio')
 @click.argument('address')
 @click.pass_context
@@ -1146,7 +1115,6 @@ def wallet_portfolio(ctx: click.Context, address: str):
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
 
-
 # ============================================================================
 # Blockchain Commands
 # ============================================================================
@@ -1155,7 +1123,6 @@ def wallet_portfolio(ctx: click.Context, address: str):
 def blockchain():
     """Blockchain information commands"""
     pass
-
 
 @blockchain.command('info')
 @click.pass_context
@@ -1185,7 +1152,6 @@ def blockchain_info(ctx: click.Context):
 
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
-
 
 @blockchain.command('block')
 @click.argument('block_id')
@@ -1233,7 +1199,6 @@ def blockchain_block(ctx: click.Context, block_id: str):
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
 
-
 @blockchain.command('mempool')
 @click.pass_context
 def blockchain_mempool(ctx: click.Context):
@@ -1280,7 +1245,6 @@ def blockchain_mempool(ctx: click.Context):
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
 
-
 @blockchain.command('state')
 @click.pass_context
 def blockchain_state(ctx: click.Context):
@@ -1307,7 +1271,6 @@ def blockchain_state(ctx: click.Context):
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
 
-
 @blockchain.command('validate-block')
 @click.option('--index', type=int, help='Block height to validate')
 @click.option('--hash', 'block_hash', help='Block hash to validate')
@@ -1316,8 +1279,8 @@ def blockchain_state(ctx: click.Context):
 @click.pass_context
 def blockchain_validate_block(
     ctx: click.Context,
-    index: Optional[int],
-    block_hash: Optional[str],
+    index: int | None,
+    block_hash: str | None,
     include_transactions: bool,
 ):
     """Validate a block header and optionally its transactions."""
@@ -1354,7 +1317,6 @@ def blockchain_validate_block(
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
 
-
 @blockchain.command('consensus')
 @click.pass_context
 def blockchain_consensus(ctx: click.Context):
@@ -1376,12 +1338,10 @@ def blockchain_consensus(ctx: click.Context):
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
 
-
 @blockchain.group("genesis")
 def blockchain_genesis():
     """Inspect and verify genesis configuration."""
     pass
-
 
 @blockchain_genesis.command("show")
 @click.option(
@@ -1390,7 +1350,7 @@ def blockchain_genesis():
     help="Explicit path to genesis.json (defaults to packaged file or XAI_GENESIS_PATH).",
 )
 @click.pass_context
-def blockchain_genesis_show(ctx: click.Context, genesis_path: Optional[Path]):
+def blockchain_genesis_show(ctx: click.Context, genesis_path: Path | None):
     """Display genesis allocation summary."""
     data, source_path = _load_genesis_file(genesis_path)
     total_allocation = sum(tx.get("amount", 0.0) for tx in data.get("transactions", []))
@@ -1414,7 +1374,6 @@ def blockchain_genesis_show(ctx: click.Context, genesis_path: Optional[Path]):
         table.add_row(key.replace("_", " ").title(), str(value))
     console.print(Panel(table, border_style="cyan"))
 
-
 @blockchain_genesis.command("verify")
 @click.option(
     "--genesis-path",
@@ -1422,7 +1381,7 @@ def blockchain_genesis_show(ctx: click.Context, genesis_path: Optional[Path]):
     help="Explicit path to genesis.json.",
 )
 @click.pass_context
-def blockchain_genesis_verify(ctx: click.Context, genesis_path: Optional[Path]):
+def blockchain_genesis_verify(ctx: click.Context, genesis_path: Path | None):
     """Verify declared genesis hash matches computed hash."""
     from xai.core.config import Config
 
@@ -1447,7 +1406,6 @@ def blockchain_genesis_verify(ctx: click.Context, genesis_path: Optional[Path]):
             table.add_row(key.replace("_", " ").title(), str(value))
         console.print(Panel(table, border_style="cyan"))
 
-
 @blockchain.command("checkpoints")
 @click.option(
     "--data-dir",
@@ -1465,7 +1423,7 @@ def blockchain_checkpoints(ctx: click.Context, data_dir: Path, limit: int):
     resolved = _determine_data_dir(data_dir, require_exists=True)
     manager = CheckpointManager(data_dir=str(resolved))
     heights = sorted(manager.list_checkpoints(), reverse=True)
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for height in heights[: max(limit, 0)]:
         checkpoint = manager.load_checkpoint(height)
         rows.append(
@@ -1500,7 +1458,6 @@ def blockchain_checkpoints(ctx: click.Context, data_dir: Path, limit: int):
             )
         console.print(Panel(table, border_style="cyan"))
 
-
 @blockchain.command("reset")
 @click.option(
     "--data-dir",
@@ -1529,7 +1486,7 @@ def blockchain_reset(ctx: click.Context, data_dir: Path, preserve_checkpoints: b
     try:
         blockchain = _create_blockchain_instance(resolved)
         summary = blockchain.reset_chain_state(preserve_checkpoints=preserve_checkpoints)
-    except Exception as exc:
+    except (ValueError, TypeError, KeyError, OSError, IOError, RuntimeError, AttributeError) as exc:
         raise click.ClickException(f"Chain reset failed: {exc}") from exc
 
     summary.update(
@@ -1539,7 +1496,6 @@ def blockchain_reset(ctx: click.Context, data_dir: Path, preserve_checkpoints: b
         }
     )
     _emit_admin_payload(ctx, summary, "Chain Reset")
-
 
 @blockchain.command("rollback")
 @click.option(
@@ -1566,18 +1522,16 @@ def blockchain_rollback(ctx: click.Context, data_dir: Path, height: int, yes: bo
     try:
         blockchain = _create_blockchain_instance(resolved)
         summary = blockchain.restore_checkpoint(height)
-    except Exception as exc:
+    except (ValueError, TypeError, KeyError, OSError, IOError, RuntimeError, AttributeError) as exc:
         raise click.ClickException(f"Checkpoint restore failed: {exc}") from exc
 
     summary["data_dir"] = str(resolved)
     _emit_admin_payload(ctx, summary, "Checkpoint Rollback")
 
-
 @cli.group()
 def mempool():
     """Mempool management operations."""
     pass
-
 
 @mempool.command("drop")
 @click.argument("txid")
@@ -1608,7 +1562,6 @@ def mempool_drop(ctx: click.Context, txid: str, ban_sender: bool):
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
 
-
 # ============================================================================
 # Mining Commands
 # ============================================================================
@@ -1617,7 +1570,6 @@ def mempool_drop(ctx: click.Context, txid: str, ban_sender: bool):
 def mining():
     """Mining operations"""
     pass
-
 
 @mining.command('start')
 @click.option('--address', required=True, help='Miner address (receives rewards)')
@@ -1649,7 +1601,6 @@ def mining_start(ctx: click.Context, address: str, threads: int, intensity: int)
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
 
-
 @mining.command('stop')
 @click.pass_context
 def mining_stop(ctx: click.Context):
@@ -1671,7 +1622,6 @@ def mining_stop(ctx: click.Context):
 
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
-
 
 @mining.command('status')
 @click.pass_context
@@ -1707,7 +1657,6 @@ def mining_status(ctx: click.Context):
 
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
-
 
 @mining.command('stats')
 @click.option('--address', required=True, help='Miner address')
@@ -1750,7 +1699,6 @@ def mining_stats(ctx: click.Context, address: str):
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
 
-
 # ============================================================================
 # Network Commands
 # ============================================================================
@@ -1759,7 +1707,6 @@ def mining_stats(ctx: click.Context, address: str):
 def network():
     """Network information commands"""
     pass
-
 
 @network.command('info')
 @click.pass_context
@@ -1790,7 +1737,6 @@ def network_info(ctx: click.Context):
 
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
-
 
 @network.command('peers')
 @click.pass_context
@@ -1842,7 +1788,6 @@ def network_peers(ctx: click.Context):
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
 
-
 # ============================================================================
 # Sync Commands
 # ============================================================================
@@ -1851,7 +1796,6 @@ def network_peers(ctx: click.Context):
 def sync():
     """Synchronization status and control"""
     pass
-
 
 @sync.command('status')
 @click.option('--watch', is_flag=True, help='Watch sync progress in real-time')
@@ -1994,7 +1938,6 @@ def sync_status(ctx: click.Context, watch: bool, interval: int):
     except KeyboardInterrupt:
         console.print("\n[yellow]Stopped watching sync status[/]")
 
-
 # ============================================================================
 # AI Commands (Revolutionary AI-Blockchain Features)
 # Import production-grade AI commands module
@@ -2004,7 +1947,6 @@ from xai.cli.ai_commands import ai
 
 # Register AI commands group
 cli.add_command(ai)
-
 
 # ============================================================================
 # Main Entry Point
@@ -2019,7 +1961,6 @@ def main():
         sys.exit(130)
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _cli_fail(exc)
-
 
 if __name__ == '__main__':
     main()

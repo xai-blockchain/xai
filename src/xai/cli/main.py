@@ -5,9 +5,9 @@ This module provides the primary CLI interface for the XAI blockchain.
 Legacy wallet commands are preserved for backward compatibility.
 """
 
-import sys
-import os
 import logging
+import os
+import sys
 
 # Configure module logger
 logger = logging.getLogger(__name__)

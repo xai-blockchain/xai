@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI AML Compliance System
 
@@ -5,11 +7,10 @@ Transaction monitoring, risk scoring, and regulatory reporting
 Makes suspicious activity highly visible while separating normal transactions
 """
 
-import time
 import hashlib
-from typing import Any, Dict, List, Optional, Tuple
+import time
 from enum import Enum
-
+from typing import Any
 
 class RiskLevel(Enum):
     """Risk level classifications"""
@@ -19,7 +20,6 @@ class RiskLevel(Enum):
     MEDIUM = "medium"  # 41-60
     HIGH = "high"  # 61-80
     CRITICAL = "critical"  # 81-100
-
 
 class FlagReason(Enum):
     """Reasons for transaction flagging"""
@@ -33,7 +33,6 @@ class FlagReason(Enum):
     NEW_ACCOUNT_LARGE_TX = "new_account_large_transaction"
     ROUND_AMOUNT = "round_amount_pattern"
     VELOCITY_SPIKE = "velocity_spike"
-
 
 class TransactionRiskScore:
     """Calculate risk score for transactions"""
@@ -51,8 +50,8 @@ class TransactionRiskScore:
         self.sanctioned_addresses = set()
 
     def calculate_risk_score(
-        self, transaction: Dict, sender_history: List[Dict] = None
-    ) -> Tuple[int, List[str]]:
+        self, transaction: Dict, sender_history: list[Dict] = None
+    ) -> tuple[int, list[str]]:
         """
         Calculate risk score (0-100) and flag reasons
 
@@ -121,12 +120,12 @@ class TransactionRiskScore:
 
         return score, reasons
 
-    def _get_recent_transactions(self, history: List[Dict], window: int) -> List[Dict]:
+    def _get_recent_transactions(self, history: list[Dict], window: int) -> list[Dict]:
         """Get transactions within time window"""
         cutoff = time.time() - window
         return [tx for tx in history if tx.get("timestamp", 0) > cutoff]
 
-    def _detect_structuring(self, recent_txs: List[Dict], current_tx: Dict) -> bool:
+    def _detect_structuring(self, recent_txs: list[Dict], current_tx: Dict) -> bool:
         """Detect structuring pattern (multiple txs just under threshold)"""
         # Multiple transactions just under $10k in 24 hours
         near_threshold = [
@@ -144,7 +143,7 @@ class TransactionRiskScore:
         round_amounts = [1000, 5000, 10000, 50000, 100000, 500000, 1000000]
         return amount in round_amounts
 
-    def _detect_velocity_spike(self, history: List[Dict], current_tx: Dict) -> bool:
+    def _detect_velocity_spike(self, history: list[Dict], current_tx: Dict) -> bool:
         """Detect sudden spike in transaction velocity"""
         if len(history) < 10:
             return False
@@ -188,7 +187,6 @@ class TransactionRiskScore:
         """Add address to sanctions list"""
         self.sanctioned_addresses.add(address)
 
-
 class AddressBlacklist:
     """Manage blacklisted and sanctioned addresses"""
 
@@ -220,7 +218,6 @@ class AddressBlacklist:
         """Get full sanctions list"""
         return self.sanctions
 
-
 class RegulatorDashboard:
     """
     API and reporting for regulatory agencies
@@ -231,7 +228,7 @@ class RegulatorDashboard:
         self.blockchain = blockchain
         self.risk_scorer = TransactionRiskScore()
 
-    def get_flagged_transactions(self, min_score: int = 61, limit: int = 1000) -> List[Dict]:
+    def get_flagged_transactions(self, min_score: int = 61, limit: int = 1000) -> list[Dict]:
         """Get all flagged transactions above risk threshold"""
 
         flagged = []
@@ -260,7 +257,7 @@ class RegulatorDashboard:
         flagged.sort(key=lambda x: x["timestamp"], reverse=True)
         return flagged[:limit]
 
-    def get_high_risk_addresses(self, min_score: int = 70) -> List[Dict]:
+    def get_high_risk_addresses(self, min_score: int = 70) -> list[Dict]:
         """Get addresses with consistently high risk scores"""
 
         address_scores = {}
@@ -292,7 +289,7 @@ class RegulatorDashboard:
         high_risk.sort(key=lambda x: x["average_risk_score"], reverse=True)
         return high_risk
 
-    def get_address_risk_profile(self, address: str) -> Dict[str, Any]:
+    def get_address_risk_profile(self, address: str) -> dict[str, Any]:
         """Return the latest risk snapshot for a specific address."""
         if not address:
             return {
@@ -373,7 +370,7 @@ class RegulatorDashboard:
 
     def search_transactions(
         self, address: str = None, min_amount: float = None, risk_level: RiskLevel = None
-    ) -> List[Dict]:
+    ) -> list[Dict]:
         """Search transactions with filters"""
 
         results = []
@@ -395,7 +392,6 @@ class RegulatorDashboard:
                     results.append(tx)
 
         return results
-
 
 class PublicExplorerAPI:
     """
@@ -424,7 +420,7 @@ class PublicExplorerAPI:
 
         return None
 
-    def get_recent_transactions(self, limit: int = 100) -> List[Dict]:
+    def get_recent_transactions(self, limit: int = 100) -> list[Dict]:
         """Get recent transactions (no filtering by risk)"""
 
         transactions = []
@@ -445,7 +441,6 @@ class PublicExplorerAPI:
                     return transactions
 
         return transactions
-
 
 # Example usage
 if __name__ == "__main__":

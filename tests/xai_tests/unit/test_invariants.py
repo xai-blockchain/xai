@@ -14,7 +14,7 @@ import pytest
 import hashlib
 import time
 from decimal import Decimal
-from typing import List, Dict, Any
+from typing import Any
 
 from xai.core.blockchain import Blockchain, Transaction, Block
 from xai.core.wallet import Wallet

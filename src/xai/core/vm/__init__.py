@@ -7,14 +7,14 @@ Only the interfaces live here today; concrete logic will follow as the
 implementation plan is executed.
 """
 
-from .exceptions import VMExecutionError, VMConfigurationError  # noqa: F401
-from .state import EVMState, AccountState  # noqa: F401
+from .exceptions import VMConfigurationError, VMExecutionError  # noqa: F401
 from .executor import (  # noqa: F401
+    BaseExecutor,
     ExecutionMessage,
     ExecutionResult,
-    BaseExecutor,
 )
 from .manager import SmartContractManager  # noqa: F401
+from .state import AccountState, EVMState  # noqa: F401
 from .tx_processor import ContractTransactionProcessor  # noqa: F401
 
 __all__ = [

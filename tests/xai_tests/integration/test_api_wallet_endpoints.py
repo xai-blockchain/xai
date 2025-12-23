@@ -16,7 +16,7 @@ import os
 import tempfile
 from unittest.mock import Mock, MagicMock, patch
 from flask import Flask
-from typing import Dict, Any
+from typing import Any
 
 from xai.core.api_wallet import WalletAPIHandler
 from xai.core.wallet import Wallet

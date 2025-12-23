@@ -17,7 +17,6 @@ import argparse
 from datetime import datetime, timezone
 import json
 from pathlib import Path
-from typing import Iterable, List, Tuple
 
 from xai.tools.withdrawal_calibrator import (
     analyze_events,
@@ -27,15 +26,13 @@ from xai.tools.withdrawal_calibrator import (
     recommend_rate_threshold,
 )
 
-
-def _format_top_users(top_users: List[Tuple[str, int, float]]) -> str:
+def _format_top_users(top_users: list[tuple[str, int, float]]) -> str:
     if not top_users:
         return "No withdrawal activity recorded."
     lines = []
     for user, count, volume in top_users:
         lines.append(f" - {user}: {count} withdrawals, {volume:.2f} total")
     return "\n".join(lines)
-
 
 def _build_details(
     *,
@@ -90,7 +87,6 @@ def _build_details(
         alert_required = True
     details["alert_required"] = alert_required
     return details
-
 
 def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Calibrate withdrawal alert thresholds.")
@@ -162,7 +158,6 @@ def main(argv: Iterable[str] | None = None) -> int:
         args.json_output.parent.mkdir(parents=True, exist_ok=True)
         args.json_output.write_text(json.dumps(details, indent=2), encoding="utf-8")
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

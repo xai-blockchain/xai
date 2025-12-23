@@ -5,78 +5,83 @@ Real cryptocurrency blockchain with transactions, mining, and consensus
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
-import time
+import math
 import os
-import copy
 import statistics
 import tempfile
-import math
 import threading
-from pathlib import Path
-from typing import List, Dict, Optional, Tuple, Any, Union, Sequence
-from types import SimpleNamespace
-from datetime import datetime
-import base58
-from xai.core.config import Config
-from xai.core.advanced_consensus import DynamicDifficultyAdjustment
-from xai.core.gamification import (
-    AirdropManager,
-    StreakTracker,
-    TreasureHuntManager,
-    FeeRefundCalculator,
-    TimeCapsuleManager,
-)
-from xai.core.nonce_tracker import NonceTracker
-from xai.core.wallet_trade_manager_impl import WalletTradeManager
-from xai.core.trading import SwapOrderType
-from xai.core.blockchain_storage import BlockchainStorage
-from xai.core.transaction_validator import TransactionValidator
-from xai.core.utxo_manager import UTXOManager
-from xai.core.crypto_utils import sign_message_hex, verify_signature_hex
-from xai.core.vm.manager import SmartContractManager
-from xai.core.governance_execution import GovernanceExecutionEngine
-from xai.core.governance_transactions import GovernanceState, GovernanceTxType, GovernanceTransaction
-from xai.core.checkpoints import CheckpointManager
+import time
 from collections import defaultdict, deque
-from xai.core.structured_logger import StructuredLogger, get_structured_logger
-from xai.core.blockchain_exceptions import (
-    DatabaseError,
-    StorageError,
-    InitializationError,
-    ConfigurationError,
-    InvalidBlockError,
-    InvalidTransactionError,
-    ChainReorgError,
-    ValidationError,
-)
-from xai.core.block_header import BlockHeader, canonical_json
-from xai.core.blockchain_interface import BlockchainDataProvider, GamificationBlockchainInterface
-from xai.core.blockchain_security import BlockchainSecurityConfig, BlockSizeValidator
-from xai.core.finality import (
-    FinalityManager,
-    FinalityCertificate,
-    FinalityConfigurationError,
-    FinalityValidationError,
-    ValidatorIdentity,
-)
-from xai.blockchain.slashing_manager import SlashingManager
+from datetime import datetime
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 
-from xai.core.transaction import Transaction, TransactionValidationError
-from xai.core.node_identity import load_or_create_identity
-from xai.core.security_validation import SecurityEventRouter
+import base58
+
+from xai.blockchain.slashing_manager import SlashingManager
 from xai.core.account_abstraction import (
-    get_sponsored_transaction_processor,
     SponsorshipResult,
+    get_sponsored_transaction_processor,
 )
 from xai.core.address_index import AddressTransactionIndex
+from xai.core.advanced_consensus import DynamicDifficultyAdjustment
+from xai.core.block_header import BlockHeader, canonical_json
 
 # Block class and mixins extracted to separate modules for maintainability
 from xai.core.blockchain_components.block import Block
 from xai.core.blockchain_components.consensus_mixin import BlockchainConsensusMixin
 from xai.core.blockchain_components.mempool_mixin import BlockchainMempoolMixin
 from xai.core.blockchain_components.mining_mixin import BlockchainMiningMixin
+from xai.core.blockchain_exceptions import (
+    ChainReorgError,
+    ConfigurationError,
+    DatabaseError,
+    InitializationError,
+    InvalidBlockError,
+    InvalidTransactionError,
+    StorageError,
+    ValidationError,
+)
+from xai.core.blockchain_interface import BlockchainDataProvider, GamificationBlockchainInterface
+from xai.core.blockchain_security import BlockchainSecurityConfig, BlockSizeValidator
+from xai.core.blockchain_storage import BlockchainStorage
+from xai.core.checkpoints import CheckpointManager
+from xai.core.config import Config
+from xai.core.crypto_utils import sign_message_hex, verify_signature_hex
+from xai.core.finality import (
+    FinalityCertificate,
+    FinalityConfigurationError,
+    FinalityManager,
+    FinalityValidationError,
+    ValidatorIdentity,
+)
+from xai.core.gamification import (
+    AirdropManager,
+    FeeRefundCalculator,
+    StreakTracker,
+    TimeCapsuleManager,
+    TreasureHuntManager,
+)
+from xai.core.governance_execution import GovernanceExecutionEngine
+from xai.core.governance_transactions import (
+    GovernanceState,
+    GovernanceTransaction,
+    GovernanceTxType,
+)
+from xai.core.node_identity import load_or_create_identity
+from xai.core.nonce_tracker import NonceTracker
+from xai.core.security_validation import SecurityEventRouter
+from xai.core.structured_logger import StructuredLogger, get_structured_logger
+from xai.core.trading import SwapOrderType
+from xai.core.transaction import Transaction, TransactionValidationError
+from xai.core.transaction_validator import TransactionValidator
+from xai.core.utxo_manager import UTXOManager
+from xai.core.vm.manager import SmartContractManager
+from xai.core.wallet_trade_manager_impl import WalletTradeManager
 
 # Module-level logger for early initialization logging
 logger = get_structured_logger()
@@ -89,7 +94,6 @@ _GOVERNANCE_METADATA_TYPE_MAP = {
     "proposal_execution": GovernanceTxType.EXECUTE_PROPOSAL,
     "rollback_change": GovernanceTxType.ROLLBACK_CHANGE,
 }
-
 
 class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMiningMixin):
     """AXN Blockchain - Real cryptocurrency implementation"""
@@ -105,7 +109,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         def get_chain_length(self) -> int:
             return len(self._blockchain.chain)
 
-        def get_block_by_index(self, index: int) -> Optional[Any]:
+        def get_block_by_index(self, index: int) -> Any | None:
             return self._blockchain.storage.load_block_from_disk(index)
 
         def get_latest_block_hash(self) -> str:
@@ -113,7 +117,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 return "0"
             return self._blockchain.chain[-1].hash
 
-        def get_pending_transactions(self) -> List[Transaction]:
+        def get_pending_transactions(self) -> list[Transaction]:
             return self._blockchain.pending_transactions
         
         def get_mempool_size_kb(self) -> float:
@@ -121,7 +125,6 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
         def add_transaction_to_mempool(self, transaction: Transaction) -> bool:
             return self._blockchain.add_transaction(transaction)
-
 
     def __init__(
         self,
@@ -202,15 +205,21 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
         # Initialize manager components for god class refactoring
         # These managers encapsulate specific areas of blockchain functionality
-        from xai.core.mining_manager import MiningManager
-        from xai.core.validation_manager import ValidationManager
-        from xai.core.state_manager import StateManager
         from xai.core.fork_manager import ForkManager
+        from xai.core.mining_manager import MiningManager
+        from xai.core.state_manager import StateManager
+        from xai.core.validation_manager import ValidationManager
+        from xai.core.chain_state import ChainState
+        from xai.core.block_processor import BlockProcessor
+        from xai.core.mining import MiningCoordinator
 
         self.mining_manager = MiningManager(self)
         self.validation_manager = ValidationManager(self)
         self.state_manager = StateManager(self)
         self.fork_manager = ForkManager(self)
+        self.chain_state = ChainState(self)
+        self.block_processor = BlockProcessor(self)
+        self.mining_coordinator = MiningCoordinator(self)
 
     def _init_storage(
         self,
@@ -228,12 +237,12 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         if not self.storage.verify_integrity():
             raise Exception("Blockchain data integrity check failed. Data may be corrupted.")
 
-        self.chain: List[BlockHeader] = []
-        self.pending_transactions: List[Transaction] = []
-        self.orphan_transactions: List[Transaction] = []
-        self._draft_transactions: List[Transaction] = []
-        self.trade_history: List[Dict[str, Any]] = []
-        self.trade_sessions: Dict[str, Dict[str, Any]] = {}
+        self.chain: list[BlockHeader] = []
+        self.pending_transactions: list[Transaction] = []
+        self.orphan_transactions: list[Transaction] = []
+        self._draft_transactions: list[Transaction] = []
+        self.trade_history: list[dict[str, Any]] = []
+        self.trade_sessions: dict[str, dict[str, Any]] = {}
         self.transaction_fee_percent = 0.24
 
         # Write-Ahead Log for crash-safe chain reorganizations
@@ -263,16 +272,16 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         self.timecapsule_manager = TimeCapsuleManager(self.gamification_adapter, data_dir)
         self.trade_manager = WalletTradeManager()
 
-        self.contracts: Dict[str, Dict[str, Any]] = {}
-        self.contract_receipts: List[Dict[str, Any]] = []
+        self.contracts: dict[str, dict[str, Any]] = {}
+        self.contract_receipts: list[dict[str, Any]] = []
         self.smart_contract_manager: SmartContractManager | None = None
-        self.governance_state: Optional[GovernanceState] = None
-        self.governance_executor: Optional[GovernanceExecutionEngine] = None
+        self.governance_state: GovernanceState | None = None
+        self.governance_executor: GovernanceExecutionEngine | None = None
 
     def _init_consensus(self) -> None:
         """Load validator configuration and consensus security parameters."""
         self._finality_quorum_threshold = float(os.getenv("XAI_FINALITY_QUORUM", "0.67"))
-        self._validator_set: List[ValidatorIdentity] = []
+        self._validator_set: list[ValidatorIdentity] = []
         try:
             self._validator_set = self._load_validator_set()
         except FinalityConfigurationError as exc:
@@ -282,13 +291,13 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             )
             self._validator_set = []
 
-        self.slashing_manager: Optional[SlashingManager] = None
+        self.slashing_manager: SlashingManager | None = None
         if self._validator_set:
             self.slashing_manager = self._initialize_slashing_manager(self.data_dir, self._validator_set)
         else:
             self.logger.warn("Slashing manager disabled: no validator set available")
 
-        self.finality_manager: Optional[FinalityManager] = None
+        self.finality_manager: FinalityManager | None = None
         if self._validator_set:
             try:
                 self.finality_manager = self._initialize_finality_manager(self.data_dir, self._validator_set)
@@ -324,14 +333,14 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             getattr(BlockchainSecurityConfig, "MAX_TRANSACTIONS_PER_BLOCK", 10_000)
         )
         self._max_pow_target = int("f" * 64, 16)
-        self._block_work_cache: Dict[str, int] = {}
+        self._block_work_cache: dict[str, int] = {}
         self._median_time_span = int(
             getattr(BlockchainSecurityConfig, "MEDIAN_TIME_SPAN", 11)
         )
         self._max_future_block_time = int(
             getattr(BlockchainSecurityConfig, "MAX_FUTURE_BLOCK_TIME", 2 * 3600)
         )
-        self._timestamp_drift_history: deque[Dict[str, float]] = deque(maxlen=256)
+        self._timestamp_drift_history: deque[dict[str, float]] = deque(maxlen=256)
 
     def _init_mining(self) -> None:
         """Configure mining, mempool, and transaction validation subsystems."""
@@ -351,7 +360,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         self._last_peer_block_time: float = 0.0
         self._mining_cooldown_seconds: float = float(os.getenv("XAI_MINING_COOLDOWN_SECONDS", "5.0"))
         self._abort_current_mining: bool = False  # Flag to abort ongoing mining when peer block received
-        self._mining_target_height: Optional[int] = None  # Height currently being mined
+        self._mining_target_height: int | None = None  # Height currently being mined
         self.max_reorg_depth = int(os.getenv("XAI_MAX_REORG_DEPTH", "100"))
         self.max_orphan_blocks = int(os.getenv("XAI_MAX_ORPHAN_BLOCKS", "200"))
 
@@ -361,8 +370,8 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 MEMPOOL_INVALID_BAN_SECONDS,
                 MEMPOOL_INVALID_TX_THRESHOLD,
                 MEMPOOL_INVALID_WINDOW_SECONDS,
-                MEMPOOL_MAX_SIZE,
                 MEMPOOL_MAX_PER_SENDER,
+                MEMPOOL_MAX_SIZE,
                 MEMPOOL_MIN_FEE_RATE,
             )
             self._mempool_max_size = int(MEMPOOL_MAX_SIZE)
@@ -397,15 +406,15 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             self, self.nonce_tracker, utxo_manager=self.utxo_manager
         )
 
-        self.orphan_blocks: Dict[int, List[Block]] = {}
-        self._invalid_sender_tracker: Dict[str, Dict[str, float]] = {}
+        self.orphan_blocks: dict[int, list[Block]] = {}
+        self._invalid_sender_tracker: dict[str, dict[str, float]] = {}
         self._mempool_rejected_invalid_total = 0
         self._mempool_rejected_banned_total = 0
         self._mempool_rejected_low_fee_total = 0
         self._mempool_rejected_sender_cap_total = 0
         self._mempool_evicted_low_fee_total = 0
         self._mempool_expired_total = 0
-        self._state_integrity_snapshots: list[Dict[str, Any]] = []
+        self._state_integrity_snapshots: list[dict[str, Any]] = []
 
     def _init_governance(self) -> None:
         """Initialize governance state once the chain is loaded."""
@@ -426,7 +435,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
     def _initialize_finality_manager(
         self,
         data_dir: str,
-        validators: List[ValidatorIdentity],
+        validators: list[ValidatorIdentity],
     ) -> FinalityManager:
         return FinalityManager(
             data_dir=os.path.join(data_dir, "finality"),
@@ -438,9 +447,9 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
     def _initialize_slashing_manager(
         self,
         data_dir: str,
-        validators: List[ValidatorIdentity],
-    ) -> Optional[SlashingManager]:
-        stakes: Dict[str, float] = {v.address: float(v.voting_power) for v in validators}
+        validators: list[ValidatorIdentity],
+    ) -> SlashingManager | None:
+        stakes: dict[str, float] = {v.address: float(v.voting_power) for v in validators}
         try:
             return SlashingManager(
                 db_path=Path(os.path.join(data_dir, "slashing.db")),
@@ -456,13 +465,13 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             )
             return None
 
-    def _load_validator_set(self) -> List[ValidatorIdentity]:
+    def _load_validator_set(self) -> list[ValidatorIdentity]:
         """
         Load validator identities from environment or configuration file.
         Falls back to the local node identity for development/test networks.
         """
         raw = os.getenv("XAI_VALIDATOR_SET", "").strip()
-        config_entries: List[Dict[str, Any]] = []
+        config_entries: list[dict[str, Any]] = []
         if raw:
             try:
                 config_entries = json.loads(raw)
@@ -482,7 +491,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                         f"Failed to load validator set from {default_path}: {exc}"
                     ) from exc
 
-        validators: List[ValidatorIdentity] = []
+        validators: list[ValidatorIdentity] = []
         for entry in config_entries:
             public_key = entry.get("public_key", "").strip()
             if not public_key:
@@ -530,7 +539,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         digest = hashlib.sha256(bytes.fromhex(public_key_hex)).hexdigest()
         return f"{prefix}{digest[:40]}"
 
-    def _handle_finality_misbehavior(self, validator_address: str, block_height: int, proof: Dict[str, Any]) -> None:
+    def _handle_finality_misbehavior(self, validator_address: str, block_height: int, proof: dict[str, Any]) -> None:
         """Slash validators that violate finality guarantees."""
         if not self.slashing_manager:
             return
@@ -568,13 +577,13 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         return self
 
     @property
-    def utxo_set(self) -> Dict[str, List[Dict[str, Any]]]:
+    def utxo_set(self) -> dict[str, list[dict[str, Any]]]:
         """Expose current UTXO set for diagnostics/testing without allowing external mutation."""
         return self.utxo_manager.utxo_set
 
     # ==================== DESERIALIZATION HELPERS ====================
 
-    def get_block(self, index: int) -> Optional[Block]:
+    def get_block(self, index: int) -> Block | None:
         """Return a full block by index, loading from disk if only header is cached."""
         if index < len(self.chain):
             candidate = self.chain[index]
@@ -586,7 +595,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             self.logger.debug(f"Failed to load block {index} from disk: {type(e).__name__}: {e}")
             return None
 
-    def get_block_by_hash(self, block_hash: str) -> Optional[Block]:
+    def get_block_by_hash(self, block_hash: str) -> Block | None:
         """
         Return a block matching the provided hash.
 
@@ -594,7 +603,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             block_hash: Hex-encoded hash with or without 0x prefix.
         """
 
-        def _normalize(value: Optional[str]) -> Optional[str]:
+        def _normalize(value: str | None) -> str | None:
             if not value:
                 return None
             lowered = value.lower()
@@ -616,22 +625,22 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
     def get_circulating_supply(self) -> float:
         """Circulating supply derived from total unspent value."""
-        return self.utxo_manager.get_total_unspent_value()
+        return self.chain_state.get_circulating_supply()
 
     def get_balance(self, address: str) -> float:
         """
         Return confirmed balance for an address using the authoritative UTXO set.
         """
-        return self.utxo_manager.get_balance(address)
+        return self.chain_state.get_balance(address)
 
     def submit_finality_vote(
         self,
         *,
         validator_address: str,
         signature: str,
-        block_hash: Optional[str] = None,
-        block_index: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        block_hash: str | None = None,
+        block_index: int | None = None,
+    ) -> dict[str, Any]:
         """
         Record a validator finality vote for a specific block.
 
@@ -677,9 +686,9 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
     def get_finality_certificate(
         self,
         *,
-        block_hash: Optional[str] = None,
-        block_index: Optional[int] = None,
-    ) -> Optional[FinalityCertificate]:
+        block_hash: str | None = None,
+        block_index: int | None = None,
+    ) -> FinalityCertificate | None:
         if not self.finality_manager:
             return None
         if block_hash:
@@ -691,8 +700,8 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
     def is_block_finalized(
         self,
         *,
-        block_hash: Optional[str] = None,
-        block_index: Optional[int] = None,
+        block_hash: str | None = None,
+        block_index: int | None = None,
     ) -> bool:
         if not self.finality_manager:
             return False
@@ -702,7 +711,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
     def get_transaction_history_window(
         self, address: str, limit: int, offset: int
-    ) -> Tuple[List[Dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], int]:
         """
         Retrieve transaction history window using O(log n) address index.
 
@@ -739,7 +748,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         # Query indexed transactions (already sorted by block height DESC)
         indexed_txs = self.address_index.get_transactions(address, limit, offset)
 
-        window: List[Dict[str, Any]] = []
+        window: list[dict[str, Any]] = []
 
         # Load full transaction details for each indexed entry
         for block_index, tx_index, txid, is_sender, amount, timestamp in indexed_txs:
@@ -794,7 +803,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
         return window, total_matches
 
-    def get_transaction_history(self, address: str, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_transaction_history(self, address: str, limit: int = 100) -> list[dict[str, Any]]:
         """
         Backwards-compatible helper that returns up to `limit` history entries.
         """
@@ -802,7 +811,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         return window
 
     @staticmethod
-    def _transaction_from_dict(tx_data: Dict[str, Any]) -> Transaction:
+    def _transaction_from_dict(tx_data: dict[str, Any]) -> Transaction:
         tx = Transaction(
             tx_data.get("sender", ""),
             tx_data.get("recipient", ""),
@@ -823,7 +832,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         return tx
 
     @classmethod
-    def deserialize_block(cls, block_data: Dict[str, Any]) -> Block:
+    def deserialize_block(cls, block_data: dict[str, Any]) -> Block:
         # Accept both nested-header and flattened block dicts over the wire
         header_data = {}
         if isinstance(block_data, dict):
@@ -861,7 +870,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         return Block(header, transactions)
 
     @classmethod
-    def deserialize_chain(cls, chain_data: List[Dict[str, Any]]) -> List[BlockHeader]:
+    def deserialize_chain(cls, chain_data: list[dict[str, Any]]) -> list[BlockHeader]:
         headers = []
         for bd in chain_data:
             header_data = dict(bd.get("header") or {})
@@ -1047,7 +1056,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             }
         )
 
-    def _write_reorg_wal(self, old_tip: Optional[str], new_tip: Optional[str], fork_point: Optional[int]) -> Optional[str]:
+    def _write_reorg_wal(self, old_tip: str | None, new_tip: str | None, fork_point: int | None) -> str | None:
         """
         Write-Ahead Log for chain reorganization.
 
@@ -1067,7 +1076,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         # and be checked on startup to detect incomplete reorgs
         return None
 
-    def _clear_reorg_wal(self, wal_entry: Optional[str]) -> None:
+    def _clear_reorg_wal(self, wal_entry: str | None) -> None:
         """
         Clear Write-Ahead Log entry after successful reorg completion.
 
@@ -1078,7 +1087,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         # This indicates the reorg completed successfully
         pass
 
-    def _transaction_to_governance_transaction(self, tx: "Transaction") -> Optional[GovernanceTransaction]:
+    def _transaction_to_governance_transaction(self, tx: "Transaction") -> GovernanceTransaction | None:
         metadata = getattr(tx, "metadata", {}) or {}
         metadata_type = metadata.get("type")
         if not metadata_type:
@@ -1103,7 +1112,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         gtx.txid = tx.txid or gtx.txid
         return gtx
 
-    def _find_pending_proposal_payload(self, proposal_id: str) -> Dict[str, Any]:
+    def _find_pending_proposal_payload(self, proposal_id: str) -> dict[str, Any]:
         """Find the proposal payload that was submitted on-chain."""
         for tx in self.pending_transactions:
             metadata = getattr(tx, "metadata", {}) or {}
@@ -1127,7 +1136,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 continue
             self._apply_governance_transaction(gtx)
 
-    def _apply_governance_transaction(self, gtx: GovernanceTransaction) -> Dict[str, Any]:
+    def _apply_governance_transaction(self, gtx: GovernanceTransaction) -> dict[str, Any]:
         """Route governance transaction to the GovernanceState and ExecutionEngine."""
         if not self.governance_state:
             return {"success": False, "error": "Governance state unavailable"}
@@ -1153,7 +1162,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
         return {"success": False, "error": f"Unsupported governance transaction type: {tx_type.value}"}
 
-    def _run_governance_execution(self, proposal_id: str) -> Dict[str, Any]:
+    def _run_governance_execution(self, proposal_id: str) -> dict[str, Any]:
         """Execute approved proposal payloads via the execution engine."""
         if not self.governance_executor or not self.governance_state:
             return {"success": False, "error": "Governance executor unavailable"}
@@ -1180,7 +1189,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             )
             return {"success": False, "error": str(exc)}
 
-    def derive_contract_address(self, sender: str, nonce: Optional[int]) -> str:
+    def derive_contract_address(self, sender: str, nonce: int | None) -> str:
         """Deterministically derive a contract address from sender and nonce."""
         # Use network-appropriate prefix
         from xai.core.config import NETWORK
@@ -1214,7 +1223,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             },
         }
 
-    def get_contract_state(self, address: str) -> Optional[Dict[str, Any]]:
+    def get_contract_state(self, address: str) -> dict[str, Any] | None:
         contract = self.contracts.get(address.upper())
         if not contract:
             return None
@@ -1229,7 +1238,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             "interfaces": dict(contract.get("interfaces") or {}),
         }
 
-    def normalize_contract_abi(self, abi: Any) -> Optional[List[Dict[str, Any]]]:
+    def normalize_contract_abi(self, abi: Any) -> list[dict[str, Any]] | None:
         if abi is None:
             return None
         payload = abi
@@ -1243,11 +1252,11 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         if not isinstance(payload, list):
             raise ValueError("ABI must be a list of entries")
 
-        sanitized: List[Dict[str, Any]] = []
+        sanitized: list[dict[str, Any]] = []
         for entry in payload:
             if not isinstance(entry, dict):
                 raise ValueError("ABI entries must be JSON objects")
-            normalized_entry: Dict[str, Any] = {}
+            normalized_entry: dict[str, Any] = {}
             for key, value in entry.items():
                 if not isinstance(key, str):
                     raise ValueError("ABI entry keys must be strings")
@@ -1283,7 +1292,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         contract["abi_updated_at"] = time.time()
         return True
 
-    def get_contract_abi(self, address: str) -> Optional[Dict[str, Any]]:
+    def get_contract_abi(self, address: str) -> dict[str, Any] | None:
         contract = self.contracts.get(address.upper())
         if not contract:
             return None
@@ -1297,7 +1306,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             "updated_at": contract.get("abi_updated_at"),
         }
 
-    def get_contract_interface_metadata(self, address: str) -> Optional[Dict[str, Any]]:
+    def get_contract_interface_metadata(self, address: str) -> dict[str, Any] | None:
         """Return cached interface detection metadata, if available."""
         contract = self.contracts.get(address.upper())
         if not contract:
@@ -1318,10 +1327,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
     def update_contract_interface_metadata(
         self,
         address: str,
-        supports: Dict[str, bool],
+        supports: dict[str, bool],
         *,
         source: str = "probe",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Persist interface detection results for downstream consumers."""
         normalized = address.upper()
         contract = self.contracts.get(normalized)
@@ -1339,9 +1348,9 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             contract["interfaces"].update(metadata)
         return metadata
 
-    def get_contract_events(self, address: str, limit: int, offset: int) -> Tuple[List[Dict[str, Any]], int]:
+    def get_contract_events(self, address: str, limit: int, offset: int) -> tuple[list[dict[str, Any]], int]:
         normalized = address.upper()
-        events: List[Dict[str, Any]] = []
+        events: list[dict[str, Any]] = []
         for receipt in reversed(self.contract_receipts):
             if receipt.get("contract") != normalized:
                 continue
@@ -1390,122 +1399,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             self.smart_contract_manager = None
 
     def create_genesis_block(self) -> None:
-        """Create or load the genesis block"""
-        import os
+        """Create or load the genesis block (delegated to BlockProcessor)"""
+        self.block_processor.create_genesis_block()
 
-        # Try to load genesis block from file (for unified network)
-        genesis_file = os.path.join(os.path.dirname(__file__), "genesis.json")
-
-        if os.path.exists(genesis_file):
-            self.logger.info(f"Loading genesis block from {genesis_file}")
-            with open(genesis_file, "r") as f:
-                genesis_data = json.load(f)
-
-            # Recreate ALL genesis transactions
-            genesis_transactions = []
-            for tx_data in genesis_data["transactions"]:
-                genesis_tx = Transaction(
-                    tx_data["sender"],
-                    tx_data["recipient"],
-                    tx_data["amount"],
-                    tx_data["fee"],
-                    tx_type="coinbase",
-                    outputs=[{"address": tx_data["recipient"], "amount": tx_data["amount"]}],
-                )
-                genesis_tx.timestamp = tx_data["timestamp"]
-                genesis_tx.txid = tx_data.get("txid")
-                genesis_tx.signature = tx_data.get("signature")
-                genesis_transactions.append(genesis_tx)
-
-            self.logger.info(
-                f"Loaded {len(genesis_transactions)} genesis transactions (Total: {sum(tx.amount for tx in genesis_transactions)} AXN)"
-            )
-
-            merkle_root = self.calculate_merkle_root(genesis_transactions)
-
-            header = BlockHeader(
-                index=0,
-                previous_hash="0" * 64,
-                merkle_root=merkle_root,
-                timestamp=genesis_data["timestamp"],
-                difficulty=self.difficulty,
-                nonce=genesis_data.get("nonce", 0),
-                miner_pubkey="genesis_miner_pubkey",
-                version=genesis_data.get("version", Config.BLOCK_HEADER_VERSION),
-            )
-            # Ensure genesis hash reflects real PoW for deterministic startup
-            declared_hash = genesis_data.get("hash")
-            if declared_hash and declared_hash.startswith("0" * header.difficulty) and declared_hash == header.calculate_hash():
-                header.hash = declared_hash
-            else:
-                header.hash = self.mine_block(header)
-            header.signature = genesis_data.get("signature")
-            genesis_block = Block(header, genesis_transactions)
-
-            self.logger.info(f"Genesis block loaded: {genesis_block.hash}")
-        else:
-            self.logger.info("Creating new genesis block...")
-            # Create genesis transactions matching the allocation in genesis.json
-            # Total allocation: 60.5M XAI (50% of 121M cap)
-            genesis_transactions = [
-                Transaction(
-                    "COINBASE",
-                    "XAI_FOUNDER_IMMEDIATE",
-                    2500000.0,
-                    outputs=[{"address": "XAI_FOUNDER_IMMEDIATE", "amount": 2500000.0}],
-                ),
-                Transaction(
-                    "COINBASE",
-                    "XAI_FOUNDER_VESTING",
-                    9600000.0,
-                    outputs=[{"address": "XAI_FOUNDER_VESTING", "amount": 9600000.0}],
-                ),
-                Transaction(
-                    "COINBASE",
-                    "XAI_DEV_FUND",
-                    6050000.0,
-                    outputs=[{"address": "XAI_DEV_FUND", "amount": 6050000.0}],
-                ),
-                Transaction(
-                    "COINBASE",
-                    "XAI_MARKETING_FUND",
-                    6050000.0,
-                    outputs=[{"address": "XAI_MARKETING_FUND", "amount": 6050000.0}],
-                ),
-                Transaction(
-                    "COINBASE",
-                    "XAI_MINING_POOL",
-                    36300000.0,
-                    outputs=[{"address": "XAI_MINING_POOL", "amount": 36300000.0}],
-                ),
-            ]
-
-            # Set transaction IDs
-            for tx in genesis_transactions:
-                tx.txid = tx.calculate_hash()
-
-            header = BlockHeader(
-                index=0,
-                previous_hash="0" * 64,
-                merkle_root=self.calculate_merkle_root(genesis_transactions),
-                timestamp=time.time(),
-                difficulty=self.difficulty,
-                nonce=0,
-                miner_pubkey="genesis_miner_pubkey",
-                version=Config.BLOCK_HEADER_VERSION,
-            )
-            genesis_block = Block(header, genesis_transactions)
-            genesis_block.header.hash = self.mine_block(genesis_block.header)
-
-        self.chain.append(genesis_block)
-        for tx in genesis_block.transactions:
-            self.utxo_manager.process_transaction_outputs(tx)
-        self.storage._save_block_to_disk(genesis_block)  # Save genesis block to its file
-        self.storage.save_state_to_disk(
-            self.utxo_manager, self.pending_transactions, self.contracts, self.contract_receipts
-        )
-
-    def reset_chain_state(self, *, preserve_checkpoints: bool = False) -> Dict[str, Any]:
+    def reset_chain_state(self, *, preserve_checkpoints: bool = False) -> dict[str, Any]:
         """
         Reset the blockchain data directory back to genesis.
 
@@ -1534,7 +1431,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             if not preserve_checkpoints:
                 try:
                     self.checkpoint_manager.reset_all_checkpoints()
-                except Exception as exc:
+                except (OSError, IOError, ValueError, RuntimeError) as exc:
                     self.logger.warning(
                         "Checkpoint reset failed during chain reset",
                         extra={
@@ -1545,7 +1442,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
             try:
                 self.address_index.close()
-            except Exception:
+            except (OSError, IOError, AttributeError, RuntimeError):
                 pass
             try:
                 os.remove(address_index_path)
@@ -1577,13 +1474,14 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 "new_height": self.chain[-1].index if self.chain else -1,
                 "checkpoints_preserved": preserve_checkpoints,
             }
-        except Exception as exc:
+        except (OSError, IOError, ValueError, RuntimeError, KeyError, AttributeError) as exc:
             self.logger.error(
                 "Failed to reset chain state",
                 extra={
                     "error": str(exc),
                     "error_type": type(exc).__name__
-                }
+                },
+                exc_info=True
             )
             self.chain = old_chain
             self.utxo_manager.restore(utxo_snapshot)
@@ -1594,7 +1492,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 if not os.path.exists(address_index_path):
                     self.address_index = AddressTransactionIndex(address_index_path)
                 self.address_index.rebuild_from_chain(self)
-            except Exception as index_exc:
+            except (OSError, IOError, ValueError, RuntimeError, KeyError) as index_exc:
                 self.logger.warning(
                     "Failed to rebuild address index after reset failure",
                     extra={
@@ -1605,7 +1503,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             self._rollback_reorg_wal(wal_entry)
             raise
 
-    def restore_checkpoint(self, target_height: int) -> Dict[str, Any]:
+    def restore_checkpoint(self, target_height: int) -> dict[str, Any]:
         """
         Restore blockchain state to the specified checkpoint height.
 
@@ -1640,7 +1538,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         )
 
         try:
-            truncated_chain: List[Block] = []
+            truncated_chain: list[Block] = []
             for index in range(target_height + 1):
                 block = self.storage.load_block_from_disk(index)
                 if not block:
@@ -1695,13 +1593,14 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 "removed_blocks": previous_height - target_height,
                 "checkpoint_height": target_height,
             }
-        except Exception as exc:
+        except (OSError, IOError, ValueError, RuntimeError, KeyError, AttributeError) as exc:
             self.logger.error(
                 "Failed to restore checkpoint",
                 extra={
                     "error": str(exc),
                     "error_type": type(exc).__name__
-                }
+                },
+                exc_info=True
             )
             self.chain = old_chain
             self.utxo_manager.restore(utxo_snapshot)
@@ -1737,9 +1636,9 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         recipient_address: str,
         amount: float,
         fee: float = 0.0,
-        private_key: Optional[str] = None,
-        public_key: Optional[str] = None,
-    ) -> Optional[Transaction]:
+        private_key: str | None = None,
+        public_key: str | None = None,
+    ) -> Transaction | None:
         """
         Create a properly formed UTXO-based transaction.
 
@@ -2135,39 +2034,16 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             )
             return False
 
-    def calculate_merkle_root(self, transactions: List[Transaction]) -> str:
-        """Calculate merkle root of transactions"""
-        if not transactions:
-            return hashlib.sha256(b"").hexdigest()
-
-        # Get transaction hashes, ensuring all txids are set
-        tx_hashes = []
-        for tx in transactions:
-            if tx.txid is None:
-                # Calculate hash for transactions without txid
-                tx.txid = tx.calculate_hash()
-            tx_hashes.append(tx.txid)
-
-        while len(tx_hashes) > 1:
-            if len(tx_hashes) % 2 != 0:
-                tx_hashes.append(tx_hashes[-1])
-
-            new_hashes = []
-            for i in range(0, len(tx_hashes), 2):
-                combined = tx_hashes[i] + tx_hashes[i + 1]
-                new_hash = hashlib.sha256(combined.encode()).hexdigest()
-                new_hashes.append(new_hash)
-
-            tx_hashes = new_hashes
-
-        return tx_hashes[0]
+    def calculate_merkle_root(self, transactions: list[Transaction]) -> str:
+        """Calculate merkle root of transactions (delegated to BlockProcessor)"""
+        return self.block_processor.calculate_merkle_root(transactions)
 
     def validate_chain(
         self,
-        chain: Optional[List[Union["Block", BlockHeader]]] = None,
-        expected_genesis_hash: Optional[str] = None,
+        chain: list["Block" | BlockHeader] | None = None,
+        expected_genesis_hash: str | None = None,
         use_checkpoint: bool = True,
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """
         Validate the blockchain tip-to-genesis without mutating live state.
 
@@ -2203,7 +2079,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             return False
 
         # Normalize to full blocks (load from disk when only headers are present)
-        blocks: List[Block] = []
+        blocks: list[Block] = []
         for element in chain_to_check:
             if isinstance(element, Block):
                 block = element
@@ -2271,7 +2147,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
         seen_txids: set[str] = set()
         current_supply = checkpoint_supply  # Start from checkpoint supply
-        previous_timestamp: Optional[float] = None
+        previous_timestamp: float | None = None
 
         # If using checkpoint, set previous_timestamp from checkpoint block
         if checkpoint_start_idx > 0:
@@ -2400,7 +2276,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                     }
                 )
 
-    def _calculate_block_work(self, block_like: Union["Block", BlockHeader, Any]) -> int:
+    def _calculate_block_work(self, block_like: "Block" | BlockHeader | Any) -> int:
         """
         Convert a block's declared difficulty into an absolute work value using the
         2^256 / (target + 1) formulation popularized by Bitcoin. This prevents
@@ -2435,7 +2311,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             self._block_work_cache[block_hash] = work
         return work
 
-    def _calculate_chain_work(self, chain: List[Union["Block", BlockHeader, Any]]) -> int:
+    def _calculate_chain_work(self, chain: list["Block" | BlockHeader | Any]) -> int:
         """
         Calculate cumulative work for a candidate chain using precise PoW arithmetic.
 
@@ -2479,7 +2355,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         # Persist incoming block so replace_chain can load it
         self.storage._save_block_to_disk(block)
 
-        candidate_chain: List[BlockHeader] = []
+        candidate_chain: list[BlockHeader] = []
         # Up to fork point (exclusive)
         candidate_chain.extend(self.chain[:fork_index])
         candidate_chain.append(block.header)
@@ -2540,7 +2416,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         if not lineage:
             return False
 
-        candidate_chain: List[Block] = []
+        candidate_chain: list[Block] = []
         for ancestor in lineage:
             if isinstance(ancestor, Block):
                 candidate_block = ancestor
@@ -2585,7 +2461,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                     self.orphan_blocks.pop(idx, None)
         return replaced
     
-    def replace_chain(self, new_chain: List[BlockHeader]) -> bool:
+    def replace_chain(self, new_chain: list[BlockHeader]) -> bool:
         """
         Replace the current chain with a new chain if it's longer and valid.
         This enables chain reorganization when a longer valid chain is discovered.
@@ -2603,7 +2479,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         Returns:
             True if chain was replaced, False otherwise
         """
-        def _materialize(block_like: BlockHeader | Block) -> Optional[Block]:
+        def _materialize(block_like: BlockHeader | Block) -> Block | None:
             if isinstance(block_like, Block):
                 return block_like
             loaded = self.storage.load_block_from_disk(block_like.index)
@@ -2645,7 +2521,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 return False
 
         # Materialize new chain blocks up-front for validation/metrics
-        materialized_chain: List[Block] = []
+        materialized_chain: list[Block] = []
         for candidate in new_chain:
             block = _materialize(candidate)
             if block is None:
@@ -2898,7 +2774,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
             return False
 
-    def _find_fork_point(self, new_chain: List[BlockHeader]) -> Optional[int]:
+    def _find_fork_point(self, new_chain: list[BlockHeader]) -> int | None:
         """
         Finds the common ancestor between the current chain and a new chain.
         """
@@ -2907,7 +2783,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 return i - 1
         return min(len(self.chain), len(new_chain)) - 1
 
-    def _validate_chain_structure(self, chain: List[BlockHeader]) -> bool:
+    def _validate_chain_structure(self, chain: list[BlockHeader]) -> bool:
         """
         Validates the structural integrity of a candidate chain (hashes, links).
 
@@ -2993,7 +2869,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
         return True
 
-    def is_chain_valid(self, chain: Optional[List[BlockHeader]] = None) -> bool:
+    def is_chain_valid(self, chain: list[BlockHeader] | None = None) -> bool:
         """
         Public validation hook to verify chain integrity.
 
@@ -3003,7 +2879,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         candidate_chain = chain if chain is not None else self.chain
         return self._validate_chain_structure(candidate_chain)
 
-    def _extract_timestamp(self, block_like: Union["Block", BlockHeader, Any]) -> Optional[float]:
+    def _extract_timestamp(self, block_like: "Block" | BlockHeader | Any) -> float | None:
         """Return a floating-point timestamp from a block/header-like object."""
         if hasattr(block_like, "timestamp"):
             raw = getattr(block_like, "timestamp")
@@ -3017,13 +2893,13 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
     def _median_time_from_history(
         self,
-        history: Sequence[Union["Block", BlockHeader, Any]],
-    ) -> Optional[float]:
+        history: Sequence["Block" | BlockHeader | Any],
+    ) -> float | None:
         """Compute the median timestamp over the rolling history window."""
         if not history:
             return None
         window = list(history)[-self._median_time_span :]
-        timestamps: List[float] = []
+        timestamps: list[float] = []
         for entry in window:
             ts = self._extract_timestamp(entry)
             if ts is not None:
@@ -3038,11 +2914,11 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
     def _validate_block_timestamp(
         self,
-        block_like: Union["Block", BlockHeader, Any],
-        history: Sequence[Union["Block", BlockHeader, Any]],
+        block_like: "Block" | BlockHeader | Any,
+        history: Sequence["Block" | BlockHeader | Any],
         *,
         emit_metrics: bool = False,
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """
         Enforce timestamp constraints:
         - each block must be newer than the median of the trailing window
@@ -3148,7 +3024,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         *,
         index: int,
         timestamp: float,
-        median_time: Optional[float],
+        median_time: float | None,
         history_length: int,
     ) -> None:
         """Persist timestamp drift history and emit monitoring signals."""
@@ -3191,7 +3067,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 error=str(exc),
             )
 
-    def get_recent_timestamp_drift(self) -> List[Dict[str, float]]:
+    def get_recent_timestamp_drift(self) -> list[dict[str, float]]:
         """Return a copy of the recent timestamp drift history for diagnostics."""
         return list(self._timestamp_drift_history)
 
@@ -3503,7 +3379,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
     # get_mempool_size_kb is inherited from BlockchainMempoolMixin
 
-    def compute_state_snapshot(self) -> Dict[str, Any]:
+    def compute_state_snapshot(self) -> dict[str, Any]:
         """
         Return a deterministic snapshot used for integrity validation and reorg audits.
         """
@@ -3524,7 +3400,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             "timestamp": time.time(),
         }
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """
         Return a live snapshot of blockchain health and activity for APIs/monitoring.
         """
@@ -3561,8 +3437,8 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         title: str,
         description: str,
         proposal_type: str,
-        proposal_data: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        proposal_data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Submit a governance proposal to the blockchain.
 
@@ -3620,7 +3496,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         proposal_id: str,
         vote: str,
         voting_power: float = 0.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Cast a vote on a governance proposal.
 
@@ -3666,7 +3542,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         approved: bool,
         comments: str = "",
         voting_power: float = 0.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Submit a code review for a governance proposal.
 
@@ -3706,7 +3582,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             "success": result.get("success", True),
         }
 
-    def execute_governance_proposal(self, proposal_id: str, executor: str = "system") -> Dict[str, Any]:
+    def execute_governance_proposal(self, proposal_id: str, executor: str = "system") -> dict[str, Any]:
         """
         Execute an approved governance proposal.
 
@@ -3748,7 +3624,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         proposal_id: str,
         approved: bool = True,
         voting_power: float = 0.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Vote on a governance proposal implementation.
 
@@ -3786,7 +3662,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             "error": result.get("error"),
         }
 
-    def execute_proposal(self, executor: str, proposal_id: str) -> Dict[str, Any]:
+    def execute_proposal(self, executor: str, proposal_id: str) -> dict[str, Any]:
         """
         Execute an approved governance proposal (alias for execute_governance_proposal).
 
@@ -3799,13 +3675,13 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         """
         return self.execute_governance_proposal(proposal_id, executor)
 
-    def get_governance_proposal(self, proposal_id: str) -> Optional[Dict[str, Any]]:
+    def get_governance_proposal(self, proposal_id: str) -> dict[str, Any] | None:
         """Get details of a governance proposal."""
         if not self.governance_state:
             return None
         return self.governance_state.get_proposal_state(proposal_id)
 
-    def list_governance_proposals(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_governance_proposals(self, status: str | None = None) -> list[dict[str, Any]]:
         """
         List all governance proposals, optionally filtered by status.
 
@@ -3828,7 +3704,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
     # ==================== BLOCKCHAIN SERIALIZATION ====================
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """
         Export the entire blockchain state to a dictionary.
 
@@ -3850,7 +3726,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             },
         }
 
-    def from_dict(self, data: Dict[str, Any]) -> SimpleNamespace:
+    def from_dict(self, data: dict[str, Any]) -> SimpleNamespace:
         """
         Materialize a lightweight blockchain snapshot from serialized data.
 
@@ -3900,7 +3776,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             difficulty=difficulty,
         )
 
-    def _block_to_full_dict(self, block: Any) -> Dict[str, Any]:
+    def _block_to_full_dict(self, block: Any) -> dict[str, Any]:
         """Convert a block (header or full) to dictionary with transactions."""
         if hasattr(block, "to_dict"):
             return block.to_dict()
@@ -3953,20 +3829,20 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             mempool_size_bytes=mempool_size,
         )
 
-    def register_trade_session(self, wallet_address: str) -> Dict[str, Any]:
+    def register_trade_session(self, wallet_address: str) -> dict[str, Any]:
         """Create and track a short-lived trade session token."""
         session = self.trade_manager.register_session(wallet_address)
         self.trade_sessions[session["session_token"]] = session
         self.record_trade_event("session_registered", {"wallet_address": wallet_address})
         return session
 
-    def record_trade_event(self, event_type: str, payload: Dict[str, Any]) -> None:
+    def record_trade_event(self, event_type: str, payload: dict[str, Any]) -> None:
         """Record trade-related events for diagnostics."""
         entry = {"type": event_type, "payload": payload, "timestamp": time.time()}
         self.trade_history.append(entry)
         self.trade_history = self.trade_history[-500:]
 
-    def submit_trade_order(self, order_data: Dict[str, Any]) -> Dict[str, Any]:
+    def submit_trade_order(self, order_data: dict[str, Any]) -> dict[str, Any]:
         """
         Normalize order payload, verify ECDSA signature, and dispatch to the trade manager.
 
@@ -3982,8 +3858,9 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         Raises:
             ValueError: If signature validation fails or required fields missing
         """
-        from xai.core.crypto_utils import verify_signature_hex
         import json
+
+        from xai.core.crypto_utils import verify_signature_hex
 
         # Extract and validate signature
         signature = order_data.get("signature")
@@ -4056,7 +3933,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         normalized = self._normalize_trade_order(order_data)
         order, matches = self.trade_manager.place_order(**normalized)
 
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "success": True,
             "order_id": order.order_id,
             "status": "pending",
@@ -4080,7 +3957,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         self.record_trade_event("order_created", {"order_id": order.order_id, "status": result["status"]})
         return result
 
-    def _normalize_trade_order(self, order_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _normalize_trade_order(self, order_data: dict[str, Any]) -> dict[str, Any]:
         wallet_address = order_data.get("wallet_address") or order_data.get("from_address")
         if not wallet_address:
             raise ValueError("wallet_address required")
@@ -4141,15 +4018,15 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             "order_type": order_type,
         }
 
-    def get_trade_orders(self) -> List[Dict[str, Any]]:
+    def get_trade_orders(self) -> list[dict[str, Any]]:
         """Return serialized trade orders."""
         return [order.to_dict() for order in self.trade_manager.list_orders()]
 
-    def get_trade_matches(self) -> List[Dict[str, Any]]:
+    def get_trade_matches(self) -> list[dict[str, Any]]:
         """Return serialized trade matches."""
         return [match.to_dict() for match in self.trade_manager.list_matches()]
 
-    def reveal_trade_secret(self, match_id: str, secret: str) -> Dict[str, Any]:
+    def reveal_trade_secret(self, match_id: str, secret: str) -> dict[str, Any]:
         """Settle a match once both parties provide the HTLC secret."""
         result = self.trade_manager.settle_match(match_id, secret)
         if result.get("success"):
@@ -4162,10 +4039,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
     def _write_reorg_wal(
         self,
-        old_tip: Optional[str],
-        new_tip: Optional[str],
-        fork_point: Optional[int]
-    ) -> Dict[str, Any]:
+        old_tip: str | None,
+        new_tip: str | None,
+        fork_point: int | None
+    ) -> dict[str, Any]:
         """
         Write a WAL entry recording the start of a chain reorganization.
 
@@ -4180,8 +4057,8 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         Returns:
             WAL entry dictionary
         """
-        import time
         import json
+        import time
 
         wal_entry = {
             "type": "REORG_BEGIN",
@@ -4215,7 +4092,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
         return wal_entry
 
-    def _commit_reorg_wal(self, wal_entry: Dict[str, Any]) -> None:
+    def _commit_reorg_wal(self, wal_entry: dict[str, Any]) -> None:
         """
         Mark a WAL entry as committed (reorg completed successfully).
 
@@ -4248,7 +4125,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 extra={"event": "wal.commit_failed", "error": str(e), "error_type": type(e).__name__}
             )
 
-    def _rollback_reorg_wal(self, wal_entry: Dict[str, Any]) -> None:
+    def _rollback_reorg_wal(self, wal_entry: dict[str, Any]) -> None:
         """
         Mark a WAL entry as rolled back (reorg failed and was reverted).
 

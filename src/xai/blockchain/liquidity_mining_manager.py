@@ -1,15 +1,16 @@
+from __future__ import annotations
+
 import logging
 import time
-from typing import Callable, Optional
+from typing import Callable
 
 logger = logging.getLogger("xai.blockchain.liquidity_mining_manager")
-
 
 class LiquidityMiningManager:
     def __init__(
         self,
         daily_reward_cap: float,
-        time_provider: Optional[Callable[[], int]] = None,
+        time_provider: Callable[[], int] | None = None,
     ):
         if not isinstance(daily_reward_cap, (int, float)) or daily_reward_cap <= 0:
             raise ValueError("Daily reward cap must be a positive number.")
@@ -31,14 +32,14 @@ class LiquidityMiningManager:
         except (TypeError, ValueError) as exc:
             raise ValueError("time_provider must return an integer timestamp") from exc
 
-    def _normalize_timestamp(self, current_time: Optional[int]) -> int:
+    def _normalize_timestamp(self, current_time: int | None) -> int:
         if current_time is None:
             return self._current_time()
         if not isinstance(current_time, int):
             raise ValueError("current_time must be provided as an integer timestamp")
         return current_time
 
-    def _check_and_reset_daily_rewards(self, current_time: Optional[int] = None) -> int:
+    def _check_and_reset_daily_rewards(self, current_time: int | None = None) -> int:
         """Resets daily rewards if a new day has started."""
         normalized_time = self._normalize_timestamp(current_time)
         # Simple daily reset: if more than 24 hours passed since last reset
@@ -48,7 +49,7 @@ class LiquidityMiningManager:
             logger.info("Daily rewards reset at %s", normalized_time)
         return normalized_time
 
-    def distribute_rewards(self, amount: float, current_time: Optional[int] = None) -> float:
+    def distribute_rewards(self, amount: float, current_time: int | None = None) -> float:
         """
         Distributes liquidity mining rewards, enforcing the daily cap.
         Returns the amount actually distributed.

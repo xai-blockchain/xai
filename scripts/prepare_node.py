@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
-from typing import Dict
 
 from scripts.node_profile import ensure_path, register_peer, write_node_config
 

@@ -10,9 +10,10 @@ Usage:
 3. Use throughout the codebase to track metrics and log events
 """
 
-from xai.core.monitoring import MetricsCollector, AlertLevel
-from xai.core.structured_logger import StructuredLogger, LogContext, PerformanceTimer
 import time
+
+from xai.core.monitoring import AlertLevel, MetricsCollector
+from xai.core.structured_logger import LogContext, PerformanceTimer, StructuredLogger
 
 
 def example_blockchain_integration():

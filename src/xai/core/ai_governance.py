@@ -12,14 +12,15 @@ Consensus mechanism for AI-driven development:
 """
 
 from __future__ import annotations
-import time
+
 import hashlib
-import math
 import inspect
 import logging
-from typing import Dict, List, Optional, Tuple, Any, Set
-from enum import Enum
+import math
+import time
 from collections import defaultdict
+from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,6 @@ except ImportError:
         PARAMETER_CHANGE = "parameter_change"
         EMERGENCY = "emergency"
 
-
 class VoterType(Enum):
     """Types of voters in governance"""
 
@@ -53,7 +53,6 @@ class VoterType(Enum):
     MINER = "miner"  # Mines blocks
     AI_CONTRIBUTOR = "ai_contributor"  # Donated AI minutes
     HYBRID = "hybrid"  # Multiple roles
-
 
 class VotingPowerDisplay:
     """
@@ -86,7 +85,7 @@ class VotingPowerDisplay:
         }
 
     @staticmethod
-    def compare_contributors(contributor_minutes: List[float]) -> List[Dict]:
+    def compare_contributors(contributor_minutes: list[float]) -> list[Dict]:
         """
         Show how multiple contributors compare
         Demonstrates small contributors still matter
@@ -104,7 +103,6 @@ class VotingPowerDisplay:
             )
 
         return results
-
 
 class VotingPower:
     """
@@ -183,7 +181,7 @@ class VotingPower:
 
         return min(base_power, self.max_node_votes)
 
-    def calculate_total_voting_power(self, voter_data: Dict) -> Tuple[float, Dict]:
+    def calculate_total_voting_power(self, voter_data: Dict) -> tuple[float, Dict]:
         """
         Calculate total voting power across all contributions
 
@@ -222,7 +220,6 @@ class VotingPower:
 
         return total, breakdown
 
-
 class GovernanceFraudDetector:
     """Detect coordinated/sybil voting patterns and emit structured alerts."""
 
@@ -241,20 +238,20 @@ class GovernanceFraudDetector:
     POWER_SKEW_MIN_VOTERS = 3
 
     def __init__(self) -> None:
-        self.vote_records: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
-        self.alerts: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
-        self._cluster_alerted: Set[Tuple[str, str, str]] = set()
-        self._new_account_alerted: Set[str] = set()
-        self._burst_alerted: Set[str] = set()
-        self._power_alerted: Set[Tuple[str, str, str]] = set()
+        self.vote_records: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        self.alerts: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        self._cluster_alerted: set[tuple[str, str, str]] = set()
+        self._new_account_alerted: set[str] = set()
+        self._burst_alerted: set[str] = set()
+        self._power_alerted: set[tuple[str, str, str]] = set()
 
     def record_vote(
         self,
         proposal_id: str,
         voter_address: str,
         voting_power: float,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[Dict[str, Any]]:
+        metadata: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         """Store vote telemetry and evaluate heuristics."""
         metadata = metadata or {}
         entry = {
@@ -267,7 +264,7 @@ class GovernanceFraudDetector:
         self.vote_records[proposal_id].append(entry)
         self._prune_records(proposal_id)
 
-        alerts: List[Dict[str, Any]] = []
+        alerts: list[dict[str, Any]] = []
         alerts.extend(self._detect_identity_clusters(proposal_id, entry))
         alerts.extend(self._detect_new_account_swarms(proposal_id))
         alerts.extend(self._detect_burst_activity(proposal_id))
@@ -283,7 +280,7 @@ class GovernanceFraudDetector:
             self.alerts[proposal_id].extend(alerts)
         return alerts
 
-    def get_alerts(self, proposal_id: str) -> List[Dict[str, Any]]:
+    def get_alerts(self, proposal_id: str) -> list[dict[str, Any]]:
         """Return previously generated alerts for a proposal."""
         alerts = list(self.alerts.get(proposal_id, []))
         new_account_alerts = [
@@ -306,8 +303,8 @@ class GovernanceFraudDetector:
     def _calculate_total_power(self, proposal_id: str) -> float:
         return sum(record["voting_power"] for record in self.vote_records[proposal_id])
 
-    def _extract_cluster_keys(self, metadata: Dict[str, Any]) -> List[Tuple[str, str]]:
-        keys: List[Tuple[str, str]] = []
+    def _extract_cluster_keys(self, metadata: dict[str, Any]) -> list[tuple[str, str]]:
+        keys: list[tuple[str, str]] = []
         ip_address = metadata.get("ip_address")
         if isinstance(ip_address, str) and ip_address.count(".") >= 1:
             subnet = ".".join(ip_address.split(".")[:3])
@@ -325,8 +322,8 @@ class GovernanceFraudDetector:
         return keys
 
     def _detect_identity_clusters(
-        self, proposal_id: str, latest_entry: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+        self, proposal_id: str, latest_entry: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         if not latest_entry["cluster_keys"]:
             return []
         now = latest_entry["timestamp"]
@@ -335,7 +332,7 @@ class GovernanceFraudDetector:
             for record in self.vote_records[proposal_id]
             if now - record["timestamp"] <= self.CLUSTER_WINDOW_SECONDS
         ]
-        alerts: List[Dict[str, Any]] = []
+        alerts: list[dict[str, Any]] = []
         for dimension, value in latest_entry["cluster_keys"]:
             matching = [
                 record
@@ -370,7 +367,7 @@ class GovernanceFraudDetector:
                 self._cluster_alerted.add(cache_key)
         return alerts
 
-    def _detect_new_account_swarms(self, proposal_id: str) -> List[Dict[str, Any]]:
+    def _detect_new_account_swarms(self, proposal_id: str) -> list[dict[str, Any]]:
         now = time.time()
         recent = [
             record
@@ -410,7 +407,7 @@ class GovernanceFraudDetector:
         self._new_account_alerted.add(cache_key)
         return [alert]
 
-    def _detect_burst_activity(self, proposal_id: str) -> List[Dict[str, Any]]:
+    def _detect_burst_activity(self, proposal_id: str) -> list[dict[str, Any]]:
         now = time.time()
         recent = [
             record
@@ -441,13 +438,13 @@ class GovernanceFraudDetector:
         return [alert]
 
     def _detect_power_skew(
-        self, proposal_id: str, latest_entry: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+        self, proposal_id: str, latest_entry: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         total_power = self._calculate_total_power(proposal_id)
         if total_power <= 0 or not latest_entry["cluster_keys"]:
             return []
         now = latest_entry["timestamp"]
-        alerts: List[Dict[str, Any]] = []
+        alerts: list[dict[str, Any]] = []
         for dimension, value in latest_entry["cluster_keys"]:
             matching = [
                 record
@@ -479,7 +476,7 @@ class GovernanceFraudDetector:
                 self._power_alerted.add(cache_key)
         return alerts
 
-    def evaluate_sybil_risk(self, proposal_id: str) -> Dict[str, Any]:
+    def evaluate_sybil_risk(self, proposal_id: str) -> dict[str, Any]:
         alerts = self.get_alerts(proposal_id)
         severity_weights = {"low": 1, "medium": 3, "high": 6}
         raw_score = sum(severity_weights.get(alert.get("severity", "").lower(), 2) for alert in alerts)
@@ -490,7 +487,6 @@ class GovernanceFraudDetector:
             "alert_count": len(alerts),
             "alerts": alerts,
         }
-
 
 class AIWorkloadDistribution:
     """
@@ -503,7 +499,7 @@ class AIWorkloadDistribution:
     def __init__(self) -> None:
         self.contributor_pool = {}  # address -> contribution data
 
-    def _ensure_contributor_entry(self, address: str) -> Dict[str, Any]:
+    def _ensure_contributor_entry(self, address: str) -> dict[str, Any]:
         """Return contributor record, creating a baseline entry if needed."""
         if address not in self.contributor_pool:
             self.contributor_pool[address] = {
@@ -534,7 +530,7 @@ class AIWorkloadDistribution:
         self,
         address: str,
         planned_minutes: float,
-        actual_minutes: Optional[float],
+        actual_minutes: float | None,
         satisfaction_score: float,
         incidents: int = 0,
         breach_detected: bool = False,
@@ -664,7 +660,7 @@ class AIWorkloadDistribution:
 
         return execution_plan
 
-    def apply_execution_feedback(self, feedback_entries: List[Dict[str, Any]]) -> Dict[str, float]:
+    def apply_execution_feedback(self, feedback_entries: list[dict[str, Any]]) -> dict[str, float]:
         """
         Batch update contributor quality metrics from execution feedback.
 
@@ -680,7 +676,7 @@ class AIWorkloadDistribution:
         Returns:
             Mapping of address -> updated quality score
         """
-        updates: Dict[str, float] = {}
+        updates: dict[str, float] = {}
         for entry in feedback_entries:
             address = entry.get("address")
             if not address:
@@ -703,7 +699,6 @@ class AIWorkloadDistribution:
         if contribs:
             return contribs[-1]["ai_model"]
         return "claude-sonnet-4"
-
 
 class ConsensusRules:
     """
@@ -761,7 +756,7 @@ class ConsensusRules:
 
     def check_consensus_reached(
         self, proposal: Dict, votes: Dict, current_min_voters: int = None
-    ) -> Tuple[bool, str, Dict]:
+    ) -> tuple[bool, str, Dict]:
         """
         Check if proposal reached consensus
 
@@ -832,7 +827,6 @@ class ConsensusRules:
             },
         )
 
-
 class AIGovernanceProposal:
     """Proposal with adaptive voting and timelock"""
 
@@ -844,8 +838,8 @@ class AIGovernanceProposal:
         detailed_prompt: str,
         estimated_minutes: float,
         proposal_type: ProposalType = ProposalType.AI_IMPROVEMENT,
-        parameter_change: Optional[Dict] = None,
-        submitter_address: Optional[str] = None,
+        parameter_change: Dict | None = None,
+        submitter_address: str | None = None,
         submitter_voting_power: float = 0,
     ) -> None:
         self.proposal_id = hashlib.sha256(f"{title}{time.time()}".encode()).hexdigest()[:16]
@@ -996,7 +990,7 @@ class AIGovernanceProposal:
             "can_execute_at": self.timelock_expiry,
         }
 
-    def can_execute(self) -> Tuple[bool, str]:
+    def can_execute(self) -> tuple[bool, str]:
         """Check if proposal can be executed"""
 
         if self.status != "timelock_active":
@@ -1029,7 +1023,6 @@ class AIGovernanceProposal:
             "vote_attempt": len(self.vote_attempts) + 1,
         }
 
-
 class ProposalImpactAnalyzer:
     """
     AI-powered proposal impact analysis system.
@@ -1044,7 +1037,7 @@ class ProposalImpactAnalyzer:
             ai_executor: Optional AI executor for ML-powered analysis
         """
         self.ai_executor = ai_executor
-        self.analysis_cache: Dict[str, Dict] = {}
+        self.analysis_cache: dict[str, Dict] = {}
 
     @staticmethod
     def _clamp(value: float, min_value: float = 0.0, max_value: float = 1.0) -> float:
@@ -1052,7 +1045,7 @@ class ProposalImpactAnalyzer:
         return max(min_value, min(max_value, value))
 
     @staticmethod
-    def _normalize_iterable(value: Any) -> List[str]:
+    def _normalize_iterable(value: Any) -> list[str]:
         """Convert iterable or scalar into a list of lowercase strings."""
         if value is None:
             return []
@@ -1062,9 +1055,9 @@ class ProposalImpactAnalyzer:
             return [str(item).lower() for item in value if isinstance(item, (str, int, float))]
         return []
 
-    def _extract_tags(self, proposal: Dict) -> Set[str]:
+    def _extract_tags(self, proposal: Dict) -> set[str]:
         """Collect normalized tags/keywords describing the proposal impact surface."""
-        tags: Set[str] = set()
+        tags: set[str] = set()
         for key in ("tags", "components", "modules", "impact_scope"):
             tags.update(self._normalize_iterable(proposal.get(key)))
 
@@ -1087,13 +1080,13 @@ class ProposalImpactAnalyzer:
         return tags
 
     @staticmethod
-    def _score_keywords(text: str, keyword_weights: Dict[str, float]) -> float:
+    def _score_keywords(text: str, keyword_weights: dict[str, float]) -> float:
         """Score text based on presence of weighted keywords."""
         lowered = text.lower()
         return sum(weight for keyword, weight in keyword_weights.items() if keyword in lowered)
 
     def analyze_proposal_impact(
-        self, proposal: Dict, historical_data: Optional[Dict] = None
+        self, proposal: Dict, historical_data: Dict | None = None
     ) -> Dict:
         """
         Generate comprehensive impact analysis for a proposal
@@ -1179,10 +1172,10 @@ class ProposalImpactAnalyzer:
         ) + (len(files_to_modify) if isinstance(files_to_modify, (list, tuple, set)) else 0)
         estimated_minutes = max(float(proposal.get("estimated_minutes", 0)), 1.0)
 
-        risk_factors: List[str] = []
-        mitigation_strategies: List[str] = []
+        risk_factors: list[str] = []
+        mitigation_strategies: list[str] = []
 
-        def _add_unique(target: List[str], item: str) -> None:
+        def _add_unique(target: list[str], item: str) -> None:
             if item not in target:
                 target.append(item)
 
@@ -1262,7 +1255,7 @@ class ProposalImpactAnalyzer:
         }
 
     def _predict_community_impact(
-        self, proposal: Dict, historical_data: Optional[Dict] = None
+        self, proposal: Dict, historical_data: Dict | None = None
     ) -> Dict:
         """Predict how proposal will impact the community with contextual signals."""
         historical = historical_data or {}
@@ -1367,7 +1360,7 @@ class ProposalImpactAnalyzer:
             "developers": {"keywords": {"api", "sdk", "contract", "developer"}},
         }
 
-        stakeholder_groups: Dict[str, Dict[str, Any]] = {}
+        stakeholder_groups: dict[str, dict[str, Any]] = {}
         for group, profile in stakeholder_templates.items():
             impact_base = 0.2
             if profile["keywords"] & tags:
@@ -1432,7 +1425,7 @@ class ProposalImpactAnalyzer:
         complexity = self._clamp(complexity, max_value=0.98)
 
         raw_dependencies = proposal.get("dependencies", [])
-        dependencies: Set[str] = set()
+        dependencies: set[str] = set()
         if isinstance(raw_dependencies, str):
             dependencies.add(raw_dependencies)
         elif isinstance(raw_dependencies, (list, tuple, set)):
@@ -1453,7 +1446,7 @@ class ProposalImpactAnalyzer:
         )
         backward_compatible = not breaking_changes and not requires_migration
 
-        testing_requirements: List[str] = []
+        testing_requirements: list[str] = []
         if touches_consensus:
             testing_requirements.append("deterministic consensus regression")
         if "wallet" in tags:
@@ -1495,7 +1488,7 @@ class ProposalImpactAnalyzer:
         }
 
     def _analyze_financial_impact(
-        self, proposal: Dict, historical_data: Optional[Dict] = None
+        self, proposal: Dict, historical_data: Dict | None = None
     ) -> Dict:
         """Analyze financial implications with realistic production estimates."""
         tags = self._extract_tags(proposal)
@@ -1565,7 +1558,7 @@ class ProposalImpactAnalyzer:
         tags = self._extract_tags(proposal)
         description = str(proposal.get("description", "")).lower()
         attack_vectors_input = proposal.get("identified_attack_vectors", [])
-        attack_vectors: List[str] = (
+        attack_vectors: list[str] = (
             list(attack_vectors_input)
             if isinstance(attack_vectors_input, (list, tuple, set))
             else ([attack_vectors_input] if isinstance(attack_vectors_input, str) else [])
@@ -1667,10 +1660,10 @@ class ProposalImpactAnalyzer:
         technical_analysis: Dict,
         security_assessment: Dict,
         financial_impact: Dict,
-    ) -> List[str]:
+    ) -> list[str]:
         """Generate actionable recommendations anchored to the detected risks."""
         tags = self._extract_tags(proposal)
-        recommendations: List[str] = []
+        recommendations: list[str] = []
 
         def _add(msg: str) -> None:
             if msg not in recommendations:
@@ -1815,13 +1808,12 @@ RECOMMENDATIONS
 """
         return report
 
-
 class AIGovernance:
     """Simplified AI governance facade used by the pytest suite."""
 
     def __init__(self) -> None:
-        self.proposals: Dict[str, Dict] = {}
-        self.parameters: Dict[str, float] = {"quorum": 0.5, "timelock_days": 1.0}
+        self.proposals: dict[str, Dict] = {}
+        self.parameters: dict[str, float] = {"quorum": 0.5, "timelock_days": 1.0}
         self.voter_type_weights = {
             VoterType.NODE_OPERATOR: 1.25,
             VoterType.MINER: 1.0,
@@ -1832,7 +1824,7 @@ class AIGovernance:
         self.impact_analyzer = ProposalImpactAnalyzer()
         self.fraud_detector = GovernanceFraudDetector()
         self.workload_manager = AIWorkloadDistribution()
-        self.execution_history: List[Dict[str, Any]] = []
+        self.execution_history: list[dict[str, Any]] = []
 
     def _generate_proposal_id(self, title: str, proposer: str) -> str:
         seed = f"{title}-{proposer}-{time.time()}"
@@ -1872,8 +1864,8 @@ class AIGovernance:
         contributor_address: str,
         ai_model: str,
         minutes_contributed: float,
-        timestamp: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        timestamp: float | None = None,
+    ) -> dict[str, Any]:
         """
         Register contributor AI minutes for future workload distribution.
 
@@ -1890,7 +1882,7 @@ class AIGovernance:
         voter_address: str,
         vote: str,
         voting_power: float,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> bool:
         """Record votes and guard against double voting."""
         proposal = self.proposals.get(proposal_id)
@@ -1944,14 +1936,14 @@ class AIGovernance:
         proposal["last_tally"] = result
         return result
 
-    def execute_proposal(self, proposal_id: str) -> Optional[Dict]:
+    def execute_proposal(self, proposal_id: str) -> Dict | None:
         proposal = self.proposals.get(proposal_id)
         if not proposal:
             return None
 
         result = self.tally_votes(proposal_id)
         now = time.time()
-        execution_record: Dict[str, Any] = {
+        execution_record: dict[str, Any] = {
             "proposal_id": proposal_id,
             "attempted_at": now,
             "yes_power": result.get("yes_power"),
@@ -1984,7 +1976,7 @@ class AIGovernance:
 
         proposal["execution_time"] = now
         proposal["status"] = "executed"
-        workload_plan: Optional[Dict[str, Any]] = None
+        workload_plan: dict[str, Any] | None = None
         if (
             proposal.get("proposal_type") == "ai_improvement"
             and proposal.get("estimated_minutes", 0) > 0
@@ -1999,14 +1991,14 @@ class AIGovernance:
         self.execution_history.append(dict(execution_record))
         return {"status": "executed", "executed": True, "workload_plan": workload_plan}
 
-    def get_parameters(self) -> Dict[str, float]:
+    def get_parameters(self) -> dict[str, float]:
         return dict(self.parameters)
 
     def update_parameter(self, key: str, value: float) -> bool:
         self.parameters[key] = value
         return True
 
-    def get_fraud_alerts(self, proposal_id: str) -> List[Dict[str, Any]]:
+    def get_fraud_alerts(self, proposal_id: str) -> list[dict[str, Any]]:
         proposal = self.proposals.get(proposal_id)
         if not proposal:
             return []
@@ -2014,15 +2006,15 @@ class AIGovernance:
         proposal["fraud_alerts"] = alerts
         return alerts
 
-    def get_sybil_report(self, proposal_id: str) -> Dict[str, Any]:
+    def get_sybil_report(self, proposal_id: str) -> dict[str, Any]:
         """Return normalized sybil risk report for a proposal."""
         if proposal_id not in self.proposals:
             return {"proposal_id": proposal_id, "risk_score": 0.0, "alert_count": 0, "alerts": []}
         return self.fraud_detector.evaluate_sybil_risk(proposal_id)
 
     def record_execution_feedback(
-        self, proposal_id: str, feedback_entries: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, proposal_id: str, feedback_entries: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """
         Attach post-execution telemetry and update contributor quality metrics.
         """

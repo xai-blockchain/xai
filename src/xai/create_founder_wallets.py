@@ -3,11 +3,12 @@ Create XAI Founder Wallets and Update Genesis Block
 Allocates 121M XAI with proper distribution
 """
 
-import sys
-import os
-from src.xai.core.wallet import Wallet
 import json
+import os
+import sys
 import time
+
+from src.xai.core.wallet import Wallet
 
 # Allocation (121M total)
 TOTAL_SUPPLY = 121000000.0

@@ -14,22 +14,22 @@ Comprehensive security middleware for Flask applications providing:
 
 from __future__ import annotations
 
-import secrets
 import hashlib
 import hmac
-import json
-import re
-import logging
-import threading
-from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any, List, Tuple, Callable, Set
+import html
 import ipaddress
+import json
+import logging
+import re
+import secrets
+import threading
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 from functools import wraps
+from typing import Any, Callable
 from urllib.parse import urlparse
 
-from flask import Flask, request, jsonify, Response, session
-import html
+from flask import Flask, Response, jsonify, request, session
 
 # Security logger
 security_logger = logging.getLogger("xai.security.middleware")
@@ -53,16 +53,13 @@ if not security_logger.handlers:
     handler.setFormatter(formatter)
     security_logger.addHandler(handler)
 
-
 class RateLimitExceeded(Exception):
     """Raised when rate limit is exceeded."""
     pass
 
-
 class CSRFTokenInvalid(Exception):
     """Raised when CSRF token is invalid."""
     pass
-
 
 class SecurityConfig:
     """Configuration for security middleware."""
@@ -75,7 +72,7 @@ class SecurityConfig:
 
     # CORS
     CORS_ENABLED: bool = True
-    CORS_ORIGINS: List[str] = [
+    CORS_ORIGINS: list[str] = [
         "http://localhost:12030",
         "http://localhost:12001",
         "http://127.0.0.1:3000",
@@ -85,14 +82,14 @@ class SecurityConfig:
         "https://127.0.0.1:5443",
         "https://localhost:5443",
     ]
-    CORS_METHODS: List[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    CORS_METHODS: list[str] = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_MAX_AGE: int = 3600
 
     # CSRF Protection
     CSRF_ENABLED: bool = True
     CSRF_TOKEN_LENGTH: int = 32
-    CSRF_EXEMPT_ENDPOINTS: List[str] = [
+    CSRF_EXEMPT_ENDPOINTS: list[str] = [
         "/health",
         "/metrics",
         "/stats",
@@ -105,7 +102,7 @@ class SecurityConfig:
         "/block/receive",  # P2P block broadcasting
         "/transaction/receive",  # P2P transaction broadcasting
     ]
-    CSRF_EXEMPT_METHODS: List[str] = ["GET", "HEAD", "OPTIONS"]
+    CSRF_EXEMPT_METHODS: list[str] = ["GET", "HEAD", "OPTIONS"]
 
     # Security Headers
     SECURITY_HEADERS_ENABLED: bool = True
@@ -134,7 +131,7 @@ class SecurityConfig:
     MAX_URL_LENGTH: int = 2048  # 2KB
 
     # Endpoint-specific rate limits
-    ENDPOINT_LIMITS: Dict[str, Tuple[int, int]] = {
+    ENDPOINT_LIMITS: dict[str, tuple[int, int]] = {
         "/wallet/create": (5, 3600),  # 5 requests per hour
         "/wallet/send": (20, 60),  # 20 requests per minute
         "/mine": (100, 60),  # 100 requests per minute
@@ -150,17 +147,16 @@ class SecurityConfig:
     SUSPICIOUS_ACTIVITY_THRESHOLD: int = 5  # Failed attempts before blocking
     BLOCK_DURATION: int = 900  # 15 minutes
     TRUST_PROXY_HEADERS: bool = False
-    TRUSTED_PROXY_IPS: List[str] = []
-    TRUSTED_PROXY_NETWORKS: List[str] = []
+    TRUSTED_PROXY_IPS: list[str] = []
+    TRUSTED_PROXY_NETWORKS: list[str] = []
     STRICT_SESSION_FINGERPRINTING: bool = True
     SESSION_BIND_USER_AGENT: bool = True
     SESSION_BIND_ACCEPT_LANGUAGE: bool = False
 
-
 class TokenManager:
     """Manages CSRF tokens and secure session tokens."""
 
-    def __init__(self, secret_key: Optional[str] = None):
+    def __init__(self, secret_key: str | None = None):
         """
         Initialize token manager.
 
@@ -168,8 +164,8 @@ class TokenManager:
             secret_key: Secret key for HMAC operations
         """
         self.secret_key = secret_key or secrets.token_hex(32)
-        self.valid_tokens: Dict[str, Dict[str, Any]] = {}
-        self.token_expiry: Dict[str, datetime] = {}
+        self.valid_tokens: dict[str, dict[str, Any]] = {}
+        self.token_expiry: dict[str, datetime] = {}
 
     def generate_csrf_token(self, session_id: str) -> str:
         """
@@ -245,7 +241,6 @@ class TokenManager:
         for token in expired_tokens:
             self.revoke_csrf_token(token)
 
-
 class RateLimiter:
     """Advanced rate limiting with endpoint-specific rules and memory management."""
 
@@ -257,11 +252,11 @@ class RateLimiter:
 
     def __init__(self):
         """Initialize rate limiter with memory-safe defaults."""
-        self.request_history: Dict[str, List[float]] = defaultdict(list)
-        self.blocked_ips: Dict[str, datetime] = {}
-        self.failed_attempts: Dict[str, int] = defaultdict(int)
+        self.request_history: dict[str, list[float]] = defaultdict(list)
+        self.blocked_ips: dict[str, datetime] = {}
+        self.failed_attempts: dict[str, int] = defaultdict(int)
         self._request_count = 0  # Counter for cleanup scheduling
-        self._last_access: Dict[str, float] = {}  # Track last access time for LRU eviction
+        self._last_access: dict[str, float] = {}  # Track last access time for LRU eviction
 
     def get_client_ip(self) -> str:
         """Get client IP address from request."""
@@ -365,7 +360,7 @@ class RateLimiter:
             f"current size: {len(self.request_history)}"
         )
 
-    def get_memory_stats(self) -> Dict[str, int]:
+    def get_memory_stats(self) -> dict[str, int]:
         """Get memory usage statistics for monitoring."""
         return {
             "history_entries": len(self.request_history),
@@ -431,7 +426,6 @@ class RateLimiter:
         self.request_history[key].append(now)
         self.failed_attempts[client_ip] = 0
         return True
-
 
 class InputSanitizer:
     """Sanitizes user input to prevent injection attacks."""
@@ -502,7 +496,7 @@ class InputSanitizer:
         return value
 
     @staticmethod
-    def sanitize_json(data: Dict[str, Any], max_depth: int = 10) -> Dict[str, Any]:
+    def sanitize_json(data: dict[str, Any], max_depth: int = 10) -> dict[str, Any]:
         """
         Recursively sanitize JSON data.
 
@@ -547,14 +541,13 @@ class InputSanitizer:
 
         return sanitized
 
-
 class SessionManager:
     """Manages secure user sessions with optional fingerprinting and IP binding."""
 
     def __init__(self):
         """Initialize session manager."""
-        self.active_sessions: Dict[str, Dict[str, Any]] = {}
-        self.session_tokens: Dict[str, str] = {}
+        self.active_sessions: dict[str, dict[str, Any]] = {}
+        self.session_tokens: dict[str, str] = {}
 
     @staticmethod
     def _is_trusted_proxy(ip_str: str) -> bool:
@@ -608,7 +601,7 @@ class SessionManager:
 
         return remote_ip
 
-    def create_session(self, user_id: str, metadata: Optional[Dict[str, Any]] = None) -> str:
+    def create_session(self, user_id: str, metadata: dict[str, Any] | None = None) -> str:
         """
         Create a new secure session.
 
@@ -641,7 +634,7 @@ class SessionManager:
 
         return session_token
 
-    def validate_session(self, session_token: str) -> Tuple[bool, Optional[Dict[str, Any]]]:
+    def validate_session(self, session_token: str) -> tuple[bool, dict[str, Any] | None]:
         """
         Validate a session token.
 
@@ -719,7 +712,6 @@ class SessionManager:
             if user_id:
                 self.session_tokens.pop(user_id, None)
 
-
 class TOTPManager:
     """
     Two-Factor Authentication using TOTP (Time-based One-Time Password).
@@ -736,8 +728,8 @@ class TOTPManager:
             import pyotp
             self.pyotp = pyotp
             self.AVAILABLE = True
-            self.user_secrets: Dict[str, str] = {}
-            self.user_backup_codes: Dict[str, Dict[str, Any]] = {}
+            self.user_secrets: dict[str, str] = {}
+            self.user_backup_codes: dict[str, dict[str, Any]] = {}
             security_logger.info("TOTP manager initialized successfully")
         except ImportError:
             security_logger.warning("pyotp not installed - 2FA will be disabled")
@@ -761,7 +753,7 @@ class TOTPManager:
         digest.update(code.encode("utf-8"))
         return digest.hexdigest()
 
-    def generate_secret(self, user_id: str, issuer: str = "XAI-Wallet") -> Dict[str, str]:
+    def generate_secret(self, user_id: str, issuer: str = "XAI-Wallet") -> dict[str, str]:
         """
         Generate a new TOTP secret for a user.
 
@@ -811,7 +803,7 @@ class TOTPManager:
         totp = self.pyotp.TOTP(secret)
         return totp.verify(token, valid_window=SecurityConfig.TOTP_WINDOW)
 
-    def get_backup_codes(self, user_id: str, count: int = 10) -> List[str]:
+    def get_backup_codes(self, user_id: str, count: int = 10) -> list[str]:
         """
         Generate backup codes for account recovery.
 
@@ -827,7 +819,7 @@ class TOTPManager:
 
         codes = [secrets.token_hex(4) for _ in range(count)]
         salt = secrets.token_bytes(16)
-        hashed_codes: Set[str] = set()
+        hashed_codes: set[str] = set()
         for code in codes:
             hashed_codes.add(self._hash_backup_code(code, salt))
 
@@ -889,7 +881,6 @@ class TOTPManager:
         )
         return True
 
-
 class SecurityMiddleware:
     """
     Main security middleware for Flask applications.
@@ -897,7 +888,7 @@ class SecurityMiddleware:
     Combines all security features into a single middleware class.
     """
 
-    def __init__(self, app: Flask, config: Optional[SecurityConfig] = None):
+    def __init__(self, app: Flask, config: SecurityConfig | None = None):
         """
         Initialize security middleware.
 
@@ -915,7 +906,7 @@ class SecurityMiddleware:
 
         # Secure credential storage - thread-safe with hashed passwords
         self._credentials_lock = threading.RLock()
-        self._credentials: Dict[str, str] = {}  # user_id -> hashed_password
+        self._credentials: dict[str, str] = {}  # user_id -> hashed_password
 
         # Set Flask configuration
         self._configure_flask()
@@ -940,7 +931,7 @@ class SecurityMiddleware:
         self.app.errorhandler(RateLimitExceeded)(self._handle_rate_limit)
         self.app.errorhandler(CSRFTokenInvalid)(self._handle_csrf_error)
 
-    def _before_request(self) -> Optional[Response]:
+    def _before_request(self) -> Response | None:
         """Pre-request middleware."""
         # Skip middleware for static files
         if request.path.startswith("/static"):
@@ -1012,7 +1003,7 @@ class SecurityMiddleware:
         if not self.token_manager.validate_csrf_token(token, session_id):
             raise CSRFTokenInvalid("CSRF token invalid")
 
-    def _handle_rate_limit(self, error: RateLimitExceeded) -> Tuple[Dict[str, Any], int]:
+    def _handle_rate_limit(self, error: RateLimitExceeded) -> tuple[dict[str, Any], int]:
         """Handle rate limit errors."""
         security_logger.warning(f"Rate limit exceeded: {request.remote_addr}")
         return (
@@ -1020,7 +1011,7 @@ class SecurityMiddleware:
             429
         )
 
-    def _handle_csrf_error(self, error: CSRFTokenInvalid) -> Tuple[Dict[str, Any], int]:
+    def _handle_csrf_error(self, error: CSRFTokenInvalid) -> tuple[dict[str, Any], int]:
         """Handle CSRF errors."""
         security_logger.warning(f"CSRF error: {str(error)} - {request.remote_addr}")
         return (
@@ -1315,10 +1306,9 @@ class SecurityMiddleware:
             )
             return True
 
-
 def setup_security_middleware(
     app: Flask,
-    config: Optional[SecurityConfig] = None,
+    config: SecurityConfig | None = None,
     enable_cors: bool = True,
 ) -> SecurityMiddleware:
     """

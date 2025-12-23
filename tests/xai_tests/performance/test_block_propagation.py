@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Performance tests for block propagation across network peers.
 
@@ -12,7 +14,7 @@ import asyncio
 import time
 import statistics
 import json
-from typing import List, Dict, Any, Set
+from typing import Any
 from unittest.mock import Mock, AsyncMock, patch
 
 from xai.core.blockchain import Blockchain
@@ -20,10 +22,8 @@ from xai.core.wallet import Wallet
 from xai.core.transaction import Transaction
 from xai.core.node_p2p import P2PNetworkManager
 
-
 # Mark all tests in this module as performance tests
 pytestmark = pytest.mark.performance
-
 
 class TestBlockPropagation:
     """Tests for block propagation across network."""
@@ -40,7 +40,7 @@ class TestBlockPropagation:
         """Create wallets for testing."""
         return [Wallet() for _ in range(10)]
 
-    def _create_block(self, blockchain: Blockchain, wallets: List[Wallet], tx_count: int = 5):
+    def _create_block(self, blockchain: Blockchain, wallets: list[Wallet], tx_count: int = 5):
         """Helper to create and mine a block."""
         for i in range(tx_count):
             sender = wallets[i % len(wallets)]
@@ -325,7 +325,6 @@ class TestBlockPropagation:
         speedup = full_time / compact_time if compact_time > 0 else 0
         print(f"\nCompact block speedup: {speedup:.2f}x")
 
-
 class TestNetworkTopology:
     """Tests for block propagation in different network topologies."""
 
@@ -422,7 +421,7 @@ class TestNetworkTopology:
         connections_per_node = 4
 
         # Create network graph (simplified simulation)
-        network: Dict[str, Set[str]] = {}
+        network: dict[str, set[str]] = {}
         for i in range(num_nodes):
             node = f"node_{i}"
             # Connect to next few nodes (circular)
@@ -453,8 +452,8 @@ class TestNetworkTopology:
         # Simulate propagation through mesh
         start = time.perf_counter()
 
-        visited: Set[str] = set()
-        wave_times: List[float] = []
+        visited: set[str] = set()
+        wave_times: list[float] = []
 
         # BFS-style propagation from origin node
         current_wave = {"node_0"}
@@ -463,7 +462,7 @@ class TestNetworkTopology:
 
         while current_wave and wave_num < 10:  # Max 10 hops
             wave_start = time.perf_counter()
-            next_wave: Set[str] = set()
+            next_wave: set[str] = set()
 
             for node in current_wave:
                 # Each node sends to its neighbors
@@ -556,7 +555,6 @@ class TestNetworkTopology:
 
         # Sync should be reasonably fast
         assert total_sync_time < 10, f"Sync too slow: {total_sync_time:.2f}s"
-
 
 class TestPropagationUnderLoad:
     """Tests for block propagation under heavy network load."""
@@ -684,7 +682,6 @@ class TestPropagationUnderLoad:
 
         print(f"Block propagated: {result} bytes")
         print(f"Under load time: {benchmark.stats.stats.mean * 1000:.2f} ms")
-
 
 if __name__ == "__main__":
     # Allow running tests directly

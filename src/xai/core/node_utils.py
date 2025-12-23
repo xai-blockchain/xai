@@ -4,10 +4,11 @@ Shared utility functions, helper methods, and constants for the blockchain node.
 """
 
 from __future__ import annotations
-from typing import List, Dict, Any, Optional
-import os
-import yaml
 
+import os
+from typing import Any
+
+import yaml
 
 # ==================== CONSTANTS ====================
 
@@ -18,11 +19,9 @@ DEFAULT_HOST: str = os.getenv("XAI_DEFAULT_HOST", "127.0.0.1")
 DEFAULT_PORT: int = int(os.getenv("XAI_DEFAULT_PORT", "8545"))
 DEFAULT_MINER_ADDRESS: str = "DEFAULT_MINER"
 
-
 # ==================== CONFIGURATION UTILITIES ====================
 
-
-def get_allowed_origins() -> List[str]:
+def get_allowed_origins() -> list[str]:
     """
     Get allowed CORS origins from configuration file.
 
@@ -40,7 +39,6 @@ def get_allowed_origins() -> List[str]:
             cors_config = yaml.safe_load(f)
             return cors_config.get("origins", [])
     return []
-
 
 def get_base_dir() -> str:
     """
@@ -64,11 +62,9 @@ def get_base_dir() -> str:
 
     return base_dir
 
-
 # ==================== RESPONSE FORMATTING ====================
 
-
-def format_success_response(data: Dict[str, Any], message: str = "") -> Dict[str, Any]:
+def format_success_response(data: dict[str, Any], message: str = "") -> dict[str, Any]:
     """
     Format a success API response.
 
@@ -84,13 +80,12 @@ def format_success_response(data: Dict[str, Any], message: str = "") -> Dict[str
         >>> print(response)
         {'success': True, 'balance': 100, 'message': 'Balance retrieved'}
     """
-    response: Dict[str, Any] = {"success": True, **data}
+    response: dict[str, Any] = {"success": True, **data}
     if message:
         response["message"] = message
     return response
 
-
-def format_error_response(error: str, status_code: int = 400) -> Dict[str, Any]:
+def format_error_response(error: str, status_code: int = 400) -> dict[str, Any]:
     """
     Format an error API response.
 
@@ -108,9 +103,7 @@ def format_error_response(error: str, status_code: int = 400) -> Dict[str, Any]:
     """
     return {"success": False, "error": error, "status_code": status_code}
 
-
 # ==================== VALIDATION UTILITIES ====================
-
 
 def is_valid_address(address: str) -> bool:
     """
@@ -142,7 +135,6 @@ def is_valid_address(address: str) -> bool:
 
     return True
 
-
 def is_valid_amount(amount: float) -> bool:
     """
     Validate transaction amount.
@@ -164,7 +156,6 @@ def is_valid_amount(amount: float) -> bool:
 
     return amount > 0
 
-
 def is_valid_order_type(order_type: str) -> bool:
     """
     Validate exchange order type.
@@ -182,7 +173,6 @@ def is_valid_order_type(order_type: str) -> bool:
         False
     """
     return order_type in ["buy", "sell"]
-
 
 def is_valid_currency(currency: str) -> bool:
     """
@@ -202,7 +192,6 @@ def is_valid_currency(currency: str) -> bool:
     """
     supported_currencies = ["AXN", "BTC", "ETH", "USDT", "USD"]
     return currency in supported_currencies
-
 
 def is_valid_trading_pair(pair: str) -> bool:
     """
@@ -230,9 +219,7 @@ def is_valid_trading_pair(pair: str) -> bool:
     base, quote = parts
     return is_valid_currency(base) and is_valid_currency(quote)
 
-
 # ==================== DATA UTILITIES ====================
-
 
 def calculate_block_reward(block_index: int) -> float:
     """
@@ -261,7 +248,6 @@ def calculate_block_reward(block_index: int) -> float:
     # Minimum reward
     return max(reward, 0.00000001)
 
-
 def calculate_difficulty(chain_length: int, target_block_time: float = 60.0) -> int:
     """
     Calculate mining difficulty based on blockchain state.
@@ -289,8 +275,7 @@ def calculate_difficulty(chain_length: int, target_block_time: float = 60.0) -> 
     # Maximum difficulty of 6
     return min(base_difficulty + difficulty_increment, 6)
 
-
-def validate_required_fields(data: Dict[str, Any], required_fields: List[str]) -> Optional[str]:
+def validate_required_fields(data: dict[str, Any], required_fields: list[str]) -> str | None:
     """
     Validate that all required fields are present in data dictionary.
 
@@ -318,8 +303,7 @@ def validate_required_fields(data: Dict[str, Any], required_fields: List[str]) -
 
     return None
 
-
-def paginate_list(items: List[Any], limit: int = 10, offset: int = 0) -> Dict[str, Any]:
+def paginate_list(items: list[Any], limit: int = 10, offset: int = 0) -> dict[str, Any]:
     """
     Paginate a list of items.
 
@@ -350,9 +334,7 @@ def paginate_list(items: List[Any], limit: int = 10, offset: int = 0) -> Dict[st
         "has_more": offset + limit < total,
     }
 
-
 # ==================== TIME UTILITIES ====================
-
 
 def get_timestamp() -> float:
     """
@@ -369,7 +351,6 @@ def get_timestamp() -> float:
     import time
 
     return time.time()
-
 
 def format_timestamp(timestamp: float) -> str:
     """
@@ -389,7 +370,6 @@ def format_timestamp(timestamp: float) -> str:
 
     dt = datetime.fromtimestamp(timestamp)
     return dt.strftime("%Y-%m-%d %H:%M:%S")
-
 
 def is_timestamp_recent(timestamp: float, max_age_seconds: float = 300.0) -> bool:
     """
@@ -413,11 +393,9 @@ def is_timestamp_recent(timestamp: float, max_age_seconds: float = 300.0) -> boo
     age = current_time - timestamp
     return 0 <= age <= max_age_seconds
 
-
 # ==================== ENDPOINT DOCUMENTATION ====================
 
-
-def get_api_endpoints() -> Dict[str, str]:
+def get_api_endpoints() -> dict[str, str]:
     """
     Get dictionary of all API endpoints with descriptions.
 

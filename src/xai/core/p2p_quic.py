@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import asyncio
 from functools import partial
-from typing import Callable, Awaitable, Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 if TYPE_CHECKING:
     from aioquic.asyncio import QuicConnectionProtocol
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from aioquic.quic.events import StreamDataReceived
 
 try:
-    from aioquic.asyncio import serve, connect, QuicConnectionProtocol
+    from aioquic.asyncio import QuicConnectionProtocol, connect, serve
     from aioquic.quic.configuration import QuicConfiguration
     from aioquic.quic.events import StreamDataReceived
     AIOQUIC_AVAILABLE = True

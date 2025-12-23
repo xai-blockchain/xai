@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Security Alert System for XAI Blockchain
 
@@ -14,7 +16,7 @@ import os
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+
 import argparse
 from dataclasses import dataclass
 import smtplib
@@ -27,7 +29,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-
 @dataclass
 class Alert:
     """Alert data class"""
@@ -38,14 +39,13 @@ class Alert:
     count: int
     timestamp: str
 
-
 class AlertManager:
     """Manages security alerts"""
 
     def __init__(self, config: Dict):
         """Initialize alert manager"""
         self.config = config
-        self.alerts: List[Alert] = []
+        self.alerts: list[Alert] = []
 
     def add_alert(self, alert: Alert):
         """Add alert to queue"""
@@ -231,7 +231,6 @@ Please review the full security report and take appropriate action.
 
         except Exception as e:
 
-
 class AlertProcessor:
     """Processes security reports and generates alerts"""
 
@@ -281,7 +280,7 @@ class AlertProcessor:
             )
             self.manager.add_alert(alert)
 
-    def _determine_severity(self, tool: str, count: int, thresholds: Dict) -> Optional[str]:
+    def _determine_severity(self, tool: str, count: int, thresholds: Dict) -> str | None:
         """Determine alert severity based on vulnerability count"""
         if count >= thresholds.get('critical', 0):
             return 'critical'
@@ -293,7 +292,6 @@ class AlertProcessor:
             return 'low'
 
         return None
-
 
 def main():
     """Main entry point"""
@@ -336,7 +334,6 @@ def main():
     # Process report and send alerts
     processor = AlertProcessor(config)
     processor.process_report(args.report)
-
 
 if __name__ == '__main__':
     main()

@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 import logging
-from typing import Dict, Any, List
+from typing import Any
 
 logger = logging.getLogger("xai.blockchain.fork_detector")
 
-
 class ForkDetector:
-    def __init__(self, node_id: str, initial_chain_head: Dict[str, Any]):
+    def __init__(self, node_id: str, initial_chain_head: dict[str, Any]):
         if not node_id:
             raise ValueError("Node ID cannot be empty.")
         if (
@@ -18,7 +19,7 @@ class ForkDetector:
         self.node_id = node_id
         self.current_chain_head = initial_chain_head  # {"hash": "...", "height": int}
         # Stores peer chain heads: {peer_id: {"hash": "...", "height": int}}
-        self.peer_chain_heads: Dict[str, Dict[str, Any]] = {}
+        self.peer_chain_heads: dict[str, dict[str, Any]] = {}
         logger.info(
             "ForkDetector initialized for node %s at height %s (%s)",
             self.node_id,
@@ -26,7 +27,7 @@ class ForkDetector:
             self.current_chain_head["hash"],
         )
 
-    def update_node_chain_head(self, new_chain_head: Dict[str, Any]):
+    def update_node_chain_head(self, new_chain_head: dict[str, Any]):
         """Updates the node's own view of the current chain head."""
         if (
             not isinstance(new_chain_head, dict)
@@ -42,7 +43,7 @@ class ForkDetector:
             self.current_chain_head["hash"],
         )
 
-    def report_peer_chain_head(self, peer_id: str, peer_chain_head: Dict[str, Any]):
+    def report_peer_chain_head(self, peer_id: str, peer_chain_head: dict[str, Any]):
         """A peer reports its current chain head."""
         if not peer_id:
             raise ValueError("Peer ID cannot be empty.")

@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Comprehensive Security Monitoring Script for XAI Blockchain
 
@@ -22,7 +24,7 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+
 import argparse
 import time
 from dataclasses import dataclass, asdict
@@ -39,7 +41,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class ScanResult:
     """Security scan result data class"""
@@ -48,20 +49,19 @@ class ScanResult:
     status: str
     summary: Dict
     details: Dict
-    vulnerabilities: List[Dict]
-    warnings: List[str]
-    errors: List[str]
+    vulnerabilities: list[Dict]
+    warnings: list[str]
+    errors: list[str]
     duration: float
-
 
 class SecurityMonitor:
     """Main security monitoring orchestrator"""
 
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: str | None = None):
         """Initialize security monitor with configuration"""
         self.config_path = config_path or '.security/config.yml'
         self.config = self._load_config()
-        self.results: Dict[str, ScanResult] = {}
+        self.results: dict[str, ScanResult] = {}
         self.start_time = datetime.now()
         self.repo_root = Path.cwd()
         self.reports_dir = self.repo_root / 'security_reports'
@@ -581,7 +581,6 @@ class SecurityMonitor:
             }
         }
 
-
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
@@ -629,7 +628,6 @@ def main():
     except Exception as e:
         logger.error(f"Critical error: {e}", exc_info=True)
         sys.exit(1)
-
 
 if __name__ == '__main__':
     main()

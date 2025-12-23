@@ -16,19 +16,11 @@ from xai.core.wallet import Wallet
 from xai.mobile.biometric_auth import (
     BiometricAuthManager,
     MockBiometricProvider,
+    ProtectionLevel,
     SessionConfig,
-    ProtectionLevel
 )
-from xai.mobile.secure_enclave import (
-    SecureEnclaveManager,
-    MockSecureEnclaveProvider,
-    KeyAlgorithm
-)
-from xai.mobile.biometric_wallet import (
-    BiometricWallet,
-    BiometricWalletFactory,
-    SecurityPolicy
-)
+from xai.mobile.biometric_wallet import BiometricWallet, BiometricWalletFactory, SecurityPolicy
+from xai.mobile.secure_enclave import KeyAlgorithm, MockSecureEnclaveProvider, SecureEnclaveManager
 
 
 def example_basic_biometric_wallet():

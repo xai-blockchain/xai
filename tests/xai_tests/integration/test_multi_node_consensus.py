@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Integration tests for multi-node consensus in XAI blockchain.
 
@@ -11,19 +13,18 @@ Tests are skipped where this method is required for peer block acceptance.
 import pytest
 import time
 import threading
-from typing import List, Dict, Any
+from typing import Any
 
 from xai.core.blockchain import Blockchain, Transaction
 from xai.core.node import BlockchainNode
 from xai.core.wallet import Wallet
 from xai.core.node_consensus import ConsensusManager
 
-
 class TestMultiNodeConsensus:
     """Test consensus mechanisms across multiple nodes"""
 
     @pytest.fixture
-    def blockchain_nodes(self, tmp_path) -> List[BlockchainNode]:
+    def blockchain_nodes(self, tmp_path) -> list[BlockchainNode]:
         """Create 3 independent blockchain nodes"""
         nodes = []
         for i in range(3):
@@ -311,7 +312,6 @@ class TestMultiNodeConsensus:
             # Should be accepted (or already present)
             assert result or len(node.blockchain.chain) >= len(node1.blockchain.chain)
 
-
 class TestConsensusEdgeCases:
     """Test edge cases in consensus mechanism"""
 
@@ -374,7 +374,6 @@ class TestConsensusEdgeCases:
         # Chains should match
         assert len(node1.blockchain.chain) == len(node2.blockchain.chain)
         assert node1.blockchain.chain[-1].hash == node2.blockchain.chain[-1].hash
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

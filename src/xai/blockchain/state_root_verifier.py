@@ -1,17 +1,18 @@
+from __future__ import annotations
+
 import logging
-from typing import Dict, Any, List, Tuple
+from typing import Any
 
 from .merkle import MerkleTree  # Import MerkleTree
 
 logger = logging.getLogger("xai.blockchain.state_root_verifier")
-
 
 class StateRootVerifier:
     def __init__(self):
         # In a real system, these would be fetched from a light client or a trusted oracle
         # and would be updated regularly. For this mock, we'll pre-populate some.
         # Format: {chain_id: {block_number: state_root_hash}}
-        self.trusted_state_roots: Dict[str, Dict[int, str]] = {
+        self.trusted_state_roots: dict[str, dict[int, str]] = {
             "SourceChainA": {
                 100: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
                 101: "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b3",
@@ -46,7 +47,7 @@ class StateRootVerifier:
         return state_root
 
     def verify_inclusion(
-        self, data: Any, merkle_proof: List[Tuple[str, str]], chain_id: str, block_number: int
+        self, data: Any, merkle_proof: list[tuple[str, str]], chain_id: str, block_number: int
     ) -> bool:
         """
         Verifies that a piece of data is included in the state of a source chain

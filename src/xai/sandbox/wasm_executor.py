@@ -20,15 +20,13 @@ import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 logger = logging.getLogger(__name__)
-
 
 class WasmExecutionError(Exception):
     """Raised when WASM execution fails"""
     pass
-
 
 @dataclass
 class WasmResult:
@@ -41,7 +39,6 @@ class WasmResult:
     memory_used_bytes: int = 0
     fuel_consumed: int = 0  # Metered execution
 
-
 @dataclass
 class WasmLimits:
     """Resource limits for WASM execution"""
@@ -50,7 +47,6 @@ class WasmLimits:
     max_instances: int = 1
     max_execution_fuel: int = 1000000  # Metered instructions
     max_wall_time_seconds: int = 10
-
 
 class WasmExecutor:
     """
@@ -61,7 +57,7 @@ class WasmExecutor:
 
     def __init__(
         self,
-        limits: Optional[WasmLimits] = None,
+        limits: WasmLimits | None = None,
         runtime: str = "auto",
     ):
         """
@@ -81,8 +77,8 @@ class WasmExecutor:
         self,
         wasm_bytes: bytes,
         function_name: str = "_start",
-        arguments: Optional[List[Any]] = None,
-        imports: Optional[Dict[str, Any]] = None,
+        arguments: list[Any] | None = None,
+        imports: dict[str, Any] | None = None,
     ) -> WasmResult:
         """
         Execute WASM module
@@ -126,10 +122,10 @@ class WasmExecutor:
 
     def execute_file(
         self,
-        wasm_path: Union[str, Path],
+        wasm_path: str | Path,
         function_name: str = "_start",
-        arguments: Optional[List[Any]] = None,
-        imports: Optional[Dict[str, Any]] = None,
+        arguments: list[Any] | None = None,
+        imports: dict[str, Any] | None = None,
     ) -> WasmResult:
         """Execute WASM module from file"""
         wasm_bytes = Path(wasm_path).read_bytes()
@@ -162,7 +158,7 @@ class WasmExecutor:
             logger.warning(f"WASM validation failed: {e}")
             return False
 
-    def _initialize_runtime(self, runtime: str) -> Optional[Any]:
+    def _initialize_runtime(self, runtime: str) -> Any | None:
         """Initialize WASM runtime"""
         if runtime == "auto":
             # Try runtimes in order of preference
@@ -175,7 +171,7 @@ class WasmExecutor:
         else:
             return self._try_initialize_runtime(runtime)
 
-    def _try_initialize_runtime(self, runtime: str) -> Optional[Any]:
+    def _try_initialize_runtime(self, runtime: str) -> Any | None:
         """Try to initialize specific runtime"""
         try:
             if runtime == "wasmer":
@@ -203,8 +199,8 @@ class WasmExecutor:
         self,
         wasm_bytes: bytes,
         function_name: str,
-        arguments: List[Any],
-        imports: Dict[str, Any],
+        arguments: list[Any],
+        imports: dict[str, Any],
     ) -> WasmResult:
         """Execute with detected runtime"""
         if self.runtime_name == "wasmer":
@@ -220,13 +216,22 @@ class WasmExecutor:
         self,
         wasm_bytes: bytes,
         function_name: str,
-        arguments: List[Any],
-        imports: Dict[str, Any],
+        arguments: list[Any],
+        imports: dict[str, Any],
     ) -> WasmResult:
         """Execute using wasmer runtime"""
         try:
             import wasmer
-            from wasmer import engine, Store, Module, Instance, ImportObject, Function, FunctionType, Type
+            from wasmer import (
+                Function,
+                FunctionType,
+                ImportObject,
+                Instance,
+                Module,
+                Store,
+                Type,
+                engine,
+            )
 
             # Create store with engine
             store = Store(engine.JIT())
@@ -283,8 +288,8 @@ class WasmExecutor:
         self,
         wasm_bytes: bytes,
         function_name: str,
-        arguments: List[Any],
-        imports: Dict[str, Any],
+        arguments: list[Any],
+        imports: dict[str, Any],
     ) -> WasmResult:
         """Execute using wasmtime runtime"""
         try:
@@ -354,8 +359,8 @@ class WasmExecutor:
         self,
         wasm_bytes: bytes,
         function_name: str,
-        arguments: List[Any],
-        imports: Dict[str, Any],
+        arguments: list[Any],
+        imports: dict[str, Any],
     ) -> WasmResult:
         """Execute using wasm3 interpreter"""
         try:
@@ -407,7 +412,7 @@ class WasmExecutor:
         """Validate module with wasmer"""
         try:
             import wasmer
-            from wasmer import engine, Store, Module
+            from wasmer import Module, Store, engine
 
             store = Store(engine.JIT())
             module = Module(store, wasm_bytes)
@@ -448,7 +453,6 @@ class WasmExecutor:
         except Exception:
             return False
 
-
 class WasmHostAPI:
     """
     Host API for WASM modules
@@ -465,7 +469,7 @@ class WasmHostAPI:
         self.app_id = app_id
         self.permission_manager = permission_manager
 
-    def get_host_imports(self) -> Dict[str, Any]:
+    def get_host_imports(self) -> dict[str, Any]:
         """Get host functions for WASM import"""
         return {
             "log": self.log,
@@ -495,7 +499,6 @@ class WasmHostAPI:
         """Get random uint32"""
         import random
         return random.randint(0, 2**32 - 1)
-
 
 def compile_to_wasm(source_code: str, language: str = "rust") -> bytes:
     """

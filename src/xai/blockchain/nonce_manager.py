@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Nonce Manager Module
 
@@ -9,10 +11,8 @@ to prevent duplicate transaction processing and replay attacks.
 """
 
 import logging
-from typing import Dict
 
 logger = logging.getLogger("xai.blockchain.nonce_manager")
-
 
 class NonceManager:
     """
@@ -29,7 +29,7 @@ class NonceManager:
     def __init__(self) -> None:
         """Initialize the NonceManager with an empty nonce tracking dictionary."""
         # Stores the last successfully processed nonce for each sender address
-        self.last_nonces: Dict[str, int] = {}
+        self.last_nonces: dict[str, int] = {}
 
     def get_current_nonce(self, sender_address: str) -> int:
         """
@@ -83,5 +83,4 @@ class NonceManager:
                 expected_nonce,
             )
             return False
-
 

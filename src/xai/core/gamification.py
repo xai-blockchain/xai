@@ -1,22 +1,23 @@
+from __future__ import annotations
+
 """
 AXN Blockchain Gamification Features
 Implements 5 gamification mechanisms to increase engagement and network activity
 All features use $0 cost - pure Python with JSON file storage
 """
 
+import hashlib
 import json
 import logging
-import time
+import os
 import secrets
-import hashlib
-from typing import List, Dict, Optional, Tuple
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
-import os
+
 from xai.core.blockchain_interface import GamificationBlockchainInterface
 
 logger = logging.getLogger(__name__)
-
 
 # Cryptographically secure random number generation helpers
 # Used for fairness-critical operations: airdrops, winner selection, treasure hunts
@@ -39,7 +40,6 @@ def _secure_randint(a: int, b: int) -> int:
         raise ValueError(f"Invalid range: {a} > {b}")
     return secrets.randbelow(b - a + 1) + a
 
-
 def _secure_random_float(min_val: float = 0.0, max_val: float = 1.0, precision: int = 10000) -> float:
     """
     Cryptographically secure random float in [min_val, max_val].
@@ -60,7 +60,6 @@ def _secure_random_float(min_val: float = 0.0, max_val: float = 1.0, precision: 
 
     # Scale to desired range
     return min_val + (random_fraction * (max_val - min_val))
-
 
 def _secure_sample(population: list, k: int) -> list:
     """
@@ -93,7 +92,6 @@ def _secure_sample(population: list, k: int) -> list:
 
     return result
 
-
 def _secure_choice(population: list):
     """
     Cryptographically secure random choice from list.
@@ -108,7 +106,6 @@ def _secure_choice(population: list):
         raise ValueError("Cannot choose from empty population")
 
     return population[secrets.randbelow(len(population))]
-
 
 class AirdropManager:
     """
@@ -127,7 +124,7 @@ class AirdropManager:
         self.airdrop_file = self.data_dir / "airdrops.json"
         self.airdrop_history = self._load_airdrop_history()
 
-    def _load_airdrop_history(self) -> List[dict]:
+    def _load_airdrop_history(self) -> list[dict]:
         """Load airdrop history from file"""
         if self.airdrop_file.exists():
             try:
@@ -153,7 +150,7 @@ class AirdropManager:
         """Check if airdrop should trigger at this block height"""
         return block_height > 0 and block_height % 100 == 0
 
-    def get_active_addresses(self, lookback_blocks: int = 100) -> List[str]:
+    def get_active_addresses(self, lookback_blocks: int = 100) -> list[str]:
         """
         Get active addresses from recent blocks (excluding COINBASE and GENESIS)
         Returns addresses that have sent or received transactions in the last N blocks
@@ -176,12 +173,12 @@ class AirdropManager:
 
     def select_airdrop_winners(
         self,
-        active_addresses: List[str],
+        active_addresses: list[str],
         count: int = 10,
         seed: str = None,
         weighted: bool = True,
-        activity_scores: Optional[Dict[str, int]] = None
-    ) -> List[str]:
+        activity_scores: dict[str, int] | None = None
+    ) -> list[str]:
         """
         TASK 61: Fair random selection with optional weighted distribution
         Uses block hash as seed for deterministic but unpredictable selection
@@ -285,7 +282,7 @@ class AirdropManager:
                 winners = _secure_sample(active_addresses, winner_count)
                 return winners
 
-    def calculate_airdrop_amounts(self, winners: List[str], seed: str = None) -> Dict[str, float]:
+    def calculate_airdrop_amounts(self, winners: list[str], seed: str = None) -> dict[str, float]:
         """
         Calculate random airdrop amount for each winner (1-10 AXN)
         Uses seed for deterministic amounts
@@ -313,7 +310,7 @@ class AirdropManager:
 
         return amounts
 
-    def execute_airdrop(self, block_height: int, block_hash: str) -> Optional[Dict[str, float]]:
+    def execute_airdrop(self, block_height: int, block_hash: str) -> dict[str, float] | None:
         """
         Execute airdrop at the given block height
         Returns dict of {address: amount} for winners
@@ -365,11 +362,11 @@ class AirdropManager:
 
         return airdrop_amounts
 
-    def get_recent_airdrops(self, limit: int = 10) -> List[dict]:
+    def get_recent_airdrops(self, limit: int = 10) -> list[dict]:
         """Get recent airdrop history"""
         return self.airdrop_history[-limit:]
 
-    def get_user_airdrop_history(self, address: str) -> List[dict]:
+    def get_user_airdrop_history(self, address: str) -> list[dict]:
         """Get airdrop history for specific address"""
         user_airdrops = []
         for airdrop in self.airdrop_history:
@@ -382,7 +379,6 @@ class AirdropManager:
                     }
                 )
         return user_airdrops
-
 
 class StreakTracker:
     """
@@ -401,7 +397,7 @@ class StreakTracker:
         self.streak_file = self.data_dir / "mining_streaks.json"
         self.miner_streaks = self._load_streaks()
 
-    def _load_streaks(self) -> Dict[str, dict]:
+    def _load_streaks(self) -> dict[str, dict]:
         """Load mining streaks from file"""
         if self.streak_file.exists():
             try:
@@ -501,7 +497,7 @@ class StreakTracker:
 
         return max(0.0, bonus_percent)  # Ensure non-negative
 
-    def apply_streak_bonus(self, miner_address: str, base_reward: float) -> Tuple[float, float]:
+    def apply_streak_bonus(self, miner_address: str, base_reward: float) -> tuple[float, float]:
         """
         Apply streak bonus to block reward
         Returns (final_reward, bonus_amount)
@@ -512,7 +508,7 @@ class StreakTracker:
 
         return final_reward, bonus_amount
 
-    def get_miner_stats(self, miner_address: str) -> Optional[dict]:
+    def get_miner_stats(self, miner_address: str) -> dict | None:
         """Get mining statistics for address"""
         if miner_address not in self.miner_streaks:
             return None
@@ -521,7 +517,7 @@ class StreakTracker:
         streak_data["bonus_percent"] = self.get_streak_bonus(miner_address) * 100
         return streak_data
 
-    def get_leaderboard(self, limit: int = 10, sort_by: str = "current_streak") -> List[dict]:
+    def get_leaderboard(self, limit: int = 10, sort_by: str = "current_streak") -> list[dict]:
         """
         Get mining streak leaderboard
         sort_by: 'current_streak', 'longest_streak', or 'total_blocks_mined'
@@ -543,7 +539,6 @@ class StreakTracker:
 
         return leaderboard[:limit]
 
-
 class TreasureHuntManager:
     """
     Blockchain Treasure Hunts - Allow miners to hide puzzle transactions
@@ -561,7 +556,7 @@ class TreasureHuntManager:
         self.treasure_file = self.data_dir / "treasure_hunts.json"
         self.treasures = self._load_treasures()
 
-    def _load_treasures(self) -> Dict[str, dict]:
+    def _load_treasures(self) -> dict[str, dict]:
         """Load treasure hunts from file"""
         if self.treasure_file.exists():
             with open(self.treasure_file, "r") as f:
@@ -620,7 +615,7 @@ class TreasureHuntManager:
 
         return treasure_id
 
-    def verify_solution(self, treasure_id: str, solution: str, proof: Optional[dict] = None) -> bool:
+    def verify_solution(self, treasure_id: str, solution: str, proof: dict | None = None) -> bool:
         """
         TASK 59: Verify if solution is correct for treasure hunt
         Supports GPS or cryptographic proof verification
@@ -662,7 +657,7 @@ class TreasureHuntManager:
             radius = puzzle_data.get("radius_meters", 100)
 
             # Calculate distance using Haversine formula
-            from math import radians, cos, sin, asin, sqrt
+            from math import asin, cos, radians, sin, sqrt
 
             lat1, lon1 = radians(target_lat), radians(target_lon)
             lat2, lon2 = radians(proof["latitude"]),
@@ -694,7 +689,7 @@ class TreasureHuntManager:
         treasure_id: str,
         claimer_address: str,
         solution: str,
-    ) -> Tuple[bool, Optional[float]]:
+    ) -> tuple[bool, float | None]:
         """
         Attempt to claim treasure by solving puzzle
         Returns (success, amount)
@@ -734,7 +729,7 @@ class TreasureHuntManager:
 
         return True, treasure["amount"]
 
-    def get_active_treasures(self) -> List[dict]:
+    def get_active_treasures(self) -> list[dict]:
         """Get all active (unclaimed) treasure hunts"""
         active = []
         for treasure_id, treasure in self.treasures.items():
@@ -753,7 +748,7 @@ class TreasureHuntManager:
                 )
         return active
 
-    def get_treasure_details(self, treasure_id: str) -> Optional[dict]:
+    def get_treasure_details(self, treasure_id: str) -> dict | None:
         """Get full details of treasure hunt (for display, no answer)"""
         if treasure_id not in self.treasures:
             return None
@@ -774,14 +769,13 @@ class TreasureHuntManager:
 
         return treasure
 
-    def get_user_created_treasures(self, address: str) -> List[dict]:
+    def get_user_created_treasures(self, address: str) -> list[dict]:
         """Get treasures created by user"""
         return [t for t in self.treasures.values() if t["creator"] == address]
 
-    def get_user_claimed_treasures(self, address: str) -> List[dict]:
+    def get_user_claimed_treasures(self, address: str) -> list[dict]:
         """Get treasures claimed by user"""
         return [t for t in self.treasures.values() if t["claimed_by"] == address]
-
 
 class FeeRefundCalculator:
     """
@@ -804,7 +798,7 @@ class FeeRefundCalculator:
         self.LOW_CONGESTION_THRESHOLD = 5  # <5 pending = 50% refund
         self.MED_CONGESTION_THRESHOLD = 10  # 5-10 pending = 25% refund
 
-    def _load_refunds(self) -> List[dict]:
+    def _load_refunds(self) -> list[dict]:
         """Load refund history from file"""
         if self.refund_file.exists():
             with open(self.refund_file, "r") as f:
@@ -849,7 +843,7 @@ class FeeRefundCalculator:
 
         return base_refund
 
-    def calculate_refunds_for_block(self, block) -> Dict[str, float]:
+    def calculate_refunds_for_block(self, block) -> dict[str, float]:
         """
         Calculate fee refunds for all transactions in a block
         Returns dict of {address: refund_amount}
@@ -872,7 +866,7 @@ class FeeRefundCalculator:
 
         return refunds
 
-    def process_refunds(self, block) -> Dict[str, float]:
+    def process_refunds(self, block) -> dict[str, float]:
         """
         Process fee refunds for a block and record history
         """
@@ -908,7 +902,7 @@ class FeeRefundCalculator:
 
         return refunds
 
-    def get_user_refund_history(self, address: str) -> List[dict]:
+    def get_user_refund_history(self, address: str) -> list[dict]:
         """Get refund history for specific address"""
         user_refunds = []
         for record in self.refund_history:
@@ -945,7 +939,6 @@ class FeeRefundCalculator:
             "unique_addresses": len(all_addresses),
         }
 
-
 class TimeCapsuleManager:
     """
     Time Capsule Transactions - Lock AXN to be sent on a future date with message
@@ -963,7 +956,7 @@ class TimeCapsuleManager:
         self.capsule_file = self.data_dir / "time_capsules.json"
         self.capsules = self._load_capsules()
 
-    def _load_capsules(self) -> Dict[str, dict]:
+    def _load_capsules(self) -> dict[str, dict]:
         """Load time capsules from file"""
         if self.capsule_file.exists():
             with open(self.capsule_file, "r") as f:
@@ -1022,7 +1015,7 @@ class TimeCapsuleManager:
 
         return capsule_id
 
-    def get_unlockable_capsules(self, current_time: float = None) -> List[dict]:
+    def get_unlockable_capsules(self, current_time: float = None) -> list[dict]:
         """Get capsules that are ready to be unlocked"""
         if current_time is None:
             current_time = time.time()
@@ -1071,7 +1064,7 @@ class TimeCapsuleManager:
 
         return True
 
-    def auto_create_unlock_transactions(self) -> List[dict]:
+    def auto_create_unlock_transactions(self) -> list[dict]:
         """
         TASK 58: Auto-create unlock transactions for ready capsules
         Automatically generates transactions for time capsules that are ready to unlock
@@ -1126,7 +1119,7 @@ class TimeCapsuleManager:
 
         return created_txs
 
-    def get_pending_capsules(self, address: str = None) -> List[dict]:
+    def get_pending_capsules(self, address: str = None) -> list[dict]:
         """
         Get pending (locked) time capsules
         Optionally filter by sender or recipient address
@@ -1169,7 +1162,7 @@ class TimeCapsuleManager:
 
         return {"sent": sent, "received": received}
 
-    def get_capsule_details(self, capsule_id: str) -> Optional[dict]:
+    def get_capsule_details(self, capsule_id: str) -> dict | None:
         """Get details of specific time capsule"""
         if capsule_id not in self.capsules:
             return None
@@ -1184,9 +1177,7 @@ class TimeCapsuleManager:
 
         return capsule
 
-
 # Utility functions for easy integration
-
 
 def initialize_gamification(blockchain_interface: GamificationBlockchainInterface, data_dir: str = None) -> dict:
     """
@@ -1200,7 +1191,6 @@ def initialize_gamification(blockchain_interface: GamificationBlockchainInterfac
         "fee_refund": FeeRefundCalculator(blockchain_interface, data_dir),
         "time_capsule": TimeCapsuleManager(blockchain_interface, data_dir),
     }
-
 
 if __name__ == "__main__":
     import sys

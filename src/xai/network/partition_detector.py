@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Network Partition Detection Module
 
@@ -5,22 +7,20 @@ Monitors peer connectivity to detect network partitions and triggers recovery.
 Critical for maintaining blockchain consensus during network issues.
 """
 
-import time
 import logging
-from typing import Dict, Any, List, Set, Optional
+import time
 from collections import defaultdict
 from dataclasses import dataclass
-
+from typing import Any
 
 @dataclass
 class PartitionEvent:
     """Records a detected network partition event"""
     detected_at: float
     partition_type: str  # 'full', 'partial', 'suspected'
-    affected_peers: Set[str]
+    affected_peers: set[str]
     connectivity_ratio: float
     details: Dict
-
 
 class PartitionDetector:
     """
@@ -36,7 +36,7 @@ class PartitionDetector:
     def __init__(
         self,
         node_id: str,
-        known_peers: List[str],
+        known_peers: list[str],
         min_peer_threshold: int = 3,
         connectivity_threshold: float = 0.5,
         heartbeat_timeout: float = 90.0,
@@ -59,24 +59,24 @@ class PartitionDetector:
             raise ValueError("Node ID cannot be in known_peers list.")
 
         self.node_id = node_id
-        self.known_peers: Set[str] = set(known_peers)
+        self.known_peers: set[str] = set(known_peers)
         self.min_peer_threshold = min_peer_threshold
         self.connectivity_threshold = connectivity_threshold
         self.heartbeat_timeout = heartbeat_timeout
 
         # Stores reachability info: {reporting_peer_id: {reachable_peer_id_1, reachable_peer_id_2, ...}}
-        self.peer_reachability: Dict[str, Set[str]] = {
+        self.peer_reachability: dict[str, set[str]] = {
             self.node_id: set()
         }  # Initialize own reachability
         for peer in known_peers:
             self.peer_reachability[peer] = set()  # Initialize other peers' reachability
 
         # Enhanced tracking for production
-        self.peer_last_seen: Dict[str, float] = {peer: time.time() for peer in known_peers}
-        self.peer_block_heights: Dict[str, int] = {}
-        self.partition_events: List[PartitionEvent] = []
-        self.current_partition: Optional[PartitionEvent] = None
-        self.recovery_attempts: Dict[str, int] = defaultdict(int)
+        self.peer_last_seen: dict[str, float] = {peer: time.time() for peer in known_peers}
+        self.peer_block_heights: dict[str, int] = {}
+        self.partition_events: list[PartitionEvent] = []
+        self.current_partition: PartitionEvent | None = None
+        self.recovery_attempts: dict[str, int] = defaultdict(int)
         self.last_partition_check = time.time()
 
         self.logger = logging.getLogger(__name__)
@@ -84,7 +84,7 @@ class PartitionDetector:
             f"PartitionDetector initialized for node {self.node_id}. Known peers: {self.known_peers}."
         )
 
-    def update_own_reachability(self, reachable_peers: List[str]):
+    def update_own_reachability(self, reachable_peers: list[str]):
         """Updates the node's own view of which peers it can reach."""
         if not isinstance(reachable_peers, list):
             raise ValueError("Reachable peers must be a list.")
@@ -93,7 +93,7 @@ class PartitionDetector:
             f"Node {self.node_id} updated its reachability: {self.peer_reachability[self.node_id]}"
         )
 
-    def report_peer_reachability(self, reporting_peer_id: str, reachable_peers: List[str]):
+    def report_peer_reachability(self, reporting_peer_id: str, reachable_peers: list[str]):
         """A peer reports which other peers it can reach."""
         if reporting_peer_id not in self.known_peers and reporting_peer_id != self.node_id:
             print(f"Warning: Reporting peer {reporting_peer_id} is not a known peer.")
@@ -109,7 +109,7 @@ class PartitionDetector:
             f"Peer {reporting_peer_id} reported reachability: {self.peer_reachability[reporting_peer_id]}"
         )
 
-    def _get_all_nodes(self) -> Set[str]:
+    def _get_all_nodes(self) -> set[str]:
         """Returns a set of all nodes in the network (self + known_peers)."""
         return self.known_peers.union({self.node_id})
 
@@ -160,7 +160,6 @@ class PartitionDetector:
         else:
             print(f"Node {self.node_id} sees a fully connected network. No partition detected.")
             return False
-
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Economic Invariant Tests using Property-Based Testing
 
@@ -10,7 +12,7 @@ Uses Hypothesis for property-based testing - generates thousands of random test 
 import pytest
 from hypothesis import given, strategies as st, settings, assume
 from decimal import Decimal
-from typing import List, Tuple
+
 import sys
 import os
 
@@ -18,7 +20,6 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'src'))
 
 from xai.core.validation import MonetaryAmount, MAX_SUPPLY
-
 
 class TestMonetaryAmountInvariants:
     """Property-based tests for MonetaryAmount precision guarantees."""
@@ -81,7 +82,6 @@ class TestMonetaryAmountInvariants:
         with pytest.raises(TypeError, match="Float not allowed"):
             MonetaryAmount(f)
 
-
 class TestUTXOConservationInvariants:
     """Property-based tests for UTXO model conservation laws."""
 
@@ -94,7 +94,7 @@ class TestUTXOConservationInvariants:
         st.integers(min_value=1, max_value=1_000_000)
     )
     @settings(max_examples=200)
-    def test_utxo_conservation_law(self, input_amounts: List[int], fee: int):
+    def test_utxo_conservation_law(self, input_amounts: list[int], fee: int):
         """
         UTXO Conservation Law: sum(inputs) == sum(outputs) + fee
 
@@ -126,7 +126,7 @@ class TestUTXOConservationInvariants:
         )
     )
     @settings(max_examples=100)
-    def test_utxo_uniqueness_invariant(self, utxos: List[Tuple[str, int]]):
+    def test_utxo_uniqueness_invariant(self, utxos: list[tuple[str, int]]):
         """
         UTXO Uniqueness Invariant: Each UTXO can only be spent once.
 
@@ -145,7 +145,6 @@ class TestUTXOConservationInvariants:
         # Verify all UTXOs are unique
         assert len(utxo_set) == len(set(utxo_set))
 
-
 class TestSupplyInvariants:
     """Property-based tests for token supply invariants."""
 
@@ -160,7 +159,7 @@ class TestSupplyInvariants:
         )
     )
     @settings(max_examples=200)
-    def test_total_supply_conservation(self, operations: List[Tuple[str, int]]):
+    def test_total_supply_conservation(self, operations: list[tuple[str, int]]):
         """
         Total Supply Invariant: Total supply never changes from operations.
 
@@ -217,13 +216,12 @@ class TestSupplyInvariants:
         assert cumulative_supply <= MAX_SUPPLY, \
             f"Supply exceeded cap: {cumulative_supply} > {MAX_SUPPLY}"
 
-
 class TestBlockchainInvariants:
     """Property-based tests for blockchain structure invariants."""
 
     @given(st.lists(st.binary(min_size=32, max_size=32), min_size=2, max_size=10))
     @settings(max_examples=100)
-    def test_chain_linkage_invariant(self, hashes: List[bytes]):
+    def test_chain_linkage_invariant(self, hashes: list[bytes]):
         """
         Chain Linkage Invariant: Each block must reference previous block's hash.
 
@@ -248,7 +246,7 @@ class TestBlockchainInvariants:
 
     @given(st.lists(st.integers(min_value=1, max_value=100), min_size=1, max_size=20))
     @settings(max_examples=100)
-    def test_monotonic_block_index_invariant(self, indices: List[int]):
+    def test_monotonic_block_index_invariant(self, indices: list[int]):
         """
         Monotonic Index Invariant: Block indices must be strictly increasing.
         """
@@ -257,7 +255,6 @@ class TestBlockchainInvariants:
         for i in range(1, len(sorted_indices)):
             assert sorted_indices[i] > sorted_indices[i-1], \
                 "Block indices must be strictly monotonic"
-
 
 class TestCryptographicInvariants:
     """Property-based tests for cryptographic invariants."""

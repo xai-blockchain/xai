@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, Tuple, Optional, Any
+from typing import TYPE_CHECKING, Any
 
 from flask import jsonify, request
 
+from xai.core.input_validation_schemas import TreasureClaimInput, TreasureCreateInput
 from xai.core.request_validator_middleware import validate_request
-from xai.core.input_validation_schemas import TreasureCreateInput, TreasureClaimInput
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
-
 
 def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
     """Register gamification endpoints (airdrops, streaks, treasure, refunds)."""
@@ -18,7 +17,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
     node = routes.node
 
     @app.route("/airdrop/winners", methods=["GET"])
-    def get_airdrop_winners() -> Dict[str, Any]:
+    def get_airdrop_winners() -> dict[str, Any]:
         """Get recent airdrop winners.
 
         Returns list of recent airdrop events with winner addresses and amounts.
@@ -36,7 +35,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
         return jsonify({"success": True, "airdrops": recent_airdrops})
 
     @app.route("/airdrop/user/<address>", methods=["GET"])
-    def get_user_airdrops(address: str) -> Dict[str, Any]:
+    def get_user_airdrops(address: str) -> dict[str, Any]:
         """Get airdrop history for a specific user.
 
         Returns complete airdrop history including total airdrops received
@@ -66,7 +65,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
         )
 
     @app.route("/mining/streaks", methods=["GET"])
-    def get_mining_streaks() -> Dict[str, Any]:
+    def get_mining_streaks() -> dict[str, Any]:
         """Get mining streak leaderboard.
 
         Returns top miners ranked by their current or longest mining streaks.
@@ -87,7 +86,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
         return jsonify({"success": True, "leaderboard": leaderboard})
 
     @app.route("/mining/streak/<address>", methods=["GET"])
-    def get_miner_streak(address: str) -> Tuple[Dict[str, Any], int]:
+    def get_miner_streak(address: str) -> tuple[dict[str, Any], int]:
         """Get mining streak statistics for a specific miner.
 
         Returns current streak, longest streak, and other mining statistics
@@ -113,7 +112,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
         return jsonify({"success": True, "address": address, "stats": stats}), 200
 
     @app.route("/treasure/active", methods=["GET"])
-    def get_active_treasures() -> Dict[str, Any]:
+    def get_active_treasures() -> dict[str, Any]:
         """Get all active treasure hunts.
 
         Returns list of treasure hunts that are currently claimable,
@@ -130,7 +129,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/treasure/create", methods=["POST"])
     @validate_request(routes.request_validator, TreasureCreateInput)
-    def create_treasure() -> Tuple[Dict[str, Any], int]:
+    def create_treasure() -> tuple[dict[str, Any], int]:
         """Create a new treasure hunt (admin only).
 
         Creates a treasure hunt with a puzzle that users can solve to claim rewards.
@@ -161,7 +160,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
         if auth_error:
             return auth_error
 
-        model: Optional[TreasureCreateInput] = getattr(request, "validated_model", None)
+        model: TreasureCreateInput | None = getattr(request, "validated_model", None)
         if model is None:
             return routes._error_response("Invalid treasure payload", status=400, code="invalid_payload")
 
@@ -184,7 +183,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/treasure/claim", methods=["POST"])
     @validate_request(routes.request_validator, TreasureClaimInput)
-    def claim_treasure() -> Tuple[Dict[str, Any], int]:
+    def claim_treasure() -> tuple[dict[str, Any], int]:
         """Claim a treasure hunt by solving its puzzle.
 
         Attempts to claim a treasure by providing the solution to its puzzle.
@@ -214,7 +213,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
         if auth_error:
             return auth_error
 
-        model: Optional[TreasureClaimInput] = getattr(request, "validated_model", None)
+        model: TreasureClaimInput | None = getattr(request, "validated_model", None)
         if model is None:
             return routes._error_response("Invalid treasure payload", status=400, code="invalid_payload")
 
@@ -248,7 +247,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "claim_treasure")
 
     @app.route("/treasure/details/<treasure_id>", methods=["GET"])
-    def get_treasure_details(treasure_id: str) -> Tuple[Dict[str, Any], int]:
+    def get_treasure_details(treasure_id: str) -> tuple[dict[str, Any], int]:
         """Get detailed information about a specific treasure hunt.
 
         Returns complete details including creator, amount, puzzle type,
@@ -271,7 +270,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
         return jsonify({"success": True, "treasure": treasure}), 200
 
     @app.route("/timecapsule/pending", methods=["GET"])
-    def get_pending_timecapsules() -> Dict[str, Any]:
+    def get_pending_timecapsules() -> dict[str, Any]:
         """Get pending time capsule transactions.
 
         Returns list of time-locked transactions that have not yet matured
@@ -287,7 +286,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
         return jsonify({"success": True, "count": len(capsules), "capsules": capsules})
 
     @app.route("/timecapsule/<address>", methods=["GET"])
-    def get_user_timecapsules(address: str) -> Dict[str, Any]:
+    def get_user_timecapsules(address: str) -> dict[str, Any]:
         """Get time capsule transactions for a specific user.
 
         Returns both sent and received time capsules for the specified address,
@@ -314,7 +313,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
         )
 
     @app.route("/refunds/stats", methods=["GET"])
-    def get_refund_stats() -> Dict[str, Any]:
+    def get_refund_stats() -> dict[str, Any]:
         """Get system-wide fee refund statistics.
 
         Returns aggregate statistics about fee refunds including total refunds
@@ -329,7 +328,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
         return jsonify({"success": True, "stats": stats})
 
     @app.route("/refunds/<address>", methods=["GET"])
-    def get_user_refunds(address: str) -> Dict[str, Any]:
+    def get_user_refunds(address: str) -> dict[str, Any]:
         """Get fee refund history for a specific user.
 
         Returns complete refund history including total refunds received

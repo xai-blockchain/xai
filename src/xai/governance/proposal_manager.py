@@ -1,10 +1,11 @@
-from typing import Dict, Any, Optional, List
-import time
+from __future__ import annotations
+
 import logging
 import threading
+import time
+from typing import Any
 
 logger = logging.getLogger(__name__)
-
 
 class ProposalManager:
     def __init__(self, minimum_stake_for_proposal: float, quorum_percentage: float = 10.0,
@@ -36,7 +37,7 @@ class ProposalManager:
         self.voting_period_seconds = voting_period_seconds
 
         # Stores active proposals with voting data
-        self.active_proposals: Dict[str, Dict[str, Any]] = {}
+        self.active_proposals: dict[str, dict[str, Any]] = {}
         self._proposal_id_counter = 0
         self._lock = threading.RLock()
 
@@ -143,7 +144,7 @@ class ProposalManager:
                 f"AGAINST={proposal['votes_against']:.2f}"
             )
 
-    def get_vote_tally(self, proposal_id: str) -> Dict[str, Any]:
+    def get_vote_tally(self, proposal_id: str) -> dict[str, Any]:
         """Get real-time vote tallying for a proposal."""
         with self._lock:
             proposal = self.active_proposals.get(proposal_id)
@@ -172,7 +173,7 @@ class ProposalManager:
                 "time_remaining": max(0, proposal["voting_end"] - int(time.time()))
             }
 
-    def finalize_proposal(self, proposal_id: str) -> Dict[str, Any]:
+    def finalize_proposal(self, proposal_id: str) -> dict[str, Any]:
         """
         Finalize a proposal at voting period end with automatic tallying.
         Calculates quorum, threshold, and publishes result.
@@ -252,7 +253,6 @@ class ProposalManager:
             logger.info(
                 f"Stake of {staked_amount:.2f} for proposal {proposal_id} returned to {proposal['proposer']}."
             )
-
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

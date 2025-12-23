@@ -19,7 +19,7 @@ import time
 import hmac
 import hashlib
 from unittest.mock import MagicMock, patch, call
-from typing import Dict, Any
+from typing import Any
 
 import pytest
 

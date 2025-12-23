@@ -14,11 +14,11 @@ All providers integrate with strict limit enforcement system.
 
 from __future__ import annotations
 
-import time
 import json
-from typing import Dict, Optional, Any, List
-import requests
+import time
+from typing import Any
 
+import requests
 
 class PerplexityProvider:
     """
@@ -37,7 +37,7 @@ class PerplexityProvider:
         task: str,
         max_tokens: int,
         model: str = "llama-3.1-sonar-large-128k-online",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Call Perplexity API with STRICT token limit
 
@@ -92,7 +92,6 @@ class PerplexityProvider:
         except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
             return {"success": False, "error": f"Perplexity API error: {str(e)}", "tokens_used": 0}
 
-
 class GroqProvider:
     """
     Groq - Ultra-fast inference with custom LPU hardware
@@ -106,7 +105,7 @@ class GroqProvider:
 
     def call_with_limit(
         self, api_key: str, task: str, max_tokens: int, model: str = "llama-3.1-70b-versatile"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Call Groq API with STRICT token limit
 
@@ -164,7 +163,6 @@ class GroqProvider:
         except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
             return {"success": False, "error": f"Groq API error: {str(e)}", "tokens_used": 0}
 
-
 class XAIProvider:
     """
     xAI (Grok) - Real-time insights with X/Twitter integration
@@ -178,7 +176,7 @@ class XAIProvider:
 
     def call_with_limit(
         self, api_key: str, task: str, max_tokens: int, model: str = "grok-beta"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Call xAI/Grok API with STRICT token limit
 
@@ -230,7 +228,6 @@ class XAIProvider:
         except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
             return {"success": False, "error": f"xAI API error: {str(e)}", "tokens_used": 0}
 
-
 class TogetherAIProvider:
     """
     Together AI - Cost-effective access to open source models
@@ -248,7 +245,7 @@ class TogetherAIProvider:
         task: str,
         max_tokens: int,
         model: str = "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Call Together AI API with STRICT token limit
 
@@ -303,7 +300,6 @@ class TogetherAIProvider:
         except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
             return {"success": False, "error": f"Together AI error: {str(e)}", "tokens_used": 0}
 
-
 class FireworksAIProvider:
     """
     Fireworks AI - Production-optimized hosting
@@ -321,7 +317,7 @@ class FireworksAIProvider:
         task: str,
         max_tokens: int,
         model: str = "accounts/fireworks/models/llama-v3p1-70b-instruct",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Call Fireworks AI API with STRICT token limit
 
@@ -374,7 +370,6 @@ class FireworksAIProvider:
         except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
             return {"success": False, "error": f"Fireworks AI error: {str(e)}", "tokens_used": 0}
 
-
 class DeepSeekProvider:
     """
     DeepSeek Coder - Specialized code generation model
@@ -388,7 +383,7 @@ class DeepSeekProvider:
 
     def call_with_limit(
         self, api_key: str, task: str, max_tokens: int, model: str = "deepseek-coder"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Call DeepSeek API with STRICT token limit
 
@@ -440,7 +435,6 @@ class DeepSeekProvider:
         except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
             return {"success": False, "error": f"DeepSeek API error: {str(e)}", "tokens_used": 0}
 
-
 # Integration with existing auto_switching_ai_executor.py
 def extend_executor_with_new_providers(executor_class: Any) -> None:
     """
@@ -448,44 +442,44 @@ def extend_executor_with_new_providers(executor_class: Any) -> None:
     """
 
     # Add methods to executor (providers are created lazily on each call)
-    def _call_perplexity_with_limit(self: Any, api_key: str, task: str, max_tokens: int, model: Optional[str] = None) -> Dict[str, Any]:
+    def _call_perplexity_with_limit(self: Any, api_key: str, task: str, max_tokens: int, model: str | None = None) -> dict[str, Any]:
         provider = PerplexityProvider()
-        kwargs: Dict[str, Any] = {"api_key": api_key, "task": task, "max_tokens": max_tokens}
+        kwargs: dict[str, Any] = {"api_key": api_key, "task": task, "max_tokens": max_tokens}
         if model is not None:
             kwargs["model"] = model
         return provider.call_with_limit(**kwargs)
 
-    def _call_groq_with_limit(self: Any, api_key: str, task: str, max_tokens: int, model: Optional[str] = None) -> Dict[str, Any]:
+    def _call_groq_with_limit(self: Any, api_key: str, task: str, max_tokens: int, model: str | None = None) -> dict[str, Any]:
         provider = GroqProvider()
-        kwargs: Dict[str, Any] = {"api_key": api_key, "task": task, "max_tokens": max_tokens}
+        kwargs: dict[str, Any] = {"api_key": api_key, "task": task, "max_tokens": max_tokens}
         if model is not None:
             kwargs["model"] = model
         return provider.call_with_limit(**kwargs)
 
-    def _call_xai_with_limit(self: Any, api_key: str, task: str, max_tokens: int, model: Optional[str] = None) -> Dict[str, Any]:
+    def _call_xai_with_limit(self: Any, api_key: str, task: str, max_tokens: int, model: str | None = None) -> dict[str, Any]:
         provider = XAIProvider()
-        kwargs: Dict[str, Any] = {"api_key": api_key, "task": task, "max_tokens": max_tokens}
+        kwargs: dict[str, Any] = {"api_key": api_key, "task": task, "max_tokens": max_tokens}
         if model is not None:
             kwargs["model"] = model
         return provider.call_with_limit(**kwargs)
 
-    def _call_together_with_limit(self: Any, api_key: str, task: str, max_tokens: int, model: Optional[str] = None) -> Dict[str, Any]:
+    def _call_together_with_limit(self: Any, api_key: str, task: str, max_tokens: int, model: str | None = None) -> dict[str, Any]:
         provider = TogetherAIProvider()
-        kwargs: Dict[str, Any] = {"api_key": api_key, "task": task, "max_tokens": max_tokens}
+        kwargs: dict[str, Any] = {"api_key": api_key, "task": task, "max_tokens": max_tokens}
         if model is not None:
             kwargs["model"] = model
         return provider.call_with_limit(**kwargs)
 
-    def _call_fireworks_with_limit(self: Any, api_key: str, task: str, max_tokens: int, model: Optional[str] = None) -> Dict[str, Any]:
+    def _call_fireworks_with_limit(self: Any, api_key: str, task: str, max_tokens: int, model: str | None = None) -> dict[str, Any]:
         provider = FireworksAIProvider()
-        kwargs: Dict[str, Any] = {"api_key": api_key, "task": task, "max_tokens": max_tokens}
+        kwargs: dict[str, Any] = {"api_key": api_key, "task": task, "max_tokens": max_tokens}
         if model is not None:
             kwargs["model"] = model
         return provider.call_with_limit(**kwargs)
 
-    def _call_deepseek_with_limit(self: Any, api_key: str, task: str, max_tokens: int, model: Optional[str] = None) -> Dict[str, Any]:
+    def _call_deepseek_with_limit(self: Any, api_key: str, task: str, max_tokens: int, model: str | None = None) -> dict[str, Any]:
         provider = DeepSeekProvider()
-        kwargs: Dict[str, Any] = {"api_key": api_key, "task": task, "max_tokens": max_tokens}
+        kwargs: dict[str, Any] = {"api_key": api_key, "task": task, "max_tokens": max_tokens}
         if model is not None:
             kwargs["model"] = model
         return provider.call_with_limit(**kwargs)
@@ -502,8 +496,8 @@ def extend_executor_with_new_providers(executor_class: Any) -> None:
     original_execute = executor_class._execute_with_strict_limits
 
     def _execute_with_strict_limits_extended(
-        self: Any, keys: Dict[str, str], task_description: str, estimated_tokens: int, max_tokens: int, provider: Any
-    ) -> Dict[str, Any]:
+        self: Any, keys: dict[str, str], task_description: str, estimated_tokens: int, max_tokens: int, provider: Any
+    ) -> dict[str, Any]:
         # Add new provider handling
         api_key = keys.get(provider.value, "")
         if provider.value == "perplexity":
@@ -527,7 +521,6 @@ def extend_executor_with_new_providers(executor_class: Any) -> None:
         return result
 
     executor_class._execute_with_strict_limits = _execute_with_strict_limits_extended
-
 
 # Example usage
 if __name__ == "__main__":

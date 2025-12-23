@@ -1,5 +1,8 @@
-from pydantic import BaseModel, Field, conint, constr, confloat
-from typing import List, Optional, Dict, Any
+from __future__ import annotations
+
+from typing import Any
+
+from pydantic import BaseModel, Field, confloat, conint, constr
 
 class NodeTransactionInput(BaseModel):
     sender: str
@@ -10,8 +13,8 @@ class NodeTransactionInput(BaseModel):
     nonce: int
     timestamp: float
     signature: str
-    txid: Optional[str] = Field(default=None, min_length=64, max_length=64)
-    metadata: Optional[Dict[str, Any]] = None
+    txid: str | None = Field(default=None, min_length=64, max_length=64)
+    metadata: dict[str, Any] | None = None
 
 class PeerTransactionInput(BaseModel):
     sender: str
@@ -21,12 +24,12 @@ class PeerTransactionInput(BaseModel):
     public_key: str
     tx_type: str
     nonce: int
-    inputs: List[Dict[str, Any]]
-    outputs: List[Dict[str, Any]]
-    timestamp: Optional[float] = None
+    inputs: list[dict[str, Any]]
+    outputs: list[dict[str, Any]]
+    timestamp: float | None = None
     signature: str
-    txid: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    txid: str | None = None
+    metadata: dict[str, Any] | None = None
 
 class FaucetClaimInput(BaseModel):
     address: str
@@ -34,7 +37,7 @@ class FaucetClaimInput(BaseModel):
 class PeerBlockInput(BaseModel):
     index: int
     timestamp: float
-    transactions: List[PeerTransactionInput]
+    transactions: list[PeerTransactionInput]
     previous_hash: str
     merkle_root: str
     nonce: int
@@ -46,7 +49,7 @@ class PeerAddInput(BaseModel):
 
 class RecoverySetupInput(BaseModel):
     owner_address: str
-    guardians: List[str]
+    guardians: list[str]
     threshold: conint(gt=0)
     signature: str
 
@@ -86,7 +89,7 @@ class ExchangeTransferInput(BaseModel):
     to_address: str
     currency: str
     amount: float
-    destination: Optional[str] = None
+    destination: str | None = None
 
 class ExchangeCancelInput(BaseModel):
     order_id: str
@@ -104,8 +107,8 @@ class TreasureCreateInput(BaseModel):
     creator: str
     amount: confloat(gt=0)
     puzzle_type: str
-    puzzle_data: Dict[str, Any]
-    hint: Optional[str] = None
+    puzzle_data: dict[str, Any]
+    hint: str | None = None
 
 class TreasureClaimInput(BaseModel):
     treasure_id: str
@@ -125,10 +128,10 @@ class ReferralCreateInput(BaseModel):
 class ReferralUseInput(BaseModel):
     new_address: str
     referral_code: str
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
 class FraudCheckInput(BaseModel):
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
 
 class ContractDeployInput(BaseModel):
     sender: str
@@ -137,23 +140,23 @@ class ContractDeployInput(BaseModel):
     value: float = 0.0
     fee: float = 0.0
     public_key: str
-    nonce: Optional[int] = None
+    nonce: int | None = None
     signature: str
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
     
 class ContractCallInput(BaseModel):
     sender: str
     contract_address: str
-    payload: Optional[Dict[str, Any]] = None
-    data: Optional[str] = None
+    payload: dict[str, Any] | None = None
+    data: str | None = None
     gas_limit: int
     value: float = 0.0
     fee: float = 0.0
     public_key: str
-    nonce: Optional[int] = None
+    nonce: int | None = None
     signature: str
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
 class ContractFeatureToggleInput(BaseModel):
     enabled: bool
-    reason: Optional[str] = None
+    reason: str | None = None

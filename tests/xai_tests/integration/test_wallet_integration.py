@@ -11,7 +11,6 @@ Test is skipped where peer block acceptance is required.
 import pytest
 import json
 import os
-from typing import List
 
 from xai.core.blockchain import Blockchain
 from xai.core.wallet import Wallet

@@ -10,21 +10,18 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 from scripts.node_profile import ensure_path, register_peer, write_node_config
 
 # Configure module logger
 logger = logging.getLogger(__name__)
 
-
-def prompt(text: str, default: Optional[str] = None) -> str:
+def prompt(text: str, default: str | None = None) -> str:
     suffix = f" [{default}]" if default else ""
     value = input(f"{text}{suffix}: ").strip()
     if not value and default is not None:
         return default
     return value
-
 
 def confirm(text: str, default: bool = True) -> bool:
     suffix = "Y/n" if default else "y/N"
@@ -32,7 +29,6 @@ def confirm(text: str, default: bool = True) -> bool:
     if not answer:
         return default
     return answer.startswith("y")
-
 
 def main():
     logger.info("Starting XAI Node Wizard")
@@ -81,7 +77,6 @@ def main():
     print(
         "\nKeep this terminal open to see logs, and point your Grafana at /metrics for live status."
     )
-
 
 if __name__ == "__main__":
     main()

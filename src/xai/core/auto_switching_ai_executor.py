@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Auto-Switching AI Executor
 
@@ -15,35 +17,33 @@ Key Features:
 This ensures AI tasks NEVER stop due to depleted keys (as long as pool has balance).
 """
 
-import time
 import json
-from typing import Dict, List, Optional, Tuple, Generator
+import logging
+import time
 from dataclasses import dataclass
 from enum import Enum
+
 import anthropic
 import openai
 from google import generativeai as genai
 
-import logging
 logger = logging.getLogger(__name__)
-
 
 # Import new AI providers
 try:
     from xai.core.additional_ai_providers import (
-        PerplexityProvider,
-        GroqProvider,
-        XAIProvider,
-        TogetherAIProvider,
-        FireworksAIProvider,
         DeepSeekProvider,
+        FireworksAIProvider,
+        GroqProvider,
+        PerplexityProvider,
+        TogetherAIProvider,
+        XAIProvider,
     )
 
     NEW_PROVIDERS_AVAILABLE = True
 except ImportError:
     NEW_PROVIDERS_AVAILABLE = False
     print("⚠️ Warning: New AI providers not available. Install additional_ai_providers.py")
-
 
 class TaskStatus(Enum):
     """Status of an AI task"""
@@ -54,7 +54,6 @@ class TaskStatus(Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
-
 @dataclass
 class ConversationContext:
     """
@@ -62,8 +61,8 @@ class ConversationContext:
     Allows seamless continuation even when switching API keys
     """
 
-    messages: List[Dict]  # Full conversation history
-    system_prompt: Optional[str] = None
+    messages: list[Dict]  # Full conversation history
+    system_prompt: str | None = None
     temperature: float = 1.0
     model: str = "claude-sonnet-4-20250514"
 
@@ -71,10 +70,9 @@ class ConversationContext:
         """Add message to conversation"""
         self.messages.append({"role": role, "content": content})
 
-    def get_context_for_continuation(self) -> List[Dict]:
+    def get_context_for_continuation(self) -> list[Dict]:
         """Get full context for resuming after key swap"""
         return self.messages.copy()
-
 
 @dataclass
 class KeySwapEvent:
@@ -86,7 +84,6 @@ class KeySwapEvent:
     tokens_used_old_key: int
     tokens_remaining_old_key: int
     reason: str  # "depleted", "approaching_limit", "error"
-
 
 class AutoSwitchingAIExecutor:
     """
@@ -107,10 +104,10 @@ class AutoSwitchingAIExecutor:
         self.key_manager = key_manager
 
         # Active task tracking
-        self.active_tasks: Dict[str, Dict] = {}
+        self.active_tasks: dict[str, Dict] = {}
 
         # Key swap history
-        self.swap_events: List[KeySwapEvent] = []
+        self.swap_events: list[KeySwapEvent] = []
 
         # Configuration
         self.switch_threshold = 0.9  # Switch when 90% of key used
@@ -605,7 +602,7 @@ class AutoSwitchingAIExecutor:
 
     def _switch_to_next_key(
         self, task_id: str, old_key_id: str, provider, reason: str
-    ) -> Optional[Tuple[str, str, Dict]]:
+    ) -> tuple[str, str, Dict] | None:
         """
         Switch to next available API key
 
@@ -650,7 +647,7 @@ class AutoSwitchingAIExecutor:
 
     def _get_next_available_key(
         self, provider, estimated_tokens: int
-    ) -> Optional[Tuple[str, str, Dict]]:
+    ) -> tuple[str, str, Dict] | None:
         """
         Get next available API key from pool
 
@@ -685,7 +682,7 @@ class AutoSwitchingAIExecutor:
         self,
         task_id: str,
         initial_prompt: str,
-        continuation_prompts: List[str],
+        continuation_prompts: list[str],
         provider,
         max_tokens_per_turn: int = 50000,
     ) -> Dict:
@@ -790,15 +787,14 @@ class AutoSwitchingAIExecutor:
             "full_conversation": context.messages,
         }
 
-
 # Example usage
 if __name__ == "__main__":
     print("=" * 80)
     print("AUTO-SWITCHING AI EXECUTOR - DEMONSTRATION")
     print("=" * 80)
 
-    from xai.core.secure_api_key_manager import SecureAPIKeyManager, AIProvider
     from xai.core.ai_pool_with_strict_limits import StrictAIPoolManager
+    from xai.core.secure_api_key_manager import AIProvider, SecureAPIKeyManager
 
     # Initialize
     blockchain_seed = "xai_genesis_block_hash"

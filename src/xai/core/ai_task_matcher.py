@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 AI Task Matcher - Intelligent AI Selection System
 
@@ -14,10 +16,8 @@ on simple tasks, and not using cheap models for critical security work.
 """
 
 import time
-from typing import Dict, List, Optional, Tuple
-from enum import Enum
 from dataclasses import dataclass
-
+from enum import Enum
 
 class TaskType(Enum):
     """Types of development tasks"""
@@ -40,7 +40,6 @@ class TaskType(Enum):
     MONITORING = "monitoring"  # Monitoring/logging
     INTEGRATION = "integration"  # Third-party integrations
 
-
 class TaskComplexity(Enum):
     """Complexity levels"""
 
@@ -49,7 +48,6 @@ class TaskComplexity(Enum):
     COMPLEX = 3  # High complexity, architecture decisions
     CRITICAL = 4  # Mission-critical, security-sensitive
 
-
 class TaskPriority(Enum):
     """Priority levels"""
 
@@ -57,7 +55,6 @@ class TaskPriority(Enum):
     MEDIUM = 2
     HIGH = 3
     CRITICAL = 4
-
 
 @dataclass
 class AICapability:
@@ -87,7 +84,6 @@ class AICapability:
     # Availability
     available: bool = True
 
-
 class AITaskMatcher:
     """
     Intelligent system that matches tasks to optimal AI models
@@ -100,7 +96,7 @@ class AITaskMatcher:
         # Task type to required capabilities mapping
         self.task_requirements = self._initialize_task_requirements()
 
-    def _initialize_ai_capabilities(self) -> Dict[str, AICapability]:
+    def _initialize_ai_capabilities(self) -> dict[str, AICapability]:
         """Define capabilities of each AI model"""
 
         return {
@@ -323,7 +319,7 @@ class AITaskMatcher:
             ),
         }
 
-    def _initialize_task_requirements(self) -> Dict[TaskType, Dict[str, int]]:
+    def _initialize_task_requirements(self) -> dict[TaskType, dict[str, int]]:
         """Define what each task type requires from AI"""
 
         return {
@@ -443,7 +439,7 @@ class AITaskMatcher:
         complexity: TaskComplexity,
         priority: TaskPriority,
         estimated_tokens: int,
-        available_providers: Optional[List[str]] = None,
+        available_providers: list[str] | None = None,
         prefer_cost_optimization: bool = False,
     ) -> Dict:
         """
@@ -530,7 +526,7 @@ class AITaskMatcher:
     def _calculate_match_score(
         self,
         capabilities: AICapability,
-        requirements: Dict[str, int],
+        requirements: dict[str, int],
         complexity: TaskComplexity,
         priority: TaskPriority,
         estimated_tokens: int,
@@ -648,7 +644,6 @@ class AITaskMatcher:
             reasoning += ". Critical task requires highest quality."
 
         return reasoning
-
 
 # Example usage and demonstration
 if __name__ == "__main__":

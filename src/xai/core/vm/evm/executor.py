@@ -8,24 +8,23 @@ integrating the interpreter with the XAI blockchain framework.
 from __future__ import annotations
 
 import hashlib
-import time
 import logging
+import time
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Optional, Dict, Any, List
+from typing import TYPE_CHECKING, Any
 
+from ..exceptions import VMExecutionError
+from ..executor import BaseExecutor, ExecutionMessage, ExecutionResult
+from .abi import encode_call, keccak256
+from .builtin_tokens import execute_builtin_contract
+from .context import BlockContext, CallContext, CallType, ExecutionContext, Log
 from .interpreter import EVMInterpreter
-from .context import ExecutionContext, CallContext, CallType, BlockContext, Log
 from .memory import EVMMemory
 from .stack import EVMStack
 from .storage import EVMStorage
-from .builtin_tokens import execute_builtin_contract
-from .abi import encode_call, keccak256
-from ..executor import ExecutionMessage, ExecutionResult, BaseExecutor
-from ..exceptions import VMExecutionError
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Blockchain
-
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,6 @@ ERC20_RECEIVE_MAGIC = keccak256(ERC20_RECEIVE_SIGNATURE.encode("utf-8"))[:4]
 ERC721_RECEIVE_SIGNATURE = "onERC721Received(address,address,uint256,bytes)"
 # bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"))
 ERC721_RECEIVE_MAGIC = b"\x15\x0b\x7a\x02"
-
 
 class EVMBytecodeExecutor(BaseExecutor):
     """
@@ -79,7 +77,7 @@ class EVMBytecodeExecutor(BaseExecutor):
     def __init__(
         self,
         blockchain: "Blockchain",
-        chain_id: Optional[int] = None,
+        chain_id: int | None = None,
     ) -> None:
         """
         Initialize EVM executor.
@@ -90,7 +88,7 @@ class EVMBytecodeExecutor(BaseExecutor):
         """
         self.blockchain = blockchain
         self.chain_id = chain_id or self.XAI_CHAIN_ID
-        self._contract_locks: Dict[str, bool] = {}
+        self._contract_locks: dict[str, bool] = {}
 
         # Bytecode cache for performance optimization (LRU eviction)
         # Maps normalized address -> decoded bytecode (bytes)
@@ -618,12 +616,12 @@ class EVMBytecodeExecutor(BaseExecutor):
             return address.lower()
         return f"0x{address.lower()}"
 
-    def _get_contract_record(self, address: str) -> Optional[Dict[str, Any]]:
+    def _get_contract_record(self, address: str) -> dict[str, Any] | None:
         """Fetch raw contract metadata from the blockchain registry."""
         normalized = address.upper()
         return self.blockchain.contracts.get(normalized)
 
-    def _get_contract_code(self, address: str, record: Optional[Dict[str, Any]] = None) -> bytes:
+    def _get_contract_code(self, address: str, record: dict[str, Any] | None = None) -> bytes:
         """
         Get contract bytecode from blockchain with LRU caching.
 
@@ -702,7 +700,7 @@ class EVMBytecodeExecutor(BaseExecutor):
                 }
             )
 
-    def invalidate_contract_cache(self, address: Optional[str] = None) -> None:
+    def invalidate_contract_cache(self, address: str | None = None) -> None:
         """
         Invalidate bytecode cache for a contract.
 
@@ -738,7 +736,7 @@ class EVMBytecodeExecutor(BaseExecutor):
                     }
                 )
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """
         Get bytecode cache statistics for monitoring and debugging.
 
@@ -765,7 +763,7 @@ class EVMBytecodeExecutor(BaseExecutor):
         self,
         *,
         contract_address: str,
-        record: Dict[str, Any],
+        record: dict[str, Any],
         message: ExecutionMessage,
         static: bool,
     ) -> ExecutionResult:
@@ -847,7 +845,7 @@ class EVMBytecodeExecutor(BaseExecutor):
         from_addr: str,
         to_addr: str,
         amount: int = 0,
-        token_id: Optional[int] = None,
+        token_id: int | None = None,
         data: bytes,
     ) -> None:
         normalized_target = self._normalize_address(to_addr)
@@ -928,14 +926,13 @@ class EVMBytecodeExecutor(BaseExecutor):
         if normalized in self.blockchain.contracts:
             self.blockchain.contracts[normalized]["storage"] = storage.to_dict()
 
-    def _log_to_dict(self, log: Log) -> Dict[str, Any]:
+    def _log_to_dict(self, log: Log) -> dict[str, Any]:
         """Convert Log to dictionary."""
         return {
             "address": log.address,
             "topics": [f"0x{t:064x}" for t in log.topics],
             "data": log.data.hex(),
         }
-
 
 class EVMPrecompiles:
     """
@@ -1118,7 +1115,7 @@ class EVMPrecompiles:
         y2 = int.from_bytes(data[96:128], "big")
 
         try:
-            from py_ecc.optimized_bn128 import add, is_on_curve, FQ, curve_order, b
+            from py_ecc.optimized_bn128 import FQ, add, b, curve_order, is_on_curve
         except (ImportError, AttributeError, ModuleNotFoundError) as exc:
             raise VMExecutionError(f"ECADD dependency error: {exc}")
 
@@ -1163,7 +1160,7 @@ class EVMPrecompiles:
         s = int.from_bytes(data[64:96], "big")
 
         try:
-            from py_ecc.optimized_bn128 import multiply, is_on_curve, FQ, curve_order, b
+            from py_ecc.optimized_bn128 import FQ, b, curve_order, is_on_curve, multiply
         except (ImportError, AttributeError, ModuleNotFoundError) as exc:
             raise VMExecutionError(f"ECMUL dependency error: {exc}")
 
@@ -1201,16 +1198,16 @@ class EVMPrecompiles:
             raise VMExecutionError("Out of gas for ECPAIRING")
 
         try:
-            from py_ecc.optimized_bn128 import pairing, normalize, is_on_curve, FQ, FQ2, b2
+            from py_ecc.optimized_bn128 import FQ, FQ2, b2, is_on_curve, normalize, pairing
         except (ImportError, AttributeError, ModuleNotFoundError) as exc:
             raise VMExecutionError(f"ECPAIRING dependency error: {exc}")
 
         # Compute product of pairings; equal to identity -> success (1), else 0
         # The py_ecc pairing(a,b) returns a value in FQ12; product equals 1 for true.
         # We'll accumulate by multiplying pairings and check if result is one.
-        from py_ecc.optimized_bn128.optimized_curve import is_inf
         from py_ecc.fields.field_properties import field_properties as fq12_props
         from py_ecc.optimized_bn128 import FQ12
+        from py_ecc.optimized_bn128.optimized_curve import is_inf
 
         acc = FQ12.one()
 
@@ -1433,10 +1430,10 @@ class EVMPrecompiles:
                 G1,
                 G2,
                 add,
-                neg,
-                multiply,
-                pairing,
                 curve_order,
+                multiply,
+                neg,
+                pairing,
             )
         except (ImportError, AttributeError, ModuleNotFoundError) as exc:  # pragma: no cover - dependency/import guard
             raise VMExecutionError(f"KZG dependency error: {exc}") from exc

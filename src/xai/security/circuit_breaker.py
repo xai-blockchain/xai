@@ -1,6 +1,6 @@
 import logging
-from enum import Enum
 from datetime import datetime, timezone
+from enum import Enum
 
 logger = logging.getLogger("xai.security.circuit_breaker")
 

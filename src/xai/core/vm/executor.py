@@ -10,16 +10,15 @@ TASK 23: Reentrancy protection
 from __future__ import annotations
 
 import json
-import time
 import threading
+import time
 from dataclasses import dataclass
-from typing import Protocol, Sequence, TYPE_CHECKING, Dict, Optional
+from typing import TYPE_CHECKING, Protocol
 
 from .exceptions import VMExecutionError
 
 if TYPE_CHECKING:  # pragma: no cover - runtime imports deferred
     from xai.core.blockchain import Blockchain
-
 
 @dataclass
 class ExecutionMessage:
@@ -30,14 +29,12 @@ class ExecutionMessage:
     data: bytes
     nonce: int
 
-
 @dataclass
 class ExecutionResult:
     success: bool
     gas_used: int
     return_data: bytes
     logs: Sequence[dict]
-
 
 class BaseExecutor(Protocol):
     """
@@ -56,7 +53,6 @@ class BaseExecutor(Protocol):
     def estimate_gas(self, message: ExecutionMessage) -> int:
         ...
 
-
 class DummyExecutor(BaseExecutor):
     """
     Minimal placeholder executor used until the real VM is wired in.
@@ -73,7 +69,6 @@ class DummyExecutor(BaseExecutor):
 
     def estimate_gas(self, message: ExecutionMessage) -> int:  # pragma: no cover - placeholder
         raise VMExecutionError("Gas estimation is not yet implemented")
-
 
 class ProductionContractExecutor(BaseExecutor):
     """
@@ -118,7 +113,7 @@ class ProductionContractExecutor(BaseExecutor):
         self.blockchain = blockchain
 
         # TASK 23: Reentrancy protection - track executing contracts
-        self._executing_contracts: Dict[str, threading.Lock] = {}
+        self._executing_contracts: dict[str, threading.Lock] = {}
         self._execution_lock = threading.Lock()
 
     def execute(self, message: ExecutionMessage) -> ExecutionResult:
@@ -467,7 +462,6 @@ class ProductionContractExecutor(BaseExecutor):
     @staticmethod
     def _normalize_address(address: str) -> str:
         return address.upper()
-
 
 # Alias for backward compatibility
 SimpleContractExecutor = ProductionContractExecutor

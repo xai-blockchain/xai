@@ -17,7 +17,7 @@ All tests marked with @pytest.mark.security for automated security suite executi
 import pytest
 import json
 import time
-from typing import Dict, Any, Optional
+from typing import Any
 from unittest.mock import Mock, patch, MagicMock
 from flask import Flask
 import tempfile

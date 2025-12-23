@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 """
 Personal AI Assistant Module Stub
 
 This module provides the PersonalAIAssistant class for managing personal AI requests.
 """
 
-from typing import Dict, Any, Optional, List
-
+from typing import Any
 
 class PersonalAIAssistant:
     """
@@ -16,7 +17,7 @@ class PersonalAIAssistant:
         self.blockchain = blockchain
         self.requests = {}
 
-    def create_request(self, user_address: str, request_data: Dict[str, Any]) -> str:
+    def create_request(self, user_address: str, request_data: dict[str, Any]) -> str:
         """
         Create a new AI request.
 
@@ -40,7 +41,7 @@ class PersonalAIAssistant:
         }
         return request_id
 
-    def get_request(self, request_id: str) -> Optional[Dict[str, Any]]:
+    def get_request(self, request_id: str) -> dict[str, Any] | None:
         """
         Get a request by ID.
 
@@ -52,7 +53,7 @@ class PersonalAIAssistant:
         """
         return self.requests.get(request_id)
 
-    def list_requests(self, user_address: Optional[str] = None) -> List[Dict[str, Any]]:
+    def list_requests(self, user_address: str | None = None) -> list[dict[str, Any]]:
         """
         List all requests, optionally filtered by user.
 

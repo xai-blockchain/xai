@@ -1,12 +1,11 @@
-import logging
-import json
-from datetime import datetime, timezone
-import os
+import gzip
 import hashlib
 import hmac
-import gzip
+import json
+import logging
+import os
 import shutil
-from typing import Optional
+from datetime import datetime, timezone
 
 AUDIT_LOG_FILE = os.path.join("logs", "audit.log")
 

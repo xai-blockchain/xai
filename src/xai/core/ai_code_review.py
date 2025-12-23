@@ -10,15 +10,15 @@ Multi-stage review process before AI changes go live:
 """
 
 from __future__ import annotations
+
 import ast
-import time
 import hashlib
 import logging
-from typing import Dict, List, Optional, Tuple, Any, Set
+import time
 from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
-
 
 class ReviewStatus(Enum):
     """Code review status"""
@@ -32,7 +32,6 @@ class ReviewStatus(Enum):
     READY_FOR_VOTE = "ready_for_vote"
     REJECTED = "rejected"
 
-
 class SafetyCheck(Enum):
     """Safety validation checks"""
 
@@ -43,7 +42,6 @@ class SafetyCheck(Enum):
     NO_CONSENSUS_CHANGES = "no_consensus_changes"
     NO_SUPPLY_CHANGES = "no_supply_changes"
 
-
 class AICodeSubmission:
     """
     AI-generated code in staging area for review
@@ -53,10 +51,10 @@ class AICodeSubmission:
     def __init__(
         self,
         proposal_id: str,
-        code_changes: Dict[str, Any],
+        code_changes: dict[str, Any],
         description: str,
-        files_modified: List[str],
-        original_approvers: Optional[List[str]] = None,
+        files_modified: list[str],
+        original_approvers: list[str] | None = None,
     ) -> None:
         self.submission_id = hashlib.sha256(f"{proposal_id}{time.time()}".encode()).hexdigest()[:16]
         self.proposal_id = proposal_id
@@ -210,20 +208,20 @@ class AICodeSubmission:
                     return False
         return True
 
-    def _extract_public_symbols(self, code: str) -> Set[str]:
+    def _extract_public_symbols(self, code: str) -> set[str]:
         """Extract public function and class names from code."""
         tree = ast.parse(code)
-        symbols: Set[str] = set()
+        symbols: set[str] = set()
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                 if not node.name.startswith("_"):
                     symbols.add(node.name)
         return symbols
 
-    def _extract_constants(self, code: str, filter_names: Set[str]) -> Dict[str, Any]:
+    def _extract_constants(self, code: str, filter_names: set[str]) -> dict[str, Any]:
         """Extract constant assignments matching filter names."""
         tree = ast.parse(code)
-        constants: Dict[str, Any] = {}
+        constants: dict[str, Any] = {}
         for node in ast.walk(tree):
             if isinstance(node, ast.Assign):
                 for target in node.targets:
@@ -297,7 +295,7 @@ class AICodeSubmission:
         for file_path, changes in self.code_changes.items():
             self.rollback_code[file_path] = changes.get("old_code", "")
 
-    def can_proceed_to_vote(self, min_reviewers: int = 250) -> Tuple[bool, str]:
+    def can_proceed_to_vote(self, min_reviewers: int = 250) -> tuple[bool, str]:
         """Check if code ready for implementation vote"""
 
         if self.review_status != ReviewStatus.TESTS_PASSED:
@@ -344,7 +342,7 @@ class AICodeSubmission:
 
         return {"success": True, "vote_recorded": approved}
 
-    def check_implementation_approval(self, required_percent: float = 50) -> Tuple[bool, str, Dict]:
+    def check_implementation_approval(self, required_percent: float = 50) -> tuple[bool, str, Dict]:
         """
         Check if implementation approved by original voters
 
@@ -387,7 +385,6 @@ class AICodeSubmission:
         else:
             return False, f"Need {required_yes_votes} yes votes, have {yes_votes}", details
 
-
 class RollbackProposal:
     """
     Proposal to reverse a previous change
@@ -404,7 +401,6 @@ class RollbackProposal:
 
         # Rollback gets fast-tracked (shorter timelock)
         self.timelock_days = 3  # Only 3 days instead of 7
-
 
 # Example usage
 if __name__ == "__main__":

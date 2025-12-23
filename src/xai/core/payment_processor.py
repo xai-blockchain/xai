@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Lightweight PaymentProcessor shim to satisfy blockchain imports without external dependencies.
 """
@@ -5,9 +7,7 @@ Lightweight PaymentProcessor shim to satisfy blockchain imports without external
 import os
 import time
 from decimal import Decimal
-from typing import Dict, Optional, List
 from enum import Enum
-
 
 class RefundReason(Enum):
     """Reasons for payment refunds"""
@@ -18,7 +18,6 @@ class RefundReason(Enum):
     PROCESSING_ERROR = "processing_error"
     OTHER = "other"
 
-
 class RefundStatus(Enum):
     """Status of refund processing"""
     PENDING = "pending"
@@ -27,11 +26,10 @@ class RefundStatus(Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
 
-
 class PaymentProcessor:
     """Simplified payment processor emulation for tests."""
 
-    def __init__(self, stripe_api_key: Optional[str] = None):
+    def __init__(self, stripe_api_key: str | None = None):
         self.stripe_api_key = stripe_api_key or os.getenv("STRIPE_API_KEY")
         self.test_mode = True if not self.stripe_api_key else False
         self.axn_usd_price = Decimal("0.0512")
@@ -41,8 +39,8 @@ class PaymentProcessor:
         self.credit_card_fee_fixed = Decimal("0.30")
 
         # Refund tracking (Task 108)
-        self.payment_history: Dict[str, Dict] = {}
-        self.refund_history: List[Dict] = []
+        self.payment_history: dict[str, Dict] = {}
+        self.refund_history: list[Dict] = []
         self.refund_time_window_days = 30  # 30-day refund window
 
     def calculate_purchase(self, usd_amount: float) -> Dict:
@@ -157,7 +155,7 @@ class PaymentProcessor:
     def process_refund(
         self,
         payment_id: str,
-        refund_amount: Optional[float] = None,
+        refund_amount: float | None = None,
         reason: RefundReason = RefundReason.CUSTOMER_REQUEST,
         notes: str = ""
     ) -> Dict:
@@ -297,7 +295,7 @@ class PaymentProcessor:
             "payment_date": payment["timestamp"],
         }
 
-    def get_refund_history(self, user_address: Optional[str] = None, limit: int = 100) -> List[Dict]:
+    def get_refund_history(self, user_address: str | None = None, limit: int = 100) -> list[Dict]:
         """
         Get refund history, optionally filtered by user address.
 

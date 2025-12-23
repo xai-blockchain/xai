@@ -7,12 +7,11 @@ Comprehensive benchmarking tools for measuring blockchain performance.
 
 from __future__ import annotations
 
-import time
-import statistics
-from typing import List, Dict, Any, Callable, Optional
-from dataclasses import dataclass, field
 import json
-
+import statistics
+import time
+from dataclasses import dataclass, field
+from typing import Any, Callable
 
 @dataclass
 class BenchmarkResult:
@@ -26,9 +25,9 @@ class BenchmarkResult:
     max_time: float
     std_dev: float
     operations_per_second: float
-    measurements: List[float] = field(default_factory=list)
+    measurements: list[float] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "iterations": self.iterations,
@@ -40,7 +39,6 @@ class BenchmarkResult:
             "std_dev_ms": self.std_dev * 1000,
             "ops_per_second": self.operations_per_second
         }
-
 
 class Benchmark:
     """Single benchmark"""
@@ -57,7 +55,7 @@ class Benchmark:
         self.name = name
         self.func = func
         self.iterations = iterations
-        self.measurements: List[float] = []
+        self.measurements: list[float] = []
 
     def run(self) -> BenchmarkResult:
         """Run benchmark and collect results"""
@@ -99,20 +97,19 @@ class Benchmark:
             measurements=self.measurements
         )
 
-
 class BenchmarkSuite:
     """Suite of benchmarks"""
 
     def __init__(self, name: str = "Blockchain Benchmarks"):
         self.name = name
-        self.benchmarks: List[Benchmark] = []
-        self.results: List[BenchmarkResult] = []
+        self.benchmarks: list[Benchmark] = []
+        self.results: list[BenchmarkResult] = []
 
     def add_benchmark(self, name: str, func: Callable, iterations: int = 100) -> None:
         """Add benchmark to suite"""
         self.benchmarks.append(Benchmark(name, func, iterations))
 
-    def run_all(self) -> List[BenchmarkResult]:
+    def run_all(self) -> list[BenchmarkResult]:
         """Run all benchmarks"""
         self.results.clear()
 
@@ -139,7 +136,7 @@ class BenchmarkSuite:
         with open(filename, 'w') as f:
             json.dump(data, f, indent=2)
 
-    def compare_with_baseline(self, baseline_file: str) -> Dict[str, Any]:
+    def compare_with_baseline(self, baseline_file: str) -> dict[str, Any]:
         """Compare current results with baseline"""
         try:
             with open(baseline_file, 'r') as f:
@@ -172,7 +169,6 @@ class BenchmarkSuite:
 
         except FileNotFoundError:
             return {"error": "Baseline file not found"}
-
 
 class BlockchainBenchmarks:
     """Predefined blockchain benchmarks"""
@@ -272,18 +268,17 @@ class BlockchainBenchmarks:
         balances = {f"XAI{'0'*40}": 100.0}
         _ = balances.get(f"XAI{'0'*40}", 0.0)
 
-
 class PerformanceComparison:
     """Compare performance across different implementations"""
 
     def __init__(self):
-        self.implementations: Dict[str, List[BenchmarkResult]] = {}
+        self.implementations: dict[str, list[BenchmarkResult]] = {}
 
-    def add_implementation(self, name: str, results: List[BenchmarkResult]) -> None:
+    def add_implementation(self, name: str, results: list[BenchmarkResult]) -> None:
         """Add implementation results"""
         self.implementations[name] = results
 
-    def compare(self) -> Dict[str, Any]:
+    def compare(self) -> dict[str, Any]:
         """Compare all implementations"""
         if len(self.implementations) < 2:
             return {"error": "Need at least 2 implementations to compare"}
@@ -316,7 +311,6 @@ class PerformanceComparison:
 
         return comparisons
 
-
 class MicroBenchmark:
     """Micro-benchmark for small code segments"""
 
@@ -341,7 +335,7 @@ class MicroBenchmark:
         return elapsed / iterations
 
     @staticmethod
-    def compare_functions(funcs: Dict[str, Callable], iterations: int = 10000) -> Dict[str, float]:
+    def compare_functions(funcs: dict[str, Callable], iterations: int = 10000) -> dict[str, float]:
         """
         Compare multiple function implementations
 
@@ -360,12 +354,11 @@ class MicroBenchmark:
 
         return results
 
-
 class ThroughputMeasurement:
     """Measure system throughput"""
 
     def __init__(self):
-        self.start_time: Optional[float] = None
+        self.start_time: float | None = None
         self.operation_count = 0
 
     def start(self) -> None:

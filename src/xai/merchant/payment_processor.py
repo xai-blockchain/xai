@@ -11,15 +11,15 @@ Provides merchant-focused payment processing capabilities including:
 
 from __future__ import annotations
 
-import logging
-import time
-import hmac
 import hashlib
+import hmac
 import json
+import logging
 import threading
-from typing import Dict, Any, Optional, Callable, List
+import time
+from dataclasses import asdict, dataclass, field
 from enum import Enum
-from dataclasses import dataclass, field, asdict
+from typing import Any, Callable
 from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,6 @@ except ImportError:
     REQUESTS_AVAILABLE = False
     logger.warning("requests library not available - webhook delivery disabled")
 
-
 class PaymentStatus(Enum):
     """Payment request status"""
     PENDING = "pending"
@@ -39,7 +38,6 @@ class PaymentStatus(Enum):
     EXPIRED = "expired"
     CANCELLED = "cancelled"
     FAILED = "failed"
-
 
 class WebhookEvent(Enum):
     """Webhook event types"""
@@ -50,7 +48,6 @@ class WebhookEvent(Enum):
     PAYMENT_CANCELLED = "payment.cancelled"
     PAYMENT_FAILED = "payment.failed"
 
-
 class WebhookDeliveryStatus(Enum):
     """Webhook delivery status"""
     PENDING = "pending"
@@ -58,7 +55,6 @@ class WebhookDeliveryStatus(Enum):
     FAILED = "failed"
     RETRYING = "retrying"
     ABANDONED = "abandoned"
-
 
 @dataclass
 class PaymentRequest:
@@ -69,28 +65,28 @@ class PaymentRequest:
     amount: float
     currency: str = "XAI"
     memo: str = ""
-    invoice_id: Optional[str] = None
-    customer_id: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    invoice_id: str | None = None
+    customer_id: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     # Timestamps
     created_at: int = field(default_factory=lambda: int(time.time()))
-    expires_at: Optional[int] = None
-    paid_at: Optional[int] = None
-    confirmed_at: Optional[int] = None
+    expires_at: int | None = None
+    paid_at: int | None = None
+    confirmed_at: int | None = None
 
     # Status tracking
     status: PaymentStatus = PaymentStatus.PENDING
-    paid_txid: Optional[str] = None
+    paid_txid: str | None = None
     confirmations: int = 0
     required_confirmations: int = 6
 
     # Webhook configuration
-    webhook_url: Optional[str] = None
-    webhook_secret: Optional[str] = None
-    webhook_events: List[str] = field(default_factory=lambda: [e.value for e in WebhookEvent])
+    webhook_url: str | None = None
+    webhook_secret: str | None = None
+    webhook_events: list[str] = field(default_factory=lambda: [e.value for e in WebhookEvent])
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary representation"""
         data = asdict(self)
         data["status"] = self.status.value
@@ -108,7 +104,6 @@ class PaymentRequest:
         """Check if payment is confirmed"""
         return self.confirmations >= self.required_confirmations
 
-
 @dataclass
 class WebhookDelivery:
     """Tracks webhook delivery attempts"""
@@ -116,19 +111,19 @@ class WebhookDelivery:
     request_id: str
     event: str
     url: str
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
 
     created_at: int = field(default_factory=lambda: int(time.time()))
     status: WebhookDeliveryStatus = WebhookDeliveryStatus.PENDING
 
     attempts: int = 0
     max_attempts: int = 5
-    last_attempt_at: Optional[int] = None
-    next_attempt_at: Optional[int] = None
+    last_attempt_at: int | None = None
+    next_attempt_at: int | None = None
 
-    response_code: Optional[int] = None
-    response_body: Optional[str] = None
-    error_message: Optional[str] = None
+    response_code: int | None = None
+    response_body: str | None = None
+    error_message: str | None = None
 
     def should_retry(self) -> bool:
         """Check if delivery should be retried"""
@@ -147,7 +142,6 @@ class WebhookDelivery:
         delay = delays[min(self.attempts, len(delays) - 1)]
         return int(time.time()) + delay
 
-
 class MerchantPaymentProcessor:
     """
     Merchant payment processor with webhook notifications.
@@ -162,7 +156,7 @@ class MerchantPaymentProcessor:
     def __init__(
         self,
         merchant_id: str,
-        webhook_secret: Optional[str] = None,
+        webhook_secret: str | None = None,
         default_expiry_minutes: int = 60,
         required_confirmations: int = 6
     ):
@@ -181,15 +175,15 @@ class MerchantPaymentProcessor:
         self.required_confirmations = required_confirmations
 
         # Storage
-        self._payment_requests: Dict[str, PaymentRequest] = {}
-        self._webhook_deliveries: Dict[str, WebhookDelivery] = {}
+        self._payment_requests: dict[str, PaymentRequest] = {}
+        self._webhook_deliveries: dict[str, WebhookDelivery] = {}
 
         # Event handlers
-        self._event_handlers: Dict[str, List[Callable]] = {}
+        self._event_handlers: dict[str, list[Callable]] = {}
 
         # Background webhook delivery
-        self._webhook_thread: Optional[threading.Thread] = None
-        self._webhook_queue: List[WebhookDelivery] = []
+        self._webhook_thread: threading.Thread | None = None
+        self._webhook_queue: list[WebhookDelivery] = []
         self._webhook_lock = threading.Lock()
         self._running = False
 
@@ -198,12 +192,12 @@ class MerchantPaymentProcessor:
         address: str,
         amount: float,
         memo: str = "",
-        invoice_id: Optional[str] = None,
-        customer_id: Optional[str] = None,
-        expiry_minutes: Optional[int] = None,
-        webhook_url: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        required_confirmations: Optional[int] = None
+        invoice_id: str | None = None,
+        customer_id: str | None = None,
+        expiry_minutes: int | None = None,
+        webhook_url: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        required_confirmations: int | None = None
     ) -> PaymentRequest:
         """
         Create a new payment request.
@@ -277,7 +271,7 @@ class MerchantPaymentProcessor:
 
         return payment_request
 
-    def get_payment_request(self, request_id: str) -> Optional[PaymentRequest]:
+    def get_payment_request(self, request_id: str) -> PaymentRequest | None:
         """
         Get payment request by ID.
 
@@ -385,7 +379,7 @@ class MerchantPaymentProcessor:
         txid: str,
         amount: float,
         recipient: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Verify a payment against a request.
 
@@ -457,7 +451,7 @@ class MerchantPaymentProcessor:
             "confirmed": payment_request.is_confirmed()
         }
 
-    def check_expired_payments(self) -> List[str]:
+    def check_expired_payments(self) -> list[str]:
         """
         Check for expired payment requests and update their status.
 
@@ -555,7 +549,7 @@ class MerchantPaymentProcessor:
         if not self._running:
             self.start_webhook_delivery()
 
-    def _generate_webhook_signature(self, payload: Dict[str, Any], secret: str) -> str:
+    def _generate_webhook_signature(self, payload: dict[str, Any], secret: str) -> str:
         """
         Generate HMAC signature for webhook payload.
 
@@ -574,7 +568,7 @@ class MerchantPaymentProcessor:
         ).hexdigest()
         return signature
 
-    def verify_webhook_signature(self, payload: Dict[str, Any], signature: str, secret: str) -> bool:
+    def verify_webhook_signature(self, payload: dict[str, Any], signature: str, secret: str) -> bool:
         """
         Verify webhook signature.
 
@@ -717,7 +711,7 @@ class MerchantPaymentProcessor:
             self._event_handlers[event.value] = []
         self._event_handlers[event.value].append(handler)
 
-    def get_webhook_deliveries(self, request_id: Optional[str] = None) -> List[WebhookDelivery]:
+    def get_webhook_deliveries(self, request_id: str | None = None) -> list[WebhookDelivery]:
         """
         Get webhook delivery history.
 
@@ -731,7 +725,7 @@ class MerchantPaymentProcessor:
             return [d for d in self._webhook_deliveries.values() if d.request_id == request_id]
         return list(self._webhook_deliveries.values())
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """
         Get payment processor statistics.
 

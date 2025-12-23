@@ -1,4 +1,5 @@
 """Personal AI assistant implementation for the XAI blockchain."""
+from __future__ import annotations
 
 import hashlib
 import json
@@ -10,7 +11,7 @@ import time
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Iterable, Tuple
+from typing import Any
 
 try:
     import requests
@@ -37,12 +38,11 @@ except ModuleNotFoundError:
         DeepSeekProvider
     ) = None
 
-
 @dataclass
 class MicroAssistantProfile:
     name: str
     personality: str
-    skills: List[str]
+    skills: list[str]
     description: str
     usage_count: int = 0
     tokens_consumed: int = 0
@@ -59,15 +59,14 @@ class MicroAssistantProfile:
         ) / self.interactions
         self.last_active = time.time()
 
-
 class MicroAssistantNetwork:
     """Tracks multiple micro-AI profiles and aggregated learning statistics."""
 
     def __init__(self):
-        self.assistants: Dict[str, MicroAssistantProfile] = {}
+        self.assistants: dict[str, MicroAssistantProfile] = {}
         self.aggregate_tokens = 0
         self.aggregate_requests = 0
-        self.skill_popularity: Dict[str, int] = defaultdict(int)
+        self.skill_popularity: dict[str, int] = defaultdict(int)
         self._seed_default_profiles()
 
     def _seed_default_profiles(self):
@@ -94,7 +93,7 @@ class MicroAssistantNetwork:
         for profile in defaults:
             self.assistants[profile.name.lower()] = profile
 
-    def list_profiles(self) -> List[Dict[str, Any]]:
+    def list_profiles(self) -> list[dict[str, Any]]:
         return [
             {
                 "name": profile.name,
@@ -109,7 +108,7 @@ class MicroAssistantNetwork:
             for profile in self.assistants.values()
         ]
 
-    def select_profile(self, key: Optional[str]) -> MicroAssistantProfile:
+    def select_profile(self, key: str | None) -> MicroAssistantProfile:
         key = (key or "guiding mentor").lower()
         return self.assistants.get(key, list(self.assistants.values())[0])
 
@@ -125,7 +124,7 @@ class MicroAssistantNetwork:
         self.aggregate_tokens += tokens
         self.aggregate_requests += 1
 
-    def get_aggregate_metrics(self) -> Dict[str, Any]:
+    def get_aggregate_metrics(self) -> dict[str, Any]:
         most_popular = sorted(
             self.skill_popularity.items(), key=lambda item: item[1], reverse=True
         )[:3]
@@ -134,7 +133,6 @@ class MicroAssistantNetwork:
             "total_tokens": self.aggregate_tokens,
             "trending_skills": [skill for skill, _ in most_popular],
         }
-
 
 class PersonalAIAssistant:
     """Wraps user-owned AI providers for personal assistance."""
@@ -168,18 +166,18 @@ class PersonalAIAssistant:
         "general": 0.045,
     }
 
-    def __init__(self, blockchain, safety_controls=None, webhook_url: Optional[str] = None):
+    def __init__(self, blockchain, safety_controls=None, webhook_url: str | None = None):
         self.blockchain = blockchain
         self.safety_controls = safety_controls
         self.user_usage = defaultdict(self._build_empty_usage_bucket)
-        self.rate_cache: Dict[str, float] = {}
+        self.rate_cache: dict[str, float] = {}
         self.webhook_url = webhook_url or getattr(Config, "PERSONAL_AI_WEBHOOK_URL", "")
         self.webhook_timeout = getattr(Config, "PERSONAL_AI_WEBHOOK_TIMEOUT", 5)
         self.micro_network = MicroAssistantNetwork()
         self.additional_providers = self._init_additional_providers()
         self._cache_ttl = float(getattr(Config, "PERSONAL_AI_CACHE_TTL", 60))
         self._cache_max_entries = int(getattr(Config, "PERSONAL_AI_CACHE_MAX_ENTRIES", 256))
-        self._response_cache: Dict[str, Dict[str, Any]] = {}
+        self._response_cache: dict[str, dict[str, Any]] = {}
 
     @staticmethod
     def _build_empty_usage_bucket():
@@ -188,7 +186,7 @@ class PersonalAIAssistant:
     def _generate_request_id(self) -> str:
         return f"personal-ai-{int(time.time())}-{uuid.uuid4().hex[:6]}"
 
-    def _normalize_provider(self, provider: Optional[str]) -> str:
+    def _normalize_provider(self, provider: str | None) -> str:
         if not provider:
             return "openai"
         normalized = provider.strip().lower()
@@ -200,7 +198,7 @@ class PersonalAIAssistant:
         }
         return provider_map.get(normalized, normalized)
 
-    def _init_additional_providers(self) -> Dict[str, Any]:
+    def _init_additional_providers(self) -> dict[str, Any]:
         provider_classes = {
             "perplexity": PerplexityProvider,
             "groq": GroqProvider,
@@ -231,7 +229,7 @@ class PersonalAIAssistant:
         digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
         return f"{provider}:{model}:{digest}"
 
-    def _get_cached_response(self, cache_key: str) -> Optional[Dict[str, Any]]:
+    def _get_cached_response(self, cache_key: str) -> dict[str, Any] | None:
         if self._cache_ttl <= 0:
             return None
         entry = self._response_cache.get(cache_key)
@@ -244,7 +242,7 @@ class PersonalAIAssistant:
         result["cached"] = True
         return result
 
-    def _store_cached_response(self, cache_key: str, result: Dict[str, Any]) -> None:
+    def _store_cached_response(self, cache_key: str, result: dict[str, Any]) -> None:
         if self._cache_ttl <= 0 or not result.get("success"):
             return
         if len(self._response_cache) >= self._cache_max_entries:
@@ -256,11 +254,11 @@ class PersonalAIAssistant:
 
     def _handle_ai_failure(
         self,
-        request_id: Optional[str],
+        request_id: str | None,
         profile: MicroAssistantProfile,
-        ai_response: Dict[str, Any],
+        ai_response: dict[str, Any],
         ai_provider: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Finalize request when AI provider is unavailable."""
         if request_id:
             self._finalize_request(request_id)
@@ -278,7 +276,7 @@ class PersonalAIAssistant:
         for i in range(0, len(text), max(1, chunk_size)):
             yield text[i : i + chunk_size]
 
-    def _format_stream_event(self, event_type: str, payload: Dict[str, Any]) -> str:
+    def _format_stream_event(self, event_type: str, payload: dict[str, Any]) -> str:
         body = {"type": event_type, **payload}
         return f"data: {json.dumps(body)}\n\n"
 
@@ -288,8 +286,8 @@ class PersonalAIAssistant:
         ai_model: str,
         user_api_key: str,
         prompt: str,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[Dict[str, Any], Iterable[str]]:
+        metadata: dict[str, Any] | None = None,
+    ) -> tuple[dict[str, Any], Iterable[str]]:
         result = self._call_ai_provider(ai_provider, ai_model, user_api_key, prompt)
 
         def generator():
@@ -306,11 +304,11 @@ class PersonalAIAssistant:
 
         return result, generator()
 
-    def _trim_usage(self, stats: Dict[str, List[float]], now: float):
+    def _trim_usage(self, stats: dict[str, list[float]], now: float):
         for window, window_seconds in self.RATE_WINDOW_SECONDS.items():
             stats[window] = [ts for ts in stats[window] if now - ts < window_seconds]
 
-    def _check_rate_limit(self, user_address: str) -> (bool, Dict[str, object]):
+    def _check_rate_limit(self, user_address: str) -> (bool, dict[str, object]):
         user_address = user_address.upper()
         stats = self.user_usage[user_address]
         now = time.time()
@@ -348,8 +346,8 @@ class PersonalAIAssistant:
         ai_provider: str,
         ai_model: str,
         operation: str,
-        assistant_name: Optional[str] = None,
-    ) -> (Optional[str], Optional[Dict[str, object]]):
+        assistant_name: str | None = None,
+    ) -> (str | None, dict[str, object] | None):
         user_address = user_address.upper()
         allowed, rate_info = self._check_rate_limit(user_address)
         if not allowed:
@@ -394,10 +392,10 @@ class PersonalAIAssistant:
 
         return request_id, None
 
-    def _prepare_assistant(self, assistant_name: Optional[str]):
+    def _prepare_assistant(self, assistant_name: str | None):
         return self.micro_network.select_profile(assistant_name)
 
-    def _finalize_assistant_usage(self, result: Dict[str, object], profile: MicroAssistantProfile):
+    def _finalize_assistant_usage(self, result: dict[str, object], profile: MicroAssistantProfile):
         tokens = result.get("ai_cost", {}).get("tokens_used", 0)
         self.micro_network.record_interaction(profile, tokens, result.get("success", False))
         result["assistant_profile"] = {
@@ -413,12 +411,12 @@ class PersonalAIAssistant:
         result["assistant_aggregate"] = self.micro_network.get_aggregate_metrics()
         return result
 
-    def _finalize_request(self, request_id: Optional[str]):
+    def _finalize_request(self, request_id: str | None):
         if not request_id or not self.safety_controls:
             return
         self.safety_controls.complete_personal_ai_request(request_id)
 
-    def _notify_webhook(self, event_type: str, payload: Dict[str, object]):
+    def _notify_webhook(self, event_type: str, payload: dict[str, object]):
         if not requests or not self.webhook_url:
             return
 
@@ -435,7 +433,7 @@ class PersonalAIAssistant:
                 extra={"error": str(e), "event": "assistant.webhook_failed"}
             )
 
-    def _get_pool_status(self) -> Dict[str, object]:
+    def _get_pool_status(self) -> dict[str, object]:
         stats_fn = getattr(self.blockchain, "get_ai_pool_stats", None)
         if callable(stats_fn):
             try:
@@ -445,7 +443,7 @@ class PersonalAIAssistant:
                 return {}
         return {}
 
-    def _summarize_ai_cost(self, ai_cost: Dict[str, object]) -> Dict[str, object]:
+    def _summarize_ai_cost(self, ai_cost: dict[str, object]) -> dict[str, object]:
         tokens = ai_cost.get("tokens_used", 0)
         summary = {
             "tokens_used": tokens,
@@ -456,8 +454,8 @@ class PersonalAIAssistant:
         return summary
 
     def _attach_ai_cost(
-        self, payload: Dict[str, object], ai_cost: Dict[str, object]
-    ) -> Dict[str, object]:
+        self, payload: dict[str, object], ai_cost: dict[str, object]
+    ) -> dict[str, object]:
         payload["ai_cost"] = ai_cost
         payload["ai_cost_summary"] = self._summarize_ai_cost(ai_cost)
         return payload
@@ -482,7 +480,7 @@ class PersonalAIAssistant:
         from_coin: str,
         to_coin: str,
         amount: float,
-        swap_details: Dict[str, object],
+        swap_details: dict[str, object],
         rate: float,
     ) -> str:
         balance = self.blockchain.get_balance(user_address)
@@ -530,7 +528,7 @@ class PersonalAIAssistant:
         ai_model: str,
         user_api_key: str,
         prompt: str,
-    ) -> Dict[str, object]:
+    ) -> dict[str, object]:
         provider = self._normalize_provider(ai_provider)
         cache_key = self._build_cache_key(provider, ai_model, prompt)
         cached = self._get_cached_response(cache_key)
@@ -621,8 +619,8 @@ class PersonalAIAssistant:
         user_api_key: str,
         prompt: str,
         streaming: bool = False,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         normalized = self._normalize_provider(ai_provider)
         if streaming:
             stream_result, stream = self._stream_ai_response(
@@ -671,7 +669,7 @@ class PersonalAIAssistant:
             },
         }
 
-    def _normalize_ai_result(self, response: Dict[str, Any], provider: str) -> Dict[str, Any]:
+    def _normalize_ai_result(self, response: dict[str, Any], provider: str) -> dict[str, Any]:
         """
         Ensure AI responses are valid; downgrade stubs/empty payloads to errors.
         """
@@ -706,7 +704,7 @@ class PersonalAIAssistant:
 
         return response
 
-    def _estimate_ai_cost(self, prompt: str) -> Dict[str, object]:
+    def _estimate_ai_cost(self, prompt: str) -> dict[str, object]:
         tokens = max(150, len(prompt) // 3)
         return {
             "tokens_used": tokens,
@@ -740,10 +738,10 @@ class PersonalAIAssistant:
         ai_provider: str,
         ai_model: str,
         user_api_key: str,
-        swap_details: Dict[str, object],
-        assistant_name: Optional[str] = None,
+        swap_details: dict[str, object],
+        assistant_name: str | None = None,
         streaming: bool = False,
-    ) -> Dict[str, object]:
+    ) -> dict[str, object]:
         profile = self._prepare_assistant(assistant_name)
         request_id, error = self._begin_request(
             user_address, ai_provider, ai_model, "atomic_swap", assistant_name=profile.name
@@ -863,9 +861,9 @@ class PersonalAIAssistant:
         ai_model: str,
         user_api_key: str,
         contract_description: str,
-        contract_type: Optional[str] = None,
-        assistant_name: Optional[str] = None,
-    ) -> Dict[str, object]:
+        contract_type: str | None = None,
+        assistant_name: str | None = None,
+    ) -> dict[str, object]:
         profile = self._prepare_assistant(assistant_name)
         request_id, error = self._begin_request(
             user_address, ai_provider, ai_model, "smart_contract", assistant_name=profile.name
@@ -921,11 +919,11 @@ class PersonalAIAssistant:
         ai_model: str,
         user_api_key: str,
         contract_code: str,
-        constructor_params: Optional[Dict[str, object]],
+        constructor_params: dict[str, object] | None,
         testnet: bool,
-        signature: Optional[str],
-        assistant_name: Optional[str] = None,
-    ) -> Dict[str, object]:
+        signature: str | None,
+        assistant_name: str | None = None,
+    ) -> dict[str, object]:
         profile = self._prepare_assistant(assistant_name)
         request_id, error = self._begin_request(
             user_address,
@@ -974,9 +972,9 @@ class PersonalAIAssistant:
         ai_provider: str,
         ai_model: str,
         user_api_key: str,
-        transaction: Dict[str, object],
-        assistant_name: Optional[str] = None,
-    ) -> Dict[str, object]:
+        transaction: dict[str, object],
+        assistant_name: str | None = None,
+    ) -> dict[str, object]:
         profile = self._prepare_assistant(assistant_name)
         request_id, error = self._begin_request(
             user_address, ai_provider, ai_model, "transaction_optimize", assistant_name=profile.name
@@ -1028,8 +1026,8 @@ class PersonalAIAssistant:
         ai_model: str,
         user_api_key: str,
         query: str,
-        assistant_name: Optional[str] = None,
-    ) -> Dict[str, object]:
+        assistant_name: str | None = None,
+    ) -> dict[str, object]:
         profile = self._prepare_assistant(assistant_name)
         request_id, error = self._begin_request(
             user_address, ai_provider, ai_model, "blockchain_analysis", assistant_name=profile.name
@@ -1073,8 +1071,8 @@ class PersonalAIAssistant:
         ai_model: str,
         user_api_key: str,
         analysis_type: str,
-        assistant_name: Optional[str] = None,
-    ) -> Dict[str, object]:
+        assistant_name: str | None = None,
+    ) -> dict[str, object]:
         profile = self._prepare_assistant(assistant_name)
         request_id, error = self._begin_request(
             user_address, ai_provider, ai_model, "wallet_analysis", assistant_name=profile.name
@@ -1125,9 +1123,9 @@ class PersonalAIAssistant:
         ai_provider: str,
         ai_model: str,
         user_api_key: str,
-        recovery_details: Optional[Dict[str, object]] = None,
-        assistant_name: Optional[str] = None,
-    ) -> Dict[str, object]:
+        recovery_details: dict[str, object] | None = None,
+        assistant_name: str | None = None,
+    ) -> dict[str, object]:
         profile = self._prepare_assistant(assistant_name)
         request_id, error = self._begin_request(
             user_address, ai_provider, ai_model, "wallet_recovery", assistant_name=profile.name
@@ -1176,9 +1174,9 @@ class PersonalAIAssistant:
         ai_provider: str,
         ai_model: str,
         user_api_key: str,
-        setup_request: Optional[Dict[str, object]] = None,
-        assistant_name: Optional[str] = None,
-    ) -> Dict[str, object]:
+        setup_request: dict[str, object] | None = None,
+        assistant_name: str | None = None,
+    ) -> dict[str, object]:
         profile = self._prepare_assistant(assistant_name)
         request_id, error = self._begin_request(
             user_address, ai_provider, ai_model, "node_setup", assistant_name=profile.name
@@ -1229,9 +1227,9 @@ class PersonalAIAssistant:
         ai_model: str,
         user_api_key: str,
         pool_name: str,
-        alert_details: Optional[Dict[str, object]] = None,
-        assistant_name: Optional[str] = None,
-    ) -> Dict[str, object]:
+        alert_details: dict[str, object] | None = None,
+        assistant_name: str | None = None,
+    ) -> dict[str, object]:
         profile = self._prepare_assistant(assistant_name)
         request_id, error = self._begin_request(
             user_address, ai_provider, ai_model, "liquidity_alert", assistant_name=profile.name
@@ -1281,8 +1279,8 @@ class PersonalAIAssistant:
         ai_model: str,
         user_api_key: str,
         prompt: str,
-        assistant_name: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        assistant_name: str | None = None,
+    ) -> dict[str, Any]:
         profile = self._prepare_assistant(assistant_name)
         request_id, error = self._begin_request(
             user_address, ai_provider, ai_model, "stream_prompt", assistant_name=profile.name
@@ -1315,7 +1313,7 @@ class PersonalAIAssistant:
 
         return {"success": True, "stream": generator()}
 
-    def list_micro_assistants(self) -> Dict[str, object]:
+    def list_micro_assistants(self) -> dict[str, object]:
         """Expose the available micro-assistants and their aggregated metrics."""
         return {
             "profiles": self.micro_network.list_profiles(),

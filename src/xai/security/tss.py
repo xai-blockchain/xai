@@ -1,7 +1,8 @@
-from abc import ABC, abstractmethod
+from __future__ import annotations
+
 import hashlib
 import logging
-from typing import Dict, List, Optional, Sequence
+from abc import ABC, abstractmethod
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
@@ -15,7 +16,6 @@ from xai.security.tss_production import (
 
 logger = logging.getLogger(__name__)
 
-
 class TSSInterface(ABC):
     """
     Abstract Base Class for a Threshold Signature Scheme (TSS).
@@ -23,7 +23,7 @@ class TSSInterface(ABC):
     """
 
     @abstractmethod
-    def generate_distributed_keys(self, num_participants: int, threshold: int) -> List[TSSKeyShare]:
+    def generate_distributed_keys(self, num_participants: int, threshold: int) -> list[TSSKeyShare]:
         """
         Generates key shares for multiple participants such that a threshold
         number of shares can reconstruct the signing key or produce a signature.
@@ -35,7 +35,7 @@ class TSSInterface(ABC):
         self,
         message: bytes,
         participant_key_shares: Sequence[TSSKeyShare],
-        threshold: Optional[int] = None,
+        threshold: int | None = None,
     ) -> bytes:
         """
         Collects partial signatures from participants and combines them to produce
@@ -52,7 +52,6 @@ class TSSInterface(ABC):
         """
         raise NotImplementedError
 
-
 class MockTSS(TSSInterface):
     """
     A hardened mock Threshold Signature Scheme for fast local testing.
@@ -63,17 +62,17 @@ class MockTSS(TSSInterface):
     """
 
     def __init__(self) -> None:
-        self._master_public_key: Optional[bytes] = None
-        self._participants_keys: Dict[str, Tuple[str, str]] = {}
-        self._threshold: Optional[int] = None
+        self._master_public_key: bytes | None = None
+        self._participants_keys: dict[str, tuple[str, str]] = {}
+        self._threshold: int | None = None
 
-    def generate_distributed_keys(self, num_participants: int, threshold: int) -> List[TSSKeyShare]:
+    def generate_distributed_keys(self, num_participants: int, threshold: int) -> list[TSSKeyShare]:
         if threshold > num_participants:
             raise ValueError("Threshold cannot be greater than number of participants.")
         if threshold < 1:
             raise ValueError("Threshold must be at least 1.")
 
-        participant_key_shares: List[TSSKeyShare] = []
+        participant_key_shares: list[TSSKeyShare] = []
         for i in range(num_participants):
             private_key = ec.generate_private_key(ec.SECP256K1(), default_backend())
             public_key = private_key.public_key()
@@ -115,7 +114,7 @@ class MockTSS(TSSInterface):
         )
         return participant_key_shares
 
-    def _require_threshold(self, provided: Optional[int]) -> int:
+    def _require_threshold(self, provided: int | None) -> int:
         threshold = provided or self._threshold
         if threshold is None:
             raise ValueError("Threshold not initialized for signing.")
@@ -125,7 +124,7 @@ class MockTSS(TSSInterface):
         self,
         message: bytes,
         participant_key_shares: Sequence[TSSKeyShare],
-        threshold: Optional[int] = None,
+        threshold: int | None = None,
     ) -> bytes:
         """
         Simulates distributed signing by verifying a threshold of individual signatures.
@@ -137,7 +136,7 @@ class MockTSS(TSSInterface):
                 f"Insufficient signatures collected. Required: {required}, Got: {len(participant_key_shares)}"
             )
 
-        valid_signatures: List[bytes] = []
+        valid_signatures: list[bytes] = []
         for share in participant_key_shares:
             stored = self._participants_keys.get(share.participant_id)
             if not stored:
@@ -182,7 +181,6 @@ class MockTSS(TSSInterface):
         """
         return bool(combined_signature) and public_key == self._master_public_key
 
-
 class SecureTSS(TSSInterface):
     """
     Production wrapper around the fully implemented TSS with Shamir shares.
@@ -195,11 +193,11 @@ class SecureTSS(TSSInterface):
     def __init__(self, curve: ec.EllipticCurve = ec.SECP256K1()) -> None:
         self.curve = curve
         self._impl = ProductionTSS(curve)
-        self._key_shares: List[TSSKeyShare] = []
-        self._master_public_key: Optional[bytes] = None
-        self._threshold: Optional[int] = None
+        self._key_shares: list[TSSKeyShare] = []
+        self._master_public_key: bytes | None = None
+        self._threshold: int | None = None
 
-    def generate_distributed_keys(self, num_participants: int, threshold: int) -> List[TSSKeyShare]:
+    def generate_distributed_keys(self, num_participants: int, threshold: int) -> list[TSSKeyShare]:
         key_shares, master_public_key = self._impl.generate_distributed_keys(
             num_participants=num_participants, threshold=threshold
         )
@@ -212,7 +210,7 @@ class SecureTSS(TSSInterface):
         self,
         message: bytes,
         participant_key_shares: Sequence[TSSKeyShare],
-        threshold: Optional[int] = None,
+        threshold: int | None = None,
     ) -> bytes:
         required = threshold or self._threshold
         if required is None:
@@ -232,7 +230,6 @@ class SecureTSS(TSSInterface):
         if not public_key:
             raise ValueError("Public key is required for verification.")
         return self._impl.verify_threshold_signature(public_key, message, signature)
-
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

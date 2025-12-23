@@ -11,29 +11,24 @@ Implements:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Callable, Dict, List, Optional
-
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Callable
 
 DecimalLike = Decimal | float | str | int
-
 
 def to_decimal(value: DecimalLike) -> Decimal:
     if isinstance(value, Decimal):
         return value
     return Decimal(str(value))
 
-
 class MarginException(Exception):
     """Raised when margin operations violate risk constraints."""
-
 
 @dataclass
 class AssetRiskParams:
     max_leverage: Decimal = Decimal("5")
     initial_margin: Decimal = Decimal("0.2")  # 20%
     maintenance_margin: Decimal = Decimal("0.1")  # 10%
-
 
 @dataclass
 class Position:
@@ -67,16 +62,15 @@ class Position:
         self.entry_price = weighted_price.quantize(Decimal("0.00000001"), rounding=ROUND_HALF_UP)
         self.size = new_size
 
-
 @dataclass
 class MarginAccount:
     account_id: str
     mode: str = "cross"
     collateral: Decimal = Decimal("0")
-    positions: Dict[str, Position] = field(default_factory=dict)
+    positions: dict[str, Position] = field(default_factory=dict)
     realized_pnl: Decimal = Decimal("0")
 
-    def equity(self, mark_prices: Dict[str, Decimal]) -> Decimal:
+    def equity(self, mark_prices: dict[str, Decimal]) -> Decimal:
         equity = self.collateral + self.realized_pnl
         for asset, position in self.positions.items():
             price = mark_prices.get(asset)
@@ -85,19 +79,18 @@ class MarginAccount:
             equity += position.unrealized_pnl(price)
         return equity
 
-
 class MarginEngine:
     def __init__(
         self,
         price_oracle: Callable[[str], Decimal],
-        asset_risk: Optional[Dict[str, AssetRiskParams]] = None,
-        default_risk: Optional[AssetRiskParams] = None,
+        asset_risk: dict[str, AssetRiskParams] | None = None,
+        default_risk: AssetRiskParams | None = None,
         liquidation_penalty: DecimalLike = Decimal("0.005"),
     ):
         self.price_oracle = price_oracle
         self.asset_risk = asset_risk or {}
         self.default_risk = default_risk or AssetRiskParams()
-        self.accounts: Dict[str, MarginAccount] = {}
+        self.accounts: dict[str, MarginAccount] = {}
         self.liquidation_penalty = to_decimal(liquidation_penalty)
 
     def _get_account(self, account_id: str) -> MarginAccount:
@@ -105,7 +98,7 @@ class MarginEngine:
             self.accounts[account_id] = MarginAccount(account_id=account_id)
         return self.accounts[account_id]
 
-    def get_positions(self, account_id: str) -> Dict[str, Position]:
+    def get_positions(self, account_id: str) -> dict[str, Position]:
         account = self.accounts.get(account_id)
         if not account:
             return {}
@@ -135,8 +128,8 @@ class MarginEngine:
         size: DecimalLike,
         *,
         isolated: bool = False,
-        leverage: Optional[DecimalLike] = None,
-        mark_price: Optional[DecimalLike] = None,
+        leverage: DecimalLike | None = None,
+        mark_price: DecimalLike | None = None,
     ) -> Position:
         account = self._get_account(account_id)
         risk = self._risk(asset)
@@ -177,9 +170,9 @@ class MarginEngine:
         self,
         account_id: str,
         asset: str,
-        size: Optional[DecimalLike] = None,
-        mark_price: Optional[DecimalLike] = None,
-    ) -> Dict[str, Decimal]:
+        size: DecimalLike | None = None,
+        mark_price: DecimalLike | None = None,
+    ) -> dict[str, Decimal]:
         account = self._get_account(account_id)
         position = account.positions.get(asset)
         if not position:
@@ -203,7 +196,7 @@ class MarginEngine:
             position.margin *= abs(position.size) / (abs(position.size) + abs(close_size))
         return {"realized_pnl": pnl, "remaining_size": position.size}
 
-    def account_overview(self, account_id: str) -> Dict[str, Decimal]:
+    def account_overview(self, account_id: str) -> dict[str, Decimal]:
         account = self._get_account(account_id)
         mark_prices = self._mark_prices(account.positions.keys())
         equity = account.equity(mark_prices)
@@ -216,8 +209,8 @@ class MarginEngine:
             "health_factor": hf,
         }
 
-    def perform_liquidations(self) -> List[str]:
-        liquidated: List[str] = []
+    def perform_liquidations(self) -> list[str]:
+        liquidated: list[str] = []
         for account_id, account in list(self.accounts.items()):
             mark_prices = self._mark_prices(account.positions.keys())
             equity = account.equity(mark_prices)
@@ -235,14 +228,14 @@ class MarginEngine:
             liquidated.append(account_id)
         return liquidated
 
-    def _mark_prices(self, assets: List[str] | Dict[str, Position]) -> Dict[str, Decimal]:
-        marks: Dict[str, Decimal] = {}
+    def _mark_prices(self, assets: list[str] | dict[str, Position]) -> dict[str, Decimal]:
+        marks: dict[str, Decimal] = {}
         keys = assets.keys() if isinstance(assets, dict) else assets
         for asset in keys:
             marks[asset] = self.price_oracle(asset)
         return marks
 
-    def _maintenance_requirement(self, account: MarginAccount, marks: Dict[str, Decimal]) -> Decimal:
+    def _maintenance_requirement(self, account: MarginAccount, marks: dict[str, Decimal]) -> Decimal:
         requirement = Decimal("0")
         for asset, position in account.positions.items():
             risk = self._risk(asset)

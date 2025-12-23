@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Mobile Telemetry API Handler
 
@@ -7,22 +9,16 @@ Handles mobile-specific telemetry endpoints:
 - GET /api/v1/telemetry/mobile/optimize - Get optimization recommendations
 """
 
-import time
 import logging
-from typing import Dict, Any, Optional, Tuple
+import time
+from typing import Any
+
 from flask import Flask, jsonify, request
 
-from xai.mobile.telemetry import (
-    MobileTelemetryCollector,
-    TelemetryEvent
-)
-from xai.mobile.network_optimizer import (
-    NetworkOptimizer,
-    ConnectionType
-)
+from xai.mobile.network_optimizer import ConnectionType, NetworkOptimizer
+from xai.mobile.telemetry import MobileTelemetryCollector, TelemetryEvent
 
 logger = logging.getLogger(__name__)
-
 
 class MobileTelemetryAPIHandler:
     """Handles all mobile telemetry API endpoints."""
@@ -31,7 +27,7 @@ class MobileTelemetryAPIHandler:
         self,
         node: Any,
         app: Flask,
-        api_auth: Optional[Any] = None
+        api_auth: Any | None = None
     ):
         """
         Initialize Mobile Telemetry API Handler.
@@ -63,31 +59,31 @@ class MobileTelemetryAPIHandler:
         """Register all mobile telemetry routes."""
 
         @self.app.route("/api/v1/telemetry/mobile", methods=["POST"])
-        def submit_telemetry() -> Tuple[Dict[str, Any], int]:
+        def submit_telemetry() -> tuple[dict[str, Any], int]:
             """Submit mobile telemetry data."""
             return self.submit_telemetry_handler()
 
         @self.app.route("/api/v1/telemetry/mobile/summary", methods=["GET"])
-        def get_telemetry_summary() -> Tuple[Dict[str, Any], int]:
+        def get_telemetry_summary() -> tuple[dict[str, Any], int]:
             """Get aggregated telemetry summary (admin only)."""
             return self.get_telemetry_summary_handler()
 
         @self.app.route("/api/v1/telemetry/mobile/optimize", methods=["POST"])
-        def get_optimization_recommendations() -> Tuple[Dict[str, Any], int]:
+        def get_optimization_recommendations() -> tuple[dict[str, Any], int]:
             """Get network optimization recommendations."""
             return self.get_optimization_handler()
 
         @self.app.route("/api/v1/telemetry/mobile/queue", methods=["GET"])
-        def get_offline_queue_status() -> Tuple[Dict[str, Any], int]:
+        def get_offline_queue_status() -> tuple[dict[str, Any], int]:
             """Get offline transaction queue status."""
             return self.get_queue_status_handler()
 
         @self.app.route("/api/v1/telemetry/mobile/stats", methods=["GET"])
-        def get_telemetry_stats() -> Tuple[Dict[str, Any], int]:
+        def get_telemetry_stats() -> tuple[dict[str, Any], int]:
             """Get telemetry statistics (public)."""
             return self.get_stats_handler()
 
-    def submit_telemetry_handler(self) -> Tuple[Dict[str, Any], int]:
+    def submit_telemetry_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle telemetry submission from mobile clients.
 
@@ -181,7 +177,7 @@ class MobileTelemetryAPIHandler:
             "recommendations": recommendations
         }), 200
 
-    def get_telemetry_summary_handler(self) -> Tuple[Dict[str, Any], int]:
+    def get_telemetry_summary_handler(self) -> tuple[dict[str, Any], int]:
         """
         Get aggregated telemetry summary (admin only).
 
@@ -243,7 +239,7 @@ class MobileTelemetryAPIHandler:
             logger.error(f"Failed to get telemetry summary: {e}")
             return jsonify({"error": "Failed to generate summary"}), 500
 
-    def get_optimization_handler(self) -> Tuple[Dict[str, Any], int]:
+    def get_optimization_handler(self) -> tuple[dict[str, Any], int]:
         """
         Get network optimization recommendations.
 
@@ -308,7 +304,7 @@ class MobileTelemetryAPIHandler:
             }
         }), 200
 
-    def get_queue_status_handler(self) -> Tuple[Dict[str, Any], int]:
+    def get_queue_status_handler(self) -> tuple[dict[str, Any], int]:
         """
         Get offline transaction queue status.
 
@@ -321,7 +317,7 @@ class MobileTelemetryAPIHandler:
             "queue": status
         }), 200
 
-    def get_stats_handler(self) -> Tuple[Dict[str, Any], int]:
+    def get_stats_handler(self) -> tuple[dict[str, Any], int]:
         """
         Get public telemetry statistics (limited view).
 

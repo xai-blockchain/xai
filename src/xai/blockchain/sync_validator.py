@@ -1,17 +1,17 @@
-import logging
-from typing import Any, Dict, List, Optional
+from __future__ import annotations
 
+import logging
+from typing import Any
 
 logger = logging.getLogger("xai.blockchain.sync_validator")
 
-
 class SyncValidator:
-    def __init__(self, trusted_checkpoints: Optional[List[Dict[str, Any]]] = None):
+    def __init__(self, trusted_checkpoints: list[dict[str, Any]] | None = None):
         # trusted_checkpoints: [{"height": int, "hash": str}]
         self.trusted_checkpoints = trusted_checkpoints or []
         logger.info("SyncValidator initialized with checkpoints: %s", self.trusted_checkpoints)
 
-    def _validate_block_header(self, block_header: Dict[str, Any]) -> bool:
+    def _validate_block_header(self, block_header: dict[str, Any]) -> bool:
         """
         Simulates validation of a block header.
         In a real system, this would involve cryptographic checks (PoW/PoS),
@@ -45,7 +45,7 @@ class SyncValidator:
         )
         return True
 
-    def _validate_block_transactions(self, transactions: List[Dict[str, Any]]) -> bool:
+    def _validate_block_transactions(self, transactions: list[dict[str, Any]]) -> bool:
         """
         Simulates validation of transactions within a block.
         In a real system, this would involve checking signatures, amounts, nonces,
@@ -66,7 +66,7 @@ class SyncValidator:
         logger.info("All %s transactions validated conceptually", len(transactions))
         return True
 
-    def validate_incoming_block(self, block: Dict[str, Any]) -> bool:
+    def validate_incoming_block(self, block: dict[str, Any]) -> bool:
         """
         Validates an entire incoming block for synchronization.
         """

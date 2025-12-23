@@ -1,24 +1,23 @@
 from __future__ import annotations
 
 import logging
+
 logger = logging.getLogger(__name__)
 
-
-from typing import TYPE_CHECKING, Dict, Tuple, Optional, Any
+from typing import TYPE_CHECKING, Any
 
 from flask import jsonify, request
 
-from xai.core.request_validator_middleware import validate_request
 from xai.core.input_validation_schemas import (
-    MiningRegisterInput,
     MiningBonusClaimInput,
+    MiningRegisterInput,
     ReferralCreateInput,
     ReferralUseInput,
 )
+from xai.core.request_validator_middleware import validate_request
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
-
 
 def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
     """Register mining bonus, referral, and leaderboard endpoints."""
@@ -27,7 +26,7 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/mining/register", methods=["POST"])
     @validate_request(routes.request_validator, MiningRegisterInput)
-    def register_miner() -> Tuple[Dict[str, Any], int]:
+    def register_miner() -> tuple[dict[str, Any], int]:
         """Register a miner for bonus programs (admin only).
 
         Enrolls a miner address in the bonus tracking system to enable
@@ -54,7 +53,7 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         if auth_error:
             return auth_error
 
-        model: Optional[MiningRegisterInput] = getattr(request, "validated_model", None)
+        model: MiningRegisterInput | None = getattr(request, "validated_model", None)
         if model is None:
             return routes._error_response("Invalid miner payload", status=400, code="invalid_payload")
 
@@ -75,7 +74,7 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "register_miner")
 
     @app.route("/mining/achievements/<address>", methods=["GET"])
-    def get_achievements(address: str) -> Tuple[Dict[str, Any], int]:
+    def get_achievements(address: str) -> tuple[dict[str, Any], int]:
         """Get mining achievements for an address.
 
         Checks which achievements the miner has unlocked based on blocks mined
@@ -117,7 +116,7 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/mining/claim-bonus", methods=["POST"])
     @validate_request(routes.request_validator, MiningBonusClaimInput)
-    def claim_bonus() -> Tuple[Dict[str, Any], int]:
+    def claim_bonus() -> tuple[dict[str, Any], int]:
         """Claim an earned mining bonus (admin only).
 
         Claims a specific bonus type that the miner has earned through
@@ -145,7 +144,7 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         if auth_error:
             return auth_error
 
-        model: Optional[MiningBonusClaimInput] = getattr(request, "validated_model", None)
+        model: MiningBonusClaimInput | None = getattr(request, "validated_model", None)
         if model is None:
             return routes._error_response("Invalid bonus payload", status=400, code="invalid_payload")
 
@@ -167,7 +166,7 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/mining/referral/create", methods=["POST"])
     @validate_request(routes.request_validator, ReferralCreateInput)
-    def create_referral_code() -> Tuple[Dict[str, Any], int]:
+    def create_referral_code() -> tuple[dict[str, Any], int]:
         """Create a referral code for a miner (admin only).
 
         Generates a unique referral code that can be shared with new miners
@@ -194,7 +193,7 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         if auth_error:
             return auth_error
 
-        model: Optional[ReferralCreateInput] = getattr(request, "validated_model", None)
+        model: ReferralCreateInput | None = getattr(request, "validated_model", None)
         if model is None:
             return routes._error_response("Invalid referral payload", status=400, code="invalid_payload")
 
@@ -216,7 +215,7 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/mining/referral/use", methods=["POST"])
     @validate_request(routes.request_validator, ReferralUseInput)
-    def use_referral_code() -> Tuple[Dict[str, Any], int]:
+    def use_referral_code() -> tuple[dict[str, Any], int]:
         """Apply a referral code for a new miner (admin only).
 
         Registers a referral relationship between new miner and referrer,
@@ -245,7 +244,7 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
         if auth_error:
             return auth_error
 
-        model: Optional[ReferralUseInput] = getattr(request, "validated_model", None)
+        model: ReferralUseInput | None = getattr(request, "validated_model", None)
         if model is None:
             return routes._error_response("Invalid referral payload", status=400, code="invalid_payload")
 
@@ -270,7 +269,7 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "use_referral_code")
 
     @app.route("/mining/user-bonuses/<address>", methods=["GET"])
-    def get_user_bonuses(address: str) -> Tuple[Dict[str, Any], int]:
+    def get_user_bonuses(address: str) -> tuple[dict[str, Any], int]:
         """Get all bonuses for a specific miner.
 
         Returns complete bonus status including earned bonuses, claimed bonuses,
@@ -304,7 +303,7 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "get_user_bonuses")
 
     @app.route("/mining/leaderboard", methods=["GET"])
-    def get_bonus_leaderboard() -> Tuple[Dict[str, Any], int]:
+    def get_bonus_leaderboard() -> tuple[dict[str, Any], int]:
         """Get mining bonus leaderboard.
 
         Returns ranked list of miners by total bonuses earned.
@@ -339,7 +338,7 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "get_bonus_leaderboard")
 
     @app.route("/mining/leaderboard/unified", methods=["GET"])
-    def get_unified_leaderboard() -> Tuple[Dict[str, Any], int]:
+    def get_unified_leaderboard() -> tuple[dict[str, Any], int]:
         """Get unified leaderboard across all mining metrics.
 
         Returns ranked miners based on selected metric combining blocks mined,
@@ -380,7 +379,7 @@ def register_mining_bonus_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "get_unified_leaderboard")
 
     @app.route("/mining/stats", methods=["GET"])
-    def get_mining_bonus_stats() -> Tuple[Dict[str, Any], int]:
+    def get_mining_bonus_stats() -> tuple[dict[str, Any], int]:
         """Get system-wide mining bonus statistics.
 
         Returns aggregate statistics about the mining bonus program including

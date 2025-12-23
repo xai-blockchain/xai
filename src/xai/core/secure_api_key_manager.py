@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Secure API Key Management System
 
@@ -16,24 +18,22 @@ Security Features:
 9. Hardware security module (HSM) support (optional)
 """
 
+import base64
 import hashlib
 import hmac
+import json
+import logging
+import os
 import secrets
 import time
-import json
-import os
-from typing import Dict, List, Optional, Tuple
 from enum import Enum
+
 from cryptography.fernet import Fernet
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.backends import default_backend
-import base64
 
-import logging
 logger = logging.getLogger(__name__)
-
-
 
 class KeyStatus(Enum):
     """Status of stored API key"""
@@ -46,7 +46,6 @@ class KeyStatus(Enum):
     REVOKED = "revoked"  # Manually revoked by donor
     DESTROYED = "destroyed"  # Securely wiped from storage
 
-
 class AIProvider(Enum):
     """Supported AI providers for key validation"""
 
@@ -56,7 +55,6 @@ class AIProvider(Enum):
     TOGETHER = "together"
     REPLICATE = "replicate"
     COHERE = "cohere"
-
 
 class SecureAPIKeyManager:
     """
@@ -80,8 +78,8 @@ class SecureAPIKeyManager:
         self.fernet = Fernet(self.master_key)
 
         # Key storage
-        self.stored_keys: Dict[str, Dict] = {}
-        self.access_log: List[Dict] = []
+        self.stored_keys: dict[str, Dict] = {}
+        self.access_log: list[Dict] = []
 
         # Rate limiting
         self.submission_rate_limit = {}  # address -> last_submission_time
@@ -117,7 +115,7 @@ class SecureAPIKeyManager:
         provider: AIProvider,
         api_key: str,
         donated_tokens: int,
-        expiration_days: Optional[int] = None,
+        expiration_days: int | None = None,
     ) -> Dict:
         """
         Securely submit API key donation
@@ -353,7 +351,7 @@ class SecureAPIKeyManager:
 
     def get_api_key_for_task(
         self, provider: AIProvider, required_tokens: int
-    ) -> Optional[Tuple[str, str, Dict]]:
+    ) -> tuple[str, str, Dict] | None:
         """
         Retrieve decrypted API key for use in a task
 
@@ -530,7 +528,7 @@ class SecureAPIKeyManager:
         with open(log_file, "a") as f:
             f.write(json.dumps(log_entry) + "\n")
 
-    def get_key_status(self, key_id: str) -> Optional[Dict]:
+    def get_key_status(self, key_id: str) -> Dict | None:
         """Get current status of a stored key"""
         if key_id not in self.stored_keys:
             return None
@@ -542,7 +540,7 @@ class SecureAPIKeyManager:
 
         return key_record
 
-    def get_donor_keys(self, donor_address: str) -> List[Dict]:
+    def get_donor_keys(self, donor_address: str) -> list[Dict]:
         """Get all keys donated by a specific address"""
         return [
             self.get_key_status(kid)
@@ -593,7 +591,6 @@ class SecureAPIKeyManager:
             "by_provider": stats_by_provider,
             "total_access_logs": len(self.access_log),
         }
-
 
 # Example usage
 if __name__ == "__main__":

@@ -17,21 +17,20 @@ Security features:
 
 from __future__ import annotations
 
-import time
 import logging
 import statistics
+import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from ..vm.exceptions import VMExecutionError
-from .access_control import AccessControl, SignedRequest, RoleBasedAccessControl, Role
+from .access_control import AccessControl, Role, RoleBasedAccessControl, SignedRequest
 
 if TYPE_CHECKING:
     from ..blockchain import Blockchain
 
 logger = logging.getLogger(__name__)
-
 
 class OracleStatus(Enum):
     """Oracle data feed status."""
@@ -39,7 +38,6 @@ class OracleStatus(Enum):
     STALE = "stale"
     PAUSED = "paused"
     INVALID = "invalid"
-
 
 @dataclass
 class PriceData:
@@ -51,7 +49,6 @@ class PriceData:
     source: str
     confidence: int = 10000  # Confidence level (basis points)
 
-
 @dataclass
 class PriceFeed:
     """Configuration for a price feed."""
@@ -61,7 +58,7 @@ class PriceFeed:
     quote_asset: str
 
     # Data providers
-    sources: List[str] = field(default_factory=list)
+    sources: list[str] = field(default_factory=list)
 
     # Price data
     latest_price: int = 0
@@ -69,7 +66,7 @@ class PriceFeed:
     round_id: int = 0
 
     # Historical data (last N prices)
-    price_history: List[PriceData] = field(default_factory=list)
+    price_history: list[PriceData] = field(default_factory=list)
     history_size: int = 100
 
     # Configuration
@@ -89,12 +86,11 @@ class PriceFeed:
     max_price_age: int = 3600  # Maximum price staleness (1 hour)
 
     # Multi-source aggregation tracking
-    pending_updates: Dict[str, PriceData] = field(default_factory=dict)  # source -> price_data
+    pending_updates: dict[str, PriceData] = field(default_factory=dict)  # source -> price_data
 
     # Rate limiting per source
-    last_update_time: Dict[str, float] = field(default_factory=dict)  # source -> timestamp
+    last_update_time: dict[str, float] = field(default_factory=dict)  # source -> timestamp
     min_update_interval: int = 60  # Minimum seconds between updates from same source
-
 
 @dataclass
 class PriceOracle:
@@ -121,13 +117,13 @@ class PriceOracle:
     owner: str = ""
 
     # Price feeds by pair
-    feeds: Dict[str, PriceFeed] = field(default_factory=dict)
+    feeds: dict[str, PriceFeed] = field(default_factory=dict)
 
     # Authorized data providers
-    authorized_providers: Dict[str, bool] = field(default_factory=dict)
+    authorized_providers: dict[str, bool] = field(default_factory=dict)
 
     # Price bounds (min/max acceptable prices per asset)
-    price_bounds: Dict[str, Tuple[int, int]] = field(default_factory=dict)
+    price_bounds: dict[str, tuple[int, int]] = field(default_factory=dict)
 
     # Circuit breaker (pause all feeds if triggered)
     circuit_breaker_active: bool = False
@@ -137,7 +133,7 @@ class PriceOracle:
 
     # Access control with signature verification
     access_control: AccessControl = field(default_factory=AccessControl)
-    rbac: Optional[RoleBasedAccessControl] = None
+    rbac: RoleBasedAccessControl | None = None
 
     def __post_init__(self) -> None:
         """Initialize oracle."""
@@ -325,7 +321,7 @@ class PriceOracle:
         caller: str,
         pair: str,
         price: int,
-        timestamp: Optional[float] = None,
+        timestamp: float | None = None,
     ) -> bool:
         """
         Update price for a feed with comprehensive manipulation protection.
@@ -488,9 +484,9 @@ class PriceOracle:
     def update_price_batch(
         self,
         caller: str,
-        pairs: List[str],
-        prices: List[int],
-        timestamps: Optional[List[float]] = None,
+        pairs: list[str],
+        prices: list[int],
+        timestamps: list[float] | None = None,
     ) -> bool:
         """Update multiple prices in a single call."""
         if len(pairs) != len(prices):
@@ -534,7 +530,7 @@ class PriceOracle:
 
         return feed.latest_price
 
-    def get_price_safe(self, pair: str) -> Tuple[int, bool]:
+    def get_price_safe(self, pair: str) -> tuple[int, bool]:
         """
         Get price with validity flag (doesn't throw).
 
@@ -572,7 +568,7 @@ class PriceOracle:
             "answered_in_round": feed.round_id,
         }
 
-    def get_historical_price(self, pair: str, round_id: int) -> Optional[PriceData]:
+    def get_historical_price(self, pair: str, round_id: int) -> PriceData | None:
         """
         Get historical price by round ID.
 
@@ -633,7 +629,7 @@ class PriceOracle:
             "sources": feed.sources,
         }
 
-    def get_all_feeds(self) -> List[str]:
+    def get_all_feeds(self) -> list[str]:
         """Get list of all feed pairs."""
         return list(self.feeds.keys())
 
@@ -768,7 +764,7 @@ class PriceOracle:
         request: SignedRequest,
         pair: str,
         price: int,
-        timestamp: Optional[float] = None,
+        timestamp: float | None = None,
     ) -> bool:
         """
         Update price for a feed with signature verification and manipulation protection.
@@ -1201,7 +1197,6 @@ class PriceOracle:
             "total_updates": self.total_updates,
         }
 
-
 @dataclass
 class OracleAggregator:
     """
@@ -1214,7 +1209,7 @@ class OracleAggregator:
     """
 
     name: str = "XAI Oracle Aggregator"
-    oracles: List[PriceOracle] = field(default_factory=list)
+    oracles: list[PriceOracle] = field(default_factory=list)
 
     def add_oracle(self, oracle: PriceOracle) -> None:
         """Add an oracle to the aggregator."""
@@ -1243,7 +1238,7 @@ class OracleAggregator:
 
         return statistics.median(prices)
 
-    def get_all_prices(self, pair: str) -> List[Tuple[str, int, bool]]:
+    def get_all_prices(self, pair: str) -> list[tuple[str, int, bool]]:
         """
         Get prices from all oracles.
 

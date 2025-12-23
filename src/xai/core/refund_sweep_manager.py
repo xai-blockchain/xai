@@ -8,8 +8,7 @@ plus a safety margin, leaving construction/broadcast to upstream callers.
 from __future__ import annotations
 
 import time
-from typing import Iterable, List, Dict, Any
-
+from typing import Any
 
 class RefundSweepManager:
     """Identify swaps that should be refunded."""
@@ -17,7 +16,7 @@ class RefundSweepManager:
     def __init__(self, safety_margin_seconds: int = 1800):
         self.safety_margin_seconds = safety_margin_seconds
 
-    def find_expired_swaps(self, swaps: Iterable[Dict[str, Any]], now: float | None = None) -> List[Dict[str, Any]]:
+    def find_expired_swaps(self, swaps: Iterable[dict[str, Any]], now: float | None = None) -> list[dict[str, Any]]:
         """
         Return swaps whose timelock has passed plus safety margin and are not already claimed/refunded.
         """

@@ -1,15 +1,16 @@
+from __future__ import annotations
+
 import logging
 import time
-from typing import Dict, Any, Tuple
+from typing import Any
 
 logger = logging.getLogger("xai.blockchain.double_sign_detector")
-
 
 class DoubleSignDetector:
     def __init__(self):
         # Stores validator signatures for blocks:
         # {validator_id: {block_height: signed_block_hash}}
-        self.validator_signatures: Dict[str, Dict[int, str]] = {}
+        self.validator_signatures: dict[str, dict[int, str]] = {}
         logger.info("DoubleSignDetector initialized.")
 
     def _generate_double_sign_proof(
@@ -18,7 +19,7 @@ class DoubleSignDetector:
         block_height: int,
         first_signed_block_hash: str,
         second_signed_block_hash: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Generates a conceptual proof of double-signing.
         In a real system, this would include the full signed block headers/messages.
@@ -44,7 +45,7 @@ class DoubleSignDetector:
 
     def process_signed_block(
         self, validator_id: str, block_height: int, signed_block_hash: str
-    ) -> Tuple[bool, Dict[str, Any] | None]:
+    ) -> tuple[bool, dict[str, Any] | None]:
         """
         Processes a newly signed block and checks for double-signing.
         Returns (is_double_sign_detected, proof_if_detected).
@@ -98,7 +99,7 @@ class DoubleSignDetector:
             )
             return False, None
 
-    def get_state(self) -> Dict[str, Any]:
+    def get_state(self) -> dict[str, Any]:
         """
         Get current detector state for snapshotting.
 
@@ -110,7 +111,7 @@ class DoubleSignDetector:
             "validator_signatures": copy.deepcopy(self.validator_signatures)
         }
 
-    def restore_state(self, state: Dict[str, Any]) -> None:
+    def restore_state(self, state: dict[str, Any]) -> None:
         """
         Restore detector state from a snapshot.
 

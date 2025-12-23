@@ -13,32 +13,32 @@ Endpoints:
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Dict, Any, Tuple
+
+import base64
+import logging
+from typing import TYPE_CHECKING, Any
 
 from flask import jsonify, request
-import logging
-import base64
 
-from xai.core.light_clients.manager import (
-    LightClientManager,
-    ChainType,
+from xai.core.light_clients.cosmos_light_client import (
+    CosmosBlockHeader,
+    CosmosCommit,
+    CosmosProof,
+    CosmosValidatorSet,
 )
 from xai.core.light_clients.evm_light_client import (
     EVMBlockHeader,
     EVMStateProof,
 )
-from xai.core.light_clients.cosmos_light_client import (
-    CosmosBlockHeader,
-    CosmosValidatorSet,
-    CosmosProof,
-    CosmosCommit,
+from xai.core.light_clients.manager import (
+    ChainType,
+    LightClientManager,
 )
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPI
 
 logger = logging.getLogger(__name__)
-
 
 def register_light_client_routes(node_api: 'NodeAPI') -> None:
     """
@@ -53,7 +53,7 @@ def register_light_client_routes(node_api: 'NodeAPI') -> None:
         logger.info("Light client manager initialized")
 
     @node_api.app.route("/api/v1/light/chains", methods=["GET"])
-    def list_chains() -> Tuple[Dict[str, Any], int]:
+    def list_chains() -> tuple[dict[str, Any], int]:
         """
         List all registered light client chains.
 
@@ -77,7 +77,7 @@ def register_light_client_routes(node_api: 'NodeAPI') -> None:
             }), 500
 
     @node_api.app.route("/api/v1/light/evm/<chain_id>/header/<int:height>", methods=["GET"])
-    def get_evm_header(chain_id: str, height: int) -> Tuple[Dict[str, Any], int]:
+    def get_evm_header(chain_id: str, height: int) -> tuple[dict[str, Any], int]:
         """
         Get EVM block header at specific height.
 
@@ -120,7 +120,7 @@ def register_light_client_routes(node_api: 'NodeAPI') -> None:
             }), 500
 
     @node_api.app.route("/api/v1/light/cosmos/<chain_id>/header/<int:height>", methods=["GET"])
-    def get_cosmos_header(chain_id: str, height: int) -> Tuple[Dict[str, Any], int]:
+    def get_cosmos_header(chain_id: str, height: int) -> tuple[dict[str, Any], int]:
         """
         Get Cosmos block header at specific height.
 
@@ -167,7 +167,7 @@ def register_light_client_routes(node_api: 'NodeAPI') -> None:
             }), 500
 
     @node_api.app.route("/api/v1/light/verify-proof", methods=["POST"])
-    def verify_proof() -> Tuple[Dict[str, Any], int]:
+    def verify_proof() -> tuple[dict[str, Any], int]:
         """
         Verify a cross-chain proof.
 
@@ -279,7 +279,7 @@ def register_light_client_routes(node_api: 'NodeAPI') -> None:
             }), 500
 
     @node_api.app.route("/api/v1/light/status/<chain_type>/<chain_id>", methods=["GET"])
-    def get_chain_status(chain_type: str, chain_id: str) -> Tuple[Dict[str, Any], int]:
+    def get_chain_status(chain_type: str, chain_id: str) -> tuple[dict[str, Any], int]:
         """
         Get status of a registered chain.
 
@@ -325,7 +325,7 @@ def register_light_client_routes(node_api: 'NodeAPI') -> None:
             }), 500
 
     @node_api.app.route("/api/v1/light/cache/stats", methods=["GET"])
-    def get_cache_stats() -> Tuple[Dict[str, Any], int]:
+    def get_cache_stats() -> tuple[dict[str, Any], int]:
         """Get verification cache statistics."""
         try:
             manager: LightClientManager = node_api.node.light_client_manager
@@ -344,7 +344,7 @@ def register_light_client_routes(node_api: 'NodeAPI') -> None:
             }), 500
 
     @node_api.app.route("/api/v1/light/cache/clear", methods=["POST"])
-    def clear_cache() -> Tuple[Dict[str, Any], int]:
+    def clear_cache() -> tuple[dict[str, Any], int]:
         """Clear verification cache."""
         try:
             manager: LightClientManager = node_api.node.light_client_manager
@@ -364,10 +364,9 @@ def register_light_client_routes(node_api: 'NodeAPI') -> None:
 
     logger.info("Light client API routes registered")
 
-
 # Helper functions for parsing proof data
 
-def _parse_evm_header(data: Dict[str, Any]) -> EVMBlockHeader:
+def _parse_evm_header(data: dict[str, Any]) -> EVMBlockHeader:
     """Parse EVM header from JSON data"""
     from eth_utils import to_bytes
 
@@ -390,8 +389,7 @@ def _parse_evm_header(data: Dict[str, Any]) -> EVMBlockHeader:
         base_fee_per_gas=int(data['base_fee_per_gas']) if 'base_fee_per_gas' in data else None,
     )
 
-
-def _parse_evm_state_proof(data: Dict[str, Any]) -> EVMStateProof:
+def _parse_evm_state_proof(data: dict[str, Any]) -> EVMStateProof:
     """Parse EVM state proof from JSON data"""
     from eth_utils import to_bytes
 
@@ -411,18 +409,15 @@ def _parse_evm_state_proof(data: Dict[str, Any]) -> EVMStateProof:
         storage_proofs=storage_proofs,
     )
 
-
-def _parse_cosmos_header(data: Dict[str, Any]) -> CosmosBlockHeader:
+def _parse_cosmos_header(data: dict[str, Any]) -> CosmosBlockHeader:
     """Parse Cosmos header from JSON data"""
     return CosmosBlockHeader.from_dict(data)
 
-
-def _parse_cosmos_validator_set(data: Dict[str, Any]) -> CosmosValidatorSet:
+def _parse_cosmos_validator_set(data: dict[str, Any]) -> CosmosValidatorSet:
     """Parse Cosmos validator set from JSON data"""
     return CosmosValidatorSet.from_dict(data)
 
-
-def _parse_cosmos_commit(data: Dict[str, Any]) -> CosmosCommit:
+def _parse_cosmos_commit(data: dict[str, Any]) -> CosmosCommit:
     """Parse Cosmos commit from JSON data"""
     signatures = [
         (
@@ -440,8 +435,7 @@ def _parse_cosmos_commit(data: Dict[str, Any]) -> CosmosCommit:
         timestamp=data['timestamp'],
     )
 
-
-def _parse_cosmos_proof(data: Dict[str, Any]) -> CosmosProof:
+def _parse_cosmos_proof(data: dict[str, Any]) -> CosmosProof:
     """Parse Cosmos IBC proof from JSON data"""
     return CosmosProof(
         key=base64.b64decode(data['key']),

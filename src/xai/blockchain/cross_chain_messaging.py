@@ -1,12 +1,13 @@
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from xai.blockchain.merkle import MerkleTree
 
 logger = logging.getLogger("xai.blockchain.cross_chain_messaging")
-
 
 class CrossChainMessage:
     def __init__(
@@ -15,9 +16,9 @@ class CrossChainMessage:
         destination_chain_id: str,
         sender_address: str,
         recipient_address: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         sequence_number: int,
-        merkle_proof: Optional[List[Tuple[str, str]]] = None,
+        merkle_proof: list[tuple[str, str]] | None = None,
     ):
         if not origin_chain_id or not destination_chain_id:
             raise ValueError("Origin and destination chain IDs cannot be empty.")
@@ -36,7 +37,7 @@ class CrossChainMessage:
         self.sequence_number = sequence_number
         self.merkle_proof = merkle_proof  # Proof of inclusion on origin chain
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "origin_chain_id": self.origin_chain_id,
             "destination_chain_id": self.destination_chain_id,
@@ -56,7 +57,6 @@ class CrossChainMessage:
             f"CrossChainMessage(from='{self.origin_chain_id}', to='{self.destination_chain_id}', "
             f"seq={self.sequence_number}, payload={self.payload})"
         )
-
 
 class CrossChainMessageVerifier:
     def __init__(self):

@@ -10,7 +10,7 @@ from __future__ import annotations
 import time
 import json
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import Mock, patch, MagicMock
 
 import pytest

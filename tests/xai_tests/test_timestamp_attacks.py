@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Phase 4 Security Tests: Timestamp Manipulation Attacks
 Phase 4.5 of LOCAL_TESTING_PLAN.md
@@ -15,13 +17,12 @@ All tests marked with @pytest.mark.security for automated security suite executi
 import pytest
 import time
 import tempfile
-from typing import Tuple
+
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 from xai.core.blockchain import Blockchain, Block, Transaction
 from xai.core.wallet import Wallet
-
 
 @pytest.mark.security
 class TestTimestampValidation:
@@ -200,7 +201,6 @@ class TestTimestampValidation:
 
         # This should ideally be rejected
 
-
 @pytest.mark.security
 class TestTimeDriftAttacks:
     """
@@ -208,7 +208,7 @@ class TestTimeDriftAttacks:
     """
 
     @pytest.fixture
-    def two_node_network(self, tmp_path) -> Tuple[Blockchain, Blockchain]:
+    def two_node_network(self, tmp_path) -> tuple[Blockchain, Blockchain]:
         """Create 2-node network"""
         node1_dir = tmp_path / "node1"
         node2_dir = tmp_path / "node2"
@@ -342,7 +342,6 @@ class TestTimeDriftAttacks:
             # But timestamp should be validated first
 
         # Difficulty should not have decreased due to timestamp manipulation
-
 
 @pytest.mark.security
 class TestTimestampConsistency:
@@ -488,7 +487,6 @@ class TestTimestampConsistency:
         # Node2 should reject malicious chain
         # (Would need to test replace_chain validation)
 
-
 @pytest.mark.security
 class TestBlockTimingAttacks:
     """
@@ -594,7 +592,6 @@ class TestBlockTimingAttacks:
             # Both nodes should have identical timestamp for this block
             assert node1.chain[-1].timestamp == node2.chain[-1].timestamp, \
                 "Nodes should agree on block timestamp"
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-m", "security"])

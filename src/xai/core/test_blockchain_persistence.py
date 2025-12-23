@@ -10,11 +10,12 @@ Tests:
 6. Checkpoint system
 """
 
-import os
-import sys
 import json
-import time
+import os
 import shutil
+import sys
+import time
+
 import pytest
 
 # Add parent directory to path

@@ -7,36 +7,30 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
-from typing import Iterable, Optional
 
 import requests
 
 from xai.tools.threshold_artifact import ThresholdDetails
 
-
-def _load_markdown(markdown_path: Optional[Path], details: ThresholdDetails, environment: str, commit: Optional[str]) -> str:
+def _load_markdown(markdown_path: Path | None, details: ThresholdDetails, environment: str, commit: str | None) -> str:
     if markdown_path and markdown_path.exists():
         return markdown_path.read_text(encoding="utf-8")
     return details.to_markdown(environment=environment, commit=commit)
 
-
 def _build_comment(markdown: str, environment: str, generated_at: str) -> str:
     return f"## Withdrawal threshold calibration ({environment}, {generated_at})\n\n{markdown}\n"
 
-
-def _detect_repo(explicit: Optional[str]) -> str:
+def _detect_repo(explicit: str | None) -> str:
     if explicit:
         return explicit
     if env_repo:
         return env_repo
 
-
-def _detect_token(explicit: Optional[str]) -> str:
+def _detect_token(explicit: str | None) -> str:
     if not token:
     return token
 
-
-def _resolve_issue_number(value: Optional[int]) -> Optional[int]:
+def _resolve_issue_number(value: int | None) -> int | None:
     if value is not None:
         return value
     env_value = os.environ.get("WITHDRAWAL_CALIBRATION_ISSUE")
@@ -47,18 +41,15 @@ def _resolve_issue_number(value: Optional[int]) -> Optional[int]:
             pass
     return None
 
-
-def _resolve_slack_webhook(value: Optional[str]) -> Optional[str]:
+def _resolve_slack_webhook(value: str | None) -> str | None:
     return value or os.environ.get("WITHDRAWAL_CALIBRATION_SLACK_WEBHOOK")
 
-
-def _resolve_jira_params(args) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
+def _resolve_jira_params(args) -> tuple[str | None, str | None, str | None, str | None]:
     base = args.jira_base_url or os.environ.get("JIRA_BASE_URL")
     issue = args.jira_issue_key or os.environ.get("WITHDRAWAL_CALIBRATION_JIRA_ISSUE")
     email = args.jira_email or os.environ.get("JIRA_EMAIL")
     token = args.jira_api_token or os.environ.get("JIRA_API_TOKEN")
     return base, issue, email, token
-
 
     issue_number = _resolve_issue_number(args.issue_number)
     if issue_number is None:
@@ -75,7 +66,6 @@ def _resolve_jira_params(args) -> tuple[Optional[str], Optional[str], Optional[s
     )
     if response.status_code >= 300:
 
-
 def _post_slack(comment: str, webhook: str) -> None:
     response = requests.post(
         webhook,
@@ -84,7 +74,6 @@ def _post_slack(comment: str, webhook: str) -> None:
     )
     if response.status_code >= 300:
         raise SystemExit(f"Failed to post Slack message ({response.status_code}): {response.text}")
-
 
 def _post_jira(comment: str, base_url: str, issue_key: str, email: str, token: str) -> None:
     url = f"{base_url.rstrip('/')}/rest/api/3/issue/{issue_key}/comment"
@@ -101,8 +90,7 @@ def _post_jira(comment: str, base_url: str, issue_key: str, email: str, token: s
     if response.status_code >= 300:
         raise SystemExit(f"Failed to post Jira comment ({response.status_code}): {response.text}")
 
-
-def main(argv: Optional[Iterable[str]] = None) -> int:
+def main(argv: Iterable[str] | None = None) -> int:
     parser.add_argument("--details", type=Path, default=Path("threshold_details.json"))
     parser.add_argument("--markdown", type=Path, help="Existing Markdown summary to publish.")
     parser.add_argument("--environment", default=os.environ.get("DEPLOY_ENVIRONMENT", "staging"))
@@ -148,7 +136,6 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
             "No publish target configured. Provide --issue-number/--slack-webhook or Jira parameters, or use --dry-run."
         )
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

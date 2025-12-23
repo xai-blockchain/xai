@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Peer Discovery and Network Bootstrap
 
@@ -11,21 +13,20 @@ Implements:
 - Geographic and IP diversity preference
 """
 
-import time
 import json
+import logging
 import secrets
 import threading
-import logging
-import requests
-from flask import request
-from typing import List, Dict, Set, Optional, Tuple
+import time
 from collections import defaultdict
 from datetime import datetime
+
+import requests
+from flask import request
 
 from xai.core.config import Config
 
 logger = logging.getLogger(__name__)
-
 
 class PeerInfo:
     """Information about a discovered peer"""
@@ -111,7 +112,6 @@ class PeerInfo:
             "chain_height": self.chain_height,
         }
 
-
 class BootstrapNodes:
     """Hardcoded bootstrap/seed nodes for network discovery"""
 
@@ -139,7 +139,7 @@ class BootstrapNodes:
     ]
 
     @classmethod
-    def get_seeds(cls, network_type: str = "mainnet") -> List[str]:
+    def get_seeds(cls, network_type: str = "mainnet") -> list[str]:
         """
         Get bootstrap nodes for network type
 
@@ -156,12 +156,11 @@ class BootstrapNodes:
         }
         return network_map.get(network_type.lower(), cls.MAINNET_SEEDS)
 
-
 class PeerDiscoveryProtocol:
     """Implements peer exchange protocol"""
 
     @staticmethod
-    def send_get_peers_request(peer_url: str, timeout: int = 5) -> Optional[List[str]]:
+    def send_get_peers_request(peer_url: str, timeout: int = 5) -> list[str] | None:
         """
         Request peer list from a node
 
@@ -220,7 +219,7 @@ class PeerDiscoveryProtocol:
         return False
 
     @staticmethod
-    def ping_peer(peer_url: str, timeout: int = 3) -> Tuple[bool, float]:
+    def ping_peer(peer_url: str, timeout: int = 3) -> tuple[bool, float]:
         """
         Ping a peer to check if alive
 
@@ -248,7 +247,7 @@ class PeerDiscoveryProtocol:
             return False, 0.0
 
     @staticmethod
-    def get_peer_info(peer_url: str, timeout: int = 5) -> Optional[dict]:
+    def get_peer_info(peer_url: str, timeout: int = 5) -> dict | None:
         """
         Get detailed peer information
 
@@ -275,7 +274,6 @@ class PeerDiscoveryProtocol:
 
         return None
 
-
 class PeerDiversityManager:
     """Manages peer diversity for eclipse attack resistance"""
 
@@ -299,7 +297,7 @@ class PeerDiversityManager:
         return ip_address
 
     @staticmethod
-    def calculate_diversity_score(peers: List[PeerInfo]) -> float:
+    def calculate_diversity_score(peers: list[PeerInfo]) -> float:
         """
         Calculate diversity score (0-100) based on IP distribution
 
@@ -332,8 +330,8 @@ class PeerDiversityManager:
 
     @staticmethod
     def select_diverse_peers(
-        peers: List[PeerInfo], count: int, prefer_quality: bool = True
-    ) -> List[PeerInfo]:
+        peers: list[PeerInfo], count: int, prefer_quality: bool = True
+    ) -> list[PeerInfo]:
         """
         Select diverse set of peers
 
@@ -379,7 +377,6 @@ class PeerDiversityManager:
 
         return selected
 
-
 class PeerDiscoveryManager:
     """
     Main peer discovery and management system
@@ -414,10 +411,10 @@ class PeerDiscoveryManager:
         self.discovery_interval = discovery_interval
 
         # Peer storage
-        self.known_peers: Dict[str, PeerInfo] = {}  # url -> PeerInfo
-        self.connected_peers: Set[str] = set()
-        self.prefix_counts: Dict[str, int] = defaultdict(int)
-        self.asn_counts: Dict[str, int] = defaultdict(int)
+        self.known_peers: dict[str, PeerInfo] = {}  # url -> PeerInfo
+        self.connected_peers: set[str] = set()
+        self.prefix_counts: dict[str, int] = defaultdict(int)
+        self.asn_counts: dict[str, int] = defaultdict(int)
         self.max_per_prefix = getattr(Config, "P2P_MAX_PEERS_PER_PREFIX", 8)
         self.max_per_asn = getattr(Config, "P2P_MAX_PEERS_PER_ASN", 16)
         self.min_unique_prefixes = getattr(Config, "P2P_MIN_UNIQUE_PREFIXES", 5)
@@ -548,7 +545,7 @@ class PeerDiscoveryManager:
         self.total_discoveries += new_peers
         return new_peers
 
-    def connect_to_best_peers(self, count: int = None) -> List[str]:
+    def connect_to_best_peers(self, count: int = None) -> list[str]:
         """
         Connect to best quality diverse peers
 
@@ -653,7 +650,7 @@ class PeerDiscoveryManager:
                         },
                     )
 
-    def get_peer_list(self) -> List[str]:
+    def get_peer_list(self) -> list[str]:
         """
         Get list of known peer URLs (for sharing)
 
@@ -672,7 +669,7 @@ class PeerDiscoveryManager:
         # Return up to 50 peers
         return (connected + other_peers)[:50]
 
-    def get_connected_peer_urls(self) -> List[str]:
+    def get_connected_peer_urls(self) -> list[str]:
         """Get list of connected peer URLs"""
         return list(self.connected_peers)
 
@@ -781,10 +778,9 @@ class PeerDiscoveryManager:
             "is_running": self.is_running,
         }
 
-    def get_peer_details(self) -> List[dict]:
+    def get_peer_details(self) -> list[dict]:
         """Get detailed information about all known peers"""
         return [peer.to_dict() for peer in self.known_peers.values()]
-
 
 def setup_peer_discovery_api(app, node):
     """
@@ -839,7 +835,6 @@ def setup_peer_discovery_api(app, node):
             return {"error": "Peer discovery not enabled"}, 503
 
     logger.info("Peer discovery API endpoints registered", extra={"event": "peer_discovery.api_ready"})
-
 
 if __name__ == "__main__":
     # Test peer discovery

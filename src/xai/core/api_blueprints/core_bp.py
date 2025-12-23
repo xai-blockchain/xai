@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 import os
 import time
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from flask import Blueprint, g, jsonify, request
 
@@ -26,9 +26,8 @@ logger = logging.getLogger(__name__)
 
 core_bp = Blueprint("core", __name__)
 
-
 @core_bp.route("/", methods=["GET"])
-def index() -> Tuple[Dict[str, Any], int]:
+def index() -> tuple[dict[str, Any], int]:
     """Node information and available endpoints."""
     return (
         jsonify(
@@ -43,18 +42,17 @@ def index() -> Tuple[Dict[str, Any], int]:
         200,
     )
 
-
 @core_bp.route("/health", methods=["GET"])
-def health_check() -> Tuple[Dict[str, Any], int]:
+def health_check() -> tuple[dict[str, Any], int]:
     """Health check endpoint for Docker and monitoring."""
     node = get_node()
     overall_status = "healthy"
     http_status = 200
     timestamp = time.time()
-    blockchain_summary: Dict[str, Any] = {"accessible": False}
-    services: Dict[str, Any] = {"api": "running"}
-    backlog: Dict[str, Any] = {"pending_transactions": 0, "orphan_blocks": 0}
-    network: Dict[str, Any] = {"peers": 0}
+    blockchain_summary: dict[str, Any] = {"accessible": False}
+    services: dict[str, Any] = {"api": "running"}
+    backlog: dict[str, Any] = {"pending_transactions": 0, "orphan_blocks": 0}
+    network: dict[str, Any] = {"peers": 0}
 
     def degrade(reason: str) -> None:
         nonlocal overall_status, http_status
@@ -207,9 +205,8 @@ def health_check() -> Tuple[Dict[str, Any], int]:
         response["error"] = services.get("issues", ["degraded"])[0] if services.get("issues") else "degraded"
     return jsonify(response), http_status
 
-
 @core_bp.route("/metrics", methods=["GET"])
-def prometheus_metrics() -> Tuple[str, int, Dict[str, str]]:
+def prometheus_metrics() -> tuple[str, int, dict[str, str]]:
     """Prometheus metrics endpoint."""
     node = get_node()
     try:
@@ -240,9 +237,8 @@ def prometheus_metrics() -> Tuple[str, int, Dict[str, str]]:
         )
         return f"# Error generating metrics: {e}\n", 500, {"Content-Type": "text/plain"}
 
-
 @core_bp.route("/stats", methods=["GET"])
-def get_stats() -> Dict[str, Any]:
+def get_stats() -> dict[str, Any]:
     """Get blockchain statistics."""
     node = get_node()
     blockchain = get_blockchain()
@@ -253,9 +249,8 @@ def get_stats() -> Dict[str, Any]:
     stats["node_uptime"] = time.time() - node.start_time
     return jsonify(stats)
 
-
 @core_bp.route("/mempool", methods=["GET"])
-def get_mempool_overview() -> Tuple[Dict[str, Any], int]:
+def get_mempool_overview() -> tuple[dict[str, Any], int]:
     """Get mempool statistics and a snapshot of pending transactions."""
     blockchain = get_blockchain()
     limit_param = request.args.get("limit", default=100, type=int)
@@ -298,9 +293,8 @@ def get_mempool_overview() -> Tuple[Dict[str, Any], int]:
         )
         return handle_exception(exc, "mempool_overview")
 
-
 @core_bp.route("/mempool/stats", methods=["GET"])
-def get_mempool_stats() -> Tuple[Dict[str, Any], int]:
+def get_mempool_stats() -> tuple[dict[str, Any], int]:
     """Aggregate mempool fee statistics and congestion indicators."""
     blockchain = get_blockchain()
     limit_param = request.args.get("limit", default=0, type=int)
@@ -403,7 +397,7 @@ def get_mempool_stats() -> Tuple[Dict[str, Any], int]:
         "size_kb": overview.get("size_kb", size_bytes / 1024.0 if size_bytes else 0.0),
     }
 
-    response_body: Dict[str, Any] = {
+    response_body: dict[str, Any] = {
         "success": True,
         "limit": limit,
         "timestamp": overview.get("timestamp"),

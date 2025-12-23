@@ -1,15 +1,16 @@
+from __future__ import annotations
+
 """
 XAI AI Development Governance DAO
 Community-driven AI task proposal and voting system
 """
 
-import time
 import hashlib
 import json
+import time
 from enum import Enum
-from typing import List, Dict, Optional
-from cryptography.fernet import Fernet
 
+from cryptography.fernet import Fernet
 
 class ProposalCategory(Enum):
     """Categories for AI development proposals"""
@@ -35,7 +36,6 @@ class ProposalCategory(Enum):
     GAMIFICATION = "gamification"  # Achievements, challenges
     OTHER = "other"  # Uncategorized
 
-
 class ProposalStatus(Enum):
     """Lifecycle states of a proposal"""
 
@@ -55,7 +55,6 @@ class ProposalStatus(Enum):
     CANCELLED = "cancelled"  # Proposer withdrew
     SUPERSEDED = "superseded"  # Replaced by better proposal
 
-
 class SecurityThreat(Enum):
     """Potential security threats in proposals"""
 
@@ -71,7 +70,6 @@ class SecurityThreat(Enum):
     GOVERNANCE_ATTACK = "governance_attack"  # Manipulates voting
     DEPENDENCY_RISK = "dependency_risk"  # Risky external dependencies
     ECONOMIC_ATTACK = "economic_attack"  # Harms tokenomics
-
 
 class AITaskProposal:
     """Community-submitted AI development proposal"""
@@ -157,7 +155,6 @@ class AITaskProposal:
             "execution_completed_at": self.execution_completed_at,
             "result_hash": self.result_hash,
         }
-
 
 class ProposalSecurityAnalyzer:
     """AI-powered security analysis of proposals"""
@@ -266,7 +263,7 @@ class ProposalSecurityAnalyzer:
             "reviewed_at": time.time(),
         }
 
-    def _keyword_scan(self, proposal: AITaskProposal) -> List[SecurityThreat]:
+    def _keyword_scan(self, proposal: AITaskProposal) -> list[SecurityThreat]:
         """Fast keyword-based threat detection"""
         threats = []
         text = (
@@ -344,7 +341,7 @@ class ProposalSecurityAnalyzer:
 
         return {"risky": len(risks) > 0, "warnings": risks}
 
-    def _analyze_code_patterns(self, proposal: AITaskProposal) -> List[SecurityThreat]:
+    def _analyze_code_patterns(self, proposal: AITaskProposal) -> list[SecurityThreat]:
         """Detect risky code patterns in proposal"""
         threats = []
         text = proposal.detailed_prompt.lower()
@@ -361,7 +358,7 @@ class ProposalSecurityAnalyzer:
 
         return threats
 
-    def _analyze_dependencies(self, proposal: AITaskProposal) -> List[str]:
+    def _analyze_dependencies(self, proposal: AITaskProposal) -> list[str]:
         """Check for risky dependencies"""
         warnings = []
         text = proposal.detailed_prompt.lower()
@@ -392,7 +389,6 @@ class ProposalSecurityAnalyzer:
             return "RISKY - Major concerns, needs revision"
         else:
             return "DANGEROUS - Reject or major overhaul needed"
-
 
 class AIGovernanceDAO:
     """Main governance system for AI development"""
@@ -727,7 +723,7 @@ class AIGovernanceDAO:
         # Implementation would notify community
         pass
 
-    def get_proposal(self, proposal_id: str) -> Optional[Dict]:
+    def get_proposal(self, proposal_id: str) -> Dict | None:
         """Get proposal details"""
         if proposal_id in self.proposals:
             return self.proposals[proposal_id].to_dict()
@@ -735,10 +731,10 @@ class AIGovernanceDAO:
 
     def list_proposals(
         self,
-        status: Optional[ProposalStatus] = None,
-        category: Optional[ProposalCategory] = None,
+        status: ProposalStatus | None = None,
+        category: ProposalCategory | None = None,
         sort_by: str = "created",
-    ) -> List[Dict]:
+    ) -> list[Dict]:
         """
         List proposals with optional filters
         """
@@ -762,7 +758,7 @@ class AIGovernanceDAO:
 
         return [p.to_dict() for p in proposals]
 
-    def get_active_votes(self) -> List[Dict]:
+    def get_active_votes(self) -> list[Dict]:
         """Get all proposals currently open for voting"""
         active = [
             p
@@ -783,7 +779,6 @@ class AIGovernanceDAO:
         if self.snapshot_height is None:
             return self.blockchain.get_balance(address)
         return self.blockchain.get_balance_at_height(address, self.snapshot_height)
-
 
 # Example usage
 if __name__ == "__main__":

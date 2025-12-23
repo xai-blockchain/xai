@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Light client utilities for mobile and constrained devices.
 
@@ -20,10 +22,9 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
-
 
 @dataclass
 class SyncProgress:
@@ -36,14 +37,14 @@ class SyncProgress:
     current_height: int
     target_height: int
     sync_percentage: float
-    estimated_time_remaining: Optional[int]  # seconds
+    estimated_time_remaining: int | None  # seconds
     sync_state: str  # "syncing", "synced", "stalled", "idle"
     headers_per_second: float
     started_at: datetime
     checkpoint_sync_enabled: bool = False
-    checkpoint_height: Optional[int] = None
+    checkpoint_height: int | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "current_height": self.current_height,
@@ -57,16 +58,14 @@ class SyncProgress:
             "checkpoint_height": self.checkpoint_height,
         }
 
-
 class MerkleProofError(Exception):
     """Raised when merkle proof verification fails."""
     pass
 
-
 def verify_merkle_proof(
     txid: str,
     merkle_root: str,
-    proof: List[Dict[str, str]],
+    proof: list[dict[str, str]],
 ) -> bool:
     """
     Verify a merkle proof for a transaction.
@@ -154,14 +153,13 @@ def verify_merkle_proof(
 
     return is_valid
 
-
 def verify_transaction_inclusion(
     txid: str,
-    block_header: Dict[str, Any],
-    proof: List[Dict[str, str]],
+    block_header: dict[str, Any],
+    proof: list[dict[str, str]],
     min_confirmations: int = 6,
-    current_height: Optional[int] = None,
-) -> Tuple[bool, str]:
+    current_height: int | None = None,
+) -> tuple[bool, str]:
     """
     Verify that a transaction is included in a block with sufficient confirmations.
 
@@ -206,24 +204,23 @@ def verify_transaction_inclusion(
 
     return True, "Merkle proof valid (confirmation count not checked)"
 
-
 class LightClientService:
     """Expose lightweight proofs for mobile wallets."""
 
     def __init__(self, blockchain):
         self.blockchain = blockchain
         # Sync progress tracking
-        self._sync_start_time: Optional[float] = None
+        self._sync_start_time: float | None = None
         self._sync_start_height: int = 0
         self._last_height_update_time: float = time.time()
         self._last_height: int = 0
         self._target_height: int = 0
-        self._sync_history: List[Tuple[float, int]] = []  # (timestamp, height) pairs
+        self._sync_history: list[tuple[float, int]] = []  # (timestamp, height) pairs
         self._stall_threshold: int = 30  # seconds without progress = stalled
 
     def get_recent_headers(
-        self, count: int = 20, start_index: Optional[int] = None
-    ) -> Dict[str, Any]:
+        self, count: int = 20, start_index: int | None = None
+    ) -> dict[str, Any]:
         chain = self.blockchain.chain
         if not chain:
             return {"latest_height": -1, "headers": [], "range": {"start": 0, "end": -1}}
@@ -245,7 +242,7 @@ class LightClientService:
             "range": {"start": start_index, "end": end_index},
         }
 
-    def get_checkpoint(self) -> Dict[str, Any]:
+    def get_checkpoint(self) -> dict[str, Any]:
         """Return the latest header and pending transaction count."""
         chain = self.blockchain.chain
         if not chain:
@@ -258,7 +255,7 @@ class LightClientService:
             "pending_transactions": len(self.blockchain.pending_transactions),
         }
 
-    def get_transaction_proof(self, txid: str) -> Optional[Dict[str, Any]]:
+    def get_transaction_proof(self, txid: str) -> dict[str, Any] | None:
         """Return a merkle proof for a transaction, if present on-chain."""
         for block in reversed(self.blockchain.chain):
             proof = self._build_merkle_proof(block, txid)
@@ -283,9 +280,9 @@ class LightClientService:
     def verify_proof(
         self,
         txid: str,
-        proof_data: Dict[str, Any],
+        proof_data: dict[str, Any],
         min_confirmations: int = 6,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         Verify a transaction proof returned by get_transaction_proof.
 
@@ -348,7 +345,7 @@ class LightClientService:
 
         return True, f"Transaction verified with {confirmations} confirmations"
 
-    def _serialize_header(self, block) -> Dict[str, Any]:
+    def _serialize_header(self, block) -> dict[str, Any]:
         """Return the compact header for a block object."""
         # Some historical blocks may not have hash precomputed.
         block_hash = block.hash or block.calculate_hash()
@@ -362,7 +359,7 @@ class LightClientService:
             "nonce": block.nonce,
         }
 
-    def _build_merkle_proof(self, block, txid: str) -> Optional[List[Dict[str, str]]]:
+    def _build_merkle_proof(self, block, txid: str) -> list[dict[str, str]] | None:
         """Construct a merkle proof for the provided transaction ID."""
         tx_hashes = [tx.txid for tx in block.transactions]
         if txid not in tx_hashes:
@@ -370,7 +367,7 @@ class LightClientService:
 
         index = tx_hashes.index(txid)
         layers = self._build_merkle_layers(tx_hashes)
-        proof: List[Dict[str, str]] = []
+        proof: list[dict[str, str]] = []
 
         for layer in layers[:-1]:
             working_layer = list(layer)
@@ -389,7 +386,7 @@ class LightClientService:
 
         return proof
 
-    def _build_merkle_layers(self, tx_hashes: List[str]) -> List[List[str]]:
+    def _build_merkle_layers(self, tx_hashes: list[str]) -> list[list[str]]:
         layers = [tx_hashes]
 
         while len(layers[-1]) > 1:
@@ -432,7 +429,7 @@ class LightClientService:
             }
         )
 
-    def update_sync_progress(self, current_height: Optional[int] = None) -> None:
+    def update_sync_progress(self, current_height: int | None = None) -> None:
         """
         Update sync progress tracking with current height.
 

@@ -13,25 +13,20 @@ import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Dict, Tuple
 
 logger = logging.getLogger(__name__)
 
-
 DEFAULT_LIMIT_PER_DAY = float(os.getenv("XAI_DAILY_SPEND_LIMIT", "1000000"))  # 1,000,000 units default
 STATE_PATH = os.path.expanduser("~/.xai/spending_limits.json")
-
 
 def _today_key(ts: float | None = None) -> str:
     dt = datetime.fromtimestamp(ts or datetime.now(tz=timezone.utc).timestamp(), tz=timezone.utc)
     return dt.strftime("%Y-%m-%d")
 
-
 @dataclass
 class SpendingState:
-    limits: Dict[str, float]
-    usage: Dict[str, Dict[str, float]]  # address -> {YYYY-MM-DD: amount}
-
+    limits: dict[str, float]
+    usage: dict[str, dict[str, float]]  # address -> {YYYY-MM-DD: amount}
 
 class SpendingLimitManager:
     def __init__(self, path: str = STATE_PATH, default_limit: float = DEFAULT_LIMIT_PER_DAY) -> None:
@@ -97,7 +92,7 @@ class SpendingLimitManager:
         day = day_key or _today_key(None)
         return float(self.state.usage.get(address.lower(), {}).get(day, 0.0))
 
-    def can_spend(self, address: str, amount: float, ts: float | None = None) -> Tuple[bool, float, float]:
+    def can_spend(self, address: str, amount: float, ts: float | None = None) -> tuple[bool, float, float]:
         day = _today_key(ts)
         limit = self.get_limit(address)
         used = float(self.state.usage.get(address.lower(), {}).get(day, 0.0))

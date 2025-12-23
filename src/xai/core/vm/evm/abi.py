@@ -14,10 +14,9 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from typing import Any, Iterable, List, Sequence, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
-
 
 def keccak256(data: bytes) -> bytes:
     """Return Keccak-256 digest compatible with Ethereum.
@@ -64,32 +63,26 @@ def keccak256(data: bytes) -> bytes:
     logger.debug("Using SHA3-256 fallback (not identical to Keccak-256)")
     return hashlib.sha3_256(data).digest()
 
-
 def function_selector(signature: str) -> bytes:
     """Return 4-byte function selector for a given function signature."""
     return keccak256(signature.encode("utf-8"))[:4]
-
 
 def _pad_right(b: bytes, size: int = 32) -> bytes:
     if len(b) % size == 0:
         return b
     return b + bytes(size - (len(b) % size))
 
-
 def _pad_left(b: bytes, size: int = 32) -> bytes:
     if len(b) >= size:
         return b[-size:]
     return bytes(size - len(b)) + b
 
-
 # ==================== Encoders ====================
-
 
 def encode_uint256(value: int) -> bytes:
     if value < 0:
         raise ValueError("uint256 cannot be negative")
     return _pad_left(value.to_bytes(32, "big"))
-
 
 def encode_int256(value: int) -> bytes:
     if value >= 0:
@@ -97,10 +90,8 @@ def encode_int256(value: int) -> bytes:
     # Two's complement for negative numbers
     return (value & ((1 << 256) - 1)).to_bytes(32, "big")
 
-
 def encode_bool(value: bool) -> bytes:
     return encode_uint256(1 if value else 0)
-
 
 def encode_address(addr: str) -> bytes:
     """Encode an Ethereum-style address (0x-prefixed or plain hex) as 32-byte word."""
@@ -116,22 +107,18 @@ def encode_address(addr: str) -> bytes:
         raise ValueError("Address must be 20 bytes")
     return _pad_left(raw, 32)
 
-
 def encode_bytes32(value: bytes) -> bytes:
     if len(value) != 32:
         raise ValueError("bytes32 must be exactly 32 bytes")
     return value
-
 
 def encode_bytes(value: bytes) -> bytes:
     length = encode_uint256(len(value))
     data = _pad_right(value, 32)
     return length + data
 
-
 def encode_string(value: str) -> bytes:
     return encode_bytes(value.encode("utf-8"))
-
 
 def encode_args(types: Sequence[str], values: Sequence[Any]) -> bytes:
     """
@@ -143,12 +130,12 @@ def encode_args(types: Sequence[str], values: Sequence[Any]) -> bytes:
     if len(types) != len(values):
         raise ValueError("Types and values length mismatch")
 
-    head_parts: List[bytes] = []
-    tail_parts: List[bytes] = []
+    head_parts: list[bytes] = []
+    tail_parts: list[bytes] = []
 
     # Determine dynamic offsets
     # Each head slot is 32 bytes; dynamic heads store offset from start of args payload
-    dynamic_indices: List[int] = []
+    dynamic_indices: list[int] = []
     for t in types:
         if t in ("bytes", "string"):
             dynamic_indices.append(1)
@@ -191,7 +178,6 @@ def encode_args(types: Sequence[str], values: Sequence[Any]) -> bytes:
 
     return b"".join(head_parts) + b"".join(tail_parts)
 
-
 def encode_call(signature: str, args: Sequence[Any]) -> bytes:
     """Encode a function call given signature like 'transfer(address,uint256)' and values."""
     # Parse types from signature inside parentheses
@@ -202,37 +188,30 @@ def encode_call(signature: str, args: Sequence[Any]) -> bytes:
     types = [t.strip() for t in types_str.split(",")] if types_str else []
     return function_selector(signature) + encode_args(types, list(args))
 
-
 # ==================== Decoders (basic) ====================
-
 
 def _require_len(data: bytes, size: int) -> None:
     if len(data) < size:
         raise ValueError("Insufficient data for decoding")
 
-
-def decode_uint256(data: bytes, offset: int = 0) -> Tuple[int, int]:
+def decode_uint256(data: bytes, offset: int = 0) -> tuple[int, int]:
     _require_len(data[offset:], 32)
     return int.from_bytes(data[offset : offset + 32], "big"), offset + 32
 
-
-def decode_bool(data: bytes, offset: int = 0) -> Tuple[bool, int]:
+def decode_bool(data: bytes, offset: int = 0) -> tuple[bool, int]:
     val, new_off = decode_uint256(data, offset)
     return val != 0, new_off
 
-
-def decode_address(data: bytes, offset: int = 0) -> Tuple[str, int]:
+def decode_address(data: bytes, offset: int = 0) -> tuple[str, int]:
     _require_len(data[offset:], 32)
     raw = data[offset + 12 : offset + 32]
     return "0x" + raw.hex(), offset + 32
 
-
-def decode_bytes32(data: bytes, offset: int = 0) -> Tuple[bytes, int]:
+def decode_bytes32(data: bytes, offset: int = 0) -> tuple[bytes, int]:
     _require_len(data[offset:], 32)
     return data[offset : offset + 32], offset + 32
 
-
-def decode_bytes(data: bytes, base: int = 0, offset: int = 0) -> Tuple[bytes, int]:
+def decode_bytes(data: bytes, base: int = 0, offset: int = 0) -> tuple[bytes, int]:
     # offset is the position in the head where the pointer resides
     ptr, off2 = decode_uint256(data, offset)
     length, _ = decode_uint256(data, base + ptr)
@@ -241,7 +220,6 @@ def decode_bytes(data: bytes, base: int = 0, offset: int = 0) -> Tuple[bytes, in
     _require_len(data, end)
     return data[start : start + length], off2
 
-
-def decode_string(data: bytes, base: int = 0, offset: int = 0) -> Tuple[str, int]:
+def decode_string(data: bytes, base: int = 0, offset: int = 0) -> tuple[str, int]:
     b, off = decode_bytes(data, base, offset)
     return b.decode("utf-8", errors="replace"), off

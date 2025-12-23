@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Time Capsule System
 
@@ -6,14 +8,14 @@ Time capsule locks are represented by on-chain `time_capsule_lock` transactions,
 and the unlock is handled automatically via `time_capsule_claim` transactions.
 """
 
-import time
-import os
-import json
 import hashlib
+import json
 import logging
-from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+import os
+import time
 from datetime import datetime, timedelta
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from xai.core.config import Config
 from xai.core.crypto_utils import deterministic_keypair_from_seed
@@ -23,13 +25,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
 class TimeCapsuleType:
     """Types of time capsules"""
 
     XAI_ONLY = "xai_only"
     CROSS_CHAIN = "cross_chain"
-
 
 class TimeCapsule:
     """Represents a time-locked capsule"""
@@ -44,8 +44,8 @@ class TimeCapsule:
         amount: float = 0,
         coin_type: str = "XAI",
         message: str = "",
-        htlc_details: Optional[Dict[str, Any]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        htlc_details: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
     ):
         self.capsule_id = capsule_id
         self.creator = creator
@@ -59,7 +59,7 @@ class TimeCapsule:
         self.metadata = metadata or {}
         self.created_time = int(time.time())
         self.claimed = False
-        self.claimed_time: Optional[int] = None
+        self.claimed_time: int | None = None
 
     def is_unlocked(self) -> bool:
         return int(time.time()) >= self.unlock_time
@@ -70,7 +70,7 @@ class TimeCapsule:
     def days_remaining(self) -> float:
         return self.time_remaining() / 86400
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "capsule_id": self.capsule_id,
             "creator": self.creator,
@@ -92,7 +92,7 @@ class TimeCapsule:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TimeCapsule":
+    def from_dict(cls, data: dict[str, Any]) -> "TimeCapsule":
         capsule = cls(
             capsule_id=data["capsule_id"],
             creator=data["creator"],
@@ -110,20 +110,19 @@ class TimeCapsule:
         capsule.claimed_time = data.get("claimed_time")
         return capsule
 
-
 class TimeCapsuleManager:
     """Manages time capsules and the deterministic addresses used to hold them"""
 
     STORAGE_FILENAME = "time_capsules.json"
 
-    def __init__(self, blockchain, storage_file: Optional[str] = None):
+    def __init__(self, blockchain, storage_file: str | None = None):
         self.blockchain = blockchain
         data_dir = Path(storage_file if storage_file else Config.DATA_DIR)
         self.storage_path = data_dir / self.STORAGE_FILENAME
         self.log_path = data_dir / "time_capsule_events.log"
         self.storage_path.parent.mkdir(parents=True, exist_ok=True)
-        self.capsules: Dict[str, TimeCapsule] = {}
-        self.user_capsules: Dict[str, List[str]] = {}
+        self.capsules: dict[str, TimeCapsule] = {}
+        self.user_capsules: dict[str, list[str]] = {}
         self._load_capsules()
 
     def _load_capsules(self):
@@ -153,7 +152,7 @@ class TimeCapsuleManager:
         with open(self.storage_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
-    def _log_event(self, event_type: str, payload: Dict[str, Any]):
+    def _log_event(self, event_type: str, payload: dict[str, Any]):
         entry = {"event": event_type, "timestamp": int(time.time()), "payload": payload}
         with open(self.log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
@@ -236,7 +235,7 @@ class TimeCapsuleManager:
             },
         )
 
-    def get_unlockable_capsules(self, current_time: Optional[float] = None) -> List[TimeCapsule]:
+    def get_unlockable_capsules(self, current_time: float | None = None) -> list[TimeCapsule]:
         if current_time is None:
             current_time = time.time()
         return [
@@ -245,7 +244,7 @@ class TimeCapsuleManager:
             if capsule.metadata.get("status") == "locked" and capsule.unlock_time <= current_time
         ]
 
-    def build_claim_transaction(self, capsule: TimeCapsule) -> Optional["Transaction"]:
+    def build_claim_transaction(self, capsule: TimeCapsule) -> "Transaction" | None:
         if capsule.metadata.get("status") != "locked":
             return None
         capsule_address = self.capsule_address(capsule.capsule_id)
@@ -291,7 +290,7 @@ class TimeCapsuleManager:
             },
         )
 
-    def _value_snapshot(self, capsule: TimeCapsule) -> Dict[str, Any]:
+    def _value_snapshot(self, capsule: TimeCapsule) -> dict[str, Any]:
         address = capsule.metadata.get("capsule_address") or self.capsule_address(
             capsule.capsule_id
         )
@@ -313,7 +312,7 @@ class TimeCapsuleManager:
             "value_change_note": message,
         }
 
-    def _burial_windows(self) -> List[Dict[str, datetime]]:
+    def _burial_windows(self) -> list[dict[str, datetime]]:
         year = datetime.utcnow().year
         return [
             {"start": datetime(year, 3, 10), "end": datetime(year, 3, 30)},
@@ -337,7 +336,7 @@ class TimeCapsuleManager:
 
     def create_xai_capsule(
         self, creator: str, beneficiary: str, amount: float, unlock_time: int, message: str = ""
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         if amount <= 0:
             return {"success": False, "error": "Amount must be positive"}
         if unlock_time <= int(time.time()):
@@ -375,7 +374,7 @@ class TimeCapsuleManager:
         htlc_hash: str,
         origin_chain_tx: str,
         message: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         if unlock_time <= int(time.time()):
             return {"success": False, "error": "Unlock time must be in the future"}
         supported = ["BTC", "ETH", "LTC", "DOGE", "XMR", "BCH", "ZEC", "DASH"]
@@ -403,8 +402,8 @@ class TimeCapsuleManager:
         }
 
     def claim_capsule(
-        self, capsule_id: str, claimer: str, htlc_preimage: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, capsule_id: str, claimer: str, htlc_preimage: str | None = None
+    ) -> dict[str, Any]:
         capsule = self.capsules.get(capsule_id)
         if not capsule:
             return {"success": False, "error": "Capsule not found"}
@@ -437,7 +436,7 @@ class TimeCapsuleManager:
             "message": "Time Capsule ready to be unearthed via the automated claim transaction",
         }
 
-    def get_user_capsules(self, address: str) -> List[Dict[str, Any]]:
+    def get_user_capsules(self, address: str) -> list[dict[str, Any]]:
         if address not in self.user_capsules:
             return []
         capsules = []
@@ -451,7 +450,7 @@ class TimeCapsuleManager:
         capsules.sort(key=lambda c: c["unlock_time"])
         return capsules
 
-    def get_capsule(self, capsule_id: str) -> Optional[Dict[str, Any]]:
+    def get_capsule(self, capsule_id: str) -> dict[str, Any] | None:
         capsule = self.capsules.get(capsule_id)
         if not capsule:
             return None
@@ -460,7 +459,7 @@ class TimeCapsuleManager:
         result.update(self._value_snapshot(capsule))
         return result
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         total = len(self.capsules)
         claimed = sum(1 for c in self.capsules.values() if c.claimed)
         unlocked = sum(1 for c in self.capsules.values() if c.is_unlocked() and not c.claimed)
@@ -481,6 +480,5 @@ class TimeCapsuleManager:
         payload = f"{creator}{unlock_time}{int(time.time())}"
         return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
-
-def get_time_capsule_manager(blockchain, storage_file: Optional[str] = None) -> TimeCapsuleManager:
+def get_time_capsule_manager(blockchain, storage_file: str | None = None) -> TimeCapsuleManager:
     return TimeCapsuleManager(blockchain, storage_file)

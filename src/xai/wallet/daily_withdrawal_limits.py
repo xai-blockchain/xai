@@ -1,23 +1,21 @@
 from __future__ import annotations
 
-from typing import Dict, Any, List, Optional, TYPE_CHECKING
-from datetime import datetime, timezone, timedelta
 import logging
+from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from xai.wallet.metrics_collector import MetricsCollector
 
-
 logger = logging.getLogger("xai.wallet.daily_limits")
-
 
 class UserWithdrawalTracker:
     def __init__(self, user_address: str):
         self.user_address = user_address
-        self.withdrawals: List[Dict[str, Any]] = []  # Stores {"amount": float, "timestamp": int}
+        self.withdrawals: list[dict[str, Any]] = []  # Stores {"amount": float, "timestamp": int}
         self.current_day_start_timestamp = self._get_current_day_start_timestamp()
 
-    def _get_current_day_start_timestamp(self, reference_timestamp: Optional[int] = None) -> int:
+    def _get_current_day_start_timestamp(self, reference_timestamp: int | None = None) -> int:
         """Returns the UTC timestamp for the start of the current day (00:00:00 UTC)."""
         if reference_timestamp is None:
             now_utc = datetime.now(timezone.utc)
@@ -38,7 +36,7 @@ class UserWithdrawalTracker:
         ]
         return sum(w["amount"] for w in self.withdrawals)
 
-    def reset_if_new_day(self, current_timestamp: Optional[int] = None):
+    def reset_if_new_day(self, current_timestamp: int | None = None):
         """Resets the tracker if a new UTC day has started."""
         new_day_start = self._get_current_day_start_timestamp(current_timestamp)
         if new_day_start > self.current_day_start_timestamp:
@@ -53,15 +51,14 @@ class UserWithdrawalTracker:
             f"day_start={datetime.fromtimestamp(self.current_day_start_timestamp, timezone.utc)})"
         )
 
-
 class DailyWithdrawalLimitManager:
     DEFAULT_DAILY_LIMIT = 5000.0  # Max amount per user per 24 hours
 
-    def __init__(self, daily_limit: float = DEFAULT_DAILY_LIMIT, metrics_collector: Optional['MetricsCollector'] = None):
+    def __init__(self, daily_limit: float = DEFAULT_DAILY_LIMIT, metrics_collector: 'MetricsCollector' | None = None):
         if not isinstance(daily_limit, (int, float)) or daily_limit <= 0:
             raise ValueError("Daily limit must be a positive number.")
         self.daily_limit = daily_limit
-        self.user_trackers: Dict[str, UserWithdrawalTracker] = {}
+        self.user_trackers: dict[str, UserWithdrawalTracker] = {}
         self.metrics_collector = metrics_collector
 
     def _get_user_tracker(self, user_address: str) -> UserWithdrawalTracker:
@@ -73,7 +70,7 @@ class DailyWithdrawalLimitManager:
         self,
         user_address: str,
         amount: float,
-        current_timestamp: Optional[int] = None,
+        current_timestamp: int | None = None,
     ) -> bool:
         if not isinstance(amount, (int, float)) or amount <= 0:
             raise ValueError("Withdrawal amount must be a positive number.")
@@ -112,7 +109,6 @@ class DailyWithdrawalLimitManager:
                 self.daily_limit,
             )
             return True
-
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

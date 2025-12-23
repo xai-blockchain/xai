@@ -8,21 +8,19 @@ import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
+from xai.core import htlc_p2wsh
 from xai.core.aixn_blockchain.atomic_swap_11_coins import (
     AtomicSwapHTLC,
     CoinType,
     MeshDEXPairManager,
     SwapStateMachine,
 )
-from xai.core import htlc_p2wsh
 from xai.core.htlc_deployer import compile_htlc_contract
-
 
 class AtomicSwapArtifactError(Exception):
     """Raised when artifact generation cannot be completed."""
-
 
 @dataclass
 class UTXOParams:
@@ -31,21 +29,19 @@ class UTXOParams:
     hrp: str = "bc"
     network: str = "bitcoin"
     decimals: int = 8
-    change_address: Optional[str] = None
-    suggested_fee_sats: Optional[int] = None
-
+    change_address: str | None = None
+    suggested_fee_sats: int | None = None
 
 @dataclass
 class EthereumParams:
     sender: str
-    provider: Optional[str] = None
+    provider: str | None = None
     auto_deploy: bool = False
-    value_wei: Optional[int] = None
-    gas: Optional[int] = None
-    max_fee_per_gas: Optional[int] = None
-    max_priority_fee_per_gas: Optional[int] = None
+    value_wei: int | None = None
+    gas: int | None = None
+    max_fee_per_gas: int | None = None
+    max_priority_fee_per_gas: int | None = None
     solc_version: str = "0.8.21"
-
 
 def _resolve_atomic_swap(pair: str) -> AtomicSwapHTLC:
     manager = MeshDEXPairManager()
@@ -54,7 +50,6 @@ def _resolve_atomic_swap(pair: str) -> AtomicSwapHTLC:
         raise AtomicSwapArtifactError(f"Unsupported trading pair: {pair}")
     return manager.supported_pairs[normalized]["atomic_swap"]
 
-
 def generate_swap_artifacts(
         pair: str,
         axn_amount: float,
@@ -62,15 +57,15 @@ def generate_swap_artifacts(
         counterparty: str,
         *,
         timelock_hours: int = 24,
-        utxo: Optional[UTXOParams] = None,
-        eth: Optional[EthereumParams] = None,
+        utxo: UTXOParams | None = None,
+        eth: EthereumParams | None = None,
         web3_factory=None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Create a swap contract for the requested pair and return deployable artifacts.
     """
     atomic_swap = _resolve_atomic_swap(pair)
-    deployment_config: Dict[str, Any] = {}
+    deployment_config: dict[str, Any] = {}
 
     if utxo:
         deployment_config["utxo"] = {
@@ -84,7 +79,7 @@ def generate_swap_artifacts(
         }
 
     if eth:
-        eth_cfg: Dict[str, Any] = {
+        eth_cfg: dict[str, Any] = {
             "sender": eth.sender,
             "auto_deploy": eth.auto_deploy,
             "value_wei": eth.value_wei,
@@ -121,8 +116,7 @@ def generate_swap_artifacts(
     }
     return artifact
 
-
-def build_btc_refund_witness(sender_signature_hex: str, redeem_script_hex: str) -> Dict[str, str]:
+def build_btc_refund_witness(sender_signature_hex: str, redeem_script_hex: str) -> dict[str, str]:
     """
     Construct the witness stack for the refund path of a P2WSH HTLC.
     """
@@ -137,8 +131,7 @@ def build_btc_refund_witness(sender_signature_hex: str, redeem_script_hex: str) 
         "redeem_script": witness[2],
     }
 
-
-def write_artifacts(artifacts: Dict[str, Any], output_path: Path) -> Path:
+def write_artifacts(artifacts: dict[str, Any], output_path: Path) -> Path:
     """
     Persist artifact dictionary to disk in JSON format.
     """
@@ -146,7 +139,6 @@ def write_artifacts(artifacts: Dict[str, Any], output_path: Path) -> Path:
     with output_path.open("w", encoding="utf-8") as handle:
         json.dump(artifacts, handle, indent=2, sort_keys=True)
     return output_path
-
 
 def export_swap_state(state_machine: SwapStateMachine, output_path: Path) -> None:
     """
@@ -157,7 +149,6 @@ def export_swap_state(state_machine: SwapStateMachine, output_path: Path) -> Non
         "exported_at": time.time(),
     }
     write_artifacts(payload, output_path)
-
 
 __all__ = [
     "AtomicSwapArtifactError",

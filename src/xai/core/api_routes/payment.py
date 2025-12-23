@@ -17,28 +17,26 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from typing import TYPE_CHECKING, Dict, Any, Tuple, Optional
+from io import BytesIO
+from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, unquote
 
-from flask import jsonify, request, send_file, Response
-from io import BytesIO
+from flask import Response, jsonify, request, send_file
 
-from xai.mobile.qr_transactions import (
-    TransactionQRGenerator,
-    QRCodeValidator,
-    QRCODE_AVAILABLE,
-)
 from xai.core.validation import validate_address
+from xai.mobile.qr_transactions import (
+    QRCODE_AVAILABLE,
+    QRCodeValidator,
+    TransactionQRGenerator,
+)
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
 
 logger = logging.getLogger(__name__)
 
-
 # In-memory storage for payment requests (in production, use Redis or database)
-_payment_requests: Dict[str, Dict[str, Any]] = {}
-
+_payment_requests: dict[str, dict[str, Any]] = {}
 
 def register_payment_routes(routes: "NodeAPIRoutes") -> None:
     """Register payment QR code generation and tracking routes.
@@ -126,7 +124,7 @@ def register_payment_routes(routes: "NodeAPIRoutes") -> None:
             }), 500
 
     @app.route("/payment/qr", methods=["POST"])
-    def create_payment_qr() -> Tuple[Response, int]:
+    def create_payment_qr() -> tuple[Response, int]:
         """Generate payment request QR code with amount, memo, and expiry.
 
         Request Body (JSON):
@@ -303,7 +301,7 @@ def register_payment_routes(routes: "NodeAPIRoutes") -> None:
             }), 500
 
     @app.route("/payment/request", methods=["POST"])
-    def create_payment_request() -> Tuple[Response, int]:
+    def create_payment_request() -> tuple[Response, int]:
         """Create a tracked payment request with QR code.
 
         This endpoint creates a payment request that can be tracked and verified.
@@ -487,7 +485,7 @@ def register_payment_routes(routes: "NodeAPIRoutes") -> None:
             }), 500
 
     @app.route("/payment/request/<request_id>", methods=["GET"])
-    def get_payment_request(request_id: str) -> Tuple[Response, int]:
+    def get_payment_request(request_id: str) -> tuple[Response, int]:
         """Get payment request details and check status.
 
         This endpoint retrieves a payment request by ID and checks if payment
@@ -587,7 +585,7 @@ def register_payment_routes(routes: "NodeAPIRoutes") -> None:
             }), 500
 
     @app.route("/payment/parse", methods=["POST"])
-    def parse_payment_uri() -> Tuple[Response, int]:
+    def parse_payment_uri() -> tuple[Response, int]:
         """Parse a payment URI from QR code scan.
 
         This endpoint accepts a payment URI (typically scanned from QR code)
@@ -692,7 +690,7 @@ def register_payment_routes(routes: "NodeAPIRoutes") -> None:
             }), 500
 
     @app.route("/payment/verify", methods=["POST"])
-    def verify_payment() -> Tuple[Response, int]:
+    def verify_payment() -> tuple[Response, int]:
         """Verify a payment against a payment request.
 
         This endpoint verifies that a payment transaction matches a payment request,

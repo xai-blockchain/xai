@@ -17,7 +17,6 @@ import json
 import logging
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
 
 import requests
 
@@ -30,7 +29,6 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     logger.debug("ipwhois library not available, will use fallback GeoIP resolution")
     IPWHOIS_AVAILABLE = False
-
 
 @dataclass(frozen=True)
 class GeoIPMetadata:
@@ -57,7 +55,6 @@ class GeoIPMetadata:
             return f"AS{value}"
         return "AS-UNKNOWN"
 
-
 class GeoIPResolver:
     """Resolve ASN/country metadata with caching and graceful fallbacks."""
 
@@ -70,7 +67,7 @@ class GeoIPResolver:
         self.http_endpoint = http_endpoint
         self.timeout = timeout
         self.cache_ttl = cache_ttl
-        self._cache: Dict[str, Tuple[GeoIPMetadata, float]] = {}
+        self._cache: dict[str, tuple[GeoIPMetadata, float]] = {}
 
     def lookup(self, ip_address: str) -> GeoIPMetadata:
         """Return cached metadata or resolve via available strategies."""
@@ -92,7 +89,7 @@ class GeoIPResolver:
         self._cache[normalized_ip] = (metadata, time.time())
         return metadata
 
-    def _private_metadata(self, ip_address: str) -> Optional[GeoIPMetadata]:
+    def _private_metadata(self, ip_address: str) -> GeoIPMetadata | None:
         try:
             ip_obj = ipaddress.ip_address(ip_address)
         except ValueError:
@@ -120,7 +117,7 @@ class GeoIPResolver:
             )
         return None
 
-    def _lookup_ipwhois(self, ip_address: str) -> Optional[GeoIPMetadata]:
+    def _lookup_ipwhois(self, ip_address: str) -> GeoIPMetadata | None:
         if not IPWHOIS_AVAILABLE:  # pragma: no cover - optional path
             return None
         try:
@@ -174,7 +171,7 @@ class GeoIPResolver:
             )
             return None
 
-    def _lookup_http(self, ip_address: str) -> Optional[GeoIPMetadata]:
+    def _lookup_http(self, ip_address: str) -> GeoIPMetadata | None:
         if not self.http_endpoint:
             return None
         url = self.http_endpoint.format(ip=ip_address)

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Performance and stress tests for blockchain storage and compaction.
 
@@ -14,17 +16,15 @@ import psutil
 import json
 import shutil
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
 
 from xai.core.blockchain import Blockchain
 from xai.core.wallet import Wallet
 from xai.core.transaction import Transaction
 from xai.core.blockchain_storage import BlockchainStorage
 
-
 # Mark all tests in this module as performance tests
 pytestmark = pytest.mark.performance
-
 
 class TestStorageGrowth:
     """Tests for storage growth and disk usage patterns."""
@@ -51,7 +51,7 @@ class TestStorageGrowth:
                     total += os.path.getsize(filepath)
         return total
 
-    def _create_block_with_transactions(self, blockchain: Blockchain, wallets: List[Wallet], tx_count: int = 10):
+    def _create_block_with_transactions(self, blockchain: Blockchain, wallets: list[Wallet], tx_count: int = 10):
         """Create a block with specified number of transactions."""
         for i in range(tx_count):
             sender = wallets[i % len(wallets)]
@@ -192,7 +192,6 @@ class TestStorageGrowth:
                 print(f"Bytes per UTXO: {utxo_size / utxo_count:.2f}")
 
             assert utxo_size > 0, "UTXO file is empty"
-
 
 class TestStorageCompaction:
     """Tests for storage compaction and optimization."""
@@ -376,7 +375,6 @@ class TestStorageCompaction:
 
         print(f"Queried {len(indexed_results)} blocks using index")
 
-
 class TestStoragePruning:
     """Tests for blockchain pruning and old data removal."""
 
@@ -517,7 +515,6 @@ class TestStoragePruning:
 
         assert pruned > 0, "Should have pruned some transactions"
 
-
 class TestDatabasePerformance:
     """Tests for database query performance."""
 
@@ -629,7 +626,6 @@ class TestDatabasePerformance:
         result = benchmark(lookup_by_hash)
 
         print(f"Successfully looked up {len(result)} blocks by hash")
-
 
 if __name__ == "__main__":
     # Allow running tests directly

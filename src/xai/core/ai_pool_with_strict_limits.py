@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI AI Development Pool with STRICT Usage Limits
 
@@ -14,24 +16,25 @@ Critical Security Features:
 No API key can EVER be used beyond its donated limit.
 """
 
-import time
-import json
 import hashlib
+import json
 import logging
-from typing import Dict, List, Optional, Tuple, Any, Set
 import os
 import tempfile
+import time
 from collections import deque
-from enum import Enum
 from dataclasses import dataclass
+from enum import Enum
+from typing import Any
+
 import anthropic
 import openai
 from google import generativeai as genai
+
 from xai.core.ai_metrics import metrics
 from xai.core.ai_task_metrics import get_ai_task_metrics
 
 logger = logging.getLogger(__name__)
-
 
 class AIProvider(Enum):
     """Supported AI providers"""
@@ -39,7 +42,6 @@ class AIProvider(Enum):
     ANTHROPIC = "anthropic"
     OPENAI = "openai"
     GOOGLE = "google"
-
 
 @dataclass
 class DonatedAPIKey:
@@ -54,7 +56,7 @@ class DonatedAPIKey:
 
     # CRITICAL: Donated limits (MUST be specified)
     donated_tokens: int  # Maximum tokens allowed
-    donated_minutes: Optional[int] = None  # Alternative: time-based limit
+    donated_minutes: int | None = None  # Alternative: time-based limit
 
     # Usage tracking (updated in real-time)
     used_tokens: int = 0
@@ -66,9 +68,9 @@ class DonatedAPIKey:
 
     # Timestamps
     submitted_at: float = None
-    first_used_at: Optional[float] = None
-    last_used_at: Optional[float] = None
-    depleted_at: Optional[float] = None
+    first_used_at: float | None = None
+    last_used_at: float | None = None
+    depleted_at: float | None = None
 
     # Safety metrics
     api_calls_made: int = 0
@@ -84,7 +86,7 @@ class DonatedAPIKey:
             return float("inf")
         return max(0.0, self.donated_minutes - self.used_minutes)
 
-    def can_use(self, tokens_needed: int, minutes_needed: float = 0.0) -> Tuple[bool, str]:
+    def can_use(self, tokens_needed: int, minutes_needed: float = 0.0) -> tuple[bool, str]:
         """
         Check if this key has enough balance for the request
         STRICT validation before any API call
@@ -136,7 +138,6 @@ class DonatedAPIKey:
 
         return False
 
-
 class StrictAIPoolManager:
     """
     AI Development Pool with STRICT usage limits
@@ -145,7 +146,7 @@ class StrictAIPoolManager:
 
     def __init__(self, secure_key_manager):
         self.key_manager = secure_key_manager
-        self.donated_keys: Dict[str, DonatedAPIKey] = {}
+        self.donated_keys: dict[str, DonatedAPIKey] = {}
 
         # Usage tracking
         self.total_tokens_donated = 0
@@ -158,17 +159,17 @@ class StrictAIPoolManager:
         self.max_tokens_per_call = 100000  # Safety limit per API call
 
         # Provider-specific rate limits: (max_requests, window_seconds)
-        self.provider_rate_limits: Dict[AIProvider, Tuple[int, int]] = {
+        self.provider_rate_limits: dict[AIProvider, tuple[int, int]] = {
             AIProvider.ANTHROPIC: (30, 60),
             AIProvider.OPENAI: (30, 60),
             AIProvider.GOOGLE: (60, 60),
         }
-        self._provider_calls: Dict[AIProvider, deque] = {
+        self._provider_calls: dict[AIProvider, deque] = {
             AIProvider.ANTHROPIC: deque(),
             AIProvider.OPENAI: deque(),
             AIProvider.GOOGLE: deque(),
         }
-        self._provider_rotation: Dict[AIProvider, deque[str]] = {
+        self._provider_rotation: dict[AIProvider, deque[str]] = {
             AIProvider.ANTHROPIC: deque(),
             AIProvider.OPENAI: deque(),
             AIProvider.GOOGLE: deque(),
@@ -191,7 +192,7 @@ class StrictAIPoolManager:
         provider: AIProvider,
         api_key: str,
         donated_tokens: int,  # MANDATORY
-        donated_minutes: Optional[int] = None,  # Optional alternative limit
+        donated_minutes: int | None = None,  # Optional alternative limit
     ) -> Dict:
         """
         Submit API key donation with MANDATORY usage limits
@@ -284,7 +285,7 @@ class StrictAIPoolManager:
         task_description: str,
         estimated_tokens: int,
         provider: AIProvider,
-        max_tokens_override: Optional[int] = None,
+        max_tokens_override: int | None = None,
     ) -> Dict:
         """
         Execute AI task with STRICT enforcement of donated limits
@@ -315,7 +316,7 @@ class StrictAIPoolManager:
         job_start_time = time.time()
         metrics.record_queue_event()
 
-        def _fail(reason: str, message: str, extra: Optional[Dict[str, Any]] = None) -> Dict:
+        def _fail(reason: str, message: str, extra: dict[str, Any] | None = None) -> Dict:
             _safe_metrics_call(
                 lambda: task_metrics.jobs_failed.labels(provider=provider.value, reason=reason).inc()
             )
@@ -404,8 +405,8 @@ class StrictAIPoolManager:
                     {"tokens_unallocated": remaining},
                 )
 
-            combined_output: List[str] = []
-            segment_metadata: List[Dict[str, Any]] = []
+            combined_output: list[str] = []
+            segment_metadata: list[dict[str, Any]] = []
             total_tokens_used = 0
             total_minutes_elapsed = 0.0
 
@@ -517,7 +518,7 @@ class StrictAIPoolManager:
             if queue_recorded:
                 _safe_metrics_call(lambda: task_metrics.job_queue_size.dec())
 
-    def _find_suitable_keys(self, provider: AIProvider, tokens_needed: int) -> List[DonatedAPIKey]:
+    def _find_suitable_keys(self, provider: AIProvider, tokens_needed: int) -> list[DonatedAPIKey]:
         """
         Find API key(s) with enough balance
         Can combine multiple keys if one doesn't have enough
@@ -533,8 +534,8 @@ class StrictAIPoolManager:
             for key in self._active_keys_for_provider(provider):
                 rotation_queue.append(key.key_id)
 
-        selected: List[DonatedAPIKey] = []
-        selected_ids: Set[str] = set()
+        selected: list[DonatedAPIKey] = []
+        selected_ids: set[str] = set()
         remaining = tokens_needed
 
         inspected = 0
@@ -590,15 +591,15 @@ class StrictAIPoolManager:
         return selected
 
     def _plan_key_allocations(
-        self, keys: List[DonatedAPIKey], tokens_needed: int, per_call_limit: int
-    ) -> Tuple[List[Tuple[DonatedAPIKey, int]], int]:
+        self, keys: list[DonatedAPIKey], tokens_needed: int, per_call_limit: int
+    ) -> tuple[list[tuple[DonatedAPIKey, int]], int]:
         """Plan how tokens will be allocated across keys respecting per-call limits."""
         if per_call_limit <= 0:
             return [], tokens_needed
 
         key_budgets = {key.key_id: key.remaining_tokens() for key in keys}
         remaining = tokens_needed
-        plan: List[Tuple[DonatedAPIKey, int]] = []
+        plan: list[tuple[DonatedAPIKey, int]] = []
 
         while remaining > 0:
             progress = False
@@ -622,7 +623,7 @@ class StrictAIPoolManager:
 
     def _execute_with_strict_limits(
         self,
-        keys: List[DonatedAPIKey],
+        keys: list[DonatedAPIKey],
         task_description: str,
         estimated_tokens: int,
         max_tokens: int,
@@ -822,7 +823,7 @@ class StrictAIPoolManager:
             )
             return {"success": False, "error": str(e), "tokens_used": 0}
 
-    def _deduct_tokens_from_keys(self, keys: List[DonatedAPIKey], total_tokens: int) -> None:
+    def _deduct_tokens_from_keys(self, keys: list[DonatedAPIKey], total_tokens: int) -> None:
         """
         Deduct used tokens from donated key(s)
         If multiple keys used, deduct proportionally
@@ -1029,7 +1030,7 @@ class StrictAIPoolManager:
             for key in self._active_keys_for_provider(provider):
                 rotation.append(key.key_id)
 
-    def _active_keys_for_provider(self, provider: AIProvider) -> List[DonatedAPIKey]:
+    def _active_keys_for_provider(self, provider: AIProvider) -> list[DonatedAPIKey]:
         return [
             key
             for key in self.donated_keys.values()
@@ -1064,7 +1065,6 @@ class StrictAIPoolManager:
         }
         cleaned = deque(entry for entry in rotation if entry in valid_ids)
         self._provider_rotation[provider] = cleaned
-
 
 # Example usage
 if __name__ == "__main__":

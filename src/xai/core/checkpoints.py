@@ -18,12 +18,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import shutil
 import time
-from typing import Dict, List, Optional, Any, Tuple, TYPE_CHECKING
 from datetime import datetime
-import logging
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Block
@@ -38,7 +38,6 @@ if not logger.handlers:
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
-
 class Checkpoint:
     """Represents a blockchain checkpoint at a specific height"""
 
@@ -47,7 +46,7 @@ class Checkpoint:
         height: int,
         block_hash: str,
         previous_hash: str,
-        utxo_snapshot: Dict[str, Any],
+        utxo_snapshot: dict[str, Any],
         timestamp: float,
         difficulty: int,
         total_supply: float,
@@ -80,7 +79,7 @@ class Checkpoint:
         checkpoint_string = json.dumps(checkpoint_data, sort_keys=True)
         return hashlib.sha256(checkpoint_string.encode()).hexdigest()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert checkpoint to dictionary for serialization"""
         return {
             "height": self.height,
@@ -97,7 +96,7 @@ class Checkpoint:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Checkpoint":
+    def from_dict(cls, data: dict[str, Any]) -> "Checkpoint":
         """Create checkpoint from dictionary"""
         checkpoint = cls(
             height=data["height"],
@@ -124,7 +123,6 @@ class Checkpoint:
     def verify_integrity(self) -> bool:
         """Verify checkpoint integrity"""
         return self.checkpoint_hash == self._calculate_checkpoint_hash()
-
 
 class CheckpointManager:
     """
@@ -162,7 +160,7 @@ class CheckpointManager:
         os.makedirs(self.checkpoints_dir, exist_ok=True)
 
         # Track the latest checkpoint height to prevent deep reorgs
-        self.latest_checkpoint_height: Optional[int] = None
+        self.latest_checkpoint_height: int | None = None
         self._load_latest_checkpoint_height()
 
         logger.info(
@@ -202,7 +200,7 @@ class CheckpointManager:
 
     def create_checkpoint(
         self, block: "Block", utxo_manager: "UTXOManager", total_supply: float
-    ) -> Optional[Checkpoint]:
+    ) -> Checkpoint | None:
         """
         Create a checkpoint from the current blockchain state.
 
@@ -312,7 +310,7 @@ class CheckpointManager:
                     logger.debug(f"Could not cleanup temp file: {cleanup_error}")
             return False
 
-    def load_checkpoint(self, height: int) -> Optional[Checkpoint]:
+    def load_checkpoint(self, height: int) -> Checkpoint | None:
         """
         Load a checkpoint from disk.
 
@@ -348,7 +346,7 @@ class CheckpointManager:
             logger.error(f"Error loading checkpoint at height {height}: {e}")
             return None
 
-    def load_latest_checkpoint(self) -> Optional[Checkpoint]:
+    def load_latest_checkpoint(self) -> Checkpoint | None:
         """
         Load the most recent checkpoint.
 
@@ -370,7 +368,7 @@ class CheckpointManager:
         logger.warn("No valid checkpoints found")
         return None
 
-    def list_checkpoints(self) -> List[int]:
+    def list_checkpoints(self) -> list[int]:
         """
         List all available checkpoint heights.
 
@@ -474,7 +472,7 @@ class CheckpointManager:
 
         return height < self.latest_checkpoint_height
 
-    def get_checkpoint_info(self) -> Dict[str, Any]:
+    def get_checkpoint_info(self) -> dict[str, Any]:
         """
         Get information about the checkpoint system.
 
@@ -536,7 +534,7 @@ class CheckpointManager:
 
     def create_manual_checkpoint(
         self, block: "Block", utxo_manager: "UTXOManager", total_supply: float
-    ) -> Optional[Checkpoint]:
+    ) -> Checkpoint | None:
         """
         Manually create a checkpoint regardless of interval.
 
@@ -552,8 +550,8 @@ class CheckpointManager:
         return self.create_checkpoint(block, utxo_manager, total_supply)
 
     def verify_checkpoint_with_peers(
-        self, height: int, peer_checkpoints: List[Dict[str, Any]], min_consensus: float = 0.67
-    ) -> Tuple[bool, str]:
+        self, height: int, peer_checkpoints: list[dict[str, Any]], min_consensus: float = 0.67
+    ) -> tuple[bool, str]:
         """
         Verify checkpoint against peer consensus by comparing hashes.
 
@@ -599,8 +597,8 @@ class CheckpointManager:
             return False, f"Insufficient consensus: {consensus_percentage:.1%} < {min_consensus:.1%}"
 
     def compare_checkpoint_with_peer(
-        self, height: int, peer_checkpoint_data: Dict[str, Any]
-    ) -> Tuple[bool, List[str]]:
+        self, height: int, peer_checkpoint_data: dict[str, Any]
+    ) -> tuple[bool, list[str]]:
         """
         Compare local checkpoint with peer checkpoint and identify differences.
 
@@ -635,8 +633,8 @@ class CheckpointManager:
         return matches, differences
 
     def request_checkpoint_from_peers(
-        self, height: int, peer_list: List[str]
-    ) -> List[Dict[str, Any]]:
+        self, height: int, peer_list: list[str]
+    ) -> list[dict[str, Any]]:
         """
         Request checkpoint data from multiple peers for consensus verification.
 

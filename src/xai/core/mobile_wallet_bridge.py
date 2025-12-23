@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Mobile wallet bridge helpers.
 
@@ -16,14 +18,13 @@ import logging
 import time
 import uuid
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from xai.core.blockchain import Transaction
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_BLOCK_CAPACITY = 500
-
 
 class MobileWalletBridge:
     """Draft/commit flow for mobile wallets and air-gapped signers."""
@@ -34,10 +35,10 @@ class MobileWalletBridge:
         self.blockchain = blockchain
         self.validator = validator
         self.fee_optimizer = fee_optimizer
-        self._drafts: Dict[str, Dict[str, Any]] = {}
+        self._drafts: dict[str, dict[str, Any]] = {}
         self.expiry_seconds = self.DEFAULT_EXPIRY_SECONDS
 
-    def create_draft(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def create_draft(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Create an unsigned transaction draft."""
         self._purge_expired()
 
@@ -108,7 +109,7 @@ class MobileWalletBridge:
             "defer_until_congestion_below": defer_congestion,
         }
 
-    def get_draft(self, draft_id: str) -> Optional[Dict[str, Any]]:
+    def get_draft(self, draft_id: str) -> dict[str, Any] | None:
         self._purge_expired()
         draft = self._drafts.get(draft_id)
         if not draft:
@@ -165,7 +166,7 @@ class MobileWalletBridge:
 
         return tx
 
-    def _get_fee_quote(self, priority: str) -> Dict[str, Any]:
+    def _get_fee_quote(self, priority: str) -> dict[str, Any]:
         """
         Get fee quote for transaction.
 
@@ -178,7 +179,7 @@ class MobileWalletBridge:
             Fee quote dictionary with recommended_fee and conditions
         """
         pending = len(self.blockchain.pending_transactions)
-        optimizer_quote: Optional[Dict[str, Any]] = None
+        optimizer_quote: dict[str, Any] | None = None
         if self.fee_optimizer:
             try:
                 optimizer_quote = self.fee_optimizer.predict_optimal_fee(
@@ -265,7 +266,7 @@ class MobileWalletBridge:
             return "high"
         return "critical"
 
-    def _active_drafts_for_sender(self, sender: str) -> List[str]:
+    def _active_drafts_for_sender(self, sender: str) -> list[str]:
         return [
             draft_id
             for draft_id, draft in self._drafts.items()

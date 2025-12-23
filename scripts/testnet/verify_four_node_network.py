@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Iterable, List
 
 from xai.testnet.verification import NodeTarget, TestnetVerifier
 
@@ -17,10 +16,9 @@ DEFAULT_NODES = [
     ("node3", "http://localhost:12031"),
 ]
 
-
-def parse_node_definitions(raw_defs: Iterable[str]) -> List[NodeTarget]:
+def parse_node_definitions(raw_defs: Iterable[str]) -> list[NodeTarget]:
     """Parse command-line definitions (name=url) into NodeTarget objects."""
-    targets: List[NodeTarget] = []
+    targets: list[NodeTarget] = []
     for raw in raw_defs:
         if "=" not in raw:
             raise ValueError(f"Invalid node definition '{raw}'. Use name=http://host:port")
@@ -31,7 +29,6 @@ def parse_node_definitions(raw_defs: Iterable[str]) -> List[NodeTarget]:
             raise ValueError(f"Invalid node definition '{raw}'. Name and URL required")
         targets.append(NodeTarget(name=name, base_url=url))
     return targets
-
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -74,8 +71,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     return parser
 
-
-def main(argv: List[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
@@ -101,7 +97,6 @@ def main(argv: List[str] | None = None) -> int:
         print(verifier.render_text(result))
 
     return 0 if result.ok else 2
-
 
 if __name__ == "__main__":
     sys.exit(main())

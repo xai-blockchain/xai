@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Enhanced Voting System with Coin-Holding Incentives
 
@@ -19,10 +21,8 @@ This encourages people to:
 """
 
 import time
-from typing import Dict, List, Optional, Tuple
-from enum import Enum
 from dataclasses import dataclass
-
+from enum import Enum
 
 class VoteCheckpoint(Enum):
     """Multiple voting stages throughout project"""
@@ -34,7 +34,6 @@ class VoteCheckpoint(Enum):
     FINAL_APPROVAL = "final_approval"  # Before deployment
     CODE_REVIEW_VOTE = "code_review_vote"  # After AI completes
 
-
 class VoteStatus(Enum):
     """Status of a vote"""
 
@@ -42,7 +41,6 @@ class VoteStatus(Enum):
     INVALIDATED_SOLD_COINS = "invalidated_sold_coins"  # Sold coins
     INVALIDATED_TRANSFERRED = "invalidated_transferred"  # Transferred coins
     WITHDRAWN = "withdrawn"  # Voter manually withdrew
-
 
 @dataclass
 class VoterSnapshot:
@@ -66,10 +64,9 @@ class VoterSnapshot:
     total_voting_power: float  # Combined
 
     # Verification
-    verified_until: Optional[float] = None  # Last verification time
+    verified_until: float | None = None  # Last verification time
     is_valid: bool = True  # Still holds coins?
-    invalidation_reason: Optional[str] = None
-
+    invalidation_reason: str | None = None
 
 @dataclass
 class ProjectTimeline:
@@ -94,7 +91,6 @@ class ProjectTimeline:
     min_review_period: int = 3  # 3 days for code review
     min_final_vote: int = 2  # 2 days for final vote
 
-
 class EnhancedVotingSystem:
     """
     Voting system that incentivizes coin holding + donations
@@ -104,8 +100,8 @@ class EnhancedVotingSystem:
         self.blockchain = blockchain
 
         # Vote storage
-        self.proposals: Dict[str, Dict] = {}
-        self.voter_snapshots: Dict[str, Dict[str, VoterSnapshot]] = (
+        self.proposals: dict[str, Dict] = {}
+        self.voter_snapshots: dict[str, dict[str, VoterSnapshot]] = (
             {}
         )  # proposal_id -> {address -> snapshot}
 
@@ -122,7 +118,7 @@ class EnhancedVotingSystem:
 
     def calculate_voting_power(
         self, address: str, ai_donation_history: Dict
-    ) -> Tuple[float, float, float]:
+    ) -> tuple[float, float, float]:
         """
         Calculate combined voting power from coins + donations
 
@@ -528,7 +524,6 @@ class EnhancedVotingSystem:
                 "donate_60_minutes": f"+{60 * self.donation_weight:.1f} voting power",
             },
         }
-
 
 # Example usage
 if __name__ == "__main__":

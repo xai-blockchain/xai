@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - UTXO Manager
 
@@ -11,14 +13,15 @@ Security Notes:
 - Maximum amount is bounded by total supply cap
 """
 
-from typing import Dict, List, Any, Optional, TYPE_CHECKING
-from collections import defaultdict
-from threading import RLock
-from xai.core.structured_logger import StructuredLogger, get_structured_logger
-from xai.core.validation import validate_amount
 import hashlib
 import json
 import math
+from collections import defaultdict
+from threading import RLock
+from typing import TYPE_CHECKING, Any
+
+from xai.core.structured_logger import StructuredLogger, get_structured_logger
+from xai.core.validation import validate_amount
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Transaction
@@ -27,11 +30,9 @@ if TYPE_CHECKING:
 MAX_UTXO_AMOUNT = 121_000_000.0  # Total supply cap
 MIN_UTXO_AMOUNT = 0.0
 
-
 class UTXOValidationError(ValueError):
     """Raised when UTXO validation fails."""
     pass
-
 
 class UTXOManager:
     """
@@ -39,9 +40,9 @@ class UTXOManager:
     Thread-safe implementation using RLock to prevent concurrent access issues.
     """
 
-    def __init__(self, logger: Optional[StructuredLogger] = None) -> None:
+    def __init__(self, logger: StructuredLogger | None = None) -> None:
         # utxo_set: {address: [{txid, vout, amount, script_pubkey}, ...]}
-        self.utxo_set: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        self.utxo_set: dict[str, list[dict[str, Any]]] = defaultdict(list)
         self.logger = logger or get_structured_logger()
         self.total_utxos = 0
         self.total_value = 0.0
@@ -49,13 +50,13 @@ class UTXOManager:
         self._lock = RLock()
         # Pending UTXOs: Track UTXOs selected for pending transactions to prevent double-spend
         # Format: {(txid, vout): timestamp} - timestamp enables timeout-based cleanup
-        self._pending_utxos: Dict[tuple, float] = {}
+        self._pending_utxos: dict[tuple, float] = {}
         # Timeout for pending UTXO locks (5 minutes)
         self._pending_timeout = 300.0
         # PERFORMANCE OPTIMIZATION: Hash-based index for O(1) UTXO lookups
         # Maps "{txid}:{vout}" -> (address, utxo_dict) for constant-time access
         # Eliminates O(n×m) scan through all addresses and UTXOs
-        self._utxo_index: Dict[str, tuple[str, Dict[str, Any]]] = {}
+        self._utxo_index: dict[str, tuple[str, dict[str, Any]]] = {}
 
     def snapshot_digest(self) -> str:
         """
@@ -208,7 +209,7 @@ class UTXOManager:
             )
             return False
 
-    def get_utxos_for_address(self, address: str, exclude_pending: bool = True) -> List[Dict[str, Any]]:
+    def get_utxos_for_address(self, address: str, exclude_pending: bool = True) -> list[dict[str, Any]]:
         """
         Retrieves all unspent UTXOs for a given address.
 
@@ -328,7 +329,7 @@ class UTXOManager:
         )
         return True
 
-    def get_unspent_output(self, txid: str, vout: int, exclude_pending: bool = True) -> Optional[Dict[str, Any]]:
+    def get_unspent_output(self, txid: str, vout: int, exclude_pending: bool = True) -> dict[str, Any] | None:
         """
         Retrieves a specific unspent UTXO by its transaction ID and output index.
 
@@ -360,7 +361,7 @@ class UTXOManager:
 
             return None
 
-    def find_spendable_utxos(self, address: str, amount: float) -> List[Dict[str, Any]]:
+    def find_spendable_utxos(self, address: str, amount: float) -> list[dict[str, Any]]:
         """
         Finds a set of unspent UTXOs for an address that sum up to at least the required amount.
 
@@ -385,7 +386,7 @@ class UTXOManager:
 
         return spendable_utxos
 
-    def lock_utxos(self, utxos: List[Dict[str, Any]]) -> bool:
+    def lock_utxos(self, utxos: list[dict[str, Any]]) -> bool:
         """
         Lock UTXOs for a pending transaction to prevent double-spending.
 
@@ -425,7 +426,7 @@ class UTXOManager:
 
             return True
 
-    def unlock_utxos(self, utxos: List[Dict[str, Any]]) -> None:
+    def unlock_utxos(self, utxos: list[dict[str, Any]]) -> None:
         """
         Unlock UTXOs when transaction is rejected or mined.
 
@@ -442,7 +443,7 @@ class UTXOManager:
                         extra={"event": "utxo.unlocked", "utxo": utxo_key}
                     )
 
-    def unlock_utxos_by_keys(self, utxo_keys: List[tuple]) -> None:
+    def unlock_utxos_by_keys(self, utxo_keys: list[tuple]) -> None:
         """
         Unlock UTXOs by their (txid, vout) keys.
 
@@ -491,7 +492,7 @@ class UTXOManager:
             self._cleanup_expired_pending()
             return len(self._pending_utxos)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """
         Converts the UTXO set to a dictionary for serialization.
         """
@@ -507,7 +508,7 @@ class UTXOManager:
                 ]
             return serializable_utxo_set
 
-    def get_utxo_set(self) -> Dict[str, Any]:
+    def get_utxo_set(self) -> dict[str, Any]:
         """
         Get a copy of the current UTXO set.
 
@@ -516,7 +517,7 @@ class UTXOManager:
         """
         return self.to_dict()
 
-    def load_utxo_set(self, utxo_set_data: Dict[str, Any]) -> None:
+    def load_utxo_set(self, utxo_set_data: dict[str, Any]) -> None:
         """
         Loads the UTXO set from a dictionary and rebuilds the hash index.
 
@@ -569,7 +570,7 @@ class UTXOManager:
         # get_balance already has lock, RLock allows reentrant locking
         return len([addr for addr, utxos in self.utxo_set.items() if self.get_balance(addr) > 0])
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """
         Returns statistics about the current UTXO set.
         """
@@ -592,7 +593,7 @@ class UTXOManager:
             self._utxo_index = {}  # Clear index
             self.logger.info("UTXO Manager reset.")
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         """
         Creates a complete snapshot of the current UTXO state.
         Thread-safe atomic operation for chain reorganization rollback.
@@ -607,7 +608,7 @@ class UTXOManager:
                 "total_value": self.total_value,
             }
 
-    def restore(self, snapshot: Dict[str, Any]) -> None:
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """
         Restores UTXO state from a snapshot and rebuilds the hash index.
         Thread-safe atomic operation for chain reorganization rollback.
@@ -742,7 +743,7 @@ class UTXOManager:
 
             return utxo_hashes[0]
 
-    def verify_utxo_consistency(self) -> Dict[str, Any]:
+    def verify_utxo_consistency(self) -> dict[str, Any]:
         """
         Verify internal consistency of the UTXO set.
 
@@ -786,12 +787,10 @@ class UTXOManager:
                 "duplicates_found": duplicates,
             }
 
-
 # Global instance for convenience
 _global_utxo_manager = None
 
-
-def get_utxo_manager(logger: Optional[StructuredLogger] = None) -> UTXOManager:
+def get_utxo_manager(logger: StructuredLogger | None = None) -> UTXOManager:
     """
     Get global UTXO manager instance.
     """

@@ -1,8 +1,8 @@
+from __future__ import annotations
+
 import logging
-from typing import Dict
 
 logger = logging.getLogger("xai.blockchain.mev_redistributor")
-
 
 class MEVRedistributor:
     def __init__(self, redistribution_percentage: float = 50.0):
@@ -26,7 +26,7 @@ class MEVRedistributor:
         self.total_mev_captured += amount
         logger.info("Captured %.2f MEV (total captured %.2f)", amount, self.total_mev_captured)
 
-    def redistribute_mev(self, users: Dict[str, float]) -> Dict[str, float]:
+    def redistribute_mev(self, users: dict[str, float]) -> dict[str, float]:
         """
         Redistributes a portion of the captured MEV to users based on their proportional share.
         'users' is a dictionary of {user_address: proportional_share_factor}.
@@ -51,7 +51,7 @@ class MEVRedistributor:
             logger.warning("Redistribution skipped: total user share factors are zero")
             return {}
 
-        redistributed_amounts: Dict[str, float] = {}
+        redistributed_amounts: dict[str, float] = {}
         for user_address, share_factor in users.items():
             if share_factor > 0:
                 amount_for_user = (share_factor / total_share_factors) * mev_to_redistribute

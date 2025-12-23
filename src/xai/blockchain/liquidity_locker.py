@@ -1,14 +1,15 @@
+from __future__ import annotations
+
 import logging
-from typing import Dict, Any, List
 import time
+from typing import Any
 
 logger = logging.getLogger("xai.blockchain.liquidity_locker")
-
 
 class LiquidityLocker:
     def __init__(self):
         # Stores locked positions: {lock_id: {"lp_token_amount": float, "lock_duration_seconds": int, "unlock_timestamp": int, "owner": str}}
-        self.locked_positions: Dict[str, Dict[str, Any]] = {}
+        self.locked_positions: dict[str, dict[str, Any]] = {}
         self._lock_id_counter = 0
 
     def lock_liquidity(
@@ -85,7 +86,7 @@ class LiquidityLocker:
         # In a real system, the LP tokens would be transferred back to the owner.
         return unlocked_amount
 
-    def get_locked_liquidity(self, owner_address: str = None) -> List[Dict[str, Any]]:
+    def get_locked_liquidity(self, owner_address: str = None) -> list[dict[str, Any]]:
         """
         Returns a list of all locked liquidity positions, or positions for a specific owner.
         """

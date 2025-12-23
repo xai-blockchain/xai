@@ -1,12 +1,11 @@
-from typing import List, Set, Tuple
-
+from __future__ import annotations
 
 class PacketFilter:
-    def __init__(self, default_allowed_ports: List[int] = None):
-        self.allowed_ports: Set[int] = (
+    def __init__(self, default_allowed_ports: list[int] = None):
+        self.allowed_ports: set[int] = (
             set(default_allowed_ports) if default_allowed_ports else set()
         )
-        self.blocked_ips: Set[str] = set()
+        self.blocked_ips: set[str] = set()
         print(
             f"PacketFilter initialized. Allowed ports: {self.allowed_ports}, Blocked IPs: {self.blocked_ips}."
         )
@@ -55,7 +54,6 @@ class PacketFilter:
 
         print(f"Packet from {source_ip} to port {destination_port} ALLOWED.")
         return True
-
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

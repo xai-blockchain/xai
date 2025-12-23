@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import time
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable
 
 from flask import jsonify, request
 
@@ -19,7 +19,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
 def register_core_routes(
     routes: "NodeAPIRoutes",
     *,
@@ -33,7 +32,7 @@ def register_core_routes(
     blockchain = routes.blockchain
 
     @app.route("/", methods=["GET"])
-    def index() -> Tuple[Dict[str, Any], int]:
+    def index() -> tuple[dict[str, Any], int]:
         """Node information and available endpoints."""
         return (
             jsonify(
@@ -49,15 +48,15 @@ def register_core_routes(
         )
 
     @app.route("/health", methods=["GET"])
-    def health_check() -> Tuple[Dict[str, Any], int]:
+    def health_check() -> tuple[dict[str, Any], int]:
         """Health check endpoint for Docker and monitoring."""
         overall_status = "healthy"
         http_status = 200
         timestamp = time.time()
-        blockchain_summary: Dict[str, Any] = {"accessible": False}
-        services: Dict[str, Any] = {"api": "running"}
-        backlog: Dict[str, Any] = {"pending_transactions": 0, "orphan_blocks": 0}
-        network: Dict[str, Any] = {"peers": 0}
+        blockchain_summary: dict[str, Any] = {"accessible": False}
+        services: dict[str, Any] = {"api": "running"}
+        backlog: dict[str, Any] = {"pending_transactions": 0, "orphan_blocks": 0}
+        network: dict[str, Any] = {"peers": 0}
 
         def degrade(reason: str) -> None:
             nonlocal overall_status, http_status
@@ -167,7 +166,7 @@ def register_core_routes(
         return jsonify(response), http_status
 
     @app.route("/checkpoint/provenance", methods=["GET"])
-    def checkpoint_provenance() -> Tuple[Dict[str, Any], int]:
+    def checkpoint_provenance() -> tuple[dict[str, Any], int]:
         """Expose recent checkpoint provenance for diagnostics."""
         sync_coordinator = getattr(node, "partial_sync_coordinator", None)
         sync_mgr = getattr(sync_coordinator, "sync_manager", None) if sync_coordinator else None
@@ -180,7 +179,7 @@ def register_core_routes(
         return jsonify({"provenance": provenance}), 200
 
     @app.route("/metrics", methods=["GET"])
-    def prometheus_metrics() -> Tuple[str, int, Dict[str, str]]:
+    def prometheus_metrics() -> tuple[str, int, dict[str, str]]:
         """Prometheus metrics endpoint."""
         try:
             metrics_output = node.metrics_collector.export_prometheus()
@@ -190,7 +189,7 @@ def register_core_routes(
             return f"# Error generating metrics: {exc}\n", 500, {"Content-Type": "text/plain"}
 
     @app.route("/stats", methods=["GET"])
-    def get_stats() -> Dict[str, Any]:
+    def get_stats() -> dict[str, Any]:
         """Get blockchain statistics with miner and uptime metadata."""
         stats = blockchain.get_stats()
         stats["miner_address"] = node.miner_address
@@ -200,7 +199,7 @@ def register_core_routes(
         return jsonify(stats)
 
     @app.route("/mempool", methods=["GET"])
-    def get_mempool_overview() -> Tuple[Dict[str, Any], int]:
+    def get_mempool_overview() -> tuple[dict[str, Any], int]:
         """Get mempool statistics and a snapshot of pending transactions."""
         limit_param = request.args.get("limit", default=100, type=int)
         limit = 100 if limit_param is None else limit_param
@@ -219,7 +218,7 @@ def register_core_routes(
             return routes._handle_exception(exc, "mempool_overview")
 
     @app.route("/mempool/stats", methods=["GET"])
-    def get_mempool_stats() -> Tuple[Dict[str, Any], int]:
+    def get_mempool_stats() -> tuple[dict[str, Any], int]:
         """Aggregate mempool fee statistics and congestion indicators."""
         limit_param = request.args.get("limit", default=0, type=int)
         limit = 0 if limit_param is None else limit_param
@@ -297,7 +296,7 @@ def register_core_routes(
             "size_kb": overview.get("size_kb", size_bytes / 1024.0 if size_bytes else 0.0),
         }
 
-        response_body: Dict[str, Any] = {
+        response_body: dict[str, Any] = {
             "success": True,
             "limit": limit,
             "timestamp": overview.get("timestamp"),

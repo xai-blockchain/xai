@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Generate edge-case tests from Python module metadata.
 
@@ -18,31 +20,28 @@ import importlib.util
 import inspect
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-
+from typing import Any
 
 @dataclass
 class Parameter:
     """Captured metadata for a single function parameter."""
 
     name: str
-    annotation: Optional[str]
+    annotation: str | None
     has_default: bool
-
 
 @dataclass
 class FunctionSignature:
     """Metadata describing one callable in the target module."""
 
     name: str
-    parameters: List[Parameter]
+    parameters: list[Parameter]
     is_async: bool
-
 
 class EdgeCaseGenerator:
     """Helper to generate test strings for a callable."""
 
-    TEST_VALUES: Dict[str, List[Any]] = {
+    TEST_VALUES: dict[str, list[Any]] = {
         'int': [0, -1, 1, 2**31 - 1, -2**31],
         'float': [0.0, -1.0, 1.0, float('inf'), float('-inf')],
         'str': ['', 'a', 'test', ' ', '\n', '\t', 'x' * 200],
@@ -51,7 +50,7 @@ class EdgeCaseGenerator:
         'dict': [{}, {'a': 1}, {'nested': {'value': 1}}],
     }
 
-    FIXTURE_VALUES: Dict[str, Dict[str, str]] = {
+    FIXTURE_VALUES: dict[str, dict[str, str]] = {
         'empty': {
             'int': '0',
             'float': '0.0',
@@ -90,9 +89,9 @@ class EdgeCaseGenerator:
         spec.loader.exec_module(module)
         return module
 
-    def collect_functions(self, module) -> List[FunctionSignature]:
+    def collect_functions(self, module) -> list[FunctionSignature]:
         """Return all top-level callables found in the module."""
-        signatures: List[FunctionSignature] = []
+        signatures: list[FunctionSignature] = []
         for _, callable_obj in inspect.getmembers(module, inspect.isfunction):
             if callable_obj.__name__.startswith('_'):
                 continue
@@ -110,11 +109,11 @@ class EdgeCaseGenerator:
             )
         return signatures
 
-    def extract_base_type(self, annotation: Optional[str]) -> str:
-        """Reduce annotations like Optional[int] -> int."""
+    def extract_base_type(self, annotation: str | None) -> str:
+        """Reduce annotations like int | None -> int."""
         if not annotation:
             return 'Any'
-        annotation = annotation.replace('Optional[', '').replace(']', '')
+        annotation = annotation.replace('', '').replace(' | None', '')
         for base in ['int', 'float', 'str', 'bool', 'list', 'dict']:
             if base in annotation:
                 return base
@@ -173,7 +172,7 @@ class EdgeCaseGenerator:
         module = self.load_module(module_path)
         functions = self.collect_functions(module)
         module_name = module_path.stem
-        output_lines: List[str] = [
+        output_lines: list[str] = [
             f"# Generated edge-case tests for {module_path.name}",
             "",
             "import pytest",
@@ -186,7 +185,6 @@ class EdgeCaseGenerator:
                 output_lines.append(self.build_parameterized_test(func, param))
             output_lines.append(self.build_fixture_tests(func))
         return '\n'.join(output_lines)
-
 
 def main():
     parser = argparse.ArgumentParser(description='Generate edge case tests from a module.')
@@ -202,7 +200,6 @@ def main():
     output_path.write_text(content)
 
     print(f"Edge case test scaffold written to {output_path}")
-
 
 if __name__ == '__main__':
     main()

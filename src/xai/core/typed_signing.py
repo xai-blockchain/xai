@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Typed Data Signing - EIP-712/EIP-191 Equivalent
 
@@ -15,13 +17,11 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Union
-
+from typing import Any
 
 # XAI signing prefixes (similar to Ethereum's)
 XIP191_PREFIX = b"\x19XAI Signed Message:\n"
 XIP712_PREFIX = b"\x19\x01"
-
 
 @dataclass
 class TypedDataDomain:
@@ -36,10 +36,10 @@ class TypedDataDomain:
     name: str
     version: str
     chain_id: int
-    verifying_contract: Optional[str] = None
-    salt: Optional[str] = None
+    verifying_contract: str | None = None
+    salt: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for hashing."""
         d = {
             "name": self.name,
@@ -52,7 +52,6 @@ class TypedDataDomain:
             d["salt"] = self.salt
         return d
 
-
 # Standard type definitions for XIP-712
 PRIMITIVE_TYPES = {
     "bool", "address", "string", "bytes",
@@ -61,8 +60,7 @@ PRIMITIVE_TYPES = {
     "bytes1", "bytes2", "bytes4", "bytes8", "bytes16", "bytes32",
 }
 
-
-def _is_array_type(type_name: str) -> Tuple[bool, str, Optional[int]]:
+def _is_array_type(type_name: str) -> tuple[bool, str, int | None]:
     """
     Check if type is an array type.
 
@@ -76,8 +74,7 @@ def _is_array_type(type_name: str) -> Tuple[bool, str, Optional[int]]:
         return True, base_type, length
     return False, type_name, None
 
-
-def _encode_type(type_name: str, types: Dict[str, List[Dict[str, str]]]) -> str:
+def _encode_type(type_name: str, types: dict[str, list[dict[str, str]]]) -> str:
     """
     Encode a type string for hashing (EIP-712 encodeType).
 
@@ -115,8 +112,7 @@ def _encode_type(type_name: str, types: Dict[str, List[Dict[str, str]]]) -> str:
 
     return encoded
 
-
-def _find_type_dependencies(type_name: str, types: Dict, visited: Optional[set] = None) -> set:
+def _find_type_dependencies(type_name: str, types: Dict, visited: set | None = None) -> set:
     """Find all type dependencies recursively."""
     if visited is None:
         visited = set()
@@ -138,17 +134,15 @@ def _find_type_dependencies(type_name: str, types: Dict, visited: Optional[set] 
 
     return deps
 
-
-def _hash_type(type_name: str, types: Dict[str, List[Dict[str, str]]]) -> bytes:
+def _hash_type(type_name: str, types: dict[str, list[dict[str, str]]]) -> bytes:
     """Compute typeHash for a type."""
     encoded = _encode_type(type_name, types)
     return hashlib.sha256(encoded.encode('utf-8')).digest()
 
-
 def _encode_data(
     type_name: str,
-    data: Dict[str, Any],
-    types: Dict[str, List[Dict[str, str]]]
+    data: dict[str, Any],
+    types: dict[str, list[dict[str, str]]]
 ) -> bytes:
     """
     Encode structured data for hashing (EIP-712 encodeData).
@@ -172,11 +166,10 @@ def _encode_data(
 
     return encoded
 
-
 def _encode_value(
     type_name: str,
     value: Any,
-    types: Dict[str, List[Dict[str, str]]]
+    types: dict[str, list[dict[str, str]]]
 ) -> bytes:
     """Encode a single value based on its type."""
     # Handle arrays
@@ -229,8 +222,7 @@ def _encode_value(
     else:
         raise ValueError(f"Unknown type: {type_name}")
 
-
-def hash_personal_message(message: Union[str, bytes]) -> bytes:
+def hash_personal_message(message: str | bytes) -> bytes:
     """
     Hash a personal message (XIP-191 equivalent of EIP-191).
 
@@ -250,12 +242,11 @@ def hash_personal_message(message: Union[str, bytes]) -> bytes:
     prefixed = XIP191_PREFIX + str(len(message)).encode('utf-8') + message
     return hashlib.sha256(prefixed).digest()
 
-
 def hash_typed_data(
     domain: TypedDataDomain,
     primary_type: str,
-    types: Dict[str, List[Dict[str, str]]],
-    message: Dict[str, Any]
+    types: dict[str, list[dict[str, str]]],
+    message: dict[str, Any]
 ) -> bytes:
     """
     Hash typed structured data (XIP-712 equivalent of EIP-712).
@@ -300,8 +291,7 @@ def hash_typed_data(
     # Combine with XIP-712 prefix
     return hashlib.sha256(XIP712_PREFIX + domain_hash + message_hash).digest()
 
-
-def create_personal_sign_request(message: str) -> Dict[str, Any]:
+def create_personal_sign_request(message: str) -> dict[str, Any]:
     """
     Create a personal_sign request object.
 
@@ -323,13 +313,12 @@ def create_personal_sign_request(message: str) -> Dict[str, Any]:
         }
     }
 
-
 def create_typed_sign_request(
     domain: TypedDataDomain,
     primary_type: str,
-    types: Dict[str, List[Dict[str, str]]],
-    message: Dict[str, Any]
-) -> Dict[str, Any]:
+    types: dict[str, list[dict[str, str]]],
+    message: dict[str, Any]
+) -> dict[str, Any]:
     """
     Create a signTypedData request object.
 
@@ -359,7 +348,6 @@ def create_typed_sign_request(
         }
     }
 
-
 # Common type definitions for reuse
 PERMIT_TYPES = {
     "Permit": [
@@ -388,7 +376,6 @@ VOTE_TYPES = {
     ]
 }
 
-
 def create_permit_signature_request(
     token_name: str,
     token_address: str,
@@ -398,7 +385,7 @@ def create_permit_signature_request(
     value: int,
     nonce: int,
     deadline: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Create a token permit signature request (gasless approval).
 

@@ -1,57 +1,52 @@
+from __future__ import annotations
+
 """
 Production-Grade Hardware Security Module (HSM) Implementation
 Provides secure key generation, storage, rotation, audit logging, and multi-signature support.
 """
 
-import os
-import json
-import secrets
 import hashlib
+import json
 import logging
+import os
+import secrets
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass, asdict
 from enum import Enum
+from pathlib import Path
+from typing import Any
 
-from cryptography.hazmat.primitives.asymmetric import ec, rsa, ed25519
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.backends import default_backend
 from cryptography.exceptions import InvalidSignature
-
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 # Security-specific exceptions
 class HSMError(Exception):
     """Base exception for HSM operations"""
     pass
 
-
 class HSMKeyGenerationError(HSMError):
     """Raised when key generation fails"""
     pass
-
 
 class HSMSigningError(HSMError):
     """Raised when signing operation fails"""
     pass
 
-
 class HSMKeyRotationError(HSMError):
     """Raised when key rotation fails"""
     pass
-
 
 class HSMStorageError(HSMError):
     """Raised when storage operations fail"""
     pass
 
-
 class HSMCryptographicError(HSMError):
     """Raised when cryptographic operations fail"""
     pass
-
 
 class KeyType(Enum):
     """Supported cryptographic key types"""
@@ -61,7 +56,6 @@ class KeyType(Enum):
     RSA_2048 = "rsa_2048"
     RSA_4096 = "rsa_4096"
 
-
 class KeyPurpose(Enum):
     """Purpose classification for keys"""
     SIGNING = "signing"
@@ -69,7 +63,6 @@ class KeyPurpose(Enum):
     MULTISIG = "multisig"
     COLD_STORAGE = "cold_storage"
     HOT_WALLET = "hot_wallet"
-
 
 @dataclass
 class AuditLogEntry:
@@ -79,11 +72,10 @@ class AuditLogEntry:
     key_id: str
     user_id: str
     success: bool
-    details: Dict[str, Any]
+    details: dict[str, Any]
 
     def to_dict(self) -> Dict:
         return asdict(self)
-
 
 @dataclass
 class KeyMetadata:
@@ -93,12 +85,11 @@ class KeyMetadata:
     purpose: KeyPurpose
     created_at: str
     last_used: str
-    rotation_date: Optional[str]
+    rotation_date: str | None
     is_active: bool
-    multisig_threshold: Optional[int]
-    multisig_total: Optional[int]
+    multisig_threshold: int | None
+    multisig_total: int | None
     public_key_pem: str
-
 
 class HardwareSecurityModule:
     """
@@ -113,7 +104,7 @@ class HardwareSecurityModule:
     def __init__(
         self,
         storage_path: str = "./hsm_storage",
-        master_password: Optional[str] = None,
+        master_password: str | None = None,
         auto_rotate_days: int = 90
     ):
         """
@@ -149,8 +140,8 @@ class HardwareSecurityModule:
         self.aesgcm = AESGCM(self.encryption_key)
 
         # Load existing keys and metadata
-        self.key_metadata: Dict[str, KeyMetadata] = self._load_metadata()
-        self.encrypted_keys: Dict[str, bytes] = self._load_encrypted_keys()
+        self.key_metadata: dict[str, KeyMetadata] = self._load_metadata()
+        self.encrypted_keys: dict[str, bytes] = self._load_encrypted_keys()
 
     def _load_or_generate_salt(self) -> bytes:
         """
@@ -190,7 +181,7 @@ class HardwareSecurityModule:
         )
         return salt
 
-    def _derive_encryption_key(self, password: str, salt: Optional[bytes] = None) -> bytes:
+    def _derive_encryption_key(self, password: str, salt: bytes | None = None) -> bytes:
         """
         Derive encryption key from master password using PBKDF2.
 
@@ -221,7 +212,7 @@ class HardwareSecurityModule:
         key_id: str,
         user_id: str,
         success: bool,
-        details: Dict[str, Any]
+        details: dict[str, Any]
     ) -> None:
         """Write audit log entry"""
         entry = AuditLogEntry(
@@ -241,7 +232,7 @@ class HardwareSecurityModule:
         key_type: KeyType,
         purpose: KeyPurpose,
         user_id: str = "system",
-        multisig_config: Optional[Tuple[int, int]] = None
+        multisig_config: tuple[int, int] | None = None
     ) -> str:
         """
         Generate a new cryptographic key pair.
@@ -639,7 +630,7 @@ class HardwareSecurityModule:
             raise ValueError(f"Key {key_id} not found")
         return metadata.public_key_pem
 
-    def list_keys(self, active_only: bool = True) -> List[Dict]:
+    def list_keys(self, active_only: bool = True) -> list[Dict]:
         """List all keys with metadata"""
         keys = []
         for metadata in self.key_metadata.values():
@@ -657,10 +648,10 @@ class HardwareSecurityModule:
 
     def multisig_sign(
         self,
-        key_ids: List[str],
+        key_ids: list[str],
         message: bytes,
         user_id: str = "system"
-    ) -> List[Tuple[str, bytes]]:
+    ) -> list[tuple[str, bytes]]:
         """
         Create multiple signatures for multisig transaction.
 
@@ -681,7 +672,7 @@ class HardwareSecurityModule:
 
     def verify_multisig(
         self,
-        signatures: List[Tuple[str, bytes]],
+        signatures: list[tuple[str, bytes]],
         message: bytes,
         threshold: int
     ) -> bool:
@@ -757,7 +748,7 @@ class HardwareSecurityModule:
 
         return valid_count >= threshold
 
-    def get_audit_logs(self, limit: int = 100) -> List[Dict]:
+    def get_audit_logs(self, limit: int = 100) -> list[Dict]:
         """Retrieve recent audit log entries"""
         logs = []
         if not self.audit_log_file.exists():
@@ -833,7 +824,7 @@ class HardwareSecurityModule:
         with open(self.metadata_file, "w") as f:
             json.dump(data, f, indent=2)
 
-    def _load_metadata(self) -> Dict[str, KeyMetadata]:
+    def _load_metadata(self) -> dict[str, KeyMetadata]:
         """Load key metadata from disk"""
         if not self.metadata_file.exists():
             return {}
@@ -875,7 +866,7 @@ class HardwareSecurityModule:
                 f.write(len(encrypted_data).to_bytes(4, 'big'))
                 f.write(encrypted_data)
 
-    def _load_encrypted_keys(self) -> Dict[str, bytes]:
+    def _load_encrypted_keys(self) -> dict[str, bytes]:
         """Load encrypted keys from disk"""
         if not self.keys_file.exists():
             return {}

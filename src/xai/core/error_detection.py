@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Error Detection and Classification System
 
@@ -8,19 +10,16 @@ Comprehensive error detection and classification:
 - Error pattern analysis
 """
 
-import time
 import hashlib
-from typing import Dict, List, Optional, Tuple, Any
-from datetime import datetime
-from enum import Enum
-from decimal import Decimal
+import logging
+import time
 from collections import deque
-import logging
+from datetime import datetime
+from decimal import Decimal
+from enum import Enum
+from typing import Any
 
-import logging
 logger = logging.getLogger(__name__)
-
-
 
 class ErrorSeverity(Enum):
     """Error severity levels for classification."""
@@ -30,7 +29,6 @@ class ErrorSeverity(Enum):
     HIGH = "high"
     CRITICAL = "critical"
 
-
 class RecoveryState(Enum):
     """System recovery states."""
 
@@ -39,7 +37,6 @@ class RecoveryState(Enum):
     RECOVERING = "recovering"
     CRITICAL = "critical"
     SHUTDOWN = "shutdown"
-
 
 class ErrorDetector:
     """
@@ -61,7 +58,7 @@ class ErrorDetector:
         """
         self.blockchain = blockchain
         self.error_history: deque = deque(maxlen=1000)
-        self.error_patterns: Dict[str, int] = {}
+        self.error_patterns: dict[str, int] = {}
         self.logger: logging.Logger = logging.getLogger("error_detector")
         self.logger.setLevel(logging.INFO)
 
@@ -101,17 +98,17 @@ class ErrorDetector:
         # Default to medium severity
         return ErrorSeverity.MEDIUM
 
-    def detect_error_patterns(self) -> List[Dict[str, Any]]:
+    def detect_error_patterns(self) -> list[dict[str, Any]]:
         """
         Detect recurring error patterns in recent history.
 
         Returns:
             List of detected patterns with details
         """
-        patterns: List[Dict[str, Any]] = []
+        patterns: list[dict[str, Any]] = []
 
         # Count errors in last 100 entries
-        recent_errors: Dict[str, int] = {}
+        recent_errors: dict[str, int] = {}
         for error in list(self.error_history)[-100:]:
             error_type = error.get("type", "unknown")
             recent_errors[error_type] = recent_errors.get(error_type, 0) + 1
@@ -130,7 +127,7 @@ class ErrorDetector:
 
         return patterns
 
-    def get_error_statistics(self) -> Dict[str, Any]:
+    def get_error_statistics(self) -> dict[str, Any]:
         """
         Get comprehensive error statistics.
 
@@ -155,7 +152,7 @@ class ErrorDetector:
             error_rate = 0.0
 
         # Count error types
-        error_counts: Dict[str, int] = {}
+        error_counts: dict[str, int] = {}
         for error in self.error_history:
             error_type = error.get("type", "unknown")
             error_counts[error_type] = error_counts.get(error_type, 0) + 1
@@ -217,7 +214,6 @@ class ErrorDetector:
 
         return suggestions.get(error_type, "Review error logs and investigate root cause")
 
-
 class CorruptionDetector:
     """
     Detect and analyze blockchain data corruption.
@@ -232,7 +228,7 @@ class CorruptionDetector:
 
     def __init__(self) -> None:
         """Initialize corruption detector with check registry."""
-        self.corruption_checks: Dict[str, Any] = {
+        self.corruption_checks: dict[str, Any] = {
             "hash_integrity": self._check_hash_integrity,
             "chain_continuity": self._check_chain_continuity,
             "utxo_consistency": self._check_utxo_consistency,
@@ -242,7 +238,7 @@ class CorruptionDetector:
         self.logger: logging.Logger = logging.getLogger("corruption_detector")
         self.logger.setLevel(logging.INFO)
 
-    def detect_corruption(self, blockchain: Any) -> Tuple[bool, List[str]]:
+    def detect_corruption(self, blockchain: Any) -> tuple[bool, list[str]]:
         """
         Run all corruption checks on blockchain.
 
@@ -252,7 +248,7 @@ class CorruptionDetector:
         Returns:
             Tuple of (is_corrupted, list of issues found)
         """
-        issues: List[str] = []
+        issues: list[str] = []
 
         for check_name, check_func in self.corruption_checks.items():
             try:
@@ -270,7 +266,7 @@ class CorruptionDetector:
 
         return len(issues) > 0, issues
 
-    def _check_hash_integrity(self, blockchain: Any) -> Tuple[bool, List[str]]:
+    def _check_hash_integrity(self, blockchain: Any) -> tuple[bool, list[str]]:
         """
         Check block hash integrity.
 
@@ -280,7 +276,7 @@ class CorruptionDetector:
         Returns:
             Tuple of (is_valid, list of errors)
         """
-        errors: List[str] = []
+        errors: list[str] = []
 
         for i, block in enumerate(blockchain.chain):
             # Verify hash matches content
@@ -292,7 +288,7 @@ class CorruptionDetector:
 
         return len(errors) == 0, errors
 
-    def _check_chain_continuity(self, blockchain: Any) -> Tuple[bool, List[str]]:
+    def _check_chain_continuity(self, blockchain: Any) -> tuple[bool, list[str]]:
         """
         Check blockchain continuity.
 
@@ -302,7 +298,7 @@ class CorruptionDetector:
         Returns:
             Tuple of (is_valid, list of errors)
         """
-        errors: List[str] = []
+        errors: list[str] = []
 
         for i in range(1, len(blockchain.chain)):
             current = blockchain.chain[i]
@@ -316,7 +312,7 @@ class CorruptionDetector:
 
         return len(errors) == 0, errors
 
-    def _check_utxo_consistency(self, blockchain: Any) -> Tuple[bool, List[str]]:
+    def _check_utxo_consistency(self, blockchain: Any) -> tuple[bool, list[str]]:
         """
         Check UTXO set consistency by rebuilding and comparing.
 
@@ -326,10 +322,10 @@ class CorruptionDetector:
         Returns:
             Tuple of (is_valid, list of errors)
         """
-        errors: List[str] = []
+        errors: list[str] = []
 
         try:
-            rebuilt_utxo: Dict[str, List[Dict[str, Any]]] = {}
+            rebuilt_utxo: dict[str, list[dict[str, Any]]] = {}
 
             for block in blockchain.chain:
                 for tx in block.transactions:
@@ -379,7 +375,7 @@ class CorruptionDetector:
 
         return len(errors) == 0, errors
 
-    def _check_supply_validation(self, blockchain: Any) -> Tuple[bool, List[str]]:
+    def _check_supply_validation(self, blockchain: Any) -> tuple[bool, list[str]]:
         """
         Check total supply doesn't exceed maximum cap.
 
@@ -389,7 +385,7 @@ class CorruptionDetector:
         Returns:
             Tuple of (is_valid, list of errors)
         """
-        errors: List[str] = []
+        errors: list[str] = []
 
         try:
             total_supply = Decimal(0)
@@ -416,7 +412,7 @@ class CorruptionDetector:
 
         return len(errors) == 0, errors
 
-    def _check_transaction_validity(self, blockchain: Any) -> Tuple[bool, List[str]]:
+    def _check_transaction_validity(self, blockchain: Any) -> tuple[bool, list[str]]:
         """
         Check transaction validity across all blocks.
 
@@ -426,7 +422,7 @@ class CorruptionDetector:
         Returns:
             Tuple of (is_valid, list of errors)
         """
-        errors: List[str] = []
+        errors: list[str] = []
 
         for i, block in enumerate(blockchain.chain):
             for j, tx in enumerate(block.transactions):
@@ -442,15 +438,31 @@ class CorruptionDetector:
                     try:
                         tx.verify_signature()
                     except Exception as e:
-                        # Catch any signature verification error
-                        from xai.core.transaction import SignatureVerificationError
-                        if isinstance(e, SignatureVerificationError):
+                        # Catch signature verification errors
+                        from xai.core.transaction import (
+                            SignatureVerificationError,
+                            MissingSignatureError,
+                            InvalidSignatureError,
+                            SignatureCryptoError
+                        )
+                        if isinstance(e, (SignatureVerificationError, MissingSignatureError, InvalidSignatureError, SignatureCryptoError)):
                             errors.append(f"Block {i}, tx {j}: Signature verification failed: {e}")
                         else:
+                            import logging
+                            logger = logging.getLogger(__name__)
+                            logger.error(
+                                "Unexpected signature verification error in error detection",
+                                extra={
+                                    "error_type": type(e).__name__,
+                                    "error": str(e),
+                                    "block": i,
+                                    "tx": j
+                                },
+                                exc_info=True
+                            )
                             errors.append(f"Block {i}, tx {j}: Unexpected signature verification error: {type(e).__name__}: {e}")
 
         return len(errors) == 0, errors
-
 
 class HealthMonitor:
     """
@@ -466,7 +478,7 @@ class HealthMonitor:
 
     def __init__(self) -> None:
         """Initialize health monitor with default metrics."""
-        self.metrics: Dict[str, Any] = {
+        self.metrics: dict[str, Any] = {
             "last_block_time": time.time(),
             "blocks_mined": 0,
             "transactions_processed": 0,
@@ -480,7 +492,7 @@ class HealthMonitor:
         self.logger: logging.Logger = logging.getLogger("health_monitor")
         self.logger.setLevel(logging.INFO)
 
-    def update_metrics(self, blockchain: Any, node: Optional[Any] = None) -> None:
+    def update_metrics(self, blockchain: Any, node: Any | None = None) -> None:
         """
         Update health metrics from blockchain and node state.
 
@@ -533,7 +545,7 @@ class HealthMonitor:
 
         return max(0, score)
 
-    def get_health_status(self) -> Dict[str, Any]:
+    def get_health_status(self) -> dict[str, Any]:
         """
         Get current health status with score and classification.
 

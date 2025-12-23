@@ -1,16 +1,17 @@
+from __future__ import annotations
+
 """
 Trading Client for XAI SDK
 
 Handles peer-to-peer trading and order management.
 """
 
-from typing import Optional, Dict, Any, List
 from datetime import datetime
+from typing import Any
 
+from ..exceptions import ValidationError, XAIError
 from ..http_client import HTTPClient
 from ..models import TradeOrder
-from ..exceptions import XAIError, ValidationError
-
 
 class TradingClient:
     """Client for trading operations."""
@@ -28,7 +29,7 @@ class TradingClient:
         self,
         wallet_address: str,
         peer_id: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Register a trading session.
 
@@ -51,10 +52,15 @@ class TradingClient:
                 "peer_id": peer_id,
             }
             return self.http_client.post("/wallet-trades/register", data=payload)
-        except Exception as e:
-            raise XAIError(f"Failed to register trading session: {str(e)}")
+        except XAIError:
 
-    def list_orders(self) -> List[TradeOrder]:
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise XAIError(f"Failed to register trading session: {str(e)}") from e
+
+    def list_orders(self) -> list[TradeOrder]:
         """
         List active trade orders.
 
@@ -84,8 +90,13 @@ class TradingClient:
             ]
 
             return orders
-        except Exception as e:
-            raise XAIError(f"Failed to list trade orders: {str(e)}")
+        except XAIError:
+
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise XAIError(f"Failed to list trade orders: {str(e)}") from e
 
     def create_order(
         self,
@@ -93,7 +104,7 @@ class TradingClient:
         to_address: str,
         from_amount: str,
         to_amount: str,
-        timeout: Optional[int] = None,
+        timeout: int | None = None,
     ) -> TradeOrder:
         """
         Create a trade order.
@@ -138,10 +149,15 @@ class TradingClient:
                 created_at=datetime.fromisoformat(response["created_at"]),
                 status=response.get("status", "pending"),
             )
-        except Exception as e:
-            raise XAIError(f"Failed to create trade order: {str(e)}")
+        except XAIError:
 
-    def cancel_order(self, order_id: str) -> Dict[str, Any]:
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise XAIError(f"Failed to create trade order: {str(e)}") from e
+
+    def cancel_order(self, order_id: str) -> dict[str, Any]:
         """
         Cancel a trade order.
 
@@ -161,10 +177,15 @@ class TradingClient:
             return self.http_client.post(
                 f"/wallet-trades/orders/{order_id}/cancel", data={}
             )
-        except Exception as e:
-            raise XAIError(f"Failed to cancel order: {str(e)}")
+        except XAIError:
 
-    def get_order_status(self, order_id: str) -> Dict[str, Any]:
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise XAIError(f"Failed to cancel order: {str(e)}") from e
+
+    def get_order_status(self, order_id: str) -> dict[str, Any]:
         """
         Get trade order status.
 
@@ -182,5 +203,10 @@ class TradingClient:
 
         try:
             return self.http_client.get(f"/wallet-trades/orders/{order_id}/status")
-        except Exception as e:
-            raise XAIError(f"Failed to get order status: {str(e)}")
+        except XAIError:
+
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise XAIError(f"Failed to get order status: {str(e)}") from e

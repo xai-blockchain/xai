@@ -1,27 +1,27 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Prometheus Metrics
 Comprehensive metrics collection for blockchain monitoring
 """
 
+import logging
+import os
+import time
+
+import psutil
 from prometheus_client import (
+    CollectorRegistry,
     Counter,
     Gauge,
     Histogram,
-    Summary,
     Info,
-    CollectorRegistry,
+    Summary,
     start_http_server,
 )
-import time
-import psutil
-import os
-from typing import Optional
 from pythonjsonlogger import jsonlogger
 
-import logging
 logger = logging.getLogger(__name__)
-
-
 
 class BlockchainMetrics:
     """
@@ -29,7 +29,7 @@ class BlockchainMetrics:
     Exports metrics in Prometheus format
     """
 
-    def __init__(self, port: int = 8000, registry: Optional[CollectorRegistry] = None):
+    def __init__(self, port: int = 8000, registry: CollectorRegistry | None = None):
         """
         Initialize blockchain metrics
 
@@ -379,10 +379,8 @@ class BlockchainMetrics:
         self.ai_tasks_total.labels(provider=provider, status=status).inc()
         self.ai_task_duration.labels(provider=provider).observe(duration)
 
-
 # Global metrics instance
-_metrics_instance: Optional[BlockchainMetrics] = None
-
+_metrics_instance: BlockchainMetrics | None = None
 
 def get_metrics() -> BlockchainMetrics:
     """Get or create global metrics instance"""
@@ -390,7 +388,6 @@ def get_metrics() -> BlockchainMetrics:
     if _metrics_instance is None:
         _metrics_instance = BlockchainMetrics()
     return _metrics_instance
-
 
 def initialize_metrics(
     port: int = 8000, version: str = "1.0.0", network: str = "mainnet", node_id: str = ""
@@ -409,7 +406,6 @@ def initialize_metrics(
     metrics.set_node_info(version, network, node_id)
     metrics.start_server()
     return metrics
-
 
 # Convenience decorator for timing functions
 def time_function(metric_name: str):
@@ -442,7 +438,6 @@ def time_function(metric_name: str):
         return wrapper
 
     return decorator
-
 
 if __name__ == "__main__":
     # Example usage

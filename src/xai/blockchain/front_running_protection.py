@@ -1,21 +1,22 @@
+from __future__ import annotations
+
 import hashlib
 import json
 import logging
 import secrets
-from typing import Dict, Any
+from typing import Any
 
 logger = logging.getLogger("xai.blockchain.front_running_protection")
 
-
 class FrontRunningProtectionManager:
     def __init__(self):
-        self.committed_transactions: Dict[str, Dict[str, Any]] = (
+        self.committed_transactions: dict[str, dict[str, Any]] = (
             {}
         )  # {commit_hash: {"sender": str, "revealed_tx": dict, "salt": str, "status": str}}
-        self.revealed_transactions: Dict[str, Dict[str, Any]] = {}  # {tx_hash: tx_details}
-        self.mempool_transactions: Dict[str, Dict[str, Any]] = {}  # Simulated mempool for ordering
+        self.revealed_transactions: dict[str, dict[str, Any]] = {}  # {tx_hash: tx_details}
+        self.mempool_transactions: dict[str, dict[str, Any]] = {}  # Simulated mempool for ordering
 
-    def _hash_transaction_with_salt(self, transaction: Dict[str, Any], salt: str) -> str:
+    def _hash_transaction_with_salt(self, transaction: dict[str, Any], salt: str) -> str:
         """Generates a consistent hash for a transaction including a salt."""
         data_to_hash = {"transaction": transaction, "salt": salt}
         return hashlib.sha256(json.dumps(data_to_hash, sort_keys=True).encode()).hexdigest()
@@ -37,7 +38,7 @@ class FrontRunningProtectionManager:
         logger.info("Transaction committed by %s (hash %s...)", sender_address, commit_hash[:10])
         return True
 
-    def reveal_transaction(self, sender_address: str, transaction: Dict[str, Any], salt: str):
+    def reveal_transaction(self, sender_address: str, transaction: dict[str, Any], salt: str):
         """
         Simulates the reveal phase of a commit-reveal scheme.
         Users reveal their full transaction and the salt, which is then checked against the committed hash.

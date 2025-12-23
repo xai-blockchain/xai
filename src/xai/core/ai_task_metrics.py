@@ -5,8 +5,7 @@ Comprehensive Prometheus metrics for AI task lifecycle, provider management,
 and execution tracking following PAW's proven patterns.
 """
 
-from prometheus_client import Counter, Gauge, Histogram, Summary
-from prometheus_client import CollectorRegistry, REGISTRY
+from prometheus_client import REGISTRY, CollectorRegistry, Counter, Gauge, Histogram, Summary
 
 
 class AITaskMetrics:

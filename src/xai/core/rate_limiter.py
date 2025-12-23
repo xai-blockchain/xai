@@ -1,15 +1,15 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Anonymous Rate Limiting
 
 Rate limiting using cryptographic hashing for privacy.
 """
 
-import time
 import hashlib
+import time
 from collections import defaultdict
 from datetime import datetime, timezone
-from typing import Optional, Tuple
-
 
 class AnonymousRateLimiter:
     """
@@ -84,7 +84,7 @@ class AnonymousRateLimiter:
 
     def check_rate_limit(
         self, request_identifier: str, endpoint: str
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """
         Check if request is within rate limits
 
@@ -93,7 +93,7 @@ class AnonymousRateLimiter:
             endpoint: API endpoint being accessed
 
         Returns:
-            Tuple[bool, Optional[str]]: (allowed, error_message)
+            tuple[bool, str | None]: (allowed, error_message)
                 - allowed: True if request is allowed
                 - error_message: Error message if denied, None if allowed
         """
@@ -197,10 +197,8 @@ class AnonymousRateLimiter:
             "note": "All tracking is anonymous via hashed tokens",
         }
 
-
 # Global rate limiter instance
 _global_rate_limiter = None
-
 
 def get_rate_limiter() -> AnonymousRateLimiter:
     """
@@ -214,8 +212,7 @@ def get_rate_limiter() -> AnonymousRateLimiter:
         _global_rate_limiter = AnonymousRateLimiter()
     return _global_rate_limiter
 
-
-def check_rate_limit(request_identifier: str, endpoint: str) -> Tuple[bool, Optional[str]]:
+def check_rate_limit(request_identifier: str, endpoint: str) -> tuple[bool, str | None]:
     """
     Convenience function to check rate limit
 
@@ -224,7 +221,7 @@ def check_rate_limit(request_identifier: str, endpoint: str) -> Tuple[bool, Opti
         endpoint: Endpoint being accessed
 
     Returns:
-        Tuple[bool, Optional[str]]: (allowed, error_message)
+        tuple[bool, str | None]: (allowed, error_message)
     """
     limiter = get_rate_limiter()
     return limiter.check_rate_limit(request_identifier, endpoint)

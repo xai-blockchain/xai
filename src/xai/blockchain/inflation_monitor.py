@@ -1,12 +1,12 @@
+from __future__ import annotations
+
 import logging
 import time
 from collections import deque
-from typing import Deque, Tuple
 
 from .token_supply_manager import TokenSupplyManager
 
 logger = logging.getLogger("xai.blockchain.inflation_monitor")
-
 
 class InflationMonitor:
     def __init__(
@@ -27,7 +27,7 @@ class InflationMonitor:
         self.token_supply_manager = token_supply_manager
         self.alert_threshold_percentage = alert_threshold_percentage
         self.history_window_seconds = history_window_days * 24 * 3600
-        self.supply_history: Deque[Tuple[int, float]] = deque()
+        self.supply_history: deque[tuple[int, float]] = deque()
         self._record_current_supply()
         logger.info(
             "InflationMonitor initialized (threshold %.2f%%, window %d days)",

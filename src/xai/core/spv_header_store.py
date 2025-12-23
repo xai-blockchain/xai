@@ -6,10 +6,8 @@ Tracks headers, cumulative work, and best tip selection to support SPV verificat
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import json
-from typing import Dict, Optional
-
+from dataclasses import dataclass, field
 
 @dataclass
 class Header:
@@ -42,14 +40,13 @@ class Header:
             return False
         return h < target
 
-
 class SPVHeaderStore:
     """Minimal header store to track best chain by cumulative work."""
 
     def __init__(self):
-        self.headers: Dict[str, Header] = {}
-        self.best_tip: Optional[Header] = None
-        self.heights: Dict[int, str] = {}
+        self.headers: dict[str, Header] = {}
+        self.best_tip: Header | None = None
+        self.heights: dict[int, str] = {}
 
     def add_header(self, header: Header) -> bool:
         """Add a header if it links to an existing chain (or is genesis)."""
@@ -70,10 +67,10 @@ class SPVHeaderStore:
             self.best_tip = header
         return True
 
-    def get_best_tip(self) -> Optional[Header]:
+    def get_best_tip(self) -> Header | None:
         return self.best_tip
 
-    def get_header(self, block_hash: str) -> Optional[Header]:
+    def get_header(self, block_hash: str) -> Header | None:
         return self.headers.get(block_hash)
 
     def has_height(self, height: int) -> bool:

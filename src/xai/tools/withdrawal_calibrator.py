@@ -1,29 +1,26 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Dict, Iterable, List, Tuple
 import json
 import math
 from collections import Counter, defaultdict
-
+from dataclasses import dataclass
+from pathlib import Path
 
 @dataclass
 class WithdrawalAnalysis:
     total_events: int
     total_volume: float
     unique_users: int
-    top_users: List[Tuple[str, int, float]]
-    sliding_rates: List[int]
+    top_users: list[tuple[str, int, float]]
+    sliding_rates: list[int]
     p95_rate: float
     max_rate: int
 
-
-def load_events(path: Path) -> List[Dict[str, float]]:
+def load_events(path: Path) -> list[dict[str, float]]:
     """Load withdrawal events from a JSONL file."""
     if not path.exists():
         return []
-    events: List[Dict[str, float]] = []
+    events: list[dict[str, float]] = []
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
             line = line.strip()
@@ -34,7 +31,6 @@ def load_events(path: Path) -> List[Dict[str, float]]:
             except json.JSONDecodeError:
                 continue
     return events
-
 
 def load_time_lock_snapshot(path: Path) -> int:
     """Return the number of pending time-locked withdrawals."""
@@ -47,12 +43,11 @@ def load_time_lock_snapshot(path: Path) -> int:
         return 0
     return sum(1 for entry in entries if entry.get("status", "pending") == "pending")
 
-
-def _sliding_window_rates(timestamps: List[float], window_seconds: int = 60) -> List[int]:
+def _sliding_window_rates(timestamps: list[float], window_seconds: int = 60) -> list[int]:
     if not timestamps:
         return []
     timestamps = sorted(timestamps)
-    rates: List[int] = []
+    rates: list[int] = []
     start = 0
     for end, ts in enumerate(timestamps):
         while timestamps[start] < ts - window_seconds:
@@ -60,8 +55,7 @@ def _sliding_window_rates(timestamps: List[float], window_seconds: int = 60) -> 
         rates.append(end - start + 1)
     return rates
 
-
-def _percentile(sorted_values: List[float], percentile: float) -> float:
+def _percentile(sorted_values: list[float], percentile: float) -> float:
     if not sorted_values:
         return 0.0
     if len(sorted_values) == 1:
@@ -74,8 +68,7 @@ def _percentile(sorted_values: List[float], percentile: float) -> float:
         return float(sorted_values[int(k)])
     return float(sorted_values[f] * (c - k) + sorted_values[c] * (k - f))
 
-
-def analyze_events(events: Iterable[Dict[str, float]], window_seconds: int = 60) -> WithdrawalAnalysis:
+def analyze_events(events: Iterable[dict[str, float]], window_seconds: int = 60) -> WithdrawalAnalysis:
     events_list = list(events)
     if not events_list:
         return WithdrawalAnalysis(0, 0.0, 0, [], [], 0.0, 0)
@@ -110,7 +103,6 @@ def analyze_events(events: Iterable[Dict[str, float]], window_seconds: int = 60)
         max_rate=max_rate,
     )
 
-
 def recommend_rate_threshold(
     analysis: WithdrawalAnalysis,
     percentile: float = 0.95,
@@ -124,7 +116,6 @@ def recommend_rate_threshold(
     pct_value = _percentile(sorted_rates, percentile)
     baseline = max(pct_value, analysis.max_rate, floor)
     return max(floor, int(math.ceil(baseline * (1 + headroom))))
-
 
 def recommend_backlog_threshold(
     current_backlog: int,

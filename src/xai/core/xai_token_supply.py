@@ -1,13 +1,15 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - XAI Token Supply Management
 
 Manages the total supply, circulating supply, and burning mechanisms of the XAI token.
 """
 
-from typing import Dict, Any, Optional
+from typing import Any
+
 from xai.core.structured_logger import StructuredLogger, get_structured_logger
 from xai.core.xai_token_manager import XAITokenManager, get_xai_token_manager
-
 
 class XAITokenSupply:
     """
@@ -16,8 +18,8 @@ class XAITokenSupply:
 
     def __init__(
         self,
-        token_manager: Optional[XAITokenManager] = None,
-        logger: Optional[StructuredLogger] = None,
+        token_manager: XAITokenManager | None = None,
+        logger: StructuredLogger | None = None,
     ):
         self.token_manager = token_manager or get_xai_token_manager()
         self.logger = logger or get_structured_logger()
@@ -88,7 +90,7 @@ class XAITokenSupply:
         """
         return self.burned_tokens
 
-    def get_supply_metrics(self) -> Dict[str, Any]:
+    def get_supply_metrics(self) -> dict[str, Any]:
         """
         Returns a comprehensive set of supply-related metrics.
         """
@@ -104,13 +106,11 @@ class XAITokenSupply:
             ],  # This is the non-circulating part due to vesting
         }
 
-
 # Global instance for convenience
 _global_xai_token_supply = None
 
-
 def get_xai_token_supply(
-    token_manager: Optional[XAITokenManager] = None, logger: Optional[StructuredLogger] = None
+    token_manager: XAITokenManager | None = None, logger: StructuredLogger | None = None
 ) -> XAITokenSupply:
     """
     Get global XAITokenSupply instance.

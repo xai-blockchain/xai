@@ -1,14 +1,15 @@
+from __future__ import annotations
+
 import logging
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable
 
-from .slashing import (
+from .slashing import (  # Re-using ValidatorStake for RelayerStake
     SlashingManager,
     ValidatorStake,
-)  # Re-using ValidatorStake for RelayerStake
+)
 
 logger = logging.getLogger("xai.blockchain.relayer_staking")
-
 
 class Relayer:
     def __init__(self, address: str, bonded_amount: int, status: str = "active"):
@@ -24,7 +25,7 @@ class Relayer:
         self.status = status
         self.unbonding_start_timestamp: int = 0  # Timestamp when unbonding started
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "address": self.address,
             "bonded_amount": self.bonded_amount,
@@ -38,7 +39,6 @@ class Relayer:
             f"status='{self.status}')"
         )
 
-
 class RelayerStakingManager:
     DEFAULT_MIN_BOND = 10000
     DEFAULT_UNBONDING_PERIOD_SECONDS = 7 * 24 * 3600  # 7 days
@@ -48,14 +48,14 @@ class RelayerStakingManager:
         slashing_manager: SlashingManager,
         min_bond: int = DEFAULT_MIN_BOND,
         unbonding_period_seconds: int = DEFAULT_UNBONDING_PERIOD_SECONDS,
-        time_provider: Optional[Callable[[], int]] = None,
+        time_provider: Callable[[], int] | None = None,
     ):
         if not isinstance(min_bond, int) or min_bond <= 0:
             raise ValueError("Minimum bond must be a positive integer.")
         if not isinstance(unbonding_period_seconds, int) or unbonding_period_seconds <= 0:
             raise ValueError("Unbonding period must be a positive integer.")
 
-        self.relay_pool: Dict[str, Relayer] = {}
+        self.relay_pool: dict[str, Relayer] = {}
         self.slashing_manager = slashing_manager
         self.min_bond = min_bond
         self.unbonding_period_seconds = unbonding_period_seconds
@@ -104,7 +104,7 @@ class RelayerStakingManager:
             self.unbonding_period_seconds,
         )
 
-    def finalize_unbonding(self, relayer_address: str, current_timestamp: Optional[int] = None):
+    def finalize_unbonding(self, relayer_address: str, current_timestamp: int | None = None):
         relayer = self.relay_pool.get(relayer_address)
         if not relayer:
             raise ValueError(f"Relayer {relayer_address} not found in pool.")

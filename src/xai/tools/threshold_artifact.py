@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
 import json
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, List, Mapping, Optional
+from typing import Any
 
-
-def _coerce_int(value: Any) -> Optional[int]:
+def _coerce_int(value: Any) -> int | None:
     if value is None or value == "":
         return None
     try:
@@ -15,20 +14,17 @@ def _coerce_int(value: Any) -> Optional[int]:
     except (TypeError, ValueError):
         return None
 
-
 def _coerce_float(value: Any) -> float:
     try:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
 
-
 @dataclass
 class ThresholdTopUser:
     user: str
     count: int
     total_volume: float
-
 
 @dataclass
 class ThresholdAnalysis:
@@ -38,8 +34,7 @@ class ThresholdAnalysis:
     max_rate_per_minute: int
     p95_rate_per_minute: float
     current_backlog: int
-    top_users: List[ThresholdTopUser]
-
+    top_users: list[ThresholdTopUser]
 
 @dataclass
 class ThresholdInputs:
@@ -50,18 +45,15 @@ class ThresholdInputs:
     events_log: str
     locks_file: str
 
-
 @dataclass
 class ThresholdRecommendations:
-    rate_per_minute: Optional[int]
-    time_lock_backlog: Optional[int]
-
+    rate_per_minute: int | None
+    time_lock_backlog: int | None
 
 @dataclass
 class ThresholdCurrent:
-    rate_per_minute: Optional[int]
-    time_lock_backlog: Optional[int]
-
+    rate_per_minute: int | None
+    time_lock_backlog: int | None
 
 @dataclass
 class ThresholdDetails:
@@ -140,7 +132,7 @@ class ThresholdDetails:
             "alert_required": self.alert_required,
         }
 
-    def to_markdown(self, *, environment: str, commit: Optional[str] = None) -> str:
+    def to_markdown(self, *, environment: str, commit: str | None = None) -> str:
         lines = [
             f"**Environment**: {environment}",
             f"**Generated**: {self.generated_at}",
@@ -174,7 +166,7 @@ class ThresholdDetails:
                 )
         return "\n".join(lines)
 
-    def to_history_entry(self, *, environment: str, commit: Optional[str] = None) -> "ThresholdHistoryEntry":
+    def to_history_entry(self, *, environment: str, commit: str | None = None) -> "ThresholdHistoryEntry":
         return ThresholdHistoryEntry(
             generated_at=self.generated_at,
             environment=environment,
@@ -192,16 +184,15 @@ class ThresholdDetails:
             current_backlog=self.analysis.current_backlog,
         )
 
-
 @dataclass
 class ThresholdHistoryEntry:
     generated_at: str
     environment: str
-    commit: Optional[str]
-    recommended_rate: Optional[int]
-    recommended_backlog: Optional[int]
-    current_rate_threshold: Optional[int]
-    current_backlog_threshold: Optional[int]
+    commit: str | None
+    recommended_rate: int | None
+    recommended_backlog: int | None
+    current_rate_threshold: int | None
+    current_backlog_threshold: int | None
     alert_required: bool
     events_analyzed: int
     unique_users: int
@@ -213,18 +204,16 @@ class ThresholdHistoryEntry:
     def to_json(self) -> str:
         return json.dumps(asdict(self), sort_keys=True)
 
-
 def append_history_entry(history_path: Path, entry: ThresholdHistoryEntry) -> None:
     history_path.parent.mkdir(parents=True, exist_ok=True)
     with history_path.open("a", encoding="utf-8") as handle:
         handle.write(entry.to_json())
         handle.write("\n")
 
-
-def load_history(history_path: Path) -> List[ThresholdHistoryEntry]:
+def load_history(history_path: Path) -> list[ThresholdHistoryEntry]:
     if not history_path.exists():
         return []
-    entries: List[ThresholdHistoryEntry] = []
+    entries: list[ThresholdHistoryEntry] = []
     with history_path.open("r", encoding="utf-8") as handle:
         for line in handle:
             line = line.strip()
@@ -253,7 +242,6 @@ def load_history(history_path: Path) -> List[ThresholdHistoryEntry]:
                 )
             )
     return entries
-
 
 def prune_history(history_path: Path, max_entries: int) -> None:
     if max_entries <= 0 or not history_path.exists():

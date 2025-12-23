@@ -1,18 +1,18 @@
+from __future__ import annotations
+
 """
 Production-Grade Two-Factor Authentication (2FA) Implementation
 Implements TOTP (Time-based One-Time Password) following RFC 6238.
 """
 
-import secrets
-import time
+import base64
 import hashlib
 import hmac
-import base64
-from typing import Optional, Tuple
+import secrets
+import time
 from dataclasses import dataclass
 
 import pyotp
-
 
 @dataclass
 class TwoFactorSetup:
@@ -21,7 +21,6 @@ class TwoFactorSetup:
     provisioning_uri: str
     backup_codes: list[str]
     qr_code_url: str
-
 
 class TwoFactorAuthManager:
     """
@@ -48,7 +47,7 @@ class TwoFactorAuthManager:
         self.backup_code_length = 8
         self.num_backup_codes = 10
 
-    def setup_2fa(self, user_id: str, user_email: Optional[str] = None) -> TwoFactorSetup:
+    def setup_2fa(self, user_id: str, user_email: str | None = None) -> TwoFactorSetup:
         """
         Set up 2FA for a user.
 
@@ -122,7 +121,7 @@ class TwoFactorAuthManager:
         self,
         provided_code: str,
         stored_backup_codes: list[str]
-    ) -> Tuple[bool, Optional[list[str]]]:
+    ) -> tuple[bool, list[str] | None]:
         """
         Verify a backup code and remove it from the list.
 
@@ -206,7 +205,6 @@ class TwoFactorAuthManager:
             codes.append(formatted)
 
         return codes
-
 
 if __name__ == "__main__":
     raise SystemExit("TwoFactorAuth demo removed; use unit tests instead.")

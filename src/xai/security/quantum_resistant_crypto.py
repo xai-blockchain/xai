@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Production-Grade NIST Post-Quantum Cryptography (PQC) Implementation
 
@@ -10,54 +12,49 @@ This module implements NIST-standardized post-quantum cryptographic algorithms:
 All algorithms are quantum-resistant and approved by NIST for post-quantum cryptography.
 """
 
-import hashlib
-import secrets
-import json
 import base64
+import hashlib
+import json
 import logging
-from typing import Tuple, Optional, Dict, Any, List
-from dataclasses import dataclass, asdict
+import secrets
+from dataclasses import asdict, dataclass
 from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
-
 
 # Post-quantum cryptography exceptions
 class PQCError(Exception):
     """Base exception for post-quantum cryptography operations"""
     pass
 
-
 class PQCSignatureError(PQCError):
     """Raised when signature operations fail"""
     pass
-
 
 class PQCVerificationError(PQCError):
     """Raised when verification fails"""
     pass
 
-
 class PQCKeyError(PQCError):
     """Raised when key operations fail"""
     pass
 
+import pqcrypto.kem.ml_kem_768 as ml_kem_768
+import pqcrypto.kem.ml_kem_1024 as ml_kem_1024
+import pqcrypto.sign.falcon_512 as falcon_512
+import pqcrypto.sign.falcon_1024 as falcon_1024
 
 # NIST PQC algorithms via pqcrypto library
 import pqcrypto.sign.ml_dsa_65 as ml_dsa_65
 import pqcrypto.sign.ml_dsa_87 as ml_dsa_87
-import pqcrypto.sign.falcon_512 as falcon_512
-import pqcrypto.sign.falcon_1024 as falcon_1024
 import pqcrypto.sign.sphincs_sha2_128f_simple as sphincs_128f
 import pqcrypto.sign.sphincs_sha2_256f_simple as sphincs_256f
-import pqcrypto.kem.ml_kem_768 as ml_kem_768
-import pqcrypto.kem.ml_kem_1024 as ml_kem_1024
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes, serialization
 
 # For hybrid classical-quantum approach
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.backends import default_backend
-
 
 class PQCAlgorithm(Enum):
     """Supported NIST Post-Quantum Cryptographic algorithms"""
@@ -80,7 +77,6 @@ class PQCAlgorithm(Enum):
     # Hybrid mode
     HYBRID_ML_DSA = "Hybrid-ML-DSA"  # ECDSA + ML-DSA
 
-
 @dataclass
 class PQCKeyPair:
     """Post-Quantum Cryptographic key pair"""
@@ -88,9 +84,9 @@ class PQCKeyPair:
     private_key: bytes
     public_key: bytes
     key_id: str
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization"""
         return {
             "algorithm": self.algorithm,
@@ -101,7 +97,7 @@ class PQCKeyPair:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'PQCKeyPair':
+    def from_dict(cls, data: dict[str, Any]) -> 'PQCKeyPair':
         """Create from dictionary"""
         return cls(
             algorithm=data["algorithm"],
@@ -110,7 +106,6 @@ class PQCKeyPair:
             key_id=data["key_id"],
             metadata=data.get("metadata", {})
         )
-
 
 @dataclass
 class HybridKeyPair:
@@ -122,7 +117,7 @@ class HybridKeyPair:
     algorithm: str
     key_id: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization"""
         return {
             "algorithm": self.algorithm,
@@ -132,7 +127,6 @@ class HybridKeyPair:
             "quantum_public": base64.b64encode(self.quantum_public).decode('utf-8'),
             "key_id": self.key_id
         }
-
 
 class QuantumResistantCryptoManager:
     """
@@ -185,7 +179,7 @@ class QuantumResistantCryptoManager:
 
     def generate_keypair(
         self,
-        algorithm: Optional[PQCAlgorithm] = None
+        algorithm: PQCAlgorithm | None = None
     ) -> PQCKeyPair:
         """
         Generate a post-quantum cryptographic key pair.
@@ -233,7 +227,7 @@ class QuantumResistantCryptoManager:
         self,
         private_key: bytes,
         message: bytes,
-        algorithm: Optional[PQCAlgorithm] = None
+        algorithm: PQCAlgorithm | None = None
     ) -> bytes:
         """
         Sign a message using post-quantum cryptography.
@@ -264,7 +258,7 @@ class QuantumResistantCryptoManager:
         public_key: bytes,
         message: bytes,
         signature: bytes,
-        algorithm: Optional[PQCAlgorithm] = None
+        algorithm: PQCAlgorithm | None = None
     ) -> bool:
         """
         Verify a post-quantum signature.
@@ -360,7 +354,7 @@ class QuantumResistantCryptoManager:
         self,
         public_key: bytes,
         algorithm: PQCAlgorithm = PQCAlgorithm.ML_KEM_768
-    ) -> Tuple[bytes, bytes]:
+    ) -> tuple[bytes, bytes]:
         """
         Encapsulate a shared secret using KEM.
 
@@ -456,7 +450,7 @@ class QuantumResistantCryptoManager:
         self,
         hybrid_keypair: HybridKeyPair,
         message: bytes
-    ) -> Dict[str, bytes]:
+    ) -> dict[str, bytes]:
         """
         Sign using both classical and post-quantum schemes.
 
@@ -491,8 +485,8 @@ class QuantumResistantCryptoManager:
         self,
         hybrid_keypair: HybridKeyPair,
         message: bytes,
-        signatures: Dict[str, bytes]
-    ) -> Dict[str, bool]:
+        signatures: dict[str, bytes]
+    ) -> dict[str, bool]:
         """
         Verify hybrid signatures.
 
@@ -562,7 +556,7 @@ class QuantumResistantCryptoManager:
         }
         return json.dumps(data)
 
-    def deserialize_public_key(self, serialized: str) -> Tuple[bytes, str]:
+    def deserialize_public_key(self, serialized: str) -> tuple[bytes, str]:
         """
         Deserialize public key from base64 string.
 
@@ -577,7 +571,7 @@ class QuantumResistantCryptoManager:
         algorithm = data["algorithm"]
         return public_key, algorithm
 
-    def get_algorithm_info(self, algorithm: PQCAlgorithm) -> Dict[str, Any]:
+    def get_algorithm_info(self, algorithm: PQCAlgorithm) -> dict[str, Any]:
         """
         Get information about a PQC algorithm.
 
@@ -625,7 +619,7 @@ class QuantumResistantCryptoManager:
             return "NIST Selected"
         return "Unknown"
 
-    def list_available_algorithms(self) -> Dict[str, List[str]]:
+    def list_available_algorithms(self) -> dict[str, list[str]]:
         """
         List all available PQC algorithms.
 
@@ -638,7 +632,6 @@ class QuantumResistantCryptoManager:
             "recommended_signature": "ML-DSA-65",
             "recommended_kem": "ML-KEM-768"
         }
-
 
 # Example usage and comprehensive testing
 if __name__ == "__main__":

@@ -2,19 +2,18 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import TYPE_CHECKING, Dict, Tuple, Any, List
+from typing import TYPE_CHECKING, Any
 
 from flask import jsonify, request
 
 from xai.core import node_utils
-from xai.core.node_utils import ALGO_FEATURES_ENABLED
 from xai.core.input_validation_schemas import FraudCheckInput
+from xai.core.node_utils import ALGO_FEATURES_ENABLED
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
-
 
 def register_algo_routes(routes: "NodeAPIRoutes") -> None:
     """Register algorithmic feature endpoints."""
@@ -23,7 +22,7 @@ def register_algo_routes(routes: "NodeAPIRoutes") -> None:
     node = routes.node
 
     @app.route("/algo/fee-estimate", methods=["GET"])
-    def estimate_fee() -> Tuple[Dict[str, Any], int]:
+    def estimate_fee() -> tuple[dict[str, Any], int]:
         """Estimate optimal transaction fee based on mempool state.
 
         Uses statistical analysis of pending transactions to predict the optimal
@@ -50,7 +49,7 @@ def register_algo_routes(routes: "NodeAPIRoutes") -> None:
         pending_transactions = list(getattr(blockchain, "pending_transactions", []) or [])
         pending_count = len(pending_transactions)
 
-        fee_rates: List[float] = []
+        fee_rates: list[float] = []
         mempool_bytes = 0
         size_samples = 0
 
@@ -95,7 +94,7 @@ def register_algo_routes(routes: "NodeAPIRoutes") -> None:
         return jsonify(recommendation), 200
 
     @app.route("/algo/fraud-check", methods=["POST"])
-    def check_fraud() -> Tuple[Dict[str, Any], int]:
+    def check_fraud() -> tuple[dict[str, Any], int]:
         """Analyze transaction for potential fraud patterns.
 
         Uses machine learning and pattern detection to assess fraud risk for
@@ -147,7 +146,7 @@ def register_algo_routes(routes: "NodeAPIRoutes") -> None:
         return jsonify(analysis), 200
 
     @app.route("/algo/status", methods=["GET"])
-    def algo_status() -> Dict[str, Any]:
+    def algo_status() -> dict[str, Any]:
         """Get status of algorithmic features.
 
         Returns information about which algorithmic features are enabled and active,
@@ -172,7 +171,7 @@ def register_algo_routes(routes: "NodeAPIRoutes") -> None:
         if not enabled:
             return jsonify({"enabled": False, "features": []})
 
-        features: List[Dict[str, Any]] = []
+        features: list[dict[str, Any]] = []
         if fee_optimizer:
             fee_history = getattr(fee_optimizer, "fee_history", [])
             features.append(

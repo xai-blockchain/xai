@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Multi-AI Collaboration System
 
@@ -22,14 +24,13 @@ Use Cases:
 - Code optimization (compare different implementations)
 """
 
-import time
+import difflib
 import json
-from typing import Dict, List, Optional, Tuple
+import time
 from dataclasses import dataclass, field
 from enum import Enum
-from xai.core.ai_pool_with_strict_limits import StrictAIPoolManager, AIProvider
-import difflib
 
+from xai.core.ai_pool_with_strict_limits import AIProvider, StrictAIPoolManager
 
 class CollaborationStrategy(Enum):
     """How multiple AIs should collaborate"""
@@ -39,7 +40,6 @@ class CollaborationStrategy(Enum):
     DEBATE = "debate"  # AIs discuss and vote on approaches
     MERGE = "merge"  # Each AI does part, merge results
     PEER_REVIEW = "peer_review"  # One implements, others review
-
 
 MODEL_PROVIDER_MAP = {
     "claude-opus-4": AIProvider.ANTHROPIC,
@@ -59,7 +59,6 @@ MODEL_PROVIDER_MAP = {
     "deepseek-coder": AIProvider.ANTHROPIC,
 }
 
-
 class AIRole(Enum):
     """Role of AI in collaboration"""
 
@@ -69,7 +68,6 @@ class AIRole(Enum):
     SECURITY_AUDITOR = "auditor"  # Security-focused review
     ARCHITECT = "architect"  # High-level design
     TESTER = "tester"  # Writes tests
-
 
 @dataclass
 class AIContribution:
@@ -85,8 +83,8 @@ class AIContribution:
     confidence: float  # 0-1, how confident AI is
 
     # Analysis
-    strengths: List[str] = field(default_factory=list)
-    weaknesses: List[str] = field(default_factory=list)
+    strengths: list[str] = field(default_factory=list)
+    weaknesses: list[str] = field(default_factory=list)
     security_score: float = 0.0
     code_quality_score: float = 0.0
     performance_score: float = 0.0
@@ -95,7 +93,6 @@ class AIContribution:
     tokens_used: int = 0
     execution_time: float = 0.0
     timestamp: float = field(default_factory=time.time)
-
 
 @dataclass
 class AIPeerReview:
@@ -110,17 +107,16 @@ class AIPeerReview:
     approved: bool
 
     # Detailed feedback
-    security_issues: List[Dict] = field(default_factory=list)
-    code_quality_issues: List[Dict] = field(default_factory=list)
-    optimization_suggestions: List[str] = field(default_factory=list)
-    bugs_found: List[Dict] = field(default_factory=list)
+    security_issues: list[Dict] = field(default_factory=list)
+    code_quality_issues: list[Dict] = field(default_factory=list)
+    optimization_suggestions: list[str] = field(default_factory=list)
+    bugs_found: list[Dict] = field(default_factory=list)
 
     # Summary
     summary: str = ""
     recommendation: str = ""  # "approve", "approve_with_changes", "reject"
 
     timestamp: float = field(default_factory=time.time)
-
 
 @dataclass
 class CollaborativeTask:
@@ -134,29 +130,28 @@ class CollaborativeTask:
     # Collaboration settings
     strategy: CollaborationStrategy
     num_ais: int  # 2 or 3
-    selected_ais: List[Tuple[str, str, AIRole]]  # [(provider, model, role), ...]
+    selected_ais: list[tuple[str, str, AIRole]]  # [(provider, model, role), ...]
 
     # Contributions
-    contributions: List[AIContribution] = field(default_factory=list)
-    reviews: List[AIPeerReview] = field(default_factory=list)
+    contributions: list[AIContribution] = field(default_factory=list)
+    reviews: list[AIPeerReview] = field(default_factory=list)
 
     # Consensus
-    winning_contribution_id: Optional[str] = None
-    merged_solution: Optional[str] = None
+    winning_contribution_id: str | None = None
+    merged_solution: str | None = None
     consensus_confidence: float = 0.0
 
     # Metadata
     started_at: float = field(default_factory=time.time)
-    completed_at: Optional[float] = None
+    completed_at: float | None = None
     total_tokens_used: int = 0
-
 
 class MultiAICollaboration:
     """
     System for managing multi-AI collaboration on blockchain tasks
     """
 
-    def __init__(self, ai_executor, ai_matcher, pool_manager: Optional[StrictAIPoolManager] = None):
+    def __init__(self, ai_executor, ai_matcher, pool_manager: StrictAIPoolManager | None = None):
         """
         Initialize multi-AI collaboration system
 
@@ -170,12 +165,12 @@ class MultiAICollaboration:
         self.pool_manager = pool_manager
 
         # Active collaborative tasks
-        self.tasks: Dict[str, CollaborativeTask] = {}
+        self.tasks: dict[str, CollaborativeTask] = {}
 
         # Collaboration templates
         self.strategies = self._define_strategies()
 
-    def _define_strategies(self) -> Dict[CollaborationStrategy, Dict]:
+    def _define_strategies(self) -> dict[CollaborationStrategy, Dict]:
         """Define collaboration strategies and their configurations"""
 
         return {
@@ -556,7 +551,7 @@ for security, quality, and correctness. Write clean, well-documented code.
 
     def _select_ais_for_collaboration(
         self, description: str, requirements: str, strategy: CollaborationStrategy, num_ais: int
-    ) -> List[Tuple[str, str, AIRole]]:
+    ) -> list[tuple[str, str, AIRole]]:
         """
         Intelligently select which AIs should collaborate
 
@@ -957,7 +952,6 @@ for security, quality, and correctness. Write clean, well-documented code.
             "decision": "Merge best aspects of each approach",
             "rationale": "Combine strengths while avoiding weaknesses",
         }
-
 
 # Example usage and demonstration
 if __name__ == "__main__":

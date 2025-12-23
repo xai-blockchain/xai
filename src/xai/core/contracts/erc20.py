@@ -19,11 +19,11 @@ Security features:
 from __future__ import annotations
 
 import hashlib
-import time
 import logging
+import time
 from dataclasses import dataclass, field
-from typing import Dict, Optional, List, TYPE_CHECKING
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from ..vm.exceptions import VMExecutionError
 
@@ -31,7 +31,6 @@ if TYPE_CHECKING:
     from ..blockchain import Blockchain
 
 logger = logging.getLogger(__name__)
-
 
 # ERC20 Function selectors (first 4 bytes of keccak256 hash of function signature)
 ERC20_SELECTORS = {
@@ -58,7 +57,6 @@ ERC20_SELECTORS = {
 TRANSFER_EVENT = hashlib.sha3_256(b"Transfer(address,address,uint256)").digest()
 APPROVAL_EVENT = hashlib.sha3_256(b"Approval(address,address,uint256)").digest()
 
-
 @dataclass
 class TokenEvent:
     """Represents an ERC20 event."""
@@ -70,7 +68,6 @@ class TokenEvent:
     timestamp: float = field(default_factory=time.time)
     block_number: int = 0
     transaction_hash: str = ""
-
 
 @dataclass
 class ERC20Token:
@@ -105,14 +102,14 @@ class ERC20Token:
     owner: str = ""
 
     # State
-    balances: Dict[str, int] = field(default_factory=dict)
-    allowances: Dict[str, Dict[str, int]] = field(default_factory=dict)
+    balances: dict[str, int] = field(default_factory=dict)
+    allowances: dict[str, dict[str, int]] = field(default_factory=dict)
 
     # EIP-2612 nonces
-    nonces: Dict[str, int] = field(default_factory=dict)
+    nonces: dict[str, int] = field(default_factory=dict)
 
     # Event log
-    events: List[TokenEvent] = field(default_factory=list)
+    events: list[TokenEvent] = field(default_factory=list)
 
     # Supply cap (0 = unlimited)
     max_supply: int = 0
@@ -652,7 +649,6 @@ class ERC20Token:
         token.nonces = dict(data.get("nonces", {}))
         return token
 
-
 class ERC20Factory:
     """
     Factory for creating ERC20 tokens.
@@ -661,7 +657,7 @@ class ERC20Factory:
     consistent initialization and registration in the blockchain.
     """
 
-    def __init__(self, blockchain: Optional["Blockchain"] = None) -> None:
+    def __init__(self, blockchain: "Blockchain" | None = None) -> None:
         """
         Initialize the factory.
 
@@ -669,7 +665,7 @@ class ERC20Factory:
             blockchain: Optional blockchain for registration
         """
         self.blockchain = blockchain
-        self.deployed_tokens: Dict[str, ERC20Token] = {}
+        self.deployed_tokens: dict[str, ERC20Token] = {}
 
     def create_token(
         self,
@@ -679,7 +675,7 @@ class ERC20Factory:
         decimals: int = 18,
         initial_supply: int = 0,
         max_supply: int = 0,
-        mint_to: Optional[str] = None,
+        mint_to: str | None = None,
     ) -> ERC20Token:
         """
         Create a new ERC20 token.
@@ -765,7 +761,7 @@ class ERC20Factory:
 
         return token
 
-    def get_token(self, address: str) -> Optional[ERC20Token]:
+    def get_token(self, address: str) -> ERC20Token | None:
         """
         Get a deployed token by address.
 
@@ -789,7 +785,7 @@ class ERC20Factory:
 
         return None
 
-    def list_tokens(self) -> List[Dict]:
+    def list_tokens(self) -> list[Dict]:
         """
         List all deployed tokens.
 

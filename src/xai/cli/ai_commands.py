@@ -6,27 +6,27 @@ Blockchain-integrated AI task submission and provider management
 
 from __future__ import annotations
 
-import sys
+import hashlib
 import json
 import logging
+import sys
 import time
-import hashlib
-from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
-from pathlib import Path
 from enum import Enum
+from pathlib import Path
+from typing import Any
 
 try:
     import click
-    from rich.console import Console
-    from rich.table import Table
-    from rich.panel import Panel
-    from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
-    from rich.prompt import Confirm, Prompt, IntPrompt, FloatPrompt
-    from rich.syntax import Syntax
     from rich import box
-    from rich.tree import Tree
+    from rich.console import Console
     from rich.live import Live
+    from rich.panel import Panel
+    from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
+    from rich.prompt import Confirm, FloatPrompt, IntPrompt, Prompt
+    from rich.syntax import Syntax
+    from rich.table import Table
+    from rich.tree import Tree
 except ImportError:
     print("ERROR: Required packages not installed. Install with:")
     print("  pip install click rich")
@@ -45,7 +45,6 @@ def _handle_cli_error(exc: Exception, exit_code: int = 1) -> None:
     console.print(f"[bold red]Error:[/] {exc}")
     sys.exit(exit_code)
 
-
 class TaskType(str, Enum):
     """AI task types supported by the network"""
     CODE_GENERATION = "code"
@@ -56,7 +55,6 @@ class TaskType(str, Enum):
     TRAINING = "training"
     INFERENCE = "inference"
 
-
 class TaskStatus(str, Enum):
     """Task execution status"""
     PENDING = "pending"
@@ -66,14 +64,12 @@ class TaskStatus(str, Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
 
-
 class TaskPriority(str, Enum):
     """Task priority levels"""
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
-
 
 class AIComputeClient:
     """Client for AI compute network operations"""
@@ -82,7 +78,7 @@ class AIComputeClient:
         self.node_url = node_url.rstrip('/')
         self.timeout = timeout
 
-    def _request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
+    def _request(self, method: str, endpoint: str, **kwargs) -> dict[str, Any]:
         """Make HTTP request to AI compute endpoint"""
         url = f"{self.node_url}/ai/{endpoint.lstrip('/')}"
         logger.debug("AI compute request: %s %s", method, url)
@@ -95,46 +91,45 @@ class AIComputeClient:
             logger.error("AI compute network error: %s", e)
             raise click.ClickException(f"AI compute network error: {e}")
 
-    def submit_task(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
+    def submit_task(self, task_data: dict[str, Any]) -> dict[str, Any]:
         """Submit AI compute task"""
         return self._request("POST", "/tasks", json=task_data)
 
-    def get_task_status(self, task_id: str) -> Dict[str, Any]:
+    def get_task_status(self, task_id: str) -> dict[str, Any]:
         """Query task status"""
         return self._request("GET", f"/tasks/{task_id}")
 
-    def cancel_task(self, task_id: str) -> Dict[str, Any]:
+    def cancel_task(self, task_id: str) -> dict[str, Any]:
         """Cancel pending task"""
         return self._request("DELETE", f"/tasks/{task_id}")
 
-    def list_tasks(self, status: Optional[str] = None, limit: int = 50) -> Dict[str, Any]:
+    def list_tasks(self, status: str | None = None, limit: int = 50) -> dict[str, Any]:
         """List tasks with optional status filter"""
         params = {"limit": limit}
         if status:
             params["status"] = status
         return self._request("GET", "/tasks", params=params)
 
-    def get_providers(self, sort_by: str = "reputation") -> Dict[str, Any]:
+    def get_providers(self, sort_by: str = "reputation") -> dict[str, Any]:
         """Get list of AI compute providers"""
         return self._request("GET", "/providers", params={"sort": sort_by})
 
-    def get_provider_details(self, provider_id: str) -> Dict[str, Any]:
+    def get_provider_details(self, provider_id: str) -> dict[str, Any]:
         """Get detailed provider information"""
         return self._request("GET", f"/providers/{provider_id}")
 
-    def register_provider(self, provider_data: Dict[str, Any]) -> Dict[str, Any]:
+    def register_provider(self, provider_data: dict[str, Any]) -> dict[str, Any]:
         """Register as AI compute provider"""
         return self._request("POST", "/providers", json=provider_data)
 
-    def get_earnings(self, provider_id: str, period: str = "30d") -> Dict[str, Any]:
+    def get_earnings(self, provider_id: str, period: str = "30d") -> dict[str, Any]:
         """Get provider earnings"""
         return self._request("GET", f"/providers/{provider_id}/earnings",
                            params={"period": period})
 
-    def get_marketplace_stats(self) -> Dict[str, Any]:
+    def get_marketplace_stats(self) -> dict[str, Any]:
         """Get AI marketplace statistics"""
         return self._request("GET", "/stats")
-
 
 def generate_task_id(task_type: str, description: str) -> str:
     """Generate unique task ID"""
@@ -142,7 +137,6 @@ def generate_task_id(task_type: str, description: str) -> str:
     hash_input = f"{task_type}{description}{timestamp}".encode()
     hash_suffix = hashlib.sha256(hash_input).hexdigest()[:8]
     return f"AI-{timestamp}-{hash_suffix}"
-
 
 def estimate_task_cost(task_type: TaskType, priority: TaskPriority,
                        estimated_tokens: int = 0) -> float:
@@ -172,12 +166,10 @@ def estimate_task_cost(task_type: TaskType, priority: TaskPriority,
 
     return (base_cost * priority_mult) + token_cost
 
-
 @click.group()
 def ai():
     """AI compute and provider commands"""
     pass
-
 
 @ai.command('submit')
 @click.option('--task-type', required=True,
@@ -195,8 +187,8 @@ def ai():
 @click.option('--wallet', required=True, help='Wallet address for payment')
 @click.pass_context
 def submit_task(ctx: click.Context, task_type: str, description: str,
-                priority: str, max_cost: Optional[float], input_file: Optional[str],
-                model: Optional[str], timeout: int, wallet: str):
+                priority: str, max_cost: float | None, input_file: str | None,
+                model: str | None, timeout: int, wallet: str):
     """
     Submit AI compute job to the network
 
@@ -289,7 +281,6 @@ def submit_task(ctx: click.Context, task_type: str, description: str,
     except (click.ClickException, requests.RequestException, ValueError, KeyError) as exc:
         _handle_cli_error(exc)
 
-
 @ai.command('query')
 @click.argument('task_id')
 @click.option('--watch', is_flag=True, help='Watch status in real-time')
@@ -374,7 +365,6 @@ def query_task(ctx: click.Context, task_id: str, watch: bool):
     else:
         fetch_and_display()
 
-
 @ai.command('cancel')
 @click.argument('task_id')
 @click.pass_context
@@ -416,13 +406,12 @@ def cancel_task(ctx: click.Context, task_id: str):
     except (click.ClickException, requests.RequestException, ValueError, KeyError) as exc:
         _handle_cli_error(exc)
 
-
 @ai.command('list')
 @click.option('--status', type=click.Choice([s.value for s in TaskStatus]),
               help='Filter by status')
 @click.option('--limit', default=20, help='Number of tasks to show')
 @click.pass_context
-def list_tasks(ctx: click.Context, status: Optional[str], limit: int):
+def list_tasks(ctx: click.Context, status: str | None, limit: int):
     """
     List AI compute tasks
 
@@ -493,7 +482,6 @@ def list_tasks(ctx: click.Context, status: Optional[str], limit: int):
     except (click.ClickException, requests.RequestException, ValueError, KeyError) as exc:
         _handle_cli_error(exc)
 
-
 @ai.command('providers')
 @click.option('--sort-by', default='reputation',
               type=click.Choice(['reputation', 'cost', 'speed', 'availability', 'tasks']),
@@ -502,8 +490,8 @@ def list_tasks(ctx: click.Context, status: Optional[str], limit: int):
 @click.option('--task-type', type=click.Choice([t.value for t in TaskType]),
               help='Filter by supported task type')
 @click.pass_context
-def list_providers(ctx: click.Context, sort_by: str, min_reputation: Optional[int],
-                   task_type: Optional[str]):
+def list_providers(ctx: click.Context, sort_by: str, min_reputation: int | None,
+                   task_type: str | None):
     """
     List and rank AI compute providers
 
@@ -580,7 +568,6 @@ def list_providers(ctx: click.Context, sort_by: str, min_reputation: Optional[in
     except (click.ClickException, requests.RequestException, ValueError, KeyError) as exc:
         _handle_cli_error(exc)
 
-
 @ai.command('provider-details')
 @click.argument('provider_id')
 @click.pass_context
@@ -635,7 +622,6 @@ def provider_details(ctx: click.Context, provider_id: str):
 
     except (click.ClickException, requests.RequestException, ValueError, KeyError) as exc:
         _handle_cli_error(exc)
-
 
 @ai.command('earnings')
 @click.option('--provider-id', required=True, help='AI provider ID')
@@ -699,7 +685,6 @@ def provider_earnings(ctx: click.Context, provider_id: str, period: str):
 
     except (click.ClickException, requests.RequestException, ValueError, KeyError) as exc:
         _handle_cli_error(exc)
-
 
 @ai.command('register-provider')
 @click.option('--wallet', required=True, help='Provider wallet address')
@@ -778,7 +763,6 @@ def register_provider(ctx: click.Context, wallet: str, models: str,
     except (click.ClickException, requests.RequestException, ValueError, KeyError) as exc:
         _handle_cli_error(exc)
 
-
 @ai.command('marketplace')
 @click.pass_context
 def marketplace_stats(ctx: click.Context):
@@ -832,7 +816,6 @@ def marketplace_stats(ctx: click.Context):
 
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _handle_cli_error(exc)
-
 
 if __name__ == '__main__':
     ai()

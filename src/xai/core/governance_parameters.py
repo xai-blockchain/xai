@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Governance Parameters
 
@@ -6,9 +8,7 @@ Standard mechanism used in crypto governance systems
 """
 
 import time
-from typing import Dict, Tuple
 from enum import Enum
-
 
 class ProposalType(Enum):
     """Types of governance proposals"""
@@ -16,7 +16,6 @@ class ProposalType(Enum):
     AI_IMPROVEMENT = "ai_improvement"  # AI work on blockchain code
     PARAMETER_CHANGE = "parameter_change"  # Change governance rules
     EMERGENCY = "emergency"  # Security fixes (shorter timelock)
-
 
 class GovernanceParameters:
     """
@@ -57,7 +56,7 @@ class GovernanceParameters:
         self.implementation_approval_percent = 50  # 50% of original voters
         self.min_code_reviewers = 250  # Minimum reviewers for code review stage
 
-    def can_submit_ai_improvement(self) -> Tuple[bool, str]:
+    def can_submit_ai_improvement(self) -> tuple[bool, str]:
         """Check if AI improvements are currently allowed"""
 
         current_time = time.time()
@@ -164,7 +163,6 @@ class GovernanceParameters:
             "revote_delay_days": self.revote_delay_days,
         }
 
-
 class TimelockProposal:
     """
     Proposal in timelock queue waiting for execution
@@ -196,7 +194,6 @@ class TimelockProposal:
         """Days remaining until execution allowed"""
         remaining_seconds = self.execution_time - time.time()
         return max(0, remaining_seconds / 86400)
-
 
 # Example usage
 if __name__ == "__main__":

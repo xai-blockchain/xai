@@ -10,17 +10,16 @@ Handles all mining-related functionality including:
 from __future__ import annotations
 
 import logging
+
 logger = logging.getLogger(__name__)
 
-
-import time
-import threading
 import random
-from typing import TYPE_CHECKING, Optional
+import threading
+import time
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from xai.core.blockchain import Blockchain, Block
-
+    from xai.core.blockchain import Block, Blockchain
 
 class MiningManager:
     """
@@ -41,7 +40,7 @@ class MiningManager:
         self.blockchain = blockchain
         self.miner_address = miner_address
         self.is_mining = False
-        self.mining_thread: Optional[threading.Thread] = None
+        self.mining_thread: threading.Thread | None = None
         self.broadcast_callback = None
 
     def set_broadcast_callback(self, callback) -> None:
@@ -121,7 +120,7 @@ class MiningManager:
 
             time.sleep(1)  # Small delay between mining attempts
 
-    def mine_single_block(self) -> Optional[Block]:
+    def mine_single_block(self) -> Block | None:
         """
         Mine a single block with current pending transactions.
 

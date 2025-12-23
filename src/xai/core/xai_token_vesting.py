@@ -1,14 +1,16 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - XAI Token Vesting Management
 
 Manages vesting schedules for XAI tokens, ensuring tokens are released over time.
 """
 
-from typing import Dict, Any, Optional
 import time
+from typing import Any
+
 from xai.core.structured_logger import StructuredLogger, get_structured_logger
 from xai.core.xai_token_manager import XAITokenManager, get_xai_token_manager
-
 
 class XAITokenVesting:
     """
@@ -17,8 +19,8 @@ class XAITokenVesting:
 
     def __init__(
         self,
-        token_manager: Optional[XAITokenManager] = None,
-        logger: Optional[StructuredLogger] = None,
+        token_manager: XAITokenManager | None = None,
+        logger: StructuredLogger | None = None,
     ):
         self.token_manager = token_manager or get_xai_token_manager()
         self.logger = logger or get_structured_logger()
@@ -66,7 +68,7 @@ class XAITokenVesting:
             )
             return False
 
-    def get_vesting_status(self, address: str) -> Optional[Dict[str, Any]]:
+    def get_vesting_status(self, address: str) -> dict[str, Any] | None:
         """
         Retrieves the current vesting status for an address.
 
@@ -138,13 +140,11 @@ class XAITokenVesting:
             total += schedule["amount"] - schedule["released"]
         return total
 
-
 # Global instance for convenience
 _global_xai_token_vesting = None
 
-
 def get_xai_token_vesting(
-    token_manager: Optional[XAITokenManager] = None, logger: Optional[StructuredLogger] = None
+    token_manager: XAITokenManager | None = None, logger: StructuredLogger | None = None
 ) -> XAITokenVesting:
     """
     Get global XAITokenVesting instance.

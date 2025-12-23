@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Logging Standards and Configuration for XAI Blockchain
 
@@ -12,11 +14,10 @@ Usage:
 """
 
 import logging
-from typing import Dict, Optional
 
 # Module-level log level standards
 # These define the default verbosity for each type of module
-LOG_LEVELS: Dict[str, str] = {
+LOG_LEVELS: dict[str, str] = {
     # Core blockchain operations - INFO for tracking chain state
     "blockchain": "INFO",
     "consensus": "INFO",
@@ -142,8 +143,7 @@ LOG_LEVELS: Dict[str, str] = {
 # Default level for modules not in the map
 DEFAULT_LOG_LEVEL = "INFO"
 
-
-def get_module_category(module_name: str) -> Optional[str]:
+def get_module_category(module_name: str) -> str | None:
     """
     Determine the category for a module name.
 
@@ -169,8 +169,7 @@ def get_module_category(module_name: str) -> Optional[str]:
 
     return None
 
-
-def get_log_level(module_name: str, override: Optional[str] = None) -> str:
+def get_log_level(module_name: str, override: str | None = None) -> str:
     """
     Get the appropriate log level for a module.
 
@@ -190,11 +189,10 @@ def get_log_level(module_name: str, override: Optional[str] = None) -> str:
 
     return DEFAULT_LOG_LEVEL
 
-
 def configure_module_logging(
     module_name: str,
-    category: Optional[str] = None,
-    override_level: Optional[str] = None,
+    category: str | None = None,
+    override_level: str | None = None,
 ) -> logging.Logger:
     """
     Configure and return a logger for a module with standardized settings.
@@ -223,8 +221,7 @@ def configure_module_logging(
 
     return logger
 
-
-def get_all_module_categories() -> Dict[str, str]:
+def get_all_module_categories() -> dict[str, str]:
     """
     Get a mapping of all module categories to their log levels.
 
@@ -232,7 +229,6 @@ def get_all_module_categories() -> Dict[str, str]:
         Dictionary mapping category name to log level
     """
     return LOG_LEVELS.copy()
-
 
 def set_category_level(category: str, level: str) -> None:
     """
@@ -246,7 +242,6 @@ def set_category_level(category: str, level: str) -> None:
         LOG_LEVELS[category] = level.upper()
     else:
         raise ValueError(f"Unknown category: {category}")
-
 
 # Structured logging field standards
 STANDARD_FIELDS = {
@@ -287,8 +282,7 @@ STANDARD_FIELDS = {
     "size": "Data size in bytes",
 }
 
-
-def get_standard_fields() -> Dict[str, str]:
+def get_standard_fields() -> dict[str, str]:
     """
     Get the standard structured logging field names and their descriptions.
 

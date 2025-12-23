@@ -6,11 +6,11 @@ their priority levels, and the data structures for notification payloads.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Dict, Any, Optional
-from datetime import datetime
 
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any
 
 class NotificationType(Enum):
     """Types of push notifications supported by XAI."""
@@ -24,7 +24,6 @@ class NotificationType(Enum):
     CONTRACT = "contract"  # Smart contract events
     SOCIAL_RECOVERY = "social_recovery"  # Social recovery requests
 
-
 class NotificationPriority(Enum):
     """Priority levels for push notifications."""
 
@@ -32,7 +31,6 @@ class NotificationPriority(Enum):
     NORMAL = "normal"  # Standard notification
     HIGH = "high"  # Important, with alert
     CRITICAL = "critical"  # Security-critical, bypasses quiet hours
-
 
 @dataclass
 class NotificationPayload:
@@ -59,21 +57,21 @@ class NotificationPayload:
     title: str
     body: str
     priority: NotificationPriority = NotificationPriority.NORMAL
-    data: Dict[str, Any] = field(default_factory=dict)
-    badge: Optional[int] = None
-    sound: Optional[str] = "default"
-    click_action: Optional[str] = None
+    data: dict[str, Any] = field(default_factory=dict)
+    badge: int | None = None
+    sound: str | None = "default"
+    click_action: str | None = None
     timestamp: datetime = field(default_factory=datetime.utcnow)
     ttl: int = 86400  # 24 hours default
 
-    def to_fcm_payload(self) -> Dict[str, Any]:
+    def to_fcm_payload(self) -> dict[str, Any]:
         """
         Convert to Firebase Cloud Messaging payload format.
 
         Returns:
             Dict containing FCM-compatible notification structure
         """
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "notification": {
                 "title": self.title,
                 "body": self.body,
@@ -99,14 +97,14 @@ class NotificationPayload:
 
         return payload
 
-    def to_apns_payload(self) -> Dict[str, Any]:
+    def to_apns_payload(self) -> dict[str, Any]:
         """
         Convert to Apple Push Notification Service payload format.
 
         Returns:
             Dict containing APNs-compatible notification structure
         """
-        aps: Dict[str, Any] = {
+        aps: dict[str, Any] = {
             "alert": {
                 "title": self.title,
                 "body": self.body,
@@ -142,7 +140,6 @@ class NotificationPayload:
         if self.priority in (NotificationPriority.HIGH, NotificationPriority.CRITICAL):
             return "high"
         return "normal"
-
 
 def create_transaction_notification(
     tx_hash: str,
@@ -188,7 +185,6 @@ def create_transaction_notification(
         click_action=f"xai://transaction/{tx_hash}",
     )
 
-
 def create_confirmation_notification(
     tx_hash: str,
     confirmations: int,
@@ -221,7 +217,6 @@ def create_confirmation_notification(
         click_action=f"xai://transaction/{tx_hash}",
         sound="silent" if confirmations < required_confirmations else "default",
     )
-
 
 def create_price_alert_notification(
     price: float,
@@ -257,7 +252,6 @@ def create_price_alert_notification(
         },
         click_action="xai://price-alerts",
     )
-
 
 def create_security_notification(
     event_type: str,
@@ -295,12 +289,11 @@ def create_security_notification(
         sound="default",  # Always alert for security
     )
 
-
 def create_governance_notification(
     proposal_id: str,
     title: str,
     action: str,
-    time_remaining: Optional[str] = None,
+    time_remaining: str | None = None,
 ) -> NotificationPayload:
     """
     Create a governance-related notification.

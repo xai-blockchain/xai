@@ -11,18 +11,17 @@ Adaptive optimization based on network conditions:
 
 from __future__ import annotations
 
-import time
-import json
 import gzip
+import json
 import logging
-from typing import Dict, Any, List, Optional, Tuple
-from dataclasses import dataclass, asdict, field
+import time
 from collections import deque
-from threading import Lock
+from dataclasses import asdict, dataclass, field
 from enum import Enum
+from threading import Lock
+from typing import Any
 
 logger = logging.getLogger(__name__)
-
 
 class ConnectionType(Enum):
     """Network connection types"""
@@ -31,14 +30,12 @@ class ConnectionType(Enum):
     OFFLINE = "offline"
     UNKNOWN = "unknown"
 
-
 class BandwidthMode(Enum):
     """Bandwidth optimization modes"""
     FULL = "full"           # No restrictions
     OPTIMIZED = "optimized" # Moderate compression
     LOW = "low"             # Aggressive compression, reduced polling
     MINIMAL = "minimal"     # Only critical operations
-
 
 @dataclass
 class NetworkProfile:
@@ -108,7 +105,7 @@ class NetworkProfile:
         else:
             return max(base_size // 10, 1)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             'connection_type': self.connection_type.value,
@@ -121,27 +118,25 @@ class NetworkProfile:
             'recommended_mode': self.recommended_mode().value
         }
 
-
 @dataclass
 class QueuedTransaction:
     """Transaction queued for offline submission"""
 
     tx_id: str
-    tx_data: Dict[str, Any]
+    tx_data: dict[str, Any]
     created_at: float
     priority: int = 0  # Higher = more urgent
     retries: int = 0
-    last_retry_at: Optional[float] = None
+    last_retry_at: float | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> QueuedTransaction:
+    def from_dict(cls, data: dict[str, Any]) -> QueuedTransaction:
         """Create from dictionary"""
         return cls(**data)
-
 
 class NetworkOptimizer:
     """
@@ -174,7 +169,7 @@ class NetworkOptimizer:
         self.compression_threshold = compression_threshold_bytes
 
         # Current network profile
-        self._current_profile: Optional[NetworkProfile] = None
+        self._current_profile: NetworkProfile | None = None
         self._profile_lock = Lock()
 
         # Offline transaction queue
@@ -192,7 +187,7 @@ class NetworkOptimizer:
         connection_type: str,
         signal_strength: int,
         latency_ms: float,
-        estimated_bandwidth_kbps: Optional[float] = None,
+        estimated_bandwidth_kbps: float | None = None,
         packet_loss_percent: float = 0.0,
         is_metered: bool = False
     ) -> NetworkProfile:
@@ -245,7 +240,7 @@ class NetworkOptimizer:
 
         return profile
 
-    def get_current_profile(self) -> Optional[NetworkProfile]:
+    def get_current_profile(self) -> NetworkProfile | None:
         """Get current network profile"""
         with self._profile_lock:
             return self._current_profile
@@ -320,7 +315,7 @@ class NetworkOptimizer:
         mode = self.get_bandwidth_mode()
         return mode in (BandwidthMode.LOW, BandwidthMode.MINIMAL, BandwidthMode.OPTIMIZED)
 
-    def compress_response(self, data: Dict[str, Any]) -> Tuple[bytes, bool]:
+    def compress_response(self, data: dict[str, Any]) -> tuple[bytes, bool]:
         """
         Compress response data if beneficial.
 
@@ -352,7 +347,7 @@ class NetworkOptimizer:
             logger.error(f"Compression failed: {e}")
             return json_data, False
 
-    def decompress_request(self, data: bytes) -> Dict[str, Any]:
+    def decompress_request(self, data: bytes) -> dict[str, Any]:
         """
         Decompress request data.
 
@@ -374,7 +369,7 @@ class NetworkOptimizer:
     def queue_transaction(
         self,
         tx_id: str,
-        tx_data: Dict[str, Any],
+        tx_data: dict[str, Any],
         priority: int = 0
     ) -> bool:
         """
@@ -413,8 +408,8 @@ class NetworkOptimizer:
 
     def get_queued_transactions(
         self,
-        max_count: Optional[int] = None
-    ) -> List[QueuedTransaction]:
+        max_count: int | None = None
+    ) -> list[QueuedTransaction]:
         """
         Get queued transactions for submission.
 
@@ -466,7 +461,7 @@ class NetworkOptimizer:
                     tx.last_retry_at = time.time()
                     break
 
-    def get_queue_status(self) -> Dict[str, Any]:
+    def get_queue_status(self) -> dict[str, Any]:
         """
         Get offline queue status.
 
@@ -494,7 +489,7 @@ class NetworkOptimizer:
             'queue_capacity': self.max_queue_size
         }
 
-    def optimize_sync_params(self, base_params: Dict[str, Any]) -> Dict[str, Any]:
+    def optimize_sync_params(self, base_params: dict[str, Any]) -> dict[str, Any]:
         """
         Optimize sync parameters based on network conditions.
 
@@ -539,7 +534,7 @@ class NetworkOptimizer:
 
         return optimized
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """
         Get optimizer statistics.
 

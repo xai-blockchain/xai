@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Dict
-
-
 class MetricsCollector:
     """Collect and track metrics for the blockchain and AI systems."""
 
@@ -13,7 +10,7 @@ class MetricsCollector:
 
     def reset(self) -> None:
         """Reset all metrics to initial state."""
-        self._data: Dict[str, int] = {
+        self._data: dict[str, int] = {
             "queue_events": 0,
             "completed_tasks": 0,
             "bridge_syncs": 0,
@@ -36,14 +33,12 @@ class MetricsCollector:
         """Record tokens used."""
         self._data["tokens_used"] += tokens
 
-    def get_snapshot(self) -> Dict[str, int]:
+    def get_snapshot(self) -> dict[str, int]:
         """Get a snapshot of current metrics."""
         return self._data.copy()
 
-
 # Global metrics instance
 metrics = MetricsCollector()
-
 
 def reset_metrics() -> None:
     """Reset all metrics to initial state."""

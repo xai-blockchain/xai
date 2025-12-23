@@ -19,10 +19,10 @@ Security features:
 from __future__ import annotations
 
 import hashlib
-import time
 import logging
+import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from ..vm.exceptions import VMExecutionError
 
@@ -30,7 +30,6 @@ if TYPE_CHECKING:
     from ..blockchain import Blockchain
 
 logger = logging.getLogger(__name__)
-
 
 # ERC721 Function selectors
 ERC721_SELECTORS = {
@@ -62,7 +61,6 @@ APPROVAL_FOR_ALL_EVENT = hashlib.sha3_256(
     b"ApprovalForAll(address,address,bool)"
 ).digest()
 
-
 @dataclass
 class NFTMetadata:
     """Metadata for an NFT."""
@@ -72,9 +70,8 @@ class NFTMetadata:
     image: str = ""
     external_url: str = ""
     animation_url: str = ""
-    attributes: List[Dict] = field(default_factory=list)
+    attributes: list[Dict] = field(default_factory=list)
     properties: Dict = field(default_factory=dict)
-
 
 @dataclass
 class NFTEvent:
@@ -86,7 +83,6 @@ class NFTEvent:
     token_id: int
     approved: bool = False  # For ApprovalForAll
     timestamp: float = field(default_factory=time.time)
-
 
 @dataclass
 class ERC721Token:
@@ -117,20 +113,20 @@ class ERC721Token:
     owner: str = ""
 
     # Token state
-    owners: Dict[int, str] = field(default_factory=dict)  # tokenId -> owner
-    balances: Dict[str, int] = field(default_factory=dict)  # owner -> count
-    token_approvals: Dict[int, str] = field(default_factory=dict)  # tokenId -> approved
-    operator_approvals: Dict[str, Dict[str, bool]] = field(
+    owners: dict[int, str] = field(default_factory=dict)  # tokenId -> owner
+    balances: dict[str, int] = field(default_factory=dict)  # owner -> count
+    token_approvals: dict[int, str] = field(default_factory=dict)  # tokenId -> approved
+    operator_approvals: dict[str, dict[str, bool]] = field(
         default_factory=dict
     )  # owner -> operator -> approved
 
     # Enumerable data
-    all_tokens: List[int] = field(default_factory=list)
-    owner_tokens: Dict[str, List[int]] = field(default_factory=dict)  # owner -> tokenIds
+    all_tokens: list[int] = field(default_factory=list)
+    owner_tokens: dict[str, list[int]] = field(default_factory=dict)  # owner -> tokenIds
 
     # Metadata
-    token_uris: Dict[int, str] = field(default_factory=dict)
-    token_metadata: Dict[int, NFTMetadata] = field(default_factory=dict)
+    token_uris: dict[int, str] = field(default_factory=dict)
+    token_metadata: dict[int, NFTMetadata] = field(default_factory=dict)
 
     # Royalties (EIP-2981)
     royalty_receiver: str = ""
@@ -144,7 +140,7 @@ class ERC721Token:
     paused: bool = False
 
     # Events
-    events: List[NFTEvent] = field(default_factory=list)
+    events: list[NFTEvent] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Initialize NFT contract."""
@@ -461,9 +457,9 @@ class ERC721Token:
         self,
         minter: str,
         to: str,
-        token_id: Optional[int] = None,
+        token_id: int | None = None,
         uri: str = "",
-        metadata: Optional[NFTMetadata] = None,
+        metadata: NFTMetadata | None = None,
     ) -> int:
         """
         Mint a new NFT.
@@ -748,14 +744,13 @@ class ERC721Token:
         token.next_token_id = data.get("next_token_id", 1)
         return token
 
-
 class ERC721Factory:
     """Factory for creating ERC721 NFT collections."""
 
-    def __init__(self, blockchain: Optional["Blockchain"] = None) -> None:
+    def __init__(self, blockchain: "Blockchain" | None = None) -> None:
         """Initialize the factory."""
         self.blockchain = blockchain
-        self.deployed_collections: Dict[str, ERC721Token] = {}
+        self.deployed_collections: dict[str, ERC721Token] = {}
 
     def create_collection(
         self,
@@ -828,7 +823,7 @@ class ERC721Factory:
 
         return collection
 
-    def get_collection(self, address: str) -> Optional[ERC721Token]:
+    def get_collection(self, address: str) -> ERC721Token | None:
         """Get a deployed collection by address."""
         if address.lower() in self.deployed_collections:
             return self.deployed_collections[address.lower()]
@@ -842,7 +837,7 @@ class ERC721Factory:
 
         return None
 
-    def list_collections(self) -> List[Dict]:
+    def list_collections(self) -> list[Dict]:
         """List all deployed collections."""
         return [
             {

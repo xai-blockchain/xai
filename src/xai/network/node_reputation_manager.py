@@ -1,6 +1,7 @@
-import time
-from typing import Dict, Any, List
+from __future__ import annotations
 
+import time
+from typing import Any
 
 class NodeReputationManager:
     def __init__(
@@ -25,12 +26,12 @@ class NodeReputationManager:
         self.decay_rate = decay_rate  # Percentage decay per time unit (e.g., per hour)
 
         # Stores reputation: {peer_id: {"score": float, "last_updated": float}}
-        self.peer_reputations: Dict[str, Dict[str, float]] = {}
+        self.peer_reputations: dict[str, dict[str, float]] = {}
         print(
             f"NodeReputationManager initialized. Initial: {initial_reputation}, Min: {min_reputation}, Max: {max_reputation}, Decay: {decay_rate}."
         )
 
-    def _get_reputation_entry(self, peer_id: str) -> Dict[str, float]:
+    def _get_reputation_entry(self, peer_id: str) -> dict[str, float]:
         """Initializes or retrieves reputation data for a peer."""
         if peer_id not in self.peer_reputations:
             self.peer_reputations[peer_id] = {
@@ -77,8 +78,8 @@ class NodeReputationManager:
         print(f"Reputation for {peer_id} decreased to {entry['score']:.2f}.")
 
     def get_reputable_peers(
-        self, all_peer_ids: List[str], min_score_threshold: float = 25.0
-    ) -> List[str]:
+        self, all_peer_ids: list[str], min_score_threshold: float = 25.0
+    ) -> list[str]:
         """
         Returns a list of peer IDs whose reputation is above the given threshold.
         """
@@ -87,7 +88,6 @@ class NodeReputationManager:
             if self.get_reputation(peer_id) >= min_score_threshold:
                 reputable_peers.append(peer_id)
         return reputable_peers
-
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

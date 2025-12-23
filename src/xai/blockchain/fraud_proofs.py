@@ -1,21 +1,22 @@
+from __future__ import annotations
+
 import logging
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable
 
 from xai.blockchain.slashing import SlashingManager
 
 logger = logging.getLogger("xai.blockchain.fraud_proofs")
-
 
 class FraudProof:
     def __init__(
         self,
         challenger_address: str,
         challenged_validator_address: str,
-        proof_data: Dict[str, Any],
+        proof_data: dict[str, Any],
         block_number: int,
         challenge_period_ends_at: int,
-        submission_timestamp: Optional[int] = None,
+        submission_timestamp: int | None = None,
     ):
         if not challenger_address or not challenged_validator_address:
             raise ValueError("Challenger and challenged validator addresses cannot be empty.")
@@ -38,7 +39,7 @@ class FraudProof:
         self.challenge_period_ends_at = challenge_period_ends_at
         self.status = "pending"  # pending, verified, rejected, expired
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "challenger_address": self.challenger_address,
             "challenged_validator_address": self.challenged_validator_address,
@@ -56,14 +57,13 @@ class FraudProof:
             f"block={self.block_number}, status='{self.status}')"
         )
 
-
 class FraudProofManager:
     def __init__(
         self,
         slashing_manager: SlashingManager,
-        time_provider: Optional[Callable[[], int]] = None,
+        time_provider: Callable[[], int] | None = None,
     ):
-        self.fraud_proofs: Dict[str, FraudProof] = {}  # Key: unique proof ID
+        self.fraud_proofs: dict[str, FraudProof] = {}  # Key: unique proof ID
         self.slashing_manager = slashing_manager
         self._proof_counter = 0
         self._time_provider = time_provider or (lambda: int(datetime.now(timezone.utc).timestamp()))
@@ -78,7 +78,7 @@ class FraudProofManager:
         self,
         challenger_address: str,
         challenged_validator_address: str,
-        proof_data: Dict[str, Any],
+        proof_data: dict[str, Any],
         block_number: int,
         challenge_period_duration_seconds: int = 3600,
     ) -> str:
@@ -107,7 +107,7 @@ class FraudProofManager:
         )
         return proof_id
 
-    def get_proof(self, proof_id: str) -> Optional[FraudProof]:
+    def get_proof(self, proof_id: str) -> FraudProof | None:
         return self.fraud_proofs.get(proof_id)
 
     def verify_fraud_proof(self, proof_id: str) -> bool:

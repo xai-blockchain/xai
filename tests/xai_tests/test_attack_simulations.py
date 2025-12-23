@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Phase 4 Security Tests: Attack Simulations
 Phase 4.2, 4.3, 4.4 of LOCAL_TESTING_PLAN.md
@@ -15,14 +17,13 @@ import time
 import threading
 import tempfile
 import hashlib
-from typing import List, Tuple, Optional
+
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 from xai.core.blockchain import Blockchain, Block, Transaction
 from xai.core.wallet import Wallet
 from xai.core.blockchain_security import BlockchainSecurityManager, ReorganizationProtection
-
 
 @pytest.mark.security
 class TestFiftyOnePercentAttack:
@@ -34,7 +35,7 @@ class TestFiftyOnePercentAttack:
     """
 
     @pytest.fixture
-    def network_split(self, tmp_path) -> Tuple[List[Blockchain], List[Blockchain]]:
+    def network_split(self, tmp_path) -> tuple[list[Blockchain], list[Blockchain]]:
         """
         Create network split: 2 honest nodes (majority) vs 1 attacker node (minority)
         """
@@ -226,7 +227,6 @@ class TestFiftyOnePercentAttack:
         chain_length = len(node.chain)
         assert chain_length > 10, "Should have sufficient blocks"
 
-
 @pytest.mark.security
 class TestSelfishMining:
     """
@@ -236,7 +236,7 @@ class TestSelfishMining:
     """
 
     @pytest.fixture
-    def selfish_mining_network(self, tmp_path) -> Tuple[Blockchain, Blockchain, Wallet, Wallet]:
+    def selfish_mining_network(self, tmp_path) -> tuple[Blockchain, Blockchain, Wallet, Wallet]:
         """
         Setup: Honest miner and selfish miner
         """
@@ -377,7 +377,6 @@ class TestSelfishMining:
         for i in range(1, len(withheld_blocks)):
             assert withheld_blocks[i].index == withheld_blocks[i-1].index + 1
 
-
 @pytest.mark.security
 class TestTransactionMalleability:
     """
@@ -387,7 +386,7 @@ class TestTransactionMalleability:
     """
 
     @pytest.fixture
-    def blockchain_with_funds(self, tmp_path) -> Tuple[Blockchain, Wallet, Wallet]:
+    def blockchain_with_funds(self, tmp_path) -> tuple[Blockchain, Wallet, Wallet]:
         """Setup blockchain with funded wallet"""
         blockchain = Blockchain(data_dir=str(tmp_path))
         sender = Wallet()
@@ -533,7 +532,6 @@ class TestTransactionMalleability:
         # Verify original still works
         assert tx.verify_signature(), "Restored transaction should verify"
 
-
 @pytest.mark.security
 class TestDoubleSpendAttacks:
     """
@@ -543,7 +541,7 @@ class TestDoubleSpendAttacks:
     """
 
     @pytest.fixture
-    def funded_blockchain(self, tmp_path) -> Tuple[Blockchain, Wallet]:
+    def funded_blockchain(self, tmp_path) -> tuple[Blockchain, Wallet]:
         """Setup blockchain with funded wallet"""
         blockchain = Blockchain(data_dir=str(tmp_path))
         wallet = Wallet()
@@ -740,7 +738,6 @@ class TestDoubleSpendAttacks:
 
         # Both transactions spending same original UTXO cannot both succeed
         # (Implementation-specific behavior during re-org)
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-m", "security"])

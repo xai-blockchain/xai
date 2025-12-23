@@ -18,21 +18,20 @@ authorized users without proving ownership of private keys.
 
 from __future__ import annotations
 
-import time
-import logging
 import hashlib
+import logging
+import time
 from dataclasses import dataclass, field
-from typing import Dict, Set, Optional, TYPE_CHECKING
 from enum import Enum
+from typing import TYPE_CHECKING
 
-from ..vm.exceptions import VMExecutionError
 from ..crypto_utils import verify_signature_hex
+from ..vm.exceptions import VMExecutionError
 
 if TYPE_CHECKING:
     from ..blockchain import Blockchain
 
 logger = logging.getLogger(__name__)
-
 
 class Role(Enum):
     """Standard roles for DeFi access control."""
@@ -41,7 +40,6 @@ class Role(Enum):
     PRICE_FEEDER = "price_feeder"
     SLASHER = "slasher"
     OPERATOR = "operator"
-
 
 @dataclass
 class SignedRequest:
@@ -91,7 +89,6 @@ class SignedRequest:
         """
         return hashlib.sha256(self.message.encode()).digest()
 
-
 @dataclass
 class AccessControl:
     """
@@ -115,7 +112,7 @@ class AccessControl:
     """
 
     # Track used nonces per address to prevent replay attacks
-    used_nonces: Dict[str, Set[int]] = field(default_factory=dict)
+    used_nonces: dict[str, set[int]] = field(default_factory=dict)
 
     # Maximum age of requests (5 minutes)
     max_age_seconds: int = 300
@@ -293,7 +290,6 @@ class AccessControl:
             }
         )
 
-
 @dataclass
 class RoleBasedAccessControl:
     """
@@ -312,7 +308,7 @@ class RoleBasedAccessControl:
     access_control: AccessControl = field(default_factory=AccessControl)
 
     # Role assignments: role -> set of addresses
-    roles: Dict[str, Set[str]] = field(default_factory=dict)
+    roles: dict[str, set[str]] = field(default_factory=dict)
 
     # Admin address (can grant/revoke roles)
     admin_address: str = ""
@@ -502,11 +498,11 @@ class RoleBasedAccessControl:
                 f"does not have role '{role}' with valid signature"
             )
 
-    def get_role_members(self, role: str) -> Set[str]:
+    def get_role_members(self, role: str) -> set[str]:
         """Get all addresses with a given role."""
         return self.roles.get(role, set()).copy()
 
-    def get_user_roles(self, address: str) -> Set[str]:
+    def get_user_roles(self, address: str) -> set[str]:
         """Get all roles assigned to an address."""
         address_norm = address.lower()
         return {
@@ -514,7 +510,6 @@ class RoleBasedAccessControl:
             for role, members in self.roles.items()
             if address_norm in members
         }
-
 
 def requires_signature(
     access_control: AccessControl,
@@ -542,7 +537,6 @@ def requires_signature(
             return func(self, request, *args, **kwargs)
         return wrapper
     return decorator
-
 
 def requires_role(rbac: RoleBasedAccessControl, role: str):
     """

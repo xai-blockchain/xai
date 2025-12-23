@@ -6,17 +6,17 @@ in small chunks with resume capability.
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Dict, Any, Tuple
 
-from flask import jsonify, request, send_file, Response
-import logging
 import io
+import logging
+from typing import TYPE_CHECKING, Any
+
+from flask import Response, jsonify, request, send_file
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPI
 
 logger = logging.getLogger(__name__)
-
 
 def register_sync_routes(node_api: 'NodeAPI') -> None:
     """
@@ -33,7 +33,7 @@ def register_sync_routes(node_api: 'NodeAPI') -> None:
 
     @node_api.app.route("/api/v1/sync/checkpoint/manifest", methods=["GET"])
     @node_api.app.route("/sync/snapshot/latest", methods=["GET"])
-    def get_latest_snapshot() -> Tuple[Dict[str, Any], int]:
+    def get_latest_snapshot() -> tuple[dict[str, Any], int]:
         """
         Get metadata for the latest available snapshot.
 
@@ -76,7 +76,7 @@ def register_sync_routes(node_api: 'NodeAPI') -> None:
             return jsonify({"error": "Internal server error"}), 500
 
     @node_api.app.route("/sync/snapshot/<snapshot_id>", methods=["GET"])
-    def get_snapshot_metadata(snapshot_id: str) -> Tuple[Dict[str, Any], int]:
+    def get_snapshot_metadata(snapshot_id: str) -> tuple[dict[str, Any], int]:
         """
         Get metadata for a specific snapshot.
 
@@ -118,7 +118,7 @@ def register_sync_routes(node_api: 'NodeAPI') -> None:
 
     @node_api.app.route("/api/v1/sync/checkpoint/<snapshot_id>/chunks", methods=["GET"])
     @node_api.app.route("/sync/snapshot/<snapshot_id>/chunks", methods=["GET"])
-    def list_snapshot_chunks(snapshot_id: str) -> Tuple[Dict[str, Any], int]:
+    def list_snapshot_chunks(snapshot_id: str) -> tuple[dict[str, Any], int]:
         """
         List all chunks for a snapshot.
 
@@ -286,7 +286,7 @@ def register_sync_routes(node_api: 'NodeAPI') -> None:
             return jsonify({"error": "Internal server error"}), 500
 
     @node_api.app.route("/sync/snapshot/resume", methods=["POST"])
-    def resume_sync() -> Tuple[Dict[str, Any], int]:
+    def resume_sync() -> tuple[dict[str, Any], int]:
         """
         Get resume information for an interrupted sync.
 
@@ -340,7 +340,7 @@ def register_sync_routes(node_api: 'NodeAPI') -> None:
             return jsonify({"error": "Internal server error"}), 500
 
     @node_api.app.route("/sync/snapshots", methods=["GET"])
-    def list_snapshots() -> Tuple[Dict[str, Any], int]:
+    def list_snapshots() -> tuple[dict[str, Any], int]:
         """
         List all available snapshots.
 
@@ -372,7 +372,7 @@ def register_sync_routes(node_api: 'NodeAPI') -> None:
             return jsonify({"error": "Internal server error"}), 500
 
     @node_api.app.route("/api/v1/sync/progress", methods=["GET"])
-    def get_sync_progress_v1() -> Tuple[Dict[str, Any], int]:
+    def get_sync_progress_v1() -> tuple[dict[str, Any], int]:
         """
         Get current sync progress for the client.
 
@@ -409,7 +409,7 @@ def register_sync_routes(node_api: 'NodeAPI') -> None:
             return jsonify({"error": "Internal server error"}), 500
 
     @node_api.app.route("/api/v1/sync/headers/status", methods=["GET"])
-    def get_header_sync_status() -> Tuple[Dict[str, Any], int]:
+    def get_header_sync_status() -> tuple[dict[str, Any], int]:
         """
         Get current header sync status.
 
@@ -447,7 +447,7 @@ def register_sync_routes(node_api: 'NodeAPI') -> None:
             return jsonify({"error": "Internal server error"}), 500
 
     @node_api.app.route("/api/v1/sync/headers/progress", methods=["GET"])
-    def get_header_sync_progress() -> Tuple[Dict[str, Any], int]:
+    def get_header_sync_progress() -> tuple[dict[str, Any], int]:
         """
         Get detailed header synchronization progress.
 

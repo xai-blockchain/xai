@@ -1,6 +1,7 @@
-import time
-from typing import Dict, Any
+from __future__ import annotations
 
+import time
+from typing import Any
 
 class BandwidthThrottler:
     def __init__(
@@ -15,12 +16,12 @@ class BandwidthThrottler:
         self.max_download_rate_kbps = max_download_rate_kbps
 
         # Stores usage per peer: {peer_id: {"last_check_time": float, "uploaded_kb": float, "downloaded_kb": float}}
-        self.peer_usage: Dict[str, Dict[str, float]] = {}
+        self.peer_usage: dict[str, dict[str, float]] = {}
         print(
             f"BandwidthThrottler initialized. Max upload: {self.max_upload_rate_kbps} KB/s, Max download: {self.max_download_rate_kbps} KB/s."
         )
 
-    def _get_peer_usage(self, peer_id: str) -> Dict[str, float]:
+    def _get_peer_usage(self, peer_id: str) -> dict[str, float]:
         """Initializes or retrieves usage data for a peer."""
         if peer_id not in self.peer_usage:
             self.peer_usage[peer_id] = {
@@ -87,7 +88,6 @@ class BandwidthThrottler:
 
         usage["downloaded_kb"] += actual_received_kb
         return actual_received_kb
-
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

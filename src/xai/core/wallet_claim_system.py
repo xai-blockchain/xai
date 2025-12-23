@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Wallet Claim System
 
@@ -6,13 +8,12 @@ Auto-assigns pre-generated wallets to early adopters:
 - TIER 2: Standard wallets (instant on node start)
 """
 
+import hashlib
 import json
 import os
 import time
-import hashlib
-from typing import Optional
-from xai.core.wallet import Wallet
 
+from xai.core.wallet import Wallet
 
 class WalletClaimSystem:
     """Manages automatic wallet distribution to early adopters"""
@@ -197,7 +198,7 @@ class WalletClaimSystem:
             node_id, [("standard", self.standard_wallets), ("micro", self.micro_wallets)]
         )
 
-    def claim_bonus_wallet(self, miner_id: str, proof_of_mining: Optional[str] = None) -> dict:
+    def claim_bonus_wallet(self, miner_id: str, proof_of_mining: str | None = None) -> dict:
         # Claim bonus wallet for early adopter miners
         existing_claim = next(
             (c for c in self.claims["bonus_claims"] if c["node_id"] == miner_id), None
@@ -389,7 +390,6 @@ This demonstrates XAI's time-locking capability.
 Would you like to accept this offer?
 """
         return message
-
 
 def generate_node_id():
     """Generate unique node ID based on machine characteristics"""

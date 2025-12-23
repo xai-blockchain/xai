@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Simple governance-based fiat unlock manager.
 
@@ -9,18 +11,16 @@ on November 1, 2026 UTC.
 import json
 import os
 from datetime import datetime, timezone
-from typing import Dict, Optional
 
 from xai.config import Config
 from xai.core.anonymous_logger import log_info
-
 
 class FiatUnlockGovernance:
     def __init__(self, data_dir: str):
         self.data_dir = data_dir
         self.votes_file = os.path.join(self.data_dir, "fiat_unlock_votes.json")
         os.makedirs(self.data_dir, exist_ok=True)
-        self.votes: Dict[str, bool] = {}
+        self.votes: dict[str, bool] = {}
         self._load_votes()
 
     def _load_votes(self):
@@ -39,8 +39,8 @@ class FiatUnlockGovernance:
         return datetime.now(timezone.utc) >= Config.FIAT_UNLOCK_GOVERNANCE_START
 
     def cast_vote(
-        self, address: str, support: bool, reason: Optional[str] = None
-    ) -> Dict[str, object]:
+        self, address: str, support: bool, reason: str | None = None
+    ) -> dict[str, object]:
         if not self.can_start_voting():
             raise ValueError("Voting window does not open until March 12, 2026 UTC")
 
@@ -78,7 +78,7 @@ class FiatUnlockGovernance:
             return True
         return False
 
-    def get_status(self) -> Dict[str, object]:
+    def get_status(self) -> dict[str, object]:
         return {
             "votes_cast": self.total_votes(),
             "votes_for": self.support_count(),

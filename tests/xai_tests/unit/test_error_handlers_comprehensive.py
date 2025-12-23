@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Comprehensive tests for error_handlers module - targeting 70%+ coverage
 
@@ -8,7 +10,7 @@ error routing, and logging mechanisms.
 import pytest
 import time
 import logging
-from typing import Any, Optional, Tuple
+from typing import Any
 from unittest.mock import Mock, MagicMock, patch
 from xai.core.error_handlers import (
     CircuitState,
@@ -21,7 +23,6 @@ from xai.core.error_handlers import (
     ErrorHandlerRegistry,
     ErrorLogger,
 )
-
 
 class TestCircuitState:
     """Test CircuitState enum"""
@@ -37,7 +38,6 @@ class TestCircuitState:
         assert CircuitState.CLOSED == CircuitState.CLOSED
         assert CircuitState.OPEN != CircuitState.CLOSED
         assert CircuitState.HALF_OPEN != CircuitState.OPEN
-
 
 class TestCircuitBreaker:
     """Comprehensive CircuitBreaker tests"""
@@ -286,7 +286,6 @@ class TestCircuitBreaker:
         assert circuit_breaker.last_failure_time is not None
         assert before_time <= circuit_breaker.last_failure_time <= after_time
 
-
 class TestRetryStrategy:
     """Comprehensive RetryStrategy tests"""
 
@@ -406,7 +405,6 @@ class TestRetryStrategy:
         for delay in delays[2:]:  # After first few attempts
             assert delay == 5.0
 
-
 class TestErrorHandler:
     """Test ErrorHandler base class"""
 
@@ -416,7 +414,7 @@ class TestErrorHandler:
         def can_handle(self, error: Exception, context: str) -> bool:
             return False
 
-        def handle(self, error: Exception, context: str, blockchain: Any) -> Tuple[bool, Optional[str]]:
+        def handle(self, error: Exception, context: str, blockchain: Any) -> tuple[bool, str | None]:
             return False, "unhandled"
 
     def test_cannot_instantiate_directly(self):
@@ -430,7 +428,6 @@ class TestErrorHandler:
         assert handler.name == "dummy"
         assert handler.handled_count == 0
         assert handler.logger.name == "handler.dummy"
-
 
 class TestNetworkErrorHandler:
     """Comprehensive NetworkErrorHandler tests"""
@@ -485,7 +482,6 @@ class TestNetworkErrorHandler:
         handler.handle(error, "context", None)
         assert handler.handled_count == 2
 
-
 class TestValidationErrorHandler:
     """Comprehensive ValidationErrorHandler tests"""
 
@@ -536,7 +532,6 @@ class TestValidationErrorHandler:
 
         assert "Custom validation message" in msg
 
-
 class TestStorageErrorHandler:
     """Comprehensive StorageErrorHandler tests"""
 
@@ -580,7 +575,6 @@ class TestStorageErrorHandler:
         assert "Storage error" in msg
         assert "recovery may be needed" in msg
         assert handler.handled_count == 1
-
 
 class TestErrorHandlerRegistry:
     """Comprehensive ErrorHandlerRegistry tests"""
@@ -689,7 +683,6 @@ class TestErrorHandlerRegistry:
         # Find network handler stats
         network_handler_stats = [h for h in stats["handlers"] if h["name"] == "network"][0]
         assert network_handler_stats["handled_count"] == 3
-
 
 class TestErrorLogger:
     """Comprehensive ErrorLogger tests"""
@@ -821,7 +814,6 @@ class TestErrorLogger:
         assert len(logger.error_log) == 5
         assert "error 9" in logger.error_log[-1]["error_message"]
         assert "error 5" in logger.error_log[0]["error_message"]
-
 
 class TestIntegration:
     """Integration tests combining multiple components"""

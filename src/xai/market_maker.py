@@ -1,15 +1,17 @@
+from __future__ import annotations
+
 """
 AXN Market Making Bot - Automated Liquidity Provider
 Maintains buy and sell orders to ensure trading is always possible
 """
 
-import time
-import random  # OK for simulating market making order size variation (non-security context)
-from decimal import Decimal
-from typing import List, Dict, Optional
-import requests
-import sys
 import logging
+import random  # OK for simulating market making order size variation (non-security context)
+import sys
+import time
+from decimal import Decimal
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +21,6 @@ if sys.platform == "win32":
 
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
-
 
 class MarketMaker:
     """Automated market maker that maintains liquidity"""
@@ -160,7 +161,7 @@ class MarketMaker:
 
         return placed_orders
 
-    def get_current_orders(self) -> List[Dict]:
+    def get_current_orders(self) -> list[Dict]:
         """Get market maker's current orders"""
         try:
             response = requests.get(

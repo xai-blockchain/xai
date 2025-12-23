@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Unit tests for XAI Blockchain core functionality
 
@@ -9,7 +11,6 @@ import sys
 import os
 import time
 from decimal import Decimal
-from typing import List
 
 # Add core directory to path
 
@@ -18,7 +19,6 @@ from xai.core.block_header import BlockHeader
 from xai.core.crypto_utils import sign_message_hex
 from xai.core.blockchain_security import BlockchainSecurityConfig, BlockSizeValidator
 from xai.core.wallet import Wallet
-
 
 class TestBlockchainInitialization:
     """Test blockchain initialization and configuration"""
@@ -61,7 +61,6 @@ class TestBlockchainInitialization:
         assert bc.validate_chain()
         assert bc.pending_transactions == []
         assert isinstance(bc.utxo_set, dict)
-
 
 class TestBlockMining:
     """Test block mining functionality"""
@@ -126,7 +125,6 @@ class TestBlockMining:
         assert actual_reward >= base_reward
         assert actual_reward <= base_reward * 1.05
 
-
 class TestBlockReward:
     """Test block reward calculation and halving"""
 
@@ -182,7 +180,6 @@ class TestBlockReward:
 
         assert r2 == r1 / 2
         assert r3 == r2 / 2
-
 
 class TestChainValidation:
     """Test blockchain validation"""
@@ -256,7 +253,6 @@ class TestChainValidation:
         # validate_chain reads from disk, so memory changes don't affect it
         assert bc.validate_chain()  # Disk validation passes
 
-
 class TestSupplyManagement:
     """Test supply cap enforcement and tracking"""
 
@@ -306,7 +302,6 @@ class TestSupplyManagement:
             assert reward > 0
             assert reward < bc.max_supply
 
-
 class TestBlockTimestamps:
     """Test block timestamp handling"""
 
@@ -339,7 +334,6 @@ class TestBlockTimestamps:
 
         assert genesis.timestamp > 0
         assert genesis.timestamp < time.time() + 100
-
 
 class TestTransactionCreation:
     """Test transaction creation and validation"""
@@ -510,7 +504,6 @@ class TestTransactionCreation:
         with pytest.raises(ValueError, match="Failed to sign transaction"):
             tx.sign_transaction("invalid_key")
 
-
 class TestBlockStructure:
     """Test Block class structure and methods"""
 
@@ -561,7 +554,6 @@ class TestBlockStructure:
         hash2 = block.calculate_hash()
 
         assert hash1 != hash2
-
 
 class TestBlockchainTransactions:
     """Test transaction handling in blockchain"""
@@ -632,7 +624,6 @@ class TestBlockchainTransactions:
         new_balance = bc.get_balance(wallet1.address)
         assert new_balance > initial_balance
 
-
 class TestBlockchainErrorHandling:
     """Test error handling and edge cases"""
 
@@ -681,7 +672,6 @@ class TestBlockchainErrorHandling:
         latest = bc.get_latest_block()
         assert latest.index == 1
 
-
 class TestBlockchainPersistence:
     """Test blockchain persistence and loading"""
 
@@ -710,7 +700,6 @@ class TestBlockchainPersistence:
 
         assert len(bc2.chain) == chain_length
 
-
 class TestUTXOManagement:
     """Test UTXO set management"""
 
@@ -729,7 +718,6 @@ class TestUTXOManagement:
 
         # UTXO set should contain entries
         assert len(bc.utxo_set) > 0
-
 
 class TestCirculatingSupply:
     """Test circulating supply calculations"""
@@ -752,7 +740,6 @@ class TestCirculatingSupply:
 
         new_supply = bc.get_circulating_supply()
         assert new_supply > initial_supply
-
 
 class TestDifficultyGuardrails:
     """Ensure deterministic difficulty schedule is enforced."""
@@ -829,7 +816,6 @@ class TestDifficultyGuardrails:
         assert genesis_block is not None
         assert bc.validate_chain(chain=[genesis_block, forged_block]) is False
 
-
 class TestHeaderVersionEnforcement:
     """Ensure unsupported header versions are rejected."""
 
@@ -883,7 +869,6 @@ class TestHeaderVersionEnforcement:
         assert genesis_block is not None
         assert bc.validate_chain(chain=[genesis_block, forged_block]) is False
 
-
 class TestBlockSizeEnforcement:
     """Ensure oversized blocks are rejected early."""
 
@@ -902,7 +887,7 @@ class TestBlockSizeEnforcement:
 
     def _build_oversized_block(self, blockchain: Blockchain, wallet: Wallet) -> Block:
         """Construct a block whose serialized size exceeds the configured maximum."""
-        transactions: List[Transaction] = []
+        transactions: list[Transaction] = []
         target_index = len(blockchain.chain)
         previous_hash = blockchain.chain[-1].hash
 
@@ -949,7 +934,6 @@ class TestBlockSizeEnforcement:
         genesis_block = bc.get_block(0)
         assert genesis_block is not None
         assert bc.validate_chain(chain=[genesis_block, oversized_block]) is False
-
 
 class TestAddBlockAtomicity:
     """Test atomic state updates in add_block() method."""
@@ -1070,7 +1054,6 @@ class TestAddBlockAtomicity:
 
         nonce_after = bc.nonce_tracker.snapshot()
         assert nonce_after == nonce_before, "Nonce not restored after exception"
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

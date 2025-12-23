@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from flask import Blueprint, jsonify, request
 
@@ -31,9 +31,8 @@ logger = logging.getLogger(__name__)
 
 exchange_bp = Blueprint("exchange", __name__, url_prefix="/exchange")
 
-
 @exchange_bp.route("/orders", methods=["GET"])
-def get_order_book() -> Tuple[Dict[str, Any], int]:
+def get_order_book() -> tuple[dict[str, Any], int]:
     """Get current order book (buy and sell orders)."""
     node = get_node()
     blockchain = get_blockchain()
@@ -103,9 +102,8 @@ def get_order_book() -> Tuple[Dict[str, Any], int]:
         )
         return handle_exception(exc, "exchange_get_order_book")
 
-
 @exchange_bp.route("/balance/<address>", methods=["GET"])
-def get_exchange_balance(address: str) -> Tuple[Dict[str, Any], int]:
+def get_exchange_balance(address: str) -> tuple[dict[str, Any], int]:
     """Get exchange balances for an address."""
     node = get_node()
 
@@ -142,9 +140,8 @@ def get_exchange_balance(address: str) -> Tuple[Dict[str, Any], int]:
         )
         return handle_exception(exc, "exchange_get_balance")
 
-
 @exchange_bp.route("/balance/<address>/<currency>", methods=["GET"])
-def get_exchange_balance_currency(address: str, currency: str) -> Tuple[Dict[str, Any], int]:
+def get_exchange_balance_currency(address: str, currency: str) -> tuple[dict[str, Any], int]:
     """Get exchange balance for a specific currency."""
     node = get_node()
 
@@ -181,9 +178,8 @@ def get_exchange_balance_currency(address: str, currency: str) -> Tuple[Dict[str
         )
         return handle_exception(exc, "exchange_get_balance_currency")
 
-
 @exchange_bp.route("/stats", methods=["GET"])
-def get_exchange_stats() -> Tuple[Dict[str, Any], int]:
+def get_exchange_stats() -> tuple[dict[str, Any], int]:
     """Get exchange statistics."""
     node = get_node()
     blockchain = get_blockchain()

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 EVM Memory Implementation.
 
@@ -5,14 +7,11 @@ The EVM memory is a byte-addressable linear memory that expands dynamically.
 Memory expansion has a gas cost that grows quadratically with size.
 """
 
-from typing import Optional
 from ..exceptions import VMExecutionError
-
 
 # Memory constants
 WORD_SIZE = 32  # 256 bits = 32 bytes
 MAX_MEMORY_SIZE = 32 * 1024 * 1024  # 32 MB default limit
-
 
 class EVMMemory:
     """
@@ -289,7 +288,7 @@ class EVMMemory:
         self._data.clear()
         self._highest_accessed = 0
 
-    def dump(self, start: int = 0, length: Optional[int] = None) -> str:
+    def dump(self, start: int = 0, length: int | None = None) -> str:
         """
         Dump memory contents as hex string for debugging.
 

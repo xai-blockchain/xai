@@ -6,18 +6,17 @@ Provides secure biometric authentication for mobile wallet applications.
 
 from .biometric_auth import (
     BiometricAuthProvider,
-    BiometricType,
+    BiometricCapability,
     BiometricError,
     BiometricResult,
-    BiometricCapability,
+    BiometricType,
     MockBiometricProvider,
 )
-
 from .secure_key_derivation import (
-    SecureKeyDerivation,
+    BiometricTokenCache,
     DerivedKey,
     EncryptedWalletKey,
-    BiometricTokenCache,
+    SecureKeyDerivation,
 )
 
 __all__ = [

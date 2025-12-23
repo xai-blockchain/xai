@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Dict
+from typing import Callable
 
-from .executor import ExecutionMessage, ExecutionResult
 from .exceptions import VMExecutionError
-
+from .executor import ExecutionMessage, ExecutionResult
 
 PrecompileHandler = Callable[[ExecutionMessage], ExecutionResult]
-
 
 @dataclass
 class Precompile:
@@ -18,12 +16,11 @@ class Precompile:
     handler: PrecompileHandler
     description: str
 
-
 class PrecompileRegistry:
     """Simple in-memory registry so executors can look up native handlers."""
 
     def __init__(self) -> None:
-        self._registry: Dict[str, Precompile] = {}
+        self._registry: dict[str, Precompile] = {}
 
     def register(self, address: str, handler: PrecompileHandler, description: str) -> None:
         key = address.lower()

@@ -1,20 +1,19 @@
 """Audit signer backed by secp256k1 keys using cryptography."""
+from __future__ import annotations
 
 import os
-from pathlib import Path
 from hashlib import sha256
-from typing import Optional
+from pathlib import Path
 
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-
 
 class AuditSigner:
     def __init__(self, data_dir: str):
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.key_path = self.data_dir / "audit_key.pem"
-        self._key: Optional[ec.EllipticCurvePrivateKey] = None
+        self._key: ec.EllipticCurvePrivateKey | None = None
         self._load_or_generate()
 
     def _load_or_generate(self):

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Structured Logging System
 
@@ -10,21 +12,19 @@ Comprehensive structured logging with:
 - Privacy-preserving features
 """
 
+import hashlib
 import json
 import logging
 import os
 import threading
+import time
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from logging.handlers import TimedRotatingFileHandler
-from typing import Dict, Any, Optional
-from contextvars import ContextVar
-import hashlib
-import time
-
+from typing import Any
 
 # Context variable for correlation ID (thread-safe)
-correlation_id: ContextVar[Optional[str]] = ContextVar("correlation_id", default=None)
-
+correlation_id: ContextVar[str | None] = ContextVar("correlation_id", default=None)
 
 class JSONFormatter(logging.Formatter):
     """
@@ -72,7 +72,6 @@ class JSONFormatter(logging.Formatter):
             log_entry.update(record.extra_fields)
 
         return json.dumps(log_entry, default=str)
-
 
 class StructuredLogger:
     """
@@ -160,7 +159,7 @@ class StructuredLogger:
             return "UNKNOWN"
         return f"{address[:6]}...{address[-4:]}"
 
-    def _sanitize_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _sanitize_data(self, data: dict[str, Any]) -> dict[str, Any]:
         """Remove sensitive information from data"""
         sensitive_keys = ["private_key", "password", "secret", "api_key", "signature"]
         sanitized = {}
@@ -309,14 +308,13 @@ class StructuredLogger:
             **kwargs,
         )
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get logger statistics"""
         return {
             "log_counts": self.log_counts.copy(),
             "total_logs": sum(self.log_counts.values()),
             "performance_metrics": self.performance_metrics.copy(),
         }
-
 
 class CorrelationIDFilter(logging.Filter):
     """Filter to add correlation ID to log records"""
@@ -325,7 +323,6 @@ class CorrelationIDFilter(logging.Filter):
         corr_id = correlation_id.get()
         record.correlation_id = corr_id if corr_id else "NO-ID"
         return True
-
 
 class LogContext:
     """
@@ -363,7 +360,6 @@ class LogContext:
         """Clear correlation ID on context exit"""
         correlation_id.reset(self.token)
 
-
 class PerformanceTimer:
     """
     Context manager for performance timing
@@ -396,10 +392,8 @@ class PerformanceTimer:
         duration = (time.time() - self.start_time) * 1000  # Convert to ms
         self.logger.performance_event(self.operation_name, duration, "ms")
 
-
 # Global logger instance
 _global_structured_logger = None
-
 
 def get_structured_logger(name: str = "XAI_Blockchain") -> StructuredLogger:
     """
@@ -415,7 +409,6 @@ def get_structured_logger(name: str = "XAI_Blockchain") -> StructuredLogger:
     if _global_structured_logger is None:
         _global_structured_logger = StructuredLogger(name)
     return _global_structured_logger
-
 
 # Convenience functions
 def set_correlation_id(custom_id: str = None) -> str:
@@ -433,11 +426,9 @@ def set_correlation_id(custom_id: str = None) -> str:
     correlation_id.set(corr_id)
     return corr_id
 
-
 def clear_correlation_id():
     """Clear correlation ID from current context"""
     correlation_id.set(None)
-
 
 # Example usage
 if __name__ == "__main__":

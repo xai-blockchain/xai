@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 XAI Node Setup Wizard
 Interactive configuration for new node operators
@@ -31,8 +33,6 @@ import subprocess
 import platform
 import getpass
 from pathlib import Path
-from typing import Optional, Dict, List, Tuple
-
 
 # ANSI color codes for terminal output
 class Colors:
@@ -60,11 +60,9 @@ class Colors:
         Colors.BOLD = ''
         Colors.UNDERLINE = ''
 
-
 # Disable colors if not running in a terminal
 if not sys.stdout.isatty():
     Colors.disable()
-
 
 # ASCII Art Banner
 BANNER = f"""{Colors.CYAN}{Colors.BOLD}
@@ -83,33 +81,27 @@ BANNER = f"""{Colors.CYAN}{Colors.BOLD}
 ╚═══════════════════════════════════════════════════════════════╝
 {Colors.ENDC}"""
 
-
 def print_header(text: str):
     """Print a section header."""
     print(f"\n{Colors.BOLD}{Colors.BLUE}{'='*65}{Colors.ENDC}")
     print(f"{Colors.BOLD}{Colors.BLUE}{text:^65}{Colors.ENDC}")
     print(f"{Colors.BOLD}{Colors.BLUE}{'='*65}{Colors.ENDC}\n")
 
-
 def print_info(text: str):
     """Print informational text."""
     print(f"{Colors.CYAN}ℹ {text}{Colors.ENDC}")
-
 
 def print_success(text: str):
     """Print success message."""
     print(f"{Colors.GREEN}✓ {text}{Colors.ENDC}")
 
-
 def print_warning(text: str):
     """Print warning message."""
     print(f"{Colors.YELLOW}⚠ {text}{Colors.ENDC}")
 
-
 def print_error(text: str):
     """Print error message."""
     print(f"{Colors.RED}✗ {text}{Colors.ENDC}")
-
 
 def print_progress(current: int, total: int, description: str):
     """Print progress indicator."""
@@ -120,15 +112,13 @@ def print_progress(current: int, total: int, description: str):
     if current == total:
         print()  # New line when complete
 
-
 def print_step(step: int, total: int, title: str):
     """Print step header with progress."""
     print(f"\n{Colors.BOLD}{Colors.BLUE}{'='*65}{Colors.ENDC}")
     print(f"{Colors.BOLD}{Colors.BLUE}Step {step}/{total}: {title}{Colors.ENDC}")
     print(f"{Colors.BOLD}{Colors.BLUE}{'='*65}{Colors.ENDC}\n")
 
-
-def prompt(text: str, default: Optional[str] = None) -> str:
+def prompt(text: str, default: str | None = None) -> str:
     """Prompt user for input with optional default."""
     suffix = f" [{default}]" if default else ""
     try:
@@ -139,7 +129,6 @@ def prompt(text: str, default: Optional[str] = None) -> str:
     except (KeyboardInterrupt, EOFError):
         print(f"\n{Colors.YELLOW}Setup cancelled by user.{Colors.ENDC}")
         sys.exit(0)
-
 
 def confirm(text: str, default: bool = True) -> bool:
     """Ask for yes/no confirmation."""
@@ -153,8 +142,7 @@ def confirm(text: str, default: bool = True) -> bool:
         print(f"\n{Colors.YELLOW}Setup cancelled by user.{Colors.ENDC}")
         sys.exit(0)
 
-
-def select_option(text: str, options: List[Tuple[str, str, str]], default: int = 0) -> str:
+def select_option(text: str, options: list[tuple[str, str, str]], default: int = 0) -> str:
     """Present a numbered list of options and get user selection."""
     print(f"\n{Colors.CYAN}{Colors.BOLD}? {text}{Colors.ENDC}")
     for i, (key, name, desc) in enumerate(options, 1):
@@ -178,7 +166,6 @@ def select_option(text: str, options: List[Tuple[str, str, str]], default: int =
             print(f"\n{Colors.YELLOW}Setup cancelled by user.{Colors.ENDC}")
             sys.exit(0)
 
-
 def is_port_available(port: int) -> bool:
     """Check if a port is available for binding."""
     try:
@@ -188,7 +175,6 @@ def is_port_available(port: int) -> bool:
             return True
     except OSError:
         return False
-
 
 def validate_xai_address(address: str) -> bool:
     """Validate XAI address format (basic check)."""
@@ -201,23 +187,19 @@ def validate_xai_address(address: str) -> bool:
         return len(address) == 42
     return False
 
-
 def generate_jwt_secret() -> str:
     """Generate a secure JWT secret."""
     return secrets.token_hex(32)
-
 
 def generate_wallet_trade_secret() -> str:
     """Generate a secure wallet trade peer secret."""
     return secrets.token_hex(32)
 
-
 def generate_encryption_key() -> str:
     """Generate a secure encryption key."""
     return secrets.token_hex(32)
 
-
-def check_disk_space(path: Path, required_gb: int) -> Tuple[bool, int]:
+def check_disk_space(path: Path, required_gb: int) -> tuple[bool, int]:
     """Check if sufficient disk space is available.
 
     Returns:
@@ -232,8 +214,7 @@ def check_disk_space(path: Path, required_gb: int) -> Tuple[bool, int]:
         # If we can't check, assume it's OK
         return True, 0
 
-
-def detect_os() -> Tuple[str, str, str]:
+def detect_os() -> tuple[str, str, str]:
     """Detect the operating system.
 
     Returns:
@@ -280,8 +261,7 @@ def detect_os() -> Tuple[str, str, str]:
 
     return os_type, os_name, os_version
 
-
-def check_python_version() -> Tuple[bool, str]:
+def check_python_version() -> tuple[bool, str]:
     """Check if Python version meets requirements (3.10+).
 
     Returns:
@@ -292,8 +272,7 @@ def check_python_version() -> Tuple[bool, str]:
     is_ok = version_info >= (3, 10)
     return is_ok, version_str
 
-
-def check_git_installed() -> Tuple[bool, str]:
+def check_git_installed() -> tuple[bool, str]:
     """Check if git is installed.
 
     Returns:
@@ -312,8 +291,7 @@ def check_git_installed() -> Tuple[bool, str]:
     except Exception as e:
         return False, str(e)
 
-
-def check_pip_installed() -> Tuple[bool, str]:
+def check_pip_installed() -> tuple[bool, str]:
     """Check if pip is installed.
 
     Returns:
@@ -330,8 +308,7 @@ def check_pip_installed() -> Tuple[bool, str]:
     except Exception as e:
         return False, str(e)
 
-
-def check_dependencies() -> List[Tuple[str, bool, str]]:
+def check_dependencies() -> list[tuple[str, bool, str]]:
     """Check if required Python packages are available.
 
     Returns:
@@ -358,8 +335,7 @@ def check_dependencies() -> List[Tuple[str, bool, str]]:
 
     return dependencies
 
-
-def test_network_connectivity() -> Tuple[bool, str]:
+def test_network_connectivity() -> tuple[bool, str]:
     """Test basic internet connectivity.
 
     Returns:
@@ -372,8 +348,7 @@ def test_network_connectivity() -> Tuple[bool, str]:
     except socket.error:
         return False, "No internet connection detected"
 
-
-def create_wallet() -> Tuple[str, str, str]:
+def create_wallet() -> tuple[str, str, str]:
     """Create a new wallet and return (address, private_key, mnemonic).
 
     Attempts to use the proper wallet module if available, falls back to
@@ -425,7 +400,6 @@ def create_wallet() -> Tuple[str, str, str]:
 
     return address, private_key, mnemonic
 
-
 def backup_existing_env(env_path: Path):
     """Create a backup of existing .env file."""
     if env_path.exists():
@@ -434,8 +408,7 @@ def backup_existing_env(env_path: Path):
         shutil.copy2(env_path, backup_path)
         print_success(f"Backed up existing .env to: {backup_path}")
 
-
-def write_env_file(config: Dict[str, str], env_path: Path):
+def write_env_file(config: dict[str, str], env_path: Path):
     """Write configuration to .env file."""
     lines = [
         "# XAI Blockchain Node Configuration",
@@ -492,8 +465,7 @@ def write_env_file(config: Dict[str, str], env_path: Path):
     os.chmod(env_path, 0o600)
     print_success(f"Configuration written to: {env_path}")
 
-
-def create_systemd_service(config: Dict[str, str], project_root: Path) -> Optional[Path]:
+def create_systemd_service(config: dict[str, str], project_root: Path) -> Path | None:
     """Create a systemd service file for auto-starting the node.
 
     Returns:
@@ -532,7 +504,6 @@ WantedBy=multi-user.target
     service_file.write_text(service_content)
 
     return service_file
-
 
 def main():
     """Main wizard flow."""
@@ -607,7 +578,7 @@ def main():
         print_info("Setup cancelled. Run this script again when ready.")
         return
 
-    config: Dict[str, str] = {}
+    config: dict[str, str] = {}
     config['os_type'] = os_type
 
     # Step: Setup Mode Selection
@@ -1013,7 +984,6 @@ def main():
         print_info("\nStarting node...")
         os.chdir(project_root)
         os.system("python -m xai.core.node")
-
 
 if __name__ == "__main__":
     try:

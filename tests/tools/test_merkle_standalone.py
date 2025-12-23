@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Standalone test for Merkle Proof functionality.
 Tests the core algorithm without requiring full blockchain dependencies.
 """
 
 import hashlib
-from typing import List, Tuple
 
-
-def calculate_merkle_root(tx_hashes: List[str]) -> str:
+def calculate_merkle_root(tx_hashes: list[str]) -> str:
     """Calculate merkle root from transaction hashes"""
     if not tx_hashes:
         return hashlib.sha256(b"").hexdigest()
@@ -29,8 +29,7 @@ def calculate_merkle_root(tx_hashes: List[str]) -> str:
 
     return hashes[0]
 
-
-def generate_merkle_proof(tx_hashes: List[str], txid: str) -> List[Tuple[str, bool]]:
+def generate_merkle_proof(tx_hashes: list[str], txid: str) -> list[tuple[str, bool]]:
     """Generate a merkle proof for a transaction"""
     if not tx_hashes:
         raise ValueError("No transactions")
@@ -40,7 +39,7 @@ def generate_merkle_proof(tx_hashes: List[str], txid: str) -> List[Tuple[str, bo
     except ValueError:
         raise ValueError(f"Transaction {txid} not found")
 
-    proof: List[Tuple[str, bool]] = []
+    proof: list[tuple[str, bool]] = []
     current_index = tx_index
     current_level = tx_hashes.copy()
 
@@ -69,8 +68,7 @@ def generate_merkle_proof(tx_hashes: List[str], txid: str) -> List[Tuple[str, bo
 
     return proof
 
-
-def verify_merkle_proof(txid: str, merkle_proof: List[Tuple[str, bool]], merkle_root: str) -> bool:
+def verify_merkle_proof(txid: str, merkle_proof: list[tuple[str, bool]], merkle_root: str) -> bool:
     """Verify a transaction is in a block using a merkle proof"""
     if not merkle_proof and txid == merkle_root:
         return True
@@ -89,7 +87,6 @@ def verify_merkle_proof(txid: str, merkle_proof: List[Tuple[str, bool]], merkle_
         current_hash = hashlib.sha256(combined.encode()).hexdigest()
 
     return current_hash == merkle_root
-
 
 def test_merkle_proof():
     """Test merkle proof functionality"""
@@ -221,7 +218,6 @@ def test_merkle_proof():
     print("✅ ALL MERKLE PROOF TESTS PASSED!")
     print("=" * 70)
     return True
-
 
 if __name__ == "__main__":
     import sys

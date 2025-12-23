@@ -1,14 +1,14 @@
+from __future__ import annotations
+
 """
 SPV proof verification tests for atomic swaps.
 """
 
 import hashlib
-from typing import List
 
 from xai.core.aixn_blockchain.atomic_swap_11_coins import CrossChainVerifier
 
-
-def _build_expected_root(tx_hash: str, siblings: List[str], tx_index: int) -> str:
+def _build_expected_root(tx_hash: str, siblings: list[str], tx_index: int) -> str:
     current = bytes.fromhex(tx_hash)[::-1]
     position = tx_index
     for sibling in siblings:
@@ -21,7 +21,6 @@ def _build_expected_root(tx_hash: str, siblings: List[str], tx_index: int) -> st
         position >>= 1
     return current[::-1].hex()
 
-
 def test_spv_proof_success():
     verifier = CrossChainVerifier()
     tx_hash = "aa" * 32
@@ -33,7 +32,6 @@ def test_spv_proof_success():
     assert ok is True
     assert "successfully" in msg
 
-
 def test_spv_proof_mismatch():
     verifier = CrossChainVerifier()
     tx_hash = "aa" * 32
@@ -42,7 +40,6 @@ def test_spv_proof_mismatch():
     ok, msg = verifier.verify_spv_proof("BTC", tx_hash, siblings, block_header, tx_index=0)
     assert ok is False
     assert "merkle root mismatch" in msg
-
 
 def test_verify_transaction_spv_fetches_merkle_and_header(monkeypatch):
     verifier = CrossChainVerifier()
@@ -75,7 +72,6 @@ def test_verify_transaction_spv_fetches_merkle_and_header(monkeypatch):
     assert ok is True
     assert data["merkle_root"] == merkle_root
     assert data["block_hash"] == "0000deadbeef"
-
 
 def test_verify_transaction_spv_unsupported_coin():
     verifier = CrossChainVerifier()

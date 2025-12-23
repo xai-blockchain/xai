@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Exchange - Decentralized Order Book and Matching Engine
 
@@ -17,44 +19,40 @@ Security:
 - Structured logging for audit trail
 """
 
-from abc import ABC, abstractmethod
+import hashlib
+import hmac
+import json
 import logging
+import math
+import secrets
 import time
 import uuid
-import hmac
-import hashlib
-import secrets
-from decimal import Decimal, InvalidOperation
-from typing import List, Dict, Optional, Tuple, Callable, Any
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from decimal import Decimal, InvalidOperation
 from enum import Enum
-import json
-import math
-from xai.core.transaction import Transaction
+from typing import Any, Callable
+
 from xai.core.exchange_wallet import ExchangeWalletManager
+from xai.core.transaction import Transaction
 
 logger = logging.getLogger(__name__)
-
 
 class ExchangeError(Exception):
     """Base exception for exchange errors."""
     pass
 
-
 class InsufficientBalanceError(ExchangeError):
     """Raised when user has insufficient balance for trade."""
     pass
-
 
 class SettlementError(ExchangeError):
     """Raised when trade settlement fails."""
     pass
 
-
 class OrderValidationError(ExchangeError):
     """Raised when order validation fails."""
     pass
-
 
 class OrderType(Enum):
     """Order types"""
@@ -63,13 +61,11 @@ class OrderType(Enum):
     MARKET = "market"
     STOP_LIMIT = "stop_limit"
 
-
 class OrderSide(Enum):
     """Order sides"""
 
     BUY = "buy"
     SELL = "sell"
-
 
 class OrderStatus(Enum):
     """Order status"""
@@ -78,7 +74,6 @@ class OrderStatus(Enum):
     PARTIAL = "partial"
     FILLED = "filled"
     CANCELLED = "cancelled"
-
 
 @dataclass
 class Order:
@@ -95,11 +90,11 @@ class Order:
     status: OrderStatus = OrderStatus.PENDING
     timestamp: float = field(default_factory=time.time)
     pay_fee_with_axn: bool = False
-    stop_price: Optional[Decimal] = None
+    stop_price: Decimal | None = None
     triggered: bool = False
-    triggered_at: Optional[float] = None
-    slippage_bps: Optional[int] = None
-    reference_price: Optional[Decimal] = None
+    triggered_at: float | None = None
+    slippage_bps: int | None = None
+    reference_price: Decimal | None = None
 
     def remaining(self) -> Decimal:
         """Get remaining unfilled amount"""
@@ -131,14 +126,12 @@ class Order:
             "reference_price": float(self.reference_price) if self.reference_price is not None else None,
         }
 
-
 class SettlementStatus(Enum):
     """Settlement status for trades."""
     PENDING = "pending"
     SETTLED = "settled"
     FAILED = "failed"
     ROLLED_BACK = "rolled_back"
-
 
 @dataclass
 class Trade:
@@ -161,12 +154,12 @@ class Trade:
     settlement_status: SettlementStatus = SettlementStatus.PENDING
     buyer_fee: Decimal = Decimal("0")
     seller_fee: Decimal = Decimal("0")
-    settlement_txid: Optional[str] = None
-    settlement_error: Optional[str] = None
-    maker_address: Optional[str] = None
-    taker_address: Optional[str] = None
-    maker_order_id: Optional[str] = None
-    taker_order_id: Optional[str] = None
+    settlement_txid: str | None = None
+    settlement_error: str | None = None
+    maker_address: str | None = None
+    taker_address: str | None = None
+    maker_order_id: str | None = None
+    taker_order_id: str | None = None
     maker_fee: Decimal = Decimal("0")
     taker_fee: Decimal = Decimal("0")
 
@@ -205,14 +198,13 @@ class Trade:
             "taker_fee": float(self.taker_fee),
         }
 
-
 class OrderBook:
     """Order book for a single trading pair"""
 
     def __init__(self, pair: str):
         self.pair = pair
-        self.buy_orders: List[Order] = []  # Sorted by price (highest first)
-        self.sell_orders: List[Order] = []  # Sorted by price (lowest first)
+        self.buy_orders: list[Order] = []  # Sorted by price (highest first)
+        self.sell_orders: list[Order] = []  # Sorted by price (lowest first)
 
     def add_order(self, order: Order):
         """Add order to the book"""
@@ -230,26 +222,26 @@ class OrderBook:
         self.buy_orders = [o for o in self.buy_orders if o.id != order_id]
         self.sell_orders = [o for o in self.sell_orders if o.id != order_id]
 
-    def get_order(self, order_id: str) -> Optional[Order]:
+    def get_order(self, order_id: str) -> Order | None:
         """Get order by ID"""
         for order in self.buy_orders + self.sell_orders:
             if order.id == order_id:
                 return order
         return None
 
-    def get_best_bid(self) -> Optional[Decimal]:
+    def get_best_bid(self) -> Decimal | None:
         """Get highest buy price"""
         if self.buy_orders:
             return self.buy_orders[0].price
         return None
 
-    def get_best_ask(self) -> Optional[Decimal]:
+    def get_best_ask(self) -> Decimal | None:
         """Get lowest sell price"""
         if self.sell_orders:
             return self.sell_orders[0].price
         return None
 
-    def get_spread(self) -> Optional[Decimal]:
+    def get_spread(self) -> Decimal | None:
         """Get bid-ask spread"""
         bid = self.get_best_bid()
         ask = self.get_best_ask()
@@ -282,7 +274,6 @@ class OrderBook:
             "spread": float(self.get_spread()) if self.get_spread() else None,
         }
 
-
 class BalanceProvider(ABC):
     """
     Interface for balance management.
@@ -314,8 +305,8 @@ class BalanceProvider(ABC):
         asset: str,
         amount: Decimal,
         *,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Optional[str]:
+        context: dict[str, Any] | None = None,
+    ) -> str | None:
         """
         Execute atomic transfer between addresses.
 
@@ -326,7 +317,6 @@ class BalanceProvider(ABC):
     def verify_transfer(self, txid: str, *, timeout_seconds: int = 0) -> bool:
         """Verify that a transfer with the specified txid has been confirmed."""
 
-
 class InMemoryBalanceProvider(BalanceProvider):
     """
     In-memory balance provider for testing and development.
@@ -336,8 +326,8 @@ class InMemoryBalanceProvider(BalanceProvider):
     """
 
     def __init__(self):
-        self.balances: Dict[str, Dict[str, Decimal]] = {}  # address -> {asset -> balance}
-        self.reservations: Dict[str, Dict[str, Decimal]] = {}  # address -> {asset -> reserved}
+        self.balances: dict[str, dict[str, Decimal]] = {}  # address -> {asset -> balance}
+        self.reservations: dict[str, dict[str, Decimal]] = {}  # address -> {asset -> reserved}
         self._tx_counter = 0
 
     def set_balance(self, address: str, asset: str, amount: Decimal):
@@ -381,8 +371,8 @@ class InMemoryBalanceProvider(BalanceProvider):
         asset: str,
         amount: Decimal,
         *,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Optional[str]:
+        context: dict[str, Any] | None = None,
+    ) -> str | None:
         """Execute atomic transfer."""
         accounts = self.balances.setdefault(from_address, {})
         from_balance = accounts.get(asset, Decimal("0"))
@@ -413,7 +403,6 @@ class InMemoryBalanceProvider(BalanceProvider):
     def verify_transfer(self, txid: str, *, timeout_seconds: int = 0) -> bool:
         return True
 
-
 class BlockchainBalanceProvider(BalanceProvider):
     """
     Blockchain-backed provider that records settlement receipts on-chain while
@@ -426,7 +415,7 @@ class BlockchainBalanceProvider(BalanceProvider):
         blockchain,
         *,
         attestor_address: str = "XAI0000000000000000000000000000000000000000",
-        attestor_secret: Optional[str] = None,
+        attestor_secret: str | None = None,
         confirmations_required: int = 1,
         settlement_fee: float = 0.0,
     ) -> None:
@@ -455,8 +444,8 @@ class BlockchainBalanceProvider(BalanceProvider):
         asset: str,
         amount: Decimal,
         *,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Optional[str]:
+        context: dict[str, Any] | None = None,
+    ) -> str | None:
         context = context or {}
         amount_decimal = Decimal(str(amount))
 
@@ -532,8 +521,8 @@ class BlockchainBalanceProvider(BalanceProvider):
         to_address: str,
         asset: str,
         amount: Decimal,
-        context: Dict[str, Any],
-    ) -> Optional[str]:
+        context: dict[str, Any],
+    ) -> str | None:
         payload = {
             "type": "exchange_settlement",
             "from": from_address,
@@ -562,7 +551,7 @@ class BlockchainBalanceProvider(BalanceProvider):
             return None
         return tx.txid
 
-    def _locate_transaction(self, txid: str) -> Tuple[Optional[Any], Optional[int]]:
+    def _locate_transaction(self, txid: str) -> tuple[Any | None, int | None]:
         pending = getattr(self.blockchain, "pending_transactions", []) or []
         for tx in pending:
             candidate = getattr(tx, "txid", None)
@@ -585,7 +574,6 @@ class BlockchainBalanceProvider(BalanceProvider):
                     return tx, index
         return None, None
 
-
 class MatchingEngine:
     """
     Order matching engine with atomic settlement.
@@ -604,11 +592,11 @@ class MatchingEngine:
         self,
         fee_rate: Decimal = Decimal("0.001"),
         xai_fee_discount: Decimal = Decimal("0.5"),
-        axn_fee_discount: Optional[Decimal] = None,
-        balance_provider: Optional[BalanceProvider] = None,
+        axn_fee_discount: Decimal | None = None,
+        balance_provider: BalanceProvider | None = None,
         fee_collector_address: str = "XAI_FEE_COLLECTOR",
-        maker_fee_rate: Optional[Decimal] = None,
-        taker_fee_rate: Optional[Decimal] = None,
+        maker_fee_rate: Decimal | None = None,
+        taker_fee_rate: Decimal | None = None,
     ):
         """
         Initialize matching engine.
@@ -622,12 +610,12 @@ class MatchingEngine:
         """
         if axn_fee_discount is not None:
             xai_fee_discount = axn_fee_discount
-        self.order_books: Dict[str, OrderBook] = {}
-        self.active_orders: Dict[str, Order] = {}
-        self.trade_history: List[Trade] = []
-        self.user_orders: Dict[str, List[str]] = {}
-        self.stop_orders: Dict[str, List[Order]] = {}
-        self.last_trade_price: Dict[str, Decimal] = {}
+        self.order_books: dict[str, OrderBook] = {}
+        self.active_orders: dict[str, Order] = {}
+        self.trade_history: list[Trade] = []
+        self.user_orders: dict[str, list[str]] = {}
+        self.stop_orders: dict[str, list[Order]] = {}
+        self.last_trade_price: dict[str, Decimal] = {}
         self.fee_rate = fee_rate
         self.xai_fee_discount = xai_fee_discount
         self.maker_fee_rate = maker_fee_rate if maker_fee_rate is not None else fee_rate
@@ -665,7 +653,7 @@ class MatchingEngine:
         """
         return self.xai_fee_discount
 
-    def _verify_settlement_tx(self, txid: Optional[str], leg: str) -> None:
+    def _verify_settlement_tx(self, txid: str | None, leg: str) -> None:
         if not txid:
             raise SettlementError(f"Missing settlement transaction for {leg}")
         verifier = getattr(self.balance_provider, "verify_transfer", None)
@@ -680,7 +668,7 @@ class MatchingEngine:
             self.order_books[pair] = OrderBook(pair)
         return self.order_books[pair]
 
-    def _market_reference_price(self, pair: str, side: OrderSide) -> Optional[Decimal]:
+    def _market_reference_price(self, pair: str, side: OrderSide) -> Decimal | None:
         """Return the best available price for slippage calculations."""
         book = self.get_order_book(pair)
         if side == OrderSide.BUY:
@@ -694,8 +682,8 @@ class MatchingEngine:
         order_type: str,
         price: float,
         amount: float,
-        stop_price: Optional[float] = None,
-    ) -> Tuple[OrderSide, OrderType, Decimal, Decimal, Optional[Decimal]]:
+        stop_price: float | None = None,
+    ) -> tuple[OrderSide, OrderType, Decimal, Decimal, Decimal | None]:
         """
         Validate order placement parameters and return parsed enums/decimals.
 
@@ -740,7 +728,7 @@ class MatchingEngine:
         if amount_decimal.is_nan() or amount_decimal.is_infinite():
             raise OrderValidationError("Order amount must be finite.")
 
-        stop_decimal: Optional[Decimal] = None
+        stop_decimal: Decimal | None = None
         if type_enum == OrderType.STOP_LIMIT:
             if stop_price is None:
                 raise OrderValidationError("Stop-limit orders require a stop_price.")
@@ -769,8 +757,8 @@ class MatchingEngine:
         order_type: str,
         price: float,
         amount: float,
-        stop_price: Optional[float] = None,
-        max_slippage_bps: Optional[int] = None,
+        stop_price: float | None = None,
+        max_slippage_bps: int | None = None,
         pay_fee_with_axn: bool = False,
     ) -> Order:
         """Place a new order"""
@@ -890,7 +878,7 @@ class MatchingEngine:
                 },
             )
 
-    def _current_price_for_side(self, pair: str, side: OrderSide) -> Optional[Decimal]:
+    def _current_price_for_side(self, pair: str, side: OrderSide) -> Decimal | None:
         """Get the current reference price used for stop order triggering."""
         last_trade = self.last_trade_price.get(pair)
         if last_trade is not None:
@@ -933,7 +921,7 @@ class MatchingEngine:
         if not pending:
             return
 
-        remaining: List[Order] = []
+        remaining: list[Order] = []
         for order in pending:
             if self._should_trigger_stop(order):
                 self._activate_stop_order(order)
@@ -1054,7 +1042,7 @@ class MatchingEngine:
         amount: Decimal,
         *,
         taker_is_buy: bool,
-    ) -> Optional[Trade]:
+    ) -> Trade | None:
         """
         Execute a trade between two orders with atomic settlement.
 
@@ -1189,7 +1177,7 @@ class MatchingEngine:
 
         # Execute atomic settlement
         # Track completed transfers for potential rollback
-        completed_transfers: List[Dict[str, Any]] = []
+        completed_transfers: list[dict[str, Any]] = []
 
         try:
             # Transfer 1: Buyer sends quote currency to seller (minus seller fee)
@@ -1397,7 +1385,7 @@ class MatchingEngine:
 
         return True
 
-    def get_user_orders(self, user_address: str, status: Optional[str] = None) -> List[Order]:
+    def get_user_orders(self, user_address: str, status: str | None = None) -> list[Order]:
         """Get all orders for a user"""
         order_ids = self.user_orders.get(user_address, [])
         orders = [self.active_orders[oid] for oid in order_ids if oid in self.active_orders]
@@ -1407,7 +1395,7 @@ class MatchingEngine:
 
         return orders
 
-    def get_recent_trades(self, pair: Optional[str] = None, limit: int = 20) -> List[Trade]:
+    def get_recent_trades(self, pair: str | None = None, limit: int = 20) -> list[Trade]:
         """Get recent trades"""
         trades = self.trade_history
 
@@ -1422,8 +1410,8 @@ class MatchingEngine:
         total: Decimal,
         pay_with_xai: bool = False,
         *,
-        pay_with_axn: Optional[bool] = None,
-        is_maker: Optional[bool] = None,
+        pay_with_axn: bool | None = None,
+        is_maker: bool | None = None,
     ) -> Decimal:
         """
         Calculate trading fee.

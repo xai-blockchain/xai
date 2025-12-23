@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import hashlib
 import logging
-from typing import Tuple
 
 from src.xai.security.csprng import CSPRNG
 
@@ -29,7 +30,7 @@ class KeyStretchingManager:
         """Generates a cryptographically secure random salt."""
         return self.csprng.generate_bytes(self.salt_length_bytes)
 
-    def derive_key(self, password: str, salt: bytes = None) -> Tuple[bytes, bytes, int]:
+    def derive_key(self, password: str, salt: bytes = None) -> tuple[bytes, bytes, int]:
         """
         Derives a cryptographic key from a password using PBKDF2.
         If no salt is provided, a new one is generated.
@@ -75,6 +76,5 @@ class KeyStretchingManager:
         )
 
         return computed_derived_key == stored_derived_key
-
 
 # Example usage is intentionally omitted in production modules.

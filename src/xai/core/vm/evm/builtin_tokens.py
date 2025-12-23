@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Callable, Sequence
 
+from ..exceptions import VMExecutionError
 from .abi import (
     decode_address,
     decode_bool,
@@ -26,10 +27,8 @@ from .abi import (
     keccak256,
 )
 from .storage import EVMStorage
-from ..exceptions import VMExecutionError
 
 ZERO_ADDRESS = "0x" + "0" * 40
-
 
 def _normalize_address(address: str) -> str:
     """Return a checks-safe lowercase hex address."""
@@ -39,15 +38,12 @@ def _normalize_address(address: str) -> str:
         return address.lower()
     return f"0x{address.lower()}"
 
-
 def _encode_address_topic(address: str) -> str:
     raw = bytes.fromhex(_normalize_address(address)[2:])
     return "0x" + raw.rjust(32, b"\x00").hex()
 
-
 def _encode_uint_topic(value: int) -> str:
     return "0x" + encode_uint256(value).hex()
-
 
 class StorageLayout:
     """Utility helpers for mapping keys into EVM storage slots."""
@@ -111,7 +107,6 @@ class StorageLayout:
     ) -> int:
         first = self.mapping_slot(base_slot, key1)
         return self.mapping_slot(first, key2)
-
 
 class ERC20StorageAdapter(StorageLayout):
     """Storage-backed view of ERC20 contract state."""
@@ -217,7 +212,6 @@ class ERC20StorageAdapter(StorageLayout):
     def get_domain_separator(self) -> bytes:
         return self.storage.get_raw(self.DOMAIN_SEPARATOR_SLOT).to_bytes(32, "big")
 
-
 class ERC20BuiltinContract:
     """Implements ERC20 logic on top of EVM storage."""
 
@@ -241,9 +235,9 @@ class ERC20BuiltinContract:
         self,
         *,
         storage: EVMStorage,
-        metadata: Dict[str, int | str],
+        metadata: dict[str, int | str],
         address: str,
-        receive_hook: Optional[Callable[[str, str, str, int, bytes], None]] = None,
+        receive_hook: Callable[[str, str, str, int, bytes], None] | None = None,
     ) -> None:
         self.address = _normalize_address(address)
         self.storage = storage
@@ -282,7 +276,7 @@ class ERC20BuiltinContract:
         *,
         value: int,
         static: bool,
-    ) -> Tuple[bytes, int, List[Dict[str, Sequence[str] | str]]]:
+    ) -> tuple[bytes, int, list[dict[str, Sequence[str] | str]]]:
         sender = _normalize_address(sender)
         selector_hex = selector.lower()
         if static and selector_hex in self.STATEFUL_FUNCTIONS:
@@ -290,7 +284,7 @@ class ERC20BuiltinContract:
         if value:
             raise VMExecutionError("ERC20 builtin does not accept native token value")
 
-        handlers: Dict[str, Callable[[bytes, str], bytes]] = {
+        handlers: dict[str, Callable[[bytes, str], bytes]] = {
             "06fdde03": self._handle_name,
             "95d89b41": self._handle_symbol,
             "313ce567": self._handle_decimals,
@@ -315,7 +309,7 @@ class ERC20BuiltinContract:
         if handler is None:
             raise VMExecutionError(f"ERC20 builtin does not implement selector 0x{selector_hex}")
 
-        logs: List[Dict[str, Sequence[str] | str]] = []
+        logs: list[dict[str, Sequence[str] | str]] = []
         result = handler(calldata, sender, logs)
         return result, 50_000 if selector_hex in self.STATEFUL_FUNCTIONS else 20_000, logs
 
@@ -328,34 +322,34 @@ class ERC20BuiltinContract:
             raise VMExecutionError("ERC20: token is paused")
 
     def _handle_name(
-        self, _data: bytes, _sender: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, _data: bytes, _sender: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         return encode_args(["string"], [self.adapter.get_name()])
 
     def _handle_symbol(
-        self, _data: bytes, _sender: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, _data: bytes, _sender: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         return encode_args(["string"], [self.adapter.get_symbol()])
 
     def _handle_decimals(
-        self, _data: bytes, _sender: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, _data: bytes, _sender: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         return encode_uint256(self.adapter.get_decimals())
 
     def _handle_total_supply(
-        self, _data: bytes, _sender: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, _data: bytes, _sender: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         return encode_uint256(self.adapter.get_total_supply())
 
     def _handle_balance_of(
-        self, data: bytes, _sender: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, _sender: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         addr, _ = decode_address(data, 0)
         balance = self.adapter.get_balance(addr)
         return encode_uint256(balance)
 
     def _handle_allowance(
-        self, data: bytes, _sender: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, _sender: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         owner, offset = decode_address(data, 0)
         spender, _ = decode_address(data, offset)
@@ -363,7 +357,7 @@ class ERC20BuiltinContract:
         return encode_uint256(amount)
 
     def _handle_transfer(
-        self, data: bytes, sender: str, logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, sender: str, logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         self._require_not_paused()
         to_addr, offset = decode_address(data, 0)
@@ -403,7 +397,7 @@ class ERC20BuiltinContract:
         return encode_bool(True)
 
     def _handle_approve(
-        self, data: bytes, sender: str, logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, sender: str, logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         spender, offset = decode_address(data, 0)
         amount, _ = decode_uint256(data, offset)
@@ -422,7 +416,7 @@ class ERC20BuiltinContract:
         return encode_bool(True)
 
     def _handle_transfer_from(
-        self, data: bytes, sender: str, logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, sender: str, logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         self._require_not_paused()
         from_addr, offset = decode_address(data, 0)
@@ -467,7 +461,7 @@ class ERC20BuiltinContract:
         return encode_bool(True)
 
     def _handle_mint(
-        self, data: bytes, caller: str, logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, caller: str, logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         self._require_owner(caller)
         self._require_not_paused()
@@ -509,7 +503,7 @@ class ERC20BuiltinContract:
         return encode_bool(True)
 
     def _handle_burn(
-        self, data: bytes, caller: str, logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, caller: str, logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         self._require_not_paused()
         amount, _ = decode_uint256(data, 0)
@@ -532,7 +526,7 @@ class ERC20BuiltinContract:
         return encode_bool(True)
 
     def _handle_burn_from(
-        self, data: bytes, sender: str, logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, sender: str, logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         holder, offset = decode_address(data, 0)
         amount, _ = decode_uint256(data, offset)
@@ -560,21 +554,21 @@ class ERC20BuiltinContract:
         return encode_bool(True)
 
     def _handle_pause(
-        self, _data: bytes, caller: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, _data: bytes, caller: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         self._require_owner(caller)
         self.adapter.set_paused(True)
         return encode_bool(True)
 
     def _handle_unpause(
-        self, _data: bytes, caller: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, _data: bytes, caller: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         self._require_owner(caller)
         self.adapter.set_paused(False)
         return encode_bool(True)
 
     def _handle_transfer_ownership(
-        self, data: bytes, caller: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, caller: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         self._require_owner(caller)
         new_owner, _ = decode_address(data, 0)
@@ -584,19 +578,19 @@ class ERC20BuiltinContract:
         return encode_bool(True)
 
     def _handle_nonce(
-        self, data: bytes, _caller: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, _caller: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         owner, _ = decode_address(data, 0)
         nonce = self.adapter.get_nonce(owner)
         return encode_uint256(nonce)
 
     def _handle_domain_separator(
-        self, _data: bytes, _caller: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, _data: bytes, _caller: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         return self.adapter.get_domain_separator()
 
     def _handle_permit(
-        self, data: bytes, _caller: str, logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, _caller: str, logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         base = 0
         owner, base = decode_address(data, base)
@@ -647,7 +641,6 @@ class ERC20BuiltinContract:
             amount,
             data,
         )
-
 
 @dataclass
 class ERC721StorageAdapter(StorageLayout):
@@ -745,7 +738,6 @@ class ERC721StorageAdapter(StorageLayout):
         slot = self.mapping_slot(self.TOKEN_URI_BASE, token_id)
         self.write_string(slot, uri)
 
-
 class ERC721BuiltinContract:
     """Minimal ERC721 runtime for builtin execution."""
 
@@ -770,9 +762,9 @@ class ERC721BuiltinContract:
         self,
         *,
         storage: EVMStorage,
-        metadata: Dict[str, str | int],
+        metadata: dict[str, str | int],
         address: str,
-        receive_hook: Optional[Callable[[str, str, str, int, bytes], None]] = None,
+        receive_hook: Callable[[str, str, str, int, bytes], None] | None = None,
     ) -> None:
         self.address = _normalize_address(address)
         self.storage = storage
@@ -793,7 +785,7 @@ class ERC721BuiltinContract:
         *,
         value: int,
         static: bool,
-    ) -> Tuple[bytes, int, List[Dict[str, Sequence[str] | str]]]:
+    ) -> tuple[bytes, int, list[dict[str, Sequence[str] | str]]]:
         sender = _normalize_address(sender)
         if value:
             raise VMExecutionError("ERC721 builtin does not accept native value")
@@ -801,7 +793,7 @@ class ERC721BuiltinContract:
         if static and selector_hex in self.STATEFUL_SELECTORS:
             raise VMExecutionError("State-changing ERC721 call in static context")
 
-        handlers: Dict[str, Callable[[bytes, str, List[Dict[str, Sequence[str] | str]]], bytes]] = {
+        handlers: dict[str, Callable[[bytes, str, list[dict[str, Sequence[str] | str]]], bytes]] = {
             "06fdde03": self._handle_name,
             "95d89b41": self._handle_symbol,
             "18160ddd": self._handle_total_supply,
@@ -824,7 +816,7 @@ class ERC721BuiltinContract:
         if handler is None:
             raise VMExecutionError(f"ERC721 builtin missing selector 0x{selector_hex}")
 
-        logs: List[Dict[str, Sequence[str] | str]] = []
+        logs: list[dict[str, Sequence[str] | str]] = []
         result = handler(calldata, sender, logs)
         gas = 90_000 if selector_hex in self.STATEFUL_SELECTORS else 30_000
         return result, gas, logs
@@ -834,22 +826,22 @@ class ERC721BuiltinContract:
             raise VMExecutionError("ERC721: caller is not owner")
 
     def _handle_name(
-        self, _data: bytes, _sender: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, _data: bytes, _sender: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         return encode_args(["string"], [self.adapter.get_name()])
 
     def _handle_symbol(
-        self, _data: bytes, _sender: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, _data: bytes, _sender: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         return encode_args(["string"], [self.adapter.get_symbol()])
 
     def _handle_total_supply(
-        self, _data: bytes, _sender: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, _data: bytes, _sender: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         return encode_uint256(self.adapter.get_total_supply())
 
     def _handle_balance_of(
-        self, data: bytes, _sender: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, _sender: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         owner, _ = decode_address(data, 0)
         if owner == ZERO_ADDRESS:
@@ -857,7 +849,7 @@ class ERC721BuiltinContract:
         return encode_uint256(self.adapter.get_balance(owner))
 
     def _handle_owner_of(
-        self, data: bytes, _sender: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, _sender: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         token_id, _ = decode_uint256(data, 0)
         owner = self.adapter.get_token_owner(token_id)
@@ -881,7 +873,7 @@ class ERC721BuiltinContract:
         to_addr: str,
         token_id: int,
         caller: str,
-        logs: List[Dict[str, Sequence[str] | str]],
+        logs: list[dict[str, Sequence[str] | str]],
     ) -> None:
         owner = self.adapter.get_token_owner(token_id)
         if owner != _normalize_address(from_addr):
@@ -909,7 +901,7 @@ class ERC721BuiltinContract:
         )
 
     def _handle_transfer_from(
-        self, data: bytes, sender: str, logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, sender: str, logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         from_addr, offset = decode_address(data, 0)
         to_addr, offset = decode_address(data, offset)
@@ -918,7 +910,7 @@ class ERC721BuiltinContract:
         return b""
 
     def _handle_safe_transfer_from(
-        self, data: bytes, sender: str, logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, sender: str, logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         from_addr, offset = decode_address(data, 0)
         to_addr, offset = decode_address(data, offset)
@@ -927,7 +919,7 @@ class ERC721BuiltinContract:
         return b""
 
     def _handle_safe_transfer_from_data(
-        self, data: bytes, sender: str, logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, sender: str, logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         from_addr, offset = decode_address(data, 0)
         to_addr, offset = decode_address(data, offset)
@@ -942,7 +934,7 @@ class ERC721BuiltinContract:
         to_addr: str,
         token_id: int,
         operator: str,
-        logs: List[Dict[str, Sequence[str] | str]],
+        logs: list[dict[str, Sequence[str] | str]],
         data: bytes,
     ) -> None:
         previous_owner = self.adapter.get_token_owner(token_id)
@@ -972,7 +964,7 @@ class ERC721BuiltinContract:
             raise
 
     def _handle_approve(
-        self, data: bytes, sender: str, logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, sender: str, logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         to_addr, offset = decode_address(data, 0)
         token_id, _ = decode_uint256(data, offset)
@@ -996,14 +988,14 @@ class ERC721BuiltinContract:
         return b""
 
     def _handle_get_approved(
-        self, data: bytes, _sender: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, _sender: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         token_id, _ = decode_uint256(data, 0)
         approved = self.adapter.get_token_approval(token_id)
         return encode_args(["address"], [approved])
 
     def _handle_set_approval_for_all(
-        self, data: bytes, sender: str, logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, sender: str, logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         operator, offset = decode_address(data, 0)
         approved, _ = decode_bool(data, offset)
@@ -1024,7 +1016,7 @@ class ERC721BuiltinContract:
         return b""
 
     def _handle_is_approved_for_all(
-        self, data: bytes, _sender: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, _sender: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         owner, offset = decode_address(data, 0)
         operator, _ = decode_address(data, offset)
@@ -1032,14 +1024,14 @@ class ERC721BuiltinContract:
         return encode_bool(approved)
 
     def _handle_token_uri(
-        self, data: bytes, _sender: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, _sender: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         token_id, _ = decode_uint256(data, 0)
         uri = self.adapter.get_token_uri(token_id)
         return encode_args(["string"], [uri])
 
     def _handle_mint(
-        self, data: bytes, caller: str, logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, caller: str, logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         self._require_owner(caller)
         to_addr, offset = decode_address(data, 0)
@@ -1069,7 +1061,7 @@ class ERC721BuiltinContract:
         return b""
 
     def _handle_burn(
-        self, data: bytes, caller: str, logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, caller: str, logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         token_id, _ = decode_uint256(data, 0)
         owner = self.adapter.get_token_owner(token_id)
@@ -1094,7 +1086,7 @@ class ERC721BuiltinContract:
         return b""
 
     def _handle_transfer_ownership(
-        self, data: bytes, caller: str, _logs: List[Dict[str, Sequence[str] | str]]
+        self, data: bytes, caller: str, _logs: list[dict[str, Sequence[str] | str]]
     ) -> bytes:
         self._require_owner(caller)
         new_owner, _ = decode_address(data, 0)
@@ -1116,25 +1108,23 @@ class ERC721BuiltinContract:
             return
         self._receive_hook(operator, previous_owner, to_addr, token_id, data)
 
-
-BuiltinContractResult = Tuple[
-    bytes, int, List[Dict[str, Sequence[str] | str]], EVMStorage
+BuiltinContractResult = tuple[
+    bytes, int, list[dict[str, Sequence[str] | str]], EVMStorage
 ]
-
 
 def execute_builtin_contract(
     *,
     contract_type: str,
     contract_address: str,
-    storage_data: Dict[str, int],
-    metadata: Dict[str, str | int],
+    storage_data: dict[str, int],
+    metadata: dict[str, str | int],
     selector: str,
     calldata: bytes,
     sender: str,
     value: int,
     static: bool,
-    erc20_receive_hook: Optional[Callable[[str, str, str, int, bytes], None]] = None,
-    erc721_receive_hook: Optional[Callable[[str, str, str, int, bytes], None]] = None,
+    erc20_receive_hook: Callable[[str, str, str, int, bytes], None] | None = None,
+    erc721_receive_hook: Callable[[str, str, str, int, bytes], None] | None = None,
 ) -> BuiltinContractResult:
     """
     Dispatch an ERC builtin contract call.

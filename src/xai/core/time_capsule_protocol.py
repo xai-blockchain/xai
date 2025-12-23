@@ -14,7 +14,7 @@ import json
 import os
 import time
 from datetime import datetime, timedelta
-from typing import Dict, Optional
+
 from xai.core.wallet import Wallet
 
 

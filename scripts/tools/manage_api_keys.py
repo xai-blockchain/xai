@@ -10,7 +10,6 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -18,7 +17,6 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from xai.core.api_auth import APIKeyStore  # noqa: E402
 from xai.core.config import API_KEY_STORE_PATH, Config  # noqa: E402
-
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Manage API keys in the store")
@@ -66,26 +64,22 @@ def build_parser() -> argparse.ArgumentParser:
 
     return parser
 
-
 def cmd_list(store: APIKeyStore) -> None:
     keys = store.list_keys()
     print(json.dumps(keys, indent=2) or "{}")
-
 
 def cmd_events(store: APIKeyStore, limit: int) -> None:
     events = store.get_events(limit=limit)
     print(json.dumps(events, indent=2))
 
-
-def _ttl_seconds_from_args(ttl_days: Optional[float], ttl_hours: Optional[float]) -> Optional[int]:
+def _ttl_seconds_from_args(ttl_days: float | None, ttl_hours: float | None) -> int | None:
     if ttl_days is not None:
         return max(1, int(ttl_days * 86400))
     if ttl_hours is not None:
         return max(1, int(ttl_hours * 3600))
     return None
 
-
-def cmd_issue(store: APIKeyStore, label: str, scope: str, ttl_seconds: Optional[int], permanent: bool) -> None:
+def cmd_issue(store: APIKeyStore, label: str, scope: str, ttl_seconds: int | None, permanent: bool) -> None:
     api_key, key_id = store.issue_key(label=label, scope=scope, ttl_seconds=ttl_seconds, permanent=permanent)
     metadata = store.list_keys().get(key_id, {})
     payload = {
@@ -98,14 +92,12 @@ def cmd_issue(store: APIKeyStore, label: str, scope: str, ttl_seconds: Optional[
     }
     print(json.dumps(payload, indent=2))
 
-
 def cmd_revoke(store: APIKeyStore, key_id: str) -> int:
     if store.revoke_key(key_id):
         print(json.dumps({"revoked": True, "key_id": key_id}))
         return 0
     print(json.dumps({"revoked": False, "key_id": key_id, "error": "not_found"}))
     return 1
-
 
 def cmd_watch_events(store: APIKeyStore, limit: int, interval: float) -> int:
     """Stream the audit log so ops teams can tail issuance/revocation events."""
@@ -140,12 +132,11 @@ def cmd_watch_events(store: APIKeyStore, limit: int, interval: float) -> int:
         except KeyboardInterrupt:
             return 0
 
-
 def cmd_bootstrap_admin(
     store: APIKeyStore,
     label: str,
-    secret: Optional[str],
-    ttl_seconds: Optional[int],
+    secret: str | None,
+    ttl_seconds: int | None,
     permanent: bool,
 ) -> int:
     """Issue an admin key using a pre-provisioned secret (env or CLI)."""
@@ -170,7 +161,6 @@ def cmd_bootstrap_admin(
     }
     print(json.dumps(payload, indent=2))
     return 0
-
 
 def main() -> int:
     parser = build_parser()
@@ -208,7 +198,6 @@ def main() -> int:
             print(json.dumps({"error": str(exc)}))
             return 1
     return 1
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

@@ -13,7 +13,7 @@ import sys
 import tarfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Dict, Any, List
+from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -22,7 +22,6 @@ if str(PROJECT_ROOT) not in sys.path:
 from xai.core.blockchain import Blockchain  # noqa: E402
 from xai.core.config import Config  # noqa: E402
 
-
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -30,17 +29,15 @@ def sha256_file(path: Path) -> str:
             digest.update(chunk)
     return digest.hexdigest()
 
-
 def load_blockchain(data_dir: Path) -> Blockchain:
     return Blockchain(data_dir=str(data_dir))
 
-
-def collect_metadata(blockchain: Blockchain, data_dir: Path, label: str) -> Dict[str, Any]:
+def collect_metadata(blockchain: Blockchain, data_dir: Path, label: str) -> dict[str, Any]:
     chain_height = len(blockchain.chain) - 1 if blockchain.chain else -1
     latest_hash = blockchain.chain[-1].hash if blockchain.chain else None
     genesis_hash = blockchain.chain[0].hash if blockchain.chain else None
     blocks_dir = data_dir / "blocks"
-    block_hashes: List[Dict[str, Any]] = []
+    block_hashes: list[dict[str, Any]] = []
     if blocks_dir.exists():
         for block_file in sorted(blocks_dir.glob("block_*.json"), key=lambda p: int(p.stem.split("_")[1])):
             block_hashes.append(
@@ -66,7 +63,6 @@ def collect_metadata(blockchain: Blockchain, data_dir: Path, label: str) -> Dict
     }
     return metadata
 
-
 def create_snapshot(args: argparse.Namespace) -> int:
     data_dir = Path(args.data_dir).resolve()
     if not data_dir.exists():
@@ -86,11 +82,9 @@ def create_snapshot(args: argparse.Namespace) -> int:
     print(json.dumps({"snapshot": str(output_path), "manifest": str(manifest_path), "height": metadata["height"]}))
     return 0
 
-
-def load_manifest(manifest_path: Path) -> Dict[str, Any]:
+def load_manifest(manifest_path: Path) -> dict[str, Any]:
     with manifest_path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
-
 
 def verify_snapshot(args: argparse.Namespace) -> int:
     manifest_path = Path(args.manifest).resolve()
@@ -117,12 +111,10 @@ def verify_snapshot(args: argparse.Namespace) -> int:
     print(json.dumps({"snapshot": str(snapshot_path), "status": "verified", "height": manifest.get("height")}))
     return 0
 
-
 def describe_snapshot(args: argparse.Namespace) -> int:
     manifest = load_manifest(Path(args.manifest).resolve())
     print(json.dumps(manifest, indent=2))
     return 0
-
 
 def restore_snapshot(args: argparse.Namespace) -> int:
     snapshot_path = Path(args.snapshot).resolve()
@@ -153,7 +145,6 @@ def restore_snapshot(args: argparse.Namespace) -> int:
     print(json.dumps({"restored_to": str(target_dir), "snapshot": str(snapshot_path)}))
     return 0
 
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Manage blockchain state snapshots.")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -178,7 +169,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     return parser
 
-
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
@@ -191,7 +181,6 @@ def main() -> int:
     if args.command == "restore":
         return restore_snapshot(args)
     return 1
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

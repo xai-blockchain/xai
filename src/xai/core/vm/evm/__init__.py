@@ -15,13 +15,13 @@ Features:
 - Error handling with revert data
 """
 
-from .opcodes import Opcode, OPCODE_INFO
+from .context import CallContext, ExecutionContext
+from .executor import EVMBytecodeExecutor
+from .interpreter import EVMInterpreter
 from .memory import EVMMemory
+from .opcodes import OPCODE_INFO, Opcode
 from .stack import EVMStack
 from .storage import EVMStorage
-from .interpreter import EVMInterpreter
-from .context import ExecutionContext, CallContext
-from .executor import EVMBytecodeExecutor
 
 __all__ = [
     "Opcode",

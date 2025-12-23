@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import hashlib
 import logging
 import os
-from typing import Optional, Dict, Any, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -10,11 +12,10 @@ logger = logging.getLogger(__name__)
 # Its purpose is to illustrate the concept of offloading sensitive operations to a secure environment.
 # DO NOT use this for any production or security-sensitive applications.
 
-
 class SecureEnclaveManager:
     def __init__(self, simulate_enclave_available: bool = True):
         self._simulate_enclave_available = simulate_enclave_available
-        self._enclave_keys: Dict[str, Tuple[bytes, bytes]] = (
+        self._enclave_keys: dict[str, tuple[bytes, bytes]] = (
             {}
         )  # {key_handle: (conceptual_private_key, conceptual_public_key)}
         self._key_handle_counter = 0
@@ -27,7 +28,7 @@ class SecureEnclaveManager:
         """Simulates checking if the secure enclave is available."""
         return self._simulate_enclave_available
 
-    def generate_key_in_enclave(self) -> Optional[str]:
+    def generate_key_in_enclave(self) -> str | None:
         """
         Simulates generating a new private key and corresponding public key inside the secure enclave.
         Returns a key handle, not the actual private key.
@@ -52,7 +53,7 @@ class SecureEnclaveManager:
         )
         return key_handle
 
-    def get_public_key_from_enclave(self, key_handle: str) -> Optional[bytes]:
+    def get_public_key_from_enclave(self, key_handle: str) -> bytes | None:
         """
         Simulates retrieving the public key associated with a key handle from the enclave.
         """
@@ -70,7 +71,7 @@ class SecureEnclaveManager:
 
         return key_pair[1]  # Return the conceptual public key
 
-    def sign_data_in_enclave(self, key_handle: str, data_to_sign: bytes) -> Optional[bytes]:
+    def sign_data_in_enclave(self, key_handle: str, data_to_sign: bytes) -> bytes | None:
         """
         Simulates sending data to the enclave for signing using a key handle.
         The private key never leaves the conceptual enclave.
@@ -144,6 +145,5 @@ class SecureEnclaveManager:
             extra={"event": "secure_enclave.verify_failed", "handle": getattr(self, '_last_handle', None)},
         )
         return False
-
 
 # Example usage is intentionally omitted in production modules.

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Comprehensive Testing Framework
 
@@ -13,14 +15,12 @@ import os
 import time
 import unittest
 import tempfile
-from typing import List, Dict, Tuple
 
 import pytest
 from xai.core.blockchain import Blockchain, Transaction, Block
 from xai.core.wallet import Wallet
 from xai.core.blockchain_security import BlockchainSecurityManager, BlockchainSecurityConfig
 from xai.core.advanced_consensus import AdvancedConsensusManager
-
 
 class FrameworkResult:
     """Test result tracking"""
@@ -31,12 +31,11 @@ class FrameworkResult:
         self.failed = 0
         self.errors = 0
         self.skipped = 0
-        self.failures: List[Tuple[str, str]] = []
+        self.failures: list[tuple[str, str]] = []
         self.start_time = time.time()
 
     def duration(self) -> float:
         return time.time() - self.start_time
-
 
 class BlockchainUnitTests:
     """Unit tests for core blockchain components"""
@@ -119,7 +118,6 @@ class BlockchainUnitTests:
             balance = blockchain.get_balance(wallet.address)
             assert balance == 80.0, f"Balance should be 80.0, got {balance}"
         return True
-
 
 class BlockchainIntegrationTests:
     """Integration tests for full blockchain operations"""
@@ -227,7 +225,6 @@ class BlockchainIntegrationTests:
             # All transactions should be in block
             assert len(block.transactions) == 6, "Block should have coinbase + 5 transactions"
         return True
-
 
 class SecurityTests:
     """Security tests for attack scenarios"""
@@ -344,7 +341,6 @@ class SecurityTests:
             assert "too deep" in error.lower(), "Error should mention depth"
         return True
 
-
 class PerformanceTests:
     """Performance and stress tests"""
 
@@ -440,7 +436,6 @@ class PerformanceTests:
             assert duration < 0.1, "Balance query should be fast"
         return True
 
-
 class FrameworkRunner:
     """Main test runner"""
 
@@ -515,7 +510,6 @@ class FrameworkRunner:
             print(f"\n✗ SOME TESTS FAILED")
             return False
 
-
 def run_all_tests():
     """Run all test suites"""
     print("=" * 70)
@@ -534,7 +528,6 @@ def run_all_tests():
     success = runner.print_summary()
 
     return 0 if success else 1
-
 
 if __name__ == "__main__":
     exit_code = run_all_tests()

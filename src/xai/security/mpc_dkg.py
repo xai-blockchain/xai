@@ -1,16 +1,17 @@
+from __future__ import annotations
+
 """
 Production-Grade Multi-Party Computation Distributed Key Generation (MPC-DKG)
 Implements proper Shamir's Secret Sharing and cryptographic commitments.
 """
 
-import secrets
 import hashlib
-from typing import List, Tuple, Dict, Optional
+import secrets
 from dataclasses import dataclass
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.backends import default_backend
 
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 
 @dataclass
 class SecretShare:
@@ -20,15 +21,13 @@ class SecretShare:
     y: int  # y-coordinate (the share value)
     commitment: bytes  # Pedersen commitment for verification
 
-
 @dataclass
 class DKGResult:
     """Result of distributed key generation"""
     participant_id: int
     secret_share: SecretShare
     public_key: bytes  # Common public key
-    verification_vector: List[bytes]  # For verifying shares
-
+    verification_vector: list[bytes]  # For verifying shares
 
 class ShamirSecretSharing:
     """
@@ -36,7 +35,7 @@ class ShamirSecretSharing:
     Supports (t, n) threshold schemes where t shares are needed to reconstruct.
     """
 
-    def __init__(self, prime: Optional[int] = None):
+    def __init__(self, prime: int | None = None):
         """
         Initialize with a prime modulus.
 
@@ -49,14 +48,14 @@ class ShamirSecretSharing:
         else:
             self.prime = prime
 
-    def _eval_polynomial(self, coefficients: List[int], x: int) -> int:
+    def _eval_polynomial(self, coefficients: list[int], x: int) -> int:
         """Evaluate polynomial at x using Horner's method"""
         result = 0
         for coef in reversed(coefficients):
             result = (result * x + coef) % self.prime
         return result
 
-    def _extended_gcd(self, a: int, b: int) -> Tuple[int, int, int]:
+    def _extended_gcd(self, a: int, b: int) -> tuple[int, int, int]:
         """Extended Euclidean algorithm"""
         if a == 0:
             return b, 0, 1
@@ -72,7 +71,7 @@ class ShamirSecretSharing:
             raise ValueError("Modular inverse does not exist")
         return (x % self.prime + self.prime) % self.prime
 
-    def generate_shares(self, secret: int, threshold: int, num_shares: int) -> List[SecretShare]:
+    def generate_shares(self, secret: int, threshold: int, num_shares: int) -> list[SecretShare]:
         """
         Generate shares using Shamir's Secret Sharing.
 
@@ -105,7 +104,7 @@ class ShamirSecretSharing:
 
         return shares
 
-    def reconstruct_secret(self, shares: List[SecretShare]) -> int:
+    def reconstruct_secret(self, shares: list[SecretShare]) -> int:
         """
         Reconstruct secret from shares using Lagrange interpolation.
 
@@ -145,7 +144,6 @@ class ShamirSecretSharing:
         expected_commitment = hashlib.sha256(f"{share.x}:{share.y}".encode()).digest()
         return share.commitment == expected_commitment
 
-
 class MPCDistributedKeyGeneration:
     """
     Multi-Party Computation for Distributed Key Generation.
@@ -164,7 +162,7 @@ class MPCDistributedKeyGeneration:
         self,
         num_participants: int,
         threshold: int
-    ) -> Tuple[List[DKGResult], bytes]:
+    ) -> tuple[list[DKGResult], bytes]:
         """
         Generate distributed keys for participants.
 
@@ -208,7 +206,7 @@ class MPCDistributedKeyGeneration:
 
         return results, common_public_bytes
 
-    def reconstruct_private_key(self, dkg_results: List[DKGResult]) -> bytes:
+    def reconstruct_private_key(self, dkg_results: list[DKGResult]) -> bytes:
         """
         Reconstruct private key from threshold shares.
 
@@ -241,7 +239,7 @@ class MPCDistributedKeyGeneration:
         """Verify a DKG result's share commitment"""
         return self.sss.verify_share(result.secret_share)
 
-    def _generate_verification_vector(self, threshold: int) -> List[bytes]:
+    def _generate_verification_vector(self, threshold: int) -> list[bytes]:
         """
         Generate verification vector for Feldman's VSS.
 
@@ -261,7 +259,7 @@ class MPCDistributedKeyGeneration:
 
     def combine_partial_signatures(
         self,
-        partial_signatures: List[Tuple[int, bytes]],
+        partial_signatures: list[tuple[int, bytes]],
         threshold: int
     ) -> bytes:
         """
@@ -284,7 +282,6 @@ class MPCDistributedKeyGeneration:
             combined_sig.update(sig)
 
         return combined_sig.digest()
-
 
 # Example and test
 if __name__ == "__main__":

@@ -12,18 +12,18 @@ Example:
 
 from .client import XAIClient
 from .exceptions import (
-    XAIError,
     AuthenticationError,
-    RateLimitError,
     NetworkError,
+    RateLimitError,
     ValidationError,
+    XAIError,
 )
 from .models import (
-    Wallet,
-    Transaction,
     Block,
-    Proposal,
     MiningStatus,
+    Proposal,
+    Transaction,
+    Wallet,
 )
 
 __version__ = "1.0.0"

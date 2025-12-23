@@ -1,28 +1,27 @@
 from __future__ import annotations
 
 import logging
-logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
 
 import json
 import os
 import time
-from typing import TYPE_CHECKING, Dict, Tuple, Optional, Any
+from typing import TYPE_CHECKING, Any
 
 from flask import jsonify, request
 
-from xai.core.request_validator_middleware import validate_request
 from xai.core.input_validation_schemas import (
-    ExchangeOrderInput,
-    ExchangeTransferInput,
     ExchangeCancelInput,
     ExchangeCardPurchaseInput,
+    ExchangeOrderInput,
+    ExchangeTransferInput,
 )
 from xai.core.node_utils import get_base_dir
+from xai.core.request_validator_middleware import validate_request
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
-
 
 def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
     """Register all exchange-related endpoints."""
@@ -33,7 +32,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
     # --- core exchange order/trade routes ---
 
     @app.route("/exchange/orders", methods=["GET"])
-    def get_order_book() -> Tuple[Dict[str, Any], int]:
+    def get_order_book() -> tuple[dict[str, Any], int]:
         """Get current exchange order book.
 
         Returns top buy and sell orders from the exchange order book,
@@ -99,7 +98,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/exchange/place-order", methods=["POST"])
     @validate_request(routes.request_validator, ExchangeOrderInput)
-    def place_order() -> Tuple[Dict[str, Any], int]:
+    def place_order() -> tuple[dict[str, Any], int]:
         """Place a buy or sell order on the exchange (admin only).
 
         Creates a limit order, locks required funds, and attempts to match
@@ -235,7 +234,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/exchange/cancel-order", methods=["POST"])
     @validate_request(routes.request_validator, ExchangeCancelInput)
-    def cancel_order() -> Tuple[Dict[str, Any], int]:
+    def cancel_order() -> tuple[dict[str, Any], int]:
         """Cancel an open order and unlock funds (admin only).
 
         Cancels an open order, removes it from the order book, and unlocks
@@ -305,7 +304,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "exchange_cancel_order")
 
     @app.route("/exchange/my-orders/<address>", methods=["GET"])
-    def get_my_orders(address: str) -> Tuple[Dict[str, Any], int]:
+    def get_my_orders(address: str) -> tuple[dict[str, Any], int]:
         """Get all orders for a specific user address.
 
         Returns all orders (buy and sell, all statuses) for the specified address,
@@ -345,7 +344,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
             return jsonify({"error": str(exc)}), 500
 
     @app.route("/exchange/trades", methods=["GET"])
-    def get_recent_trades() -> Tuple[Dict[str, Any], int]:
+    def get_recent_trades() -> tuple[dict[str, Any], int]:
         """Get recent executed trades.
 
         Returns recent matched trades from the exchange, sorted by timestamp
@@ -381,7 +380,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/exchange/deposit", methods=["POST"])
     @validate_request(routes.request_validator, ExchangeTransferInput)
-    def deposit_funds() -> Tuple[Dict[str, Any], int]:
+    def deposit_funds() -> tuple[dict[str, Any], int]:
         """Deposit funds to exchange wallet (admin only).
 
         Credits user's exchange balance with specified currency and amount.
@@ -443,7 +442,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/exchange/withdraw", methods=["POST"])
     @validate_request(routes.request_validator, ExchangeTransferInput)
-    def withdraw_funds() -> Tuple[Dict[str, Any], int]:
+    def withdraw_funds() -> tuple[dict[str, Any], int]:
         """Withdraw funds from exchange wallet (admin only).
 
         Debits user's exchange balance and initiates withdrawal to destination address.
@@ -502,7 +501,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "exchange_withdraw")
 
     @app.route("/exchange/balance/<address>", methods=["GET"])
-    def get_user_balance(address: str) -> Tuple[Dict[str, Any], int]:
+    def get_user_balance(address: str) -> tuple[dict[str, Any], int]:
         """Get all exchange balances for a user.
 
         Returns all currency balances (available and locked) for the specified address.
@@ -531,7 +530,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
             return jsonify({"error": str(exc)}), 500
 
     @app.route("/exchange/balance/<address>/<currency>", methods=["GET"])
-    def get_currency_balance(address: str, currency: str) -> Tuple[Dict[str, Any], int]:
+    def get_currency_balance(address: str, currency: str) -> tuple[dict[str, Any], int]:
         """Get specific currency balance for a user.
 
         Returns available and locked balance for a single currency.
@@ -557,7 +556,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
             return jsonify({"error": str(exc)}), 500
 
     @app.route("/exchange/transactions/<address>", methods=["GET"])
-    def get_transactions(address: str) -> Tuple[Dict[str, Any], int]:
+    def get_transactions(address: str) -> tuple[dict[str, Any], int]:
         """Get transaction history for a user's exchange wallet.
 
         Returns deposit and withdrawal transaction history.
@@ -588,7 +587,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
     # --- stats routes ---
 
     @app.route("/exchange/price-history", methods=["GET"])
-    def get_price_history() -> Tuple[Dict[str, Any], int]:
+    def get_price_history() -> tuple[dict[str, Any], int]:
         """Get historical price data for charting.
 
         Returns price and volume data for the specified timeframe.
@@ -643,7 +642,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
             return jsonify({"error": str(exc)}), 500
 
     @app.route("/exchange/stats", methods=["GET"])
-    def get_exchange_stats() -> Tuple[Dict[str, Any], int]:
+    def get_exchange_stats() -> tuple[dict[str, Any], int]:
         """Get exchange statistics and market data.
 
         Returns current market statistics including price, volume, and order counts.
@@ -705,7 +704,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/exchange/buy-with-card", methods=["POST"])
     @validate_request(routes.request_validator, ExchangeCardPurchaseInput)
-    def buy_with_card() -> Tuple[Dict[str, Any], int]:
+    def buy_with_card() -> tuple[dict[str, Any], int]:
         """Purchase tokens with credit card (admin only).
 
         Processes credit card payment and deposits purchased tokens to user's
@@ -791,7 +790,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "exchange_buy_with_card")
 
     @app.route("/exchange/payment-methods", methods=["GET"])
-    def get_payment_methods() -> Tuple[Dict[str, Any], int]:
+    def get_payment_methods() -> tuple[dict[str, Any], int]:
         """Get supported payment methods.
 
         Returns list of available payment methods for purchasing tokens.
@@ -813,7 +812,7 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "exchange_payment_methods")
 
     @app.route("/exchange/calculate-purchase", methods=["POST"])
-    def calculate_purchase() -> Tuple[Dict[str, Any], int]:
+    def calculate_purchase() -> tuple[dict[str, Any], int]:
         """Calculate token purchase amount and fees.
 
         Calculates how many tokens will be received for a USD amount,

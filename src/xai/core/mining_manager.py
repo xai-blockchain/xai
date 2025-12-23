@@ -4,17 +4,17 @@ Extracted from Blockchain god class for better separation of concerns
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional, Dict, List, Any
-import time
+
 import os
+import time
+from typing import TYPE_CHECKING, Any
 
 from xai.core.block_header import BlockHeader
-from xai.core.transaction import Transaction
 from xai.core.structured_logger import get_structured_logger
+from xai.core.transaction import Transaction
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Block, Blockchain
-
 
 class MiningManager:
     """
@@ -39,8 +39,8 @@ class MiningManager:
     def mine_pending_transactions(
         self,
         miner_address: str,
-        node_identity: Optional[Dict[str, str]] = None
-    ) -> Optional['Block']:
+        node_identity: dict[str, str] | None = None
+    ) -> 'Block' | None:
         """
         Mine a new block containing pending transactions.
 

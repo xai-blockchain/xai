@@ -20,15 +20,16 @@ import math
 import re
 import time
 from decimal import Decimal, InvalidOperation
-from typing import List, Dict, Optional, Any, Union
+from typing import Any
+
 import base58
-from xai.core.crypto_utils import sign_message_hex, verify_signature_hex, derive_public_key_hex
+
+from xai.core.crypto_utils import derive_public_key_hex, sign_message_hex, verify_signature_hex
 from xai.core.validation import validate_address, validate_amount
 
 logger = logging.getLogger(__name__)
 
-
-def canonical_json(data: Dict[str, Any]) -> str:
+def canonical_json(data: dict[str, Any]) -> str:
     """Produce deterministic JSON string for consensus-critical hashing.
 
     Uses canonical serialization to ensure identical hashes across all nodes:
@@ -52,7 +53,6 @@ def canonical_json(data: Dict[str, Any]) -> str:
         ensure_ascii=True
     )
 
-
 # Validation constants
 MAX_TRANSACTION_AMOUNT = 121_000_000.0  # Total supply cap
 MIN_TRANSACTION_AMOUNT = 0.0
@@ -62,31 +62,25 @@ MAX_INPUTS = 1000  # Maximum inputs per transaction
 MAX_OUTPUTS = 1000  # Maximum outputs per transaction
 ADDRESS_PATTERN = re.compile(r'^(XAI|TXAI|COINBASE)[A-Fa-f0-9]{0,64}$')
 
-
 class TransactionValidationError(ValueError):
     """Raised when transaction validation fails."""
     pass
-
 
 class SignatureVerificationError(TransactionValidationError):
     """Base class for signature verification failures."""
     pass
 
-
 class MissingSignatureError(SignatureVerificationError):
     """Transaction is missing required signature or public key."""
     pass
-
 
 class InvalidSignatureError(SignatureVerificationError):
     """Signature cryptographic verification failed."""
     pass
 
-
 class SignatureCryptoError(SignatureVerificationError):
     """Cryptographic operation failed during signature verification."""
     pass
-
 
 class Transaction:
     """Real cryptocurrency transaction with ECDSA signatures, supporting UTXO model.
@@ -163,7 +157,7 @@ class Transaction:
             raise TransactionValidationError(f"{field_name}: {e}") from e
 
     @staticmethod
-    def _validate_inputs(inputs: Any) -> List[Dict[str, Any]]:
+    def _validate_inputs(inputs: Any) -> list[dict[str, Any]]:
         """Validate transaction inputs.
 
         Args:
@@ -203,7 +197,7 @@ class Transaction:
         return validated
 
     @staticmethod
-    def _validate_outputs(outputs: Any, skip_address_validation: bool = False) -> List[Dict[str, Any]]:
+    def _validate_outputs(outputs: Any, skip_address_validation: bool = False) -> list[dict[str, Any]]:
         """Validate transaction outputs.
 
         Args:
@@ -250,7 +244,7 @@ class Transaction:
         return validated
 
     @staticmethod
-    def _validate_metadata(metadata: Any) -> Dict[str, Any]:
+    def _validate_metadata(metadata: Any) -> dict[str, Any]:
         """Validate transaction metadata.
 
         Args:
@@ -288,15 +282,15 @@ class Transaction:
         recipient: str,
         amount: float,
         fee: float = 0.0,
-        public_key: Optional[str] = None,
+        public_key: str | None = None,
         tx_type: str = "normal",
-        nonce: Optional[int] = None,
-        inputs: Optional[List[Dict[str, Any]]] = None,
-        outputs: Optional[List[Dict[str, Any]]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        nonce: int | None = None,
+        inputs: list[dict[str, Any]] | None = None,
+        outputs: list[dict[str, Any]] | None = None,
+        metadata: dict[str, Any] | None = None,
         rbf_enabled: bool = False,
-        replaces_txid: Optional[str] = None,
-        gas_sponsor: Optional[str] = None,
+        replaces_txid: str | None = None,
+        gas_sponsor: str | None = None,
     ) -> None:
         """Initialize a new transaction with validated parameters.
 
@@ -514,7 +508,7 @@ class Transaction:
             return 0.0
         return self.fee / size
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
         result = {
             "txid": self.txid,

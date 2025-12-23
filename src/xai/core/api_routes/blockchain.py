@@ -3,20 +3,17 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import Any, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 from flask import jsonify, make_response, request
 
 from xai.core.blockchain import Blockchain
 from xai.core.monitoring import MetricsCollector
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
 
 logger = logging.getLogger(__name__)
-
 
 def register_blockchain_routes(routes: "NodeAPIRoutes") -> None:
     """Register blockchain query/manipulation endpoints."""
@@ -24,7 +21,7 @@ def register_blockchain_routes(routes: "NodeAPIRoutes") -> None:
     blockchain = routes.blockchain
 
     @app.route("/blocks", methods=["GET"])
-    def get_blocks() -> Dict[str, Any]:
+    def get_blocks() -> dict[str, Any]:
         """Get all blocks with pagination."""
         try:
             limit, offset = routes._get_pagination_params(default_limit=10, max_limit=200)
@@ -49,7 +46,7 @@ def register_blockchain_routes(routes: "NodeAPIRoutes") -> None:
         )
 
     @app.route("/blocks/<index>", methods=["GET"])
-    def get_block(index: str) -> Tuple[Dict[str, Any], int]:
+    def get_block(index: str) -> tuple[dict[str, Any], int]:
         """Get specific block by index with explicit validation (supports negative input)."""
         try:
             idx_int = int(index)
@@ -106,7 +103,7 @@ def register_blockchain_routes(routes: "NodeAPIRoutes") -> None:
         return jsonify(payload), 200
 
     @app.route("/block/<block_hash>", methods=["GET"])
-    def get_block_by_hash(block_hash: str) -> Tuple[Dict[str, Any], int]:
+    def get_block_by_hash(block_hash: str) -> tuple[dict[str, Any], int]:
         """Get a block by its hash."""
         if not block_hash:
             return jsonify({"error": "Invalid block hash"}), 400
@@ -141,7 +138,7 @@ def register_blockchain_routes(routes: "NodeAPIRoutes") -> None:
         return jsonify(payload), 200
 
     @app.route("/block/receive", methods=["POST"])
-    def receive_block() -> Tuple[Dict[str, Any], int]:
+    def receive_block() -> tuple[dict[str, Any], int]:
         """Receive a block from a peer node."""
         auth_error = routes._require_api_auth()
         if auth_error:
@@ -207,11 +204,10 @@ def register_blockchain_routes(routes: "NodeAPIRoutes") -> None:
             code="block_rejected",
         )
 
-
-def _block_to_payload(block_obj: Any, fallback: Optional[Any] = None) -> Optional[Dict[str, Any]]:
+def _block_to_payload(block_obj: Any, fallback: Any | None = None) -> dict[str, Any] | None:
     """Return a JSON-serializable representation of a block."""
     payload_source = block_obj
-    payload: Optional[Dict[str, Any]]
+    payload: dict[str, Any] | None
     if hasattr(payload_source, "to_dict") and callable(getattr(payload_source, "to_dict", None)):
         payload = payload_source.to_dict()
     elif isinstance(payload_source, dict):
@@ -232,8 +228,7 @@ def _block_to_payload(block_obj: Any, fallback: Optional[Any] = None) -> Optiona
             payload["index"] = header["index"]
     return payload
 
-
-def _build_block_summary(payload: Dict[str, Any]) -> Dict[str, Any]:
+def _build_block_summary(payload: dict[str, Any]) -> dict[str, Any]:
     """Construct a concise summary for a block response."""
     header = payload.get("header") if isinstance(payload.get("header"), dict) else {}
 
@@ -260,8 +255,7 @@ def _build_block_summary(payload: Dict[str, Any]) -> Dict[str, Any]:
         "transactions": tx_count,
     }
 
-
-def _lookup_block_by_hash(blockchain: Any, block_hash: str, normalized: str) -> Optional[Any]:
+def _lookup_block_by_hash(blockchain: Any, block_hash: str, normalized: str) -> Any | None:
     """Lookup a block by hash via direct and chain iteration fallback."""
     block_obj = None
     lookup = getattr(blockchain, "get_block_by_hash", None)

@@ -19,20 +19,17 @@ import os
 import secrets as secrets_module
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Callable, Tuple
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
-
 
 class NetworkType(Enum):
     TESTNET = "testnet"
     MAINNET = "mainnet"
 
-
 class ConfigurationError(Exception):
     """Raised when required configuration is missing or invalid."""
     pass
-
 
 def _get_required_secret(env_var: str, network: str) -> str:
     """Get a required secret from environment, with mainnet enforcement.
@@ -60,7 +57,6 @@ def _get_required_secret(env_var: str, network: str) -> str:
     )
     return generated
 
-
 def _get_secret_with_default(env_var: str, default_generator=None) -> str:
     """Get a secret from environment, or generate one if not provided."""
     value = os.getenv(env_var, "").strip()
@@ -69,7 +65,6 @@ def _get_secret_with_default(env_var: str, default_generator=None) -> str:
     if default_generator:
         return default_generator()
     return secrets_module.token_hex(32)
-
 
 # Get network type from environment variable
 NETWORK = os.getenv("XAI_NETWORK", "testnet")  # Default to testnet for safety
@@ -122,15 +117,14 @@ EMERGENCY_PAUSER_ADDRESS = os.getenv("XAI_EMERGENCY_PAUSER", "0xAdmin").strip() 
 EMERGENCY_CIRCUIT_BREAKER_THRESHOLD = int(os.getenv("XAI_EMERGENCY_CIRCUIT_THRESHOLD", "3"))
 EMERGENCY_CIRCUIT_BREAKER_TIMEOUT_SECONDS = int(os.getenv("XAI_EMERGENCY_CIRCUIT_TIMEOUT_SECONDS", "300"))
 
-def _parse_origin_list(raw: str) -> List[str]:
+def _parse_origin_list(raw: str) -> list[str]:
     """Convert comma-separated origins into normalized list."""
-    origins: List[str] = []
+    origins: list[str] = []
     for chunk in raw.split(","):
         origin = chunk.strip()
         if origin:
             origins.append(origin)
     return origins
-
 
 API_RATE_LIMIT = int(os.getenv("XAI_API_RATE_LIMIT", "120"))
 API_RATE_WINDOW_SECONDS = int(os.getenv("XAI_API_RATE_WINDOW_SECONDS", "60"))
@@ -160,7 +154,7 @@ if API_ADMIN_TOKEN:
 API_AUTH_REQUIRED = bool(int(os.getenv("XAI_API_AUTH_REQUIRED", "0")))
 API_AUTH_KEYS = [key.strip() for key in os.getenv("XAI_API_KEYS", "").split(",") if key.strip()]
 
-_RUNTIME_MUTABLE_FIELDS: Dict[str, Tuple[str, Callable[[str], Any]]] = {
+_RUNTIME_MUTABLE_FIELDS: dict[str, tuple[str, Callable[[str], Any]]] = {
     "API_RATE_LIMIT": ("XAI_API_RATE_LIMIT", int),
     "API_RATE_WINDOW_SECONDS": ("XAI_API_RATE_WINDOW_SECONDS", int),
     "API_MAX_JSON_BYTES": ("XAI_API_MAX_JSON_BYTES", int),
@@ -168,8 +162,7 @@ _RUNTIME_MUTABLE_FIELDS: Dict[str, Tuple[str, Callable[[str], Any]]] = {
 }
 _RUNTIME_INITIAL_VALUES = {key: globals()[key] for key in _RUNTIME_MUTABLE_FIELDS}
 
-
-def reload_runtime(overrides: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+def reload_runtime(overrides: dict[str, str] | None = None) -> dict[str, Any]:
     """
     Reload selected runtime configuration values from environment.
 
@@ -186,7 +179,7 @@ def reload_runtime(overrides: Optional[Dict[str, str]] = None) -> Dict[str, Any]
     if overrides:
         env.update({key: str(value) for key, value in overrides.items()})
 
-    changes: Dict[str, Dict[str, Any]] = {}
+    changes: dict[str, dict[str, Any]] = {}
     for attr, (env_var, parser) in _RUNTIME_MUTABLE_FIELDS.items():
         raw = env.get(env_var)
         if raw is None:
@@ -207,20 +200,17 @@ def reload_runtime(overrides: Optional[Dict[str, str]] = None) -> Dict[str, Any]
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
-
 def _parse_supported_versions(raw: str) -> list[str]:
     versions = [segment.strip() for segment in raw.split(",") if segment.strip()]
     return versions or ["v1"]
-
 
 API_SUPPORTED_VERSIONS = _parse_supported_versions(os.getenv("XAI_API_VERSIONS", "v1,v2"))
 API_DEFAULT_VERSION = os.getenv("XAI_API_DEFAULT_VERSION", "v2").strip() or API_SUPPORTED_VERSIONS[-1]
 if API_DEFAULT_VERSION not in API_SUPPORTED_VERSIONS:
     API_DEFAULT_VERSION = API_SUPPORTED_VERSIONS[-1]
 
-
-def _parse_int_list(raw: str) -> List[int]:
-    values: List[int] = []
+def _parse_int_list(raw: str) -> list[int]:
+    values: list[int] = []
     for chunk in raw.split(","):
         entry = chunk.strip()
         if not entry:
@@ -231,13 +221,11 @@ def _parse_int_list(raw: str) -> List[int]:
             continue
     return values
 
-
 BLOCK_HEADER_VERSION = int(os.getenv("XAI_BLOCK_HEADER_VERSION", "1"))
 _allowed_versions_env = os.getenv("XAI_BLOCK_HEADER_ALLOWED_VERSIONS", "")
 BLOCK_HEADER_ALLOWED_VERSIONS = _parse_int_list(_allowed_versions_env)
 if not BLOCK_HEADER_ALLOWED_VERSIONS:
     BLOCK_HEADER_ALLOWED_VERSIONS = [BLOCK_HEADER_VERSION]
-
 
 def _parse_deprecations(raw: str) -> dict[str, dict[str, str]]:
     mapping: dict[str, dict[str, str]] = {}
@@ -254,7 +242,6 @@ def _parse_deprecations(raw: str) -> dict[str, dict[str, str]]:
             info["sunset"] = sunset.strip()
         mapping[version] = info
     return mapping
-
 
 API_DEPRECATED_VERSIONS = _parse_deprecations(
     os.getenv("XAI_API_VERSION_DEPRECATIONS", "v1=Wed, 01 Jan 2025 00:00:00 GMT")
@@ -274,8 +261,7 @@ TRUSTED_PEER_CERT_FINGERPRINTS = [
 TRUSTED_PEER_PUBKEYS_FILE = os.getenv("XAI_TRUSTED_PEER_PUBKEYS_FILE", "").strip()
 TRUSTED_PEER_CERT_FPS_FILE = os.getenv("XAI_TRUSTED_PEER_CERT_FPS_FILE", "").strip()
 
-
-def _parse_deposit_sources(raw: str) -> Dict[str, Any]:
+def _parse_deposit_sources(raw: str) -> dict[str, Any]:
     """Parse JSON object describing crypto deposit sources."""
     if not raw:
         return {}
@@ -287,13 +273,12 @@ def _parse_deposit_sources(raw: str) -> Dict[str, Any]:
     if not isinstance(data, dict):
         logger.error("XAI_CRYPTO_DEPOSIT_SOURCES must be a JSON object mapping currency to config")
         return {}
-    normalized: Dict[str, Any] = {}
+    normalized: dict[str, Any] = {}
     for currency, cfg in data.items():
         if not isinstance(cfg, dict):
             continue
         normalized[currency.upper()] = cfg
     return normalized
-
 
 CRYPTO_DEPOSIT_MONITOR_ENABLED = bool(int(os.getenv("XAI_CRYPTO_DEPOSIT_MONITOR_ENABLED", "0")))
 CRYPTO_DEPOSIT_MONITOR_POLL_INTERVAL = int(os.getenv("XAI_CRYPTO_DEPOSIT_POLL_INTERVAL", "30"))
@@ -348,7 +333,6 @@ SAFE_GENESIS_HASHES = {
 FIAT_UNLOCK_GOVERNANCE_START = datetime(2026, 3, 12, 0, 0, 0, tzinfo=timezone.utc)
 FIAT_UNLOCK_REQUIRED_VOTES = 5
 FIAT_UNLOCK_SUPPORT_PERCENT = 0.66
-
 
 class TestnetConfig:
     """Testnet Configuration (for local testing before mainnet)"""
@@ -506,7 +490,6 @@ MAX_CONTRACT_GAS = MAX_CONTRACT_GAS
 # Fast reset (testnet only)
 ALLOW_CHAIN_RESET = True
 
-
 class MainnetConfig:
     """Mainnet Configuration (production blockchain)"""
 
@@ -637,7 +620,6 @@ class MainnetConfig:
 
     # No reset on mainnet
     ALLOW_CHAIN_RESET = False
-
 
 # Select config based on network
 if NETWORK.lower() == "mainnet":

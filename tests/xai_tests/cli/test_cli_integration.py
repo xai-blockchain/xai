@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 from click.testing import CliRunner
 import json
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import Any
 
 from xai.cli.enhanced_cli import cli, XAIClient
-
 
 def _stub_methods(monkeypatch):
     monkeypatch.setattr(
@@ -30,7 +31,6 @@ def _stub_methods(monkeypatch):
         lambda self: {"transactions": [{"txid": "tx1", "sender": "A", "recipient": "B", "amount": 1.0, "fee": 0.01}]},
     )
 
-
 def test_blockchain_info_json(monkeypatch):
     _stub_methods(monkeypatch)
     runner = CliRunner()
@@ -38,7 +38,6 @@ def test_blockchain_info_json(monkeypatch):
     assert result.exit_code == 0
     assert '"height": 42' in result.output
     assert '"pending_transactions": 3' in result.output
-
 
 def test_block_fetch_and_mempool(monkeypatch):
     _stub_methods(monkeypatch)
@@ -52,7 +51,6 @@ def test_block_fetch_and_mempool(monkeypatch):
     assert mempool_res.exit_code == 0
     assert "tx1" in mempool_res.output
 
-
 def test_blockchain_state_command(monkeypatch):
     runner = CliRunner()
     monkeypatch.setattr(
@@ -63,7 +61,6 @@ def test_blockchain_state_command(monkeypatch):
     result = runner.invoke(cli, ["--json-output", "blockchain", "state"])
     assert result.exit_code == 0
     assert '"height": 99' in result.output
-
 
 def test_blockchain_validate_block_command(monkeypatch):
     runner = CliRunner()
@@ -77,7 +74,6 @@ def test_blockchain_validate_block_command(monkeypatch):
     assert result.exit_code == 0
     assert '"block_index": 7' in result.output
 
-
 def test_blockchain_consensus_command(monkeypatch):
     runner = CliRunner()
 
@@ -89,13 +85,11 @@ def test_blockchain_consensus_command(monkeypatch):
     assert result.exit_code == 0
     assert '"difficulty": 4' in result.output
 
-
 def test_mempool_drop_requires_api_key(monkeypatch):
     runner = CliRunner()
     result = runner.invoke(cli, ["mempool", "drop", "abc123"])
     assert result.exit_code != 0
     assert "API key required" in result.output
-
 
 def test_mempool_drop_success(monkeypatch):
     runner = CliRunner()
@@ -110,7 +104,6 @@ def test_mempool_drop_success(monkeypatch):
     )
     assert result.exit_code == 0
     assert '"ban_applied": true' in result.output
-
 
 def test_blockchain_genesis_show(tmp_path):
     genesis_payload = {
@@ -131,7 +124,6 @@ def test_blockchain_genesis_show(tmp_path):
     assert result.exit_code == 0
     assert '"transaction_count": 1' in result.output
 
-
 def test_blockchain_genesis_verify(tmp_path):
     genesis_payload = {
         "index": 0,
@@ -150,11 +142,10 @@ def test_blockchain_genesis_verify(tmp_path):
     assert result.exit_code == 0
     assert '"hash_match": false' in result.output
 
-
 def test_blockchain_reset_and_rollback_commands(monkeypatch, tmp_path):
     class DummyBlockchain:
-        reset_calls: List[Tuple[str, bool]] = []
-        rollback_calls: List[Tuple[str, int]] = []
+        reset_calls: list[tuple[str, bool]] = []
+        rollback_calls: list[tuple[str, int]] = []
 
         def __init__(self, data_dir: str):
             self.data_dir = data_dir
@@ -202,7 +193,6 @@ def test_blockchain_reset_and_rollback_commands(monkeypatch, tmp_path):
     assert rollback_res.exit_code == 0
     assert '"checkpoint_height": 1' in rollback_res.output
     assert DummyBlockchain.rollback_calls == [(str(tmp_path), 1)]
-
 
 def test_cli_local_transport_balance_and_block(monkeypatch, tmp_path):
     class DummyBlock:

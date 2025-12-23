@@ -15,32 +15,28 @@ import os
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable
 
 from xai.blockchain.double_sign_detector import DoubleSignDetector
+from xai.core.block_header import BlockHeader
 from xai.core.crypto_utils import verify_signature_hex
 from xai.core.structured_logger import get_structured_logger
-from xai.core.block_header import BlockHeader
 
 try:
     from xai.core.monitoring import MetricsCollector  # type: ignore
 except ImportError:  # pragma: no cover - optional dependency in some unit tests
     MetricsCollector = None  # type: ignore
 
-
 class FinalityError(Exception):
     """Base class for finality related errors."""
-
 
 class FinalityConfigurationError(FinalityError):
     """Raised when validator configuration is invalid."""
 
-
 class FinalityValidationError(FinalityError):
     """Raised for invalid votes or signatures."""
 
-
-def _emit_finality_height_metric(height: Optional[int]) -> None:
+def _emit_finality_height_metric(height: int | None) -> None:
     """Push finalized height into Prometheus gauge when collector is active."""
     if MetricsCollector is None:
         return
@@ -57,7 +53,6 @@ def _emit_finality_height_metric(height: Optional[int]) -> None:
         # Metric unavailable or incompatible gauge type
         return
 
-
 def _record_validator_metric(metric_name: str, value: float = 1.0) -> None:
     """Record validator-oriented counters when MetricsCollector is available."""
     if MetricsCollector is None:
@@ -73,7 +68,6 @@ def _record_validator_metric(metric_name: str, value: float = 1.0) -> None:
     except (AttributeError, TypeError, ValueError):
         return
 
-
 @dataclass(frozen=True)
 class ValidatorIdentity:
     """Validator metadata required for verifying finality votes."""
@@ -85,18 +79,17 @@ class ValidatorIdentity:
     def normalized_id(self) -> str:
         return self.address.lower()
 
-
 @dataclass
 class FinalityCertificate:
     """Aggregated proof that a block reached the required quorum."""
 
     block_hash: str
     block_height: int
-    signatures: Dict[str, str] = field(default_factory=dict)
+    signatures: dict[str, str] = field(default_factory=dict)
     aggregated_power: int = 0
     created_at: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, object]:
+    def to_dict(self) -> dict[str, object]:
         return {
             "block_hash": self.block_hash,
             "block_height": self.block_height,
@@ -106,7 +99,7 @@ class FinalityCertificate:
         }
 
     @classmethod
-    def from_dict(cls, payload: Dict[str, object]) -> "FinalityCertificate":
+    def from_dict(cls, payload: dict[str, object]) -> "FinalityCertificate":
         return cls(
             block_hash=str(payload["block_hash"]),
             block_height=int(payload["block_height"]),
@@ -114,7 +107,6 @@ class FinalityCertificate:
             aggregated_power=int(payload.get("aggregated_power", 0)),
             created_at=float(payload.get("created_at", time.time())),
         )
-
 
 class FinalityManager:
     """Coordinator that tracks validator votes and issues finality certificates."""
@@ -127,7 +119,7 @@ class FinalityManager:
         data_dir: str,
         validators: Sequence[ValidatorIdentity],
         quorum_threshold: float = 2.0 / 3.0,
-        misbehavior_callback: Optional[Callable[[str, int, Dict[str, Any]], None]] = None,
+        misbehavior_callback: Callable[[str, int, dict[str, Any]], None] | None = None,
     ) -> None:
         if quorum_threshold <= 0 or quorum_threshold > 1:
             raise FinalityConfigurationError("Finality quorum threshold must be between 0 and 1.")
@@ -139,7 +131,7 @@ class FinalityManager:
         self.data_dir = data_dir
         os.makedirs(self.data_dir, exist_ok=True)
         self.store_path = os.path.join(self.data_dir, "finality_certificates.json")
-        self.validators: Dict[str, ValidatorIdentity] = {}
+        self.validators: dict[str, ValidatorIdentity] = {}
         self.total_power = 0
         self._misbehavior_callback = misbehavior_callback
         for validator in validators:
@@ -158,10 +150,10 @@ class FinalityManager:
 
         self.quorum_power = math.ceil(self.total_power * quorum_threshold)
         self.detector = DoubleSignDetector()
-        self.pending_votes: Dict[str, Dict[str, str]] = {}
-        self.pending_power: Dict[str, int] = {}
-        self.certificates_by_hash: Dict[str, FinalityCertificate] = {}
-        self.certificates_by_height: Dict[int, FinalityCertificate] = {}
+        self.pending_votes: dict[str, dict[str, str]] = {}
+        self.pending_power: dict[str, int] = {}
+        self.certificates_by_hash: dict[str, FinalityCertificate] = {}
+        self.certificates_by_height: dict[int, FinalityCertificate] = {}
         self.state_path = os.path.join(self.data_dir, "finality_state.json")
         self._load_certificates()
         self._load_state()
@@ -177,7 +169,7 @@ class FinalityManager:
         validator_address: str,
         header: BlockHeader,
         signature: str,
-    ) -> Optional[FinalityCertificate]:
+    ) -> FinalityCertificate | None:
         """Record a validator vote. Returns a certificate when quorum is met."""
         validator_id = validator_address.lower()
         with self._lock:
@@ -341,25 +333,25 @@ class FinalityManager:
             os.fsync(handle.fileno())
         os.replace(tmp_path, self.state_path)
 
-    def get_certificate_by_hash(self, block_hash: str) -> Optional[FinalityCertificate]:
+    def get_certificate_by_hash(self, block_hash: str) -> FinalityCertificate | None:
         return self.certificates_by_hash.get(block_hash)
 
-    def get_certificate_by_height(self, block_height: int) -> Optional[FinalityCertificate]:
+    def get_certificate_by_height(self, block_height: int) -> FinalityCertificate | None:
         return self.certificates_by_height.get(block_height)
 
-    def is_finalized(self, *, block_hash: Optional[str] = None, block_height: Optional[int] = None) -> bool:
+    def is_finalized(self, *, block_hash: str | None = None, block_height: int | None = None) -> bool:
         if block_hash is not None and block_hash in self.certificates_by_hash:
             return True
         if block_height is not None and block_height in self.certificates_by_height:
             return True
         return False
 
-    def get_highest_finalized_height(self) -> Optional[int]:
+    def get_highest_finalized_height(self) -> int | None:
         if not self.certificates_by_height:
             return None
         return max(self.certificates_by_height.keys())
 
-    def _update_finality_metrics(self, candidate_height: Optional[int] = None) -> None:
+    def _update_finality_metrics(self, candidate_height: int | None = None) -> None:
         """
         Update Prometheus gauges with the current finalized height. Safe no-op if
         MetricsCollector is unavailable (unit tests or stripped builds).
@@ -369,7 +361,7 @@ class FinalityManager:
             height = self.get_highest_finalized_height()
         _emit_finality_height_metric(height)
 
-    def can_reorg_to_height(self, fork_point: Optional[int]) -> bool:
+    def can_reorg_to_height(self, fork_point: int | None) -> bool:
         """Return True if reorganizing up to fork_point is allowed under finality."""
         highest_finalized = self.get_highest_finalized_height()
         if highest_finalized is None:
@@ -377,7 +369,7 @@ class FinalityManager:
         fork_index = -1 if fork_point is None else fork_point
         return fork_index >= highest_finalized
 
-    def summarize(self) -> Dict[str, object]:
+    def summarize(self) -> dict[str, object]:
         highest = self.get_highest_finalized_height()
         return {
             "total_validators": len(self.validators),
@@ -386,7 +378,7 @@ class FinalityManager:
             "finalized_blocks": len(self.certificates_by_hash),
         }
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         """
         Create a complete snapshot of the current finality state.
         Thread-safe atomic operation for chain reorganization rollback.
@@ -412,7 +404,7 @@ class FinalityManager:
                 "detector_state": self.detector.get_state(),
             }
 
-    def restore(self, snapshot: Dict[str, Any]) -> None:
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """
         Restore finality state from a snapshot.
         Thread-safe atomic operation for chain reorganization rollback.

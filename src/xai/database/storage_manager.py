@@ -1,4 +1,6 @@
 # src/xai/database/storage_manager.py
+from __future__ import annotations
+
 """
 Provides a simple, persistent key-value storage layer using SQLite.
 
@@ -11,8 +13,7 @@ serialized to JSON, allowing for the storage of complex data structures.
 import json
 import sqlite3
 from pathlib import Path
-from typing import Any, Optional
-
+from typing import Any
 
 class StorageManager:
     """
@@ -108,7 +109,7 @@ class StorageManager:
             print(f"ERROR: Failed to set key '{key}': {e}")
             raise
 
-    def get(self, key: str, default: Optional[Any] = None) -> Any:
+    def get(self, key: str, default: Any | None = None) -> Any:
         """
         Retrieves a value from the key-value store by its key.
 
@@ -116,7 +117,7 @@ class StorageManager:
 
         Args:
             key (str): The key of the data to retrieve.
-            default (Optional[Any]): The value to return if the key is not found.
+            default (Any | None): The value to return if the key is not found.
                                      Defaults to None.
 
         Returns:

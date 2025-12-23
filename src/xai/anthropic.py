@@ -1,37 +1,35 @@
+from __future__ import annotations
+
 """
 Production Anthropic API client with real HTTP implementation.
 Includes retry logic, timeout handling, and rate limiting.
 """
 
-import time
 import json
-from typing import Any, Dict, Optional
-import urllib.request
-import urllib.error
-from urllib.parse import urljoin
 import logging
+import time
+import urllib.error
+import urllib.request
+from typing import Any
+from urllib.parse import urljoin
 
 logger = logging.getLogger(__name__)
-
 
 class APIError(Exception):
     """Exception raised for API-related errors."""
 
-    def __init__(self, message: str, status_code: Optional[int] = None, response_body: Optional[str] = None):
+    def __init__(self, message: str, status_code: int | None = None, response_body: str | None = None):
         super().__init__(message)
         self.status_code = status_code
         self.response_body = response_body
-
 
 class RateLimitError(APIError):
     """Raised when rate limit is exceeded."""
     pass
 
-
 class TimeoutError(APIError):
     """Raised when request times out."""
     pass
-
 
 class Anthropic:
     """
@@ -76,9 +74,9 @@ class Anthropic:
         self,
         endpoint: str,
         method: str = "POST",
-        data: Optional[Dict[str, Any]] = None,
+        data: dict[str, Any] | None = None,
         retry_count: int = 0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Make HTTP request to Anthropic API with retry logic.
 
@@ -181,7 +179,7 @@ class Anthropic:
         except (TypeError, ValueError, OverflowError) as e:
             raise APIError(f"Unexpected error during API request: {e}")
 
-    def completion(self, **kwargs: Any) -> Dict[str, Any]:
+    def completion(self, **kwargs: Any) -> dict[str, Any]:
         """
         Create a completion request to Anthropic API.
 
@@ -217,7 +215,7 @@ class Anthropic:
 
         return response
 
-    def messages(self, **kwargs: Any) -> Dict[str, Any]:
+    def messages(self, **kwargs: Any) -> dict[str, Any]:
         """
         Create a messages request to Anthropic API (newer API format).
 

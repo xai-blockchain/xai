@@ -11,14 +11,15 @@ Protection against:
 
 from __future__ import annotations
 
-import time
 import json
-import os
 import logging
-from typing import Dict, List, Optional, Tuple, Any, Union, TYPE_CHECKING
+import os
+import time
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Blockchain, Block, Transaction
+
 from decimal import Decimal, getcontext
 
 from xai.core.config import Config
@@ -27,7 +28,6 @@ logger = logging.getLogger(__name__)
 
 # Set high precision for overflow protection
 getcontext().prec = 50
-
 
 class BlockchainSecurityConfig:
     """Security configuration constants"""
@@ -60,7 +60,6 @@ class BlockchainSecurityConfig:
     # Overflow protection
     MAX_MONEY = 121_000_000 * 100_000_000  # Max in satoshis
 
-
 class ReorganizationProtection:
     """
     Prevent deep chain reorganizations (51% attack mitigation)
@@ -68,7 +67,7 @@ class ReorganizationProtection:
 
     def __init__(self, max_depth: int = BlockchainSecurityConfig.MAX_REORG_DEPTH) -> None:
         self.max_depth = max_depth
-        self.checkpoints: Dict[int, str] = {}  # block_index -> block_hash
+        self.checkpoints: dict[int, str] = {}  # block_index -> block_hash
         self.checkpoint_file = "data/checkpoints.json"
         self._load_checkpoints()
 
@@ -106,7 +105,7 @@ class ReorganizationProtection:
 
     def validate_reorganization(
         self, current_height: int, fork_point: int
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """
         Validate if reorganization is allowed
 
@@ -130,7 +129,7 @@ class ReorganizationProtection:
 
         return True, None
 
-    def get_checkpoint(self, block_index: int) -> Optional[str]:
+    def get_checkpoint(self, block_index: int) -> str | None:
         """Get checkpoint hash for block"""
         return self.checkpoints.get(block_index)
 
@@ -176,7 +175,6 @@ class ReorganizationProtection:
             return False
         return checkpoint_hash == block_hash
 
-
 class SupplyValidator:
     """
     Validate total supply never exceeds cap (inflation bug protection)
@@ -211,8 +209,8 @@ class SupplyValidator:
         return True
 
     def validate_total_supply(
-        self, blockchain: Union['Blockchain', float]
-    ) -> Tuple[bool, Union[float, str]]:
+        self, blockchain: 'Blockchain' | float
+    ) -> tuple[bool, float | str]:
         """
         Calculate and validate total supply
 
@@ -245,7 +243,7 @@ class SupplyValidator:
         self.last_known_supply = total_supply
         return True, total_supply if input_is_blockchain else "Total supply within cap"
 
-    def validate_block_reward(self, reward: float, total_fees: float) -> Tuple[bool, str]:
+    def validate_block_reward(self, reward: float, total_fees: float) -> tuple[bool, str]:
         """
         Validate that block reward is positive and reasonable
 
@@ -262,7 +260,6 @@ class SupplyValidator:
 
         return True, "Block reward within cap"
 
-
 class OverflowProtection:
     """
     Protect against integer/float overflow in calculations
@@ -272,7 +269,7 @@ class OverflowProtection:
         self.max_money = Decimal(str(BlockchainSecurityConfig.MAX_MONEY))
         self.safe_limit = self.max_money / Decimal("100")
 
-    def safe_add(self, a: float, b: float) -> Tuple[Optional[float], bool]:
+    def safe_add(self, a: float, b: float) -> tuple[float | None, bool]:
         """Safely add two amounts"""
         try:
             result = Decimal(str(a)) + Decimal(str(b))
@@ -283,7 +280,7 @@ class OverflowProtection:
             logger.debug(f"Safe add failed: {e}")
             return None, False
 
-    def safe_multiply(self, a: float, b: float) -> Tuple[Optional[float], bool]:
+    def safe_multiply(self, a: float, b: float) -> tuple[float | None, bool]:
         """Safely multiply two amounts"""
         try:
             result = Decimal(str(a)) * Decimal(str(b))
@@ -294,7 +291,7 @@ class OverflowProtection:
             logger.debug(f"Safe multiply failed: {e}")
             return None, False
 
-    def validate_amount(self, amount: float) -> Tuple[bool, str]:
+    def validate_amount(self, amount: float) -> tuple[bool, str]:
         """Validate amount is within valid range using centralized validation"""
         from xai.core.validation import validate_amount as core_validate_amount
 
@@ -316,7 +313,6 @@ class OverflowProtection:
             )
             return False, str(e)
 
-
 class MempoolManager:
     """
     Manage pending transaction pool with size limits
@@ -328,8 +324,8 @@ class MempoolManager:
         self.current_bytes = 0
 
     def can_add_transaction(
-        self, tx: 'Transaction', pending_transactions: List['Transaction']
-    ) -> Tuple[bool, Optional[str]]:
+        self, tx: 'Transaction', pending_transactions: list['Transaction']
+    ) -> tuple[bool, str | None]:
         """
         Check if transaction can be added to mempool
 
@@ -366,14 +362,13 @@ class MempoolManager:
         """Clear mempool tracking"""
         self.current_bytes = 0
 
-
 class BlockSizeValidator:
     """
     Validate block and transaction sizes
     """
 
     @staticmethod
-    def validate_transaction_size(tx: 'Transaction') -> Tuple[bool, Optional[str]]:
+    def validate_transaction_size(tx: 'Transaction') -> tuple[bool, str | None]:
         """
         Validate single transaction size
 
@@ -395,7 +390,7 @@ class BlockSizeValidator:
         return True, None
 
     @staticmethod
-    def validate_block_size(block: 'Block') -> Tuple[bool, Optional[str]]:
+    def validate_block_size(block: 'Block') -> tuple[bool, str | None]:
         """
         Validate block size
 
@@ -437,14 +432,13 @@ class BlockSizeValidator:
 
         return True, None
 
-
 class ResourceLimiter:
     """Guardrails for mempool/memory/resource limits."""
 
     def __init__(self) -> None:
         self.max_mempool_size = BlockchainSecurityConfig.MAX_MEMPOOL_SIZE
 
-    def validate_transaction_size(self, tx: 'Transaction') -> Tuple[bool, Optional[str]]:
+    def validate_transaction_size(self, tx: 'Transaction') -> tuple[bool, str | None]:
         """Validate transaction payload size."""
         try:
             return BlockSizeValidator.validate_transaction_size(tx)
@@ -460,7 +454,7 @@ class ResourceLimiter:
                 return False, "Resource limiter: transaction too large"
             return True, None
 
-    def validate_block_size(self, block: 'Block') -> Tuple[bool, Optional[str]]:
+    def validate_block_size(self, block: 'Block') -> tuple[bool, str | None]:
         """Validate block size using existing validator."""
         return BlockSizeValidator.validate_block_size(block)
 
@@ -468,14 +462,13 @@ class ResourceLimiter:
         """Check if mempool slot is available."""
         return current_size < self.max_mempool_size
 
-
 class DustProtection:
     """
     Prevent dust attacks (tiny transactions that bloat UTXO set)
     """
 
     @staticmethod
-    def validate_transaction_amount(amount: float) -> Tuple[bool, Optional[str]]:
+    def validate_transaction_amount(amount: float) -> tuple[bool, str | None]:
         """
         Validate transaction amount meets minimum
 
@@ -497,7 +490,6 @@ class DustProtection:
     def validate_utxo_value(value: float) -> bool:
         """Validate UTXO value meets minimum"""
         return value >= BlockchainSecurityConfig.MIN_UTXO_VALUE
-
 
 class MedianTimePast:
     """
@@ -537,7 +529,7 @@ class MedianTimePast:
 
     def validate_block_timestamp(
         self, block: 'Block', blockchain: 'Blockchain'
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """
         Validate block timestamp using median-time-past
 
@@ -564,7 +556,6 @@ class MedianTimePast:
 
         return True, None
 
-
 class TimeValidator:
     """Time validation helpers consumed by tests."""
 
@@ -572,7 +563,7 @@ class TimeValidator:
         self.median_time_span = BlockchainSecurityConfig.MEDIAN_TIME_SPAN
         self.max_future_block_time = BlockchainSecurityConfig.MAX_FUTURE_BLOCK_TIME
 
-    def calculate_median_time_past(self, chain: List['Block']) -> float:
+    def calculate_median_time_past(self, chain: list['Block']) -> float:
         timestamps = [
             block.timestamp
             for block in chain[-self.median_time_span :]
@@ -588,7 +579,7 @@ class TimeValidator:
             return (timestamps[mid - 1] + timestamps[mid]) / 2
         return timestamps[mid]
 
-    def validate_block_time(self, block: 'Block', chain: List['Block']) -> Tuple[bool, Optional[str]]:
+    def validate_block_time(self, block: 'Block', chain: list['Block']) -> tuple[bool, str | None]:
         median_time = self.calculate_median_time_past(chain)
         current_time = time.time()
 
@@ -599,7 +590,6 @@ class TimeValidator:
             return False, "Block timestamp older than median past"
 
         return True, None
-
 
 class EmergencyGovernanceTimelock:
     """
@@ -624,7 +614,7 @@ class EmergencyGovernanceTimelock:
 
     def can_execute_emergency_action(
         self, proposal_id: str, current_block_height: int
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """
         Check if emergency action can be executed
 
@@ -651,7 +641,6 @@ class EmergencyGovernanceTimelock:
         if proposal_id in self.pending_emergency_actions:
             del self.pending_emergency_actions[proposal_id]
 
-
 class BlockchainSecurityManager:
     """
     Unified security management for blockchain
@@ -668,7 +657,7 @@ class BlockchainSecurityManager:
         self.median_time_past = MedianTimePast()
         self.emergency_timelock = EmergencyGovernanceTimelock()
 
-    def validate_new_transaction(self, tx: 'Transaction') -> Tuple[bool, Optional[str]]:
+    def validate_new_transaction(self, tx: 'Transaction') -> tuple[bool, str | None]:
         """
         Comprehensive transaction validation
 
@@ -707,7 +696,7 @@ class BlockchainSecurityManager:
 
         return True, None
 
-    def validate_new_block(self, block: 'Block') -> Tuple[bool, Optional[str]]:
+    def validate_new_block(self, block: 'Block') -> tuple[bool, str | None]:
         """
         Comprehensive block validation
 
@@ -752,10 +741,10 @@ class BlockchainSecurityManager:
 
     def validate_chain_reorganization(
         self, current_height: int, fork_point: int
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """Validate reorganization attempt"""
         return self.reorg_protection.validate_reorganization(current_height, fork_point)
 
-    def check_total_supply(self) -> Tuple[bool, float]:
+    def check_total_supply(self) -> tuple[bool, float]:
         """Check total supply hasn't been exceeded"""
         return self.supply_validator.validate_total_supply(self.blockchain)

@@ -6,9 +6,8 @@ After 1 year, active nodes vote on:
 - How often updates required (if mandatory)
 """
 
-import time
 import hashlib
-from typing import Dict, List, Set
+import time
 from enum import Enum
 
 

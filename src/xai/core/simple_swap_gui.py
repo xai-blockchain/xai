@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Simple Swap GUI System
 
@@ -9,19 +11,16 @@ Makes atomic swaps easy for normal users with:
 - Price floor enforcement (stablecoins only)
 """
 
-import time
 import hashlib
 import secrets
-from typing import Dict, List, Optional, Tuple
+import time
 from enum import Enum
-
 
 class SwapOrderType(Enum):
     """Type of swap order"""
 
     BUY = "buy"  # Buy XAI (sell other coin)
     SELL = "sell"  # Sell XAI (buy other coin)
-
 
 class SwapOrderStatus(Enum):
     """Status of swap order"""
@@ -32,7 +31,6 @@ class SwapOrderStatus(Enum):
     COMPLETED = "completed"  # Swap finished
     CANCELLED = "cancelled"  # User cancelled
     EXPIRED = "expired"  # Timed out
-
 
 class SwapOrder:
     """Individual swap order in orderbook"""
@@ -84,7 +82,6 @@ class SwapOrder:
             "matched_with": self.matched_with,
         }
 
-
 class MarketPriceTracker:
     """
     Track market prices from actual on-chain swaps
@@ -124,7 +121,7 @@ class MarketPriceTracker:
         if len(self.swap_history) > 1000:
             self.swap_history = self.swap_history[-1000:]
 
-    def get_market_price(self, coin: str, lookback_hours: int = 24) -> Optional[float]:
+    def get_market_price(self, coin: str, lookback_hours: int = 24) -> float | None:
         """
         Get market price from recent swap history
 
@@ -185,7 +182,6 @@ class MarketPriceTracker:
             median = prices[len(prices) // 2]
 
         return median
-
 
 class OnChainOrderbook:
     """
@@ -262,7 +258,7 @@ class OnChainOrderbook:
                 "message": "Order created. Waiting for match...",
             }
 
-    def _find_matching_order(self, new_order: SwapOrder) -> Optional[SwapOrder]:
+    def _find_matching_order(self, new_order: SwapOrder) -> SwapOrder | None:
         """
         Auto-match orders in orderbook
 
@@ -337,7 +333,6 @@ class OnChainOrderbook:
         self.active_orders.remove(order)
 
         return {"success": True, "message": "Order cancelled"}
-
 
 class SimpleSwapGUI:
     """
@@ -529,7 +524,7 @@ class SimpleSwapGUI:
             "estimated_completion": swap["created_at"] + 3600,  # 1 hour estimate
         }
 
-    def get_supported_coins(self) -> List[str]:
+    def get_supported_coins(self) -> list[str]:
         """Get list of supported coins for swaps"""
         return ["BTC", "ETH", "LTC", "DOGE", "XMR", "BCH", "USDT", "ZEC", "DASH", "USDC", "DAI"]
 
@@ -564,7 +559,6 @@ class SimpleSwapGUI:
         }
 
         return prices
-
 
 # Example usage
 if __name__ == "__main__":

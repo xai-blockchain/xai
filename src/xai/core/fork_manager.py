@@ -4,17 +4,17 @@ Extracted from Blockchain god class for better separation of concerns
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional, List, Dict, Any, Tuple, Union
+
 import json
 import os
 import time
+from typing import TYPE_CHECKING, Any
 
 from xai.core.block_header import BlockHeader
 from xai.core.structured_logger import get_structured_logger
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Block, Blockchain
-
 
 class ForkManager:
     """
@@ -103,7 +103,7 @@ class ForkManager:
 
         return True  # Fork handled but current chain retained
 
-    def replace_chain(self, new_chain: List[BlockHeader]) -> bool:
+    def replace_chain(self, new_chain: list[BlockHeader]) -> bool:
         """
         Replace current chain with a new chain (reorganization).
 
@@ -190,7 +190,7 @@ class ForkManager:
                 self._rollback_reorg_wal(wal_entry)
                 return False
 
-    def _find_fork_point(self, new_chain: List[BlockHeader]) -> Optional[int]:
+    def _find_fork_point(self, new_chain: list[BlockHeader]) -> int | None:
         """
         Find the last common block between current and new chain.
 
@@ -209,7 +209,7 @@ class ForkManager:
 
         return max_check - 1
 
-    def _build_alternative_chain(self, tip_block: 'Block') -> Optional[List[BlockHeader]]:
+    def _build_alternative_chain(self, tip_block: 'Block') -> list[BlockHeader] | None:
         """
         Build alternative chain from orphan blocks.
 
@@ -253,7 +253,7 @@ class ForkManager:
 
         return None
 
-    def _calculate_chain_work(self, chain: List[Union['Block', BlockHeader, Any]]) -> int:
+    def _calculate_chain_work(self, chain: list['Block' | BlockHeader | Any]) -> int:
         """
         Calculate total proof-of-work of a chain.
 
@@ -273,7 +273,7 @@ class ForkManager:
 
         return total_work
 
-    def _calculate_block_work(self, block_like: Union['Block', BlockHeader, Any]) -> int:
+    def _calculate_block_work(self, block_like: 'Block' | BlockHeader | Any) -> int:
         """
         Calculate proof-of-work for a single block.
 
@@ -328,7 +328,7 @@ class ForkManager:
             blocks_rolled_back=len(rollback_blocks),
         )
 
-    def _apply_new_blocks(self, new_chain: List[BlockHeader], fork_point: int) -> None:
+    def _apply_new_blocks(self, new_chain: list[BlockHeader], fork_point: int) -> None:
         """
         Apply blocks from new chain after fork point.
 
@@ -371,7 +371,7 @@ class ForkManager:
             if tx.sender != "COINBASE":
                 self.blockchain.utxo_manager.restore_spent_utxo(tx)
 
-    def _load_block_for_reorg(self, header: BlockHeader) -> Optional['Block']:
+    def _load_block_for_reorg(self, header: BlockHeader) -> 'Block' | None:
         """
         Load block for reorganization.
 
@@ -420,10 +420,10 @@ class ForkManager:
 
     def _write_reorg_wal(
         self,
-        old_tip: Optional[str],
-        new_tip: Optional[str],
-        fork_point: Optional[int],
-    ) -> Dict[str, Any]:
+        old_tip: str | None,
+        new_tip: str | None,
+        fork_point: int | None,
+    ) -> dict[str, Any]:
         """
         Write reorganization write-ahead log entry.
 
@@ -451,7 +451,7 @@ class ForkManager:
 
         return wal_entry
 
-    def _commit_reorg_wal(self, wal_entry: Dict[str, Any]) -> None:
+    def _commit_reorg_wal(self, wal_entry: dict[str, Any]) -> None:
         """
         Mark reorganization as committed in WAL.
 
@@ -466,7 +466,7 @@ class ForkManager:
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             self.logger.error(f"Failed to commit reorg WAL: {e}")
 
-    def _rollback_reorg_wal(self, wal_entry: Dict[str, Any]) -> None:
+    def _rollback_reorg_wal(self, wal_entry: dict[str, Any]) -> None:
         """
         Rollback failed reorganization using WAL.
 

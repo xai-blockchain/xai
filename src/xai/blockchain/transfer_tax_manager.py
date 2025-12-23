@@ -1,12 +1,12 @@
+from __future__ import annotations
+
 import logging
-from typing import List, Tuple
 
 logger = logging.getLogger("xai.blockchain.transfer_tax")
 
-
 class TransferTaxManager:
     def __init__(
-        self, transfer_tax_rate_percentage: float = 0.5, exempt_addresses: List[str] = None
+        self, transfer_tax_rate_percentage: float = 0.5, exempt_addresses: list[str] = None
     ):
         if not isinstance(transfer_tax_rate_percentage, (int, float)) or not (
             0 <= transfer_tax_rate_percentage <= 100
@@ -30,7 +30,7 @@ class TransferTaxManager:
 
         return amount * (self.transfer_tax_rate_percentage / 100.0)
 
-    def apply_transfer_tax(self, sender: str, recipient: str, amount: float) -> Tuple[float, float]:
+    def apply_transfer_tax(self, sender: str, recipient: str, amount: float) -> tuple[float, float]:
         """
         Applies transfer tax to an amount, returning the net amount and the tax amount.
         Returns (net_amount, tax_amount).

@@ -10,17 +10,15 @@ These methods handle contract deployment logic including:
 from __future__ import annotations
 
 import hashlib
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
-from .context import CallContext, CallType
 from ..exceptions import VMExecutionError
+from .context import CallContext, CallType
 
 if TYPE_CHECKING:
     from .interpreter import EVMInterpreter
 
-
 CODE_DEPOSIT_GAS = 200  # Gas per byte to store deployed contract code
-
 
 def rlp_encode_address_nonce(address: str, nonce: int) -> bytes:
     """
@@ -64,7 +62,6 @@ def rlp_encode_address_nonce(address: str, nonce: int) -> bytes:
     list_prefix = bytes([0xC0 + len(payload)])
     return list_prefix + payload
 
-
 def compute_create_address(sender: str, nonce: int) -> str:
     """
     Compute CREATE contract address.
@@ -81,7 +78,6 @@ def compute_create_address(sender: str, nonce: int) -> str:
     rlp_encoded = rlp_encode_address_nonce(sender, nonce)
     addr_hash = hashlib.sha3_256(rlp_encoded).digest()
     return f"0x{addr_hash[-20:].hex()}"
-
 
 def compute_create2_address(sender: str, salt: int, init_code_hash: bytes) -> str:
     """
@@ -109,7 +105,6 @@ def compute_create2_address(sender: str, salt: int, init_code_hash: bytes) -> st
 
     addr_hash = hashlib.sha3_256(addr_input).digest()
     return f"0x{addr_hash[-20:].hex()}"
-
 
 def account_exists(interpreter: "EVMInterpreter", address: str) -> bool:
     """
@@ -139,13 +134,12 @@ def account_exists(interpreter: "EVMInterpreter", address: str) -> bool:
 
     return False
 
-
 def execute_create(
     interpreter: "EVMInterpreter",
     call: CallContext,
     value: int,
     init_code: bytes,
-    salt: Optional[int],
+    salt: int | None,
 ) -> int:
     """
     Execute CREATE or CREATE2 operation.
@@ -249,7 +243,6 @@ def execute_create(
         interpreter.context.revert_to_snapshot(snapshot_id)
         return 0
 
-
 def execute_subcall(
     interpreter: "EVMInterpreter",
     call_type: CallType,
@@ -260,7 +253,7 @@ def execute_subcall(
     gas: int,
     depth: int,
     static: bool,
-    code_address: Optional[str] = None,
+    code_address: str | None = None,
 ) -> tuple[bool, bytes]:
     """
     Execute a subcall (CALL, DELEGATECALL, STATICCALL).

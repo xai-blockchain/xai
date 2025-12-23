@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 """
 AI Task models for XAI Explorer
 """
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from typing import Any
 from datetime import datetime
 from enum import Enum
-
 
 class TaskType(str, Enum):
     """AI task types"""
@@ -17,14 +18,12 @@ class TaskType(str, Enum):
     TESTING = "testing"
     DOCUMENTATION = "documentation"
 
-
 class TaskComplexity(str, Enum):
     """Task complexity levels"""
     SIMPLE = "simple"
     MODERATE = "moderate"
     COMPLEX = "complex"
     CRITICAL = "critical"
-
 
 class TaskStatus(str, Enum):
     """Task status"""
@@ -33,7 +32,6 @@ class TaskStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
-
 class AITask(BaseModel):
     """AI Task model"""
     task_id: str
@@ -41,39 +39,37 @@ class AITask(BaseModel):
     complexity: TaskComplexity
     priority: str
     status: TaskStatus
-    requester_address: Optional[str] = None
-    provider_address: Optional[str] = None
-    ai_model: Optional[str] = None
-    estimated_tokens: Optional[int] = None
-    actual_tokens: Optional[int] = None
-    cost_estimate: Optional[float] = None
-    actual_cost: Optional[float] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    compute_time_seconds: Optional[int] = None
-    result_hash: Optional[str] = None
-    result_data: Optional[Dict[str, Any]] = None
-    error_message: Optional[str] = None
+    requester_address: str | None = None
+    provider_address: str | None = None
+    ai_model: str | None = None
+    estimated_tokens: int | None = None
+    actual_tokens: int | None = None
+    cost_estimate: float | None = None
+    actual_cost: float | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    compute_time_seconds: int | None = None
+    result_hash: str | None = None
+    result_data: dict[str, Any] | None = None
+    error_message: str | None = None
     created_at: datetime
-
 
 class AIProvider(BaseModel):
     """AI Provider model"""
     provider_address: str
-    provider_name: Optional[str] = None
+    provider_name: str | None = None
     registration_date: datetime
     status: str = "active"
     reputation_score: float = 0.0
     total_tasks_completed: int = 0
     total_tasks_failed: int = 0
     total_earnings: float = 0.0
-    average_compute_time: Optional[float] = None
-    uptime_percentage: Optional[float] = None
+    average_compute_time: float | None = None
+    uptime_percentage: float | None = None
     supported_models: list[str] = []
-    hardware_specs: Optional[Dict[str, Any]] = None
-    contact_info: Optional[Dict[str, Any]] = None
+    hardware_specs: dict[str, Any] | None = None
+    contact_info: dict[str, Any] | None = None
     created_at: datetime
-
 
 class AIModelStats(BaseModel):
     """AI Model statistics"""
@@ -81,8 +77,8 @@ class AIModelStats(BaseModel):
     provider: str
     total_tasks: int = 0
     success_rate: float = 0.0
-    average_compute_time: Optional[float] = None
-    average_cost: Optional[float] = None
-    quality_score: Optional[float] = None
-    last_used: Optional[datetime] = None
+    average_compute_time: float | None = None
+    average_cost: float | None = None
+    quality_score: float | None = None
+    last_used: datetime | None = None
     created_at: datetime

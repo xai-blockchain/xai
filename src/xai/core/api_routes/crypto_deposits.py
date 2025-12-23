@@ -14,19 +14,18 @@ Integrates with the CryptoDepositManager for deposit tracking and confirmation.
 from __future__ import annotations
 
 import logging
+
 logger = logging.getLogger(__name__)
 
-
-from typing import TYPE_CHECKING, Dict, Tuple, Optional, Any
+from typing import TYPE_CHECKING, Any
 
 from flask import jsonify, request
 
-from xai.core.request_validator_middleware import validate_request
 from xai.core.input_validation_schemas import CryptoDepositAddressInput
+from xai.core.request_validator_middleware import validate_request
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
-
 
 def register_crypto_deposit_routes(routes: "NodeAPIRoutes") -> None:
     """Register all crypto deposit-related endpoints."""
@@ -35,7 +34,7 @@ def register_crypto_deposit_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/exchange/crypto/generate-address", methods=["POST"])
     @validate_request(routes.request_validator, CryptoDepositAddressInput)
-    def generate_crypto_deposit_address() -> Tuple[Dict[str, Any], int]:
+    def generate_crypto_deposit_address() -> tuple[dict[str, Any], int]:
         """Generate unique deposit address for BTC/ETH/USDT.
 
         Creates a new deposit address for the specified cryptocurrency that will
@@ -66,7 +65,7 @@ def register_crypto_deposit_routes(routes: "NodeAPIRoutes") -> None:
         if auth_error:
             return auth_error
 
-        model: Optional[CryptoDepositAddressInput] = getattr(request, "validated_model", None)
+        model: CryptoDepositAddressInput | None = getattr(request, "validated_model", None)
         if model is None:
             return routes._error_response("Invalid deposit request", status=400, code="invalid_payload")
 
@@ -101,7 +100,7 @@ def register_crypto_deposit_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "crypto_generate_address")
 
     @app.route("/exchange/crypto/addresses/<address>", methods=["GET"])
-    def get_crypto_deposit_addresses(address: str) -> Tuple[Dict[str, Any], int]:
+    def get_crypto_deposit_addresses(address: str) -> tuple[dict[str, Any], int]:
         """Get all crypto deposit addresses for user.
 
         Retrieves all deposit addresses (BTC/ETH/USDT) associated with the
@@ -146,7 +145,7 @@ def register_crypto_deposit_routes(routes: "NodeAPIRoutes") -> None:
             return jsonify({"error": str(e)}), 500
 
     @app.route("/exchange/crypto/pending-deposits", methods=["GET"])
-    def get_pending_crypto_deposits() -> Tuple[Dict[str, Any], int]:
+    def get_pending_crypto_deposits() -> tuple[dict[str, Any], int]:
         """Get pending crypto deposits.
 
         Returns all pending (unconfirmed) deposits, optionally filtered by user.
@@ -194,7 +193,7 @@ def register_crypto_deposit_routes(routes: "NodeAPIRoutes") -> None:
             return jsonify({"error": str(e)}), 500
 
     @app.route("/exchange/crypto/deposit-history/<address>", methods=["GET"])
-    def get_crypto_deposit_history(address: str) -> Tuple[Dict[str, Any], int]:
+    def get_crypto_deposit_history(address: str) -> tuple[dict[str, Any], int]:
         """Get confirmed crypto deposit history for user.
 
         Retrieves all confirmed deposits for the specified XAI address.
@@ -252,7 +251,7 @@ def register_crypto_deposit_routes(routes: "NodeAPIRoutes") -> None:
             return jsonify({"error": str(e)}), 500
 
     @app.route("/exchange/crypto/stats", methods=["GET"])
-    def get_crypto_deposit_stats() -> Tuple[Dict[str, Any], int]:
+    def get_crypto_deposit_stats() -> tuple[dict[str, Any], int]:
         """Get crypto deposit system statistics.
 
         Returns system-wide statistics for all deposit operations including

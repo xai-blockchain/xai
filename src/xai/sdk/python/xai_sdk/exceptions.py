@@ -1,11 +1,12 @@
+from __future__ import annotations
+
 """
 XAI SDK Exception classes
 
 Provides comprehensive error handling for SDK operations.
 """
 
-from typing import Optional, Dict, Any
-
+from typing import Any
 
 class XAIError(Exception):
     """Base exception class for all XAI SDK errors."""
@@ -13,8 +14,8 @@ class XAIError(Exception):
     def __init__(
         self,
         message: str,
-        code: Optional[int] = None,
-        error_details: Optional[Dict[str, Any]] = None,
+        code: int | None = None,
+        error_details: dict[str, Any] | None = None,
     ) -> None:
         """
         Initialize XAI Error.
@@ -35,24 +36,20 @@ class XAIError(Exception):
             return f"[{self.code}] {self.message}"
         return self.message
 
-
 class AuthenticationError(XAIError):
     """Raised when authentication fails."""
 
     pass
-
 
 class AuthorizationError(XAIError):
     """Raised when user lacks required permissions."""
 
     pass
 
-
 class ValidationError(XAIError):
     """Raised when input validation fails."""
 
     pass
-
 
 class RateLimitError(XAIError):
     """Raised when rate limit is exceeded."""
@@ -60,8 +57,8 @@ class RateLimitError(XAIError):
     def __init__(
         self,
         message: str,
-        retry_after: Optional[int] = None,
-        code: Optional[int] = None,
+        retry_after: int | None = None,
+        code: int | None = None,
     ) -> None:
         """
         Initialize Rate Limit Error.
@@ -74,60 +71,50 @@ class RateLimitError(XAIError):
         super().__init__(message, code)
         self.retry_after = retry_after
 
-
 class NetworkError(XAIError):
     """Raised when network connectivity issue occurs."""
 
     pass
-
 
 class TimeoutError(XAIError):
     """Raised when request times out."""
 
     pass
 
-
 class NotFoundError(XAIError):
     """Raised when requested resource is not found."""
 
     pass
-
 
 class ConflictError(XAIError):
     """Raised when resource conflict occurs."""
 
     pass
 
-
 class InternalServerError(XAIError):
     """Raised when server encounters an error."""
 
     pass
-
 
 class ServiceUnavailableError(XAIError):
     """Raised when service is temporarily unavailable."""
 
     pass
 
-
 class TransactionError(XAIError):
     """Raised when transaction operation fails."""
 
     pass
-
 
 class WalletError(XAIError):
     """Raised when wallet operation fails."""
 
     pass
 
-
 class MiningError(XAIError):
     """Raised when mining operation fails."""
 
     pass
-
 
 class GovernanceError(XAIError):
     """Raised when governance operation fails."""

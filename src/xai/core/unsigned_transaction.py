@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Unsigned Transaction Format (XUTX)
 
@@ -17,10 +19,9 @@ import base64
 import hashlib
 import json
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
-
+from typing import Any
 
 class TxStatus(Enum):
     """Transaction lifecycle status."""
@@ -30,32 +31,28 @@ class TxStatus(Enum):
     BROADCAST = "broadcast"
     CONFIRMED = "confirmed"
 
-
 @dataclass
 class TxInput:
     """Transaction input (source of funds)."""
     address: str
     amount: float
-    utxo_id: Optional[str] = None  # Reference to unspent output
+    utxo_id: str | None = None  # Reference to unspent output
     sequence: int = 0xFFFFFFFF
-
 
 @dataclass
 class TxOutput:
     """Transaction output (destination of funds)."""
     address: str
     amount: float
-    memo: Optional[str] = None
-
+    memo: str | None = None
 
 @dataclass
 class SignatureSlot:
     """Slot for collecting signatures."""
     public_key: str
-    signature: Optional[str] = None
-    signed_at: Optional[int] = None
-    signer_label: Optional[str] = None
-
+    signature: str | None = None
+    signed_at: int | None = None
+    signer_label: str | None = None
 
 @dataclass
 class UnsignedTransaction:
@@ -83,17 +80,17 @@ class UnsignedTransaction:
     fee: float = 0.001
 
     # Extended fields
-    inputs: List[TxInput] = field(default_factory=list)
-    outputs: List[TxOutput] = field(default_factory=list)
+    inputs: list[TxInput] = field(default_factory=list)
+    outputs: list[TxOutput] = field(default_factory=list)
 
     # Timing
     created_at: int = field(default_factory=lambda: int(time.time()))
-    expires_at: Optional[int] = None  # Optional expiration
-    nonce: Optional[int] = None
+    expires_at: int | None = None  # Optional expiration
+    nonce: int | None = None
 
     # Signing
     threshold: int = 1  # Signatures required
-    signature_slots: List[SignatureSlot] = field(default_factory=list)
+    signature_slots: list[SignatureSlot] = field(default_factory=list)
 
     # Metadata for human review
     memo: str = ""
@@ -103,7 +100,7 @@ class UnsignedTransaction:
     status: str = TxStatus.UNSIGNED.value
 
     # Computed fields (not serialized, computed on demand)
-    _payload_hash: Optional[str] = field(default=None, repr=False)
+    _payload_hash: str | None = field(default=None, repr=False)
 
     def __post_init__(self):
         """Initialize computed fields."""
@@ -112,7 +109,7 @@ class UnsignedTransaction:
             self.signature_slots = [SignatureSlot(public_key="")]
 
     @property
-    def payload(self) -> Dict[str, Any]:
+    def payload(self) -> dict[str, Any]:
         """Get the signable payload (excludes signatures)."""
         return {
             "version": self.version,
@@ -152,7 +149,7 @@ class UnsignedTransaction:
         """Check if transaction has enough signatures."""
         return self.signature_count >= self.threshold
 
-    def add_signature(self, public_key: str, signature: str, label: Optional[str] = None) -> bool:
+    def add_signature(self, public_key: str, signature: str, label: str | None = None) -> bool:
         """
         Add a signature to the transaction.
 
@@ -204,7 +201,7 @@ class UnsignedTransaction:
         else:
             self.status = TxStatus.FULLY_SIGNED.value
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary."""
         data = {
             "version": self.version,
@@ -238,7 +235,7 @@ class UnsignedTransaction:
         return base64.b64encode(self.to_json(indent=None).encode('utf-8')).decode('utf-8')
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "UnsignedTransaction":
+    def from_dict(cls, data: dict[str, Any]) -> "UnsignedTransaction":
         """Deserialize from dictionary."""
         signature_slots = [
             SignatureSlot(**s) for s in data.get("signature_slots", [])
@@ -317,7 +314,6 @@ class UnsignedTransaction:
 
         return "\n".join(lines)
 
-
 def create_transfer(
     sender: str,
     recipient: str,
@@ -325,7 +321,7 @@ def create_transfer(
     fee: float = 0.001,
     memo: str = "",
     network: str = "mainnet",
-    nonce: Optional[int] = None,
+    nonce: int | None = None,
 ) -> UnsignedTransaction:
     """
     Create a simple transfer transaction.
@@ -353,12 +349,11 @@ def create_transfer(
         nonce=nonce,
     )
 
-
 def create_multisig_transfer(
     sender: str,
     recipient: str,
     amount: float,
-    public_keys: List[str],
+    public_keys: list[str],
     threshold: int,
     fee: float = 0.001,
     memo: str = "",

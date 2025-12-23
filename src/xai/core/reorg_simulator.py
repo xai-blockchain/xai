@@ -7,8 +7,7 @@ snapshots (height, tip hash, UTXO digest) before and after.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Tuple
-
+from typing import Any
 
 class ReorgSimulator:
     """Lightweight harness to drive chain reorg scenarios with integrity snapshots."""
@@ -18,12 +17,12 @@ class ReorgSimulator:
             raise TypeError("blockchain must expose replace_chain() and compute_state_snapshot()")
         self.blockchain = blockchain
 
-    def snapshot(self, label: str = "snapshot") -> Dict[str, Any]:
+    def snapshot(self, label: str = "snapshot") -> dict[str, Any]:
         snap = self.blockchain.compute_state_snapshot()
         snap["label"] = label
         return snap
 
-    def simulate_reorg(self, candidate_chain: List[Any]) -> Tuple[bool, Dict[str, Any], Dict[str, Any]]:
+    def simulate_reorg(self, candidate_chain: list[Any]) -> tuple[bool, dict[str, Any], dict[str, Any]]:
         """
         Attempt a reorg against the supplied candidate chain.
 

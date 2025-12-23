@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import binascii
 from dataclasses import dataclass
-from typing import Optional
 
 from eth_account._utils.legacy_transactions import serializable_unsigned_transaction_from_dict
 from eth_account._utils.signing import to_standard_v
@@ -25,7 +24,6 @@ except ImportError as exc:  # pragma: no cover - optional dependency
     raise ImportError("ledgerblue is required for Ledger support. pip install ledgerblue") from exc
 
 from xai.core.hardware_wallet import HardwareWallet, _normalize_private_value
-
 
 def _parse_bip32_path(path: str) -> bytes:
     if not path.startswith("m/"):
@@ -43,11 +41,10 @@ def _parse_bip32_path(path: str) -> bytes:
         result += index.to_bytes(4, "big")
     return result
 
-
 @dataclass
 class LedgerHardwareWallet(HardwareWallet):
     bip32_path: str = "m/44'/22593'/0'/0/0"
-    _dongle: Optional[object] = None
+    _dongle: object | None = None
 
     def connect(self) -> bool:
         self._dongle = getDongle(True)

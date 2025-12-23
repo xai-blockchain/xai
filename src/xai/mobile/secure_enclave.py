@@ -29,17 +29,16 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Any
 
 from xai.mobile.biometric_auth import (
     BiometricAuthProvider,
     BiometricResult,
     BiometricStrength,
-    ProtectionLevel
+    ProtectionLevel,
 )
 
 logger = logging.getLogger(__name__)
-
 
 class KeyProtection(Enum):
     """Key protection levels matching platform security."""
@@ -47,7 +46,6 @@ class KeyProtection(Enum):
     BIOMETRIC_ANY = "biometric_any"            # Any biometric
     DEVICE_CREDENTIAL = "device_credential"    # PIN/password
     NONE = "none"                              # No protection (not recommended)
-
 
 class KeyAlgorithm(Enum):
     """Cryptographic algorithms for secure enclave keys."""
@@ -57,7 +55,6 @@ class KeyAlgorithm(Enum):
     RSA_4096 = "rsa_4096"
     ED25519 = "ed25519"                        # EdDSA
 
-
 class AttestationLevel(Enum):
     """Key attestation levels."""
     HARDWARE = "hardware"                      # Hardware-backed key
@@ -65,7 +62,6 @@ class AttestationLevel(Enum):
     TRUSTED_ENVIRONMENT = "trusted_environment"  # TEE
     SECURE_ENCLAVE = "secure_enclave"          # iOS Secure Enclave
     UNKNOWN = "unknown"
-
 
 @dataclass
 class SecureKey:
@@ -76,16 +72,14 @@ class SecureKey:
     public_key: bytes
     attestation_level: AttestationLevel
     created_at: int
-    metadata: Dict[str, Any]
-
+    metadata: dict[str, Any]
 
 @dataclass
 class SignatureResult:
     """Result of a signing operation."""
     success: bool
-    signature: Optional[bytes] = None
-    error_message: Optional[str] = None
-
+    signature: bytes | None = None
+    error_message: str | None = None
 
 @dataclass
 class AttestationResult:
@@ -93,8 +87,7 @@ class AttestationResult:
     is_valid: bool
     attestation_level: AttestationLevel
     hardware_backed: bool
-    details: Dict[str, Any]
-
+    details: dict[str, Any]
 
 class SecureEnclaveProvider(ABC):
     """
@@ -117,7 +110,7 @@ class SecureEnclaveProvider(ABC):
         algorithm: KeyAlgorithm,
         protection: KeyProtection,
         require_biometric: bool = True
-    ) -> Optional[SecureKey]:
+    ) -> SecureKey | None:
         """
         Generate a new key in secure enclave.
 
@@ -133,7 +126,7 @@ class SecureEnclaveProvider(ABC):
         pass
 
     @abstractmethod
-    def get_key(self, key_id: str) -> Optional[SecureKey]:
+    def get_key(self, key_id: str) -> SecureKey | None:
         """Retrieve key metadata from secure enclave."""
         pass
 
@@ -147,7 +140,7 @@ class SecureEnclaveProvider(ABC):
         self,
         key_id: str,
         data: bytes,
-        biometric_result: Optional[BiometricResult] = None
+        biometric_result: BiometricResult | None = None
     ) -> SignatureResult:
         """
         Sign data using key in secure enclave.
@@ -172,7 +165,6 @@ class SecureEnclaveProvider(ABC):
         """
         pass
 
-
 class SecureEnclaveManager:
     """
     High-level manager for secure enclave operations.
@@ -196,7 +188,7 @@ class SecureEnclaveManager:
     def __init__(
         self,
         enclave_provider: SecureEnclaveProvider,
-        biometric_provider: Optional[BiometricAuthProvider] = None
+        biometric_provider: BiometricAuthProvider | None = None
     ):
         """
         Initialize secure enclave manager.
@@ -207,7 +199,7 @@ class SecureEnclaveManager:
         """
         self.enclave = enclave_provider
         self.biometric = biometric_provider
-        self._key_cache: Dict[str, SecureKey] = {}
+        self._key_cache: dict[str, SecureKey] = {}
 
         if not self.enclave.is_available():
             logger.warning(
@@ -225,7 +217,7 @@ class SecureEnclaveManager:
         algorithm: KeyAlgorithm = KeyAlgorithm.ECDSA_SECP256K1,
         require_biometric: bool = True,
         protection_level: KeyProtection = KeyProtection.BIOMETRIC_STRONG
-    ) -> Optional[SecureKey]:
+    ) -> SecureKey | None:
         """
         Generate a new wallet key in secure enclave.
 
@@ -281,7 +273,7 @@ class SecureEnclaveManager:
 
         return key
 
-    def get_public_key(self, wallet_id: str) -> Optional[bytes]:
+    def get_public_key(self, wallet_id: str) -> bytes | None:
         """
         Get public key for wallet.
 
@@ -310,7 +302,7 @@ class SecureEnclaveManager:
         wallet_id: str,
         transaction_hash: bytes,
         prompt_message: str = "Sign transaction"
-    ) -> Optional[bytes]:
+    ) -> bytes | None:
         """
         Sign transaction hash using wallet key.
 
@@ -435,7 +427,7 @@ class SecureEnclaveManager:
 
         return success
 
-    def get_key_info(self, wallet_id: str) -> Optional[SecureKey]:
+    def get_key_info(self, wallet_id: str) -> SecureKey | None:
         """Get key metadata for wallet."""
         key_id = f"wallet_{wallet_id}"
 
@@ -448,7 +440,6 @@ class SecureEnclaveManager:
 
         return key
 
-
 class MockSecureEnclaveProvider(SecureEnclaveProvider):
     """
     Mock implementation for testing.
@@ -458,7 +449,7 @@ class MockSecureEnclaveProvider(SecureEnclaveProvider):
     """
 
     def __init__(self):
-        self._keys: Dict[str, SecureKey] = {}
+        self._keys: dict[str, SecureKey] = {}
         self._is_available = True
 
     def is_available(self) -> bool:
@@ -471,7 +462,7 @@ class MockSecureEnclaveProvider(SecureEnclaveProvider):
         algorithm: KeyAlgorithm,
         protection: KeyProtection,
         require_biometric: bool = True
-    ) -> Optional[SecureKey]:
+    ) -> SecureKey | None:
         """Generate mock key."""
         if key_id in self._keys:
             return None
@@ -497,7 +488,7 @@ class MockSecureEnclaveProvider(SecureEnclaveProvider):
 
         return key
 
-    def get_key(self, key_id: str) -> Optional[SecureKey]:
+    def get_key(self, key_id: str) -> SecureKey | None:
         """Get mock key."""
         return self._keys.get(key_id)
 
@@ -513,7 +504,7 @@ class MockSecureEnclaveProvider(SecureEnclaveProvider):
         self,
         key_id: str,
         data: bytes,
-        biometric_result: Optional[BiometricResult] = None
+        biometric_result: BiometricResult | None = None
     ) -> SignatureResult:
         """Sign data with mock key."""
         key = self._keys.get(key_id)

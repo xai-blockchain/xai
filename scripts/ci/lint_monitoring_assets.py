@@ -8,17 +8,14 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Iterable, List, Tuple
 
 ROOT = Path(__file__).resolve().parents[2]
 MONITORING = ROOT / "monitoring"
 
-
-def fail(msg: str, errors: List[str]) -> None:
+def fail(msg: str, errors: list[str]) -> None:
     errors.append(msg)
 
-
-def require_file(path: Path, errors: List[str]) -> str:
+def require_file(path: Path, errors: list[str]) -> str:
     if not path.exists():
         fail(f"Missing file: {path}", errors)
         return ""
@@ -28,14 +25,12 @@ def require_file(path: Path, errors: List[str]) -> str:
         fail(f"Failed to read {path}: {exc}", errors)
         return ""
 
-
-def check_substrings(path: Path, content: str, substrings: Iterable[str], errors: List[str]) -> None:
+def check_substrings(path: Path, content: str, substrings: Iterable[str], errors: list[str]) -> None:
     for needle in substrings:
         if needle not in content:
             fail(f"{path}: expected to contain '{needle}'", errors)
 
-
-def validate_alertmanager(errors: List[str]) -> None:
+def validate_alertmanager(errors: list[str]) -> None:
     path = MONITORING / "alertmanager.yml"
     content = require_file(path, errors)
     if not content:
@@ -47,8 +42,7 @@ def validate_alertmanager(errors: List[str]) -> None:
         errors=errors,
     )
 
-
-def validate_prometheus_rules(errors: List[str]) -> None:
+def validate_prometheus_rules(errors: list[str]) -> None:
     path = MONITORING / "prometheus_alerts.yml"
     content = require_file(path, errors)
     if not content:
@@ -67,7 +61,6 @@ def validate_prometheus_rules(errors: List[str]) -> None:
         errors=errors,
     )
 
-
 def _any_uid_prometheus(node: object) -> bool:
     if isinstance(node, dict):
         for key, value in node.items():
@@ -79,8 +72,7 @@ def _any_uid_prometheus(node: object) -> bool:
         return any(_any_uid_prometheus(item) for item in node)
     return False
 
-
-def validate_grafana_dashboard(dashboard_path: Path, errors: List[str]) -> None:
+def validate_grafana_dashboard(dashboard_path: Path, errors: list[str]) -> None:
     raw = require_file(dashboard_path, errors)
     if not raw:
         return
@@ -110,14 +102,13 @@ def validate_grafana_dashboard(dashboard_path: Path, errors: List[str]) -> None:
     if not title:
         fail(f"{dashboard_path}: missing dashboard title", errors)
 
-
 def main() -> int:
-    errors: List[str] = []
+    errors: list[str] = []
 
     validate_alertmanager(errors)
     validate_prometheus_rules(errors)
 
-    dashboards: Tuple[Path, ...] = (
+    dashboards: tuple[Path, ...] = (
         MONITORING / "dashboards" / "grafana" / "aixn_security_operations.json",
         MONITORING / "dashboards" / "grafana" / "production" / "aixn_security_operations.json",
     )
@@ -132,7 +123,6 @@ def main() -> int:
 
     print("[OK] Monitoring assets lint passed (Alertmanager/Prometheus/Grafana).")
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

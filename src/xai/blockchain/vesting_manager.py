@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 import logging
 import time
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable
 
 logger = logging.getLogger("xai.blockchain.vesting_manager")
-
 
 from dataclasses import dataclass
 
@@ -16,9 +17,9 @@ class VestingScheduleData:
     cliff_duration: int
 
 class VestingManager:
-    def __init__(self, time_provider: Optional[Callable[[], int]] = None):
+    def __init__(self, time_provider: Callable[[], int] | None = None):
         # Stores vesting schedules: {schedule_id: {"recipient": str, "total_amount": float, "start_time": int, "end_time": int, "cliff_duration": int, "claimed_amount": float}}
-        self.vesting_schedules: Dict[str, Dict[str, Any]] = {}
+        self.vesting_schedules: dict[str, dict[str, Any]] = {}
         self._schedule_id_counter = 0
         self._time_provider = time_provider or (lambda: int(time.time()))
         logger.info("VestingManager initialized with deterministic time provider: %s", bool(time_provider))
@@ -67,7 +68,7 @@ class VestingManager:
         )
         return schedule_id
 
-    def get_vested_amount(self, schedule_id: str, current_time: Optional[int] = None) -> float:
+    def get_vested_amount(self, schedule_id: str, current_time: int | None = None) -> float:
         """
         Calculates the amount of tokens that have vested for a given schedule up to current_time.
         """
@@ -108,7 +109,7 @@ class VestingManager:
 
         return max(0.0, vested_amount - claimed_amount)  # Only return unclaimed vested amount
 
-    def claim_vested_tokens(self, schedule_id: str, current_time: Optional[int] = None) -> float:
+    def claim_vested_tokens(self, schedule_id: str, current_time: int | None = None) -> float:
         """
         Simulates claiming available vested tokens for a given schedule.
         """

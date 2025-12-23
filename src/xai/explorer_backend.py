@@ -13,11 +13,11 @@ import sqlite3
 import threading
 import time
 from collections import defaultdict, deque
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
-from functools import lru_cache
-from typing import Any, Dict, List, Optional, Tuple, Set
-from dataclasses import dataclass, field, asdict
 from enum import Enum
+from functools import lru_cache
+from typing import Any
 
 import requests
 from flask import Flask, jsonify, request
@@ -31,7 +31,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 # ==================== DATA MODELS ====================
 
 class SearchType(Enum):
@@ -42,15 +41,13 @@ class SearchType(Enum):
     ADDRESS = "address"
     UNKNOWN = "unknown"
 
-
 @dataclass
 class SearchResult:
     """Search result data"""
     type: SearchType
     item_id: str
-    data: Dict[str, Any]
+    data: dict[str, Any]
     timestamp: float = field(default_factory=time.time)
-
 
 @dataclass
 class AddressLabel:
@@ -61,14 +58,12 @@ class AddressLabel:
     description: str = ""
     created_at: float = field(default_factory=time.time)
 
-
 @dataclass
 class CachedMetric:
     """Cached metric data"""
     timestamp: float
-    data: Dict[str, Any]
+    data: dict[str, Any]
     ttl: int = 300  # 5 minutes default
-
 
 # ==================== DATABASE MIGRATION MANAGER ====================
 
@@ -171,7 +166,7 @@ class DatabaseMigrationManager:
             )
             return False
 
-    def get_migration_history(self) -> List[Dict]:
+    def get_migration_history(self) -> list[Dict]:
         """Get complete migration history"""
         cursor = self.conn.cursor()
         cursor.execute("""
@@ -188,7 +183,6 @@ class DatabaseMigrationManager:
             }
             for row in cursor.fetchall()
         ]
-
 
 # Define migrations for automatic application
 MIGRATIONS = [
@@ -243,7 +237,6 @@ MIGRATIONS = [
     }
 ]
 
-
 # ==================== DATABASE MANAGEMENT ====================
 
 class ExplorerDatabase:
@@ -252,7 +245,7 @@ class ExplorerDatabase:
     def __init__(self, db_path: str = ":memory:"):
         """Initialize database"""
         self.db_path = db_path
-        self.conn: Optional[sqlite3.Connection] = None
+        self.conn: sqlite3.Connection | None = None
         self.lock = threading.RLock()
         self._init_database()
         self._apply_migrations()
@@ -361,7 +354,7 @@ class ExplorerDatabase:
                 extra={"event": "explorer_backend.search_record_failed"},
             )
 
-    def get_recent_searches(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_recent_searches(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent searches"""
         try:
             with self.lock:
@@ -401,7 +394,7 @@ class ExplorerDatabase:
                 extra={"event": "explorer_backend.label_add_failed"},
             )
 
-    def get_address_label(self, address: str) -> Optional[AddressLabel]:
+    def get_address_label(self, address: str) -> AddressLabel | None:
         """Get address label"""
         try:
             with self.lock:
@@ -422,7 +415,7 @@ class ExplorerDatabase:
             )
         return None
 
-    def record_metric(self, metric_type: str, value: float, data: Optional[Dict] = None) -> None:
+    def record_metric(self, metric_type: str, value: float, data: Dict | None = None) -> None:
         """Record analytics metric"""
         try:
             with self.lock:
@@ -439,7 +432,7 @@ class ExplorerDatabase:
                 extra={"event": "explorer_backend.metric_record_failed"},
             )
 
-    def get_metrics(self, metric_type: str, hours: int = 24) -> List[Dict[str, Any]]:
+    def get_metrics(self, metric_type: str, hours: int = 24) -> list[dict[str, Any]]:
         """Get metrics for time period"""
         try:
             with self.lock:
@@ -480,7 +473,7 @@ class ExplorerDatabase:
                 extra={"event": "explorer_backend.cache_set_failed"},
             )
 
-    def get_cache(self, key: str) -> Optional[str]:
+    def get_cache(self, key: str) -> str | None:
         """Get cache value"""
         try:
             with self.lock:
@@ -499,7 +492,6 @@ class ExplorerDatabase:
             )
         return None
 
-
 # ==================== ANALYTICS ENGINE ====================
 
 class AnalyticsEngine:
@@ -509,16 +501,16 @@ class AnalyticsEngine:
         """Initialize analytics engine"""
         self.node_url = node_url
         self.db = db
-        self.metrics_cache: Dict[str, CachedMetric] = {}
+        self.metrics_cache: dict[str, CachedMetric] = {}
         self.lock = threading.RLock()
 
         # Time-series data for recent metrics
         self.hashrate_history: deque = deque(maxlen=1440)  # 24 hours at 1-minute intervals
         self.tx_volume_history: deque = deque(maxlen=1440)
-        self.active_addresses: Set[str] = set()
+        self.active_addresses: set[str] = set()
         self.mempool_sizes: deque = deque(maxlen=1440)
 
-    def get_network_hashrate(self) -> Dict[str, Any]:
+    def get_network_hashrate(self) -> dict[str, Any]:
         """Calculate network hashrate"""
         cache_key = "hashrate"
         cached = self.db.get_cache(cache_key)
@@ -563,7 +555,7 @@ class AnalyticsEngine:
             )
             return {"error": str(e)}
 
-    def get_transaction_volume(self, period: str = "24h") -> Dict[str, Any]:
+    def get_transaction_volume(self, period: str = "24h") -> dict[str, Any]:
         """Get transaction volume metrics"""
         cache_key = f"tx_volume_{period}"
         cached = self.db.get_cache(cache_key)
@@ -622,7 +614,7 @@ class AnalyticsEngine:
             )
             return {"error": str(e)}
 
-    def get_active_addresses(self) -> Dict[str, Any]:
+    def get_active_addresses(self) -> dict[str, Any]:
         """Get count of active addresses"""
         cache_key = "active_addresses"
         cached = self.db.get_cache(cache_key)
@@ -635,7 +627,7 @@ class AnalyticsEngine:
                 return {"error": "Unable to fetch blocks"}
 
             blocks = blocks_data.get("blocks", [])
-            addresses: Set[str] = set()
+            addresses: set[str] = set()
 
             for block in blocks:
                 for tx in block.get("transactions", []):
@@ -667,7 +659,7 @@ class AnalyticsEngine:
             )
             return {"error": str(e)}
 
-    def get_average_block_time(self) -> Dict[str, Any]:
+    def get_average_block_time(self) -> dict[str, Any]:
         """Calculate average block time"""
         cache_key = "avg_block_time"
         cached = self.db.get_cache(cache_key)
@@ -719,7 +711,7 @@ class AnalyticsEngine:
             )
             return {"error": str(e)}
 
-    def get_mempool_size(self) -> Dict[str, Any]:
+    def get_mempool_size(self) -> dict[str, Any]:
         """Get pending transactions (mempool) size"""
         cache_key = "mempool_size"
         cached = self.db.get_cache(cache_key)
@@ -766,7 +758,7 @@ class AnalyticsEngine:
             )
             return {"error": str(e)}
 
-    def get_network_difficulty(self) -> Dict[str, Any]:
+    def get_network_difficulty(self) -> dict[str, Any]:
         """Get network difficulty trend"""
         try:
             stats = self._fetch_stats()
@@ -797,7 +789,7 @@ class AnalyticsEngine:
             )
             return {"error": str(e)}
 
-    def _fetch_stats(self) -> Optional[Dict[str, Any]]:
+    def _fetch_stats(self) -> dict[str, Any] | None:
         """Fetch stats from node"""
         try:
             response = requests.get(f"{self.node_url}/stats", timeout=5)
@@ -818,7 +810,7 @@ class AnalyticsEngine:
             )
             return None
 
-    def _fetch_blocks(self, limit: int = 100, offset: int = 0) -> Optional[Dict[str, Any]]:
+    def _fetch_blocks(self, limit: int = 100, offset: int = 0) -> dict[str, Any] | None:
         """Fetch blocks from node"""
         try:
             response = requests.get(
@@ -842,7 +834,6 @@ class AnalyticsEngine:
             )
             return None
 
-
 # ==================== SEARCH ENGINE ====================
 
 class SearchEngine:
@@ -854,7 +845,7 @@ class SearchEngine:
         self.db = db
         self.recent_searches: deque = deque(maxlen=100)
 
-    def search(self, query: str, user_id: str = "anonymous") -> Dict[str, Any]:
+    def search(self, query: str, user_id: str = "anonymous") -> dict[str, Any]:
         """Perform search and determine type"""
         query = query.strip()
         search_type = self._identify_search_type(query)
@@ -898,7 +889,7 @@ class SearchEngine:
 
         return result
 
-    def get_autocomplete_suggestions(self, prefix: str, limit: int = 10) -> List[str]:
+    def get_autocomplete_suggestions(self, prefix: str, limit: int = 10) -> list[str]:
         """Get autocomplete suggestions from recent searches"""
         try:
             recent = self.db.get_recent_searches(limit * 2)
@@ -915,7 +906,7 @@ class SearchEngine:
             )
             return []
 
-    def get_recent_searches(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_recent_searches(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get recent searches"""
         return self.db.get_recent_searches(limit)
 
@@ -935,7 +926,7 @@ class SearchEngine:
 
         return SearchType.UNKNOWN
 
-    def _search_block_height(self, height: int) -> Optional[Dict[str, Any]]:
+    def _search_block_height(self, height: int) -> dict[str, Any] | None:
         """Search by block height"""
         try:
             response = requests.get(f"{self.node_url}/blocks/{height}", timeout=5)
@@ -949,7 +940,7 @@ class SearchEngine:
             )
         return None
 
-    def _search_block_hash(self, block_hash: str) -> Optional[Dict[str, Any]]:
+    def _search_block_hash(self, block_hash: str) -> dict[str, Any] | None:
         """Search by block hash"""
         try:
             blocks_response = requests.get(f"{self.node_url}/blocks?limit=1000", timeout=5)
@@ -966,7 +957,7 @@ class SearchEngine:
             )
         return None
 
-    def _search_transaction(self, txid: str) -> Optional[Dict[str, Any]]:
+    def _search_transaction(self, txid: str) -> dict[str, Any] | None:
         """Search by transaction ID"""
         try:
             response = requests.get(f"{self.node_url}/transaction/{txid}", timeout=5)
@@ -980,7 +971,7 @@ class SearchEngine:
             )
         return None
 
-    def _search_address(self, address: str) -> Optional[Dict[str, Any]]:
+    def _search_address(self, address: str) -> dict[str, Any] | None:
         """Search by address"""
         try:
             balance_response = requests.get(f"{self.node_url}/balance/{address}", timeout=5)
@@ -1004,7 +995,6 @@ class SearchEngine:
             )
         return None
 
-
 # ==================== RICH LIST MANAGER ====================
 
 class RichListManager:
@@ -1014,10 +1004,10 @@ class RichListManager:
         """Initialize rich list manager"""
         self.node_url = node_url
         self.db = db
-        self.rich_list_cache: Optional[List[Dict[str, Any]]] = None
+        self.rich_list_cache: list[dict[str, Any]] | None = None
         self.cache_timestamp: float = 0
 
-    def get_rich_list(self, limit: int = 100, refresh: bool = False) -> List[Dict[str, Any]]:
+    def get_rich_list(self, limit: int = 100, refresh: bool = False) -> list[dict[str, Any]]:
         """Get top address holders"""
         cache_key = f"rich_list_{limit}"
 
@@ -1049,7 +1039,7 @@ class RichListManager:
             )
             return []
 
-    def _calculate_rich_list(self, limit: int) -> List[Dict[str, Any]]:
+    def _calculate_rich_list(self, limit: int) -> list[dict[str, Any]]:
         """Calculate rich list from blockchain"""
         try:
             blocks_response = requests.get(f"{self.node_url}/blocks?limit=10000", timeout=10)
@@ -1057,7 +1047,7 @@ class RichListManager:
             blocks = blocks_response.json().get("blocks", [])
 
             # Aggregate all transactions
-            address_balances: Dict[str, float] = defaultdict(float)
+            address_balances: dict[str, float] = defaultdict(float)
 
             for block in blocks:
                 for tx in block.get("transactions", []):
@@ -1106,7 +1096,6 @@ class RichListManager:
             )
             return []
 
-
 # ==================== CSV EXPORT ====================
 
 class ExportManager:
@@ -1116,7 +1105,7 @@ class ExportManager:
         """Initialize export manager"""
         self.node_url = node_url
 
-    def export_transactions_csv(self, address: str) -> Optional[str]:
+    def export_transactions_csv(self, address: str) -> str | None:
         """Export address transactions as CSV"""
         try:
             history_response = requests.get(f"{self.node_url}/history/{address}", timeout=5)
@@ -1157,7 +1146,6 @@ class ExportManager:
             )
             return None
 
-
 # ==================== ADDRESS LABELING MANAGER ====================
 
 class AddressLabelingManager:
@@ -1166,7 +1154,7 @@ class AddressLabelingManager:
     def __init__(self, db: ExplorerDatabase):
         self.db = db
 
-    def import_from_csv(self, csv_path: str) -> Tuple[int, int]:
+    def import_from_csv(self, csv_path: str) -> tuple[int, int]:
         """Import address labels from CSV file
 
         CSV format: address,label,category,description,verified
@@ -1251,7 +1239,7 @@ class AddressLabelingManager:
             )
             return 0
 
-    def search_labels(self, query: str) -> List[AddressLabel]:
+    def search_labels(self, query: str) -> list[AddressLabel]:
         """Search labels by name or address"""
         cursor = self.db.conn.cursor()
         cursor.execute("""
@@ -1263,7 +1251,7 @@ class AddressLabelingManager:
 
         return [AddressLabel(*row) for row in cursor.fetchall()]
 
-    def get_labels_by_category(self, category: str) -> List[AddressLabel]:
+    def get_labels_by_category(self, category: str) -> list[AddressLabel]:
         """Get all labels in a specific category"""
         cursor = self.db.conn.cursor()
         cursor.execute("""
@@ -1275,7 +1263,7 @@ class AddressLabelingManager:
 
         return [AddressLabel(*row) for row in cursor.fetchall()]
 
-    def get_all_categories(self) -> List[str]:
+    def get_all_categories(self) -> list[str]:
         """Get list of all label categories"""
         cursor = self.db.conn.cursor()
         cursor.execute("""
@@ -1284,7 +1272,6 @@ class AddressLabelingManager:
         """)
 
         return [row[0] for row in cursor.fetchall()]
-
 
 # ==================== MEMPOOL MONITOR ====================
 
@@ -1296,7 +1283,7 @@ class MempoolMonitor:
         self.db = db
         self.history = deque(maxlen=1440)  # 24 hours at 1-minute intervals
         self.monitoring = True
-        self.monitor_thread: Optional[threading.Thread] = None
+        self.monitor_thread: threading.Thread | None = None
 
         # Start monitoring thread
         self._start_monitoring()
@@ -1333,7 +1320,7 @@ class MempoolMonitor:
 
             time.sleep(10)  # Update every 10 seconds
 
-    def _store_metrics(self, metrics: Dict[str, Any]):
+    def _store_metrics(self, metrics: dict[str, Any]):
         """Store metrics in database"""
         try:
             with self.db.lock:
@@ -1358,7 +1345,7 @@ class MempoolMonitor:
                 extra={"event": "explorer_backend.mempool_metrics_store_failed"},
             )
 
-    def get_mempool_metrics(self) -> Dict[str, Any]:
+    def get_mempool_metrics(self) -> dict[str, Any]:
         """Get current mempool metrics"""
         try:
             response = requests.get(f"{self.node_url}/transactions", timeout=5)
@@ -1421,7 +1408,7 @@ class MempoolMonitor:
                 "error": str(e)
             }
 
-    def get_mempool_chart_data(self, hours: int = 24) -> List[Dict]:
+    def get_mempool_chart_data(self, hours: int = 24) -> list[Dict]:
         """Get historical mempool data for charting"""
         cutoff_time = time.time() - (hours * 3600)
 
@@ -1465,7 +1452,7 @@ class MempoolMonitor:
 
         return recent_data
 
-    def get_mempool_stats(self) -> Dict[str, Any]:
+    def get_mempool_stats(self) -> dict[str, Any]:
         """Get aggregate mempool statistics"""
         try:
             current = self.get_mempool_metrics()
@@ -1501,7 +1488,6 @@ class MempoolMonitor:
             self.monitor_thread.join(timeout=5)
         logger.info("Mempool monitoring stopped")
 
-
 # ==================== FLASK APP ====================
 
 app = Flask(__name__)
@@ -1521,9 +1507,8 @@ address_labeler = AddressLabelingManager(db)
 mempool_monitor = MempoolMonitor(NODE_URL, db)
 
 # WebSocket connections for real-time updates
-ws_clients: Set[Any] = set()
+ws_clients: set[Any] = set()
 ws_lock = threading.RLock()
-
 
 # ==================== ANALYTICS ENDPOINTS ====================
 
@@ -1532,37 +1517,31 @@ def get_hashrate_endpoint():
     """Get network hashrate"""
     return jsonify(analytics.get_network_hashrate())
 
-
 @app.route("/api/analytics/tx-volume", methods=["GET"])
 def get_tx_volume_endpoint():
     """Get transaction volume"""
     period = request.args.get("period", "24h")
     return jsonify(analytics.get_transaction_volume(period))
 
-
 @app.route("/api/analytics/active-addresses", methods=["GET"])
 def get_active_addresses_endpoint():
     """Get active addresses count"""
     return jsonify(analytics.get_active_addresses())
-
 
 @app.route("/api/analytics/block-time", methods=["GET"])
 def get_block_time_endpoint():
     """Get average block time"""
     return jsonify(analytics.get_average_block_time())
 
-
 @app.route("/api/analytics/mempool", methods=["GET"])
 def get_mempool_endpoint():
     """Get mempool size"""
     return jsonify(analytics.get_mempool_size())
 
-
 @app.route("/api/analytics/difficulty", methods=["GET"])
 def get_difficulty_endpoint():
     """Get network difficulty"""
     return jsonify(analytics.get_network_difficulty())
-
 
 @app.route("/api/analytics/dashboard", methods=["GET"])
 def get_analytics_dashboard():
@@ -1576,7 +1555,6 @@ def get_analytics_dashboard():
         "difficulty": analytics.get_network_difficulty(),
         "timestamp": time.time()
     })
-
 
 # ==================== SEARCH ENDPOINTS ====================
 
@@ -1592,7 +1570,6 @@ def search_endpoint():
 
     return jsonify(search_engine.search(query, user_id))
 
-
 @app.route("/api/search/autocomplete", methods=["GET"])
 def autocomplete_endpoint():
     """Get autocomplete suggestions"""
@@ -1606,7 +1583,6 @@ def autocomplete_endpoint():
         "suggestions": search_engine.get_autocomplete_suggestions(prefix, limit)
     })
 
-
 @app.route("/api/search/recent", methods=["GET"])
 def recent_searches_endpoint():
     """Get recent searches"""
@@ -1614,7 +1590,6 @@ def recent_searches_endpoint():
     return jsonify({
         "recent": search_engine.get_recent_searches(limit)
     })
-
 
 # ==================== RICH LIST ENDPOINTS ====================
 
@@ -1628,7 +1603,6 @@ def richlist_endpoint():
         "richlist": rich_list.get_rich_list(limit)
     })
 
-
 @app.route("/api/richlist/refresh", methods=["POST"])
 def richlist_refresh_endpoint():
     """Force refresh rich list"""
@@ -1639,7 +1613,6 @@ def richlist_refresh_endpoint():
         "richlist": rich_list.get_rich_list(limit, refresh=True)
     })
 
-
 # ==================== ADDRESS LABELING ====================
 
 @app.route("/api/address/<address>/label", methods=["GET"])
@@ -1649,7 +1622,6 @@ def get_address_label(address):
     if label:
         return jsonify(asdict(label))
     return jsonify({"label": None})
-
 
 @app.route("/api/address/<address>/label", methods=["POST"])
 def set_address_label(address):
@@ -1670,7 +1642,6 @@ def set_address_label(address):
     db.add_address_label(label)
     return jsonify({"success": True, "label": asdict(label)})
 
-
 # ==================== EXPORT ENDPOINTS ====================
 
 @app.route("/api/export/transactions/<address>", methods=["GET"])
@@ -1683,7 +1654,6 @@ def export_transactions(address):
             "Content-Disposition": f"attachment; filename=transactions_{address}.csv"
         }
     return jsonify({"error": "Unable to export"}), 404
-
 
 # ==================== WEBSOCKET REAL-TIME UPDATES ====================
 
@@ -1712,8 +1682,7 @@ def websocket_updates(ws):
             ws_clients.discard(ws)
         logger.info(f"WebSocket client disconnected. Total: {len(ws_clients)}")
 
-
-def broadcast_update(update_type: str, data: Dict[str, Any]) -> None:
+def broadcast_update(update_type: str, data: dict[str, Any]) -> None:
     """Broadcast update to all WebSocket clients"""
     message = json.dumps({
         "type": update_type,
@@ -1733,7 +1702,6 @@ def broadcast_update(update_type: str, data: Dict[str, Any]) -> None:
                 )
                 ws_clients.discard(client)
 
-
 # ==================== METRICS ENDPOINTS ====================
 
 @app.route("/api/metrics/<metric_type>", methods=["GET"])
@@ -1746,7 +1714,6 @@ def get_metric_history(metric_type):
         "period_hours": hours,
         "data": metrics
     })
-
 
 # ==================== ADDRESS LABELING ENDPOINTS ====================
 
@@ -1781,7 +1748,6 @@ def import_labels():
             os.unlink(csv_path)
         return jsonify({"error": str(e)}), 500
 
-
 @app.route("/api/labels/export", methods=["GET"])
 def export_labels():
     """Export all labels to CSV"""
@@ -1807,7 +1773,6 @@ def export_labels():
             os.unlink(csv_path)
         return jsonify({"error": str(e)}), 500
 
-
 @app.route("/api/labels/search", methods=["GET"])
 def search_labels_endpoint():
     """Search address labels"""
@@ -1822,7 +1787,6 @@ def search_labels_endpoint():
         "count": len(results)
     })
 
-
 @app.route("/api/labels/categories", methods=["GET"])
 def get_label_categories():
     """Get all label categories"""
@@ -1830,7 +1794,6 @@ def get_label_categories():
     return jsonify({
         "categories": categories
     })
-
 
 @app.route("/api/labels/category/<category>", methods=["GET"])
 def get_labels_by_category_endpoint(category):
@@ -1842,14 +1805,12 @@ def get_labels_by_category_endpoint(category):
         "count": len(labels)
     })
 
-
 # ==================== MEMPOOL MONITORING ENDPOINTS ====================
 
 @app.route("/api/mempool", methods=["GET"])
 def get_mempool_metrics_endpoint():
     """Get current mempool metrics"""
     return jsonify(mempool_monitor.get_mempool_metrics())
-
 
 @app.route("/api/mempool/chart", methods=["GET"])
 def get_mempool_chart_endpoint():
@@ -1862,12 +1823,10 @@ def get_mempool_chart_endpoint():
         "data": mempool_monitor.get_mempool_chart_data(hours)
     })
 
-
 @app.route("/api/mempool/stats", methods=["GET"])
 def get_mempool_stats_endpoint():
     """Get aggregate mempool statistics"""
     return jsonify(mempool_monitor.get_mempool_stats())
-
 
 # ==================== HEALTH CHECK ====================
 
@@ -1887,7 +1846,6 @@ def health_check():
         "node": "connected" if node_status else "disconnected",
         "timestamp": time.time()
     }), (200 if node_status else 503)
-
 
 # ==================== INFO ENDPOINT ====================
 
@@ -1916,7 +1874,6 @@ def explorer_info():
         "node_url": NODE_URL,
         "timestamp": time.time()
     })
-
 
 if __name__ == "__main__":
     port = int(os.getenv("EXPLORER_PORT", 8082))

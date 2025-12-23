@@ -14,38 +14,37 @@ Now uses the secure sandbox implementation from xai.sandbox:
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import logging
 import time
-from typing import Dict, Any, List, Optional, Set, Callable, Union
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
+from typing import Any, Callable
 
 # Import secure sandbox components
 from xai.sandbox.permissions import (
+    AuditLog,
     Permission,
+    PermissionDeniedError,
     PermissionLevel,
     PermissionManager,
-    PermissionDeniedError,
-    AuditLog,
 )
 from xai.sandbox.secure_executor import (
-    SecureExecutor,
     ExecutionContext,
     ExecutionResult,
     ResourceLimits,
     SandboxAPI,
+    SecureExecutor,
 )
 from xai.sandbox.wasm_executor import (
     WasmExecutor,
-    WasmResult,
     WasmLimits,
+    WasmResult,
 )
 
 logger = logging.getLogger(__name__)
-
 
 class AppPermission(Enum):
     """Permissions for mini apps"""
@@ -59,7 +58,6 @@ class AppPermission(Enum):
     NETWORK = "network"
     STORAGE = "storage"
 
-
 @dataclass
 class MiniApp:
     """Mini application metadata"""
@@ -70,16 +68,16 @@ class MiniApp:
     description: str
     icon_url: str
     entry_point: str
-    permissions: List[str]
+    permissions: list[str]
     verified: bool = False
-    install_time: Optional[float] = None
-    last_used: Optional[float] = None
+    install_time: float | None = None
+    last_used: float | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> MiniApp:
+    def from_dict(cls, data: dict[str, Any]) -> MiniApp:
         return cls(**data)
 
     def calculate_hash(self) -> str:
@@ -90,7 +88,6 @@ class MiniApp:
             "developer": self.developer
         }
         return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
-
 
 class AppSandbox:
     """
@@ -108,8 +105,8 @@ class AppSandbox:
         self,
         app: MiniApp,
         wallet_interface: Any,
-        permission_manager: Optional[PermissionManager] = None,
-        storage_path: Optional[Path] = None,
+        permission_manager: PermissionManager | None = None,
+        storage_path: Path | None = None,
     ):
         self.app = app
         self.wallet_interface = wallet_interface
@@ -120,7 +117,7 @@ class AppSandbox:
         self.last_reset_time = time.time()
         self.storage_limit_bytes = 1024 * 1024  # 1MB per app
         self.storage_used = 0
-        self.allowed_domains: Set[str] = set()
+        self.allowed_domains: set[str] = set()
 
         # New secure sandbox components
         self.permission_manager = permission_manager or PermissionManager(
@@ -161,8 +158,8 @@ class AppSandbox:
         code: str,
         language: str = "python",
         entry_point: str = "main",
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Union[ExecutionResult, WasmResult]:
+        context: dict[str, Any] | None = None,
+    ) -> ExecutionResult | WasmResult:
         """
         Execute app code in secure sandbox
 
@@ -195,7 +192,7 @@ class AppSandbox:
         self,
         code: str,
         entry_point: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
     ) -> ExecutionResult:
         """Execute Python code using SecureExecutor"""
         # Map old AppPermission to new Permission enum
@@ -225,7 +222,7 @@ class AppSandbox:
         self,
         wasm_bytes: bytes,
         entry_point: str,
-        arguments: Dict[str, Any],
+        arguments: dict[str, Any],
     ) -> WasmResult:
         """Execute WebAssembly module"""
         # Convert wasm_bytes (might be passed as string in old code)
@@ -254,7 +251,7 @@ class AppSandbox:
         self.api_call_count += 1
         return True
 
-    def _create_app_api(self) -> Dict[str, Callable]:
+    def _create_app_api(self) -> dict[str, Callable]:
         """Create restricted API for app"""
         api = {}
 
@@ -283,14 +280,14 @@ class AppSandbox:
 
         return api
 
-    def _get_balance(self, address: Optional[str] = None) -> float:
+    def _get_balance(self, address: str | None = None) -> float:
         """Get balance (sandboxed)"""
         if not self._check_permission(AppPermission.READ_BALANCE):
             raise PermissionError("No permission to read balance")
 
         return self.wallet_interface.get_balance(address)
 
-    def _get_transactions(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def _get_transactions(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get transactions (sandboxed)"""
         if not self._check_permission(AppPermission.READ_TRANSACTIONS):
             raise PermissionError("No permission to read transactions")
@@ -300,7 +297,7 @@ class AppSandbox:
 
         return self.wallet_interface.get_transactions(limit)
 
-    def _create_transaction(self, recipient: str, amount: float) -> Dict[str, Any]:
+    def _create_transaction(self, recipient: str, amount: float) -> dict[str, Any]:
         """Create transaction (sandboxed, requires user confirmation)"""
         if not self._check_permission(AppPermission.CREATE_TRANSACTION):
             raise PermissionError("No permission to create transactions")
@@ -373,7 +370,7 @@ class AppSandbox:
         """Check if app has permission"""
         return permission.value in self.app.permissions
 
-    def _create_restricted_builtins(self) -> Dict[str, Any]:
+    def _create_restricted_builtins(self) -> dict[str, Any]:
         """Create restricted builtins"""
         # Only allow safe builtins
         safe_builtins = {
@@ -400,7 +397,6 @@ class AppSandbox:
 
         return safe_builtins
 
-
 class MiniAppRegistry:
     """
     Registry for managing mini apps
@@ -413,8 +409,8 @@ class MiniAppRegistry:
         import os
         os.makedirs(storage_path, exist_ok=True)
 
-        self.apps: Dict[str, MiniApp] = {}
-        self.verified_developers: Set[str] = set()
+        self.apps: dict[str, MiniApp] = {}
+        self.verified_developers: set[str] = set()
         self._load_apps()
 
     def register_app(self, app: MiniApp) -> bool:
@@ -463,11 +459,11 @@ class MiniAppRegistry:
 
         return False
 
-    def get_app(self, app_id: str) -> Optional[MiniApp]:
+    def get_app(self, app_id: str) -> MiniApp | None:
         """Get app by ID"""
         return self.apps.get(app_id)
 
-    def list_apps(self, verified_only: bool = False) -> List[MiniApp]:
+    def list_apps(self, verified_only: bool = False) -> list[MiniApp]:
         """
         List all apps
 
@@ -552,14 +548,13 @@ class MiniAppRegistry:
         with open(registry_file, 'w') as f:
             json.dump(data, f, indent=2)
 
-
 class AppSecurityMonitor:
     """Monitor app behavior for security"""
 
     def __init__(self):
-        self.suspicious_activities: List[Dict[str, Any]] = []
+        self.suspicious_activities: list[dict[str, Any]] = []
 
-    def log_api_call(self, app_id: str, api_name: str, params: Dict[str, Any]) -> None:
+    def log_api_call(self, app_id: str, api_name: str, params: dict[str, Any]) -> None:
         """Log API call for monitoring"""
         # Detect suspicious patterns
         if self._is_suspicious(api_name, params):
@@ -570,7 +565,7 @@ class AppSecurityMonitor:
                 "timestamp": time.time()
             })
 
-    def _is_suspicious(self, api_name: str, params: Dict[str, Any]) -> bool:
+    def _is_suspicious(self, api_name: str, params: dict[str, Any]) -> bool:
         """Detect suspicious activity"""
         # Check for large transaction attempts
         if api_name == "createTransaction":
@@ -583,7 +578,7 @@ class AppSecurityMonitor:
 
         return False
 
-    def get_suspicious_activities(self, app_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_suspicious_activities(self, app_id: str | None = None) -> list[dict[str, Any]]:
         """Get suspicious activities"""
         if app_id:
             return [a for a in self.suspicious_activities if a["app_id"] == app_id]

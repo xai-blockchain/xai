@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Wallet Claiming API
 
@@ -9,19 +11,19 @@ Multiple ways to claim early adopter wallets:
 Includes Time Capsule Protocol integration
 """
 
-from flask import jsonify, request
-from datetime import datetime
-import os
-import json
-import time
 import hashlib
+import json
 import logging
+import os
 import threading
+import time
 from collections import defaultdict, deque
-from typing import Optional, Dict, Any, Set
+from datetime import datetime
+from typing import Any
+
+from flask import jsonify, request
 
 logger = logging.getLogger(__name__)
-
 
 class FraudDetector:
     """Comprehensive fraud detection for wallet claims"""
@@ -43,18 +45,18 @@ class FraudDetector:
         self.suspicious_pattern_threshold = suspicious_pattern_threshold
 
         # Rate limiting per IP
-        self.ip_attempts: Dict[str, deque] = defaultdict(lambda: deque())
+        self.ip_attempts: dict[str, deque] = defaultdict(lambda: deque())
 
         # Track claims per identity proof
-        self.identity_claims: Dict[str, Set[str]] = defaultdict(set)
+        self.identity_claims: dict[str, set[str]] = defaultdict(set)
 
         # Failed attempts tracking for pattern detection
-        self.failed_attempts: Dict[str, int] = defaultdict(int)
-        self.blacklisted_ips: Set[str] = set()
-        self.suspicious_patterns: Dict[str, list] = defaultdict(list)
+        self.failed_attempts: dict[str, int] = defaultdict(int)
+        self.blacklisted_ips: set[str] = set()
+        self.suspicious_patterns: dict[str, list] = defaultdict(list)
 
         # Signature validation tracking
-        self.verified_signatures: Dict[str, Dict[str, Any]] = {}
+        self.verified_signatures: dict[str, dict[str, Any]] = {}
 
         self._lock = threading.RLock()
 
@@ -63,7 +65,7 @@ class FraudDetector:
             f"Max per identity: {max_claims_per_identity}"
         )
 
-    def check_rate_limit(self, ip_address: str) -> Dict[str, Any]:
+    def check_rate_limit(self, ip_address: str) -> dict[str, Any]:
         """
         Check if IP is within rate limits.
 
@@ -110,8 +112,8 @@ class FraudDetector:
                 "limit": self.max_claims_per_ip
             }
 
-    def verify_proof_of_ownership(self, identifier: str, signature: Optional[str] = None,
-                                  public_key: Optional[str] = None) -> Dict[str, Any]:
+    def verify_proof_of_ownership(self, identifier: str, signature: str | None = None,
+                                  public_key: str | None = None) -> dict[str, Any]:
         """
         Verify proof of ownership for wallet claim.
 
@@ -170,7 +172,7 @@ class FraudDetector:
                 "verified_at": time.time()
             }
 
-    def check_identity_uniqueness(self, identity_proof: str, identifier: str) -> Dict[str, Any]:
+    def check_identity_uniqueness(self, identity_proof: str, identifier: str) -> dict[str, Any]:
         """
         Check if identity has already claimed (prevent multiple accounts).
 
@@ -209,7 +211,7 @@ class FraudDetector:
             }
 
     def detect_suspicious_patterns(self, ip_address: str, identifier: str,
-                                   claim_data: Dict[str, Any]) -> Dict[str, Any]:
+                                   claim_data: dict[str, Any]) -> dict[str, Any]:
         """
         Detect suspicious patterns for abuse prevention.
 
@@ -288,7 +290,6 @@ class FraudDetector:
         """Reset fraud tracking for an identifier (after successful claim)."""
         with self._lock:
             self.failed_attempts.pop(identifier, None)
-
 
 class WalletClaimingTracker:
     """Tracks unclaimed wallets and sends persistent notifications"""
@@ -411,7 +412,6 @@ class WalletClaimingTracker:
                 }
             )
         return summary
-
 
 def setup_wallet_claiming_api(app, node):
     """

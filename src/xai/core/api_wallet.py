@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Wallet and Trading API Handler
 
@@ -9,15 +11,15 @@ Handles all wallet and trading-related API endpoints including:
 - Wallet seeds snapshot
 """
 
-import os
 import json
-import time
 import logging
-from typing import Dict, Any, Tuple, Optional
+import os
+import time
+from typing import Any
 
 import requests
-from flask import Flask, jsonify, request, Response
-from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
+from flask import Flask, Response, jsonify, request
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, generate_latest
 
 from xai.core.config import Config
 from xai.core.security_validation import ValidationError
@@ -33,12 +35,11 @@ walletconnect_sessions_counter = Counter(
     "xai_walletconnect_sessions_total", "WalletConnect sessions registered"
 )
 
-
 class WalletAPIHandler:
     """Handles all wallet and trading-related API endpoints."""
 
     def __init__(
-        self, node: Any, app: Flask, broadcast_callback: callable, trade_peers: Dict[str, float]
+        self, node: Any, app: Flask, broadcast_callback: callable, trade_peers: dict[str, float]
     ):
         """
         Initialize Wallet API Handler.
@@ -62,109 +63,109 @@ class WalletAPIHandler:
 
         # Wallet creation routes
         @self.app.route("/wallet/create", methods=["POST"])
-        def create_wallet() -> Tuple[Dict[str, Any], int]:
+        def create_wallet() -> tuple[dict[str, Any], int]:
             """Create new wallet."""
             return self.create_wallet_handler()
 
         @self.app.route("/wallet/embedded/create", methods=["POST"])
-        def create_embedded_wallet() -> Tuple[Dict[str, Any], int]:
+        def create_embedded_wallet() -> tuple[dict[str, Any], int]:
             """Create an embedded wallet alias."""
             return self.create_embedded_wallet_handler()
 
         @self.app.route("/wallet/embedded/login", methods=["POST"])
-        def login_embedded_wallet() -> Tuple[Dict[str, Any], int]:
+        def login_embedded_wallet() -> tuple[dict[str, Any], int]:
             """Login to embedded wallet."""
             return self.login_embedded_wallet_handler()
 
         # Transaction signing route
         @self.app.route("/wallet/sign", methods=["POST"])
-        def sign_transaction() -> Tuple[Dict[str, Any], int]:
+        def sign_transaction() -> tuple[dict[str, Any], int]:
             """Sign transaction with ECDSA."""
             return self.sign_transaction_handler()
 
         # Public key derivation route
         @self.app.route("/wallet/derive-public-key", methods=["POST"])
-        def derive_public_key() -> Tuple[Dict[str, Any], int]:
+        def derive_public_key() -> tuple[dict[str, Any], int]:
             """Derive public key from private key."""
             return self.derive_public_key_handler()
 
         # WalletConnect routes
         @self.app.route("/wallet-trades/wc/handshake", methods=["POST"])
-        def walletconnect_handshake() -> Tuple[Dict[str, Any], int]:
+        def walletconnect_handshake() -> tuple[dict[str, Any], int]:
             """WalletConnect handshake."""
             return self.walletconnect_handshake_handler()
 
         @self.app.route("/wallet-trades/wc/confirm", methods=["POST"])
-        def walletconnect_confirm() -> Tuple[Dict[str, Any], int]:
+        def walletconnect_confirm() -> tuple[dict[str, Any], int]:
             """Confirm WalletConnect handshake."""
             return self.walletconnect_confirm_handler()
 
         # Trade session routes
         @self.app.route("/wallet-trades/register", methods=["POST"])
-        def register_trade_session() -> Tuple[Dict[str, Any], int]:
+        def register_trade_session() -> tuple[dict[str, Any], int]:
             """Create WalletConnect-style session."""
             return self.register_trade_session_handler()
 
         # Trade order routes
         @self.app.route("/wallet-trades/orders", methods=["GET"])
-        def list_trade_orders() -> Tuple[Dict[str, Any], int]:
+        def list_trade_orders() -> tuple[dict[str, Any], int]:
             """List trade orders."""
             return self.list_trade_orders_handler()
 
         @self.app.route("/wallet-trades/orders", methods=["POST"])
-        def create_trade_order() -> Tuple[Dict[str, Any], int]:
+        def create_trade_order() -> tuple[dict[str, Any], int]:
             """Create trade order."""
             return self.create_trade_order_handler()
 
         @self.app.route("/wallet-trades/orders/<order_id>", methods=["GET"])
-        def get_trade_order(order_id: str) -> Tuple[Dict[str, Any], int]:
+        def get_trade_order(order_id: str) -> tuple[dict[str, Any], int]:
             """Get specific trade order."""
             return self.get_trade_order_handler(order_id)
 
         # Trade match routes
         @self.app.route("/wallet-trades/matches", methods=["GET"])
-        def list_trade_matches() -> Tuple[Dict[str, Any], int]:
+        def list_trade_matches() -> tuple[dict[str, Any], int]:
             """List trade matches."""
             return self.list_trade_matches_handler()
 
         @self.app.route("/wallet-trades/matches/<match_id>", methods=["GET"])
-        def get_trade_match(match_id: str) -> Tuple[Dict[str, Any], int]:
+        def get_trade_match(match_id: str) -> tuple[dict[str, Any], int]:
             """Get specific trade match."""
             return self.get_trade_match_handler(match_id)
 
         @self.app.route("/wallet-trades/matches/<match_id>/secret", methods=["POST"])
-        def submit_trade_secret(match_id: str) -> Tuple[Dict[str, Any], int]:
+        def submit_trade_secret(match_id: str) -> tuple[dict[str, Any], int]:
             """Submit trade secret for match."""
             return self.submit_trade_secret_handler(match_id)
 
         # Gossip and snapshot routes
         @self.app.route("/wallet-trades/gossip", methods=["POST"])
-        def inbound_gossip() -> Tuple[Dict[str, Any], int]:
+        def inbound_gossip() -> tuple[dict[str, Any], int]:
             """Handle inbound gossip."""
             return self.inbound_gossip_handler()
 
         @self.app.route("/wallet-trades/snapshot", methods=["GET"])
-        def snapshot_orderbook() -> Tuple[Dict[str, Any], int]:
+        def snapshot_orderbook() -> tuple[dict[str, Any], int]:
             """Get orderbook snapshot."""
             return self.snapshot_orderbook_handler()
 
         @self.app.route("/wallet-trades/peers/register", methods=["POST"])
-        def register_trade_peer() -> Tuple[Dict[str, Any], int]:
+        def register_trade_peer() -> tuple[dict[str, Any], int]:
             """Register trade peer."""
             return self.register_trade_peer_handler()
 
         @self.app.route("/wallet-trades/backfill", methods=["GET"])
-        def trade_backfill() -> Tuple[Dict[str, Any], int]:
+        def trade_backfill() -> tuple[dict[str, Any], int]:
             """Get trade event backfill."""
             return self.trade_backfill_handler()
 
         @self.app.route("/wallet-trades/history", methods=["GET"])
-        def get_trade_history() -> Tuple[Dict[str, Any], int]:
+        def get_trade_history() -> tuple[dict[str, Any], int]:
             """Get trade history."""
             return self.get_trade_history_handler()
 
         @self.app.route("/wallet-seeds/snapshot", methods=["GET"])
-        def wallet_seeds_snapshot() -> Tuple[Dict[str, Any], int]:
+        def wallet_seeds_snapshot() -> tuple[dict[str, Any], int]:
             """Get wallet seeds snapshot."""
             return self.wallet_seeds_snapshot_handler()
 
@@ -174,7 +175,7 @@ class WalletAPIHandler:
             """Get Prometheus metrics."""
             return self.metrics_handler()
 
-    def create_wallet_handler(self) -> Tuple[Dict[str, Any], int]:
+    def create_wallet_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle wallet creation - returns encrypted keystore.
 
@@ -297,7 +298,7 @@ class WalletAPIHandler:
             201,
         )
 
-    def sign_transaction_handler(self) -> Tuple[Dict[str, Any], int]:
+    def sign_transaction_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle transaction signing with ECDSA secp256k1.
 
@@ -418,7 +419,7 @@ class WalletAPIHandler:
                 500,
             )
 
-    def derive_public_key_handler(self) -> Tuple[Dict[str, Any], int]:
+    def derive_public_key_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle public key derivation from private key.
 
@@ -479,7 +480,7 @@ class WalletAPIHandler:
                 500,
             )
 
-    def create_embedded_wallet_handler(self) -> Tuple[Dict[str, Any], int]:
+    def create_embedded_wallet_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle embedded wallet creation.
 
@@ -530,7 +531,7 @@ class WalletAPIHandler:
             200,
         )
 
-    def login_embedded_wallet_handler(self) -> Tuple[Dict[str, Any], int]:
+    def login_embedded_wallet_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle embedded wallet login.
 
@@ -564,7 +565,7 @@ class WalletAPIHandler:
             200,
         )
 
-    def walletconnect_handshake_handler(self) -> Tuple[Dict[str, Any], int]:
+    def walletconnect_handshake_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle WalletConnect handshake.
 
@@ -581,7 +582,7 @@ class WalletAPIHandler:
         walletconnect_sessions_counter.inc()
         return jsonify(handshake), 200
 
-    def walletconnect_confirm_handler(self) -> Tuple[Dict[str, Any], int]:
+    def walletconnect_confirm_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle WalletConnect confirmation.
 
@@ -612,7 +613,7 @@ class WalletAPIHandler:
 
         return jsonify({"success": True, "session_token": session["session_token"]}), 200
 
-    def register_trade_session_handler(self) -> Tuple[Dict[str, Any], int]:
+    def register_trade_session_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle trade session registration.
 
@@ -632,7 +633,7 @@ class WalletAPIHandler:
         )
         return jsonify({"success": True, **session}), 200
 
-    def list_trade_orders_handler(self) -> Tuple[Dict[str, Any], int]:
+    def list_trade_orders_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle trade orders listing.
 
@@ -642,7 +643,7 @@ class WalletAPIHandler:
         orders = self.node.blockchain.get_trade_orders()
         return jsonify({"success": True, "orders": orders}), 200
 
-    def create_trade_order_handler(self) -> Tuple[Dict[str, Any], int]:
+    def create_trade_order_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle trade order creation.
 
@@ -684,7 +685,7 @@ class WalletAPIHandler:
 
         return jsonify(result), 200
 
-    def get_trade_order_handler(self, order_id: str) -> Tuple[Dict[str, Any], int]:
+    def get_trade_order_handler(self, order_id: str) -> tuple[dict[str, Any], int]:
         """
         Handle specific trade order retrieval.
 
@@ -699,7 +700,7 @@ class WalletAPIHandler:
             return jsonify({"success": False, "error": "Order not found"}), 404
         return jsonify({"success": True, "order": order.to_dict()}), 200
 
-    def list_trade_matches_handler(self) -> Tuple[Dict[str, Any], int]:
+    def list_trade_matches_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle trade matches listing.
 
@@ -709,7 +710,7 @@ class WalletAPIHandler:
         matches = self.node.blockchain.get_trade_matches()
         return jsonify({"success": True, "matches": matches}), 200
 
-    def get_trade_match_handler(self, match_id: str) -> Tuple[Dict[str, Any], int]:
+    def get_trade_match_handler(self, match_id: str) -> tuple[dict[str, Any], int]:
         """
         Handle specific trade match retrieval.
 
@@ -724,7 +725,7 @@ class WalletAPIHandler:
             return jsonify({"success": False, "error": "Match not found"}), 404
         return jsonify({"success": True, "match": match.to_dict()}), 200
 
-    def submit_trade_secret_handler(self, match_id: str) -> Tuple[Dict[str, Any], int]:
+    def submit_trade_secret_handler(self, match_id: str) -> tuple[dict[str, Any], int]:
         """
         Handle trade secret submission.
 
@@ -753,7 +754,7 @@ class WalletAPIHandler:
 
         return jsonify(response), 200
 
-    def inbound_gossip_handler(self) -> Tuple[Dict[str, Any], int]:
+    def inbound_gossip_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle inbound gossip messages.
 
@@ -772,7 +773,7 @@ class WalletAPIHandler:
         result = self.node.blockchain.trade_manager.ingest_gossip(event)
         return jsonify(result), 200
 
-    def snapshot_orderbook_handler(self) -> Tuple[Dict[str, Any], int]:
+    def snapshot_orderbook_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle orderbook snapshot request.
 
@@ -782,7 +783,7 @@ class WalletAPIHandler:
         snapshot = self.node.blockchain.trade_manager.snapshot()
         return jsonify({"success": True, "snapshot": snapshot}), 200
 
-    def register_trade_peer_handler(self) -> Tuple[Dict[str, Any], int]:
+    def register_trade_peer_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle trade peer registration.
 
@@ -802,7 +803,7 @@ class WalletAPIHandler:
         self._register_trade_peer(host)
         return jsonify({"success": True, "host": host}), 200
 
-    def trade_backfill_handler(self) -> Tuple[Dict[str, Any], int]:
+    def trade_backfill_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle trade event backfill request.
 
@@ -826,7 +827,7 @@ class WalletAPIHandler:
             200,
         )
 
-    def get_trade_history_handler(self) -> Tuple[Dict[str, Any], int]:
+    def get_trade_history_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle trade history request.
 
@@ -836,7 +837,7 @@ class WalletAPIHandler:
         history = self.node.blockchain.trade_history
         return jsonify({"success": True, "history": history}), 200
 
-    def wallet_seeds_snapshot_handler(self) -> Tuple[Dict[str, Any], int]:
+    def wallet_seeds_snapshot_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle wallet seeds snapshot request.
 
@@ -879,7 +880,7 @@ class WalletAPIHandler:
         self.trade_peers[normalized] = time.time()
         logger.info(f"Registered wallet-trade peer {normalized}")
 
-    def _gossip_trade_event(self, event: Dict[str, Any]) -> None:
+    def _gossip_trade_event(self, event: dict[str, Any]) -> None:
         """
         Gossip trade event to peers.
 

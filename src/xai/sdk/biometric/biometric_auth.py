@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Biometric Authentication Framework - Python Reference Implementation
 
@@ -8,8 +10,6 @@ that can be used as a reference for mobile SDK implementations.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
-
 
 class BiometricType(Enum):
     """Types of biometric authentication supported."""
@@ -19,7 +19,6 @@ class BiometricType(Enum):
     IRIS = "iris"
     VOICE = "voice"
     NONE = "none"
-
 
 class BiometricError(Enum):
     """Biometric authentication error codes."""
@@ -33,16 +32,14 @@ class BiometricError(Enum):
     TIMEOUT = "timeout"
     UNKNOWN = "unknown"
 
-
 @dataclass
 class BiometricResult:
     """Result of a biometric authentication attempt."""
     success: bool
     auth_type: BiometricType
-    error_code: Optional[BiometricError] = None
-    error_message: Optional[str] = None
-    timestamp: Optional[int] = None  # Unix timestamp
-
+    error_code: BiometricError | None = None
+    error_message: str | None = None
+    timestamp: int | None = None  # Unix timestamp
 
 @dataclass
 class BiometricCapability:
@@ -52,7 +49,6 @@ class BiometricCapability:
     biometric_types: list[BiometricType]
     hardware_detected: bool
     security_level: str  # "strong", "weak", "none"
-
 
 class BiometricAuthProvider(ABC):
     """
@@ -131,7 +127,6 @@ class BiometricAuthProvider(ABC):
             - Android: Cancel BiometricPrompt
         """
         pass
-
 
 class MockBiometricProvider(BiometricAuthProvider):
     """

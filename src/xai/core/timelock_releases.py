@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Time-Locked Software Releases
 
@@ -5,12 +7,11 @@ Stores software in genesis block with activation timestamps
 Software automatically becomes available when timestamp passes
 """
 
-import time
 import base64
 import hashlib
-from typing import Dict, List, Optional
-from xai.core.constants import SECONDS_PER_DAY, GENESIS_TIMESTAMP
+import time
 
+from xai.core.constants import GENESIS_TIMESTAMP, SECONDS_PER_DAY
 
 class TimeLockRelease:
     """Individual time-locked software release"""
@@ -34,7 +35,7 @@ class TimeLockRelease:
         """Check if release is active"""
         return time.time() >= self.activation_timestamp
 
-    def get_code(self) -> Optional[str]:
+    def get_code(self) -> str | None:
         """Get code if active, None if locked"""
         if self.is_active():
             return base64.b64decode(self.code).decode("utf-8")
@@ -65,11 +66,10 @@ class TimeLockRelease:
             ),
         }
 
-
 class SoftwareReleaseManager:
     """Manages time-locked software releases in blockchain"""
 
-    def __init__(self, genesis_releases: List[Dict] = None):
+    def __init__(self, genesis_releases: list[Dict] = None):
         self.releases = []
 
         if genesis_releases:
@@ -83,7 +83,7 @@ class SoftwareReleaseManager:
                 )
                 self.releases.append(release)
 
-    def get_available_software(self) -> List[Dict]:
+    def get_available_software(self) -> list[Dict]:
         """Get all currently active software releases"""
         active = [r for r in self.releases if r.is_active()]
 
@@ -97,7 +97,7 @@ class SoftwareReleaseManager:
             for r in active
         ]
 
-    def get_upcoming_releases(self) -> List[Dict]:
+    def get_upcoming_releases(self) -> list[Dict]:
         """Get info about locked releases (no code)"""
         upcoming = [r for r in self.releases if not r.is_active()]
         return [r.to_public_dict() for r in upcoming]
@@ -110,8 +110,7 @@ class SoftwareReleaseManager:
             "total_releases": len(self.releases),
         }
 
-
-def create_genesis_software_releases() -> List[Dict]:
+def create_genesis_software_releases() -> list[Dict]:
     """
     Create time-locked software releases for genesis block
 
@@ -165,7 +164,6 @@ def create_genesis_software_releases() -> List[Dict]:
 
     return releases
 
-
 def verify_release_integrity(release_data: Dict, expected_hash: str) -> bool:
     """
     Verify software release hasn't been tampered with
@@ -179,7 +177,6 @@ def verify_release_integrity(release_data: Dict, expected_hash: str) -> bool:
     """
     actual_hash = hashlib.sha256(release_data["code"].encode()).hexdigest()
     return actual_hash == expected_hash
-
 
 # Example usage and testing
 if __name__ == "__main__":

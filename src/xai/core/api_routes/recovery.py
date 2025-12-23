@@ -1,25 +1,24 @@
 from __future__ import annotations
 
 import logging
+
 logger = logging.getLogger(__name__)
 
-
-from typing import TYPE_CHECKING, Dict, Tuple, Optional, Any
+from typing import TYPE_CHECKING, Any
 
 from flask import jsonify, request
 
-from xai.core.request_validator_middleware import validate_request
 from xai.core.input_validation_schemas import (
-    RecoverySetupInput,
-    RecoveryRequestInput,
-    RecoveryVoteInput,
     RecoveryCancelInput,
     RecoveryExecuteInput,
+    RecoveryRequestInput,
+    RecoverySetupInput,
+    RecoveryVoteInput,
 )
+from xai.core.request_validator_middleware import validate_request
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
-
 
 def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
     """Register social recovery endpoints."""
@@ -28,7 +27,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/recovery/setup", methods=["POST"])
     @validate_request(routes.request_validator, RecoverySetupInput)
-    def setup_recovery() -> Tuple[Dict[str, Any], int]:
+    def setup_recovery() -> tuple[dict[str, Any], int]:
         """Set up social recovery guardians for an account (admin only).
 
         Configures trusted guardians who can collectively help recover access
@@ -59,7 +58,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
         if auth_error:
             return auth_error
 
-        model: Optional[RecoverySetupInput] = getattr(request, "validated_model", None)
+        model: RecoverySetupInput | None = getattr(request, "validated_model", None)
         if model is None:
             return routes._error_response(
                 "Invalid recovery payload",
@@ -90,7 +89,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/recovery/request", methods=["POST"])
     @validate_request(routes.request_validator, RecoveryRequestInput)
-    def request_recovery() -> Tuple[Dict[str, Any], int]:
+    def request_recovery() -> tuple[dict[str, Any], int]:
         """Initiate account recovery process (admin only).
 
         Starts a recovery request to transfer account control to a new address.
@@ -120,7 +119,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
         if auth_error:
             return auth_error
 
-        model: Optional[RecoveryRequestInput] = getattr(request, "validated_model", None)
+        model: RecoveryRequestInput | None = getattr(request, "validated_model", None)
         if model is None:
             return routes._error_response("Invalid recovery payload", status=400, code="invalid_payload")
 
@@ -147,7 +146,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/recovery/vote", methods=["POST"])
     @validate_request(routes.request_validator, RecoveryVoteInput)
-    def vote_recovery() -> Tuple[Dict[str, Any], int]:
+    def vote_recovery() -> tuple[dict[str, Any], int]:
         """Vote to approve a recovery request (admin only).
 
         Guardian casts vote to approve account recovery. When threshold is reached,
@@ -175,7 +174,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
         auth_error = routes._require_api_auth()
         if auth_error:
             return auth_error
-        model: Optional[RecoveryVoteInput] = getattr(request, "validated_model", None)
+        model: RecoveryVoteInput | None = getattr(request, "validated_model", None)
         if model is None:
             return routes._error_response("Invalid recovery payload", status=400, code="invalid_payload")
 
@@ -200,7 +199,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "recovery_vote")
 
     @app.route("/recovery/status/<address>", methods=["GET"])
-    def get_recovery_status(address: str) -> Tuple[Dict[str, Any], int]:
+    def get_recovery_status(address: str) -> tuple[dict[str, Any], int]:
         """Get recovery status for an account.
 
         Returns current recovery status including active requests, guardian votes,
@@ -235,7 +234,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/recovery/cancel", methods=["POST"])
     @validate_request(routes.request_validator, RecoveryCancelInput)
-    def cancel_recovery() -> Tuple[Dict[str, Any], int]:
+    def cancel_recovery() -> tuple[dict[str, Any], int]:
         """Cancel an active recovery request (admin only).
 
         Allows account owner to cancel recovery request if they regain access
@@ -263,7 +262,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
         auth_error = routes._require_api_auth()
         if auth_error:
             return auth_error
-        model: Optional[RecoveryCancelInput] = getattr(request, "validated_model", None)
+        model: RecoveryCancelInput | None = getattr(request, "validated_model", None)
         if model is None:
             return routes._error_response("Invalid recovery payload", status=400, code="invalid_payload")
 
@@ -289,7 +288,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/recovery/execute", methods=["POST"])
     @validate_request(routes.request_validator, RecoveryExecuteInput)
-    def execute_recovery() -> Tuple[Dict[str, Any], int]:
+    def execute_recovery() -> tuple[dict[str, Any], int]:
         """Execute approved recovery to transfer account control (admin only).
 
         Finalizes recovery process when threshold guardian votes are reached,
@@ -316,7 +315,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
         auth_error = routes._require_api_auth()
         if auth_error:
             return auth_error
-        model: Optional[RecoveryExecuteInput] = getattr(request, "validated_model", None)
+        model: RecoveryExecuteInput | None = getattr(request, "validated_model", None)
         if model is None:
             return routes._error_response("Invalid recovery payload", status=400, code="invalid_payload")
 
@@ -339,7 +338,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "recovery_execute")
 
     @app.route("/recovery/config/<address>", methods=["GET"])
-    def get_recovery_config(address: str) -> Tuple[Dict[str, Any], int]:
+    def get_recovery_config(address: str) -> tuple[dict[str, Any], int]:
         """Get recovery configuration for an account.
 
         Returns guardian list, threshold settings, and recovery configuration
@@ -379,7 +378,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "recovery_get_config")
 
     @app.route("/recovery/guardian/<address>", methods=["GET"])
-    def get_guardian_duties(address: str) -> Tuple[Dict[str, Any], int]:
+    def get_guardian_duties(address: str) -> tuple[dict[str, Any], int]:
         """Get guardian duties and pending recovery requests.
 
         Returns all accounts where this address is a guardian and any pending
@@ -413,7 +412,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "recovery_get_guardian_duties")
 
     @app.route("/recovery/requests", methods=["GET"])
-    def get_recovery_requests() -> Tuple[Dict[str, Any], int]:
+    def get_recovery_requests() -> tuple[dict[str, Any], int]:
         """Get all recovery requests, optionally filtered by status.
 
         Returns list of recovery requests with optional status filtering
@@ -452,7 +451,7 @@ def register_recovery_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "recovery_get_requests")
 
     @app.route("/recovery/stats", methods=["GET"])
-    def get_recovery_stats() -> Tuple[Dict[str, Any], int]:
+    def get_recovery_stats() -> tuple[dict[str, Any], int]:
         """Get system-wide social recovery statistics.
 
         Returns aggregate statistics about recovery system including total

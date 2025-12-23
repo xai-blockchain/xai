@@ -1,13 +1,13 @@
+from __future__ import annotations
+
 import logging
-from typing import Set, List
 
 logger = logging.getLogger(__name__)
 
-
 class AddressFilter:
     def __init__(self, enable_whitelist: bool = False):
-        self.whitelist: Set[str] = set()
-        self.blacklist: Set[str] = set()
+        self.whitelist: set[str] = set()
+        self.blacklist: set[str] = set()
         self.enable_whitelist = enable_whitelist  # If True, only whitelisted addresses are allowed
 
     def add_to_whitelist(self, address: str):
@@ -72,7 +72,6 @@ class AddressFilter:
             # Whitelist is not enabled, so all non-blacklisted addresses are allowed
             logger.info("Address allowed (whitelist disabled)", extra={"event": "address_filter.allowed_default", "address": address})
             return True
-
 
 if __name__ == "__main__":
     raise SystemExit("AddressFilter demo removed; use unit tests instead.")

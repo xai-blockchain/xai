@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - AI Safety & Emergency Stop System
 
@@ -11,22 +13,21 @@ Philosophy: Users MUST have instant control over AI affecting their assets
 """
 
 import json
+import logging
 import os
 import re
-import time
 import threading
+import time
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
-from pathlib import Path
-from typing import Dict, List, Optional, Set, Any, Iterable, Tuple
 from enum import Enum
-import logging
+from pathlib import Path
+from typing import Any
 
-from xai.security.module_attachment_guard import ModuleAttachmentError, ModuleAttachmentGuard
 from xai.sandbox.secure_executor import SecureExecutor
+from xai.security.module_attachment_guard import ModuleAttachmentError, ModuleAttachmentGuard
 
 logger = logging.getLogger(__name__)
-
 
 class StopReason(Enum):
     """Reasons for stopping AI operations"""
@@ -39,7 +40,6 @@ class StopReason(Enum):
     ERROR_THRESHOLD = "error_threshold"
     TIMEOUT = "timeout"
 
-
 class AISafetyLevel(Enum):
     """Safety levels for AI operations"""
 
@@ -49,18 +49,16 @@ class AISafetyLevel(Enum):
     EMERGENCY_STOP = "emergency_stop"  # All AI stopped
     LOCKDOWN = "lockdown"  # All AI disabled, manual only
 
-
 @dataclass(frozen=True)
 class ThreatPattern:
     """Semantic threat vector describing intent + target pairings."""
 
     name: str
-    verbs: Set[str]
-    targets: Set[str]
+    verbs: set[str]
+    targets: set[str]
     description: str
     severity: str
     penalty: float
-
 
 @dataclass(frozen=True)
 class SensitivePattern:
@@ -72,17 +70,15 @@ class SensitivePattern:
     severity: str
     penalty: float
 
-
 @dataclass
 class SemanticAnalysisResult:
     """Semantic validation outcome for AI output."""
 
     is_safe: bool
     score: float
-    issues: List[Dict[str, Any]]
-    warnings: List[Dict[str, Any]]
+    issues: list[dict[str, Any]]
+    warnings: list[dict[str, Any]]
     sanitized_output: str
-
 
 class _SemanticOutputInspector:
     """Context-aware semantic analysis for AI output validation."""
@@ -118,7 +114,7 @@ class _SemanticOutputInspector:
         "governance": {"prompt_injection": 1.25},
     }
 
-    _THREAT_PATTERNS: Tuple[ThreatPattern, ...] = (
+    _THREAT_PATTERNS: tuple[ThreatPattern, ...] = (
         ThreatPattern(
             name="remote_code_execution",
             verbs={"execute", "launch", "deploy", "inject", "upload", "compile", "trigger"},
@@ -161,7 +157,7 @@ class _SemanticOutputInspector:
         ),
     )
 
-    _SENSITIVE_PATTERNS: Tuple[SensitivePattern, ...] = (
+    _SENSITIVE_PATTERNS: tuple[SensitivePattern, ...] = (
         SensitivePattern(
             name="api_key",
             pattern=re.compile(r"\bsk-[A-Za-z0-9]{40,}\b"),
@@ -201,8 +197,8 @@ class _SemanticOutputInspector:
 
     def inspect(self, output: str, context: str) -> SemanticAnalysisResult:
         """Analyze AI output for semantic policy violations."""
-        issues: List[Dict[str, Any]] = []
-        warnings: List[Dict[str, Any]] = []
+        issues: list[dict[str, Any]] = []
+        warnings: list[dict[str, Any]] = []
         sanitized_output = output
         score = 100.0
 
@@ -311,18 +307,18 @@ class _SemanticOutputInspector:
             sanitized_output=sanitized_result,
         )
 
-    def _split_sentences(self, text: str) -> List[str]:
+    def _split_sentences(self, text: str) -> list[str]:
         sentences = [segment.strip() for segment in self._SENTENCE_SPLIT_RE.split(text) if segment.strip()]
         return sentences or [text]
 
     def _tokenize(self, sentence: str) -> Iterable[str]:
         return [token for token in self._TOKEN_SPLIT_RE.split(sentence) if token]
 
-    def _extract_code_blocks(self, text: str) -> List[str]:
+    def _extract_code_blocks(self, text: str) -> list[str]:
         return self._CODE_BLOCK_RE.findall(text)
 
-    def _redact_sensitive_data(self, text: str) -> Tuple[str, List[Dict[str, Any]]]:
-        hits: List[Dict[str, Any]] = []
+    def _redact_sensitive_data(self, text: str) -> tuple[str, list[dict[str, Any]]]:
+        hits: list[dict[str, Any]] = []
         redacted = text
         for pattern in self._SENSITIVE_PATTERNS:
             def _replace(match: "re.Match[str]") -> str:
@@ -350,7 +346,6 @@ class _SemanticOutputInspector:
         multiplier = overrides.get(category, 1.0)
         return base_penalty * multiplier
 
-
 @dataclass
 class KnowledgeEntry:
     """Structured knowledge base entry used for hallucination checks."""
@@ -360,23 +355,22 @@ class KnowledgeEntry:
     weight: float = 1.0
     required: bool = False
     source: str = "fact"
-    tags: Set[str] = field(default_factory=set)
-
+    tags: set[str] = field(default_factory=set)
 
 class HallucinationKnowledgeBase:
     """Embeds expected facts/reference docs for hallucination detection."""
 
     _TOKENIZER = re.compile(r"[^\w]+", re.UNICODE)
 
-    def __init__(self, entries: Optional[List[KnowledgeEntry]] = None) -> None:
-        self.entries: List[KnowledgeEntry] = entries or []
-        self._entry_tokens: List[Tuple[KnowledgeEntry, Set[str]]] = [
+    def __init__(self, entries: list[KnowledgeEntry] | None = None) -> None:
+        self.entries: list[KnowledgeEntry] = entries or []
+        self._entry_tokens: list[tuple[KnowledgeEntry, set[str]]] = [
             (entry, self._tokenize(entry.content)) for entry in self.entries
         ]
 
     @classmethod
-    def from_context(cls, expected_context: Dict[str, Any]) -> "HallucinationKnowledgeBase":
-        entries: List[KnowledgeEntry] = []
+    def from_context(cls, expected_context: dict[str, Any]) -> "HallucinationKnowledgeBase":
+        entries: list[KnowledgeEntry] = []
 
         def _to_entry(item: Any, idx: int, source: str, required_default: bool = False) -> KnowledgeEntry:
             if isinstance(item, dict):
@@ -404,12 +398,12 @@ class HallucinationKnowledgeBase:
 
         return cls(entries)
 
-    def match_sentence(self, sentence: str) -> Tuple[Optional[KnowledgeEntry], float]:
+    def match_sentence(self, sentence: str) -> tuple[KnowledgeEntry | None, float]:
         """Return best matching entry for sentence and similarity score."""
         tokens = self._tokenize(sentence)
         if not tokens:
             return None, 0.0
-        best_entry: Optional[KnowledgeEntry] = None
+        best_entry: KnowledgeEntry | None = None
         best_score = 0.0
         for entry, entry_tokens in self._entry_tokens:
             if not entry_tokens:
@@ -424,12 +418,11 @@ class HallucinationKnowledgeBase:
                 best_entry = entry
         return best_entry, best_score
 
-    def required_entries(self) -> List[KnowledgeEntry]:
+    def required_entries(self) -> list[KnowledgeEntry]:
         return [entry for entry in self.entries if entry.required]
 
-    def _tokenize(self, text: str) -> Set[str]:
+    def _tokenize(self, text: str) -> set[str]:
         return {token for token in self._TOKENIZER.split(text.lower()) if token}
-
 
 class AISafetyControls:
     """
@@ -445,8 +438,8 @@ class AISafetyControls:
     def __init__(
         self,
         blockchain: Any,
-        authorized_callers: Optional[Set[str]] = None,
-        rate_limit_storage_path: Optional[str] = None,
+        authorized_callers: set[str] | None = None,
+        rate_limit_storage_path: str | None = None,
     ) -> None:
         """
         Initialize AI safety controls
@@ -467,25 +460,25 @@ class AISafetyControls:
         )
 
         # Active operations tracking
-        self.personal_ai_requests: Dict[str, Dict[str, Any]] = {}  # request_id -> request info
-        self.governance_tasks: Dict[str, Dict[str, Any]] = {}  # task_id -> task info
-        self.trading_bots: Dict[str, Any] = {}  # user_address -> bot instance
+        self.personal_ai_requests: dict[str, dict[str, Any]] = {}  # request_id -> request info
+        self.governance_tasks: dict[str, dict[str, Any]] = {}  # task_id -> task info
+        self.trading_bots: dict[str, Any] = {}  # user_address -> bot instance
 
         # Cancellation tracking
-        self.cancelled_requests: Set[str] = set()  # request_ids to cancel
-        self.paused_tasks: Set[str] = set()  # task_ids paused
+        self.cancelled_requests: set[str] = set()  # request_ids to cancel
+        self.paused_tasks: set[str] = set()  # task_ids paused
 
         # Emergency stop
         self.emergency_stop_active: bool = False
-        self.emergency_stop_reason: Optional[StopReason] = None
-        self.emergency_stop_time: Optional[float] = None
+        self.emergency_stop_reason: StopReason | None = None
+        self.emergency_stop_time: float | None = None
 
         # Statistics
         self.total_stops: int = 0
         self.total_cancellations: int = 0
 
         # Authorized safety callers (lowercase normalized)
-        self.authorized_callers: Set[str] = {
+        self.authorized_callers: set[str] = {
             "governance_dao",
             "security_committee",
             "ai_safety_team",
@@ -505,12 +498,12 @@ class AISafetyControls:
         self._rate_limit_entry_ttl = float(os.getenv("XAI_AI_SAFETY_RATE_LIMIT_TTL", 7 * 86400))
         self.rate_limit_storage_path = self._init_rate_limit_store(rate_limit_storage_path)
         limits_state = self._load_rate_limit_state()
-        self.token_usage: Dict[str, Dict[str, float]] = limits_state["users"]
-        self.provider_usage: Dict[str, Dict[str, float]] = limits_state["providers"]
+        self.token_usage: dict[str, dict[str, float]] = limits_state["users"]
+        self.provider_usage: dict[str, dict[str, float]] = limits_state["providers"]
         self.provider_limits = self._load_provider_limits()
-        self.sandboxes: Dict[str, Dict[str, Any]] = {}
+        self.sandboxes: dict[str, dict[str, Any]] = {}
 
-    def _init_rate_limit_store(self, override_path: Optional[str]) -> Path:
+    def _init_rate_limit_store(self, override_path: str | None) -> Path:
         """Resolve and prepare storage path for token usage state."""
         if override_path:
             path = Path(override_path).expanduser()
@@ -523,7 +516,7 @@ class AISafetyControls:
         path.parent.mkdir(parents=True, exist_ok=True)
         return path
 
-    def _load_rate_limit_state(self) -> Dict[str, Dict[str, Dict[str, float]]]:
+    def _load_rate_limit_state(self) -> dict[str, dict[str, dict[str, float]]]:
         """Load persisted rate limit usage from disk."""
         path = self.rate_limit_storage_path
         if not path.exists():
@@ -535,8 +528,8 @@ class AISafetyControls:
             return {"users": {}, "providers": {}}
 
         now = time.time()
-        user_state: Dict[str, Dict[str, float]] = {}
-        provider_state: Dict[str, Dict[str, float]] = {}
+        user_state: dict[str, dict[str, float]] = {}
+        provider_state: dict[str, dict[str, float]] = {}
 
         raw_users = data.get("users") if isinstance(data, dict) else data
         if isinstance(raw_users, dict):
@@ -582,7 +575,7 @@ class AISafetyControls:
         except OSError as exc:
             logger.warning("Failed to persist AI safety rate limits: %s", exc)
 
-    def _purge_stale_rate_limit_entries(self, now: Optional[float] = None) -> None:
+    def _purge_stale_rate_limit_entries(self, now: float | None = None) -> None:
         """Remove expired rate limit entries to keep state compact."""
         reference = now or time.time()
         ttl = self._rate_limit_entry_ttl
@@ -603,7 +596,7 @@ class AISafetyControls:
         for provider in stale_providers:
             self.provider_usage.pop(provider, None)
 
-    def _load_provider_limits(self) -> Dict[str, Dict[str, float]]:
+    def _load_provider_limits(self) -> dict[str, dict[str, float]]:
         """Load provider-specific call/token limits."""
         default_limits = {
             "default": {
@@ -652,7 +645,7 @@ class AISafetyControls:
 
         return default_limits
 
-    def _normalize_provider_name(self, provider: Optional[str]) -> str:
+    def _normalize_provider_name(self, provider: str | None) -> str:
         if not provider:
             return ""
         return provider.strip().lower()
@@ -663,7 +656,7 @@ class AISafetyControls:
         tokens_used: float,
         current_time: float,
         increment_call: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Update provider usage assuming `_rate_limit_lock` is held."""
         normalized = self._normalize_provider_name(provider)
         limits = self.provider_limits.get(normalized) or self.provider_limits.get("default")
@@ -714,7 +707,7 @@ class AISafetyControls:
             "window_seconds": window_seconds,
         }
 
-    def enforce_provider_request_limit(self, provider: Optional[str]) -> Dict[str, Any]:
+    def enforce_provider_request_limit(self, provider: str | None) -> dict[str, Any]:
         """Public helper to enforce call limits for a provider."""
         normalized = self._normalize_provider_name(provider)
         if not normalized:
@@ -867,7 +860,7 @@ class AISafetyControls:
             "bot_result": result,
         }
 
-    def stop_all_trading_bots(self, reason: StopReason) -> Dict[str, Any]:
+    def stop_all_trading_bots(self, reason: StopReason) -> dict[str, Any]:
         """
         Stop ALL trading bots (emergency)
 
@@ -879,7 +872,7 @@ class AISafetyControls:
         """
 
         stopped_count: int = 0
-        errors: List[str] = []
+        errors: list[str] = []
 
         with self.lock:
             for user_address, bot in self.trading_bots.items():
@@ -906,7 +899,7 @@ class AISafetyControls:
             "reason": reason.value,
         }
 
-    def authorize_safety_caller(self, identifier: str) -> Dict[str, Any]:
+    def authorize_safety_caller(self, identifier: str) -> dict[str, Any]:
         """Add an identifier that can change safety level"""
 
         if not identifier:
@@ -921,7 +914,7 @@ class AISafetyControls:
             "message": "Authorized caller can now change AI safety level",
         }
 
-    def revoke_safety_caller(self, identifier: str) -> Dict[str, Any]:
+    def revoke_safety_caller(self, identifier: str) -> dict[str, Any]:
         """Remove an identifier from safety level changes"""
 
         if not identifier:
@@ -978,7 +971,7 @@ class AISafetyControls:
 
         return True
 
-    def pause_governance_task(self, task_id: str, pauser: str) -> Dict[str, Any]:
+    def pause_governance_task(self, task_id: str, pauser: str) -> dict[str, Any]:
         """
         Pause a Governance AI task (requires authorization)
 
@@ -1009,7 +1002,7 @@ class AISafetyControls:
             "proposal_id": task["proposal_id"],
         }
 
-    def resume_governance_task(self, task_id: str) -> Dict[str, Any]:
+    def resume_governance_task(self, task_id: str) -> dict[str, Any]:
         """Resume a paused Governance AI task"""
 
         with self.lock:
@@ -1036,7 +1029,7 @@ class AISafetyControls:
 
     def activate_emergency_stop(
         self, reason: StopReason, details: str = "", activator: str = "system"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         EMERGENCY STOP - Immediately halt ALL AI operations
 
@@ -1088,7 +1081,7 @@ class AISafetyControls:
                 self.governance_tasks[task_id]["paused"] = True
 
         # Stop all trading bots
-        trading_bot_result: Dict[str, Any] = self.stop_all_trading_bots(reason)
+        trading_bot_result: dict[str, Any] = self.stop_all_trading_bots(reason)
 
         logger.critical(
             "Emergency stop complete",
@@ -1116,7 +1109,7 @@ class AISafetyControls:
             "trading_bots_stopped": trading_bot_result["stopped_count"],
         }
 
-    def deactivate_emergency_stop(self, deactivator: str) -> Dict[str, Any]:
+    def deactivate_emergency_stop(self, deactivator: str) -> dict[str, Any]:
         """
         Deactivate emergency stop (allow AI operations to resume)
 
@@ -1154,7 +1147,7 @@ class AISafetyControls:
             "duration_seconds": duration,
         }
 
-    def set_safety_level(self, level: AISafetyLevel, setter: str) -> Dict[str, Any]:
+    def set_safety_level(self, level: AISafetyLevel, setter: str) -> dict[str, Any]:
         """
         Set global AI safety level
 
@@ -1197,11 +1190,11 @@ class AISafetyControls:
 
     # ===== STATUS & MONITORING =====
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get current AI safety status"""
 
         with self.lock:
-            status: Dict[str, Any] = {
+            status: dict[str, Any] = {
                 "safety_level": self.safety_level.value,
                 "emergency_stop_active": self.emergency_stop_active,
                 "personal_ai": {
@@ -1238,7 +1231,7 @@ class AISafetyControls:
 
         return status
 
-    def get_active_operations(self) -> Dict[str, List[Dict[str, Any]]]:
+    def get_active_operations(self) -> dict[str, list[dict[str, Any]]]:
         """Get list of all active AI operations"""
 
         with self.lock:
@@ -1276,7 +1269,7 @@ class AISafetyControls:
 
     # ===== OUTPUT VALIDATION & SANDBOXING =====
 
-    def validate_ai_output(self, output: str, context: str = "general") -> Dict[str, Any]:
+    def validate_ai_output(self, output: str, context: str = "general") -> dict[str, Any]:
         """
         Validate AI output using semantic safety analysis.
 
@@ -1297,7 +1290,7 @@ class AISafetyControls:
         }
         return response
 
-    def create_ai_sandbox(self, sandbox_id: str, resource_limits: Optional[Dict] = None) -> Dict:
+    def create_ai_sandbox(self, sandbox_id: str, resource_limits: Dict | None = None) -> Dict:
         """
         Create sandboxed environment for AI execution
 
@@ -1337,7 +1330,7 @@ class AISafetyControls:
 
         return {"success": True, "sandbox": sandbox}
 
-    def record_sandbox_usage(self, sandbox_id: str, usage: Dict[str, float]) -> Dict[str, Any]:
+    def record_sandbox_usage(self, sandbox_id: str, usage: dict[str, float]) -> dict[str, Any]:
         """Record runtime metrics for a sandbox and enforce resource caps."""
         with self.lock:
             sandbox = self.sandboxes.get(sandbox_id)
@@ -1366,8 +1359,8 @@ class AISafetyControls:
         self,
         sandbox_id: str,
         action: str,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Validate sandbox actions such as imports or operations."""
         with self.lock:
             sandbox = self.sandboxes.get(sandbox_id)
@@ -1418,7 +1411,7 @@ class AISafetyControls:
 
     def check_rate_limit(
         self, identifier: str, operation: str, max_calls: int = 100, window_seconds: int = 3600
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Rate limiting for AI calls
 
@@ -1436,7 +1429,7 @@ class AISafetyControls:
 
         # Initialize if not exists
         if not hasattr(self, "rate_limit_data"):
-            self.rate_limit_data: Dict[str, List[float]] = {}
+            self.rate_limit_data: dict[str, list[float]] = {}
 
         if key not in self.rate_limit_data:
             self.rate_limit_data[key] = []
@@ -1472,8 +1465,8 @@ class AISafetyControls:
         identifier: str,
         tokens_used: int,
         max_tokens: int = 1000000,
-        provider: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        provider: str | None = None,
+    ) -> dict[str, Any]:
         """
         Track and enforce token usage limits with persistent storage.
 
@@ -1489,7 +1482,7 @@ class AISafetyControls:
         current_time = time.time()
         day_start = current_time - (current_time % 86400)
 
-        provider_result: Optional[Dict[str, Any]] = None
+        provider_result: dict[str, Any] | None = None
         with self._rate_limit_lock:
             self._purge_stale_rate_limit_entries(current_time)
             entry = self.token_usage.get(identifier)
@@ -1527,7 +1520,7 @@ class AISafetyControls:
             result["provider_limit"] = provider_result
         return result
 
-    def _evaluate_sandbox_limits(self, sandbox: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _evaluate_sandbox_limits(self, sandbox: dict[str, Any]) -> list[dict[str, Any]]:
         """Check sandbox usage against limits."""
         limits = sandbox["resource_limits"]
         current = sandbox["current_usage"]
@@ -1560,7 +1553,7 @@ class AISafetyControls:
 
         return violations
 
-    def _register_sandbox_violation(self, sandbox: Dict[str, Any], message: str) -> Dict[str, Any]:
+    def _register_sandbox_violation(self, sandbox: dict[str, Any], message: str) -> dict[str, Any]:
         violation = {"timestamp": time.time(), "message": message}
         sandbox["violations"].append(violation)
         sandbox["is_active"] = False
@@ -1568,7 +1561,7 @@ class AISafetyControls:
 
     # ===== HALLUCINATION DETECTION =====
 
-    def detect_hallucination(self, ai_output: str, expected_context: Dict) -> Dict[str, Any]:
+    def detect_hallucination(self, ai_output: str, expected_context: Dict) -> dict[str, Any]:
         """
         Detect potential AI hallucinations using knowledge base cross-checks.
 
@@ -1585,13 +1578,13 @@ class AISafetyControls:
         normalized_output = ai_output.lower()
 
         confidence_score = 100.0
-        unsupported_sentences: List[Dict[str, Any]] = []
-        knowledge_matches: List[Dict[str, Any]] = []
-        matched_required_ids: Set[str] = set()
-        contradiction_hits: List[Dict[str, Any]] = []
-        forbidden_hits: List[str] = []
-        required_term_alerts: List[str] = []
-        numeric_anomalies: List[Dict[str, Any]] = []
+        unsupported_sentences: list[dict[str, Any]] = []
+        knowledge_matches: list[dict[str, Any]] = []
+        matched_required_ids: set[str] = set()
+        contradiction_hits: list[dict[str, Any]] = []
+        forbidden_hits: list[str] = []
+        required_term_alerts: list[str] = []
+        numeric_anomalies: list[dict[str, Any]] = []
 
         match_threshold = float(context.get("knowledge_match_threshold", 0.45))
         considered_sentences = [
@@ -1666,7 +1659,7 @@ class AISafetyControls:
                 except (ValueError, KeyError):
                     continue
                 violation = False
-                details: Dict[str, Any] = {"label": label, "value": value}
+                details: dict[str, Any] = {"label": label, "value": value}
                 if expected_value is not None and abs(value - float(expected_value)) > tolerance:
                     violation = True
                     details["expected"] = expected_value
@@ -1718,7 +1711,6 @@ class AISafetyControls:
             "numeric_anomalies": numeric_anomalies,
             "coverage_ratio": coverage_ratio,
         }
-
 
 # Example usage
 if __name__ == "__main__":

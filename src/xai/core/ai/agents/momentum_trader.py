@@ -1,10 +1,9 @@
 """Momentum trader and market data helpers for AI simulations."""
+from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
 from statistics import mean
-from typing import Dict, List, Optional
-
 
 class Signal(Enum):
     """Indicator about the market direction."""
@@ -12,7 +11,6 @@ class Signal(Enum):
     BUY = "BUY"
     SELL = "SELL"
     HOLD = "HOLD"
-
 
 @dataclass
 class MarketData:
@@ -26,7 +24,6 @@ class MarketData:
     low_24h: float
     timestamp: float
 
-
 @dataclass
 class TradeDecision:
     """Simplified trading decision used in the launch script."""
@@ -38,7 +35,6 @@ class TradeDecision:
     take_profit: float
     reasoning: str
 
-
 class MomentumTrader:
     """Momentum-based AI trader stub used in the launch sequence."""
 
@@ -46,7 +42,7 @@ class MomentumTrader:
         self.config = {"risk_per_trade": 0.015, "min_confidence": 0.3, "default_amount": 1200.0}
         self.performance = {"total_value": 50000.0, "open_positions": 0}
 
-    def analyze_market(self, market_data: List[MarketData]) -> Dict[str, object]:
+    def analyze_market(self, market_data: list[MarketData]) -> dict[str, object]:
         if not market_data:
             return {
                 "signal": Signal.HOLD,
@@ -88,7 +84,7 @@ class MomentumTrader:
             },
         }
 
-    def make_trading_decision(self, analysis: Dict[str, object]) -> Optional[TradeDecision]:
+    def make_trading_decision(self, analysis: dict[str, object]) -> TradeDecision | None:
         if analysis["confidence"] < self.config["min_confidence"]:
             return None
 
@@ -111,7 +107,7 @@ class MomentumTrader:
             reasoning=reasoning,
         )
 
-    def execute_trade(self, decision: TradeDecision) -> Dict[str, object]:
+    def execute_trade(self, decision: TradeDecision) -> dict[str, object]:
         self.performance["open_positions"] += 1
         self.performance["total_value"] += decision.amount * 0.02
 
@@ -123,5 +119,5 @@ class MomentumTrader:
             "status": "simulated",
         }
 
-    def get_performance_report(self) -> Dict[str, object]:
+    def get_performance_report(self) -> dict[str, object]:
         return dict(self.performance)

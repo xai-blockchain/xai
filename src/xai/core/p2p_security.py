@@ -13,21 +13,20 @@ from __future__ import annotations
 
 import hashlib
 import time
-from typing import Dict, Tuple, Deque, Any, Set
 from collections import deque
 from threading import RLock
+from typing import Any
 
-from xai.core.crypto_utils import sign_message_hex, verify_signature_hex
 from xai.core.constants import (
+    P2P_BAN_DURATION_SECONDS,
+    P2P_INITIAL_REPUTATION,
     P2P_MAX_MESSAGE_SIZE_BYTES,
     P2P_MAX_MESSAGES_PER_SECOND,
-    P2P_INITIAL_REPUTATION,
-    P2P_MIN_REPUTATION,
     P2P_MAX_REPUTATION,
-    P2P_BAN_DURATION_SECONDS,
+    P2P_MIN_REPUTATION,
     SECONDS_5_MINUTES,
 )
-
+from xai.core.crypto_utils import sign_message_hex, verify_signature_hex
 
 HEADER_VERSION = "X-Node-Version"
 HEADER_PUBKEY = "X-Node-Pub"
@@ -36,7 +35,6 @@ HEADER_TS = "X-Node-Timestamp"
 HEADER_NONCE = "X-Node-Nonce"
 HEADER_FEATURES = "X-Node-Features"
 HEADER_CLIENT_VERSION = "X-Node-Client"
-
 
 class P2PSecurityConfig:
     """Centralized P2P security configuration constants."""
@@ -62,12 +60,10 @@ class P2PSecurityConfig:
     SUPPORTED_VERSIONS = {"1"}
     SUPPORTED_FEATURES = {"quic", "ws"}
 
-
 def _digest(body_bytes: bytes, ts: str, nonce: str) -> bytes:
     h = hashlib.sha256(body_bytes).hexdigest()
     msg = f"{h}|{ts}|{nonce}".encode("utf-8")
     return hashlib.sha256(msg).digest()
-
 
 def sign_headers(
     private_hex: str,
@@ -77,8 +73,8 @@ def sign_headers(
     timestamp: int | None = None,
     nonce: str | None = None,
     version: str | None = None,
-    features: Set[str] | None = None,
-) -> Dict[str, str]:
+    features: set[str] | None = None,
+) -> dict[str, str]:
     ts = str(int(timestamp if timestamp is not None else time.time()))
     nn = nonce if nonce is not None else hashlib.sha256(f"{time.time()}".encode()).hexdigest()[:32]
     digest = _digest(body_bytes, ts, nn)
@@ -94,8 +90,7 @@ def sign_headers(
         HEADER_FEATURES: feat,
     }
 
-
-def verify_headers(headers: Dict[str, str], body_bytes: bytes, *, max_skew_seconds: int = SECONDS_5_MINUTES) -> Tuple[bool, str]:
+def verify_headers(headers: dict[str, str], body_bytes: bytes, *, max_skew_seconds: int = SECONDS_5_MINUTES) -> tuple[bool, str]:
     version = headers.get(HEADER_VERSION, "")
     if version and version not in P2PSecurityConfig.SUPPORTED_VERSIONS:
         return False, "unsupported_protocol_version"
@@ -127,15 +122,14 @@ def verify_headers(headers: Dict[str, str], body_bytes: bytes, *, max_skew_secon
 
     return True, "ok"
 
-
 class PeerReputation:
     """Track and manage peer reputation and bans."""
 
     def __init__(self) -> None:
-        self.reputation: Dict[str, float] = {}
-        self.ban_list: Dict[str, float] = {}  # peer_url -> ban_expiry
-        self.peer_ips: Dict[str, str] = {}
-        self.connections_per_ip: Dict[str, int] = {}
+        self.reputation: dict[str, float] = {}
+        self.ban_list: dict[str, float] = {}  # peer_url -> ban_expiry
+        self.peer_ips: dict[str, str] = {}
+        self.connections_per_ip: dict[str, int] = {}
         self.lock = RLock()
 
     def _normalize(self, peer_url: str) -> str:
@@ -195,7 +189,7 @@ class PeerReputation:
             self.peer_ips[peer] = ip
             self.connections_per_ip[ip] = self.connections_per_ip.get(ip, 0) + 1
 
-    def can_accept_connection(self, peer_url: str, ip_address: str) -> Tuple[bool, str | None]:
+    def can_accept_connection(self, peer_url: str, ip_address: str) -> tuple[bool, str | None]:
         peer = self._normalize(peer_url)
         ip = ip_address.lower() if ip_address else "unknown"
 
@@ -211,7 +205,7 @@ class PeerReputation:
         parts = ip_address.split(".")
         return ".".join(parts[:2]) if len(parts) >= 2 else ip_address
 
-    def check_peer_diversity(self, peers: Set[str]) -> int:
+    def check_peer_diversity(self, peers: set[str]) -> int:
         prefixes = set()
         with self.lock:
             for peer in peers:
@@ -220,16 +214,15 @@ class PeerReputation:
                     prefixes.add(self.get_peer_ip_prefix(ip))
         return len(prefixes)
 
-
 class MessageRateLimiter:
     """Limits messages per peer per second."""
 
     def __init__(self, max_rate: int | None = None) -> None:
         self.max_rate = max_rate if max_rate is not None else P2PSecurityConfig.MAX_MESSAGES_PER_SECOND
-        self.message_log: Dict[str, Deque[float]] = {}
+        self.message_log: dict[str, deque[float]] = {}
         self.lock = RLock()
 
-    def check_rate_limit(self, peer_url: str) -> Tuple[bool, str | None]:
+    def check_rate_limit(self, peer_url: str) -> tuple[bool, str | None]:
         peer = peer_url.lower()
         now = time.time()
         with self.lock:
@@ -246,27 +239,25 @@ class MessageRateLimiter:
         allowed, _ = self.check_rate_limit(peer_id)
         return not allowed
 
-
 class MessageValidator:
     """Validates message size and type."""
 
     VALID_TYPES = {"block", "transaction", "peer_discovery", "sync_request", "ping"}
 
     @staticmethod
-    def validate_message_size(message_data: bytes) -> Tuple[bool, str | None]:
+    def validate_message_size(message_data: bytes) -> tuple[bool, str | None]:
         if len(message_data) > P2PSecurityConfig.MAX_MESSAGE_SIZE:
             return False, "message too large"
         return True, None
 
     @staticmethod
-    def validate_message_type(message: Dict[str, Any]) -> Tuple[bool, str | None]:
+    def validate_message_type(message: dict[str, Any]) -> tuple[bool, str | None]:
         msg_type = message.get("type")
         if not msg_type:
             return False, "missing type"
         if msg_type not in MessageValidator.VALID_TYPES:
             return False, "invalid type"
         return True, None
-
 
 class P2PSecurityManager:
     """Unified P2P security manager composing reputation, rate limits, and validation."""
@@ -276,13 +267,13 @@ class P2PSecurityManager:
         self.rate_limiter = MessageRateLimiter()
         self.message_validator = MessageValidator()
 
-    def can_accept_peer(self, peer_url: str, ip_address: str) -> Tuple[bool, str | None]:
+    def can_accept_peer(self, peer_url: str, ip_address: str) -> tuple[bool, str | None]:
         return self.peer_reputation.can_accept_connection(peer_url, ip_address)
 
     def track_peer_connection(self, peer_url: str, ip_address: str) -> None:
         self.peer_reputation.track_peer_ip(peer_url, ip_address)
 
-    def validate_message(self, peer_url: str, message_data: bytes, message: Dict[str, Any]) -> Tuple[bool, str | None]:
+    def validate_message(self, peer_url: str, message_data: bytes, message: dict[str, Any]) -> tuple[bool, str | None]:
         peer = peer_url.lower()
 
         if self.peer_reputation.is_banned(peer):
@@ -320,11 +311,11 @@ class P2PSecurityManager:
     def ban_peer(self, peer_url: str, duration: int | None = None) -> None:
         self.peer_reputation.ban_peer(peer_url, duration=duration)
 
-    def check_peer_diversity(self, peers: Set[str]) -> bool:
+    def check_peer_diversity(self, peers: set[str]) -> bool:
         diversity = self.peer_reputation.check_peer_diversity(peers)
         return diversity >= P2PSecurityConfig.MIN_PEER_DIVERSITY
 
-    def get_peer_stats(self) -> Dict[str, Any]:
+    def get_peer_stats(self) -> dict[str, Any]:
         with self.peer_reputation.lock:
             total = len(self.peer_reputation.reputation)
             banned = len(self.peer_reputation.ban_list)
@@ -337,7 +328,6 @@ class P2PSecurityManager:
                 "connections_per_ip": dict(self.peer_reputation.connections_per_ip),
                 "average_reputation": avg_rep,
             }
-
 
 class BandwidthLimiter:
     """
@@ -352,10 +342,10 @@ class BandwidthLimiter:
         """
         self.capacity = capacity
         self.fill_rate = fill_rate
-        self.peers: Dict[str, Dict[str, Any]] = {}  # {peer_id: {'tokens': float, 'last_fill': float}}
+        self.peers: dict[str, dict[str, Any]] = {}  # {peer_id: {'tokens': float, 'last_fill': float}}
         self._lock = RLock()
 
-    def _get_bucket(self, peer_id: str) -> Dict[str, float]:
+    def _get_bucket(self, peer_id: str) -> dict[str, float]:
         with self._lock:
             if peer_id not in self.peers:
                 self.peers[peer_id] = {'tokens': float(self.capacity), 'last_fill': time.time()}

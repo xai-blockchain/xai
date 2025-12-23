@@ -13,11 +13,11 @@ Security features:
 
 from __future__ import annotations
 
-import time
 import logging
 import threading
+import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from ..vm.exceptions import VMExecutionError
 
@@ -26,20 +26,18 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
 @dataclass
 class FlashLoanRequest:
     """Flash loan request details."""
 
     id: str
     borrower: str
-    assets: List[str]
-    amounts: List[int]
-    fee_amounts: List[int]
-    receiver_callback: Optional[Callable] = None
+    assets: list[str]
+    amounts: list[int]
+    fee_amounts: list[int]
+    receiver_callback: Callable | None = None
     timestamp: float = field(default_factory=time.time)
     status: str = "pending"  # pending, executing, repaid, defaulted
-
 
 @dataclass
 class FlashLoanProvider:
@@ -65,24 +63,24 @@ class FlashLoanProvider:
     owner: str = ""
 
     # Supported assets and their pools
-    liquidity_pools: Dict[str, int] = field(default_factory=dict)  # asset -> amount
+    liquidity_pools: dict[str, int] = field(default_factory=dict)  # asset -> amount
 
     # Fee configuration (basis points)
     flash_loan_fee: int = 9  # 0.09% (same as Aave)
 
     # Protocol reserves
-    collected_fees: Dict[str, int] = field(default_factory=dict)
+    collected_fees: dict[str, int] = field(default_factory=dict)
 
     # Active loans (for reentrancy protection)
-    _active_loans: Dict[str, FlashLoanRequest] = field(default_factory=dict)
+    _active_loans: dict[str, FlashLoanRequest] = field(default_factory=dict)
     _execution_lock: threading.Lock = field(default_factory=threading.Lock)
 
     # Explicit reentrancy guard (defense-in-depth)
-    _reentrancy_guard: Dict[str, bool] = field(default_factory=dict)
+    _reentrancy_guard: dict[str, bool] = field(default_factory=dict)
 
     # Statistics
     total_loans: int = 0
-    total_volume: Dict[str, int] = field(default_factory=dict)
+    total_volume: dict[str, int] = field(default_factory=dict)
 
     # Constants
     BASIS_POINTS: int = 10000
@@ -100,9 +98,9 @@ class FlashLoanProvider:
         self,
         borrower: str,
         receiver: str,
-        assets: List[str],
-        amounts: List[int],
-        callback: Optional[Callable[[str, List[str], List[int], List[int], bytes], bool]] = None,
+        assets: list[str],
+        amounts: list[int],
+        callback: Callable[[str, list[str], list[int], list[int], bytes], bool] | None = None,
         params: bytes = b"",
     ) -> bool:
         """
@@ -365,7 +363,7 @@ class FlashLoanProvider:
         borrower: str,
         asset: str,
         amount: int,
-        callback: Optional[Callable[[str, str, int, int, bytes], bool]] = None,
+        callback: Callable[[str, str, int, int, bytes], bool] | None = None,
         params: bytes = b"",
     ) -> bool:
         """
@@ -384,9 +382,9 @@ class FlashLoanProvider:
         # Wrap single asset in multi-asset interface
         def wrapped_callback(
             initiator: str,
-            assets: List[str],
-            amounts: List[int],
-            fees: List[int],
+            assets: list[str],
+            amounts: list[int],
+            fees: list[int],
             data: bytes,
         ) -> bool:
             if callback:

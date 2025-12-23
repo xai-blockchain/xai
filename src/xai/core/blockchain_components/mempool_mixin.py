@@ -9,14 +9,13 @@ pruning, RBF handling, fee prioritization, and mempool statistics.
 from __future__ import annotations
 
 import statistics
-import time
 import threading
+import time
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from xai.core.transaction import Transaction
-
 
 class BlockchainMempoolMixin:
     """
@@ -32,8 +31,8 @@ class BlockchainMempoolMixin:
     - Mempool statistics and overview
 
     Required attributes on the implementing class:
-    - pending_transactions: List[Transaction]
-    - orphan_transactions: List[Transaction]
+    - pending_transactions: list[Transaction]
+    - orphan_transactions: list[Transaction]
     - seen_txids: set[str]
     - _sender_pending_count: dict[str, int]
     - _invalid_sender_tracker: dict[str, dict]
@@ -65,7 +64,7 @@ class BlockchainMempoolMixin:
         This method rebuilds all mempool tracking structures including the spent_inputs
         set used for O(1) double-spend detection.
         """
-        kept: List[Transaction] = []
+        kept: list[Transaction] = []
         removed = 0
         sender_counts: dict[str, int] = defaultdict(int)
         seen_txids: set[str] = set()
@@ -117,7 +116,7 @@ class BlockchainMempoolMixin:
             self.logger.info("Expired orphan transactions pruned", removed=removed)
         return removed
 
-    def _is_sender_banned(self, sender: Optional[str], current_time: float) -> bool:
+    def _is_sender_banned(self, sender: str | None, current_time: float) -> bool:
         if not sender or sender == "COINBASE":
             return False
 
@@ -138,7 +137,7 @@ class BlockchainMempoolMixin:
             }
         return False
 
-    def _record_invalid_sender_attempt(self, sender: Optional[str], current_time: float) -> None:
+    def _record_invalid_sender_attempt(self, sender: str | None, current_time: float) -> None:
         if not sender or sender == "COINBASE":
             return
 
@@ -168,7 +167,7 @@ class BlockchainMempoolMixin:
 
         self._invalid_sender_tracker[sender] = state
 
-    def _clear_sender_penalty(self, sender: Optional[str]) -> None:
+    def _clear_sender_penalty(self, sender: str | None) -> None:
         if sender and sender != "COINBASE" and sender in self._invalid_sender_tracker:
             self._invalid_sender_tracker[sender] = {
                 "count": 0,
@@ -227,7 +226,7 @@ class BlockchainMempoolMixin:
         txid: str,
         *,
         ban_sender: bool = False,
-    ) -> Tuple[bool, Dict[str, Any]]:
+    ) -> tuple[bool, dict[str, Any]]:
         """
         Remove a specific transaction from the mempool.
 
@@ -247,7 +246,7 @@ class BlockchainMempoolMixin:
         if not txid:
             raise ValueError("txid is required")
 
-        eviction_metadata: Dict[str, Any] = {}
+        eviction_metadata: dict[str, Any] = {}
         removed = False
         with self._mempool_lock:
             for idx, tx in enumerate(list(self.pending_transactions)):
@@ -307,8 +306,8 @@ class BlockchainMempoolMixin:
         validation (checking UTXO availability) and insertion (adding to mempool).
         """
         from xai.core.account_abstraction import (
-            get_sponsored_transaction_processor,
             SponsorshipResult,
+            get_sponsored_transaction_processor,
         )
 
         # Check if transaction is None (can happen if create_transaction fails)
@@ -622,7 +621,7 @@ class BlockchainMempoolMixin:
             self._sender_pending_count[original_tx.sender] -= 1
         return True
 
-    def _prioritize_transactions(self, transactions: List["Transaction"], max_count: Optional[int] = None) -> List["Transaction"]:
+    def _prioritize_transactions(self, transactions: list["Transaction"], max_count: int | None = None) -> list["Transaction"]:
         """
         Prioritize transactions by fee rate (fee-per-byte) while maintaining nonce order per sender.
 
@@ -644,7 +643,7 @@ class BlockchainMempoolMixin:
             return []
 
         # Group transactions by sender
-        by_sender: Dict[str, List["Transaction"]] = defaultdict(list)
+        by_sender: dict[str, list["Transaction"]] = defaultdict(list)
         for tx in transactions:
             by_sender[tx.sender].append(tx)
 
@@ -676,7 +675,7 @@ class BlockchainMempoolMixin:
         total_bytes = sum(tx.get_size() for tx in self.pending_transactions) if self.pending_transactions else 0
         return total_bytes / 1024.0
 
-    def get_mempool_overview(self, limit: int = 100) -> Dict[str, Any]:
+    def get_mempool_overview(self, limit: int = 100) -> dict[str, Any]:
         """
         Return detailed mempool statistics and representative transactions.
         """
@@ -694,7 +693,7 @@ class BlockchainMempoolMixin:
         ]
         sponsor_count = sum(1 for tx in pending if getattr(tx, "gas_sponsor", None))
 
-        def _avg(values: List[float]) -> float:
+        def _avg(values: list[float]) -> float:
             return sum(values) / len(values) if values else 0.0
 
         limits = {
@@ -704,7 +703,7 @@ class BlockchainMempoolMixin:
             "max_age_seconds": getattr(self, "_mempool_max_age_seconds", 86400),
         }
 
-        overview: Dict[str, Any] = {
+        overview: dict[str, Any] = {
             "pending_count": len(pending),
             "pool_size": len(pending),  # Alias for pending_count for backward compatibility
             "size_bytes": size_bytes,
@@ -742,7 +741,7 @@ class BlockchainMempoolMixin:
         }
 
         if limit > 0 and pending:
-            tx_summaries: List[Dict[str, Any]] = []
+            tx_summaries: list[dict[str, Any]] = []
             for tx in pending[:limit]:
                 tx_size = tx.get_size()
                 summary = {

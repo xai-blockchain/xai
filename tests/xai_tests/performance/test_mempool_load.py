@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Performance and stress tests for mempool under high load.
 
@@ -11,17 +13,15 @@ import pytest
 import time
 import psutil
 import os
-from typing import List, Dict, Any
+from typing import Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from xai.core.blockchain import Blockchain
 from xai.core.wallet import Wallet
 from xai.core.transaction import Transaction
 
-
 # Mark all tests in this module as performance tests
 pytestmark = pytest.mark.performance
-
 
 class TestMempoolLoad:
     """Stress tests for mempool with large transaction volumes."""
@@ -45,7 +45,7 @@ class TestMempoolLoad:
         tx.sign_transaction(sender.private_key)
         return tx
 
-    def _get_memory_usage(self) -> Dict[str, float]:
+    def _get_memory_usage(self) -> dict[str, float]:
         """Get current process memory usage in MB."""
         process = psutil.Process(os.getpid())
         mem_info = process.memory_info()
@@ -211,7 +211,7 @@ class TestMempoolLoad:
         num_threads = 10
         txs_per_thread = 100
 
-        def worker(thread_id: int) -> Dict[str, int]:
+        def worker(thread_id: int) -> dict[str, int]:
             added = 0
             failed = 0
 
@@ -456,7 +456,6 @@ class TestMempoolLoad:
         assert result > 0, "No transactions were pruned"
         assert final_size < initial_size, "Mempool size did not decrease"
 
-
 class TestMempoolStatistics:
     """Tests for mempool statistics and monitoring."""
 
@@ -519,7 +518,6 @@ class TestMempoolStatistics:
         print(f"Statistics calculated:")
         for key, value in result.items():
             print(f"  {key}: {value}")
-
 
 if __name__ == "__main__":
     # Allow running tests directly

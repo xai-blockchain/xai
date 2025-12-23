@@ -1,9 +1,9 @@
+from __future__ import annotations
+
 import logging
-from typing import List, Tuple
 import time
 
 logger = logging.getLogger("xai.blockchain.twap_oracle")
-
 
 class TWAPOracle:
     def __init__(self, window_size_seconds: int = 3600):  # Default to 1 hour
@@ -11,7 +11,7 @@ class TWAPOracle:
             raise ValueError("Window size must be a positive integer.")
         self.window_size_seconds = window_size_seconds
         # Stores (timestamp, price) tuples, ordered by timestamp
-        self.price_data: List[Tuple[int, float]] = []
+        self.price_data: list[tuple[int, float]] = []
 
     def record_price(self, price: float, timestamp: int = None):
         """

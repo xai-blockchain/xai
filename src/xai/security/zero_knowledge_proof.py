@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Production Zero-Knowledge Proof (ZKP) Implementation
 
@@ -11,36 +13,32 @@ Uses elliptic curve cryptography (py_ecc) for secure proof generation and verifi
 """
 
 import hashlib
-import secrets
 import logging
-from typing import Tuple, Optional, Any, List, Dict
+import secrets
 from dataclasses import dataclass
-from py_ecc.secp256k1 import secp256k1
+from typing import Any
+
 import gmpy2
+from py_ecc.secp256k1 import secp256k1
 
 logger = logging.getLogger(__name__)
-
 
 # Zero-knowledge proof exceptions
 class ZKPError(Exception):
     """Base exception for zero-knowledge proof operations"""
     pass
 
-
 class ZKPVerificationError(ZKPError):
     """Raised when proof verification fails"""
     pass
-
 
 class ZKPInvalidProofError(ZKPError):
     """Raised when proof structure is invalid"""
     pass
 
-
 class ZKPCryptographicError(ZKPError):
     """Raised when cryptographic operations fail"""
     pass
-
 
 @dataclass
 class SchnorrProof:
@@ -49,26 +47,22 @@ class SchnorrProof:
     challenge: int   # c = H(G, P, R, message)
     response: int    # s = r + c*x (mod n)
 
-
 @dataclass
 class PedersenCommitment:
     """Pedersen commitment with hiding and binding properties."""
-    commitment: Tuple[int, int]  # C = v*G + r*H (point)
-    blinding_factor: Optional[int] = None  # r (kept secret by committer)
-
+    commitment: tuple[int, int]  # C = v*G + r*H (point)
+    blinding_factor: int | None = None  # r (kept secret by committer)
 
 @dataclass
 class RangeProof:
     """Range proof showing value is within [min, max] without revealing it."""
-    commitment: Tuple[int, int]
-    proof_data: Dict[str, Any]  # Proof-specific data
-
+    commitment: tuple[int, int]
+    proof_data: dict[str, Any]  # Proof-specific data
 
 @dataclass
 class MembershipProof:
     """Proof of set membership without revealing which element."""
-    proof_data: Dict[str, Any]
-
+    proof_data: dict[str, Any]
 
 class ZeroKnowledgeProof:
     """
@@ -111,7 +105,7 @@ class ZeroKnowledgeProof:
         digest = hasher.digest()
         return int.from_bytes(digest, 'big') % self.n
 
-    def _point_to_bytes(self, point: Tuple[int, int]) -> bytes:
+    def _point_to_bytes(self, point: tuple[int, int]) -> bytes:
         """Convert elliptic curve point to bytes."""
         if point is None:
             return b'\x00' * 64
@@ -120,7 +114,7 @@ class ZeroKnowledgeProof:
 
     # ==================== Schnorr Protocol ====================
 
-    def schnorr_generate_keypair(self) -> Tuple[int, Tuple[int, int]]:
+    def schnorr_generate_keypair(self) -> tuple[int, tuple[int, int]]:
         """
         Generate a Schnorr key pair.
 
@@ -135,7 +129,7 @@ class ZeroKnowledgeProof:
         self,
         private_key: int,
         message: str = ""
-    ) -> Tuple[Tuple[int, int], SchnorrProof]:
+    ) -> tuple[tuple[int, int], SchnorrProof]:
         """
         Generate a Schnorr proof of knowledge of discrete logarithm.
 
@@ -178,7 +172,7 @@ class ZeroKnowledgeProof:
 
     def schnorr_verify_knowledge(
         self,
-        public_key: Tuple[int, int],
+        public_key: tuple[int, int],
         proof: SchnorrProof,
         message: str = ""
     ) -> bool:
@@ -300,7 +294,7 @@ class ZeroKnowledgeProof:
         self,
         commitment: PedersenCommitment,
         value: int
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Prove knowledge of value and blinding factor for a commitment.
 
@@ -353,7 +347,7 @@ class ZeroKnowledgeProof:
         value: int,
         min_value: int,
         max_value: int
-    ) -> Optional[RangeProof]:
+    ) -> RangeProof | None:
         """
         Create a range proof showing value is in [min_value, max_value].
 
@@ -461,8 +455,8 @@ class ZeroKnowledgeProof:
     def membership_proof_create(
         self,
         element: int,
-        valid_set: List[int]
-    ) -> Optional[MembershipProof]:
+        valid_set: list[int]
+    ) -> MembershipProof | None:
         """
         Create a proof that element is in valid_set without revealing which one.
 
@@ -513,7 +507,7 @@ class ZeroKnowledgeProof:
     def membership_proof_verify(
         self,
         proof: MembershipProof,
-        valid_set: List[int]
+        valid_set: list[int]
     ) -> bool:
         """
         Verify a set membership proof.
@@ -576,7 +570,7 @@ class ZeroKnowledgeProof:
     def prove_private_key_knowledge(
         self,
         private_key: int
-    ) -> Tuple[Tuple[int, int], SchnorrProof]:
+    ) -> tuple[tuple[int, int], SchnorrProof]:
         """
         Prove knowledge of a private key without revealing it.
 
@@ -592,7 +586,7 @@ class ZeroKnowledgeProof:
 
     def verify_private_key_knowledge(
         self,
-        public_key: Tuple[int, int],
+        public_key: tuple[int, int],
         proof: SchnorrProof
     ) -> bool:
         """
@@ -611,7 +605,7 @@ class ZeroKnowledgeProof:
         self,
         amount: int,
         max_amount: int
-    ) -> Optional[RangeProof]:
+    ) -> RangeProof | None:
         """
         Prove a transaction amount is valid without revealing the exact amount.
 
@@ -623,7 +617,6 @@ class ZeroKnowledgeProof:
             Range proof or None if amount invalid
         """
         return self.range_proof_create(amount, 0, max_amount)
-
 
 # Legacy compatibility class (deprecated)
 class ZKP_Simulator:
@@ -641,7 +634,7 @@ class ZKP_Simulator:
         self,
         secret_number: int,
         public_statement: str
-    ) -> Optional[Tuple[str, str]]:
+    ) -> tuple[str, str] | None:
         """Legacy proof generation (deprecated)."""
         public_key, proof = self.zkp.schnorr_prove_knowledge(
             secret_number,
@@ -703,7 +696,6 @@ class ZKP_Simulator:
                 extra={"event": "zkp.identity_verify_unexpected_error", "error_type": type(e).__name__}
             )
             return False
-
 
 # Example usage and tests
 if __name__ == "__main__":

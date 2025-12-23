@@ -16,12 +16,12 @@ Security features:
 
 from __future__ import annotations
 
-import time
-import logging
 import hashlib
+import logging
+import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Callable, Any, TYPE_CHECKING
 from enum import Enum
+from typing import TYPE_CHECKING, Any, Callable
 
 from ..vm.exceptions import VMExecutionError
 
@@ -29,7 +29,6 @@ if TYPE_CHECKING:
     from ..blockchain import Blockchain
 
 logger = logging.getLogger(__name__)
-
 
 # EIP-1967 Storage Slots (keccak256 hash - 1 to avoid storage collisions)
 # These are standardized slots used by all major proxy implementations
@@ -48,14 +47,12 @@ EIP1967_BEACON_SLOT = int.from_bytes(
     "big"
 )  # keccak256("eip1967.proxy.beacon") - 1
 
-
 class ProxyType(Enum):
     """Types of proxy patterns."""
     TRANSPARENT = "transparent"
     UUPS = "uups"
     BEACON = "beacon"
     DIAMOND = "diamond"
-
 
 @dataclass
 class ImplementationInfo:
@@ -64,9 +61,8 @@ class ImplementationInfo:
     version: int
     deployed_at: float
     bytecode_hash: str
-    initializer: Optional[str] = None
+    initializer: str | None = None
     initialized: bool = False
-
 
 @dataclass
 class UpgradeHistory:
@@ -76,7 +72,6 @@ class UpgradeHistory:
     timestamp: float
     upgrader: str
     version: int
-
 
 @dataclass
 class TransparentProxy:
@@ -100,11 +95,11 @@ class TransparentProxy:
     implementation: str = ""
 
     # Storage for delegated state
-    storage: Dict[int, int] = field(default_factory=dict)
+    storage: dict[int, int] = field(default_factory=dict)
 
     # Version tracking
     version: int = 0
-    upgrade_history: List[UpgradeHistory] = field(default_factory=list)
+    upgrade_history: list[UpgradeHistory] = field(default_factory=list)
 
     # Initialization
     initialized: bool = False
@@ -123,7 +118,7 @@ class TransparentProxy:
         self,
         caller: str,
         new_implementation: str,
-        data: Optional[bytes] = None,
+        data: bytes | None = None,
     ) -> bool:
         """
         Upgrade to a new implementation.
@@ -230,7 +225,7 @@ class TransparentProxy:
         self,
         caller: str,
         calldata: bytes,
-        implementations: Dict[str, Any],
+        implementations: dict[str, Any],
     ) -> Any:
         """
         Delegate call to implementation.
@@ -284,7 +279,7 @@ class TransparentProxy:
         """Get current version."""
         return self.version
 
-    def get_upgrade_history(self) -> List[Dict]:
+    def get_upgrade_history(self) -> list[Dict]:
         """Get upgrade history."""
         return [
             {
@@ -305,7 +300,6 @@ class TransparentProxy:
     def _require_admin(self, caller: str) -> None:
         if self._normalize(caller) != self._normalize(self.admin):
             raise VMExecutionError("Caller is not admin")
-
 
 @dataclass
 class UUPSProxy:
@@ -328,11 +322,11 @@ class UUPSProxy:
     implementation: str = ""
 
     # Storage for delegated state
-    storage: Dict[int, int] = field(default_factory=dict)
+    storage: dict[int, int] = field(default_factory=dict)
 
     # Version tracking
     version: int = 0
-    upgrade_history: List[UpgradeHistory] = field(default_factory=list)
+    upgrade_history: list[UpgradeHistory] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Initialize proxy."""
@@ -394,7 +388,6 @@ class UUPSProxy:
         """Get current implementation."""
         return self.implementation
 
-
 @dataclass
 class UUPSImplementation:
     """
@@ -429,7 +422,6 @@ class UUPSImplementation:
         # In real implementation, would check address(this)
         pass
 
-
 @dataclass
 class UpgradeableBeacon:
     """
@@ -451,7 +443,7 @@ class UpgradeableBeacon:
     implementation: str = ""
 
     # Proxies using this beacon
-    beacon_proxies: List[str] = field(default_factory=list)
+    beacon_proxies: list[str] = field(default_factory=list)
 
     # Version tracking
     version: int = 0
@@ -511,7 +503,6 @@ class UpgradeableBeacon:
         if caller.lower() != self.owner.lower():
             raise VMExecutionError("Caller is not owner")
 
-
 @dataclass
 class BeaconProxy:
     """
@@ -524,7 +515,7 @@ class BeaconProxy:
     beacon: str = ""
 
     # Storage for delegated state
-    storage: Dict[int, int] = field(default_factory=dict)
+    storage: dict[int, int] = field(default_factory=dict)
 
     # Initialization tracking
     initialized: bool = False
@@ -537,7 +528,7 @@ class BeaconProxy:
             ).digest()
             self.address = f"0x{addr_hash[-20:].hex()}"
 
-    def get_implementation(self, beacons: Dict[str, UpgradeableBeacon]) -> str:
+    def get_implementation(self, beacons: dict[str, UpgradeableBeacon]) -> str:
         """
         Get implementation from beacon.
 
@@ -552,7 +543,6 @@ class BeaconProxy:
             raise VMExecutionError(f"Beacon {self.beacon} not found")
         return beacon.get_implementation()
 
-
 # Diamond Proxy (EIP-2535) - Most flexible but complex
 
 @dataclass
@@ -560,15 +550,13 @@ class FacetCut:
     """Describes changes to diamond facets."""
     facet_address: str
     action: str  # "add", "replace", "remove"
-    function_selectors: List[bytes]  # 4-byte function selectors
-
+    function_selectors: list[bytes]  # 4-byte function selectors
 
 @dataclass
 class DiamondFacet:
     """A facet (module) of a diamond."""
     address: str
-    function_selectors: List[bytes]
-
+    function_selectors: list[bytes]
 
 @dataclass
 class DiamondProxy:
@@ -596,16 +584,16 @@ class DiamondProxy:
     owner: str = ""
 
     # Function selector -> facet address mapping
-    selector_to_facet: Dict[bytes, str] = field(default_factory=dict)
+    selector_to_facet: dict[bytes, str] = field(default_factory=dict)
 
     # Facet address -> selectors mapping (for loupe)
-    facet_selectors: Dict[str, List[bytes]] = field(default_factory=dict)
+    facet_selectors: dict[str, list[bytes]] = field(default_factory=dict)
 
     # All facet addresses
-    facet_addresses: List[str] = field(default_factory=list)
+    facet_addresses: list[str] = field(default_factory=list)
 
     # Storage
-    storage: Dict[int, int] = field(default_factory=dict)
+    storage: dict[int, int] = field(default_factory=dict)
 
     # Version tracking
     version: int = 0
@@ -623,9 +611,9 @@ class DiamondProxy:
     def diamond_cut(
         self,
         caller: str,
-        facet_cuts: List[FacetCut],
-        init_address: Optional[str] = None,
-        init_calldata: Optional[bytes] = None,
+        facet_cuts: list[FacetCut],
+        init_address: str | None = None,
+        init_calldata: bytes | None = None,
     ) -> bool:
         """
         Add, replace, or remove facet functions.
@@ -672,7 +660,7 @@ class DiamondProxy:
 
         return True
 
-    def _add_facet_selectors(self, facet: str, selectors: List[bytes]) -> None:
+    def _add_facet_selectors(self, facet: str, selectors: list[bytes]) -> None:
         """Add new function selectors."""
         for selector in selectors:
             if selector in self.selector_to_facet:
@@ -688,7 +676,7 @@ class DiamondProxy:
 
         self.facet_selectors[facet].extend(selectors)
 
-    def _replace_facet_selectors(self, facet: str, selectors: List[bytes]) -> None:
+    def _replace_facet_selectors(self, facet: str, selectors: list[bytes]) -> None:
         """Replace existing function selectors."""
         for selector in selectors:
             if selector not in self.selector_to_facet:
@@ -715,7 +703,7 @@ class DiamondProxy:
         # Clean up empty facets
         self._cleanup_empty_facets()
 
-    def _remove_facet_selectors(self, selectors: List[bytes]) -> None:
+    def _remove_facet_selectors(self, selectors: list[bytes]) -> None:
         """Remove function selectors."""
         for selector in selectors:
             if selector not in self.selector_to_facet:
@@ -746,7 +734,7 @@ class DiamondProxy:
 
     # ==================== Diamond Loupe (EIP-2535) ====================
 
-    def facets(self) -> List[DiamondFacet]:
+    def facets(self) -> list[DiamondFacet]:
         """
         Get all facets and their selectors.
 
@@ -757,7 +745,7 @@ class DiamondProxy:
             for addr, selectors in self.facet_selectors.items()
         ]
 
-    def facet_function_selectors(self, facet: str) -> List[bytes]:
+    def facet_function_selectors(self, facet: str) -> list[bytes]:
         """
         Get all function selectors for a facet.
 
@@ -765,7 +753,7 @@ class DiamondProxy:
         """
         return self.facet_selectors.get(facet, [])
 
-    def facet_addresses_list(self) -> List[str]:
+    def facet_addresses_list(self) -> list[str]:
         """
         Get all facet addresses.
 
@@ -773,7 +761,7 @@ class DiamondProxy:
         """
         return self.facet_addresses.copy()
 
-    def facet_address(self, selector: bytes) -> Optional[str]:
+    def facet_address(self, selector: bytes) -> str | None:
         """
         Get the facet that implements a function selector.
 
@@ -786,7 +774,7 @@ class DiamondProxy:
     def delegate_call(
         self,
         calldata: bytes,
-        facet_implementations: Dict[str, Any],
+        facet_implementations: dict[str, Any],
     ) -> Any:
         """
         Route call to appropriate facet based on selector.
@@ -822,7 +810,6 @@ class DiamondProxy:
         if caller.lower() != self.owner.lower():
             raise VMExecutionError("Caller is not owner")
 
-
 @dataclass
 class ProxyFactory:
     """
@@ -835,10 +822,10 @@ class ProxyFactory:
     owner: str = ""
 
     # Deployed proxies
-    proxies: Dict[str, Any] = field(default_factory=dict)
+    proxies: dict[str, Any] = field(default_factory=dict)
 
     # Beacons
-    beacons: Dict[str, UpgradeableBeacon] = field(default_factory=dict)
+    beacons: dict[str, UpgradeableBeacon] = field(default_factory=dict)
 
     # Statistics
     total_proxies: int = 0
@@ -984,7 +971,7 @@ class ProxyFactory:
     def deploy_diamond(
         self,
         caller: str,
-        initial_facets: Optional[List[FacetCut]] = None,
+        initial_facets: list[FacetCut] | None = None,
     ) -> DiamondProxy:
         """
         Deploy a new diamond proxy.
@@ -1015,10 +1002,10 @@ class ProxyFactory:
 
         return diamond
 
-    def get_proxy(self, address: str) -> Optional[Any]:
+    def get_proxy(self, address: str) -> Any | None:
         """Get a proxy by address."""
         return self.proxies.get(address)
 
-    def get_beacon(self, address: str) -> Optional[UpgradeableBeacon]:
+    def get_beacon(self, address: str) -> UpgradeableBeacon | None:
         """Get a beacon by address."""
         return self.beacons.get(address)

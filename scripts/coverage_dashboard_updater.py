@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Coverage Dashboard Updater for XAI Blockchain
 Generates real-time coverage progress tracking dashboard
@@ -8,9 +10,8 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple
-import sys
 
+import sys
 
 class CoverageDashboard:
     """Generates coverage progress dashboard from coverage.json data"""
@@ -75,7 +76,7 @@ class CoverageDashboard:
             'uncovered_lines': totals.get('missing_lines', 0),
         }
 
-    def get_priority_modules(self) -> List[Tuple[str, Dict, str]]:
+    def get_priority_modules(self) -> list[tuple[str, Dict, str]]:
         """Get modules sorted by priority (critical -> low)"""
         prioritized = []
 
@@ -119,7 +120,7 @@ class CoverageDashboard:
 
         return max(1, int(missing_lines * tests_per_line))
 
-    def estimate_completion_date(self) -> Tuple[float, str]:
+    def estimate_completion_date(self) -> tuple[float, str]:
         """Estimate days to reach 98% coverage"""
         overall = self.get_overall_stats()
         current = overall['current']
@@ -288,7 +289,6 @@ class CoverageDashboard:
         print(f"Dashboard saved to: {output_file}")
         return output_file
 
-
 def main():
     """Main entry point"""
     try:
@@ -321,7 +321,6 @@ def main():
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
-
 
 if __name__ == '__main__':
     sys.exit(main())

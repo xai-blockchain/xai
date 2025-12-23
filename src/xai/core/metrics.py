@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Enhanced Metrics and Monitoring Module
 
@@ -13,37 +15,37 @@ This module provides the core monitoring infrastructure for the XAI blockchain,
 supporting both real-time dashboards and long-term trend analysis.
 """
 
+import json
+import logging
+import os
+import threading
+import time
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+import psutil
 from prometheus_client import (
+    REGISTRY,
+    CollectorRegistry,
     Counter,
     Gauge,
     Histogram,
-    Summary,
     Info,
-    CollectorRegistry,
+    Summary,
     generate_latest,
-    REGISTRY,
 )
-import time
-import psutil
-import os
-import json
-import logging
-import threading
-from typing import Optional, Dict, Any, List
-from datetime import datetime
 from pythonjsonlogger import jsonlogger
-from pathlib import Path
 
 # Create a logger for use before StructuredLogger is instantiated
 logger = logging.getLogger(__name__)
-
 
 # ==================== STRUCTURED LOGGING SETUP ====================
 
 class StructuredLogger:
     """Structured logging for JSON format output and log aggregation"""
 
-    def __init__(self, name: str, log_file: Optional[str] = None):
+    def __init__(self, name: str, log_file: str | None = None):
         """
         Initialize structured logger.
 
@@ -134,7 +136,6 @@ class StructuredLogger:
         """Log critical level message"""
         self.log("critical", message, **extra_fields)
 
-
 # ==================== PROMETHEUS METRICS ====================
 
 class BlockchainMetrics:
@@ -153,8 +154,8 @@ class BlockchainMetrics:
     def __init__(
         self,
         port: int = 8000,
-        registry: Optional[CollectorRegistry] = None,
-        log_file: Optional[str] = None,
+        registry: CollectorRegistry | None = None,
+        log_file: str | None = None,
     ):
         """
         Initialize blockchain metrics.
@@ -775,12 +776,10 @@ class BlockchainMetrics:
         with self._lock:
             self.wallet_balance.labels(address=address).set(balance)
 
-
 # ==================== GLOBAL METRICS INSTANCE ====================
 
-_metrics_instance: Optional[BlockchainMetrics] = None
+_metrics_instance: BlockchainMetrics | None = None
 _metrics_lock = threading.Lock()
-
 
 def get_metrics() -> BlockchainMetrics:
     """Get or create global metrics instance"""
@@ -791,13 +790,12 @@ def get_metrics() -> BlockchainMetrics:
                 _metrics_instance = BlockchainMetrics()
     return _metrics_instance
 
-
 def initialize_metrics(
     port: int = 8000,
     version: str = "1.0.0",
     network: str = "mainnet",
     node_id: str = "",
-    log_file: Optional[str] = None,
+    log_file: str | None = None,
 ) -> BlockchainMetrics:
     """
     Initialize and configure metrics system.
@@ -819,7 +817,6 @@ def initialize_metrics(
         _metrics_instance.metrics_port = port
         _metrics_instance.set_node_info(version, network, node_id)
     return _metrics_instance
-
 
 if __name__ == "__main__":
     # Example usage

@@ -11,24 +11,21 @@ from __future__ import annotations
 
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_PATH = REPO_ROOT / "docs" / "api" / "openapi.yaml"
 
-
-def ref_schema(name: str) -> Dict[str, str]:
+def ref_schema(name: str) -> dict[str, str]:
     return {"$ref": f"#/components/schemas/{name}"}
 
-
-def ref_param(name: str) -> Dict[str, str]:
+def ref_param(name: str) -> dict[str, str]:
     return {"$ref": f"#/components/parameters/{name}"}
 
-
-def json_request(schema: str, description: Optional[str] = None, required: bool = True) -> Dict[str, Any]:
-    body: Dict[str, Any] = {
+def json_request(schema: str, description: str | None = None, required: bool = True) -> dict[str, Any]:
+    body: dict[str, Any] = {
         "required": required,
         "content": {
             "application/json": {
@@ -40,10 +37,9 @@ def json_request(schema: str, description: Optional[str] = None, required: bool 
         body["description"] = description
     return body
 
-
 def success_response(
-    schema: Dict[str, Any], description: str = "Request succeeded"
-) -> Dict[str, Any]:
+    schema: dict[str, Any], description: str = "Request succeeded"
+) -> dict[str, Any]:
     return {
         "description": description,
         "content": {
@@ -53,8 +49,7 @@ def success_response(
         },
     }
 
-
-def error_response(description: str = "Error response") -> Dict[str, Any]:
+def error_response(description: str = "Error response") -> dict[str, Any]:
     return {
         "description": description,
         "content": {
@@ -64,9 +59,8 @@ def error_response(description: str = "Error response") -> Dict[str, Any]:
         },
     }
 
-
-def build_spec() -> Dict[str, Any]:
-    spec: Dict[str, Any] = OrderedDict()
+def build_spec() -> dict[str, Any]:
+    spec: dict[str, Any] = OrderedDict()
     spec["openapi"] = "3.0.3"
     spec["info"] = OrderedDict(
         {
@@ -106,22 +100,22 @@ def build_spec() -> Dict[str, Any]:
     ]
     spec["tags"] = [{"name": name, "description": desc} for name, desc in tags]
 
-    paths: Dict[str, Any] = OrderedDict()
+    paths: dict[str, Any] = OrderedDict()
 
     def add_operation(
         path: str,
         method: str,
         *,
-        tags: List[str],
+        tags: list[str],
         summary: str,
         description: str,
-        response_schema: Dict[str, Any],
-        parameters: Optional[List[Dict[str, Any]]] = None,
-        request_body: Optional[Dict[str, Any]] = None,
-        security: Optional[List[Dict[str, Any]]] = None,
-        additional_errors: Optional[List[str]] = None,
+        response_schema: dict[str, Any],
+        parameters: list[dict[str, Any]] | None = None,
+        request_body: dict[str, Any] | None = None,
+        security: list[dict[str, Any]] | None = None,
+        additional_errors: list[str] | None = None,
     ) -> None:
-        operation: Dict[str, Any] = OrderedDict()
+        operation: dict[str, Any] = OrderedDict()
         operation["tags"] = tags
         operation["summary"] = summary
         operation["description"] = description
@@ -129,7 +123,7 @@ def build_spec() -> Dict[str, Any]:
             operation["parameters"] = parameters
         if request_body:
             operation["requestBody"] = request_body
-        responses: Dict[str, Any] = OrderedDict()
+        responses: dict[str, Any] = OrderedDict()
         responses["200"] = success_response(response_schema)
         default_errors = ["400", "500"]
         for code in default_errors:
@@ -143,7 +137,7 @@ def build_spec() -> Dict[str, Any]:
         paths.setdefault(path, OrderedDict())[method.lower()] = operation
 
     # Helper schemas for reuse
-    def success_with(properties: Dict[str, Any]) -> Dict[str, Any]:
+    def success_with(properties: dict[str, Any]) -> dict[str, Any]:
         return {
             "type": "object",
             "properties": {
@@ -153,7 +147,7 @@ def build_spec() -> Dict[str, Any]:
             "required": ["success"],
         }
 
-    def message_response(example: str = "") -> Dict[str, Any]:
+    def message_response(example: str = "") -> dict[str, Any]:
         schema = success_with({"message": {"type": "string"}})
         if example:
             schema["properties"]["message"]["example"] = example
@@ -1460,7 +1454,7 @@ def build_spec() -> Dict[str, Any]:
     }
 
     # Schema definitions for request bodies and shared payloads
-    schemas: Dict[str, Any] = {
+    schemas: dict[str, Any] = {
         "ErrorResponse": {
             "type": "object",
             "properties": {
@@ -1760,7 +1754,6 @@ def build_spec() -> Dict[str, Any]:
 
     return spec
 
-
 def ordered(obj: Any) -> Any:
     if isinstance(obj, OrderedDict):
         return {key: ordered(value) for key, value in obj.items()}
@@ -1768,13 +1761,11 @@ def ordered(obj: Any) -> Any:
         return [ordered(item) for item in obj]
     return obj
 
-
 def main() -> None:
     spec = build_spec()
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     with OUTPUT_PATH.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(ordered(spec), handle, sort_keys=False)
-
 
 if __name__ == "__main__":
     main()

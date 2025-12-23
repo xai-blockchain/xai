@@ -1,16 +1,17 @@
-from typing import Dict, Any, Optional
-from datetime import datetime, timezone
-import threading
-import json
-import os
-import uuid
-import logging
+from __future__ import annotations
 
-from xai.core.security_validation import log_security_event
+import json
+import logging
+import os
+import threading
+import uuid
+from datetime import datetime, timezone
+from typing import Any
+
 from xai.core.monitoring import MetricsCollector
+from xai.core.security_validation import log_security_event
 
 logger = logging.getLogger("xai.wallet.time_lock")
-
 
 class PendingWithdrawal:
     def __init__(
@@ -68,7 +69,7 @@ class PendingWithdrawal:
                 self.status,
             )
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "withdrawal_id": self.withdrawal_id,
             "user_address": self.user_address,
@@ -84,7 +85,6 @@ class PendingWithdrawal:
             f"amount={self.amount}, status='{self.status}', release_at={datetime.fromtimestamp(self.release_timestamp, timezone.utc)})"
         )
 
-
 class TimeLockedWithdrawalManager:
     DEFAULT_THRESHOLD = 1000.0  # Amount in some currency unit
     DEFAULT_TIME_LOCK_SECONDS = 3600  # 1 hour
@@ -93,7 +93,7 @@ class TimeLockedWithdrawalManager:
         self,
         withdrawal_threshold: float = DEFAULT_THRESHOLD,
         time_lock_seconds: int = DEFAULT_TIME_LOCK_SECONDS,
-        storage_path: Optional[str] = None,
+        storage_path: str | None = None,
     ):
         if not isinstance(withdrawal_threshold, (int, float)) or withdrawal_threshold <= 0:
             raise ValueError("Withdrawal threshold must be a positive number.")
@@ -102,13 +102,13 @@ class TimeLockedWithdrawalManager:
 
         self.withdrawal_threshold = withdrawal_threshold
         self.time_lock_seconds = time_lock_seconds
-        self.pending_withdrawals: Dict[str, PendingWithdrawal] = {}
+        self.pending_withdrawals: dict[str, PendingWithdrawal] = {}
         self.storage_path = storage_path
         self._lock = threading.Lock()
         self._load_state()
 
     def request_withdrawal(
-        self, user_address: str, amount: float, current_timestamp: Optional[int] = None
+        self, user_address: str, amount: float, current_timestamp: int | None = None
     ) -> PendingWithdrawal:
         ts = (
             current_timestamp
@@ -289,7 +289,6 @@ class TimeLockedWithdrawalManager:
                 exc,
                 extra={"error_type": type(exc).__name__, "path": self.storage_path}
             )
-
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

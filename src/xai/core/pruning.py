@@ -20,17 +20,16 @@ import logging
 import os
 import shutil
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Set, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from xai.core.blockchain import Blockchain, Block
+    from xai.core.blockchain import Block, Blockchain
 
 logger = logging.getLogger(__name__)
-
 
 class PruneMode(Enum):
     """Pruning mode configuration"""
@@ -39,7 +38,6 @@ class PruneMode(Enum):
     DAYS = "days"  # Keep blocks from last N days
     BOTH = "both"  # Keep whichever is more restrictive
     SPACE = "space"  # Prune when disk usage exceeds threshold
-
 
 @dataclass
 class PruningStats:
@@ -54,9 +52,8 @@ class PruningStats:
     retention_days: int
     mode: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
-
 
 @dataclass
 class PruningPolicy:
@@ -118,7 +115,6 @@ class PruningPolicy:
             keep_headers_only=keep_headers,
         )
 
-
 class BlockPruningManager:
     """
     Manages block pruning operations for the blockchain.
@@ -133,7 +129,7 @@ class BlockPruningManager:
     def __init__(
         self,
         blockchain: Blockchain,
-        policy: Optional[PruningPolicy] = None,
+        policy: PruningPolicy | None = None,
         data_dir: str = "data"
     ):
         """
@@ -167,8 +163,8 @@ class BlockPruningManager:
         )
 
         # Track pruned block heights
-        self.pruned_heights: Set[int] = set()
-        self.headers_only_heights: Set[int] = set()
+        self.pruned_heights: set[int] = set()
+        self.headers_only_heights: set[int] = set()
 
         logger.info(
             "BlockPruningManager initialized with mode=%s, retain_blocks=%d, retain_days=%d",
@@ -310,7 +306,7 @@ class BlockPruningManager:
 
         return blocks_to_prune
 
-    def prune_blocks(self, up_to_height: Optional[int] = None, dry_run: bool = False) -> Dict[str, Any]:
+    def prune_blocks(self, up_to_height: int | None = None, dry_run: bool = False) -> dict[str, Any]:
         """
         Prune blocks up to specified height.
 
@@ -503,7 +499,7 @@ class BlockPruningManager:
             )
             return False
 
-    def restore_block(self, height: int) -> Optional[Block]:
+    def restore_block(self, height: int) -> Block | None:
         """
         Restore an archived block.
 
@@ -550,7 +546,7 @@ class BlockPruningManager:
             )
             return None
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """
         Get current pruning status.
 

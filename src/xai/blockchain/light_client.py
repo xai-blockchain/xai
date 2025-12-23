@@ -1,10 +1,12 @@
-import logging
-from typing import Dict, Any, List, Tuple
+from __future__ import annotations
+
 import hashlib
+import logging
+from typing import Any
+
 from .merkle import MerkleTree  # Import MerkleTree
 
 logger = logging.getLogger("xai.blockchain.light_client")
-
 
 class BlockHeader:
     def __init__(
@@ -33,7 +35,7 @@ class BlockHeader:
         header_string = f"{self.block_number}{self.prev_block_hash}{self.state_root}{self.transactions_root}{self.timestamp}"
         return hashlib.sha256(header_string.encode()).hexdigest()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "block_number": self.block_number,
             "prev_block_hash": self.prev_block_hash,
@@ -49,11 +51,10 @@ class BlockHeader:
             f"state_root='{self.state_root[:8]}...')"
         )
 
-
 class LightClient:
     def __init__(self, chain_id: str):
         self.chain_id = chain_id
-        self.trusted_headers: Dict[int, BlockHeader] = {}  # {block_number: BlockHeader}
+        self.trusted_headers: dict[int, BlockHeader] = {}  # {block_number: BlockHeader}
         self.latest_block_number = -1
 
     def sync_header(self, header: BlockHeader):
@@ -83,7 +84,7 @@ class LightClient:
         return header
 
     def verify_transaction_inclusion(
-        self, transaction_data: Any, merkle_proof: List[Tuple[str, str]], block_number: int
+        self, transaction_data: Any, merkle_proof: list[tuple[str, str]], block_number: int
     ) -> bool:
         """
         Verifies that a transaction is included in a specific block of the source chain

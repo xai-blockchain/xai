@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Hardware wallet integration for XAI blockchain.
 
@@ -15,11 +17,11 @@ Security Note:
     which defeats the purpose of hardware wallets. Never use in production.
 """
 
-from dataclasses import dataclass, field
 import hashlib
 import logging
 import os
-from typing import Protocol, runtime_checkable, Dict, Optional, TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -53,14 +55,12 @@ ALLOW_MOCK_HARDWARE_WALLET = os.getenv("XAI_ALLOW_MOCK_HARDWARE_WALLET", "false"
 _CURVE = ec.SECP256K1()
 _CURVE_ORDER = int("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16)
 
-
 def _normalize_private_value(value: int) -> int:
     """Normalize private key value to valid range."""
     normalized = value % _CURVE_ORDER
     if normalized == 0:
         normalized = 1
     return normalized
-
 
 @runtime_checkable
 class HardwareWallet(Protocol):
@@ -127,7 +127,6 @@ class HardwareWallet(Protocol):
         """
         ...
 
-
 @dataclass
 class MockHardwareWallet:
     """
@@ -148,8 +147,8 @@ class MockHardwareWallet:
     """
 
     address: str = ""
-    _private_key: Optional[ec.EllipticCurvePrivateKey] = field(default=None, repr=False)
-    _public_key: Optional[ec.EllipticCurvePublicKey] = field(default=None, repr=False)
+    _private_key: ec.EllipticCurvePrivateKey | None = field(default=None, repr=False)
+    _public_key: ec.EllipticCurvePublicKey | None = field(default=None, repr=False)
     _public_key_hex: str = field(default="", repr=False)
 
     def __post_init__(self):
@@ -244,13 +243,12 @@ class MockHardwareWallet:
 
         return signature
 
-
 class HardwareWalletManager:
     """Helper to coordinate hardware wallet sessions."""
 
     def __init__(self):
         # Replace this dictionary with device discovery results in future.
-        self.connected_devices: Dict[str, HardwareWallet] = {}
+        self.connected_devices: dict[str, HardwareWallet] = {}
 
         # Register mock provider only when explicitly allowed; production defaults to real devices.
         if ALLOW_MOCK_HARDWARE_WALLET:
@@ -265,16 +263,13 @@ class HardwareWalletManager:
     def list_devices(self) -> list[str]:
         return list(self.connected_devices.keys())
 
-
 _global_hw_manager: HardwareWalletManager | None = None
-
 
 def get_hardware_wallet_manager() -> HardwareWalletManager:
     global _global_hw_manager
     if _global_hw_manager is None:
         _global_hw_manager = HardwareWalletManager()
     return _global_hw_manager
-
 
 def get_default_hardware_wallet() -> HardwareWallet | None:
     manager = get_hardware_wallet_manager()

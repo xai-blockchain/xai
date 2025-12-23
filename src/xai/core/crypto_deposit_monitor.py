@@ -11,13 +11,12 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any
 
 import requests
 from requests import RequestException
 
 logger = logging.getLogger(__name__)
-
 
 @dataclass
 class DepositEvent:
@@ -29,20 +28,18 @@ class DepositEvent:
     currency: str
     amount: float
     confirmations: int = 0
-    required_confirmations: Optional[int] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    required_confirmations: int | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def normalized_currency(self) -> str:
         return self.currency.upper()
-
 
 class BaseDepositSource(ABC):
     """Interface for deposit sources."""
 
     @abstractmethod
-    def poll(self) -> List[DepositEvent]:
+    def poll(self) -> list[DepositEvent]:
         """Return a list of new or updated deposit events."""
-
 
 class FileDepositSource(BaseDepositSource):
     """
@@ -70,10 +67,10 @@ class FileDepositSource(BaseDepositSource):
         self.min_confirmations = max(0, int(min_confirmations))
         self.max_events = max(1, int(max_events_per_poll))
         self._lock = threading.Lock()
-        self._seen_confirmations: Dict[str, int] = {}
+        self._seen_confirmations: dict[str, int] = {}
 
-    def poll(self) -> List[DepositEvent]:
-        events: List[DepositEvent] = []
+    def poll(self) -> list[DepositEvent]:
+        events: list[DepositEvent] = []
         if not os.path.exists(self.path):
             return events
 
@@ -110,7 +107,7 @@ class FileDepositSource(BaseDepositSource):
                 events.append(event)
         return events
 
-    def _parse_entry(self, entry: Dict[str, Any]) -> Optional[DepositEvent]:
+    def _parse_entry(self, entry: dict[str, Any]) -> DepositEvent | None:
         if not isinstance(entry, dict):
             return None
         tx_hash = str(entry.get("tx_hash") or entry.get("txid") or "").strip()
@@ -146,11 +143,10 @@ class FileDepositSource(BaseDepositSource):
             metadata=metadata,
         )
 
-
 class InMemoryDepositSource(BaseDepositSource):
     """Test utility that replays a predefined sequence of events."""
 
-    def __init__(self, events: Optional[Iterable[DepositEvent]] = None) -> None:
+    def __init__(self, events: Iterable[DepositEvent] | None = None) -> None:
         self._events = list(events or [])
         self._lock = threading.Lock()
 
@@ -158,14 +154,13 @@ class InMemoryDepositSource(BaseDepositSource):
         with self._lock:
             self._events.append(event)
 
-    def poll(self) -> List[DepositEvent]:
+    def poll(self) -> list[DepositEvent]:
         with self._lock:
             events = list(self._events)
             self._events.clear()
             return events
 
-
-def _extract_path(obj: Any, path: Optional[str], default: Any = None) -> Any:
+def _extract_path(obj: Any, path: str | None, default: Any = None) -> Any:
     """Safely navigate dotted/indexed paths through dict/list structures."""
     if not path:
         return obj
@@ -187,7 +182,6 @@ def _extract_path(obj: Any, path: Optional[str], default: Any = None) -> Any:
             return default
     return current
 
-
 class ExplorerDepositSource(BaseDepositSource):
     """
     Polls HTTP explorer APIs for transactions hitting registered deposit addresses.
@@ -204,15 +198,15 @@ class ExplorerDepositSource(BaseDepositSource):
         endpoint_template: str,
         *,
         method: str = "GET",
-        headers: Optional[Dict[str, str]] = None,
-        params: Optional[Dict[str, str]] = None,
+        headers: dict[str, str] | None = None,
+        params: dict[str, str] | None = None,
         min_confirmations: int = 0,
         timeout: float = 6.0,
         amount_path: str = "amount",
         confirmations_path: str = "confirmations",
         txid_path: str = "txid",
-        metadata_paths: Optional[Dict[str, str]] = None,
-        records_path: Optional[str] = None,
+        metadata_paths: dict[str, str] | None = None,
+        records_path: str | None = None,
         amount_divisor: float = 1.0,
         max_addresses_per_cycle: int = 25,
     ) -> None:
@@ -231,13 +225,13 @@ class ExplorerDepositSource(BaseDepositSource):
         self.records_path = records_path
         self.amount_divisor = amount_divisor if amount_divisor not in (0, None) else 1.0
         self.max_addresses = max(1, int(max_addresses_per_cycle))
-        self._seen_confirmations: Dict[str, int] = {}
+        self._seen_confirmations: dict[str, int] = {}
 
-    def poll(self) -> List[DepositEvent]:
+    def poll(self) -> list[DepositEvent]:
         addresses = self.deposit_manager.list_addresses_by_currency(self.currency)
         if not addresses:
             return []
-        events: List[DepositEvent] = []
+        events: list[DepositEvent] = []
         for entry in addresses[: self.max_addresses]:
             deposit_address = entry.get("deposit_address")
             user_address = entry.get("user_address")
@@ -304,7 +298,7 @@ class ExplorerDepositSource(BaseDepositSource):
 
     def _record_to_event(
         self, record: Any, user_address: str, deposit_address: str
-    ) -> Optional[DepositEvent]:
+    ) -> DepositEvent | None:
         tx_hash = _extract_path(record, self.txid_path)
         if not tx_hash:
             return None
@@ -334,7 +328,6 @@ class ExplorerDepositSource(BaseDepositSource):
             metadata=metadata,
         )
 
-
 class CryptoDepositMonitor:
     """Coordinates deposit sources and feeds the crypto deposit manager."""
 
@@ -344,17 +337,17 @@ class CryptoDepositMonitor:
         *,
         poll_interval: int = 30,
         jitter_seconds: int = 5,
-        metrics_collector: Optional[Any] = None,
+        metrics_collector: Any | None = None,
     ) -> None:
         self.deposit_manager = deposit_manager
         self.poll_interval = max(5, int(poll_interval))
         self.jitter_seconds = max(0, int(jitter_seconds))
         self.metrics_collector = metrics_collector
-        self.sources: Dict[str, BaseDepositSource] = {}
+        self.sources: dict[str, BaseDepositSource] = {}
         self._stop_event = threading.Event()
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._stats_lock = threading.Lock()
-        self._stats: Dict[str, Any] = {
+        self._stats: dict[str, Any] = {
             "processed": 0,
             "credited": 0,
             "pending": 0,
@@ -406,7 +399,7 @@ class CryptoDepositMonitor:
         """Process every source exactly once (useful for tests)."""
         self._process_sources()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         with self._stats_lock:
             return dict(self._stats)
 
@@ -510,10 +503,9 @@ class CryptoDepositMonitor:
         )
         return status
 
-
 def create_deposit_source(
     currency: str,
-    config: Dict[str, Any],
+    config: dict[str, Any],
     deposit_manager,
 ) -> BaseDepositSource:
     """

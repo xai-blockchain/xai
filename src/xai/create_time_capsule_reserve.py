@@ -10,6 +10,7 @@ in the genesis block.
 
 import json
 import os
+
 from src.xai.core.wallet import Wallet
 
 

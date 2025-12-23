@@ -13,21 +13,20 @@ All routes require admin authentication.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Dict, Tuple, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from flask import request
 
 from xai.core.config import Config, ConfigurationError, reload_runtime
-from xai.performance.profiling import MemoryProfiler, CPUProfiler
-from xai.core.rate_limiter import get_rate_limiter
 from xai.core.monitoring import MetricsCollector
+from xai.core.rate_limiter import get_rate_limiter
 from xai.network.peer_manager import PeerManager
+from xai.performance.profiling import CPUProfiler, MemoryProfiler
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
 
 logger = logging.getLogger(__name__)
-
 
 def register_admin_routes(routes: "NodeAPIRoutes") -> None:
     """
@@ -51,7 +50,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
     spending_limits = routes.spending_limits
 
     @app.route("/admin/api-keys", methods=["GET"])
-    def list_api_keys() -> Tuple[Dict[str, Any], int]:
+    def list_api_keys() -> tuple[dict[str, Any], int]:
         """List all API key metadata (admin only)."""
         auth_error = routes._require_control_role({"admin"})
         if auth_error:
@@ -63,9 +62,9 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
     max_ttl_days = getattr(Config, "API_KEY_MAX_TTL_DAYS", 365)
     allow_permanent_keys = getattr(Config, "API_KEY_ALLOW_PERMANENT", False)
 
-    def _normalize_ttl(payload: Dict[str, Any]) -> Tuple[Optional[int], Optional[Tuple[Dict[str, Any], int]]]:
+    def _normalize_ttl(payload: dict[str, Any]) -> tuple[int | None, tuple[dict[str, Any], int] | None]:
         """Convert expires_in_days/hours payload fields into seconds."""
-        ttl_seconds: Optional[int] = None
+        ttl_seconds: int | None = None
         if "expires_in_days" in payload:
             try:
                 ttl_seconds = int(float(payload["expires_in_days"]) * 86400)
@@ -86,7 +85,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         return ttl_seconds, None
 
     @app.route("/admin/api-keys", methods=["POST"])
-    def create_api_key() -> Tuple[Dict[str, Any], int]:
+    def create_api_key() -> tuple[dict[str, Any], int]:
         """Create a new API key (admin only)."""
         auth_error = routes._require_control_role({"admin"})
         if auth_error:
@@ -111,7 +110,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
 
         try:
             api_key, key_id = api_auth.issue_key(label=label, scope=scope, ttl_seconds=ttl_seconds, permanent=permanent)
-            metadata: Dict[str, Any] = {}
+            metadata: dict[str, Any] = {}
             if api_key_store:
                 metadata = api_key_store.list_keys().get(key_id, {})
             routes._log_event(
@@ -147,7 +146,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
             return routes._error_response(str(exc), status=500, code="admin_error")
 
     @app.route("/admin/api-keys/<key_id>", methods=["DELETE"])
-    def delete_api_key(key_id: str) -> Tuple[Dict[str, Any], int]:
+    def delete_api_key(key_id: str) -> tuple[dict[str, Any], int]:
         """Revoke an API key (admin only)."""
         auth_error = routes._require_control_role({"admin"})
         if auth_error:
@@ -171,7 +170,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         return routes._error_response("API key not found", status=404, code="not_found")
 
     @app.route("/admin/api-key-events", methods=["GET"])
-    def list_api_key_events() -> Tuple[Dict[str, Any], int]:
+    def list_api_key_events() -> tuple[dict[str, Any], int]:
         """List API key events with pagination (admin only)."""
         auth_error = routes._require_control_role({"admin", "auditor"})
         if auth_error:
@@ -182,7 +181,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         return routes._success_response({"events": events})
 
     @app.route("/admin/withdrawals/telemetry", methods=["GET"])
-    def get_withdrawal_telemetry() -> Tuple[Dict[str, Any], int]:
+    def get_withdrawal_telemetry() -> tuple[dict[str, Any], int]:
         """Get withdrawal telemetry metrics (admin only)."""
         auth_error = routes._require_control_role({"admin", "operator"})
         if auth_error:
@@ -227,7 +226,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         return routes._success_response(payload)
 
     @app.route("/admin/withdrawals/status", methods=["GET"])
-    def get_withdrawal_status_snapshot() -> Tuple[Dict[str, Any], int]:
+    def get_withdrawal_status_snapshot() -> tuple[dict[str, Any], int]:
         """Get withdrawal queue status snapshot (admin only)."""
         auth_error = routes._require_control_role({"admin", "operator", "auditor"})
         if auth_error:
@@ -302,7 +301,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         return routes._success_response(payload)
 
     @app.route("/admin/spend-limit", methods=["POST"])
-    def set_spend_limit() -> Tuple[Dict[str, Any], int]:
+    def set_spend_limit() -> tuple[dict[str, Any], int]:
         """Set per-address daily spending limit (admin only)."""
         auth_error = routes._require_control_role({"admin"})
         if auth_error:
@@ -361,7 +360,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
             return routes._error_response(str(exc), status=500, code="admin_error")
 
     @app.route("/admin/emergency/status", methods=["GET"])
-    def get_emergency_status() -> Tuple[Dict[str, Any], int]:
+    def get_emergency_status() -> tuple[dict[str, Any], int]:
         """Return emergency pause and circuit breaker status (admin only)."""
         auth_error = routes._require_control_role({"admin", "operator", "auditor"})
         if auth_error:
@@ -381,7 +380,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         return routes._success_response(status)
 
     @app.route("/admin/emergency/pause", methods=["POST"])
-    def pause_operations() -> Tuple[Dict[str, Any], int]:
+    def pause_operations() -> tuple[dict[str, Any], int]:
         """Manually pause node operations (admin only)."""
         auth_error = routes._require_control_role({"admin", "operator"})
         if auth_error:
@@ -413,7 +412,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
             )
 
     @app.route("/admin/emergency/unpause", methods=["POST"])
-    def unpause_operations() -> Tuple[Dict[str, Any], int]:
+    def unpause_operations() -> tuple[dict[str, Any], int]:
         """Manually unpause node operations (admin only)."""
         auth_error = routes._require_control_role({"admin", "operator"})
         if auth_error:
@@ -445,7 +444,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
             )
 
     @app.route("/admin/emergency/circuit-breaker/trip", methods=["POST"])
-    def trip_circuit_breaker() -> Tuple[Dict[str, Any], int]:
+    def trip_circuit_breaker() -> tuple[dict[str, Any], int]:
         """Force-open the global circuit breaker and auto-pause operations."""
         auth_error = routes._require_control_role({"admin"})
         if auth_error:
@@ -470,7 +469,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         return routes._success_response({"state": breaker.state.value, "paused": pause_manager.is_paused()})
 
     @app.route("/admin/emergency/circuit-breaker/reset", methods=["POST"])
-    def reset_circuit_breaker() -> Tuple[Dict[str, Any], int]:
+    def reset_circuit_breaker() -> tuple[dict[str, Any], int]:
         """Reset the global circuit breaker and clear automated pauses (admin only)."""
         auth_error = routes._require_control_role({"admin"})
         if auth_error:
@@ -498,14 +497,14 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         return routes._success_response({"state": breaker.state.value, "paused": pause_manager.is_paused()})
 
     @app.route("/admin/mining/status", methods=["GET"])
-    def admin_mining_status() -> Tuple[Dict[str, Any], int]:
+    def admin_mining_status() -> tuple[dict[str, Any], int]:
         """Return node mining status and pause context (admin/operator/auditor)."""
         auth_error = routes._require_control_role({"admin", "operator", "auditor"})
         if auth_error:
             return auth_error
 
         pause_manager = getattr(routes, "emergency_pause_manager", None)
-        pause_status: Dict[str, Any] = {}
+        pause_status: dict[str, Any] = {}
         if pause_manager and pause_manager.is_paused():
             pause_status = pause_manager.get_status()
 
@@ -520,7 +519,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         return routes._success_response(payload)
 
     @app.route("/admin/mining/enable", methods=["POST"])
-    def admin_enable_mining() -> Tuple[Dict[str, Any], int]:
+    def admin_enable_mining() -> tuple[dict[str, Any], int]:
         """Enable node auto-mining (admin/operator)."""
         auth_error = routes._require_control_role({"admin", "operator"})
         if auth_error:
@@ -549,7 +548,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "admin_enable_mining")
 
     @app.route("/admin/mining/disable", methods=["POST"])
-    def admin_disable_mining() -> Tuple[Dict[str, Any], int]:
+    def admin_disable_mining() -> tuple[dict[str, Any], int]:
         """Disable auto-mining (admin/operator)."""
         auth_error = routes._require_control_role({"admin", "operator"})
         if auth_error:
@@ -595,7 +594,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         return profiler
 
     @app.route("/admin/peers", methods=["GET"])
-    def admin_peer_status() -> Tuple[Dict[str, Any], int]:
+    def admin_peer_status() -> tuple[dict[str, Any], int]:
         """Return detailed peer snapshot (admin/operator/auditor)."""
         auth_error = routes._require_control_role({"admin", "operator", "auditor"})
         if auth_error:
@@ -612,7 +611,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         return routes._success_response(snapshot)
 
     @app.route("/admin/peers/disconnect", methods=["POST"])
-    def admin_peer_disconnect() -> Tuple[Dict[str, Any], int]:
+    def admin_peer_disconnect() -> tuple[dict[str, Any], int]:
         """Disconnect a peer immediately (admin/operator)."""
         auth_error = routes._require_control_role({"admin", "operator"})
         if auth_error:
@@ -640,7 +639,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         return routes._success_response({"disconnected": True, "peer_id": peer_id})
 
     @app.route("/admin/peers/ban", methods=["POST"])
-    def admin_peer_ban() -> Tuple[Dict[str, Any], int]:
+    def admin_peer_ban() -> tuple[dict[str, Any], int]:
         """Ban a peer/IP and drop active connections (admin/operator)."""
         auth_error = routes._require_control_role({"admin", "operator"})
         if auth_error:
@@ -672,7 +671,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "admin_peer_ban")
 
     @app.route("/admin/peers/unban", methods=["POST"])
-    def admin_peer_unban() -> Tuple[Dict[str, Any], int]:
+    def admin_peer_unban() -> tuple[dict[str, Any], int]:
         """Remove a peer/IP from the ban list (admin/operator)."""
         auth_error = routes._require_control_role({"admin", "operator"})
         if auth_error:
@@ -703,7 +702,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
             return routes._handle_exception(exc, "admin_peer_unban")
 
     @app.route("/admin/config/reload", methods=["POST"])
-    def admin_config_reload() -> Tuple[Dict[str, Any], int]:
+    def admin_config_reload() -> tuple[dict[str, Any], int]:
         """Reload runtime configuration from environment (admin only)."""
         auth_error = routes._require_control_role({"admin"})
         if auth_error:
@@ -735,7 +734,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         return routes._success_response(result)
 
     @app.route("/admin/profiling/status", methods=["GET"])
-    def admin_profiling_status() -> Tuple[Dict[str, Any], int]:
+    def admin_profiling_status() -> tuple[dict[str, Any], int]:
         """Return profiling subsystem status (admin/operator)."""
         auth_error = routes._require_control_role({"admin", "operator"})
         if auth_error:
@@ -760,7 +759,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         return routes._success_response(payload)
 
     @app.route("/admin/profiling/memory/start", methods=["POST"])
-    def admin_memory_start() -> Tuple[Dict[str, Any], int]:
+    def admin_memory_start() -> tuple[dict[str, Any], int]:
         auth_error = routes._require_control_role({"admin"})
         if auth_error:
             return auth_error
@@ -772,7 +771,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         return routes._success_response({"started": True})
 
     @app.route("/admin/profiling/memory/stop", methods=["POST"])
-    def admin_memory_stop() -> Tuple[Dict[str, Any], int]:
+    def admin_memory_stop() -> tuple[dict[str, Any], int]:
         auth_error = routes._require_control_role({"admin"})
         if auth_error:
             return auth_error
@@ -784,7 +783,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         return routes._success_response({"stopped": True})
 
     @app.route("/admin/profiling/memory/snapshot", methods=["POST"])
-    def admin_memory_snapshot() -> Tuple[Dict[str, Any], int]:
+    def admin_memory_snapshot() -> tuple[dict[str, Any], int]:
         auth_error = routes._require_control_role({"admin", "operator"})
         if auth_error:
             return auth_error
@@ -807,7 +806,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         )
 
     @app.route("/admin/profiling/cpu/start", methods=["POST"])
-    def admin_cpu_start() -> Tuple[Dict[str, Any], int]:
+    def admin_cpu_start() -> tuple[dict[str, Any], int]:
         auth_error = routes._require_control_role({"admin"})
         if auth_error:
             return auth_error
@@ -820,7 +819,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         return routes._success_response({"started": True})
 
     @app.route("/admin/profiling/cpu/stop", methods=["POST"])
-    def admin_cpu_stop() -> Tuple[Dict[str, Any], int]:
+    def admin_cpu_stop() -> tuple[dict[str, Any], int]:
         auth_error = routes._require_control_role({"admin"})
         if auth_error:
             return auth_error
@@ -834,7 +833,7 @@ def register_admin_routes(routes: "NodeAPIRoutes") -> None:
         return routes._success_response({"stopped": True, "summary": summary})
 
     @app.route("/admin/profiling/cpu/hotspots", methods=["GET"])
-    def admin_cpu_hotspots() -> Tuple[Dict[str, Any], int]:
+    def admin_cpu_hotspots() -> tuple[dict[str, Any], int]:
         auth_error = routes._require_control_role({"admin", "operator"})
         if auth_error:
             return auth_error

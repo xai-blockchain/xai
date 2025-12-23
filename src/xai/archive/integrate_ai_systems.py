@@ -12,10 +12,10 @@ This script integrates all AI components into the existing XAI blockchain:
 Run this to upgrade existing XAI node to full AI-powered system.
 """
 
-import sys
-import os
-
 import logging
+import os
+import sys
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,8 +28,8 @@ print("=" * 80)
 
 print("\n📦 Step 1: Importing core blockchain components...")
 try:
-    from src.xai.core.node import BlockchainNode
     from src.xai.core.blockchain import Blockchain
+    from src.xai.core.node import BlockchainNode
 
     print("✅ Core blockchain loaded")
 except ImportError as e:
@@ -39,10 +39,10 @@ except ImportError as e:
 
 print("\n📦 Step 2: Importing AI governance components...")
 try:
-    from src.xai.core.enhanced_voting_system import EnhancedVotingSystem
     from src.xai.core.ai_node_operator_questioning import AINodeOperatorQuestioning
-    from src.xai.core.multi_ai_collaboration import MultiAICollaboration
     from src.xai.core.ai_task_matcher import AITaskMatcher
+    from src.xai.core.enhanced_voting_system import EnhancedVotingSystem
+    from src.xai.core.multi_ai_collaboration import MultiAICollaboration
 
     print("✅ Governance AI components loaded")
 except ImportError as e:
@@ -83,7 +83,7 @@ except ImportError as e:
 
 print("\n📦 Step 5: Importing AI Trading Bot...")
 try:
-    from src.xai.core.ai_trading_bot import AITradingBot, TradingStrategy, STRATEGY_TEMPLATES
+    from src.xai.core.ai_trading_bot import STRATEGY_TEMPLATES, AITradingBot, TradingStrategy
 
     print("✅ AI Trading Bot loaded")
 except ImportError as e:

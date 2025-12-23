@@ -18,21 +18,20 @@ Security features:
 
 from __future__ import annotations
 
-import time
-import logging
 import hashlib
+import logging
+import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Callable, TYPE_CHECKING
 from enum import Enum
+from typing import TYPE_CHECKING, Callable
 
 from ..vm.exceptions import VMExecutionError
-from .access_control import AccessControl, SignedRequest, RoleBasedAccessControl, Role
+from .access_control import AccessControl, Role, RoleBasedAccessControl, SignedRequest
 
 if TYPE_CHECKING:
     from ..blockchain import Blockchain
 
 logger = logging.getLogger(__name__)
-
 
 class BreakerType(Enum):
     """Types of circuit breakers."""
@@ -44,7 +43,6 @@ class BreakerType(Enum):
     GAS_SPIKE = "gas_spike"
     CUSTOM = "custom"
 
-
 class BreakerStatus(Enum):
     """Status of a circuit breaker."""
     ACTIVE = "active"
@@ -52,14 +50,12 @@ class BreakerStatus(Enum):
     COOLING_DOWN = "cooling_down"
     DISABLED = "disabled"
 
-
 class ProtectionLevel(Enum):
     """Level of protection when breaker triggers."""
     WARN = "warn"  # Log warning only
     LIMIT = "limit"  # Limit operations
     PAUSE = "pause"  # Pause affected operations
     HALT = "halt"  # Complete halt
-
 
 @dataclass
 class BreakerEvent:
@@ -69,7 +65,6 @@ class BreakerEvent:
     timestamp: float
     details: Dict
     actor: str = ""  # Who triggered (address or "system")
-
 
 @dataclass
 class CircuitBreaker:
@@ -103,11 +98,11 @@ class CircuitBreaker:
     cooldown_until: float = 0.0
 
     # Metrics history
-    metrics_history: List[Tuple[float, int]] = field(default_factory=list)
+    metrics_history: list[tuple[float, int]] = field(default_factory=list)
     max_history_size: int = 1000
 
     # Events
-    events: List[BreakerEvent] = field(default_factory=list)
+    events: list[BreakerEvent] = field(default_factory=list)
 
     # Recovery requirements
     require_manual_recovery: bool = False
@@ -121,7 +116,7 @@ class CircuitBreaker:
             ).digest()
             self.id = f"0x{breaker_hash[:16].hex()}"
 
-    def record_metric(self, value: int) -> Optional[str]:
+    def record_metric(self, value: int) -> str | None:
         """
         Record a metric value and check thresholds.
 
@@ -169,7 +164,7 @@ class CircuitBreaker:
 
         return None
 
-    def trigger(self, actor: str = "system", details: Optional[Dict] = None) -> None:
+    def trigger(self, actor: str = "system", details: Dict | None = None) -> None:
         """Trigger the circuit breaker."""
         now = time.time()
 
@@ -229,7 +224,7 @@ class CircuitBreaker:
         self._recover(actor)
         return True
 
-    def get_recent_events(self, limit: int = 10) -> List[Dict]:
+    def get_recent_events(self, limit: int = 10) -> list[Dict]:
         """Get recent breaker events."""
         return [
             {
@@ -241,7 +236,6 @@ class CircuitBreaker:
             }
             for e in self.events[-limit:]
         ]
-
 
 @dataclass
 class PriceDeviationBreaker(CircuitBreaker):
@@ -261,7 +255,7 @@ class PriceDeviationBreaker(CircuitBreaker):
         self.breaker_type = BreakerType.PRICE_DEVIATION
         self.name = self.name or "Price Deviation Breaker"
 
-    def check_price(self, current_price: int, twap: Optional[int] = None) -> Optional[str]:
+    def check_price(self, current_price: int, twap: int | None = None) -> str | None:
         """
         Check price against reference/TWAP.
 
@@ -285,7 +279,6 @@ class PriceDeviationBreaker(CircuitBreaker):
 
         return self.record_metric(deviation)
 
-
 @dataclass
 class CollateralRatioBreaker(CircuitBreaker):
     """
@@ -305,7 +298,7 @@ class CollateralRatioBreaker(CircuitBreaker):
         self.trigger_threshold = self.critical_ratio
         self.warning_threshold = self.min_collateral_ratio
 
-    def check_ratio(self, total_collateral: int, total_debt: int) -> Optional[str]:
+    def check_ratio(self, total_collateral: int, total_debt: int) -> str | None:
         """
         Check collateralization ratio.
 
@@ -326,7 +319,6 @@ class CollateralRatioBreaker(CircuitBreaker):
 
         return self.record_metric(inverse)
 
-
 @dataclass
 class VolumeSpikeBreaker(CircuitBreaker):
     """
@@ -344,7 +336,7 @@ class VolumeSpikeBreaker(CircuitBreaker):
         self.breaker_type = BreakerType.VOLUME_SPIKE
         self.name = self.name or "Volume Spike Breaker"
 
-    def check_volume(self, current_volume: int) -> Optional[str]:
+    def check_volume(self, current_volume: int) -> str | None:
         """Check if volume is spiking."""
         if self.baseline_volume == 0:
             return None
@@ -358,7 +350,6 @@ class VolumeSpikeBreaker(CircuitBreaker):
     def update_baseline(self, new_baseline: int) -> None:
         """Update baseline volume (e.g., from moving average)."""
         self.baseline_volume = new_baseline
-
 
 @dataclass
 class OracleFailureBreaker(CircuitBreaker):
@@ -382,7 +373,7 @@ class OracleFailureBreaker(CircuitBreaker):
         self,
         last_update: float,
         active_sources: int,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Check oracle health.
 
@@ -410,7 +401,6 @@ class OracleFailureBreaker(CircuitBreaker):
 
         return None
 
-
 @dataclass
 class CircuitBreakerRegistry:
     """
@@ -427,28 +417,28 @@ class CircuitBreakerRegistry:
     owner: str = ""
 
     # Guardians who can trigger emergency actions
-    guardians: Dict[str, bool] = field(default_factory=dict)
+    guardians: dict[str, bool] = field(default_factory=dict)
     guardian_threshold: int = 1  # Number of guardians needed
 
     # All breakers
-    breakers: Dict[str, CircuitBreaker] = field(default_factory=dict)
+    breakers: dict[str, CircuitBreaker] = field(default_factory=dict)
 
     # Breakers by target
-    breakers_by_target: Dict[str, List[str]] = field(default_factory=dict)
+    breakers_by_target: dict[str, list[str]] = field(default_factory=dict)
 
     # Global pause state
     global_pause: bool = False
     global_pause_until: float = 0.0
 
     # Action callbacks
-    pause_callbacks: Dict[str, Callable] = field(default_factory=dict)
+    pause_callbacks: dict[str, Callable] = field(default_factory=dict)
 
     # Audit log
-    audit_log: List[Dict] = field(default_factory=list)
+    audit_log: list[Dict] = field(default_factory=list)
 
     # Access control with signature verification
     access_control: AccessControl = field(default_factory=AccessControl)
-    rbac: Optional[RoleBasedAccessControl] = None
+    rbac: RoleBasedAccessControl | None = None
 
     def __post_init__(self) -> None:
         """Initialize registry."""
@@ -675,7 +665,7 @@ class CircuitBreakerRegistry:
 
     # ==================== Monitoring ====================
 
-    def check_target(self, target: str) -> Tuple[bool, List[str]]:
+    def check_target(self, target: str) -> tuple[bool, list[str]]:
         """
         Check if operations on a target are allowed.
 
@@ -728,7 +718,7 @@ class CircuitBreakerRegistry:
         allowed, _ = self.check_target(target)
         return allowed
 
-    def get_triggered_breakers(self) -> List[Dict]:
+    def get_triggered_breakers(self) -> list[Dict]:
         """Get all currently triggered breakers."""
         return [
             {
@@ -943,8 +933,8 @@ class CircuitBreakerRegistry:
         self,
         request: SignedRequest,
         breaker_id: str,
-        warning_threshold: Optional[int] = None,
-        trigger_threshold: Optional[int] = None,
+        warning_threshold: int | None = None,
+        trigger_threshold: int | None = None,
     ) -> bool:
         """
         Update circuit breaker thresholds with signature verification.
@@ -1103,7 +1093,7 @@ class CircuitBreakerRegistry:
         if len(self.audit_log) > 1000:
             self.audit_log = self.audit_log[-1000:]
 
-    def get_audit_log(self, limit: int = 100) -> List[Dict]:
+    def get_audit_log(self, limit: int = 100) -> list[Dict]:
         """Get recent audit log entries."""
         return self.audit_log[-limit:]
 

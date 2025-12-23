@@ -1,12 +1,12 @@
-import logging
-from typing import Any, Dict, Set
+from __future__ import annotations
 
+import logging
+from typing import Any
 
 logger = logging.getLogger("xai.blockchain.tombstone_manager")
 
-
 class TombstoneManager:
-    def __init__(self, initial_validators: Dict[str, float], tombstone_threshold: int = 3):
+    def __init__(self, initial_validators: dict[str, float], tombstone_threshold: int = 3):
         """
         Initializes the TombstoneManager.
         :param initial_validators: A dictionary where keys are validator_ids (str) and values are staked_amounts (float).
@@ -22,7 +22,7 @@ class TombstoneManager:
         self.tombstone_threshold = tombstone_threshold
 
         # Stores active validators: {validator_id: {"staked_amount": float, "slashed_count": int}}
-        self.active_validators: Dict[str, Dict[str, Any]] = {}
+        self.active_validators: dict[str, dict[str, Any]] = {}
         for v_id, staked_amount in initial_validators.items():
             if not isinstance(v_id, str) or not v_id:
                 raise ValueError("Validator ID must be a non-empty string.")
@@ -30,7 +30,7 @@ class TombstoneManager:
                 raise ValueError(f"Staked amount for {v_id} must be a positive number.")
             self.active_validators[v_id] = {"staked_amount": staked_amount, "slashed_count": 0}
 
-        self.tombstoned_validators: Set[str] = set()  # Stores IDs of permanently banned validators
+        self.tombstoned_validators: set[str] = set()  # Stores IDs of permanently banned validators
         logger.info(
             "TombstoneManager initialized with %s validators (threshold=%s)",
             len(self.active_validators),

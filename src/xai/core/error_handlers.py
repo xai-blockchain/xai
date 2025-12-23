@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Error Handlers and Circuit Breaker System
 
@@ -9,13 +11,12 @@ Specialized error handling mechanisms:
 - Error logging and reporting
 """
 
-import time
 import logging
+import time
 from abc import ABC, abstractmethod
-from typing import Callable, Optional, Tuple, Any, Dict, List
-from enum import Enum
 from collections import deque
-
+from enum import Enum
+from typing import Any, Callable
 
 class CircuitState(Enum):
     """Circuit breaker states for failure management."""
@@ -23,7 +24,6 @@ class CircuitState(Enum):
     CLOSED = "closed"  # Normal operation
     OPEN = "open"  # Failing, reject requests
     HALF_OPEN = "half_open"  # Testing recovery
-
 
 class CircuitBreaker:
     """
@@ -51,13 +51,13 @@ class CircuitBreaker:
 
         self.failure_count: int = 0
         self.success_count: int = 0
-        self.last_failure_time: Optional[float] = None
+        self.last_failure_time: float | None = None
         self.state: CircuitState = CircuitState.CLOSED
 
         self.logger: logging.Logger = logging.getLogger("circuit_breaker")
         self.logger.setLevel(logging.INFO)
 
-    def call(self, func: Callable, *args: Any, **kwargs: Any) -> Tuple[bool, Any, Optional[str]]:
+    def call(self, func: Callable, *args: Any, **kwargs: Any) -> tuple[bool, Any, str | None]:
         """
         Execute function through circuit breaker.
 
@@ -119,7 +119,7 @@ class CircuitBreaker:
         self.last_failure_time = None
         self.logger.info("Circuit breaker manually reset")
 
-    def get_state(self) -> Dict[str, Any]:
+    def get_state(self) -> dict[str, Any]:
         """
         Get current circuit breaker state.
 
@@ -132,7 +132,6 @@ class CircuitBreaker:
             "success_count": self.success_count,
             "last_failure_time": self.last_failure_time,
         }
-
 
 class RetryStrategy:
     """
@@ -170,7 +169,7 @@ class RetryStrategy:
         self.logger: logging.Logger = logging.getLogger("retry_strategy")
         self.logger.setLevel(logging.INFO)
 
-    def execute(self, func: Callable, *args: Any, **kwargs: Any) -> Tuple[bool, Any, Optional[str]]:
+    def execute(self, func: Callable, *args: Any, **kwargs: Any) -> tuple[bool, Any, str | None]:
         """
         Execute function with retry logic.
 
@@ -182,7 +181,7 @@ class RetryStrategy:
         Returns:
             Tuple of (success, result, error_message)
         """
-        last_error: Optional[str] = None
+        last_error: str | None = None
 
         for attempt in range(self.max_retries + 1):
             try:
@@ -202,6 +201,7 @@ class RetryStrategy:
                     # Use cryptographically secure random for jitter
                     if self.jitter:
                         import secrets
+
                         # Generate random float between 0.5 and 1.5
                         jitter_factor = 0.5 + (secrets.randbelow(1000) / 1000.0)
                         delay = delay * jitter_factor
@@ -210,7 +210,6 @@ class RetryStrategy:
                     time.sleep(delay)
 
         return False, None, f"Failed after {self.max_retries + 1} attempts: {last_error}"
-
 
 class ErrorHandler(ABC):
     """
@@ -246,7 +245,7 @@ class ErrorHandler(ABC):
         """
 
     @abstractmethod
-    def handle(self, error: Exception, context: str, blockchain: Any) -> Tuple[bool, Optional[str]]:
+    def handle(self, error: Exception, context: str, blockchain: Any) -> tuple[bool, str | None]:
         """
         Handle the error.
 
@@ -259,7 +258,6 @@ class ErrorHandler(ABC):
             Tuple of (handled_successfully, error_message)
         """
         ...
-
 
 class NetworkErrorHandler(ErrorHandler):
     """Handler for network-related errors."""
@@ -274,7 +272,7 @@ class NetworkErrorHandler(ErrorHandler):
         error_type = type(error).__name__
         return error_type in ["ConnectionError", "TimeoutError", "NetworkError", "OSError"]
 
-    def handle(self, error: Exception, context: str, blockchain: Any) -> Tuple[bool, Optional[str]]:
+    def handle(self, error: Exception, context: str, blockchain: Any) -> tuple[bool, str | None]:
         """
         Handle network error.
 
@@ -292,7 +290,6 @@ class NetworkErrorHandler(ErrorHandler):
         # Network errors are usually temporary - log and continue
         return True, f"Network error handled: {str(error)}"
 
-
 class ValidationErrorHandler(ErrorHandler):
     """Handler for validation-related errors."""
 
@@ -305,7 +302,7 @@ class ValidationErrorHandler(ErrorHandler):
         error_type = type(error).__name__
         return error_type in ["ValueError", "ValidationError"] or "invalid" in str(error).lower()
 
-    def handle(self, error: Exception, context: str, blockchain: Any) -> Tuple[bool, Optional[str]]:
+    def handle(self, error: Exception, context: str, blockchain: Any) -> tuple[bool, str | None]:
         """
         Handle validation error.
 
@@ -323,7 +320,6 @@ class ValidationErrorHandler(ErrorHandler):
         # Validation errors typically require rejecting the input
         return True, f"Validation error - input rejected: {str(error)}"
 
-
 class StorageErrorHandler(ErrorHandler):
     """Handler for storage/database-related errors."""
 
@@ -337,7 +333,7 @@ class StorageErrorHandler(ErrorHandler):
         error_type = type(error).__name__
         return error_type in ["IOError", "OSError", "PermissionError", "FileNotFoundError"]
 
-    def handle(self, error: Exception, context: str, blockchain: Any) -> Tuple[bool, Optional[str]]:
+    def handle(self, error: Exception, context: str, blockchain: Any) -> tuple[bool, str | None]:
         """
         Handle storage error.
 
@@ -355,7 +351,6 @@ class StorageErrorHandler(ErrorHandler):
         # Storage errors are critical - may require recovery
         return False, f"Storage error - recovery may be needed: {str(error)}"
 
-
 class ErrorHandlerRegistry:
     """
     Registry and dispatcher for error handlers.
@@ -366,8 +361,8 @@ class ErrorHandlerRegistry:
 
     def __init__(self) -> None:
         """Initialize error handler registry."""
-        self.handlers: List[ErrorHandler] = []
-        self.fallback_handler: Optional[ErrorHandler] = None
+        self.handlers: list[ErrorHandler] = []
+        self.fallback_handler: ErrorHandler | None = None
         self.logger: logging.Logger = logging.getLogger("error_handler_registry")
         self.logger.setLevel(logging.INFO)
 
@@ -402,7 +397,7 @@ class ErrorHandlerRegistry:
 
     def handle_error(
         self, error: Exception, context: str, blockchain: Any
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """
         Handle error by dispatching to appropriate handler.
 
@@ -429,7 +424,7 @@ class ErrorHandlerRegistry:
         self.logger.error(f"No handler found for error: {type(error).__name__}")
         return False, f"Unhandled error: {str(error)}"
 
-    def get_handler_statistics(self) -> Dict[str, Any]:
+    def get_handler_statistics(self) -> dict[str, Any]:
         """
         Get statistics for all registered handlers.
 
@@ -443,7 +438,6 @@ class ErrorHandlerRegistry:
                 for handler in self.handlers
             ],
         }
-
 
 class ErrorLogger:
     """
@@ -469,7 +463,7 @@ class ErrorLogger:
         error: Exception,
         context: str,
         severity: str = "medium",
-        additional_info: Optional[Dict[str, Any]] = None,
+        additional_info: dict[str, Any] | None = None,
     ) -> None:
         """
         Log an error with full context.
@@ -500,7 +494,7 @@ class ErrorLogger:
         else:
             self.logger.warning(log_msg)
 
-    def get_recent_errors(self, count: int = 10) -> List[Dict[str, Any]]:
+    def get_recent_errors(self, count: int = 10) -> list[dict[str, Any]]:
         """
         Get most recent errors.
 
@@ -512,7 +506,7 @@ class ErrorLogger:
         """
         return list(self.error_log)[-count:]
 
-    def get_error_summary(self) -> Dict[str, Any]:
+    def get_error_summary(self) -> dict[str, Any]:
         """
         Get summary of logged errors.
 
@@ -522,8 +516,8 @@ class ErrorLogger:
         if not self.error_log:
             return {"total_errors": 0, "by_severity": {}, "by_type": {}}
 
-        by_severity: Dict[str, int] = {}
-        by_type: Dict[str, int] = {}
+        by_severity: dict[str, int] = {}
+        by_type: dict[str, int] = {}
 
         for entry in self.error_log:
             severity = entry["severity"]

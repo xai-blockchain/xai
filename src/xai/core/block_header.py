@@ -5,38 +5,43 @@ Real cryptocurrency blockchain with transactions, mining, and consensus
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
-import time
 import os
-import copy
-from typing import List, Dict, Optional, Tuple, Any, Union
+import time
+from collections import defaultdict
 from datetime import datetime
+from typing import Any
+
 import base58
+
+from xai.core.blockchain_storage import BlockchainStorage
+from xai.core.checkpoints import CheckpointManager
 from xai.core.config import Config
+from xai.core.crypto_utils import sign_message_hex, verify_signature_hex
 from xai.core.gamification import (
     AirdropManager,
-    StreakTracker,
-    TreasureHuntManager,
     FeeRefundCalculator,
+    StreakTracker,
     TimeCapsuleManager,
+    TreasureHuntManager,
+)
+from xai.core.governance_execution import GovernanceExecutionEngine
+from xai.core.governance_transactions import (
+    GovernanceState,
+    GovernanceTransaction,
+    GovernanceTxType,
 )
 from xai.core.nonce_tracker import NonceTracker
-from xai.core.wallet_trade_manager_impl import WalletTradeManager
+from xai.core.structured_logger import StructuredLogger, get_structured_logger
 from xai.core.trading import SwapOrderType
-from xai.core.blockchain_storage import BlockchainStorage
 from xai.core.transaction_validator import TransactionValidator
 from xai.core.utxo_manager import UTXOManager
-from xai.core.crypto_utils import sign_message_hex, verify_signature_hex
 from xai.core.vm.manager import SmartContractManager
-from xai.core.governance_execution import GovernanceExecutionEngine
-from xai.core.governance_transactions import GovernanceState, GovernanceTxType, GovernanceTransaction
-from xai.core.checkpoints import CheckpointManager
-from collections import defaultdict
-from xai.core.structured_logger import StructuredLogger, get_structured_logger
+from xai.core.wallet_trade_manager_impl import WalletTradeManager
 
-
-def canonical_json(data: Dict[str, Any]) -> str:
+def canonical_json(data: dict[str, Any]) -> str:
     """Produce deterministic JSON string for consensus-critical hashing.
 
     Uses canonical serialization to ensure identical hashes across all nodes:
@@ -57,7 +62,6 @@ def canonical_json(data: Dict[str, Any]) -> str:
         ensure_ascii=True
     )
 
-
 class BlockHeader:
     """
     Represents the header of a block.
@@ -71,9 +75,9 @@ class BlockHeader:
         timestamp: float,
         difficulty: int,
         nonce: int,
-        signature: Optional[str] = None,
-        miner_pubkey: Optional[str] = None,
-        version: Optional[int] = None,
+        signature: str | None = None,
+        miner_pubkey: str | None = None,
+        version: int | None = None,
     ) -> None:
         # Validate and coerce index
         if index is None:
@@ -208,7 +212,7 @@ class BlockHeader:
         header_string = canonical_json(header_data)
         return hashlib.sha256(header_string.encode()).hexdigest()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         payload = {
             "index": self.index,

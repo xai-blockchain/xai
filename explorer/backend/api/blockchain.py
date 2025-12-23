@@ -2,7 +2,6 @@
 Blockchain API endpoints
 """
 from fastapi import APIRouter, Query, HTTPException
-from typing import Optional
 import httpx
 
 router = APIRouter()

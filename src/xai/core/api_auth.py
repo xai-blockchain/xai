@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+import atexit
+import base64
 import hashlib
+import hmac
 import json
+import logging
 import os
 import secrets
+import threading
 import time
-from typing import Dict, Optional, Tuple, Any, List, Set
-from datetime import datetime, timedelta, timezone
 from collections import deque
-
-import logging
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
 from flask import Request
 
@@ -20,11 +23,19 @@ try:
 except ImportError:
     jwt = None  # type: ignore
 
+try:
+    from cryptography.fernet import Fernet, InvalidToken
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+except ImportError:
+    Fernet = None  # type: ignore
+    InvalidToken = None  # type: ignore
+
 from xai.core.config import Config
 from xai.core.security_validation import log_security_event
 
 logger = logging.getLogger(__name__)
-
 
 class APIKeyStore:
     """Persistent API key storage with auditing metadata and expiration."""
@@ -38,7 +49,7 @@ class APIKeyStore:
     ) -> None:
         self.path = path
         self._audit_path = f"{path}.log"
-        self._keys: Dict[str, Dict[str, Any]] = {}
+        self._keys: dict[str, dict[str, Any]] = {}
         self._default_ttl_seconds = max(default_ttl_days, 1) * 86400
         self._max_ttl_seconds = max(max_ttl_days, default_ttl_days) * 86400
         self._allow_permanent = allow_permanent
@@ -72,10 +83,10 @@ class APIKeyStore:
             json.dump(self._keys, handle, indent=2)
         os.replace(tmp_path, self.path)
 
-    def list_keys(self) -> Dict[str, Dict[str, Any]]:
+    def list_keys(self) -> dict[str, dict[str, Any]]:
         """Return all keys with computed expiration/expired fields."""
         now = time.time()
-        result: Dict[str, Dict[str, Any]] = {}
+        result: dict[str, dict[str, Any]] = {}
         for key_id, metadata in self._keys.items():
             copied = dict(metadata)
             copied["expired"] = self._is_expired(metadata, now)
@@ -90,10 +101,10 @@ class APIKeyStore:
         self,
         label: str = "",
         scope: str = "user",
-        plaintext: Optional[str] = None,
-        ttl_seconds: Optional[int] = None,
+        plaintext: str | None = None,
+        ttl_seconds: int | None = None,
         permanent: bool = False,
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         new_key = plaintext or secrets.token_hex(32)
         key_id = self._hash_key(new_key)
         created = time.time()
@@ -131,9 +142,9 @@ class APIKeyStore:
         key_id: str,
         label: str = "",
         scope: str = "user",
-        ttl_seconds: Optional[int] = None,
+        ttl_seconds: int | None = None,
         permanent: bool = False,
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """
         Rotate a key by revoking the old key and issuing a new one with the same label/scope.
         Returns plaintext and new key_id.
@@ -153,7 +164,7 @@ class APIKeyStore:
         )
         return plaintext, new_id
 
-    def _log_event(self, action: str, key_id: str, extra: Optional[Dict[str, Any]] = None) -> None:
+    def _log_event(self, action: str, key_id: str, extra: dict[str, Any] | None = None) -> None:
         """Append an audit log entry to the JSONL audit file and emit security event."""
         event = {
             "timestamp": time.time(),
@@ -169,11 +180,11 @@ class APIKeyStore:
             handle.write(json.dumps(event) + "\n")
         self._emit_security_log(event)
 
-    def get_events(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_events(self, limit: int = 100) -> list[dict[str, Any]]:
         """Return the most recent audit events (default 100)."""
         if not os.path.exists(self._audit_path):
             return []
-        events: List[Dict[str, Any]] = []
+        events: list[dict[str, Any]] = []
         with open(self._audit_path, "r", encoding="utf-8") as handle:
             for line in handle:
                 line = line.strip()
@@ -185,7 +196,7 @@ class APIKeyStore:
                     continue
         return events[-limit:]
 
-    def _emit_security_log(self, event: Dict[str, Any]) -> None:
+    def _emit_security_log(self, event: dict[str, Any]) -> None:
         """Emit a structured security event for API key changes."""
         try:
             payload = {
@@ -232,8 +243,8 @@ class APIKeyStore:
             self._persist()
 
     def _compute_expires_at(
-        self, created: float, ttl_seconds: Optional[int], permanent: bool
-    ) -> Optional[float]:
+        self, created: float, ttl_seconds: int | None, permanent: bool
+    ) -> float | None:
         """Compute an expiration timestamp or None for permanent keys."""
         if permanent:
             if not self._allow_permanent:
@@ -246,7 +257,7 @@ class APIKeyStore:
         return created + ttl
 
     @staticmethod
-    def _is_expired(metadata: Dict[str, Any], now: Optional[float] = None) -> bool:
+    def _is_expired(metadata: dict[str, Any], now: float | None = None) -> bool:
         """Return True if the provided metadata has elapsed expiration."""
         expires_at = metadata.get("expires_at")
         if expires_at is None:
@@ -257,18 +268,17 @@ class APIKeyStore:
             return True
         return (now or time.time()) >= expiry
 
-
 class APIAuthManager:
     """API key authentication + rotation helper."""
 
     def __init__(
         self,
         required: bool = False,
-        allowed_keys: Optional[List[str]] = None,
-        store: Optional[APIKeyStore] = None,
-        admin_keys: Optional[List[str]] = None,
-        operator_keys: Optional[List[str]] = None,
-        auditor_keys: Optional[List[str]] = None,
+        allowed_keys: list[str] | None = None,
+        store: APIKeyStore | None = None,
+        admin_keys: list[str] | None = None,
+        operator_keys: list[str] | None = None,
+        auditor_keys: list[str] | None = None,
     ) -> None:
         """
         Initialize API authentication manager with optional manual and persisted keys.
@@ -281,7 +291,7 @@ class APIAuthManager:
             operator_keys: Manual operator-scope keys (plaintext).
             auditor_keys: Manual auditor-scope keys (plaintext).
         """
-        def _parse(keys: Optional[List[str]]) -> List[str]:
+        def _parse(keys: list[str] | None) -> list[str]:
             return [key.strip() for key in (keys or []) if key.strip()]
 
         manual_users = _parse(allowed_keys)
@@ -309,7 +319,7 @@ class APIAuthManager:
         for hashed in self._manual_admin_hashes:
             self._manual_scope_map[hashed] = "admin"
         self._store = store
-        self._store_metadata: Dict[str, Dict[str, Any]] = store.list_keys() if store else {}
+        self._store_metadata: dict[str, dict[str, Any]] = store.list_keys() if store else {}
         self._store_hash_set = set(self._store_metadata.keys()) if store else set()
         self._store_admin_hashes = {
             key_id for key_id, meta in self._store_metadata.items() if meta.get("scope") == "admin"
@@ -323,7 +333,7 @@ class APIAuthManager:
         self._required = required
 
     @classmethod
-    def from_config(cls, store: Optional[APIKeyStore] = None) -> "APIAuthManager":
+    def from_config(cls, store: APIKeyStore | None = None) -> "APIAuthManager":
         """Construct manager from Config settings and optional store."""
         return cls(
             required=getattr(Config, "API_AUTH_REQUIRED", False),
@@ -342,7 +352,7 @@ class APIAuthManager:
         """Return True if API auth is required/enabled."""
         return self._required
 
-    def _extract_key(self, request: Request) -> Optional[str]:
+    def _extract_key(self, request: Request) -> str | None:
         """Extract API key from headers or query parameters."""
         header_key = request.headers.get("X-API-Key")
         if header_key:
@@ -358,7 +368,7 @@ class APIAuthManager:
 
         return None
 
-    def authorize(self, request: Request) -> Tuple[bool, Optional[str]]:
+    def authorize(self, request: Request) -> tuple[bool, str | None]:
         """Authorize request using default scope rules."""
         if not self.is_enabled():
             return True, None
@@ -377,7 +387,7 @@ class APIAuthManager:
             return False, reason
         return False, "API key missing or invalid"
 
-    def authorize_admin(self, request: Request) -> Tuple[bool, Optional[str]]:
+    def authorize_admin(self, request: Request) -> tuple[bool, str | None]:
         """Authorize request as admin using admin token sources."""
         key = self._extract_admin_token(request)
         if not key:
@@ -391,7 +401,7 @@ class APIAuthManager:
             return True, None
         return False, "Admin token invalid"
 
-    def authorize_with_scope(self, request: Request) -> Tuple[bool, Optional[str], Optional[str]]:
+    def authorize_with_scope(self, request: Request) -> tuple[bool, str | None, str | None]:
         """
         Authorize request and return the resolved scope.
 
@@ -429,7 +439,7 @@ class APIAuthManager:
             return True, scope, None
         return False, None, "API key missing or invalid"
 
-    def authorize_scope(self, request: Request, allowed_scopes: Set[str]) -> Tuple[bool, Optional[str], Optional[str]]:
+    def authorize_scope(self, request: Request, allowed_scopes: set[str]) -> tuple[bool, str | None, str | None]:
         """
         Authorize with scope enforcement.
 
@@ -464,7 +474,7 @@ class APIAuthManager:
                 key_id for key_id, meta in self._store_metadata.items() if meta.get("scope") == "auditor"
             }
 
-    def list_key_metadata(self) -> Dict[str, Any]:
+    def list_key_metadata(self) -> dict[str, Any]:
         """Return summary metadata for manual and stored keys."""
         return {
             "manual_keys": len(self._manual_hashes),
@@ -476,9 +486,9 @@ class APIAuthManager:
         self,
         label: str = "",
         scope: str = "user",
-        ttl_seconds: Optional[int] = None,
+        ttl_seconds: int | None = None,
         permanent: bool = False,
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """Issue a new key via the persistent store."""
         if not self._store:
             raise ValueError("API key store not configured")
@@ -499,9 +509,9 @@ class APIAuthManager:
         key_id: str,
         label: str = "",
         scope: str = "user",
-        ttl_seconds: Optional[int] = None,
+        ttl_seconds: int | None = None,
         permanent: bool = False,
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """Rotate a key via the store and emit rotation security event."""
         if not self._store:
             raise ValueError("API key store not configured")
@@ -524,7 +534,7 @@ class APIAuthManager:
             )
         return new_plain, new_id
 
-    def _extract_admin_token(self, request: Request) -> Optional[str]:
+    def _extract_admin_token(self, request: Request) -> str | None:
         """Extract admin token from custom header or Authorization prefix."""
         token = request.headers.get("X-Admin-Token")
         if token:
@@ -534,7 +544,7 @@ class APIAuthManager:
             return auth.split(" ", 1)[1].strip()
         return None
 
-    def _is_store_key_active(self, key_id: str) -> Tuple[bool, Optional[str]]:
+    def _is_store_key_active(self, key_id: str) -> tuple[bool, str | None]:
         """
         Determine if a stored key is still valid based on expiration metadata.
         """
@@ -572,11 +582,11 @@ class APIAuthManager:
 
         return True, None
 
-
 class JWTAuthManager:
     """JWT-based authentication with token expiry, refresh, and blacklist.
 
     Implements Task 64: JWT Token Expiry with production-grade security features.
+    Includes automatic background cleanup of expired blacklist entries to prevent memory growth.
     """
 
     def __init__(
@@ -585,7 +595,9 @@ class JWTAuthManager:
         token_expiry_hours: int = 1,
         refresh_expiry_days: int = 30,
         algorithm: str = "HS256",
-        clock_skew_seconds: int = 30
+        clock_skew_seconds: int = 30,
+        cleanup_enabled: bool = True,
+        cleanup_interval_seconds: int = 900
     ):
         """Initialize JWT authentication manager.
 
@@ -595,6 +607,8 @@ class JWTAuthManager:
             refresh_expiry_days: Refresh token expiry in days (default: 30)
             algorithm: JWT signing algorithm (default: HS256)
             clock_skew_seconds: Clock skew tolerance in seconds (default: 30)
+            cleanup_enabled: Enable automatic blacklist cleanup (default: True)
+            cleanup_interval_seconds: Cleanup interval in seconds (default: 900 = 15 minutes)
         """
         if not jwt:
             raise ImportError("PyJWT library is required for JWT authentication")
@@ -604,9 +618,23 @@ class JWTAuthManager:
         self.refresh_expiry = timedelta(days=refresh_expiry_days)
         self.algorithm = algorithm
         self.clock_skew = timedelta(seconds=clock_skew_seconds)
-        self.blacklist: Set[str] = set()
+        self.blacklist: set[str] = set()
 
-    def generate_token(self, user_id: str, scope: str = "user") -> Tuple[str, str]:
+        # Background cleanup configuration
+        self._cleanup_enabled = cleanup_enabled
+        self._cleanup_interval = cleanup_interval_seconds
+        self._cleanup_thread: threading.Thread | None = None
+        self._cleanup_stop_event = threading.Event()
+        self._blacklist_lock = threading.RLock()  # Thread-safe access to blacklist
+
+        # Start background cleanup if enabled
+        if self._cleanup_enabled:
+            self._start_cleanup_thread()
+
+        # Register cleanup on exit
+        atexit.register(self._shutdown_cleanup)
+
+    def generate_token(self, user_id: str, scope: str = "user") -> tuple[str, str]:
         """Generate access token and refresh token.
 
         Args:
@@ -649,7 +677,7 @@ class JWTAuthManager:
 
         return access_token, refresh_token
 
-    def validate_token(self, token: str, remote_addr: Optional[str] = None) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+    def validate_token(self, token: str, remote_addr: str | None = None) -> tuple[bool, dict[str, Any] | None, str | None]:
         """Validate JWT token with expiration check.
 
         Security features:
@@ -658,6 +686,7 @@ class JWTAuthManager:
         - Required claims validation (exp, sub, iat)
         - Signature verification
         - Blacklist checking for revoked tokens
+        - Thread-safe blacklist access
 
         Args:
             token: JWT token to validate
@@ -666,8 +695,11 @@ class JWTAuthManager:
         Returns:
             Tuple of (is_valid, payload, error_message)
         """
-        # Check blacklist first (fast path for revoked tokens)
-        if token in self.blacklist:
+        # Check blacklist first (fast path for revoked tokens) - thread-safe
+        with self._blacklist_lock:
+            is_blacklisted = token in self.blacklist
+
+        if is_blacklisted:
             log_security_event(
                 "jwt_revoked_token_attempt",
                 {
@@ -733,7 +765,7 @@ class JWTAuthManager:
             )
             return False, None, "Token validation error"
 
-    def refresh_access_token(self, refresh_token: str) -> Tuple[bool, Optional[str], Optional[str]]:
+    def refresh_access_token(self, refresh_token: str) -> tuple[bool, str | None, str | None]:
         """Exchange refresh token for new access token.
 
         Args:
@@ -777,10 +809,13 @@ class JWTAuthManager:
         Note: verify_exp=False is intentionally used here because we need to
         decode and revoke even expired tokens to extract user info for audit logging.
 
+        Thread-safe operation.
+
         Args:
             token: JWT token to revoke
         """
-        self.blacklist.add(token)
+        with self._blacklist_lock:
+            self.blacklist.add(token)
 
         # Try to extract user info for logging (skip expiration check - intentional)
         try:
@@ -810,8 +845,8 @@ class JWTAuthManager:
     def cleanup_expired_tokens(self) -> int:
         """Remove expired tokens from blacklist.
 
-        In production, use Redis with TTL or scheduled cleanup.
-        For now, we check each blacklisted token and remove if expired.
+        Thread-safe operation that checks each blacklisted token and removes if expired.
+        This prevents memory growth from accumulating expired tokens.
 
         Returns:
             Number of tokens removed
@@ -819,7 +854,13 @@ class JWTAuthManager:
         removed = 0
         expired_tokens = set()
 
-        for token in self.blacklist:
+        # Create a snapshot of blacklist to iterate over (thread-safe)
+        with self._blacklist_lock:
+            blacklist_snapshot = set(self.blacklist)
+            blacklist_size_before = len(self.blacklist)
+
+        # Check each token for expiration (outside lock to avoid blocking)
+        for token in blacklist_snapshot:
             try:
                 # Explicitly verify expiration to identify expired tokens
                 jwt.decode(
@@ -832,7 +873,7 @@ class JWTAuthManager:
                 # Token is expired, can be removed
                 expired_tokens.add(token)
                 removed += 1
-            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+            except (jwt.PyJWTError, OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
                 # Any other error (invalid token, decode error), keep in blacklist to be safe
                 logger.debug(
                     "Token cleanup check failed: %s - keeping in blacklist",
@@ -840,13 +881,23 @@ class JWTAuthManager:
                     extra={"event": "api_auth.jwt_cleanup_check_failed"}
                 )
 
-        self.blacklist -= expired_tokens
+        # Remove expired tokens from blacklist (thread-safe)
+        with self._blacklist_lock:
+            self.blacklist -= expired_tokens
+            blacklist_size_after = len(self.blacklist)
 
+        # Log cleanup statistics
         if removed > 0:
+            logger.info(
+                "JWT blacklist cleanup: removed %d expired tokens, %d remaining",
+                removed,
+                blacklist_size_after
+            )
             log_security_event(
                 "jwt_blacklist_cleanup",
                 {
                     "removed_count": removed,
+                    "remaining_count": blacklist_size_after,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                 },
                 severity="INFO",
@@ -854,7 +905,7 @@ class JWTAuthManager:
 
         return removed
 
-    def extract_token_from_request(self, request: Request) -> Optional[str]:
+    def extract_token_from_request(self, request: Request) -> str | None:
         """Extract JWT token from Flask request.
 
         Checks Authorization header with Bearer scheme.
@@ -870,7 +921,7 @@ class JWTAuthManager:
             return auth_header.split(" ", 1)[1].strip()
         return None
 
-    def authorize_request(self, request: Request, required_scope: Optional[str] = None) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+    def authorize_request(self, request: Request, required_scope: str | None = None) -> tuple[bool, dict[str, Any] | None, str | None]:
         """Authorize Flask request with JWT token.
 
         Args:
@@ -914,7 +965,77 @@ class JWTAuthManager:
     def get_blacklist_size(self) -> int:
         """Get current blacklist size.
 
+        Thread-safe operation.
+
         Returns:
             Number of tokens in blacklist
         """
-        return len(self.blacklist)
+        with self._blacklist_lock:
+            return len(self.blacklist)
+
+    def _start_cleanup_thread(self) -> None:
+        """Start background thread for automatic blacklist cleanup.
+
+        The thread runs as a daemon and performs periodic cleanup of expired tokens.
+        """
+        if self._cleanup_thread is not None and self._cleanup_thread.is_alive():
+            logger.warning("Cleanup thread already running")
+            return
+
+        self._cleanup_stop_event.clear()
+        self._cleanup_thread = threading.Thread(
+            target=self._cleanup_worker,
+            name="JWT-Blacklist-Cleanup",
+            daemon=True
+        )
+        self._cleanup_thread.start()
+        logger.info(
+            "JWT blacklist cleanup thread started (interval: %d seconds)",
+            self._cleanup_interval
+        )
+
+    def _cleanup_worker(self) -> None:
+        """Background worker that periodically cleans up expired blacklist entries.
+
+        Runs in a daemon thread and stops when _cleanup_stop_event is set.
+        """
+        while not self._cleanup_stop_event.is_set():
+            # Wait for cleanup interval or stop event
+            if self._cleanup_stop_event.wait(timeout=self._cleanup_interval):
+                # Stop event was set
+                break
+
+            # Perform cleanup
+            try:
+                removed = self.cleanup_expired_tokens()
+                logger.debug(
+                    "Background cleanup completed: %d tokens removed",
+                    removed
+                )
+            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+                logger.error(
+                    "Error during background cleanup: %s",
+                    type(e).__name__,
+                    extra={"event": "api_auth.cleanup_error", "error": str(e)}
+                )
+
+        logger.info("JWT blacklist cleanup thread stopped")
+
+    def _shutdown_cleanup(self) -> None:
+        """Stop the cleanup thread gracefully.
+
+        Called automatically via atexit registration.
+        """
+        if self._cleanup_thread is not None and self._cleanup_thread.is_alive():
+            logger.info("Shutting down JWT blacklist cleanup thread...")
+            self._cleanup_stop_event.set()
+            self._cleanup_thread.join(timeout=5)
+            if self._cleanup_thread.is_alive():
+                logger.warning("Cleanup thread did not stop within timeout")
+
+    def stop_cleanup(self) -> None:
+        """Manually stop the background cleanup thread.
+
+        Useful for testing or manual control.
+        """
+        self._shutdown_cleanup()

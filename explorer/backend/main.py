@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain Explorer - FastAPI Backend
 Production-grade API with AI-specific features
@@ -10,7 +12,7 @@ from fastapi.encoders import jsonable_encoder
 from contextlib import asynccontextmanager
 import logging
 import os
-from typing import Any, Dict
+from typing import Any
 
 from api import blockchain, ai_tasks, providers, analytics
 from services.indexer import BlockchainIndexer
@@ -29,7 +31,6 @@ logger = logging.getLogger(__name__)
 db: Database = None
 indexer: BlockchainIndexer = None
 ai_service: AITaskService = None
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -79,7 +80,6 @@ async def lifespan(app: FastAPI):
 
     logger.info("XAI Blockchain Explorer stopped")
 
-
 # Create FastAPI application
 app = FastAPI(
     title="XAI Blockchain Explorer API",
@@ -105,7 +105,7 @@ auth_config = APIAuthConfig(
     key_file=os.getenv("EXPLORER_API_KEY_SECRET_PATH"),
 )
 route_dependencies = optional_dependencies(auth_config)
-router_kwargs: Dict[str, Any] = {}
+router_kwargs: dict[str, Any] = {}
 if route_dependencies:
     # dependencies expects fastapi.Depends wrappers
     router_kwargs["dependencies"] = route_dependencies
@@ -114,7 +114,6 @@ app.include_router(blockchain.router, prefix="/api/v1", tags=["Blockchain"], **r
 app.include_router(ai_tasks.router, prefix="/api/v1/ai", tags=["AI Tasks"], **router_kwargs)
 app.include_router(providers.router, prefix="/api/v1/ai/providers", tags=["AI Providers"], **router_kwargs)
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"], **router_kwargs)
-
 
 @app.get("/")
 async def root():
@@ -150,7 +149,6 @@ async def root():
         }
     }
 
-
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
@@ -185,7 +183,6 @@ async def health_check():
                 "timestamp": "2025-12-04T12:00:00Z"
             }
         )
-
 
 # WebSocket endpoint for live updates
 @app.websocket("/api/v1/ws/live")
@@ -243,7 +240,6 @@ async def websocket_live(websocket: WebSocket):
         if ai_service:
             ai_service.unsubscribe_websocket(websocket)
 
-
 @app.get("/api/v1/mempool", dependencies=route_dependencies)
 async def get_mempool(limit: int = 50):
     """Return recent mempool transactions and latest snapshot."""
@@ -258,7 +254,6 @@ async def get_mempool(limit: int = 50):
         "limit": limit,
     }
 
-
 @app.get("/api/v1/mempool/stats", dependencies=route_dependencies)
 async def get_mempool_stats():
     """Return the most recent mempool congestion snapshot."""
@@ -268,7 +263,6 @@ async def get_mempool_stats():
     if not stats:
         return JSONResponse(status_code=404, content={"error": "No mempool data available"})
     return jsonable_encoder(stats)
-
 
 @app.get("/api/v1/stats", dependencies=route_dependencies)
 async def get_stats():
@@ -292,7 +286,6 @@ async def get_stats():
             status_code=500,
             content={"error": "Failed to fetch stats", "detail": str(e)}
         )
-
 
 if __name__ == "__main__":
     import uvicorn

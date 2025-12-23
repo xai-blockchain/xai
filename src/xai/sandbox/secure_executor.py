@@ -26,27 +26,24 @@ import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from xai.security.module_attachment_guard import ModuleAttachmentError, ModuleAttachmentGuard
+from xai.sandbox.ast_validator import ASTValidator, SecurityError as ASTSecurityError
 
 logger = logging.getLogger(__name__)
-
 
 class ExecutionError(Exception):
     """Raised when code execution fails"""
     pass
 
-
 class ResourceLimitExceeded(ExecutionError):
     """Raised when resource limits are exceeded"""
     pass
 
-
 class SecurityViolation(ExecutionError):
     """Raised when a security boundary is violated"""
     pass
-
 
 @dataclass
 class ResourceLimits:
@@ -58,7 +55,6 @@ class ResourceLimits:
     max_output_bytes: int = 1024 * 100  # 100KB
     max_storage_bytes: int = 1024 * 1024  # 1MB
 
-
 @dataclass
 class ExecutionResult:
     """Result of code execution"""
@@ -69,9 +65,8 @@ class ExecutionResult:
     execution_time: float = 0.0
     memory_used_bytes: int = 0
     exit_code: int = 0
-    killed_by_signal: Optional[int] = None
+    killed_by_signal: int | None = None
     resource_exceeded: bool = False
-
 
 @dataclass
 class ExecutionContext:
@@ -79,12 +74,11 @@ class ExecutionContext:
     app_id: str
     code: str
     entry_point: str = "main"
-    arguments: Dict[str, Any] = field(default_factory=dict)
-    allowed_imports: Set[str] = field(default_factory=set)
-    allowed_network_domains: Set[str] = field(default_factory=set)
-    allowed_filesystem_paths: Set[Path] = field(default_factory=set)
-    api_functions: Dict[str, Any] = field(default_factory=dict)
-
+    arguments: dict[str, Any] = field(default_factory=dict)
+    allowed_imports: set[str] = field(default_factory=set)
+    allowed_network_domains: set[str] = field(default_factory=set)
+    allowed_filesystem_paths: set[Path] = field(default_factory=set)
+    api_functions: dict[str, Any] = field(default_factory=dict)
 
 class SecureExecutor:
     """
@@ -111,7 +105,7 @@ class SecureExecutor:
 
     def __init__(
         self,
-        limits: Optional[ResourceLimits] = None,
+        limits: ResourceLimits | None = None,
         use_subprocess: bool = False,
     ):
         self.limits = limits or ResourceLimits()
@@ -130,6 +124,9 @@ class SecureExecutor:
             trusted_stdlib=stdlib_path,
             require_attribute=None,
         )
+
+        # Create AST validator for pre-execution validation
+        self.ast_validator = ASTValidator(allowed_functions=self.SAFE_BUILTINS)
 
     def execute(self, context: ExecutionContext) -> ExecutionResult:
         """
@@ -178,20 +175,49 @@ class SecureExecutor:
 
         try:
             from RestrictedPython import compile_restricted
-            from RestrictedPython.Guards import safe_builtins, guarded_iter_unpack_sequence
+            from RestrictedPython.Guards import (
+                guarded_iter_unpack_sequence,
+                safe_builtins,
+                safer_getattr,
+            )
+
+            # Validate AST before compilation
+            try:
+                self.ast_validator.validate(
+                    context.code,
+                    filename=f'<{context.app_id}>'
+                )
+            except ASTSecurityError as e:
+                logger.error(
+                    f"AST validation failed for app {context.app_id}: {e}",
+                    extra={'event': 'sandbox.ast_validation_failed', 'app_id': context.app_id}
+                )
+                return ExecutionResult(
+                    success=False,
+                    error=f"Security violation: {str(e)}"
+                )
+            except SyntaxError as e:
+                return ExecutionResult(
+                    success=False,
+                    error=f"Syntax error: {str(e)}"
+                )
 
             # Compile code with restrictions
-            byte_code = compile_restricted(
+            compile_result = compile_restricted(
                 context.code,
                 filename=f'<{context.app_id}>',
                 mode='exec'
             )
 
-            if byte_code.errors:
+            # Check if compilation produced errors
+            if hasattr(compile_result, 'errors') and compile_result.errors:
                 return ExecutionResult(
                     success=False,
-                    error=f"Compilation errors: {'; '.join(byte_code.errors)}"
+                    error=f"Compilation errors: {'; '.join(compile_result.errors)}"
                 )
+
+            # Extract the code object
+            byte_code = compile_result.code if hasattr(compile_result, 'code') else compile_result
 
             try:
                 allowed_imports = self._validate_allowed_imports(context.allowed_imports)
@@ -245,7 +271,7 @@ class SecureExecutor:
 
                 try:
                     # Execute the code
-                    exec(byte_code.code, restricted_globals)
+                    exec(byte_code, restricted_globals)
 
                     # Call entry point if specified
                     return_value = None
@@ -281,7 +307,7 @@ class SecureExecutor:
                 error=f"Execution error: {str(e)}",
             )
 
-    def _validate_allowed_imports(self, allowed_imports: Set[str]) -> Set[str]:
+    def _validate_allowed_imports(self, allowed_imports: set[str]) -> set[str]:
         """Validate user-supplied allowed imports against the allowlist and trusted paths."""
         requested = {str(mod) for mod in (allowed_imports or set())}
         if not requested:
@@ -312,6 +338,27 @@ class SecureExecutor:
         - No network access (by default)
         - Read-only filesystem (by default)
         """
+        # Validate AST before subprocess execution
+        try:
+            self.ast_validator.validate(
+                context.code,
+                filename=f'<{context.app_id}>'
+            )
+        except ASTSecurityError as e:
+            logger.error(
+                f"AST validation failed for app {context.app_id}: {e}",
+                extra={'event': 'sandbox.ast_validation_failed', 'app_id': context.app_id}
+            )
+            return ExecutionResult(
+                success=False,
+                error=f"Security violation: {str(e)}"
+            )
+        except SyntaxError as e:
+            return ExecutionResult(
+                success=False,
+                error=f"Syntax error: {str(e)}"
+            )
+
         # Create temporary directory for execution
         try:
             allowed_imports = self._validate_allowed_imports(context.allowed_imports)
@@ -386,7 +433,7 @@ class SecureExecutor:
                     error=f"Subprocess execution failed: {str(e)}",
                 )
 
-    def _wrap_code_for_subprocess(self, context: ExecutionContext, allowed_imports: Set[str]) -> str:
+    def _wrap_code_for_subprocess(self, context: ExecutionContext, allowed_imports: set[str]) -> str:
         """Wrap user code with safety checks and API stubs"""
         runtime_allowed = set(allowed_imports) | {"sys", "json"}
         wrapper = f'''
@@ -528,7 +575,7 @@ if __name__ == "__main__":
         except Exception as e:
             logger.warning(f"Failed to set resource limits: {e}")
 
-    def _create_safe_builtins(self) -> Dict[str, Any]:
+    def _create_safe_builtins(self) -> dict[str, Any]:
         """Create dictionary of safe builtin functions"""
         safe_builtins = {}
 
@@ -559,7 +606,6 @@ if __name__ == "__main__":
         except ImportError:
             return False
 
-
 class SandboxAPI:
     """
     API wrapper for sandbox execution
@@ -578,7 +624,7 @@ class SandboxAPI:
         self.permission_manager = permission_manager
         self.wallet_interface = wallet_interface
 
-    def get_balance(self, address: Optional[str] = None) -> float:
+    def get_balance(self, address: str | None = None) -> float:
         """Get wallet balance (permission-checked)"""
         from .permissions import Permission, PermissionLevel
 
@@ -591,7 +637,7 @@ class SandboxAPI:
 
         return self.wallet_interface.get_balance(address)
 
-    def get_transactions(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_transactions(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get transaction history (permission-checked)"""
         from .permissions import Permission, PermissionLevel
 
@@ -612,7 +658,7 @@ class SandboxAPI:
         recipient: str,
         amount: float,
         memo: str = ""
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Create transaction (requires user approval)
 

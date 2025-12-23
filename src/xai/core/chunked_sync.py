@@ -27,11 +27,10 @@ import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Set
+from typing import Any
 
-from xai.core.structured_logger import get_structured_logger
 from xai.core.checkpoint_payload import CheckpointPayload
-
+from xai.core.structured_logger import get_structured_logger
 
 class ChunkPriority(Enum):
     """Priority levels for chunk download ordering."""
@@ -39,7 +38,6 @@ class ChunkPriority(Enum):
     HIGH = 1       # Recent blocks, contract state
     MEDIUM = 2     # Historical blocks
     LOW = 3        # Archive data, logs
-
 
 @dataclass
 class SyncChunk:
@@ -88,7 +86,7 @@ class SyncChunk:
             return self.data
         return gzip.decompress(self.data)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize chunk metadata (without data)."""
         return {
             "chunk_id": self.chunk_id,
@@ -99,7 +97,6 @@ class SyncChunk:
             "priority": self.priority.value,
             "size_bytes": self.size_bytes,
         }
-
 
 @dataclass
 class SnapshotMetadata:
@@ -127,9 +124,9 @@ class SnapshotMetadata:
     chunk_size: int
     timestamp: float
     compression_enabled: bool = False
-    priority_map: Dict[int, ChunkPriority] = field(default_factory=dict)
+    priority_map: dict[int, ChunkPriority] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize metadata to JSON-compatible dict."""
         return {
             "snapshot_id": self.snapshot_id,
@@ -147,7 +144,7 @@ class SnapshotMetadata:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SnapshotMetadata":
+    def from_dict(cls, data: dict[str, Any]) -> "SnapshotMetadata":
         """Deserialize metadata from dict."""
         priority_map = {
             int(k): ChunkPriority(v)
@@ -166,7 +163,6 @@ class SnapshotMetadata:
             priority_map=priority_map,
         )
 
-
 @dataclass
 class SyncProgress:
     """
@@ -181,8 +177,8 @@ class SyncProgress:
         last_chunk_at: Timestamp of last successful chunk download
     """
     snapshot_id: str
-    downloaded_chunks: Set[int] = field(default_factory=set)
-    failed_chunks: Set[int] = field(default_factory=set)
+    downloaded_chunks: set[int] = field(default_factory=set)
+    failed_chunks: set[int] = field(default_factory=set)
     total_chunks: int = 0
     started_at: float = 0.0
     last_chunk_at: float = 0.0
@@ -204,7 +200,7 @@ class SyncProgress:
         return len(self.downloaded_chunks) == self.total_chunks
 
     @property
-    def remaining_chunks(self) -> List[int]:
+    def remaining_chunks(self) -> list[int]:
         """Get list of chunks still needed."""
         all_chunks = set(range(self.total_chunks))
         return sorted(all_chunks - self.downloaded_chunks)
@@ -219,7 +215,7 @@ class SyncProgress:
         """Mark a chunk download as failed."""
         self.failed_chunks.add(chunk_index)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize progress to JSON-compatible dict."""
         return {
             "snapshot_id": self.snapshot_id,
@@ -231,7 +227,7 @@ class SyncProgress:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SyncProgress":
+    def from_dict(cls, data: dict[str, Any]) -> "SyncProgress":
         """Deserialize progress from dict."""
         return cls(
             snapshot_id=data["snapshot_id"],
@@ -241,7 +237,6 @@ class SyncProgress:
             started_at=data.get("started_at", 0.0),
             last_chunk_at=data.get("last_chunk_at", 0.0),
         )
-
 
 class ChunkedStateSyncService:
     """
@@ -287,8 +282,8 @@ class ChunkedStateSyncService:
         self,
         height: int,
         payload: CheckpointPayload,
-        priority_keys: Optional[List[str]] = None,
-    ) -> Tuple[SnapshotMetadata, List[SyncChunk]]:
+        priority_keys: list[str] | None = None,
+    ) -> tuple[SnapshotMetadata, list[SyncChunk]]:
         """
         Split a checkpoint payload into resumable chunks.
 
@@ -314,8 +309,8 @@ class ChunkedStateSyncService:
         total_size = len(serialized)
 
         # Create chunks directly from serialized data
-        chunks: List[SyncChunk] = []
-        priority_map: Dict[int, ChunkPriority] = {}
+        chunks: list[SyncChunk] = []
+        priority_map: dict[int, ChunkPriority] = {}
 
         chunk_index = 0
         offset = 0
@@ -383,7 +378,7 @@ class ChunkedStateSyncService:
 
         return metadata, chunks
 
-    def get_snapshot_metadata(self, snapshot_id: str) -> Optional[SnapshotMetadata]:
+    def get_snapshot_metadata(self, snapshot_id: str) -> SnapshotMetadata | None:
         """
         Get metadata for a snapshot.
 
@@ -412,7 +407,7 @@ class ChunkedStateSyncService:
             )
             return None
 
-    def get_latest_snapshot_id(self) -> Optional[str]:
+    def get_latest_snapshot_id(self) -> str | None:
         """
         Get the ID of the most recent snapshot.
 
@@ -452,7 +447,7 @@ class ChunkedStateSyncService:
         self,
         snapshot_id: str,
         chunk_index: int,
-    ) -> Optional[SyncChunk]:
+    ) -> SyncChunk | None:
         """
         Get a specific chunk for download.
 
@@ -510,9 +505,9 @@ class ChunkedStateSyncService:
 
     def verify_and_apply_chunks(
         self,
-        chunks: List[SyncChunk],
+        chunks: list[SyncChunk],
         expected_state_hash: str,
-    ) -> Tuple[bool, Optional[CheckpointPayload]]:
+    ) -> tuple[bool, CheckpointPayload | None]:
         """
         Verify checksums and reconstruct state from chunks.
 
@@ -630,7 +625,7 @@ class ChunkedStateSyncService:
             )
             return False, None
 
-    def get_sync_progress(self, snapshot_id: str) -> Optional[SyncProgress]:
+    def get_sync_progress(self, snapshot_id: str) -> SyncProgress | None:
         """
         Get download progress for a snapshot.
 
@@ -720,9 +715,9 @@ class ChunkedStateSyncService:
 
     def _split_by_priority(
         self,
-        payload_dict: Dict[str, Any],
-        priority_keys: List[str],
-    ) -> Tuple[bytes, bytes]:
+        payload_dict: dict[str, Any],
+        priority_keys: list[str],
+    ) -> tuple[bytes, bytes]:
         """
         Split payload data into priority and regular sections.
 
@@ -757,7 +752,7 @@ class ChunkedStateSyncService:
     def _save_snapshot(
         self,
         metadata: SnapshotMetadata,
-        chunks: List[SyncChunk],
+        chunks: list[SyncChunk],
     ) -> None:
         """
         Save snapshot metadata and chunks to disk.

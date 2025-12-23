@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 import logging
 import secrets
-from typing import List, Dict, Any
+from typing import Any
 
 logger = logging.getLogger("xai.blockchain.validator_rotation")
-
 
 class Validator:
     def __init__(self, address: str, stake: int, reputation: float = 0.5):
@@ -18,22 +19,21 @@ class Validator:
         self.stake = stake
         self.reputation = reputation  # A value between 0 and 1, higher is better
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {"address": self.address, "stake": self.stake, "reputation": self.reputation}
 
     def __repr__(self):
         return f"Validator(address='{self.address[:8]}...', stake={self.stake}, reputation={self.reputation:.2f})"
 
-
 class ValidatorSetManager:
-    def __init__(self, initial_validators: List[Validator] = None, set_size: int = 5):
+    def __init__(self, initial_validators: list[Validator] = None, set_size: int = 5):
         if not isinstance(set_size, int) or set_size <= 0:
             raise ValueError("Validator set size must be a positive integer.")
-        self.all_validators: Dict[str, Validator] = {}
+        self.all_validators: dict[str, Validator] = {}
         if initial_validators:
             for validator in initial_validators:
                 self.add_validator(validator)
-        self.current_validator_set: List[Validator] = []
+        self.current_validator_set: list[Validator] = []
         self.set_size = set_size
         self.epoch = 0
 
@@ -52,7 +52,7 @@ class ValidatorSetManager:
         else:
             logger.warning("Validator %s not found.", address)
 
-    def _select_validators(self) -> List[Validator]:
+    def _select_validators(self) -> list[Validator]:
         """
         Selects a new validator set based on a weighted random selection.
         Weight is proportional to stake and reputation.
@@ -94,7 +94,7 @@ class ValidatorSetManager:
 
         return unique_selected_set
 
-    def rotate_validator_set(self) -> List[Validator]:
+    def rotate_validator_set(self) -> list[Validator]:
         """
         Rotates the validator set for a new epoch.
         """
@@ -105,6 +105,6 @@ class ValidatorSetManager:
         logger.info("New validator set for Epoch %s: %s", self.epoch, new_set)
         return self.current_validator_set
 
-    def get_current_validator_set(self) -> List[Validator]:
+    def get_current_validator_set(self) -> list[Validator]:
         return self.current_validator_set
 

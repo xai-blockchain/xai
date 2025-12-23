@@ -4,10 +4,11 @@ Handles consensus mechanisms, block validation, and chain integrity verification
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, List, Tuple, Optional, Dict, Any
-import time
+
 import logging
 import statistics
+import time
+from typing import TYPE_CHECKING, Any
 
 from xai.core.blockchain_security import BlockchainSecurityConfig
 from xai.core.config import Config
@@ -18,12 +19,11 @@ if TYPE_CHECKING:
 # Configure logging
 logger = logging.getLogger(__name__)
 
-
 def _record_consensus_metrics(
     metric_name: str,
     value: float = 1.0,
     operation: str = "inc",
-    labels: Optional[Dict[str, Any]] = None
+    labels: dict[str, Any] | None = None
 ) -> None:
     """
     Record consensus metrics to the metrics collector singleton.
@@ -63,7 +63,6 @@ def _record_consensus_metrics(
 # This prevents timestamp manipulation attacks while allowing for minor clock drift
 MAX_FUTURE_BLOCK_TIME = 2 * 60 * 60  # 2 hours in seconds
 
-
 class ConsensusManager:
     """
     Manages consensus mechanisms and validation for the blockchain node.
@@ -97,11 +96,11 @@ class ConsensusManager:
     def validate_block(
         self,
         block: Block,
-        previous_block: Optional[Block] = None,
+        previous_block: Block | None = None,
         *,
-        history_chain: Optional[List[Block]] = None,
-        history_end_index: Optional[int] = None,
-    ) -> Tuple[bool, Optional[str]]:
+        history_chain: list[Block] | None = None,
+        history_end_index: int | None = None,
+    ) -> tuple[bool, str | None]:
         """
         Validate a single block according to consensus rules.
 
@@ -210,9 +209,9 @@ class ConsensusManager:
 
     def _calculate_median_time_past(
         self,
-        chain: Optional[List[Block]] = None,
-        end_index: Optional[int] = None,
-    ) -> Optional[float]:
+        chain: list[Block] | None = None,
+        end_index: int | None = None,
+    ) -> float | None:
         chain_ref = chain if chain is not None else getattr(self.blockchain, "chain", None)
         if not chain_ref:
             return None
@@ -224,7 +223,7 @@ class ConsensusManager:
 
         start = max(0, end_index - self._median_time_span)
         window = chain_ref[start:end_index]
-        timestamps: List[float] = []
+        timestamps: list[float] = []
         for entry in window:
             timestamp = getattr(entry, "timestamp", None)
             if timestamp is None and hasattr(entry, "header"):
@@ -245,7 +244,7 @@ class ConsensusManager:
             return (timestamps[mid - 1] + timestamps[mid]) / 2.0
         return timestamps[mid]
 
-    def _extract_block_version(self, block: Block) -> Optional[int]:
+    def _extract_block_version(self, block: Block) -> int | None:
         version_candidate = getattr(block, "version", None)
         if version_candidate is None:
             header = getattr(block, "header", None)
@@ -263,9 +262,9 @@ class ConsensusManager:
         block: Block,
         previous_block: Block,
         *,
-        history_chain: Optional[List[Block]] = None,
-        history_end_index: Optional[int] = None,
-    ) -> Tuple[bool, Optional[str]]:
+        history_chain: list[Block] | None = None,
+        history_end_index: int | None = None,
+    ) -> tuple[bool, str | None]:
         """
         Validate block timestamp is within acceptable range.
 
@@ -383,7 +382,7 @@ class ConsensusManager:
 
         return True, None
 
-    def validate_block_transactions(self, block: Block) -> Tuple[bool, Optional[str]]:
+    def validate_block_transactions(self, block: Block) -> tuple[bool, str | None]:
         """
         Validate all transactions in a block.
 
@@ -448,10 +447,28 @@ class ConsensusManager:
                     tx.verify_signature()
                 except Exception as e:
                     # Import signature verification exceptions
-                    from xai.core.transaction import SignatureVerificationError
-                    if isinstance(e, SignatureVerificationError):
+                    from xai.core.transaction import (
+                        SignatureVerificationError,
+                        MissingSignatureError,
+                        InvalidSignatureError,
+                        SignatureCryptoError
+                    )
+                    if isinstance(e, (SignatureVerificationError, MissingSignatureError, InvalidSignatureError, SignatureCryptoError)):
                         return False, f"Signature verification failed for transaction {i} ({tx.txid}): {e}"
                     else:
+                        # Log unexpected errors with full context
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.error(
+                            "Unexpected error during signature verification",
+                            extra={
+                                "error_type": type(e).__name__,
+                                "error": str(e),
+                                "tx_index": i,
+                                "tx_id": tx.txid
+                            },
+                            exc_info=True
+                        )
                         return False, f"Unexpected error verifying signature for transaction {i} ({tx.txid}): {type(e).__name__}: {e}"
 
             # Check sender has sufficient balance (except for special transactions)
@@ -492,7 +509,7 @@ class ConsensusManager:
             return True
 
         seen_txids = set()
-        sender_nonces: Dict[str, int] = {}
+        sender_nonces: dict[str, int] = {}
 
         for i, tx in enumerate(transactions):
             # Rule 1: Coinbase must be first (if present)
@@ -553,7 +570,7 @@ class ConsensusManager:
 
         return True
 
-    def resolve_forks(self, chains: List[List[Block]]) -> Tuple[Optional[List[Block]], str]:
+    def resolve_forks(self, chains: list[list[Block]]) -> tuple[list[Block] | None, str]:
         """
         Resolve blockchain forks using longest valid chain rule.
 
@@ -578,7 +595,7 @@ class ConsensusManager:
         if not chains:
             return None, "No chains provided"
 
-        valid_chains: List[Tuple[List[Block], int]] = []
+        valid_chains: list[tuple[list[Block], int]] = []
 
         # Validate all chains and track their lengths
         for i, chain in enumerate(chains):
@@ -606,7 +623,7 @@ class ConsensusManager:
 
         return longest_chain, reason
 
-    def check_chain_integrity(self) -> Tuple[bool, List[str]]:
+    def check_chain_integrity(self) -> tuple[bool, list[str]]:
         """
         Check integrity of the current blockchain.
 
@@ -627,7 +644,7 @@ class ConsensusManager:
             ...     for issue in issues:
             ...         print(f"Integrity issue: {issue}")
         """
-        issues: List[str] = []
+        issues: list[str] = []
 
         if len(self.blockchain.chain) == 0:
             return True, []
@@ -645,7 +662,7 @@ class ConsensusManager:
             issues.append(f"Chain validation failed: {error}")
 
         # Check for double-spending
-        spent_outputs: Dict[str, set] = {}
+        spent_outputs: dict[str, set] = {}
         for block in self.blockchain.chain:
             for tx in block.transactions:
                 # Track spending
@@ -664,7 +681,7 @@ class ConsensusManager:
 
         return len(issues) == 0, issues
 
-    def calculate_chain_work(self, chain: List[Block]) -> int:
+    def calculate_chain_work(self, chain: list[Block]) -> int:
         """
         Calculate total cumulative work in a chain.
 
@@ -694,7 +711,7 @@ class ConsensusManager:
 
         return total_work
 
-    def should_replace_chain(self, new_chain: List[Block]) -> Tuple[bool, str]:
+    def should_replace_chain(self, new_chain: list[Block]) -> tuple[bool, str]:
         """
         Determine if we should replace our current chain with a new one.
 
@@ -839,7 +856,7 @@ class ConsensusManager:
 
         return True
 
-    def validate_chain(self, chain: Optional[List[Block]] = None) -> Tuple[bool, Optional[str]]:
+    def validate_chain(self, chain: list[Block] | None = None) -> tuple[bool, str | None]:
         """
         Validate an entire blockchain.
 
@@ -868,7 +885,7 @@ class ConsensusManager:
         if not chain or len(chain) == 0:
             return False, "Chain is empty"
 
-        def _materialize(block_like: Block) -> Optional[Block]:
+        def _materialize(block_like: Block) -> Block | None:
             # If already a Block with transactions, return directly
             if hasattr(block_like, "transactions"):
                 return block_like
@@ -916,7 +933,7 @@ class ConsensusManager:
 
         return True, None
 
-    def get_consensus_info(self) -> Dict[str, Any]:
+    def get_consensus_info(self) -> dict[str, Any]:
         """
         Get information about current consensus state.
 

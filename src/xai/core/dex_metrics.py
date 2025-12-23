@@ -5,8 +5,7 @@ Comprehensive Prometheus metrics for swap operations, liquidity management,
 and pool health monitoring following PAW's proven patterns.
 """
 
-from prometheus_client import Counter, Gauge, Histogram
-from prometheus_client import CollectorRegistry, REGISTRY
+from prometheus_client import REGISTRY, CollectorRegistry, Counter, Gauge, Histogram
 
 
 class DEXMetrics:

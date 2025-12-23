@@ -1,30 +1,34 @@
+from __future__ import annotations
+
 import asyncio
 import hashlib
+import ipaddress
 import json
 import logging
-import os
-import ssl
-import time
-import secrets
-import ipaddress
 import math
-from collections import defaultdict, deque
-from typing import List, Dict, Any, Optional, Tuple, Iterable
+import os
+import secrets
+import ssl
 import threading
+import time
+from collections import defaultdict, deque
+from typing import Any
+
 import websockets
 from websockets.client import WebSocketClientProtocol
+
 from xai.core.config import Config
 from xai.core.p2p_security import P2PSecurityConfig
-from xai.network.geoip_resolver import GeoIPResolver, GeoIPMetadata
+from xai.network.geoip_resolver import GeoIPMetadata, GeoIPResolver
 
 # Fail fast: cryptography library is REQUIRED for P2P networking security
 # The node cannot operate without TLS encryption
 try:
     from cryptography import x509
-    from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import rsa, ec
-    from cryptography.x509.oid import NameOID
     from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec, rsa
+    from cryptography.x509.oid import NameOID
     CRYPTOGRAPHY_AVAILABLE = True
     CRYPTOGRAPHY_ERROR = None
 except ImportError as e:
@@ -33,32 +37,26 @@ except ImportError as e:
 
 logger = logging.getLogger(__name__)
 
-
 # Peer management exceptions
 class PeerError(Exception):
     """Base exception for peer management operations"""
     pass
 
-
 class PeerConnectionError(PeerError):
     """Raised when peer connection fails"""
     pass
-
 
 class PeerCommunicationError(PeerError):
     """Raised when peer communication fails"""
     pass
 
-
 class PeerValidationError(PeerError):
     """Raised when peer data validation fails"""
     pass
 
-
 class PeerNetworkError(PeerError):
     """Raised when network operations fail"""
     pass
-
 
 # Error message for missing cryptography library
 CRYPTO_INSTALL_MSG = """
@@ -78,7 +76,6 @@ On some systems you may need:
 The XAI node cannot run without TLS encryption.
 ========================================
 """
-
 
 class PeerConnectionPool:
     """
@@ -103,7 +100,7 @@ class PeerConnectionPool:
         connection_timeout: float = 30.0,
         idle_timeout: float = 300.0,
         ping_timeout: float = 5.0,
-        ssl_context: Optional[ssl.SSLContext] = None,
+        ssl_context: ssl.SSLContext | None = None,
     ):
         """
         Initialize the connection pool.
@@ -114,13 +111,13 @@ class PeerConnectionPool:
             idle_timeout: Maximum idle time before connection cleanup
             ping_timeout: Timeout for health check ping/pong
         """
-        self.pools: Dict[str, asyncio.Queue] = {}
+        self.pools: dict[str, asyncio.Queue] = {}
         self.max_per_peer = max(1, max_connections_per_peer)
         self.connection_timeout = max(1.0, connection_timeout)
         self.idle_timeout = max(60.0, idle_timeout)
         self.ping_timeout = max(1.0, ping_timeout)
         self.ssl_context = ssl_context
-        self._active_connections: Dict[str, int] = {}
+        self._active_connections: dict[str, int] = {}
         self._lock = asyncio.Lock()
         self._closed = False
 
@@ -483,7 +480,7 @@ class PeerConnectionPool:
             }
         )
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """
         Get pool utilization metrics.
 
@@ -500,7 +497,6 @@ class PeerConnectionPool:
             "active_pools": len(self.pools),
             "active_connections": sum(self._active_connections.values()),
         }
-
 
 class PeerConnection:
     """
@@ -525,7 +521,7 @@ class PeerConnection:
         """
         self.pool = pool
         self.peer_uri = peer_uri
-        self.conn: Optional[WebSocketClientProtocol] = None
+        self.conn: WebSocketClientProtocol | None = None
 
     async def __aenter__(self) -> WebSocketClientProtocol:
         """
@@ -546,14 +542,13 @@ class PeerConnection:
         if self.conn:
             await self.pool.return_connection(self.peer_uri, self.conn)
 
-
 class PeerReputation:
     """Track and manage peer reputation scores"""
 
     def __init__(self):
-        self.scores: Dict[str, float] = defaultdict(lambda: 50.0)  # Start at 50/100
-        self.history: Dict[str, deque] = defaultdict(lambda: deque(maxlen=100))
-        self._last_decay: Dict[str, float] = defaultdict(time.time)
+        self.scores: dict[str, float] = defaultdict(lambda: 50.0)  # Start at 50/100
+        self.history: dict[str, deque] = defaultdict(lambda: deque(maxlen=100))
+        self._last_decay: dict[str, float] = defaultdict(time.time)
         self.lock = threading.RLock()
 
         # Scoring parameters
@@ -620,12 +615,12 @@ class PeerReputation:
         """Check if peer should be banned based on reputation"""
         return self.get_score(peer_id) <= self.BAN_THRESHOLD
 
-    def get_top_peers(self, limit: int = 10) -> List[Tuple[str, float]]:
+    def get_top_peers(self, limit: int = 10) -> list[tuple[str, float]]:
         """Get top peers by reputation"""
         with self.lock:
             return sorted(self.scores.items(), key=lambda x: x[1], reverse=True)[:limit]
 
-    def get_history(self, peer_id: str) -> List[Dict]:
+    def get_history(self, peer_id: str) -> list[Dict]:
         """Get reputation history for a peer"""
         with self.lock:
             return list(self.history.get(peer_id, []))
@@ -646,7 +641,6 @@ class PeerReputation:
         self.scores[peer_id] = min(self.MAX_SCORE, max(self.MIN_SCORE, decayed))
         self._last_decay[peer_id] = now
 
-
 class PeerDiscovery:
     """
     Peer discovery using DNS seeds and peer exchange.
@@ -657,10 +651,10 @@ class PeerDiscovery:
 
     def __init__(
         self,
-        dns_seeds: Optional[List[str]] = None,
-        bootstrap_nodes: Optional[List[str]] = None,
-        connection_pool: Optional[PeerConnectionPool] = None,
-        encryption: Optional["PeerEncryption"] = None,
+        dns_seeds: list[str] | None = None,
+        bootstrap_nodes: list[str] | None = None,
+        connection_pool: PeerConnectionPool | None = None,
+        encryption: "PeerEncryption" | None = None,
     ):
         self.dns_seeds = dns_seeds or [
             "seed1.xai-network.io",
@@ -675,7 +669,7 @@ class PeerDiscovery:
         self.bootstrap_nodes = [
             uri for uri in (self._normalize_peer_uri(node) for node in raw_bootstrap) if uri
         ]
-        self.discovered_peers: List[Dict[str, Any]] = []
+        self.discovered_peers: list[dict[str, Any]] = []
         self.lock = threading.RLock()
         self.encryption = encryption
 
@@ -683,7 +677,7 @@ class PeerDiscovery:
         if connection_pool is not None:
             self.connection_pool = connection_pool
         else:
-            client_ssl_context: Optional[ssl.SSLContext] = None
+            client_ssl_context: ssl.SSLContext | None = None
             if str(getattr(Config, "NETWORK", "testnet")).lower() == "testnet":
                 client_ssl_context = ssl._create_unverified_context()
                 client_ssl_context.check_hostname = False
@@ -709,7 +703,7 @@ class PeerDiscovery:
             return f"wss://{peer}"
         return f"wss://{peer}:8765"
 
-    async def discover_from_dns(self) -> List[str]:
+    async def discover_from_dns(self) -> list[str]:
         """Discover peers from DNS seeds"""
         import dns.resolver
 
@@ -756,7 +750,7 @@ class PeerDiscovery:
 
         return discovered
 
-    async def discover_from_bootstrap(self) -> List[str]:
+    async def discover_from_bootstrap(self) -> list[str]:
         """
         Connect to bootstrap nodes and request peer lists.
 
@@ -834,7 +828,7 @@ class PeerDiscovery:
                         )
                         continue
 
-                    response_payload: Optional[Dict[str, Any]] = None
+                    response_payload: dict[str, Any] | None = None
                     for _ in range(3):
                         raw_response = await websocket.recv()
                         raw_bytes = raw_response if isinstance(raw_response, (bytes, bytearray)) else raw_response.encode("utf-8")
@@ -903,7 +897,7 @@ class PeerDiscovery:
 
         return discovered
 
-    def exchange_peers(self, peer_addresses: List[str]) -> None:
+    def exchange_peers(self, peer_addresses: list[str]) -> None:
         """Add peers learned from peer exchange"""
         with self.lock:
             for addr in peer_addresses:
@@ -917,7 +911,7 @@ class PeerDiscovery:
                         "source": "peer_exchange",
                     })
 
-    def get_random_peers(self, count: int = 10) -> List[str]:
+    def get_random_peers(self, count: int = 10) -> list[str]:
         """
         Get random peer addresses for connection attempts
 
@@ -933,7 +927,7 @@ class PeerDiscovery:
             sr = secrets.SystemRandom()
             return sr.sample(addresses, min(count, len(addresses)))
 
-    def get_discovered_peers(self) -> List[Dict]:
+    def get_discovered_peers(self) -> list[Dict]:
         """Get all discovered peers"""
         with self.lock:
             return list(self.discovered_peers)
@@ -946,7 +940,7 @@ class PeerDiscovery:
         """
         await self.connection_pool.close_all()
 
-    def get_pool_metrics(self) -> Dict[str, Any]:
+    def get_pool_metrics(self) -> dict[str, Any]:
         """
         Get connection pool metrics for monitoring.
 
@@ -954,7 +948,6 @@ class PeerDiscovery:
             Dictionary with pool utilization statistics
         """
         return self.connection_pool.get_metrics()
-
 
 class PeerProofOfWork:
     """Perform and validate proof-of-work for peer admission."""
@@ -971,10 +964,10 @@ class PeerProofOfWork:
         self.target = 1 << (256 - self.difficulty_bits)
         self.max_iterations = max(1, int(max_iterations))
         self.reuse_window_seconds = max(1, int(reuse_window_seconds))
-        self._solutions: Dict[str, float] = {}
+        self._solutions: dict[str, float] = {}
         self._lock = threading.RLock()
 
-    def solve(self, pubkey_hex: str, timestamp: int, message_nonce: str, payload_hash: str) -> Optional[Dict[str, Any]]:
+    def solve(self, pubkey_hex: str, timestamp: int, message_nonce: str, payload_hash: str) -> dict[str, Any] | None:
         if not self.enabled:
             return None
         base = f"{pubkey_hex}:{timestamp}:{message_nonce}:{payload_hash}"
@@ -991,7 +984,7 @@ class PeerProofOfWork:
         timestamp: int,
         message_nonce: str,
         payload_hash: str,
-        proof: Optional[Dict[str, Any]],
+        proof: dict[str, Any] | None,
     ) -> bool:
         if not self.enabled:
             return True
@@ -1018,11 +1011,10 @@ class PeerProofOfWork:
         for key in stale:
             self._solutions.pop(key, None)
 
-
 import hmac
-import secp256k1
 from datetime import datetime, timedelta
 
+import secp256k1
 
 class PeerEncryption:
     """Handle peer-to-peer encryption using TLS/SSL and message signing."""
@@ -1031,7 +1023,7 @@ class PeerEncryption:
         self,
         cert_dir: str = "data/certs",
         key_dir: str = "data/keys",
-        pow_manager: Optional["PeerProofOfWork"] = None,
+        pow_manager: "PeerProofOfWork" | None = None,
         session_ttl_seconds: int = 900,
     ):
         # Fail fast if cryptography library is not available
@@ -1051,11 +1043,11 @@ class PeerEncryption:
         self.key_file = os.path.join(self.cert_dir, "peer_key.pem")
 
         self.signing_key_file = os.path.join(self.key_dir, "signing_key.pem")
-        self.signing_key: Optional[secp256k1.PrivateKey] = None
-        self.verifying_key: Optional[secp256k1.PublicKey] = None
-        self.session_keys: Dict[str, Dict[str, Any]] = {}
+        self.signing_key: secp256k1.PrivateKey | None = None
+        self.verifying_key: secp256k1.PublicKey | None = None
+        self.session_keys: dict[str, dict[str, Any]] = {}
         self.session_ttl_seconds = max(60, int(session_ttl_seconds))
-        self._cached_identity_fp: Optional[str] = None
+        self._cached_identity_fp: str | None = None
 
         # Generate TLS certificates if they don't exist
         if not os.path.exists(self.cert_file) or not os.path.exists(self.key_file):
@@ -1388,7 +1380,7 @@ class PeerEncryption:
         self,
         is_server: bool = False,
         require_client_cert: bool = False,
-        ca_bundle: Optional[str] = None,
+        ca_bundle: str | None = None,
     ) -> ssl.SSLContext:
         """
         Create SSL context for encrypted peer connections.
@@ -1471,7 +1463,7 @@ class PeerEncryption:
 
         return context
 
-    def create_signed_message(self, payload: Dict[str, Any]) -> bytes:
+    def create_signed_message(self, payload: dict[str, Any]) -> bytes:
         """Create a signed message with payload, timestamp, nonce, and signature."""
         if not self.signing_key:
             raise ValueError("Signing key not available.")
@@ -1537,7 +1529,7 @@ class PeerEncryption:
         return entry["key"]
 
     @staticmethod
-    def fingerprint_from_ssl_object(ssl_object: ssl.SSLObject) -> Optional[str]:
+    def fingerprint_from_ssl_object(ssl_object: ssl.SSLObject) -> str | None:
         """Compute SHA256 fingerprint of the peer certificate from an SSLObject."""
         try:
             der_cert = ssl_object.getpeercert(binary_form=True)
@@ -1551,7 +1543,7 @@ class PeerEncryption:
             logging.debug("SSL/network error getting peer certificate: %s", e)
             return None
 
-    def verify_signed_message(self, signed_message_bytes: bytes) -> Optional[Dict[str, Any]]:
+    def verify_signed_message(self, signed_message_bytes: bytes) -> dict[str, Any] | None:
         """
         Verify a signed message, checking signature and freshness.
 
@@ -1774,20 +1766,20 @@ class PeerEncryption:
             )
             return None
 
-    def is_nonce_replay(self, sender_id: str, nonce: str, timestamp: Optional[float] = None) -> bool:
+    def is_nonce_replay(self, sender_id: str, nonce: str, timestamp: float | None = None) -> bool:
         """Check if nonce has been seen recently for a sender, pruning expired nonces."""
         now = timestamp if timestamp is not None else time.time()
         with self._nonce_lock:
-            dq: deque[Tuple[str, float]] = self.seen_nonces[sender_id]
+            dq: deque[tuple[str, float]] = self.seen_nonces[sender_id]
             while dq and now - dq[0][1] > self.nonce_ttl_seconds:
                 dq.popleft()
             return any(stored_nonce == nonce for stored_nonce, _ in dq)
 
-    def record_nonce(self, sender_id: str, nonce: str, timestamp: Optional[float] = None) -> None:
+    def record_nonce(self, sender_id: str, nonce: str, timestamp: float | None = None) -> None:
         """Record a nonce for replay protection with timestamp pruning."""
         now = timestamp if timestamp is not None else time.time()
         with self._nonce_lock:
-            dq: deque[Tuple[str, float]] = self.seen_nonces[sender_id]
+            dq: deque[tuple[str, float]] = self.seen_nonces[sender_id]
             while dq and now - dq[0][1] > self.nonce_ttl_seconds:
                 dq.popleft()
             dq.append((nonce, now))
@@ -1800,7 +1792,7 @@ class PeerEncryption:
         """Remove a peer public key from trust store."""
         self.trusted_peer_pubkeys.discard(pubkey_hex.lower())
 
-    def is_sender_allowed(self, pubkey_hex: Optional[str]) -> bool:
+    def is_sender_allowed(self, pubkey_hex: str | None) -> bool:
         """
         Check if sender is allowed. If a trust list is defined, enforce membership.
         If no trusted keys configured, allow by default.
@@ -1819,7 +1811,7 @@ class PeerEncryption:
         """Remove a pinned TLS certificate fingerprint."""
         self.trusted_cert_fingerprints.discard(fingerprint_hex.lower())
 
-    def is_cert_allowed(self, fingerprint_hex: Optional[str]) -> bool:
+    def is_cert_allowed(self, fingerprint_hex: str | None) -> bool:
         """
         Check if peer certificate fingerprint is allowed.
         If no pins configured, allow by default.
@@ -1845,8 +1837,8 @@ class PeerEncryption:
         Reload trust stores from configured files if mtime changed or force requested.
         Supports runtime rotation by ops pipelines.
         """
-        updated_pubkeys: Optional[set[str]] = None
-        updated_fps: Optional[set[str]] = None
+        updated_pubkeys: set[str] | None = None
+        updated_fps: set[str] | None = None
 
         try:
             if self.trusted_peer_pubkeys_file:
@@ -1949,20 +1941,19 @@ class PeerEncryption:
         if updated_fps is not None:
             self.require_client_cert = self.require_client_cert or bool(self.trusted_cert_fingerprints)
 
-
 class PeerManager:
     def __init__(
         self,
         max_connections_per_ip: int = 5,
-        trusted_peer_pubkeys: Optional[Iterable[str]] = None,
-        trusted_cert_fingerprints: Optional[Iterable[str]] = None,
-        trusted_peer_pubkeys_file: Optional[str] = None,
-        trusted_cert_fps_file: Optional[str] = None,
-        nonce_ttl_seconds: Optional[int] = None,
+        trusted_peer_pubkeys: Iterable[str] | None = None,
+        trusted_cert_fingerprints: Iterable[str] | None = None,
+        trusted_peer_pubkeys_file: str | None = None,
+        trusted_cert_fps_file: str | None = None,
+        nonce_ttl_seconds: int | None = None,
         require_client_cert: bool = False,
-        ca_bundle_path: Optional[str] = None,
-        dns_seeds: Optional[Iterable[str]] = None,
-        bootstrap_nodes: Optional[Iterable[str]] = None,
+        ca_bundle_path: str | None = None,
+        dns_seeds: Iterable[str] | None = None,
+        bootstrap_nodes: Iterable[str] | None = None,
         cert_dir: str = "data/certs",
         key_dir: str = "data/keys",
     ):
@@ -1972,22 +1963,22 @@ class PeerManager:
         self.max_connections_per_ip = max_connections_per_ip
         self.trusted_peers: set[str] = set()  # Set of trusted IP addresses or node IDs
         self.banned_peers: set[str] = set()  # Set of banned IP addresses or node IDs
-        self.banned_until: Dict[str, float] = {}
-        self.ban_counts: Dict[str, int] = defaultdict(int)
+        self.banned_until: dict[str, float] = {}
+        self.ban_counts: dict[str, int] = defaultdict(int)
 
         # Stores connected peers: {peer_id: {"ip_address": str, "connected_at": float}}
-        self.connected_peers: Dict[str, Dict[str, Any]] = {}
+        self.connected_peers: dict[str, dict[str, Any]] = {}
         # Tracks connections per IP: {ip_address: count}
-        self.connections_by_ip: Dict[str, int] = defaultdict(int)
+        self.connections_by_ip: dict[str, int] = defaultdict(int)
         # Tracks connections per /16 (IPv4) or /32 (IPv6) subnet to enforce diversity
-        self.connections_by_subnet: Dict[str, int] = defaultdict(int)
+        self.connections_by_subnet: dict[str, int] = defaultdict(int)
         self._peer_id_counter = 0
         self.max_connections_per_subnet16 = int(getattr(Config, "P2P_MAX_CONNECTIONS_PER_SUBNET16", 64))
         self.base_ban_seconds = int(getattr(Config, "P2P_BAN_BASE_SECONDS", 600))
         self.max_ban_seconds = int(getattr(Config, "P2P_BAN_MAX_SECONDS", 86400))
 
         # Replay protection: store the last 1000 nonces per peer with timestamps
-        self.seen_nonces: Dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))
+        self.seen_nonces: dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))
         self._nonce_lock = threading.RLock()
         self.nonce_ttl_seconds = nonce_ttl_seconds if nonce_ttl_seconds else 300  # Default TTL for nonce validity
 
@@ -1998,7 +1989,7 @@ class PeerManager:
         self.trusted_cert_fps_file = trusted_cert_fps_file
         self.require_client_cert = require_client_cert or bool(self.trusted_cert_fingerprints)
         self.ca_bundle_path = ca_bundle_path
-        self._trust_file_mtimes: Dict[str, float] = {}
+        self._trust_file_mtimes: dict[str, float] = {}
 
         # Initialize subsystems
         self.reputation = PeerReputation()
@@ -2088,7 +2079,7 @@ class PeerManager:
         print(f"Connection from {ip_address} allowed by policy.")
         return True
 
-    def _subnet_key(self, ip_address: str) -> Optional[str]:
+    def _subnet_key(self, ip_address: str) -> str | None:
         """
         Return a normalized subnet key for diversity enforcement.
         IPv4: /16 prefix. IPv6: /32 prefix (coarse).
@@ -2165,11 +2156,11 @@ class PeerManager:
         """Get reputation score for a peer"""
         return self.reputation.get_score(peer_id)
 
-    def get_best_peers(self, count: int = 10) -> List[Tuple[str, float]]:
+    def get_best_peers(self, count: int = 10) -> list[tuple[str, float]]:
         """Get top peers by reputation"""
         return self.reputation.get_top_peers(count)
 
-    async def discover_peers(self) -> List[str]:
+    async def discover_peers(self) -> list[str]:
         """Discover new peers using DNS and bootstrap nodes"""
         dns_peers = await self.discovery.discover_from_dns()
         bootstrap_peers = await self.discovery.discover_from_bootstrap()
@@ -2178,7 +2169,6 @@ class PeerManager:
     def get_ssl_context(self, is_server: bool = False) -> ssl.SSLContext:
         """Get SSL context for encrypted peer connections"""
         return self.encryption.create_ssl_context(is_server)
-
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":
@@ -2274,7 +2264,6 @@ if __name__ == "__main__":
         )
         print(f"Error: {e}")
 
-
 # -----------------------------------------------------------------------------
 # Production-grade PeerManager (module-level binding)
 # -----------------------------------------------------------------------------
@@ -2282,15 +2271,15 @@ class PeerManager:
     def __init__(
         self,
         max_connections_per_ip: int = 5,
-        trusted_peer_pubkeys: Optional[Iterable[str]] = None,
-        trusted_cert_fingerprints: Optional[Iterable[str]] = None,
-        trusted_peer_pubkeys_file: Optional[str] = None,
-        trusted_cert_fps_file: Optional[str] = None,
-        nonce_ttl_seconds: Optional[int] = None,
+        trusted_peer_pubkeys: Iterable[str] | None = None,
+        trusted_cert_fingerprints: Iterable[str] | None = None,
+        trusted_peer_pubkeys_file: str | None = None,
+        trusted_cert_fps_file: str | None = None,
+        nonce_ttl_seconds: int | None = None,
         require_client_cert: bool = False,
-        ca_bundle_path: Optional[str] = None,
-        dns_seeds: Optional[Iterable[str]] = None,
-        bootstrap_nodes: Optional[Iterable[str]] = None,
+        ca_bundle_path: str | None = None,
+        dns_seeds: Iterable[str] | None = None,
+        bootstrap_nodes: Iterable[str] | None = None,
         cert_dir: str = "data/certs",
         key_dir: str = "data/keys",
     ):
@@ -2300,17 +2289,17 @@ class PeerManager:
         self.max_connections_per_ip = max_connections_per_ip
         self.trusted_peers: set[str] = set()
         self.banned_peers: set[str] = set()
-        self.banned_until: Dict[str, float] = {}
-        self.ban_counts: Dict[str, int] = defaultdict(int)
-        self.connected_peers: Dict[str, Dict[str, Any]] = {}
-        self.connections_by_ip: Dict[str, int] = defaultdict(int)
-        self.connections_by_subnet: Dict[str, int] = defaultdict(int)
+        self.banned_until: dict[str, float] = {}
+        self.ban_counts: dict[str, int] = defaultdict(int)
+        self.connected_peers: dict[str, dict[str, Any]] = {}
+        self.connections_by_ip: dict[str, int] = defaultdict(int)
+        self.connections_by_subnet: dict[str, int] = defaultdict(int)
         self._peer_id_counter = 0
         self.max_connections_per_subnet16 = int(getattr(Config, "P2P_MAX_CONNECTIONS_PER_SUBNET16", 64))
         self.base_ban_seconds = int(getattr(Config, "P2P_BAN_BASE_SECONDS", 600))
         self.max_ban_seconds = int(getattr(Config, "P2P_BAN_MAX_SECONDS", 86400))
 
-        self.seen_nonces: Dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))
+        self.seen_nonces: dict[str, deque] = defaultdict(lambda: deque(maxlen=1000))
         self._nonce_lock = threading.RLock()
         self.nonce_ttl_seconds = nonce_ttl_seconds if nonce_ttl_seconds else 300
 
@@ -2318,7 +2307,7 @@ class PeerManager:
         self.trusted_cert_fingerprints: set[str] = set(fp.lower() for fp in (trusted_cert_fingerprints or []))
         self.trusted_peer_pubkeys_file = trusted_peer_pubkeys_file
         self.trusted_cert_fps_file = trusted_cert_fps_file
-        self._trust_file_mtimes: Dict[str, float] = {}
+        self._trust_file_mtimes: dict[str, float] = {}
         self.require_client_cert = require_client_cert or bool(self.trusted_cert_fingerprints)
         self.ca_bundle_path = ca_bundle_path
 
@@ -2349,9 +2338,9 @@ class PeerManager:
             timeout=float(getattr(Config, "P2P_GEOIP_TIMEOUT", 2.5)),
             cache_ttl=int(getattr(Config, "P2P_GEOIP_CACHE_TTL", 3600)),
         )
-        self.prefix_counts: Dict[str, int] = defaultdict(int)
-        self.asn_counts: Dict[str, int] = defaultdict(int)
-        self.country_counts: Dict[str, int] = defaultdict(int)
+        self.prefix_counts: dict[str, int] = defaultdict(int)
+        self.asn_counts: dict[str, int] = defaultdict(int)
+        self.country_counts: dict[str, int] = defaultdict(int)
         self.unknown_geo_peers = 0
         self._diversity_lock = threading.RLock()
 
@@ -2368,8 +2357,8 @@ class PeerManager:
         return entries
 
     def refresh_trust_stores(self, force: bool = False) -> None:
-        updated_pubkeys: Optional[set[str]] = None
-        updated_fps: Optional[set[str]] = None
+        updated_pubkeys: set[str] | None = None
+        updated_fps: set[str] | None = None
 
         try:
             if self.trusted_peer_pubkeys_file:
@@ -2478,7 +2467,7 @@ class PeerManager:
     def remove_trusted_peer_key(self, pubkey_hex: str) -> None:
         self.trusted_peer_pubkeys.discard(pubkey_hex.lower())
 
-    def is_sender_allowed(self, pubkey_hex: Optional[str]) -> bool:
+    def is_sender_allowed(self, pubkey_hex: str | None) -> bool:
         if not pubkey_hex:
             return False if self.trusted_peer_pubkeys else True
         if not self.trusted_peer_pubkeys:
@@ -2491,25 +2480,25 @@ class PeerManager:
     def remove_trusted_cert_fingerprint(self, fingerprint_hex: str) -> None:
         self.trusted_cert_fingerprints.discard(fingerprint_hex.lower())
 
-    def is_cert_allowed(self, fingerprint_hex: Optional[str]) -> bool:
+    def is_cert_allowed(self, fingerprint_hex: str | None) -> bool:
         if not self.trusted_cert_fingerprints:
             return True
         if not fingerprint_hex:
             return False
         return fingerprint_hex.lower() in self.trusted_cert_fingerprints
 
-    def is_nonce_replay(self, sender_id: str, nonce: str, timestamp: Optional[float] = None) -> bool:
+    def is_nonce_replay(self, sender_id: str, nonce: str, timestamp: float | None = None) -> bool:
         now = timestamp if timestamp is not None else time.time()
         with self._nonce_lock:
-            dq: deque[Tuple[str, float]] = self.seen_nonces[sender_id]
+            dq: deque[tuple[str, float]] = self.seen_nonces[sender_id]
             while dq and now - dq[0][1] > self.nonce_ttl_seconds:
                 dq.popleft()
             return any(stored_nonce == nonce for stored_nonce, _ in dq)
 
-    def record_nonce(self, sender_id: str, nonce: str, timestamp: Optional[float] = None) -> None:
+    def record_nonce(self, sender_id: str, nonce: str, timestamp: float | None = None) -> None:
         now = timestamp if timestamp is not None else time.time()
         with self._nonce_lock:
-            dq: deque[Tuple[str, float]] = self.seen_nonces[sender_id]
+            dq: deque[tuple[str, float]] = self.seen_nonces[sender_id]
             while dq and now - dq[0][1] > self.nonce_ttl_seconds:
                 dq.popleft()
             dq.append((nonce, now))
@@ -2567,7 +2556,7 @@ class PeerManager:
             return False
         return True
 
-    def _subnet_key(self, ip_address: str) -> Optional[str]:
+    def _subnet_key(self, ip_address: str) -> str | None:
         """Return normalized subnet key for diversity enforcement (/16 for IPv4, /32 for IPv6)."""
         try:
             ip_obj = ipaddress.ip_address(ip_address)
@@ -2633,11 +2622,11 @@ class PeerManager:
         """Return the reputation score for a peer."""
         return self.reputation.get_score(peer_id)
 
-    def get_best_peers(self, count: int = 10) -> List[Tuple[str, float]]:
+    def get_best_peers(self, count: int = 10) -> list[tuple[str, float]]:
         """Return the top peers ranked by reputation."""
         return self.reputation.get_top_peers(count)
 
-    async def discover_peers(self) -> List[str]:
+    async def discover_peers(self) -> list[str]:
         """Discover peers using DNS seeds and configured bootstrap nodes."""
         dns_peers = await self.discovery.discover_from_dns()
         bootstrap_peers = await self.discovery.discover_from_bootstrap()
@@ -2651,7 +2640,7 @@ class PeerManager:
         self,
         ip_address: str,
         mutate: bool = False,
-    ) -> Tuple[bool, GeoIPMetadata, Optional[str], bool, Optional[str]]:
+    ) -> tuple[bool, GeoIPMetadata, str | None, bool, str | None]:
         metadata = self._resolve_geo_metadata(ip_address)
         prefix = self._get_ip_prefix(ip_address)
         normalized_asn = metadata.normalized_asn
@@ -2724,7 +2713,7 @@ class PeerManager:
 
         return True, metadata, prefix, is_unknown, None
 
-    def _decrement_geo_counters(self, peer_info: Dict[str, Any]) -> None:
+    def _decrement_geo_counters(self, peer_info: dict[str, Any]) -> None:
         geo_info = peer_info.get("geo") or {}
         prefix = geo_info.get("prefix")
         normalized_asn = geo_info.get("asn")
@@ -2800,7 +2789,7 @@ class PeerManager:
         self,
         ip_address: str,
         reason: str,
-        metadata: Optional[GeoIPMetadata],
+        metadata: GeoIPMetadata | None,
     ) -> None:
         logger.warning(
             "Peer connection rejected for diversity policy (%s)",
@@ -2849,7 +2838,7 @@ class PeerManager:
                 source="error",
             )
 
-    def _get_ip_prefix(self, ip_address: str) -> Optional[str]:
+    def _get_ip_prefix(self, ip_address: str) -> str | None:
         try:
             ip_obj = ipaddress.ip_address(ip_address)
         except ValueError:

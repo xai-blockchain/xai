@@ -1,17 +1,18 @@
+from __future__ import annotations
+
 import logging
-from typing import Dict, List, Any
 import time
+from typing import Any
 
 from ..security.circuit_breaker import CircuitBreaker, CircuitBreakerState
 
 logger = logging.getLogger("xai.blockchain.order_book_manipulation")
 
-
 class OrderBook:
     def __init__(self):
         # Orders stored as {order_id: {"price": float, "amount": float, "type": "buy"|"sell", "timestamp": int, "status": "open"|"canceled"|"filled"}}
-        self.buy_orders: Dict[str, Dict[str, Any]] = {}
-        self.sell_orders: Dict[str, Dict[str, Any]] = {}
+        self.buy_orders: dict[str, dict[str, Any]] = {}
+        self.sell_orders: dict[str, dict[str, Any]] = {}
         self._order_id_counter = 0
 
     def place_order(self, order_type: str, price: float, amount: float, timestamp: int | None = None) -> str:
@@ -48,7 +49,7 @@ class OrderBook:
         logger.warning("Order %s not found or already processed", order_id)
         return False
 
-    def get_order_book_depth(self) -> Dict[str, List[Dict[str, Any]]]:
+    def get_order_book_depth(self) -> dict[str, list[dict[str, Any]]]:
         """Returns current open buy and sell orders, sorted by price."""
         sorted_buy_orders = sorted(
             [o for o in self.buy_orders.values() if o["status"] == "open"],
@@ -73,7 +74,6 @@ class OrderBook:
         elif best_ask != float("inf"):
             return best_ask
         return 0.0
-
 
 class OrderBookManipulationDetector:
     def __init__(
@@ -154,7 +154,7 @@ class OrderBookManipulationDetector:
         logger.info("Detecting layering attempts")
         depth = self.order_book.get_order_book_depth()
 
-        def check_layering_side(orders: List[Dict[str, Any]], is_buy_side: bool) -> bool:
+        def check_layering_side(orders: list[dict[str, Any]], is_buy_side: bool) -> bool:
             if len(orders) < self.layering_min_orders:
                 return False
 

@@ -10,12 +10,10 @@ import argparse
 import os
 import subprocess
 from pathlib import Path
-from typing import Iterable, Optional
 
 from xai.tools.threshold_artifact import ThresholdDetails, append_history_entry, prune_history
 
-
-def _detect_commit(explicit: Optional[str]) -> Optional[str]:
+def _detect_commit(explicit: str | None) -> str | None:
     if explicit:
         return explicit
     env_commit = (
@@ -34,8 +32,7 @@ def _detect_commit(explicit: Optional[str]) -> Optional[str]:
         return None
     return result.stdout.strip() or None
 
-
-def main(argv: Optional[Iterable[str]] = None) -> int:
+def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Append withdrawal threshold artifacts to the history log and/or emit Markdown summaries.",
     )
@@ -101,7 +98,6 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
         print(markdown)
 
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

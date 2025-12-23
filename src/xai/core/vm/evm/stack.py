@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 EVM Stack Implementation.
 
@@ -5,16 +7,13 @@ The EVM stack is a 256-bit word addressable LIFO structure with a maximum
 depth of 1024 items. All stack operations work with 256-bit unsigned integers.
 """
 
-from typing import List, Optional
 from ..exceptions import VMExecutionError
-
 
 # EVM constants
 MAX_STACK_DEPTH = 1024
 UINT256_MAX = 2**256 - 1
 INT256_MAX = 2**255 - 1
 INT256_MIN = -(2**255)
-
 
 class EVMStack:
     """
@@ -38,7 +37,7 @@ class EVMStack:
         Args:
             max_depth: Maximum stack depth (default 1024)
         """
-        self._stack: List[int] = []
+        self._stack: list[int] = []
         self._max_depth = max_depth
 
     def push(self, value: int) -> None:
@@ -134,7 +133,7 @@ class EVMStack:
             self._stack[-1],
         )
 
-    def pop_n(self, n: int) -> List[int]:
+    def pop_n(self, n: int) -> list[int]:
         """
         Pop n values from the stack.
 
@@ -154,7 +153,7 @@ class EVMStack:
         result = [self._stack.pop() for _ in range(n)]
         return result
 
-    def push_n(self, values: List[int]) -> None:
+    def push_n(self, values: list[int]) -> None:
         """
         Push multiple values onto the stack.
 
@@ -199,7 +198,6 @@ class EVMStack:
         """Clear the stack."""
         self._stack.clear()
 
-
 def to_signed(value: int) -> int:
     """
     Convert unsigned 256-bit value to signed.
@@ -214,7 +212,6 @@ def to_signed(value: int) -> int:
         return value - (UINT256_MAX + 1)
     return value
 
-
 def to_unsigned(value: int) -> int:
     """
     Convert signed value to unsigned 256-bit.
@@ -228,7 +225,6 @@ def to_unsigned(value: int) -> int:
     if value < 0:
         return value + (UINT256_MAX + 1)
     return value & UINT256_MAX
-
 
 def sign_extend(value: int, byte_size: int) -> int:
     """

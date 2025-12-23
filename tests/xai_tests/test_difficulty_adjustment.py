@@ -14,7 +14,6 @@ Tests dynamic difficulty adjustment:
 import pytest
 import time
 import statistics
-from typing import List
 
 from xai.core.blockchain import Blockchain, Block, Transaction
 from xai.core.wallet import Wallet

@@ -1,8 +1,9 @@
+from __future__ import annotations
+
 import logging
 import math
 import time
-from typing import Any, Callable, Dict, Optional
-
+from typing import Any, Callable
 
 class ImpermanentLossCalculator:
     def calculate_il(self, initial_price_ratio: float, current_price_ratio: float) -> float:
@@ -23,9 +24,7 @@ class ImpermanentLossCalculator:
 
         return impermanent_loss
 
-
 logger = logging.getLogger("xai.blockchain.impermanent_loss_protection")
-
 
 class ILProtectionManager:
     def __init__(
@@ -33,7 +32,7 @@ class ILProtectionManager:
         il_calculator: ImpermanentLossCalculator,
         protection_percentage: float = 50.0,
         min_lock_duration_days: int = 30,
-        time_provider: Optional[Callable[[], int]] = None,
+        time_provider: Callable[[], int] | None = None,
     ):
         if not isinstance(il_calculator, ImpermanentLossCalculator):
             raise ValueError("il_calculator must be an instance of ImpermanentLossCalculator.")
@@ -47,7 +46,7 @@ class ILProtectionManager:
         self.il_calculator = il_calculator
         self.protection_percentage = protection_percentage / 100.0  # Convert to decimal
         self.min_lock_duration_seconds = min_lock_duration_days * 24 * 3600
-        self.lp_positions: Dict[str, Dict[str, Any]] = {}
+        self.lp_positions: dict[str, dict[str, Any]] = {}
         self._time_provider = time_provider or (lambda: int(time.time()))
 
     def record_lp_deposit(

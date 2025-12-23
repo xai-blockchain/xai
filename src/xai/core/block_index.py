@@ -19,17 +19,16 @@ Performance:
 
 from __future__ import annotations
 
+import logging
 import os
 import sqlite3
 import threading
 import time
-import logging
-from functools import lru_cache
-from typing import Optional, Tuple, Dict, Any
 from collections import OrderedDict
+from functools import lru_cache
+from typing import Any
 
 logger = logging.getLogger(__name__)
-
 
 class LRUBlockCache:
     """
@@ -52,7 +51,7 @@ class LRUBlockCache:
         self.hits = 0
         self.misses = 0
 
-    def get(self, block_index: int) -> Optional[Any]:
+    def get(self, block_index: int) -> Any | None:
         """
         Retrieve block from cache if present.
 
@@ -107,7 +106,7 @@ class LRUBlockCache:
             self.hits = 0
             self.misses = 0
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """
         Get cache statistics.
 
@@ -124,7 +123,6 @@ class LRUBlockCache:
                 "size": len(self.cache),
                 "capacity": self.capacity,
             }
-
 
 class BlockIndex:
     """
@@ -263,7 +261,7 @@ class BlockIndex:
             finally:
                 conn.close()
 
-    def get_block_location(self, block_index: int) -> Optional[Tuple[str, int, int]]:
+    def get_block_location(self, block_index: int) -> tuple[str, int, int] | None:
         """
         Get file location for a block by height.
 
@@ -285,7 +283,7 @@ class BlockIndex:
             finally:
                 conn.close()
 
-    def get_block_location_by_hash(self, block_hash: str) -> Optional[Tuple[int, str, int, int]]:
+    def get_block_location_by_hash(self, block_hash: str) -> tuple[int, str, int, int] | None:
         """
         Get block location by hash.
 
@@ -311,7 +309,7 @@ class BlockIndex:
             finally:
                 conn.close()
 
-    def get_max_indexed_height(self) -> Optional[int]:
+    def get_max_indexed_height(self) -> int | None:
         """
         Get the highest indexed block height.
 
@@ -404,7 +402,7 @@ class BlockIndex:
             finally:
                 conn.close()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """
         Get index statistics.
 

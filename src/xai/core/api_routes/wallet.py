@@ -1,23 +1,22 @@
 from __future__ import annotations
 
 import logging
+
 logger = logging.getLogger(__name__)
 
-
-from typing import TYPE_CHECKING, Dict, Tuple, Any
+from typing import TYPE_CHECKING, Any
 
 from flask import jsonify
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
 
-
 def register_wallet_routes(routes: "NodeAPIRoutes") -> None:
     app = routes.app
     blockchain = routes.blockchain
 
     @app.route("/balance/<address>", methods=["GET"])
-    def get_balance(address: str) -> Dict[str, Any]:
+    def get_balance(address: str) -> dict[str, Any]:
         """Get balance for a blockchain address.
 
         Retrieves the current balance for the specified address by summing
@@ -35,7 +34,7 @@ def register_wallet_routes(routes: "NodeAPIRoutes") -> None:
         return jsonify({"address": address, "balance": balance})
 
     @app.route("/address/<address>/nonce", methods=["GET"])
-    def get_address_nonce(address: str) -> Tuple[Dict[str, Any], int]:
+    def get_address_nonce(address: str) -> tuple[dict[str, Any], int]:
         """Get nonce information for an address.
 
         Returns confirmed nonce, next available nonce, and pending nonce for
@@ -65,7 +64,17 @@ def register_wallet_routes(routes: "NodeAPIRoutes") -> None:
         try:
             confirmed = tracker.get_nonce(address)
             next_nonce = tracker.get_next_nonce(address)
-        except Exception as exc:
+        except (ValueError, RuntimeError, KeyError, AttributeError) as exc:
+            logger.error(
+                "Nonce lookup failed",
+                extra={
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                    "address": address,
+                    "function": "nonce_lookup"
+                },
+                exc_info=True
+            )
             return routes._handle_exception(exc, "nonce_lookup")
 
         pending_nonce = next_nonce - 1 if next_nonce - 1 > confirmed else None
@@ -82,7 +91,7 @@ def register_wallet_routes(routes: "NodeAPIRoutes") -> None:
         )
 
     @app.route("/history/<address>", methods=["GET"])
-    def get_history(address: str) -> Dict[str, Any]:
+    def get_history(address: str) -> dict[str, Any]:
         """Get transaction history for an address.
 
         Returns paginated transaction history for the specified address,

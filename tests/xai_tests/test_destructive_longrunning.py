@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Phase 7: Destructive & Long-Running Tests
 LOCAL_TESTING_PLAN.md Phase 7
@@ -23,18 +25,16 @@ import tempfile
 import threading
 import psutil
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple
+
 from collections import defaultdict
 
 from xai.core.blockchain import Blockchain, Block, Transaction
 from xai.core.wallet import Wallet
 from xai.core.blockchain_storage import BlockchainStorage
 
-
 # ============================================================================
 # Test Class 1: Database Corruption Tests (7.1)
 # ============================================================================
-
 
 @pytest.mark.destructive
 class TestDatabaseCorruption:
@@ -47,7 +47,7 @@ class TestDatabaseCorruption:
     """
 
     @pytest.fixture
-    def blockchain_with_data(self, tmp_path) -> Tuple[Path, Blockchain]:
+    def blockchain_with_data(self, tmp_path) -> tuple[Path, Blockchain]:
         """Create a blockchain with some data for corruption tests"""
         data_dir = tmp_path / "blockchain_data"
         data_dir.mkdir()
@@ -343,11 +343,9 @@ class TestDatabaseCorruption:
         # but should at least have genesis
         assert len(new_blockchain.chain) >= 1
 
-
 # ============================================================================
 # Test Class 2: Resource Constraint Tests (7.2)
 # ============================================================================
-
 
 @pytest.mark.slow
 class TestResourceConstraints:
@@ -684,11 +682,9 @@ class TestResourceConstraints:
         # System should not have crashed (implicit - we reached this point)
         assert blockchain is not None
 
-
 # ============================================================================
 # Test Class 3: Long-Running Stability Tests (7.3)
 # ============================================================================
-
 
 @pytest.mark.slow
 @pytest.mark.longrunning
@@ -1038,11 +1034,9 @@ class TestLongRunningStability:
         assert avg_cpu < 80, f"CPU usage too high: {avg_cpu:.1f}%"
         assert max_memory < 500, f"Memory usage too high: {max_memory:.1f} MB"
 
-
 # ============================================================================
 # Test Class 4: E2E Performance Tests (7.4)
 # ============================================================================
-
 
 @pytest.mark.performance
 @pytest.mark.slow

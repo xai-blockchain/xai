@@ -6,7 +6,6 @@ Analyze current coverage from coverage.json file.
 import json
 import os
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 def analyze_coverage():
     """Analyze the coverage.json file and generate report."""

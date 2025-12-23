@@ -12,12 +12,9 @@ import importlib
 import importlib.util
 import sysconfig
 from pathlib import Path
-from typing import Iterable, Optional, Set
-
 
 class ModuleAttachmentError(RuntimeError):
     """Raised when a module fails attachment validation."""
-
 
 class ModuleAttachmentGuard:
     """Validate that modules originate from trusted locations and are allowlisted."""
@@ -26,11 +23,11 @@ class ModuleAttachmentGuard:
         self,
         allowed_modules: Iterable[str],
         *,
-        trusted_base: Optional[Path] = None,
-        trusted_stdlib: Optional[Path] = None,
-        require_attribute: Optional[str] = None,
+        trusted_base: Path | None = None,
+        trusted_stdlib: Path | None = None,
+        require_attribute: str | None = None,
     ) -> None:
-        self.allowed_modules: Set[str] = {m.strip() for m in allowed_modules if m}
+        self.allowed_modules: set[str] = {m.strip() for m in allowed_modules if m}
         self.require_attribute = require_attribute
         self.trusted_base = Path(trusted_base).resolve() if trusted_base else Path(__file__).resolve().parents[2]
         stdlib_path = trusted_stdlib or Path(sysconfig.get_paths()["stdlib"])

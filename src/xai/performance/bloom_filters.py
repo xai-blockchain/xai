@@ -10,8 +10,6 @@ from __future__ import annotations
 
 import hashlib
 import math
-from typing import List, Set, Optional
-
 
 class BloomFilter:
     """
@@ -141,7 +139,6 @@ class BloomFilter:
         k = (size / expected_elements) * math.log(2)
         return max(1, int(math.ceil(k)))
 
-
 class TransactionBloomFilter:
     """
     Bloom filter specifically for transaction filtering
@@ -150,7 +147,7 @@ class TransactionBloomFilter:
     downloading all transaction data.
     """
 
-    def __init__(self, addresses: List[str], false_positive_rate: float = 0.01):
+    def __init__(self, addresses: list[str], false_positive_rate: float = 0.01):
         """
         Initialize transaction bloom filter
 
@@ -203,7 +200,6 @@ class TransactionBloomFilter:
             "hash_count": self.bloom.hash_count,
             "false_positive_rate": self.bloom.get_false_positive_rate()
         }
-
 
 class BlockBloomFilter:
     """
@@ -258,7 +254,6 @@ class BlockBloomFilter:
         """
         return self.bloom.contains(txid)
 
-
 class MultiBloomFilter:
     """
     Multiple bloom filters for different data types
@@ -306,7 +301,6 @@ class MultiBloomFilter:
             }
         }
 
-
 class LightClientFilter:
     """
     Complete bloom filter solution for light clients
@@ -314,7 +308,7 @@ class LightClientFilter:
     Combines multiple filters for efficient transaction filtering
     """
 
-    def __init__(self, tracked_addresses: List[str]):
+    def __init__(self, tracked_addresses: list[str]):
         """
         Initialize light client filter
 
@@ -333,9 +327,9 @@ class LightClientFilter:
         for address in tracked_addresses:
             self.bloom.add(address)
 
-        self.relevant_transactions: List[str] = []
+        self.relevant_transactions: list[str] = []
 
-    def filter_block(self, block: any) -> List[any]:
+    def filter_block(self, block: any) -> list[any]:
         """
         Filter block for relevant transactions
 

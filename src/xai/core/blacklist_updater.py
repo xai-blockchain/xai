@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blacklist Auto-Updater
 
@@ -5,21 +7,18 @@ Year 1: PROMPTED (optional) - nodes reminded to update blacklists
 After 1 Year: Community vote decides if mandatory and frequency
 """
 
-from abc import ABC, abstractmethod
-import os
-import time
 import hashlib
 import json
-from datetime import datetime
-from typing import Dict, List, Set
-import xml.etree.ElementTree as ET
-
 import logging
+import os
+import time
+import xml.etree.ElementTree as ET
+from abc import ABC, abstractmethod
+from datetime import datetime
+
 logger = logging.getLogger(__name__)
 
-
 import requests
-
 
 BLACKLIST_USE_MOCK = os.getenv("XAI_BLACKLIST_USE_MOCK", "true").strip().lower() in {
     "1",
@@ -29,7 +28,6 @@ BLACKLIST_USE_MOCK = os.getenv("XAI_BLACKLIST_USE_MOCK", "true").strip().lower()
 }
 BLACKLIST_HTTP_TIMEOUT = int(os.getenv("XAI_BLACKLIST_HTTP_TIMEOUT", "30"))
 COMMUNITY_VOTE_THRESHOLD = int(os.getenv("XAI_COMMUNITY_VOTE_THRESHOLD", "7"))
-
 
 class BlacklistSource(ABC):
     """Base class for blacklist sources"""
@@ -47,7 +45,7 @@ class BlacklistSource(ABC):
         return elapsed > (self.update_frequency * 3600)
 
     @abstractmethod
-    def fetch_addresses(self) -> Set[str]:
+    def fetch_addresses(self) -> set[str]:
         """Fetch and return addresses exposed by this source."""
 
     def update(self) -> Dict:
@@ -87,7 +85,6 @@ class BlacklistSource(ABC):
                 "last_update": self.last_update,
             }
 
-
 class OFACBlacklist(BlacklistSource):
     """OFAC Sanctions List"""
 
@@ -98,7 +95,7 @@ class OFACBlacklist(BlacklistSource):
             update_frequency_hours=24,
         )
 
-    def fetch_addresses(self) -> Set[str]:
+    def fetch_addresses(self) -> set[str]:
         """
         Fetch OFAC SDN (Specially Designated Nationals) list
 
@@ -132,7 +129,6 @@ class OFACBlacklist(BlacklistSource):
 
         return addresses
 
-
 class CommunityBlacklist(BlacklistSource):
     """Community-governed blacklist (multi-sig voting)"""
 
@@ -142,7 +138,7 @@ class CommunityBlacklist(BlacklistSource):
             update_frequency_hours=6,
         )
 
-    def fetch_addresses(self) -> Set[str]:
+    def fetch_addresses(self) -> set[str]:
         """
         Fetch community-voted blacklist
 
@@ -166,7 +162,6 @@ class CommunityBlacklist(BlacklistSource):
 
         return addresses
 
-
 class RansomwareTrackerBlacklist(BlacklistSource):
     """Known ransomware addresses"""
 
@@ -177,7 +172,7 @@ class RansomwareTrackerBlacklist(BlacklistSource):
             update_frequency_hours=24,
         )
 
-    def fetch_addresses(self) -> Set[str]:
+    def fetch_addresses(self) -> set[str]:
         """
         Fetch known ransomware payment addresses
 
@@ -205,7 +200,6 @@ class RansomwareTrackerBlacklist(BlacklistSource):
                     addresses.add(address)
 
         return addresses
-
 
 class BlacklistManager:
     """
@@ -260,7 +254,7 @@ class BlacklistManager:
 
         return results
 
-    def get_blacklist(self) -> Set[str]:
+    def get_blacklist(self) -> set[str]:
         """Get current consolidated blacklist"""
         return self.consolidated_blacklist.copy()
 
@@ -330,7 +324,6 @@ class BlacklistManager:
         self.consolidated_blacklist = set(data["addresses"])
         self.last_full_update = data["updated"]
 
-
 class ConsensusBlacklistValidator:
     """
     Validates nodes have current blacklist
@@ -370,7 +363,6 @@ class ConsensusBlacklistValidator:
             }
 
         return {"valid": True, "hours_since_update": round(hours_since, 2)}
-
 
 # Example usage
 if __name__ == "__main__":

@@ -14,115 +14,99 @@ Includes:
 - Biometric-protected wallet operations
 """
 
-from xai.mobile.qr_transactions import (
-    TransactionQRGenerator,
-    MobilePaymentEncoder,
-    QRCodeValidator,
-    QRCODE_AVAILABLE
-)
-
 from xai.mobile.biometric_auth import (
     BiometricAuthManager,
     BiometricAuthProvider,
-    MockBiometricProvider,
-    BiometricSession,
-    SessionConfig,
-    BiometricType,
-    BiometricStrength,
+    BiometricCapability,
     BiometricError,
     BiometricResult,
-    BiometricCapability,
-    ProtectionLevel
+    BiometricSession,
+    BiometricStrength,
+    BiometricType,
+    MockBiometricProvider,
+    ProtectionLevel,
+    SessionConfig,
 )
-
-from xai.mobile.secure_enclave import (
-    SecureEnclaveManager,
-    SecureEnclaveProvider,
-    MockSecureEnclaveProvider,
-    SecureKey,
-    KeyAlgorithm,
-    KeyProtection,
-    AttestationLevel,
-    SignatureResult,
-    AttestationResult
-)
-
 from xai.mobile.biometric_wallet import (
-    BiometricWallet,
-    BiometricWalletFactory,
-    SecurityPolicy,
-    OperationAudit,
-    BiometricWalletError,
-    AuthenticationRequiredError,
     AuthenticationFailedError,
-    WalletLockedError
+    AuthenticationRequiredError,
+    BiometricWallet,
+    BiometricWalletError,
+    BiometricWalletFactory,
+    OperationAudit,
+    SecurityPolicy,
+    WalletLockedError,
 )
-
-from xai.mobile.offline_bridge import (
-    OfflineSigningBridge,
-    UnsignedTransaction,
-    SignedTransaction,
-    QROfflineBridge,
-    BatchOfflineSigning
-)
-
 from xai.mobile.cache_sync import (
-    MobileCacheSyncManager,
+    DiffUpdate,
     IncrementalSyncProtocol,
     MobileCacheStorage,
+    MobileCacheSyncManager,
     SyncCheckpoint,
-    DiffUpdate
 )
-
-from xai.mobile.mini_app_sandbox import (
-    MiniAppRegistry,
-    AppSandbox,
-    MiniApp,
-    AppPermission
-)
-
-from xai.mobile.push_notifications import (
-    PushNotificationService,
-    DeliveryResult,
-    NotificationError,
-    InvalidTokenError,
-    RateLimitError,
-    DeviceRegistry,
-    DeviceInfo,
-    DevicePlatform,
-)
-
-from xai.mobile.notification_types import (
-    NotificationPayload,
-    NotificationType,
-    NotificationPriority,
-    create_transaction_notification,
-    create_confirmation_notification,
-    create_price_alert_notification,
-    create_security_notification,
-    create_governance_notification,
-)
-
-from xai.mobile.sync_manager import (
-    MobileSyncManager,
-    SyncState,
-    NetworkCondition,
-    SyncStatistics,
-    BandwidthThrottle,
-)
-
-from xai.mobile.telemetry import (
-    MobileTelemetryCollector,
-    TelemetryEvent,
-    AggregatedStats,
-)
-
+from xai.mobile.mini_app_sandbox import AppPermission, AppSandbox, MiniApp, MiniAppRegistry
 from xai.mobile.network_optimizer import (
+    BandwidthMode,
+    ConnectionType,
     NetworkOptimizer,
     NetworkProfile,
-    ConnectionType,
-    BandwidthMode,
     QueuedTransaction,
+)
+from xai.mobile.notification_types import (
+    NotificationPayload,
+    NotificationPriority,
+    NotificationType,
+    create_confirmation_notification,
+    create_governance_notification,
+    create_price_alert_notification,
+    create_security_notification,
+    create_transaction_notification,
+)
+from xai.mobile.offline_bridge import (
+    BatchOfflineSigning,
+    OfflineSigningBridge,
+    QROfflineBridge,
+    SignedTransaction,
+    UnsignedTransaction,
+)
+from xai.mobile.push_notifications import (
+    DeliveryResult,
+    DeviceInfo,
+    DevicePlatform,
+    DeviceRegistry,
+    InvalidTokenError,
+    NotificationError,
+    PushNotificationService,
+    RateLimitError,
+)
+from xai.mobile.qr_transactions import (
+    QRCODE_AVAILABLE,
+    MobilePaymentEncoder,
+    QRCodeValidator,
+    TransactionQRGenerator,
+)
+from xai.mobile.secure_enclave import (
+    AttestationLevel,
+    AttestationResult,
+    KeyAlgorithm,
+    KeyProtection,
+    MockSecureEnclaveProvider,
+    SecureEnclaveManager,
+    SecureEnclaveProvider,
+    SecureKey,
+    SignatureResult,
+)
+from xai.mobile.sync_manager import (
+    BandwidthThrottle,
+    MobileSyncManager,
+    NetworkCondition,
+    SyncState,
+    SyncStatistics,
+)
+from xai.mobile.telemetry import (
+    AggregatedStats,
+    MobileTelemetryCollector,
+    TelemetryEvent,
 )
 
 __all__ = [

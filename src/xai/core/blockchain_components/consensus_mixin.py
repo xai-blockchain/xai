@@ -9,12 +9,11 @@ and coinbase validation.
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from xai.core.blockchain_components.block import Block
     from xai.core.block_header import BlockHeader
-
+    from xai.core.blockchain_components.block import Block
 
 class BlockchainConsensusMixin:
     """
@@ -80,7 +79,7 @@ class BlockchainConsensusMixin:
 
         return reward
 
-    def validate_coinbase_reward(self, block: "Block") -> Tuple[bool, Optional[str]]:
+    def validate_coinbase_reward(self, block: "Block") -> tuple[bool, str | None]:
         """
         Validate that the coinbase transaction doesn't exceed the allowed block reward + fees.
 
@@ -174,8 +173,8 @@ class BlockchainConsensusMixin:
     def calculate_next_difficulty(
         self,
         *,
-        chain: Optional[Sequence[Union["Block", "BlockHeader"]]] = None,
-        current_difficulty: Optional[int] = None,
+        chain: Sequence["Block" | "BlockHeader"] | None = None,
+        current_difficulty: int | None = None,
         emit_log: bool = True,
     ) -> int:
         """
@@ -199,11 +198,11 @@ class BlockchainConsensusMixin:
         override_difficulty = current_difficulty is not None
 
         if override_chain:
-            chain_view: Sequence[Union["Block", "BlockHeader"]] = list(chain or [])
+            chain_view: Sequence["Block" | "BlockHeader"] = list(chain or [])
         else:
             chain_view = self.chain
 
-        def _extract_header(entry: Union["Block", "BlockHeader"]) -> "BlockHeader":
+        def _extract_header(entry: "Block" | "BlockHeader") -> "BlockHeader":
             return entry.header if hasattr(entry, "header") else entry
 
         if current_difficulty is None:
@@ -231,7 +230,7 @@ class BlockchainConsensusMixin:
         )
         adjuster.max_difficulty = max(derived_cap, adjuster.min_difficulty + 1)
 
-        context_obj: Union[Any, SimpleNamespace]
+        context_obj: Any | SimpleNamespace
         if override_chain or override_difficulty:
             context_obj = SimpleNamespace(chain=chain_view, difficulty=current_baseline)
         else:
@@ -310,8 +309,8 @@ class BlockchainConsensusMixin:
         self,
         *,
         block_index: int,
-        history: Sequence[Union["Block", "BlockHeader"]],
-    ) -> Optional[int]:
+        history: Sequence["Block" | "BlockHeader"],
+    ) -> int | None:
         """
         Determine the deterministic difficulty for a block based on prior history.
 

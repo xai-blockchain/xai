@@ -1,11 +1,11 @@
-import time
-from collections import defaultdict
-from typing import List, Dict, Any
+from __future__ import annotations
 
 import logging
+import time
+from collections import defaultdict
+from typing import Any
+
 logger = logging.getLogger(__name__)
-
-
 
 class EclipseProtector:
     def __init__(self, max_connections_per_ip: int = 3, min_diverse_peers: int = 5):
@@ -18,9 +18,9 @@ class EclipseProtector:
         self.min_diverse_peers = min_diverse_peers
 
         # Stores connected peers: {peer_id: {"ip_address": str, "connection_time": float}}
-        self.connected_peers: Dict[str, Dict[str, Any]] = {}
+        self.connected_peers: dict[str, dict[str, Any]] = {}
         # Tracks connections per IP: {ip_address: count}
-        self.connections_by_ip: Dict[str, int] = defaultdict(int)
+        self.connections_by_ip: dict[str, int] = defaultdict(int)
         self._peer_id_counter = 0
         print(
             f"EclipseProtector initialized. Max connections per IP: {self.max_connections_per_ip}, Min diverse peers: {self.min_diverse_peers}."
@@ -79,7 +79,6 @@ class EclipseProtector:
         # Further checks could involve geographical diversity, ASN diversity, etc.
         print(f"Network diversity check passed. {unique_ips} unique IPs connected.")
         return False
-
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

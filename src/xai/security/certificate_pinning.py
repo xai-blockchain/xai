@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Production-Grade Certificate Pinning System
 Provides secure certificate validation with backup pins and rotation support
@@ -5,32 +7,26 @@ Provides secure certificate validation with backup pins and rotation support
 
 import hashlib
 import logging
-import time
-import ssl
 import socket
-from typing import Dict, List, Optional, Tuple
+import ssl
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-
 logger = logging.getLogger(__name__)
-
 
 # Certificate pinning exceptions
 class CertificatePinningError(Exception):
     """Base exception for certificate pinning operations"""
     pass
 
-
 class CertificateFetchError(CertificatePinningError):
     """Raised when certificate fetching fails"""
     pass
 
-
 class CertificateValidationError(CertificatePinningError):
     """Raised when certificate validation fails"""
     pass
-
 
 @dataclass
 class Pin:
@@ -39,7 +35,6 @@ class Pin:
     description: str = ""
     added_at: float = 0.0
     is_backup: bool = False
-
 
 class CertificatePinner:
     """
@@ -62,12 +57,12 @@ class CertificatePinner:
             grace_period_days: Days to allow old pins during rotation
         """
         # Stores pinned public key hashes with metadata
-        self.pinned_certificates: Dict[str, List[Pin]] = {}
+        self.pinned_certificates: dict[str, list[Pin]] = {}
         self.enforce_pinning = enforce_pinning
         self.grace_period = timedelta(days=grace_period_days)
 
         # Track violations for monitoring
-        self.violations: List[Dict] = []
+        self.violations: list[Dict] = []
         self.max_violations_log = 100
 
         logger.info("CertificatePinner initialized with enforcement=%s", enforce_pinning)
@@ -184,7 +179,7 @@ class CertificatePinner:
         hostname: str,
         port: int = 443,
         description: str = ""
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Fetch current certificate from server and add as pin.
 
@@ -313,7 +308,7 @@ class CertificatePinner:
 
         return removed
 
-    def get_pins(self, hostname: str) -> List[Dict]:
+    def get_pins(self, hostname: str) -> list[Dict]:
         """Get all pins for hostname"""
         if hostname not in self.pinned_certificates:
             return []
@@ -329,7 +324,7 @@ class CertificatePinner:
             for pin in self.pinned_certificates[hostname]
         ]
 
-    def get_violations(self, limit: int = 10) -> List[Dict]:
+    def get_violations(self, limit: int = 10) -> list[Dict]:
         """Get recent pinning violations"""
         return self.violations[-limit:]
 
@@ -343,7 +338,6 @@ class CertificatePinner:
             "grace_period_days": self.grace_period.days,
             "hosts": list(self.pinned_certificates.keys())
         }
-
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

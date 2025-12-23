@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Built-In Liquidity Pools
 
@@ -5,16 +7,14 @@ AMM-style liquidity pools for instant swaps
 All pairs supported - free market pricing
 """
 
-import time
 import hashlib
 import json
 import os
-from typing import Dict, List, Tuple, Optional
+import time
 from enum import Enum
 
 from xai.core.audit_signer import AuditSigner
 from xai.core.config import Config
-
 
 class PoolPair(Enum):
     """Supported liquidity pool pairs"""
@@ -30,7 +30,6 @@ class PoolPair(Enum):
     XAI_ZEC = "XAI/ZEC"
     XAI_DASH = "XAI/DASH"
     XAI_XMR = "XAI/XMR"
-
 
 class LiquidityPool:
     """
@@ -209,8 +208,9 @@ class LiquidityPool:
         Uses constant product formula: x * y = k
         """
         # Import metrics
-        from xai.core.dex_metrics import get_dex_metrics
         import time
+
+        from xai.core.dex_metrics import get_dex_metrics
         metrics = get_dex_metrics()
         start_time = time.time()
 
@@ -409,7 +409,7 @@ class LiquidityPool:
             "tvl_other": self.other_reserve,
         }
 
-    def withdraw_protocol_fees(self, destination: str, amount: Optional[float] = None) -> Dict:
+    def withdraw_protocol_fees(self, destination: str, amount: float | None = None) -> Dict:
         amount = amount or self.protocol_fee_balance
         if amount <= 0 or amount > self.protocol_fee_balance:
             return {"success": False, "error": "Invalid amount"}
@@ -436,7 +436,6 @@ class LiquidityPool:
         with open(path, "a") as f:
             f.write(json.dumps(entry) + "\n")
 
-
 class PoolManager:
     """Manages all liquidity pools"""
 
@@ -447,11 +446,11 @@ class PoolManager:
         for pair in PoolPair:
             self.pools[pair.value] = LiquidityPool(pair)
 
-    def get_pool(self, pair: str) -> Optional[LiquidityPool]:
+    def get_pool(self, pair: str) -> LiquidityPool | None:
         """Get specific pool"""
         return self.pools.get(pair)
 
-    def get_all_pools_stats(self) -> List[Dict]:
+    def get_all_pools_stats(self) -> list[Dict]:
         """Get stats for all pools"""
 
         stats = []
@@ -482,7 +481,6 @@ class PoolManager:
                     best_pool = pair_name
 
         return {"best_pool": best_pool, "estimated_output": best_output, "xai_input": xai_amount}
-
 
 # Example usage
 if __name__ == "__main__":

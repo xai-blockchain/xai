@@ -1,15 +1,16 @@
+from __future__ import annotations
+
 import logging
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
 
-from .front_running_protection import FrontRunningProtectionManager
 from .emergency_pause import EmergencyPauseManager
+from .front_running_protection import FrontRunningProtectionManager
 
 logger = logging.getLogger("xai.blockchain.mev_mitigation")
 
 # In a real application, this would come from a secure config
 AUTHORIZED_PAUSER = "0xAdmin"
-
 
 class MEVMitigationManager:
     def __init__(
@@ -25,10 +26,10 @@ class MEVMitigationManager:
         self.pause_manager = EmergencyPauseManager(
             db_path=db_path, authorized_pauser_address=AUTHORIZED_PAUSER
         )
-        self.private_transactions_queue: List[Dict[str, Any]] = []
-        self.transaction_bundles: List[List[Dict[str, Any]]] = []
+        self.private_transactions_queue: list[dict[str, Any]] = []
+        self.transaction_bundles: list[list[dict[str, Any]]] = []
 
-    def submit_private_transaction(self, transaction: Dict[str, Any], sender_address: str) -> bool:
+    def submit_private_transaction(self, transaction: dict[str, Any], sender_address: str) -> bool:
         """
         Simulates submitting a transaction directly to a trusted block producer (e.g., through a private relay).
         This bypasses the public mempool, reducing front-running opportunities.
@@ -60,7 +61,7 @@ class MEVMitigationManager:
         logger.info("Private transactions processed.")
 
     def submit_transaction_bundle(
-        self, transactions: List[Dict[str, Any]], sender_address: str
+        self, transactions: list[dict[str, Any]], sender_address: str
     ) -> bool:
         """
         Simulates submitting a bundle of transactions for atomic execution.
@@ -98,10 +99,10 @@ class MEVMitigationManager:
 
     def detect_sandwich_attack(
         self,
-        target_transaction: Dict[str, Any],
+        target_transaction: dict[str, Any],
         pre_tx_price: float,
         post_tx_price: float,
-        current_mempool_transactions: List[Dict[str, Any]],
+        current_mempool_transactions: list[dict[str, Any]],
     ) -> bool:
         """
         Conceptual detection of a sandwich attack.

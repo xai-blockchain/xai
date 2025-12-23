@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Microbenchmark tests for performance-critical operations.
 
@@ -10,7 +12,6 @@ import pytest
 import time
 import json
 import statistics
-from typing import List, Tuple
 
 from xai.core.wallet import Wallet
 from xai.core.transaction import Transaction
@@ -18,11 +19,10 @@ from xai.core.utxo_manager import UTXOManager
 from xai.core.blockchain import Blockchain
 from xai.core.crypto_utils import sign_message_hex, verify_signature_hex, derive_public_key_hex
 
-
 class TestSignatureVerificationBenchmarks:
     """Microbenchmarks for ECDSA signature operations."""
 
-    def _generate_signed_message(self, wallet: Wallet) -> Tuple[str, str, str]:
+    def _generate_signed_message(self, wallet: Wallet) -> tuple[str, str, str]:
         """Generate a signed message for testing."""
         message = f"test_message_{time.time()}".encode()
         signature = sign_message_hex(wallet.private_key, message)
@@ -118,7 +118,6 @@ class TestSignatureVerificationBenchmarks:
         avg_ms = (elapsed / 100) * 1000
         print(f"\nTransaction signature verification: {avg_ms:.2f} ms/tx ({verifications_per_second:.2f}/s)")
         assert verifications_per_second > 10
-
 
 class TestUTXOLookupBenchmarks:
     """Microbenchmarks for UTXO manager operations."""
@@ -269,7 +268,6 @@ class TestUTXOLookupBenchmarks:
         print(f"\nConsistency check (10000 UTXOs): {avg_ms:.2f} ms/check ({checks_per_second:.2f}/s)")
         assert avg_ms < 5000
 
-
 class TestBlockSerializationBenchmarks:
     """Microbenchmarks for block serialization/deserialization."""
 
@@ -379,7 +377,6 @@ class TestBlockSerializationBenchmarks:
         print(f"\nBlock JSON serialize: {avg_ms:.3f} ms/block ({per_second:.2f}/s)")
         assert per_second > 50
 
-
 class TestMerkleTreeBenchmarks:
     """Microbenchmarks for Merkle tree operations."""
 
@@ -427,7 +424,6 @@ class TestMerkleTreeBenchmarks:
         print(f"\nMerkle root (100 txs): {avg_us:.2f} us/calc ({calcs_per_second:.0f}/s)")
         assert calcs_per_second > 100
 
-
 class TestCryptoOperationsBenchmarks:
     """Microbenchmarks for cryptographic operations."""
 
@@ -474,7 +470,6 @@ class TestCryptoOperationsBenchmarks:
         avg_ms = (elapsed / iterations) * 1000
         print(f"\nWallet creation: {avg_ms:.2f} ms/wallet ({wallets_per_second:.2f}/s)")
         assert wallets_per_second > 10
-
 
 class TestComprehensiveBenchmarkSummary:
     """Run comprehensive benchmark suite and report summary."""
@@ -541,7 +536,6 @@ class TestComprehensiveBenchmarkSummary:
         assert results["utxo_lookup"] > 1000
         assert results["tx_serialize"] > 1000
         assert results["merkle_root"] > 1
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

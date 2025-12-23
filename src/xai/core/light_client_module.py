@@ -6,11 +6,11 @@ Re-export light client functionality from core module.
 """
 
 from xai.core.light_client import (
-    LightClient,
-    SPVProof,
     BlockHeader,
+    LightClient,
     MerkleProofGenerator,
-    SPVServerInterface
+    SPVProof,
+    SPVServerInterface,
 )
 
 __all__ = [

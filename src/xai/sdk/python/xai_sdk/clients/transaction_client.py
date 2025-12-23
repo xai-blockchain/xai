@@ -1,16 +1,17 @@
+from __future__ import annotations
+
 """
 Transaction Client for XAI SDK
 
 Handles all transaction-related operations.
 """
 
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Any
 
+from ..exceptions import TransactionError, ValidationError
 from ..http_client import HTTPClient
 from ..models import Transaction, TransactionStatus
-from ..exceptions import TransactionError, ValidationError
-
 
 class TransactionClient:
     """Client for transaction operations."""
@@ -29,11 +30,11 @@ class TransactionClient:
         from_address: str,
         to_address: str,
         amount: str,
-        data: Optional[str] = None,
-        gas_limit: Optional[str] = None,
-        gas_price: Optional[str] = None,
-        nonce: Optional[int] = None,
-        signature: Optional[str] = None,
+        data: str | None = None,
+        gas_limit: str | None = None,
+        gas_price: str | None = None,
+        nonce: int | None = None,
+        signature: str | None = None,
     ) -> Transaction:
         """
         Send a transaction.
@@ -89,8 +90,13 @@ class TransactionClient:
             )
         except TransactionError:
             raise
-        except Exception as e:
-            raise TransactionError(f"Failed to send transaction: {str(e)}")
+        except TransactionError:
+
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise TransactionError(f"Failed to send transaction: {str(e)}") from e
 
     def get(self, tx_hash: str) -> Transaction:
         """
@@ -124,10 +130,15 @@ class TransactionClient:
                 block_hash=response.get("block_hash"),
                 confirmations=response.get("confirmations", 0),
             )
-        except Exception as e:
-            raise TransactionError(f"Failed to get transaction: {str(e)}")
+        except TransactionError:
 
-    def get_status(self, tx_hash: str) -> Dict[str, Any]:
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise TransactionError(f"Failed to get transaction: {str(e)}") from e
+
+    def get_status(self, tx_hash: str) -> dict[str, Any]:
         """
         Get transaction status.
 
@@ -145,16 +156,21 @@ class TransactionClient:
 
         try:
             return self.http_client.get(f"/transaction/{tx_hash}/status")
-        except Exception as e:
-            raise TransactionError(f"Failed to get transaction status: {str(e)}")
+        except TransactionError:
+
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise TransactionError(f"Failed to get transaction status: {str(e)}") from e
 
     def estimate_fee(
         self,
         from_address: str,
         to_address: str,
         amount: str,
-        data: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        data: str | None = None,
+    ) -> dict[str, Any]:
         """
         Estimate transaction fee.
 
@@ -183,8 +199,13 @@ class TransactionClient:
                 payload["data"] = data
 
             return self.http_client.post("/transaction/estimate-fee", data=payload)
-        except Exception as e:
-            raise TransactionError(f"Failed to estimate fee: {str(e)}")
+        except TransactionError:
+
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise TransactionError(f"Failed to estimate fee: {str(e)}") from e
 
     def is_confirmed(self, tx_hash: str, confirmations: int = 1) -> bool:
         """
@@ -203,8 +224,13 @@ class TransactionClient:
         try:
             status = self.get_status(tx_hash)
             return status.get("confirmations", 0) >= confirmations
-        except Exception as e:
-            raise TransactionError(f"Failed to check confirmation: {str(e)}")
+        except TransactionError:
+
+            raise
+
+        except (KeyError, ValueError, TypeError) as e:
+
+            raise TransactionError(f"Failed to check confirmation: {str(e)}") from e
 
     def wait_for_confirmation(
         self,
@@ -242,7 +268,12 @@ class TransactionClient:
                 tx = self.get(tx_hash)
                 if tx.confirmations >= confirmations:
                     return tx
-            except Exception as e:
-                raise TransactionError(f"Failed to wait for confirmation: {str(e)}")
+            except TransactionError:
+
+                raise
+
+            except (KeyError, ValueError, TypeError) as e:
+
+                raise TransactionError(f"Failed to wait for confirmation: {str(e)}") from e
 
             time.sleep(poll_interval)

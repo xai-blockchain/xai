@@ -18,13 +18,11 @@ import sys
 import time
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Dict, Iterable, List
 
-
-def _load_events(path: Path) -> List[Dict[str, float]]:
+def _load_events(path: Path) -> list[dict[str, float]]:
     if not path.exists():
         return []
-    events: List[Dict[str, float]] = []
+    events: list[dict[str, float]] = []
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
             line = line.strip()
@@ -36,7 +34,6 @@ def _load_events(path: Path) -> List[Dict[str, float]]:
                 continue
     return events
 
-
 def _load_time_lock_backlog(path: Path) -> int:
     if not path.exists():
         return 0
@@ -47,8 +44,7 @@ def _load_time_lock_backlog(path: Path) -> int:
         return 0
     return sum(1 for entry in entries if entry.get("status", "pending") == "pending")
 
-
-def _summarize(events: List[Dict[str, float]], window: int) -> Dict[str, float]:
+def _summarize(events: list[dict[str, float]], window: int) -> dict[str, float]:
     now = time.time()
     cutoff = now - window
     window_events = [event for event in events if event.get("timestamp", 0) >= cutoff]
@@ -72,7 +68,6 @@ def _summarize(events: List[Dict[str, float]], window: int) -> Dict[str, float]:
         "top_users": [(user, by_user[user], volume_by_user[user]) for user in by_user.most_common(5)],
     }
     return stats
-
 
 def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Inspect withdrawal metrics for alert calibration.")
@@ -119,7 +114,6 @@ def main(argv: Iterable[str] | None = None) -> int:
         print(">> Backlog exceeds threshold. Investigate stuck approvals or run manual release job.")
 
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

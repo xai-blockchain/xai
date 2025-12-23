@@ -8,15 +8,15 @@ balances and history without storing private keys.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any
 
-import hashlib
 from bip_utils import Bip32KeyError, Bip32Slip10Secp256k1
 
 from xai.core.validation import AddressFormatValidator
@@ -25,27 +25,21 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_WATCH_STORE = Path(os.getenv("XAI_WATCH_STORE_PATH", Path.home() / ".xai" / "watch_only.json"))
 
-
 class WatchOnlyWalletError(Exception):
     """Base class for watch-only wallet errors."""
-
 
 class DuplicateWatchAddressError(WatchOnlyWalletError):
     """Raised when attempting to add an address that already exists."""
 
-
 class WatchAddressNotFoundError(WatchOnlyWalletError):
     """Raised when attempting to remove or update an address that does not exist."""
-
 
 class XpubDerivationError(WatchOnlyWalletError):
     """Raised when xpub-based derivation fails."""
 
-
 def _utc_timestamp() -> str:
     """Return ISO8601 timestamp with Z suffix."""
     return datetime.now(tz=timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
 
 def _public_key_hex_to_address(public_key_hex: str) -> str:
     """Convert uncompressed public key hex (without 0x04 prefix) to XAI address."""
@@ -56,20 +50,19 @@ def _public_key_hex_to_address(public_key_hex: str) -> str:
     digest = hashlib.sha256(pub_bytes).hexdigest()
     return f"{prefix}{digest[:40]}"
 
-
 @dataclass
 class WatchAddressEntry:
     """Represents a single watch-only address entry."""
 
     address: str
-    label: Optional[str] = None
-    notes: Optional[str] = None
-    tags: List[str] = field(default_factory=list)
+    label: str | None = None
+    notes: str | None = None
+    tags: list[str] = field(default_factory=list)
     source: str = "manual"
     added_at: str = field(default_factory=_utc_timestamp)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize entry to native dict."""
         return {
             "address": self.address,
@@ -82,7 +75,7 @@ class WatchAddressEntry:
         }
 
     @classmethod
-    def from_dict(cls, payload: Dict[str, Any]) -> "WatchAddressEntry":
+    def from_dict(cls, payload: dict[str, Any]) -> "WatchAddressEntry":
         """Build entry from dictionary data."""
         return cls(
             address=payload["address"],
@@ -94,20 +87,19 @@ class WatchAddressEntry:
             metadata=dict(payload.get("metadata", {})),
         )
 
-
 class WatchOnlyWalletStore:
     """Persistent storage for watch-only addresses."""
 
     def __init__(
         self,
-        store_path: Optional[Path] = None,
+        store_path: Path | None = None,
         *,
-        validator: Optional[AddressFormatValidator] = None,
+        validator: AddressFormatValidator | None = None,
     ) -> None:
         self.store_path = Path(store_path or DEFAULT_WATCH_STORE).expanduser()
         self.store_path.parent.mkdir(parents=True, exist_ok=True)
         self.validator = validator or AddressFormatValidator()
-        self._entries: Dict[str, WatchAddressEntry] = {}
+        self._entries: dict[str, WatchAddressEntry] = {}
         self._load()
 
     # ------------------------------------------------------------------ I/O --
@@ -122,7 +114,7 @@ class WatchOnlyWalletStore:
         except (OSError, json.JSONDecodeError) as exc:
             raise WatchOnlyWalletError(f"Failed to read watch-only store: {exc}") from exc
         entries = data.get("addresses", [])
-        loaded: Dict[str, WatchAddressEntry] = {}
+        loaded: dict[str, WatchAddressEntry] = {}
         for entry_data in entries:
             try:
                 entry = WatchAddressEntry.from_dict(entry_data)
@@ -141,7 +133,7 @@ class WatchOnlyWalletStore:
         tmp_path.replace(self.store_path)
 
     # ------------------------------------------------------------- operations --
-    def list_addresses(self, *, tags: Optional[Sequence[str]] = None) -> List[WatchAddressEntry]:
+    def list_addresses(self, *, tags: Sequence[str] | None = None) -> list[WatchAddressEntry]:
         """Return all watch-only addresses, optionally filtered by tags."""
         entries = list(self._entries.values())
         if tags:
@@ -155,10 +147,10 @@ class WatchOnlyWalletStore:
         self,
         address: str,
         *,
-        label: Optional[str] = None,
-        notes: Optional[str] = None,
-        tags: Optional[Iterable[str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        label: str | None = None,
+        notes: str | None = None,
+        tags: Iterable[str] | None = None,
+        metadata: dict[str, Any] | None = None,
         source: str = "manual",
     ) -> WatchAddressEntry:
         """Add a watch-only address to the store."""
@@ -189,9 +181,9 @@ class WatchOnlyWalletStore:
         logger.info("Removed watch-only address %s", normalized)
         return entry
 
-    def add_addresses(self, entries: Sequence[WatchAddressEntry]) -> List[WatchAddressEntry]:
+    def add_addresses(self, entries: Sequence[WatchAddressEntry]) -> list[WatchAddressEntry]:
         """Bulk add addresses (assumes each entry already validated)."""
-        added: List[WatchAddressEntry] = []
+        added: list[WatchAddressEntry] = []
         for entry in entries:
             normalized = self.validator.validate(entry.address)
             if normalized in self._entries:
@@ -212,10 +204,10 @@ class WatchOnlyWalletStore:
         change: int = 0,
         start_index: int = 0,
         count: int = 5,
-        label: Optional[str] = None,
-        notes: Optional[str] = None,
-        tags: Optional[Iterable[str]] = None,
-    ) -> List[WatchAddressEntry]:
+        label: str | None = None,
+        notes: str | None = None,
+        tags: Iterable[str] | None = None,
+    ) -> list[WatchAddressEntry]:
         """
         Derive watch-only addresses from an extended public key.
 
@@ -241,7 +233,7 @@ class WatchOnlyWalletStore:
         except (ValueError, Bip32KeyError) as exc:
             raise XpubDerivationError(f"Invalid xpub provided: {exc}") from exc
 
-        derived_entries: List[WatchAddressEntry] = []
+        derived_entries: list[WatchAddressEntry] = []
         try:
             change_node = account_node.ChildKey(change)
         except Bip32KeyError as exc:
@@ -277,7 +269,6 @@ class WatchOnlyWalletStore:
         if not added:
             logger.info("No new addresses derived from xpub (all duplicates)")
         return added
-
 
 __all__ = [
     "WatchOnlyWalletStore",

@@ -3,20 +3,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-from .executor import ExecutionMessage, ExecutionResult, BaseExecutor, ProductionContractExecutor
+from .executor import BaseExecutor, ExecutionMessage, ExecutionResult, ProductionContractExecutor
 from .state import EVMState
 
 if TYPE_CHECKING:  # pragma: no cover - import heavy types only for hints
-    from xai.core.blockchain import Blockchain, Transaction, Block
-
+    from xai.core.blockchain import Block, Blockchain, Transaction
 
 @dataclass
 class ProcessorConfig:
     max_call_depth: int = 1024
     default_gas_limit: int = 15_000_000
-
 
 class ContractTransactionProcessor:
     """
@@ -27,7 +25,7 @@ class ContractTransactionProcessor:
     convert into receipts or errors.
     """
 
-    def __init__(self, blockchain: "Blockchain", executor: Optional[BaseExecutor] = None) -> None:
+    def __init__(self, blockchain: "Blockchain", executor: BaseExecutor | None = None) -> None:
         self.blockchain = blockchain
         # Use production executor by default with full security controls
         self.executor = executor or ProductionContractExecutor(blockchain)

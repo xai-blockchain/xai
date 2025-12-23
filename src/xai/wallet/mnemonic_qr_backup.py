@@ -14,7 +14,7 @@ import io
 import json
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 from mnemonic import Mnemonic
 
@@ -27,19 +27,16 @@ except ImportError as exc:  # pragma: no cover - exercised when dependency missi
 else:
     QR_IMPORT_ERROR = None
 
-
 class QRCodeUnavailableError(RuntimeError):
     """Raised when the qrcode dependency is missing from the environment."""
-
 
 @dataclass
 class QRBackupBundle:
     """Represents the full payload of a mnemonic QR export."""
 
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
     image_base64: str
     ascii_art: str
-
 
 class MnemonicQRBackupGenerator:
     """
@@ -79,11 +76,11 @@ class MnemonicQRBackupGenerator:
         mnemonic_phrase: str,
         passphrase: str = "",
         include_passphrase: bool = False,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Construct the structured payload that will be encoded in the QR."""
         normalized = self._validate_mnemonic(mnemonic_phrase)
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "format": self.FORMAT_NAME,
             "version": self.FORMAT_VERSION,
             "mnemonic": normalized,
@@ -102,7 +99,7 @@ class MnemonicQRBackupGenerator:
 
         return payload
 
-    def recover_mnemonic(self, payload: Dict[str, Any], passphrase: str = "") -> str:
+    def recover_mnemonic(self, payload: dict[str, Any], passphrase: str = "") -> str:
         """
         Validate a payload produced by generate_bundle and return the mnemonic.
 
@@ -169,7 +166,7 @@ class MnemonicQRBackupGenerator:
         mnemonic_phrase: str,
         passphrase: str = "",
         include_passphrase: bool = False,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> QRBackupBundle:
         """
         Generate the full QR backup bundle for the supplied mnemonic.

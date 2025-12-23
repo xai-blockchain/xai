@@ -17,29 +17,30 @@ Security features:
 
 from __future__ import annotations
 
-import time
-import logging
 import hashlib
+import logging
 import math
+import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from ..vm.exceptions import VMExecutionError
 from .safe_math import (
-    SafeMath,
     MAX_UINT256,
-    WAD,
+)
+from .safe_math import Q96 as SAFE_Q96
+from .safe_math import Q128 as SAFE_Q128
+from .safe_math import (
     RAY,
-    Q96 as SAFE_Q96,
-    Q128 as SAFE_Q128,
+    WAD,
+    SafeMath,
 )
 
 if TYPE_CHECKING:
     from ..blockchain import Blockchain
 
 logger = logging.getLogger(__name__)
-
 
 # Constants
 MIN_TICK = -887272
@@ -54,7 +55,6 @@ Q128 = SAFE_Q128
 # Precision for liquidity calculations
 LIQUIDITY_PRECISION = 10**18
 
-
 # ==================== Fixed-Point Arithmetic (Using SafeMath) ====================
 
 # Import SafeMath functions for compatibility with existing code
@@ -63,7 +63,6 @@ wad_mul = SafeMath.wad_mul
 wad_div = SafeMath.wad_div
 ray_mul = SafeMath.ray_mul
 ray_div = SafeMath.ray_div
-
 
 def mul_div(a: int, b: int, denominator: int, round_up: bool = False) -> int:
     """
@@ -94,7 +93,6 @@ def mul_div(a: int, b: int, denominator: int, round_up: bool = False) -> int:
         return (result + denominator - 1) // denominator
     return result // denominator
 
-
 def calculate_fee_amount(amount: int, fee_bps: int) -> int:
     """
     Calculate fee amount from basis points, always rounding UP.
@@ -111,7 +109,6 @@ def calculate_fee_amount(amount: int, fee_bps: int) -> int:
     # fee = amount * fee_bps / 10000, rounded up
     return mul_div(amount, fee_bps, 10000, round_up=True)
 
-
 class FeeTier(Enum):
     """Available fee tiers with corresponding tick spacing."""
     LOW = (100, 1)      # 0.01% fee, 1 tick spacing
@@ -123,7 +120,6 @@ class FeeTier(Enum):
         self.fee = fee  # In basis points (10000 = 100%)
         self.tick_spacing = tick_spacing
 
-
 @dataclass
 class TickInfo:
     """Information stored for each initialized tick."""
@@ -132,7 +128,6 @@ class TickInfo:
     fee_growth_outside_0: int = 0  # Fee growth outside range (token 0)
     fee_growth_outside_1: int = 0  # Fee growth outside range (token 1)
     initialized: bool = False
-
 
 @dataclass
 class Position:
@@ -164,7 +159,6 @@ class Position:
     def is_in_range(self, current_tick: int) -> bool:
         """Check if current price is within position's range."""
         return self.tick_lower <= current_tick < self.tick_upper
-
 
 @dataclass
 class ConcentratedLiquidityPool:
@@ -200,11 +194,11 @@ class ConcentratedLiquidityPool:
     protocol_fees_1: int = 0
 
     # Tick data
-    ticks: Dict[int, TickInfo] = field(default_factory=dict)
-    tick_bitmap: Dict[int, int] = field(default_factory=dict)
+    ticks: dict[int, TickInfo] = field(default_factory=dict)
+    tick_bitmap: dict[int, int] = field(default_factory=dict)
 
     # Positions
-    positions: Dict[int, Position] = field(default_factory=dict)
+    positions: dict[int, Position] = field(default_factory=dict)
     next_position_id: int = 1
 
     # Reserves (for reference, actual amounts calculated from positions)
@@ -323,7 +317,7 @@ class ConcentratedLiquidityPool:
         tick_lower: int,
         tick_upper: int,
         amount: int,
-    ) -> Tuple[int, int, int]:
+    ) -> tuple[int, int, int]:
         """
         Mint a new liquidity position.
 
@@ -396,8 +390,8 @@ class ConcentratedLiquidityPool:
         self,
         caller: str,
         position_id: int,
-        amount: Optional[int] = None,
-    ) -> Tuple[int, int]:
+        amount: int | None = None,
+    ) -> tuple[int, int]:
         """
         Burn liquidity from a position.
 
@@ -471,7 +465,7 @@ class ConcentratedLiquidityPool:
         self,
         caller: str,
         position_id: int,
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         """
         Collect accumulated fees from a position.
 
@@ -491,7 +485,7 @@ class ConcentratedLiquidityPool:
 
         return self._collect_fees(position)
 
-    def _collect_fees(self, position: Position) -> Tuple[int, int]:
+    def _collect_fees(self, position: Position) -> tuple[int, int]:
         """
         Collect fees for a position.
 
@@ -538,8 +532,8 @@ class ConcentratedLiquidityPool:
         caller: str,
         zero_for_one: bool,
         amount_specified: int,
-        sqrt_price_limit: Optional[int] = None,
-    ) -> Tuple[int, int]:
+        sqrt_price_limit: int | None = None,
+    ) -> tuple[int, int]:
         """
         Execute a swap through the pool.
 
@@ -697,7 +691,7 @@ class ConcentratedLiquidityPool:
         fee: int,
         zero_for_one: bool,
         exact_input: bool,
-    ) -> Tuple[int, int, int, int]:
+    ) -> tuple[int, int, int, int]:
         """
         Compute a single swap step.
 
@@ -858,7 +852,7 @@ class ConcentratedLiquidityPool:
         tick_upper: int,
         liquidity: int,
         add: bool,
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         """Calculate token amounts needed for liquidity position."""
         sqrt_price_lower = self.tick_to_sqrt_price(tick_lower)
         sqrt_price_upper = self.tick_to_sqrt_price(tick_upper)
@@ -988,7 +982,7 @@ class ConcentratedLiquidityPool:
 
     # ==================== View Functions ====================
 
-    def get_position(self, position_id: int) -> Optional[Dict]:
+    def get_position(self, position_id: int) -> Dict | None:
         """Get position details."""
         position = self.positions.get(position_id)
         if not position:
@@ -1016,7 +1010,7 @@ class ConcentratedLiquidityPool:
             "in_range": position.is_in_range(self.tick),
         }
 
-    def _collect_fees_preview(self, position: Position) -> Tuple[int, int]:
+    def _collect_fees_preview(self, position: Position) -> tuple[int, int]:
         """
         Preview fees without modifying state.
 
@@ -1068,7 +1062,7 @@ class ConcentratedLiquidityPool:
         self,
         zero_for_one: bool,
         amount_in: int,
-    ) -> Tuple[int, int]:
+    ) -> tuple[int, int]:
         """
         Get quote for a swap without executing.
 
@@ -1148,7 +1142,6 @@ class ConcentratedLiquidityPool:
         if self._locked:
             raise VMExecutionError("Pool is locked")
 
-
 @dataclass
 class ConcentratedLiquidityFactory:
     """Factory for deploying concentrated liquidity pools."""
@@ -1157,10 +1150,10 @@ class ConcentratedLiquidityFactory:
     owner: str = ""
 
     # Deployed pools
-    pools: Dict[str, ConcentratedLiquidityPool] = field(default_factory=dict)
+    pools: dict[str, ConcentratedLiquidityPool] = field(default_factory=dict)
 
     # Pool lookup by pair
-    pool_by_pair: Dict[str, Dict[int, str]] = field(default_factory=dict)
+    pool_by_pair: dict[str, dict[int, str]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Initialize factory."""
@@ -1237,7 +1230,7 @@ class ConcentratedLiquidityFactory:
         token0: str,
         token1: str,
         fee: int,
-    ) -> Optional[ConcentratedLiquidityPool]:
+    ) -> ConcentratedLiquidityPool | None:
         """Get pool by token pair and fee."""
         if token0 > token1:
             token0, token1 = token1, token0
@@ -1257,7 +1250,7 @@ class ConcentratedLiquidityFactory:
         self,
         token0: str,
         token1: str,
-    ) -> List[ConcentratedLiquidityPool]:
+    ) -> list[ConcentratedLiquidityPool]:
         """Get all pools for a token pair (all fee tiers)."""
         if token0 > token1:
             token0, token1 = token1, token0

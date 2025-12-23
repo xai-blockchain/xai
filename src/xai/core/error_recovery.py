@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Error Recovery and Resilience System
 
@@ -18,33 +20,32 @@ This module acts as a lightweight coordinator that delegates to specialized modu
 - recovery_strategies: Backup, restoration, and recovery mechanisms
 """
 
-import threading
 import logging
-from typing import Dict, List, Optional, Tuple, Callable, Any
+import threading
 from collections import deque
+from typing import Any, Callable
 
 # Import specialized modules
 from xai.core.error_detection import (
-    ErrorDetector,
     CorruptionDetector,
-    HealthMonitor,
+    ErrorDetector,
     ErrorSeverity,
+    HealthMonitor,
     RecoveryState,
 )
 from xai.core.error_handlers import (
     CircuitBreaker,
-    RetryStrategy,
     ErrorHandlerRegistry,
     ErrorLogger,
+    RetryStrategy,
 )
 from xai.core.recovery_strategies import (
     BlockchainBackup,
-    StateRecovery,
     CorruptionRecovery,
-    NetworkPartitionRecovery,
     GracefulShutdown,
+    NetworkPartitionRecovery,
+    StateRecovery,
 )
-
 
 class ErrorRecoveryManager:
     """
@@ -55,7 +56,7 @@ class ErrorRecoveryManager:
     """
 
     def __init__(
-        self, blockchain: Any, node: Optional[Any] = None, config: Optional[Dict] = None
+        self, blockchain: Any, node: Any | None = None, config: Dict | None = None
     ) -> None:
         """
         Initialize error recovery manager.
@@ -79,7 +80,7 @@ class ErrorRecoveryManager:
         self.health_monitor: HealthMonitor = HealthMonitor()
 
         # Initialize handler components
-        self.circuit_breakers: Dict[str, CircuitBreaker] = {
+        self.circuit_breakers: dict[str, CircuitBreaker] = {
             "mining": CircuitBreaker(failure_threshold=5, timeout=60),
             "validation": CircuitBreaker(failure_threshold=3, timeout=30),
             "network": CircuitBreaker(failure_threshold=10, timeout=120),
@@ -113,7 +114,7 @@ class ErrorRecoveryManager:
 
     def wrap_operation(
         self, operation: str, func: Callable, *args: Any, **kwargs: Any
-    ) -> Tuple[bool, Any, Optional[str]]:
+    ) -> tuple[bool, Any, str | None]:
         """
         Wrap critical operation with circuit breaker and error handling.
 
@@ -144,7 +145,7 @@ class ErrorRecoveryManager:
                 self.logger.error(f"Error in {operation}", extra={"error_type": type(e).__name__})
                 return False, None, str(e)
 
-    def handle_corruption(self, force_rollback: bool = False) -> Tuple[bool, Optional[str]]:
+    def handle_corruption(self, force_rollback: bool = False) -> tuple[bool, str | None]:
         """
         Handle blockchain corruption using corruption recovery strategy.
 
@@ -179,7 +180,7 @@ class ErrorRecoveryManager:
         self.recovery_in_progress = False
         return success, error
 
-    def handle_network_partition(self) -> Tuple[bool, Optional[str]]:
+    def handle_network_partition(self) -> tuple[bool, str | None]:
         """
         Handle network partition using network recovery strategy.
 
@@ -205,7 +206,7 @@ class ErrorRecoveryManager:
 
         return True, "Operating in degraded mode"
 
-    def graceful_shutdown(self, reason: str = "manual") -> Tuple[bool, Optional[str]]:
+    def graceful_shutdown(self, reason: str = "manual") -> tuple[bool, str | None]:
         """
         Perform graceful shutdown with backup and transaction preservation.
 
@@ -220,7 +221,7 @@ class ErrorRecoveryManager:
 
         return self.graceful_shutdown_manager.shutdown(self.blockchain, self.node, reason)
 
-    def create_checkpoint(self, name: Optional[str] = None) -> str:
+    def create_checkpoint(self, name: str | None = None) -> str:
         """
         Create blockchain checkpoint/backup.
 
@@ -232,7 +233,7 @@ class ErrorRecoveryManager:
         """
         return self.backup_manager.create_backup(self.blockchain, name)
 
-    def get_recovery_status(self) -> Dict[str, Any]:
+    def get_recovery_status(self) -> dict[str, Any]:
         """
         Get comprehensive recovery system status.
 
@@ -298,12 +299,10 @@ class ErrorRecoveryManager:
         self.recovery_log.append(recovery_entry)
         self.logger.info(f"Recovery [{recovery_type}]: {status} - {details}")
 
-
 # Convenience functions for backward compatibility
 
-
 def create_recovery_manager(
-    blockchain: Any, node: Optional[Any] = None, config: Optional[Dict] = None
+    blockchain: Any, node: Any | None = None, config: Dict | None = None
 ) -> ErrorRecoveryManager:
     """
     Create and initialize error recovery manager.

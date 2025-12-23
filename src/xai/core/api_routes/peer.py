@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, Tuple, Any
+from typing import TYPE_CHECKING, Any
 
 from flask import jsonify, request
 
-from xai.core.request_validator_middleware import validate_request
 from xai.core.input_validation_schemas import PeerAddInput
 from xai.core.node_p2p import P2PNetworkManager
+from xai.core.request_validator_middleware import validate_request
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
-
 
 def register_peer_routes(routes: "NodeAPIRoutes") -> None:
     """Expose peer management endpoints."""
@@ -18,7 +17,7 @@ def register_peer_routes(routes: "NodeAPIRoutes") -> None:
     node = routes.node
 
     @app.route("/peers", methods=["GET"])
-    def get_peers() -> Dict[str, Any]:
+    def get_peers() -> dict[str, Any]:
         """Get list of connected peers.
 
         Returns basic peer count and list by default. With verbose=true,
@@ -36,14 +35,14 @@ def register_peer_routes(routes: "NodeAPIRoutes") -> None:
         """
         verbose = request.args.get("verbose", "false")
         verbose_requested = str(verbose).lower() in {"1", "true", "yes", "on"}
-        peers: Dict[str, Any] = {"count": len(node.peers), "peers": list(node.peers)}
+        peers: dict[str, Any] = {"count": len(node.peers), "peers": list(node.peers)}
 
         manager = getattr(node, "p2p_manager", None)
         if isinstance(manager, P2PNetworkManager):
             peers["peers"] = sorted(manager.get_peers())
             peers["count"] = manager.get_peer_count()
 
-        payload: Dict[str, Any] = {"verbose": verbose_requested, **peers}
+        payload: dict[str, Any] = {"verbose": verbose_requested, **peers}
         if verbose_requested:
             snapshot = routes._build_peer_snapshot()
             # Prefer the connected_total from the snapshot to reflect active links
@@ -53,7 +52,7 @@ def register_peer_routes(routes: "NodeAPIRoutes") -> None:
 
     @app.route("/peers/add", methods=["POST"])
     @validate_request(routes.request_validator, PeerAddInput)
-    def add_peer() -> Tuple[Dict[str, str], int]:
+    def add_peer() -> tuple[dict[str, str], int]:
         """Add a new peer to the network (admin only).
 
         Adds a peer node to this node's peer list for blockchain synchronization
@@ -87,7 +86,7 @@ def register_peer_routes(routes: "NodeAPIRoutes") -> None:
         return routes._success_response({"message": f"Peer {model.url} added"})
 
     @app.route("/sync", methods=["POST"])
-    def sync_blockchain() -> Dict[str, Any]:
+    def sync_blockchain() -> dict[str, Any]:
         """Trigger blockchain synchronization with network peers.
 
         Forces the node to sync its blockchain with all connected peers,

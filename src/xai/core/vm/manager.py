@@ -4,27 +4,26 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Dict, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
 
+from .exceptions import VMExecutionError
 from .executor import (
+    BaseExecutor,
     ExecutionMessage,
     ExecutionResult,
     SimpleContractExecutor,
-    BaseExecutor,
 )
-from .exceptions import VMExecutionError
 from .tx_processor import ContractTransactionProcessor
 
 if TYPE_CHECKING:  # pragma: no cover - avoid circular imports
-    from xai.core.blockchain import Blockchain, Block, Transaction
+    from xai.core.blockchain import Block, Blockchain, Transaction
 
 try:  # pragma: no cover - optional for lightweight test environments
     from xai.core.monitoring import MetricsCollector  # type: ignore
 except ImportError:  # pragma: no cover
     MetricsCollector = None  # type: ignore
-
 
 def _record_contract_metric(metric_name: str, value: float, operation: str = "inc") -> None:
     """Safely record smart contract metrics if the collector is available."""
@@ -44,7 +43,6 @@ def _record_contract_metric(metric_name: str, value: float, operation: str = "in
     except (AttributeError, TypeError, ValueError):
         logger.debug("Failed to record contract metric %s", metric_name)
 
-
 class SmartContractManager:
     """Handles contract execution, receipt tracking, and view calls."""
 
@@ -58,8 +56,8 @@ class SmartContractManager:
     def is_contract_transaction(self, tx: "Transaction") -> bool:
         return tx.tx_type in self.CONTRACT_TYPES
 
-    def process_block(self, block: "Block") -> List[Dict[str, Any]]:
-        receipts: List[Dict[str, Any]] = []
+    def process_block(self, block: "Block") -> list[dict[str, Any]]:
+        receipts: list[dict[str, Any]] = []
         for tx in block.transactions:
             if not self.is_contract_transaction(tx):
                 continue
@@ -67,7 +65,7 @@ class SmartContractManager:
             receipts.append(receipt)
         return receipts
 
-    def process_transaction(self, tx: "Transaction", block: "Block") -> Dict[str, Any]:
+    def process_transaction(self, tx: "Transaction", block: "Block") -> dict[str, Any]:
         metadata = dict(tx.metadata or {})
         exec_start = time.perf_counter()
         try:
@@ -111,7 +109,7 @@ class SmartContractManager:
         block_index = getattr(block, "index", getattr(block.header, "index", None))
         block_hash = getattr(block, "hash", getattr(getattr(block, "header", None), "hash", None))
         block_timestamp = getattr(block, "timestamp", getattr(getattr(block, "header", None), "timestamp", time.time()))
-        receipt: Dict[str, Any] = {
+        receipt: dict[str, Any] = {
             "txid": tx.txid,
             "contract": normalized,
             "success": result.success,
@@ -158,7 +156,7 @@ class SmartContractManager:
         )
         return self.executor.call_static(message)
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         """
         Create a complete snapshot of the current contract state.
         Thread-safe atomic operation for chain reorganization rollback.
@@ -172,7 +170,7 @@ class SmartContractManager:
             "contract_receipts": copy.deepcopy(self.blockchain.contract_receipts),
         }
 
-    def restore(self, snapshot: Dict[str, Any]) -> None:
+    def restore(self, snapshot: dict[str, Any]) -> None:
         """
         Restore contract state from a snapshot.
         Thread-safe atomic operation for chain reorganization rollback.

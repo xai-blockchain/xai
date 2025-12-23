@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - XAI Token Wallet
 
@@ -5,11 +7,11 @@ Extends the base Wallet functionality to specifically manage XAI token balances
 and interact with the XAITokenManager.
 """
 
-from typing import Optional, Dict, Any
+from typing import Any
+
+from xai.core.structured_logger import StructuredLogger, get_structured_logger
 from xai.core.wallet import Wallet
 from xai.core.xai_token_manager import XAITokenManager, get_xai_token_manager
-from xai.core.structured_logger import StructuredLogger, get_structured_logger
-
 
 class XAITokenWallet(Wallet):
     """
@@ -19,9 +21,9 @@ class XAITokenWallet(Wallet):
 
     def __init__(
         self,
-        private_key: Optional[str] = None,
-        token_manager: Optional[XAITokenManager] = None,
-        logger: Optional[StructuredLogger] = None,
+        private_key: str | None = None,
+        token_manager: XAITokenManager | None = None,
+        logger: StructuredLogger | None = None,
     ):
         super().__init__(private_key)
         self.token_manager = token_manager or get_xai_token_manager()
@@ -94,7 +96,7 @@ class XAITokenWallet(Wallet):
         )
         return True  # Assuming the transfer_tokens call already handled the logic
 
-    def get_wallet_info(self) -> Dict[str, Any]:
+    def get_wallet_info(self) -> dict[str, Any]:
         """
         Returns comprehensive information about the XAI token wallet.
         """
@@ -102,15 +104,13 @@ class XAITokenWallet(Wallet):
         info["xai_balance"] = self.get_xai_balance()
         return info
 
-
 # Global instance for convenience
 _global_xai_token_wallet = None
 
-
 def get_xai_token_wallet(
-    private_key: Optional[str] = None,
-    token_manager: Optional[XAITokenManager] = None,
-    logger: Optional[StructuredLogger] = None,
+    private_key: str | None = None,
+    token_manager: XAITokenManager | None = None,
+    logger: StructuredLogger | None = None,
 ) -> XAITokenWallet:
     """
     Get global XAITokenWallet instance.

@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any
 
 import requests
 
-
 class NodeCheckError(RuntimeError):
     """Raised when a node or explorer endpoint cannot be queried."""
-
 
 @dataclass
 class NodeTarget:
@@ -16,8 +14,7 @@ class NodeTarget:
 
     name: str
     base_url: str
-    session: Optional[requests.Session] = None
-
+    session: requests.Session | None = None
 
 @dataclass
 class NodeStatus:
@@ -25,11 +22,11 @@ class NodeStatus:
 
     name: str
     base_url: str
-    health: Optional[Dict[str, Any]] = None
-    stats: Optional[Dict[str, Any]] = None
-    peers: Optional[Dict[str, Any]] = None
-    latest_summary: Optional[Dict[str, Any]] = None
-    errors: List[str] = field(default_factory=list)
+    health: dict[str, Any] | None = None
+    stats: dict[str, Any] | None = None
+    peers: dict[str, Any] | None = None
+    latest_summary: dict[str, Any] | None = None
+    errors: list[str] = field(default_factory=list)
 
     @property
     def status_label(self) -> str:
@@ -55,7 +52,7 @@ class NodeStatus:
         return 0
 
     @property
-    def chain_height(self) -> Optional[int]:
+    def chain_height(self) -> int | None:
         """Chain height derived from latest summary (preferred) or stats fallback."""
         summary_height = self._summary_value("block_number")
         if summary_height is None:
@@ -73,7 +70,7 @@ class NodeStatus:
             return None
 
     @property
-    def latest_block_hash(self) -> Optional[str]:
+    def latest_block_hash(self) -> str | None:
         """Latest block hash, preferring the live summary endpoint."""
         summary_hash = self._summary_value("hash")
         if isinstance(summary_hash, str) and summary_hash:
@@ -85,7 +82,7 @@ class NodeStatus:
             return hash_value
         return None
 
-    def _summary_value(self, key: str) -> Optional[Any]:
+    def _summary_value(self, key: str) -> Any | None:
         """Return a field from the latest summary response."""
         if not isinstance(self.latest_summary, dict):
             return None
@@ -96,7 +93,7 @@ class NodeStatus:
             return summary_body.get(key)
         return None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a serializable representation."""
         return {
             "name": self.name,
@@ -109,14 +106,13 @@ class NodeStatus:
             "errors": list(self.errors),
         }
 
-
 @dataclass
 class ExplorerStatus:
     """Captures explorer health check results."""
 
     url: str
-    payload: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    payload: dict[str, Any] | None = None
+    error: str | None = None
 
     @property
     def healthy(self) -> bool:
@@ -125,7 +121,7 @@ class ExplorerStatus:
             return self.payload["status"] == "healthy"
         return False if self.error else True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Return serializable representation."""
         return {
             "url": self.url,
@@ -134,17 +130,16 @@ class ExplorerStatus:
             "error": self.error,
         }
 
-
 @dataclass
 class VerificationResult:
     """Aggregate result from verifying all nodes and optional explorer."""
 
-    node_results: List[NodeStatus]
+    node_results: list[NodeStatus]
     node_checks_ok: bool
     consensus_ok: bool
     peer_counts_ok: bool
-    explorer_status: Optional[ExplorerStatus] = None
-    errors: List[str] = field(default_factory=list)
+    explorer_status: ExplorerStatus | None = None
+    errors: list[str] = field(default_factory=list)
 
     @property
     def explorer_ok(self) -> bool:
@@ -158,7 +153,7 @@ class VerificationResult:
         """Return True when every check succeeded."""
         return self.node_checks_ok and self.consensus_ok and self.peer_counts_ok and self.explorer_ok
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Return serializable representation."""
         return {
             "ok": self.ok,
@@ -170,7 +165,6 @@ class VerificationResult:
             "explorer": self.explorer_status.to_dict() if self.explorer_status else None,
             "errors": list(self.errors),
         }
-
 
 class _BaseHTTPClient:
     """Shared helper for talking to HTTP endpoints with common error handling."""
@@ -188,7 +182,7 @@ class _BaseHTTPClient:
         self.timeout = timeout
         self.session = session
 
-    def _fetch_json(self, path: str) -> Dict[str, Any]:
+    def _fetch_json(self, path: str) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
         try:
             response = self.session.get(url, timeout=self.timeout)
@@ -203,35 +197,32 @@ class _BaseHTTPClient:
             raise NodeCheckError(f"{url} returned unexpected payload type {type(payload).__name__}")
         return payload
 
-
 class NodeAPIClient(_BaseHTTPClient):
     """HTTP client for node APIs."""
 
-    def get_health(self) -> Dict[str, Any]:
+    def get_health(self) -> dict[str, Any]:
         """Return /health payload."""
         return self._fetch_json("/health")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Return /stats payload."""
         return self._fetch_json("/stats")
 
-    def get_peers(self, verbose: bool = True) -> Dict[str, Any]:
+    def get_peers(self, verbose: bool = True) -> dict[str, Any]:
         """Return /peers payload."""
         suffix = "?verbose=true" if verbose else ""
         return self._fetch_json(f"/peers{suffix}")
 
-    def get_latest_block_summary(self) -> Dict[str, Any]:
+    def get_latest_block_summary(self) -> dict[str, Any]:
         """Return /block/latest summary payload."""
         return self._fetch_json("/block/latest?summary=1")
-
 
 class ExplorerClient(_BaseHTTPClient):
     """HTTP client for explorer backend."""
 
-    def get_health(self) -> Dict[str, Any]:
+    def get_health(self) -> dict[str, Any]:
         """Return explorer /health payload."""
         return self._fetch_json("/health")
-
 
 class TestnetVerifier:
     """Collects health/consensus information from a set of nodes."""
@@ -241,9 +232,9 @@ class TestnetVerifier:
         nodes: Sequence[NodeTarget],
         *,
         min_peer_count: int = 2,
-        explorer_url: Optional[str] = None,
+        explorer_url: str | None = None,
         request_timeout: float = 3.0,
-        explorer_session: Optional[requests.Session] = None,
+        explorer_session: requests.Session | None = None,
     ) -> None:
         if not nodes:
             raise ValueError("At least one node target is required")
@@ -255,9 +246,9 @@ class TestnetVerifier:
 
     def verify(self) -> VerificationResult:
         """Collect information from every node and produce an aggregate result."""
-        node_results: List[NodeStatus] = []
-        errors: List[str] = []
-        created_sessions: List[requests.Session] = []
+        node_results: list[NodeStatus] = []
+        errors: list[str] = []
+        created_sessions: list[requests.Session] = []
 
         try:
             for target in self.nodes:
@@ -327,7 +318,7 @@ class TestnetVerifier:
     def _ensure_session(
         self,
         target: NodeTarget,
-        created_sessions: List[requests.Session],
+        created_sessions: list[requests.Session],
     ) -> requests.Session:
         if target.session is not None:
             return target.session
@@ -338,7 +329,7 @@ class TestnetVerifier:
     def _check_node(
         self,
         target: NodeTarget,
-        created_sessions: List[requests.Session],
+        created_sessions: list[requests.Session],
     ) -> NodeStatus:
         base_url = target.base_url.rstrip("/")
         session = self._ensure_session(target, created_sessions)
@@ -362,7 +353,7 @@ class TestnetVerifier:
             status.errors.append(f"latest_block:{exc}")
         return status
 
-    def _check_explorer(self, created_sessions: List[requests.Session]) -> ExplorerStatus:
+    def _check_explorer(self, created_sessions: list[requests.Session]) -> ExplorerStatus:
         base_url = self.explorer_url.rstrip("/") if self.explorer_url else ""
         session = self._explorer_session
         if session is None:
@@ -375,10 +366,10 @@ class TestnetVerifier:
         except NodeCheckError as exc:
             return ExplorerStatus(url=base_url, error=str(exc))
 
-    def _evaluate_consensus(self, node_results: Sequence[NodeStatus]) -> Tuple[bool, Optional[str]]:
-        heights: Dict[int, List[str]] = {}
-        hashes: Dict[str, List[str]] = {}
-        missing_nodes: List[str] = []
+    def _evaluate_consensus(self, node_results: Sequence[NodeStatus]) -> tuple[bool, str | None]:
+        heights: dict[int, list[str]] = {}
+        hashes: dict[str, list[str]] = {}
+        missing_nodes: list[str] = []
 
         for node in node_results:
             height = node.chain_height
@@ -399,8 +390,8 @@ class TestnetVerifier:
             return False, f"Latest hashes differ ({detail})"
         return True, None
 
-    def _evaluate_peer_counts(self, node_results: Sequence[NodeStatus]) -> Tuple[bool, Optional[str]]:
-        deficient: List[str] = []
+    def _evaluate_peer_counts(self, node_results: Sequence[NodeStatus]) -> tuple[bool, str | None]:
+        deficient: list[str] = []
         for node in node_results:
             if node.peer_count < self.min_peer_count:
                 deficient.append(f"{node.name}={node.peer_count}")

@@ -1,11 +1,12 @@
-import math
+from __future__ import annotations
+
 import hashlib
 import logging
+import math
 import threading
-from typing import Dict, Any, Set, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
-
 
 class QuadraticVoter:
     def __init__(self, minimum_stake_for_verification: float = 100.0,
@@ -18,23 +19,23 @@ class QuadraticVoter:
             minimum_account_age_seconds: Minimum account age to participate (default: 24 hours)
         """
         # Stores voter balances: {voter_address: balance}
-        self.balances: Dict[str, float] = {}
+        self.balances: dict[str, float] = {}
 
         # Sybil resistance: verified identities
-        self.verified_voters: Set[str] = set()
+        self.verified_voters: set[str] = set()
 
         # Stake-based verification: track stakes
-        self.voter_stakes: Dict[str, float] = {}
+        self.voter_stakes: dict[str, float] = {}
 
         # Social proof: track endorsements
-        self.endorsements: Dict[str, Set[str]] = {}  # {voter: set of endorsers}
+        self.endorsements: dict[str, set[str]] = {}  # {voter: set of endorsers}
 
         # Account age tracking
-        self.account_creation_times: Dict[str, int] = {}
+        self.account_creation_times: dict[str, int] = {}
 
         # Prevent multiple account detection
-        self.identity_hashes: Dict[str, str] = {}  # {voter: identity_hash}
-        self.hash_to_voters: Dict[str, Set[str]] = {}  # {identity_hash: set of voters}
+        self.identity_hashes: dict[str, str] = {}  # {voter: identity_hash}
+        self.hash_to_voters: dict[str, set[str]] = {}  # {identity_hash: set of voters}
 
         self.minimum_stake_for_verification = minimum_stake_for_verification
         self.minimum_account_age_seconds = minimum_account_age_seconds
@@ -45,7 +46,7 @@ class QuadraticVoter:
             f"Min stake: {minimum_stake_for_verification}, Min age: {minimum_account_age_seconds}s"
         )
 
-    def register_voter(self, voter_address: str, creation_time: int, identity_proof: Optional[str] = None):
+    def register_voter(self, voter_address: str, creation_time: int, identity_proof: str | None = None):
         """
         Register a new voter with identity verification.
 
@@ -217,7 +218,6 @@ class QuadraticVoter:
             f"Voter {voter_address} cast {num_votes} votes (cost: {cost:.2f} tokens). Effective votes: {effective_votes:.2f}. Remaining balance: {self.balances[voter_address]:.2f}"
         )
         return effective_votes
-
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

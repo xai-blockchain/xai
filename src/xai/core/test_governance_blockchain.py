@@ -9,8 +9,8 @@ Demonstrates full governance flow on the blockchain:
 5. Execute → ON-CHAIN
 """
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 

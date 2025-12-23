@@ -18,7 +18,7 @@ def test_safety_controls():
     print("=" * 70)
 
     # Import safety controls
-    from src.xai.core.ai_safety_controls import AISafetyControls, StopReason, AISafetyLevel
+    from src.xai.core.ai_safety_controls import AISafetyControls, AISafetyLevel, StopReason
 
     print("\n[OK] Successfully imported AISafetyControls")
 

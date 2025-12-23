@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Fuzzing tests for QR transaction parser safety.
 
@@ -12,26 +14,23 @@ import json
 import os
 import random
 import string
-from typing import Dict, Any
+from typing import Any
 
 import pytest
 
 from xai.mobile.qr_transactions import TransactionQRGenerator
 
-
 def _random_string(length: int = 16) -> str:
     alphabet = string.ascii_letters + string.digits
     return "".join(random.choice(alphabet) for _ in range(length))
 
-
-def _random_tx_payload() -> Dict[str, Any]:
+def _random_tx_payload() -> dict[str, Any]:
     return {
         "from": f"XAI{_random_string(40)}",
         "to": f"XAI{_random_string(40)}",
         "amount": random.uniform(0.0001, 10_000),
         "nonce": random.randint(0, 1_000_000),
     }
-
 
 def test_parse_transaction_qr_roundtrip_base64():
     """Base64-encoded QR payloads should roundtrip through the parser."""
@@ -44,7 +43,6 @@ def test_parse_transaction_qr_roundtrip_base64():
         parsed = TransactionQRGenerator.parse_transaction_qr(qr_data)
         assert parsed == json.loads(data)
 
-
 def test_parse_transaction_qr_roundtrip_raw_json():
     """Parser should accept direct JSON payloads when base64 decoding fails."""
     for _ in range(50):
@@ -53,7 +51,6 @@ def test_parse_transaction_qr_roundtrip_raw_json():
         qr_data = f"xai:tx:{data}"
         parsed = TransactionQRGenerator.parse_transaction_qr(qr_data)
         assert parsed == tx_payload
-
 
 def test_parse_transaction_qr_random_payloads_fail_gracefully():
     """Random payloads must raise ValueError/JSON errors without crashing."""
@@ -66,7 +63,6 @@ def test_parse_transaction_qr_random_payloads_fail_gracefully():
             assert isinstance(parsed, dict)
         except (ValueError, json.JSONDecodeError, UnicodeDecodeError, binascii.Error):
             continue
-
 
 def test_parse_transaction_qr_requires_prefix():
     """Inputs without the xai transaction prefix must raise ValueError."""

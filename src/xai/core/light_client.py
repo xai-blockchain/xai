@@ -11,9 +11,8 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from typing import List, Dict, Tuple, Optional, Any
 from dataclasses import dataclass
-
+from typing import Any
 
 @dataclass
 class BlockHeader:
@@ -26,7 +25,7 @@ class BlockHeader:
     nonce: int
     hash: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "index": self.index,
             "timestamp": self.timestamp,
@@ -38,7 +37,7 @@ class BlockHeader:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> BlockHeader:
+    def from_dict(cls, data: dict[str, Any]) -> BlockHeader:
         return cls(
             index=data["index"],
             timestamp=data["timestamp"],
@@ -62,12 +61,11 @@ class BlockHeader:
             hash=block.hash
         )
 
-
 class MerkleProofGenerator:
     """Generate and verify Merkle proofs for SPV"""
 
     @staticmethod
-    def calculate_merkle_root(tx_hashes: List[str]) -> str:
+    def calculate_merkle_root(tx_hashes: list[str]) -> str:
         """Calculate merkle root from transaction hashes"""
         if not tx_hashes:
             return hashlib.sha256(b"").hexdigest()
@@ -89,7 +87,7 @@ class MerkleProofGenerator:
         return hashes[0]
 
     @staticmethod
-    def generate_merkle_proof(tx_hashes: List[str], txid: str) -> List[Tuple[str, bool]]:
+    def generate_merkle_proof(tx_hashes: list[str], txid: str) -> list[tuple[str, bool]]:
         """
         Generate a merkle proof for a transaction
 
@@ -104,7 +102,7 @@ class MerkleProofGenerator:
         except ValueError:
             raise ValueError(f"Transaction {txid} not found")
 
-        proof: List[Tuple[str, bool]] = []
+        proof: list[tuple[str, bool]] = []
         current_index = tx_index
         current_level = tx_hashes.copy()
 
@@ -134,7 +132,7 @@ class MerkleProofGenerator:
         return proof
 
     @staticmethod
-    def verify_merkle_proof(txid: str, merkle_proof: List[Tuple[str, bool]], merkle_root: str) -> bool:
+    def verify_merkle_proof(txid: str, merkle_proof: list[tuple[str, bool]], merkle_root: str) -> bool:
         """
         Verify a transaction is in a block using a merkle proof
 
@@ -164,16 +162,15 @@ class MerkleProofGenerator:
 
         return current_hash == merkle_root
 
-
 @dataclass
 class SPVProof:
     """Complete SPV proof for transaction verification"""
     txid: str
     block_header: BlockHeader
-    merkle_proof: List[Tuple[str, bool]]
-    transaction_data: Optional[Dict[str, Any]] = None
+    merkle_proof: list[tuple[str, bool]]
+    transaction_data: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "txid": self.txid,
             "block_header": self.block_header.to_dict(),
@@ -182,14 +179,13 @@ class SPVProof:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> SPVProof:
+    def from_dict(cls, data: dict[str, Any]) -> SPVProof:
         return cls(
             txid=data["txid"],
             block_header=BlockHeader.from_dict(data["block_header"]),
             merkle_proof=[(h, r) for h, r in data["merkle_proof"]],
             transaction_data=data.get("transaction_data")
         )
-
 
 class LightClient:
     """
@@ -200,8 +196,8 @@ class LightClient:
     """
 
     def __init__(self):
-        self.headers: List[BlockHeader] = []
-        self.verified_transactions: Dict[str, SPVProof] = {}
+        self.headers: list[BlockHeader] = []
+        self.verified_transactions: dict[str, SPVProof] = {}
 
     def add_header(self, header: BlockHeader) -> bool:
         """Add and validate a block header"""
@@ -293,7 +289,7 @@ class LightClient:
 
         return is_valid
 
-    def _get_header(self, index: int) -> Optional[BlockHeader]:
+    def _get_header(self, index: int) -> BlockHeader | None:
         """Get header by index"""
         for header in self.headers:
             if header.index == index:
@@ -322,11 +318,11 @@ class LightClient:
         """Get current chain height"""
         return len(self.headers)
 
-    def get_latest_header(self) -> Optional[BlockHeader]:
+    def get_latest_header(self) -> BlockHeader | None:
         """Get the latest header"""
         return self.headers[-1] if self.headers else None
 
-    def sync_headers(self, headers: List[BlockHeader]) -> int:
+    def sync_headers(self, headers: list[BlockHeader]) -> int:
         """
         Sync multiple headers at once
 
@@ -341,14 +337,13 @@ class LightClient:
                 break  # Stop on first invalid header
         return added
 
-    def export_headers(self) -> List[Dict[str, Any]]:
+    def export_headers(self) -> list[dict[str, Any]]:
         """Export headers for storage"""
         return [h.to_dict() for h in self.headers]
 
-    def import_headers(self, headers_data: List[Dict[str, Any]]) -> None:
+    def import_headers(self, headers_data: list[dict[str, Any]]) -> None:
         """Import headers from storage"""
         self.headers = [BlockHeader.from_dict(h) for h in headers_data]
-
 
 class SPVServerInterface:
     """
@@ -360,7 +355,7 @@ class SPVServerInterface:
     def __init__(self, blockchain):
         self.blockchain = blockchain
 
-    def get_headers(self, start_height: int = 0, count: int = 2000) -> List[BlockHeader]:
+    def get_headers(self, start_height: int = 0, count: int = 2000) -> list[BlockHeader]:
         """Get block headers for light client sync"""
         headers = []
         for i in range(start_height, min(start_height + count, len(self.blockchain.chain))):
@@ -368,7 +363,7 @@ class SPVServerInterface:
             headers.append(BlockHeader.from_block(block))
         return headers
 
-    def get_spv_proof(self, txid: str) -> Optional[SPVProof]:
+    def get_spv_proof(self, txid: str) -> SPVProof | None:
         """
         Generate SPV proof for a transaction
 
@@ -401,13 +396,13 @@ class SPVServerInterface:
 
         return None
 
-    def get_header_by_height(self, height: int) -> Optional[BlockHeader]:
+    def get_header_by_height(self, height: int) -> BlockHeader | None:
         """Get header at specific height"""
         if 0 <= height < len(self.blockchain.chain):
             return BlockHeader.from_block(self.blockchain.chain[height])
         return None
 
-    def get_latest_headers(self, count: int = 10) -> List[BlockHeader]:
+    def get_latest_headers(self, count: int = 10) -> list[BlockHeader]:
         """Get the latest N headers"""
         start = max(0, len(self.blockchain.chain) - count)
         return self.get_headers(start, count)

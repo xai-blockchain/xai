@@ -1,14 +1,15 @@
+from __future__ import annotations
+
 """
 XAI Node - Prometheus Metrics Server Integration
 Automatically starts Prometheus metrics server with the node
 """
 
 import logging
-from typing import Optional
+
 from prometheus_client import start_http_server
 
 logger = logging.getLogger(__name__)
-
 
 class MetricsServer:
     """Manages Prometheus metrics HTTP server for XAI blockchain node"""
@@ -45,10 +46,8 @@ class MetricsServer:
             logger.error(f"Unexpected error starting metrics server: {e}", extra={"error_type": type(e).__name__})
             print(f"✗ Metrics server error: {e}")
 
-
 # Global metrics server instance
-_metrics_server: Optional[MetricsServer] = None
-
+_metrics_server: MetricsServer | None = None
 
 def get_metrics_server(port: int = 8000) -> MetricsServer:
     """
@@ -64,7 +63,6 @@ def get_metrics_server(port: int = 8000) -> MetricsServer:
     if _metrics_server is None:
         _metrics_server = MetricsServer(port=port)
     return _metrics_server
-
 
 def start_metrics_server_if_enabled(port: int = 8000, enabled: bool = True):
     """

@@ -9,22 +9,20 @@ sign flows in the CLI while maintaining production safety.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 try:
+    from trezorlib import ethereum
     from trezorlib.client import TrezorClient
     from trezorlib.transport import enumerate_devices
-    from trezorlib import ethereum
 except ImportError as exc:  # pragma: no cover - optional dependency
     raise ImportError("trezorlib is required for Trezor support. pip install trezor") from exc
 
-from xai.core.hardware_wallet import HardwareWallet, LEDGER_BIP32_PATH
-
+from xai.core.hardware_wallet import LEDGER_BIP32_PATH, HardwareWallet
 
 @dataclass
 class TrezorHardwareWallet(HardwareWallet):
     bip32_path: str = LEDGER_BIP32_PATH.replace("44'/22593'", "44'/22593'")
-    _client: Optional[TrezorClient] = None
+    _client: TrezorClient | None = None
 
     def connect(self) -> bool:
         devices = enumerate_devices()

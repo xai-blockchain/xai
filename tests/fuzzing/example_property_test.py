@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Property-Based Testing Examples for XAI Blockchain
 
@@ -25,12 +27,10 @@ Usage:
 
 import hashlib
 from decimal import Decimal
-from typing import List, Tuple
 
 import pytest
 from hypothesis import assume, given, strategies as st, settings, Phase, example
 from hypothesis.stateful import RuleBasedStateMachine, rule, invariant
-
 
 # ============================================================================
 # CUSTOM STRATEGIES
@@ -46,13 +46,11 @@ def blockchain_address(draw):
         max_size=40
     )))
 
-
 # Strategy for valid amounts (positive integers)
 valid_amount = st.integers(min_value=1, max_value=2**32 - 1)
 
 # Strategy for wallet balances
 valid_balance = st.integers(min_value=0, max_value=2**64 - 1)
-
 
 # ============================================================================
 # CRYPTOGRAPHIC PROPERTIES
@@ -177,7 +175,6 @@ class TestCryptographicProperties:
         # Simplified verification
         return len(signature) == 32 and len(public_key) == 32
 
-
 # ============================================================================
 # TRANSACTION PROPERTIES
 # ============================================================================
@@ -212,7 +209,7 @@ class TestTransactionProperties:
         ),
         valid_balance
     )
-    def test_balance_conservation(self, transfers: List[Tuple[str, str, int]], initial_total: int):
+    def test_balance_conservation(self, transfers: list[tuple[str, str, int]], initial_total: int):
         """
         Property: Total balance is conserved across transfers.
 
@@ -316,7 +313,6 @@ class TestTransactionProperties:
         tx_str = str(sorted(transaction.items()))
         return hashlib.sha256(tx_str.encode()).hexdigest()
 
-
 # ============================================================================
 # BLOCKCHAIN PROPERTIES
 # ============================================================================
@@ -329,7 +325,7 @@ class TestBlockchainProperties:
     """
 
     @given(st.lists(valid_amount, min_size=1, max_size=100))
-    def test_merkle_root_determinism(self, transaction_amounts: List[int]):
+    def test_merkle_root_determinism(self, transaction_amounts: list[int]):
         """
         Property: Merkle root is deterministic.
 
@@ -347,7 +343,7 @@ class TestBlockchainProperties:
         assert root1 == root2, "Merkle root must be deterministic"
 
     @given(st.lists(valid_amount, min_size=1, max_size=50))
-    def test_block_hash_includes_all_transactions(self, transaction_amounts: List[int]):
+    def test_block_hash_includes_all_transactions(self, transaction_amounts: list[int]):
         """
         Property: Block hash changes if any transaction changes.
 
@@ -370,7 +366,7 @@ class TestBlockchainProperties:
         st.integers(min_value=0, max_value=1000000),
         st.lists(valid_amount, min_size=0, max_size=10)
     )
-    def test_block_number_sequential(self, previous_block_number: int, transactions: List[int]):
+    def test_block_number_sequential(self, previous_block_number: int, transactions: list[int]):
         """
         Property: Block numbers are sequential.
 
@@ -384,7 +380,7 @@ class TestBlockchainProperties:
         assert new_block["number"] == previous_block_number + 1
 
     @given(st.lists(st.integers(min_value=1, max_value=100), min_size=2, max_size=10))
-    def test_chain_difficulty_monotonic(self, difficulties: List[int]):
+    def test_chain_difficulty_monotonic(self, difficulties: list[int]):
         """
         Property: Chain difficulty never decreases significantly.
 
@@ -414,7 +410,7 @@ class TestBlockchainProperties:
             assert 0.5 <= ratio <= 2.0, "Difficulty change too drastic"
 
     # Helper methods
-    def _compute_merkle_root(self, transactions: List[dict]) -> str:
+    def _compute_merkle_root(self, transactions: list[dict]) -> str:
         """Compute Merkle root of transactions."""
         if not transactions:
             return hashlib.sha256(b"").hexdigest()
@@ -428,19 +424,18 @@ class TestBlockchainProperties:
         combined = ''.join(sorted(tx_hashes))
         return hashlib.sha256(combined.encode()).hexdigest()
 
-    def _compute_block_hash(self, transactions: List[dict]) -> str:
+    def _compute_block_hash(self, transactions: list[dict]) -> str:
         """Compute block hash."""
         merkle_root = self._compute_merkle_root(transactions)
         return hashlib.sha256(merkle_root.encode()).hexdigest()
 
-    def _create_block(self, previous_block_number: int, transactions: List[int]) -> dict:
+    def _create_block(self, previous_block_number: int, transactions: list[int]) -> dict:
         """Create a mock block."""
         return {
             "number": previous_block_number + 1,
             "transactions": transactions,
             "previous_hash": "0" * 64
         }
-
 
 # ============================================================================
 # ARITHMETIC PROPERTIES
@@ -526,7 +521,6 @@ class TestArithmeticProperties:
 
         return {"success": True, "value": balance - amount}
 
-
 # ============================================================================
 # STATEFUL PROPERTY TESTING
 # ============================================================================
@@ -582,10 +576,8 @@ class WalletStateMachine(RuleBasedStateMachine):
         """Invariant: All balances are non-negative."""
         assert all(balance >= 0 for balance in self.balances.values())
 
-
 # Test the state machine
 TestWalletState = WalletStateMachine.TestCase
-
 
 # ============================================================================
 # TEST CONFIGURATION

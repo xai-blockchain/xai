@@ -23,18 +23,16 @@ import hashlib
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
 from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
-
 
 class TrustLevel(Enum):
     """Trust level for validator set overlap"""
     ONE_THIRD = 1/3  # Tendermint default
     TWO_THIRDS = 2/3  # Higher security
-
 
 @dataclass
 class CosmosValidator:
@@ -49,7 +47,7 @@ class CosmosValidator:
         data = self.address + self.pub_key + self.voting_power.to_bytes(8, 'big')
         return hashlib.sha256(data).digest()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             'address': base64.b64encode(self.address).decode('utf-8'),
@@ -59,7 +57,7 @@ class CosmosValidator:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> CosmosValidator:
+    def from_dict(cls, data: dict[str, Any]) -> CosmosValidator:
         """Create from dictionary"""
         return cls(
             address=base64.b64decode(data['address']),
@@ -68,11 +66,10 @@ class CosmosValidator:
             proposer_priority=data.get('proposer_priority', 0),
         )
 
-
 @dataclass
 class CosmosValidatorSet:
     """Cosmos validator set"""
-    validators: List[CosmosValidator]
+    validators: list[CosmosValidator]
     total_voting_power: int
 
     def __post_init__(self):
@@ -96,7 +93,7 @@ class CosmosValidatorSet:
         hashes = [v.hash() for v in sorted_validators]
         return self._merkle_root(hashes)
 
-    def _merkle_root(self, hashes: List[bytes]) -> bytes:
+    def _merkle_root(self, hashes: list[bytes]) -> bytes:
         """Calculate Merkle root"""
         if not hashes:
             return hashlib.sha256(b'').digest()
@@ -118,14 +115,14 @@ class CosmosValidatorSet:
 
         return hashes[0]
 
-    def get_validator(self, address: bytes) -> Optional[CosmosValidator]:
+    def get_validator(self, address: bytes) -> CosmosValidator | None:
         """Get validator by address"""
         for validator in self.validators:
             if validator.address == address:
                 return validator
         return None
 
-    def compute_voting_power(self, addresses: List[bytes]) -> int:
+    def compute_voting_power(self, addresses: list[bytes]) -> int:
         """Compute total voting power for given validator addresses"""
         power = 0
         for address in addresses:
@@ -134,7 +131,7 @@ class CosmosValidatorSet:
                 power += validator.voting_power
         return power
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             'validators': [v.to_dict() for v in self.validators],
@@ -143,13 +140,12 @@ class CosmosValidatorSet:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> CosmosValidatorSet:
+    def from_dict(cls, data: dict[str, Any]) -> CosmosValidatorSet:
         """Create from dictionary"""
         return cls(
             validators=[CosmosValidator.from_dict(v) for v in data['validators']],
             total_voting_power=data['total_voting_power'],
         )
-
 
 @dataclass
 class CosmosCommit:
@@ -157,14 +153,14 @@ class CosmosCommit:
     height: int
     round: int
     block_id: bytes
-    signatures: List[Tuple[bytes, bytes]]  # (validator_address, signature)
+    signatures: list[tuple[bytes, bytes]]  # (validator_address, signature)
     timestamp: int
 
-    def get_signing_validators(self) -> List[bytes]:
+    def get_signing_validators(self) -> list[bytes]:
         """Get list of validators who signed"""
         return [addr for addr, _ in self.signatures]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             'height': self.height,
@@ -179,7 +175,6 @@ class CosmosCommit:
             ],
             'timestamp': self.timestamp,
         }
-
 
 @dataclass
 class CosmosBlockHeader:
@@ -214,7 +209,7 @@ class CosmosBlockHeader:
         )
         return hashlib.sha256(data).digest()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             'version': self.version,
@@ -235,7 +230,7 @@ class CosmosBlockHeader:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> CosmosBlockHeader:
+    def from_dict(cls, data: dict[str, Any]) -> CosmosBlockHeader:
         """Create from dictionary"""
         return cls(
             version=data['version'],
@@ -254,16 +249,15 @@ class CosmosBlockHeader:
             proposer_address=base64.b64decode(data['proposer_address']),
         )
 
-
 @dataclass
 class CosmosProof:
     """IBC proof for cross-chain verification"""
     key: bytes
     value: bytes
-    proof_ops: List[Dict[str, Any]]  # ProofOps from IBC
+    proof_ops: list[dict[str, Any]]  # ProofOps from IBC
     height: int
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             'key': base64.b64encode(self.key).decode('utf-8'),
@@ -271,7 +265,6 @@ class CosmosProof:
             'proof_ops': self.proof_ops,
             'height': self.height,
         }
-
 
 @dataclass
 class TrustedState:
@@ -281,7 +274,7 @@ class TrustedState:
     next_validator_set: CosmosValidatorSet
     trusted_at: int  # Unix timestamp when this became trusted
 
-    def is_within_trust_period(self, trust_period_seconds: int, now: Optional[int] = None) -> bool:
+    def is_within_trust_period(self, trust_period_seconds: int, now: int | None = None) -> bool:
         """Check if trusted state is still within trust period"""
         if now is None:
             now = int(time.time())
@@ -289,7 +282,7 @@ class TrustedState:
         age = now - self.trusted_at
         return age <= trust_period_seconds
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             'header': self.header.to_dict(),
@@ -297,7 +290,6 @@ class TrustedState:
             'next_validator_set': self.next_validator_set.to_dict(),
             'trusted_at': self.trusted_at,
         }
-
 
 class CosmosLightClient:
     """
@@ -331,7 +323,7 @@ class CosmosLightClient:
         self.trust_period_seconds = trust_period_seconds
         self.max_clock_drift_seconds = max_clock_drift_seconds
 
-        self.trusted_states: Dict[int, TrustedState] = {}  # height -> state
+        self.trusted_states: dict[int, TrustedState] = {}  # height -> state
         self.latest_trusted_height = 0
 
         logger.info(
@@ -737,7 +729,7 @@ class CosmosLightClient:
         root: bytes,
         key: bytes,
         value: bytes,
-        proof_ops: List[Dict[str, Any]],
+        proof_ops: list[dict[str, Any]],
     ) -> bool:
         """
         Verify Merkle proof for IBC
@@ -774,17 +766,17 @@ class CosmosLightClient:
         # Verify final hash matches root
         return current_hash == root
 
-    def get_trusted_state(self, height: int) -> Optional[TrustedState]:
+    def get_trusted_state(self, height: int) -> TrustedState | None:
         """Get trusted state at height"""
         return self.trusted_states.get(height)
 
-    def get_latest_trusted_state(self) -> Optional[TrustedState]:
+    def get_latest_trusted_state(self) -> TrustedState | None:
         """Get latest trusted state"""
         if self.latest_trusted_height == 0:
             return None
         return self.trusted_states.get(self.latest_trusted_height)
 
-    def export_trusted_states(self) -> List[Dict[str, Any]]:
+    def export_trusted_states(self) -> list[dict[str, Any]]:
         """Export all trusted states"""
         return [
             {

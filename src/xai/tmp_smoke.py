@@ -1,8 +1,9 @@
 import os
 import traceback
+
+from src.xai.ai.ai_assistant.personal_ai_assistant import PersonalAIAssistant
 from src.xai.core.api_extensions import extend_node_api
 from src.xai.core.node import BlockchainNode
-from src.xai.ai.ai_assistant.personal_ai_assistant import PersonalAIAssistant
 
 # Load API key from environment variable
 test_api_key = os.environ.get("ANTHROPIC_API_KEY")

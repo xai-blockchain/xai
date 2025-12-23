@@ -8,13 +8,12 @@ Transactions are created online, signed offline, and broadcast online.
 
 from __future__ import annotations
 
-import json
 import base64
 import hashlib
+import json
 import time
-from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, asdict
-
+from dataclasses import asdict, dataclass
+from typing import Any
 
 @dataclass
 class UnsignedTransaction:
@@ -24,12 +23,12 @@ class UnsignedTransaction:
     amount: float
     fee: float
     timestamp: float
-    nonce: Optional[int] = None
-    inputs: Optional[List[Dict[str, Any]]] = None
-    outputs: Optional[List[Dict[str, Any]]] = None
-    metadata: Optional[Dict[str, Any]] = None
+    nonce: int | None = None
+    inputs: list[dict[str, Any]] | None = None
+    outputs: list[dict[str, Any]] | None = None
+    metadata: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     def to_json(self) -> str:
@@ -39,7 +38,7 @@ class UnsignedTransaction:
         return base64.b64encode(self.to_json().encode()).decode()
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> UnsignedTransaction:
+    def from_dict(cls, data: dict[str, Any]) -> UnsignedTransaction:
         return cls(**data)
 
     @classmethod
@@ -51,7 +50,6 @@ class UnsignedTransaction:
         json_str = base64.b64decode(b64_str).decode()
         return cls.from_json(json_str)
 
-
 @dataclass
 class SignedTransaction:
     """Signed transaction ready for broadcast"""
@@ -60,7 +58,7 @@ class SignedTransaction:
     public_key: str
     txid: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "unsigned_tx": self.unsigned_tx.to_dict(),
             "signature": self.signature,
@@ -75,7 +73,7 @@ class SignedTransaction:
         return base64.b64encode(self.to_json().encode()).decode()
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> SignedTransaction:
+    def from_dict(cls, data: dict[str, Any]) -> SignedTransaction:
         return cls(
             unsigned_tx=UnsignedTransaction.from_dict(data["unsigned_tx"]),
             signature=data["signature"],
@@ -91,7 +89,6 @@ class SignedTransaction:
     def from_base64(cls, b64_str: str) -> SignedTransaction:
         json_str = base64.b64decode(b64_str).decode()
         return cls.from_json(json_str)
-
 
 class OfflineSigningBridge:
     """
@@ -111,10 +108,10 @@ class OfflineSigningBridge:
         recipient: str,
         amount: float,
         fee: float = 0.001,
-        nonce: Optional[int] = None,
-        inputs: Optional[List[Dict[str, Any]]] = None,
-        outputs: Optional[List[Dict[str, Any]]] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        nonce: int | None = None,
+        inputs: list[dict[str, Any]] | None = None,
+        outputs: list[dict[str, Any]] | None = None,
+        metadata: dict[str, Any] | None = None
     ) -> UnsignedTransaction:
         """
         Create an unsigned transaction (online device)
@@ -206,7 +203,7 @@ class OfflineSigningBridge:
         )
 
     @staticmethod
-    def convert_to_blockchain_transaction(signed_tx: SignedTransaction) -> Dict[str, Any]:
+    def convert_to_blockchain_transaction(signed_tx: SignedTransaction) -> dict[str, Any]:
         """
         Convert signed transaction to blockchain format
 
@@ -231,7 +228,6 @@ class OfflineSigningBridge:
             "signature": signed_tx.signature,
             "public_key": signed_tx.public_key
         }
-
 
 class QROfflineBridge:
     """
@@ -300,7 +296,6 @@ class QROfflineBridge:
         b64_data = qr_data[11:]  # Remove 'xai:signed:' prefix
         return SignedTransaction.from_base64(b64_data)
 
-
 class BatchOfflineSigning:
     """
     Batch multiple transactions for offline signing
@@ -309,7 +304,7 @@ class BatchOfflineSigning:
     """
 
     @staticmethod
-    def create_batch(unsigned_txs: List[UnsignedTransaction]) -> str:
+    def create_batch(unsigned_txs: list[UnsignedTransaction]) -> str:
         """
         Create batch of unsigned transactions
 
@@ -328,7 +323,7 @@ class BatchOfflineSigning:
         return base64.b64encode(batch_json.encode()).decode()
 
     @staticmethod
-    def parse_batch(batch_data: str) -> List[UnsignedTransaction]:
+    def parse_batch(batch_data: str) -> list[UnsignedTransaction]:
         """
         Parse batch of unsigned transactions
 
@@ -348,11 +343,11 @@ class BatchOfflineSigning:
 
     @staticmethod
     def sign_batch(
-        unsigned_txs: List[UnsignedTransaction],
+        unsigned_txs: list[UnsignedTransaction],
         private_key: str,
         public_key: str,
-        acknowledgements: List[str],
-    ) -> List[SignedTransaction]:
+        acknowledgements: list[str],
+    ) -> list[SignedTransaction]:
         """
         Sign a batch of transactions offline
 
@@ -375,7 +370,7 @@ class BatchOfflineSigning:
         ]
 
     @staticmethod
-    def create_signed_batch(signed_txs: List[SignedTransaction]) -> str:
+    def create_signed_batch(signed_txs: list[SignedTransaction]) -> str:
         """
         Create batch of signed transactions
 
@@ -394,7 +389,7 @@ class BatchOfflineSigning:
         return base64.b64encode(batch_json.encode()).decode()
 
     @staticmethod
-    def parse_signed_batch(batch_data: str) -> List[SignedTransaction]:
+    def parse_signed_batch(batch_data: str) -> list[SignedTransaction]:
         """
         Parse batch of signed transactions
 
@@ -411,7 +406,6 @@ class BatchOfflineSigning:
             SignedTransaction.from_dict(tx)
             for tx in batch["transactions"]
         ]
-
 
 class OfflineSigningValidator:
     """Security validation for offline signing"""

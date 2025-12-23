@@ -9,19 +9,18 @@ and reduce per-transaction overhead.
 from __future__ import annotations
 
 import logging
+
 logger = logging.getLogger(__name__)
 
-
 import time
-from typing import List, Dict, Any, Optional, Callable
-from dataclasses import dataclass
 from collections import defaultdict
-
+from dataclasses import dataclass
+from typing import Any, Callable
 
 @dataclass
 class TransactionBatch:
     """Batch of transactions"""
-    transactions: List[Any]
+    transactions: list[Any]
     batch_id: str
     created_at: float
     size: int
@@ -30,7 +29,6 @@ class TransactionBatch:
     def get_average_fee(self) -> float:
         """Get average fee per transaction"""
         return self.total_fees / max(1, len(self.transactions))
-
 
 class TransactionBatcher:
     """
@@ -60,12 +58,12 @@ class TransactionBatcher:
         self.max_wait_time = max_wait_time
         self.min_batch_size = min_batch_size
 
-        self.pending_transactions: List[Any] = []
-        self.batch_start_time: Optional[float] = None
-        self.processed_batches: List[TransactionBatch] = []
+        self.pending_transactions: list[Any] = []
+        self.batch_start_time: float | None = None
+        self.processed_batches: list[TransactionBatch] = []
         self.batch_counter = 0
 
-    def add_transaction(self, transaction: Any) -> Optional[TransactionBatch]:
+    def add_transaction(self, transaction: Any) -> TransactionBatch | None:
         """
         Add transaction to batch
 
@@ -126,7 +124,7 @@ class TransactionBatcher:
 
         return batch
 
-    def force_batch(self) -> Optional[TransactionBatch]:
+    def force_batch(self) -> TransactionBatch | None:
         """Force creation of batch regardless of size"""
         if not self.pending_transactions:
             return None
@@ -137,7 +135,7 @@ class TransactionBatcher:
         """Get number of pending transactions"""
         return len(self.pending_transactions)
 
-    def get_batch_stats(self) -> Dict[str, Any]:
+    def get_batch_stats(self) -> dict[str, Any]:
         """Get batching statistics"""
         if not self.processed_batches:
             return {
@@ -159,7 +157,6 @@ class TransactionBatcher:
             "min_batch_size": self.min_batch_size
         }
 
-
 class PriorityBatcher:
     """
     Batch transactions with priority sorting
@@ -176,17 +173,17 @@ class PriorityBatcher:
         self.max_wait_time = max_wait_time
 
         # Priority queues (high, medium, low)
-        self.queues: Dict[str, List[Any]] = {
+        self.queues: dict[str, list[Any]] = {
             'high': [],
             'medium': [],
             'low': []
         }
 
-        self.batch_start_time: Optional[float] = None
-        self.processed_batches: List[TransactionBatch] = []
+        self.batch_start_time: float | None = None
+        self.processed_batches: list[TransactionBatch] = []
         self.batch_counter = 0
 
-    def add_transaction(self, transaction: Any, priority: str = 'medium') -> Optional[TransactionBatch]:
+    def add_transaction(self, transaction: Any, priority: str = 'medium') -> TransactionBatch | None:
         """
         Add transaction with priority
 
@@ -251,13 +248,12 @@ class PriorityBatcher:
 
         return batch
 
-    def get_queue_stats(self) -> Dict[str, int]:
+    def get_queue_stats(self) -> dict[str, int]:
         """Get queue statistics"""
         return {
             priority: len(queue)
             for priority, queue in self.queues.items()
         }
-
 
 class AdaptiveBatcher:
     """
@@ -272,17 +268,17 @@ class AdaptiveBatcher:
         self.current_batch_size = 100
         self.max_wait_time = 5.0
 
-        self.pending_transactions: List[Any] = []
-        self.batch_start_time: Optional[float] = None
-        self.processed_batches: List[TransactionBatch] = []
+        self.pending_transactions: list[Any] = []
+        self.batch_start_time: float | None = None
+        self.processed_batches: list[TransactionBatch] = []
         self.batch_counter = 0
 
         # Performance tracking
-        self.recent_tx_rate: List[float] = []  # Transactions per second
+        self.recent_tx_rate: list[float] = []  # Transactions per second
         self.adjustment_interval = 60.0  # Adjust every 60 seconds
         self.last_adjustment = time.time()
 
-    def add_transaction(self, transaction: Any) -> Optional[TransactionBatch]:
+    def add_transaction(self, transaction: Any) -> TransactionBatch | None:
         """Add transaction and adapt batch size"""
         if not self.pending_transactions:
             self.batch_start_time = time.time()
@@ -362,7 +358,7 @@ class AdaptiveBatcher:
 
         return batch
 
-    def get_adaptive_stats(self) -> Dict[str, Any]:
+    def get_adaptive_stats(self) -> dict[str, Any]:
         """Get adaptive batching statistics"""
         return {
             "current_batch_size": self.current_batch_size,
@@ -372,11 +368,10 @@ class AdaptiveBatcher:
             "total_batches": len(self.processed_batches)
         }
 
-
 class BatchProcessor:
     """Process transaction batches"""
 
-    def __init__(self, process_callback: Callable[[List[Any]], bool]):
+    def __init__(self, process_callback: Callable[[list[Any]], bool]):
         """
         Initialize batch processor
 
@@ -419,7 +414,7 @@ class BatchProcessor:
             print(f"Batch processing error: {e}")
             return False
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> dict[str, int]:
         """Get processing statistics"""
         return {
             "processed": self.processed_count,

@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import time
 from contextlib import nullcontext
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 from flask import g, jsonify, request
 
@@ -20,82 +20,71 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
-def get_api_context() -> Dict[str, Any]:
+def get_api_context() -> dict[str, Any]:
     """Get the API context containing node, blockchain, and other dependencies.
 
     The context is stored in Flask's g object during request setup.
     """
     return g.get("api_context", {})
 
-
 def get_node() -> Any:
     """Get the blockchain node instance from context."""
     ctx = get_api_context()
     return ctx.get("node")
-
 
 def get_blockchain() -> Any:
     """Get the blockchain instance from context."""
     ctx = get_api_context()
     return ctx.get("blockchain")
 
-
-def get_peer_manager() -> Optional[Any]:
+def get_peer_manager() -> Any | None:
     """Get the peer manager instance from context."""
     ctx = get_api_context()
     return ctx.get("peer_manager")
 
-
-def get_api_auth() -> Optional[Any]:
+def get_api_auth() -> Any | None:
     """Get the API auth manager from context."""
     ctx = get_api_context()
     return ctx.get("api_auth")
 
-
-def get_error_registry() -> Optional[Any]:
+def get_error_registry() -> Any | None:
     """Get the error handler registry from context."""
     ctx = get_api_context()
     return ctx.get("error_registry")
 
-
-def get_spending_limits() -> Optional[Any]:
+def get_spending_limits() -> Any | None:
     """Get the spending limits manager from context."""
     ctx = get_api_context()
     return ctx.get("spending_limits")
 
-
 def log_event(
     event_type: str,
-    payload: Optional[Dict[str, Any]] = None,
+    payload: dict[str, Any] | None = None,
     severity: str = "INFO"
 ) -> None:
     """Log API security events with sanitized payloads."""
     sanitized = SecurityValidator.sanitize_for_logging(payload or {})
     log_security_event(event_type, {"details": sanitized}, severity=severity)
 
-
-def success_response(payload: Dict[str, Any], status: int = 200) -> Tuple[Any, int]:
+def success_response(payload: dict[str, Any], status: int = 200) -> tuple[Any, int]:
     """Return a success payload with consistent structure."""
     body = {"success": True, **payload}
     return jsonify(body), status
-
 
 def error_response(
     message: str,
     status: int = 400,
     code: str = "bad_request",
-    context: Optional[Dict[str, Any]] = None,
+    context: dict[str, Any] | None = None,
     event_type: str = "node_api_error",
-) -> Tuple[Any, int]:
+) -> tuple[Any, int]:
     """Return a sanitized error response and emit a security log."""
     severity = "ERROR" if status >= 500 else "WARNING"
     details = {"code": code, "status": status, **(context or {})}
     log_event(event_type, details, severity=severity)
     return jsonify({"success": False, "error": message, "code": code}), status
 
-
-def handle_exception(error: Exception, context_str: str, status: int = 500) -> Tuple[Any, int]:
+def handle_exception(error: Exception, context_str: str, status: int = 500) -> tuple[Any, int]:
     """Route unexpected exceptions with sanitized output."""
     error_registry = get_error_registry()
     blockchain = get_blockchain()
@@ -114,8 +103,7 @@ def handle_exception(error: Exception, context_str: str, status: int = 500) -> T
         event_type="node_api_exception",
     )
 
-
-def format_timestamp(timestamp: Optional[float]) -> Optional[str]:
+def format_timestamp(timestamp: float | None) -> str | None:
     """Return RFC3339-ish string for telemetry fields."""
     if timestamp is None:
         return None
@@ -124,8 +112,7 @@ def format_timestamp(timestamp: Optional[float]) -> Optional[str]:
     except (ValueError, TypeError, OverflowError):
         return None
 
-
-def require_api_auth() -> Optional[Tuple[Any, int]]:
+def require_api_auth() -> tuple[Any, int] | None:
     """Check if API authentication is required and valid.
 
     Returns None if auth passes, or an error response tuple if it fails.
@@ -144,8 +131,7 @@ def require_api_auth() -> Optional[Tuple[Any, int]]:
         event_type="api_auth_failure",
     )
 
-
-def require_admin_auth() -> Optional[Tuple[Any, int]]:
+def require_admin_auth() -> tuple[Any, int] | None:
     """Check if admin authentication is required and valid.
 
     Returns None if auth passes, or an error response tuple if it fails.
@@ -167,17 +153,15 @@ def require_admin_auth() -> Optional[Tuple[Any, int]]:
         event_type="api_admin_auth_failure",
     )
 
-
 class PaginationError(ValueError):
     """Raised when pagination parameters are invalid."""
     pass
-
 
 def get_pagination_params(
     default_limit: int = 50,
     max_limit: int = 500,
     default_offset: int = 0,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     """Normalize pagination query params and enforce sane limits."""
     limit = request.args.get("limit", default=default_limit, type=int)
     offset = request.args.get("offset", default=default_offset, type=int)
@@ -191,8 +175,7 @@ def get_pagination_params(
         raise PaginationError("offset cannot be negative")
     return limit, offset
 
-
-def build_peer_diversity_stats(manager: "PeerManager") -> Dict[str, Any]:
+def build_peer_diversity_stats(manager: "PeerManager") -> dict[str, Any]:
     """Snapshot peer diversity counters under lock for consistent reporting."""
     diversity_lock = getattr(manager, "_diversity_lock", None)
     context = diversity_lock if hasattr(diversity_lock, "__enter__") else nullcontext()
@@ -218,8 +201,7 @@ def build_peer_diversity_stats(manager: "PeerManager") -> Dict[str, Any]:
         },
     }
 
-
-def build_peer_snapshot() -> Dict[str, Any]:
+def build_peer_snapshot() -> dict[str, Any]:
     """Assemble detailed peer metadata for verbose peer queries."""
     from xai.network.peer_manager import PeerManager
 
@@ -233,7 +215,7 @@ def build_peer_snapshot() -> Dict[str, Any]:
     trusted_set = {peer.lower() for peer in getattr(manager, "trusted_peers", set())}
     banned_set = {peer.lower() for peer in getattr(manager, "banned_peers", set())}
 
-    connections: List[Dict[str, Any]] = []
+    connections: list[dict[str, Any]] = []
     for peer_id, info in list(connected.items()):
         connected_at = float(info.get("connected_at", now) or now)
         last_seen = info.get("last_seen")

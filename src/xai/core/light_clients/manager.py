@@ -18,33 +18,31 @@ import logging
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Dict, Optional, Any, List
 from enum import Enum
+from typing import Any
 
-from xai.core.light_clients.evm_light_client import (
-    EVMLightClient,
-    EVMBlockHeader,
-    EVMStateProof,
-    EVMChainConfig,
-)
 from xai.core.light_clients.cosmos_light_client import (
-    CosmosLightClient,
     CosmosBlockHeader,
-    CosmosValidatorSet,
-    CosmosProof,
     CosmosCommit,
+    CosmosLightClient,
+    CosmosProof,
+    CosmosValidatorSet,
     TrustLevel,
+)
+from xai.core.light_clients.evm_light_client import (
+    EVMBlockHeader,
+    EVMChainConfig,
+    EVMLightClient,
+    EVMStateProof,
 )
 
 logger = logging.getLogger(__name__)
-
 
 class ChainType(Enum):
     """Supported blockchain types"""
     EVM = "evm"
     COSMOS = "cosmos"
     UNKNOWN = "unknown"
-
 
 @dataclass
 class ProofVerificationResult:
@@ -62,7 +60,7 @@ class ProofVerificationResult:
         if self.verified_at == 0:
             self.verified_at = int(time.time())
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             'valid': self.valid,
@@ -73,7 +71,6 @@ class ProofVerificationResult:
             'proof_type': self.proof_type,
             'verified_at': self.verified_at,
         }
-
 
 class LightClientManager:
     """
@@ -89,8 +86,8 @@ class LightClientManager:
         Args:
             cache_max_size: Maximum number of verification results to cache (default: 1000)
         """
-        self.evm_clients: Dict[str, EVMLightClient] = {}  # chain_id -> client
-        self.cosmos_clients: Dict[str, CosmosLightClient] = {}  # chain_id -> client
+        self.evm_clients: dict[str, EVMLightClient] = {}  # chain_id -> client
+        self.cosmos_clients: dict[str, CosmosLightClient] = {}  # chain_id -> client
 
         # LRU cache for recent verifications with size limit
         self.verification_cache: OrderedDict[str, ProofVerificationResult] = OrderedDict()
@@ -105,7 +102,7 @@ class LightClientManager:
     def register_evm_chain(
         self,
         chain_config: EVMChainConfig,
-        genesis_header: Optional[EVMBlockHeader] = None,
+        genesis_header: EVMBlockHeader | None = None,
     ) -> bool:
         """
         Register an EVM-compatible chain
@@ -146,9 +143,9 @@ class LightClientManager:
         chain_id: str,
         trust_level: TrustLevel = TrustLevel.ONE_THIRD,
         trust_period_seconds: int = 14 * 24 * 3600,
-        trusted_header: Optional[CosmosBlockHeader] = None,
-        trusted_validator_set: Optional[CosmosValidatorSet] = None,
-        trusted_next_validator_set: Optional[CosmosValidatorSet] = None,
+        trusted_header: CosmosBlockHeader | None = None,
+        trusted_validator_set: CosmosValidatorSet | None = None,
+        trusted_next_validator_set: CosmosValidatorSet | None = None,
     ) -> bool:
         """
         Register a Cosmos SDK chain
@@ -194,11 +191,11 @@ class LightClientManager:
 
         return True
 
-    def get_evm_client(self, chain_id: str) -> Optional[EVMLightClient]:
+    def get_evm_client(self, chain_id: str) -> EVMLightClient | None:
         """Get EVM light client by chain ID"""
         return self.evm_clients.get(chain_id)
 
-    def get_cosmos_client(self, chain_id: str) -> Optional[CosmosLightClient]:
+    def get_cosmos_client(self, chain_id: str) -> CosmosLightClient | None:
         """Get Cosmos light client by chain ID"""
         return self.cosmos_clients.get(chain_id)
 
@@ -408,7 +405,7 @@ class LightClientManager:
                 proof_type='ibc',
             )
 
-    def get_chain_status(self, chain_id: str, chain_type: ChainType) -> Dict[str, Any]:
+    def get_chain_status(self, chain_id: str, chain_type: ChainType) -> dict[str, Any]:
         """
         Get status of a registered chain
 
@@ -456,7 +453,7 @@ class LightClientManager:
 
         return {'registered': False}
 
-    def list_registered_chains(self) -> Dict[str, Any]:
+    def list_registered_chains(self) -> dict[str, Any]:
         """
         List all registered chains
 
@@ -481,7 +478,7 @@ class LightClientManager:
             ],
         }
 
-    def export_state(self) -> Dict[str, Any]:
+    def export_state(self) -> dict[str, Any]:
         """
         Export state of all light clients for persistence
 
@@ -562,7 +559,7 @@ class LightClientManager:
         # Evict if needed
         self._evict_cache_if_needed()
 
-    def _get_cached_verification(self, cache_key: str) -> Optional[ProofVerificationResult]:
+    def _get_cached_verification(self, cache_key: str) -> ProofVerificationResult | None:
         """
         Get cached verification result if still valid
 
@@ -587,7 +584,7 @@ class LightClientManager:
         self.verification_cache.move_to_end(cache_key)
         return result
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics"""
         now = int(time.time())
         valid_entries = sum(

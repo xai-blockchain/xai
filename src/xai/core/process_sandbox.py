@@ -1,24 +1,22 @@
+from __future__ import annotations
+
 import logging
 import os
-from typing import Dict, Tuple, Union, Any
+from typing import Any
 
-import logging
 logger = logging.getLogger(__name__)
-
-
 
 def _get_logger(logger: Any) -> logging.Logger:
     if isinstance(logger, logging.Logger):
         return logger
     return logging.getLogger(__name__)
 
-
 def apply_process_limits(
     max_mem_mb: int = 2048,
     cpu_seconds: int = 7200,
     open_files: int = 2048,
     logger: Any = None,
-) -> Dict[str, Tuple[int, int]]:
+) -> dict[str, tuple[int, int]]:
     """
     Apply best-effort resource limits to the current process.
 
@@ -33,7 +31,7 @@ def apply_process_limits(
 
     limits = {}
 
-    def _bounded(target: int, current_hard: int) -> Tuple[int, int]:
+    def _bounded(target: int, current_hard: int) -> tuple[int, int]:
         if current_hard == resource.RLIM_INFINITY or current_hard < 0:
             return target, target
         bounded = min(target, int(current_hard))
@@ -94,8 +92,7 @@ def apply_process_limits(
     log.info("Process sandbox limits applied", extra={"event": "sandbox.applied", "limits": limits})
     return limits
 
-
-def maybe_enable_process_sandbox(logger: Any = None) -> Union[Dict[str, Tuple[int, int]], bool]:
+def maybe_enable_process_sandbox(logger: Any = None) -> dict[str, tuple[int, int]] | bool:
     """
     Enable process sandboxing based on environment variables.
 

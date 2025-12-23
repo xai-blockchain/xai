@@ -9,13 +9,13 @@ checks. Designed for production use with explicit error handling.
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
-from eth_utils import to_hex, to_checksum_address
+import solcx
+from eth_utils import to_checksum_address, to_hex
 from web3 import Web3
 from web3.contract import Contract
 from web3.types import TxParams
-import solcx
 
 HTLC_SOLIDITY_SOURCE = """
 // SPDX-License-Identifier: MIT
@@ -60,15 +60,13 @@ contract AtomicSwapETH {
 }
 """
 
-
 def _ensure_solc(version: str = "0.8.21") -> None:
     """Install solc if missing."""
     if version not in solcx.get_installed_solc_versions():
         solcx.install_solc(version)
     solcx.set_solc_version(version)
 
-
-def compile_htlc_contract(version: str = "0.8.21") -> Tuple[list, str]:
+def compile_htlc_contract(version: str = "0.8.21") -> tuple[list, str]:
     """Compile the Solidity HTLC contract and return (abi, bytecode)."""
     _ensure_solc(version)
     compiled = solcx.compile_source(
@@ -79,15 +77,14 @@ def compile_htlc_contract(version: str = "0.8.21") -> Tuple[list, str]:
     _, contract_data = compiled.popitem()
     return contract_data["abi"], contract_data["bin"]
 
-
 def _build_tx_params(
     w3: Web3,
     sender: str,
     *,
     value_wei: int = 0,
-    gas: Optional[int] = None,
-    max_fee_per_gas: Optional[int] = None,
-    max_priority_fee_per_gas: Optional[int] = None,
+    gas: int | None = None,
+    max_fee_per_gas: int | None = None,
+    max_priority_fee_per_gas: int | None = None,
 ) -> TxParams:
     base: TxParams = {
         "from": to_checksum_address(sender),
@@ -117,7 +114,6 @@ def _build_tx_params(
         base["gas"] = gas
     return base
 
-
 def deploy_htlc(
     w3: Web3,
     secret_hash: str,
@@ -126,9 +122,9 @@ def deploy_htlc(
     *,
     value_wei: int,
     sender: str,
-    gas: Optional[int] = None,
-    max_fee_per_gas: Optional[int] = None,
-    max_priority_fee_per_gas: Optional[int] = None,
+    gas: int | None = None,
+    max_fee_per_gas: int | None = None,
+    max_priority_fee_per_gas: int | None = None,
     solc_version: str = "0.8.21",
 ) -> Contract:
     """Deploy the HTLC contract and return the contract instance."""
@@ -150,17 +146,16 @@ def deploy_htlc(
     receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
     return w3.eth.contract(address=receipt.contractAddress, abi=abi)
 
-
 def claim_htlc(
     w3: Web3,
     contract: Contract,
     secret: str,
     *,
     sender: str,
-    gas: Optional[int] = None,
-    max_fee_per_gas: Optional[int] = None,
-    max_priority_fee_per_gas: Optional[int] = None,
-) -> Dict[str, Any]:
+    gas: int | None = None,
+    max_fee_per_gas: int | None = None,
+    max_priority_fee_per_gas: int | None = None,
+) -> dict[str, Any]:
     """Claim HTLC funds by providing the secret preimage."""
     tx = contract.functions.claim(to_hex(hexstr=secret)).build_transaction(
         _build_tx_params(
@@ -177,16 +172,15 @@ def claim_htlc(
     receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
     return dict(status=receipt.status, tx_hash=tx_hash.hex(), block=receipt.blockNumber)
 
-
 def refund_htlc(
     w3: Web3,
     contract: Contract,
     *,
     sender: str,
-    gas: Optional[int] = None,
-    max_fee_per_gas: Optional[int] = None,
-    max_priority_fee_per_gas: Optional[int] = None,
-) -> Dict[str, Any]:
+    gas: int | None = None,
+    max_fee_per_gas: int | None = None,
+    max_priority_fee_per_gas: int | None = None,
+) -> dict[str, Any]:
     """Refund HTLC after timelock expiry."""
     tx = contract.functions.refund().build_transaction(
         _build_tx_params(

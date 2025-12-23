@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Integration tests for blockchain reorganization (reorg) scenarios.
 
@@ -11,19 +13,17 @@ peer block acceptance which is not yet implemented in the core.
 
 import pytest
 import copy
-from typing import List, Tuple
 
 from xai.core.blockchain import Blockchain, Block, Transaction
 from xai.core.node import BlockchainNode
 from xai.core.wallet import Wallet
 from xai.core.blockchain_security import ReorganizationProtection
 
-
 class TestBlockchainReorganization:
     """Test blockchain reorganization scenarios"""
 
     @pytest.fixture
-    def reorg_network(self, tmp_path) -> Tuple[BlockchainNode, BlockchainNode]:
+    def reorg_network(self, tmp_path) -> tuple[BlockchainNode, BlockchainNode]:
         """Create 2-node network for reorg testing"""
         node1_dir = tmp_path / "node1"
         node2_dir = tmp_path / "node2"
@@ -295,7 +295,6 @@ class TestBlockchainReorganization:
         is_protected = protection.is_protected(4, block_4_hash)
         assert is_protected
 
-
 class TestReorgEdgeCases:
     """Test edge cases in reorganization"""
 
@@ -352,7 +351,6 @@ class TestReorgEdgeCases:
 
         # Should be synchronized
         assert len(blockchain.chain) == len(blockchain2.chain)
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -1,17 +1,16 @@
 """Core trading primitives for wallet-based trading."""
+from __future__ import annotations
 
-from enum import Enum
-from typing import Optional, Dict, Any
-from dataclasses import dataclass
 import time
-
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any
 
 class SwapOrderType(Enum):
     """Type of swap order"""
 
     BUY = "buy"
     SELL = "sell"
-
 
 class OrderStatus(Enum):
     """Status of a trade order"""
@@ -22,7 +21,6 @@ class OrderStatus(Enum):
     CANCELLED = "cancelled"
     EXPIRED = "expired"
 
-
 class TradeMatchStatus(Enum):
     """Status of a trade match"""
 
@@ -31,7 +29,6 @@ class TradeMatchStatus(Enum):
     CONFIRMED = "confirmed"
     SETTLED = "settled"
     FAILED = "failed"
-
 
 @dataclass
 class TradeOrder:
@@ -49,7 +46,7 @@ class TradeOrder:
         if self.timestamp is None:
             self.timestamp = time.time()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "order_id": self.order_id,
@@ -60,7 +57,6 @@ class TradeOrder:
             "timestamp": self.timestamp,
             "status": self.status.value,
         }
-
 
 @dataclass
 class TradeMatch:
@@ -78,7 +74,7 @@ class TradeMatch:
         if self.timestamp is None:
             self.timestamp = time.time()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary"""
         return {
             "match_id": self.match_id,
@@ -89,7 +85,6 @@ class TradeMatch:
             "timestamp": self.timestamp,
             "status": self.status.value,
         }
-
 
 class TradeManager:
     """Manages trading operations"""
@@ -103,7 +98,7 @@ class TradeManager:
         self.orders[order.order_id] = order
         return order.order_id
 
-    def get_order(self, order_id: str) -> Optional[TradeOrder]:
+    def get_order(self, order_id: str) -> TradeOrder | None:
         """Get an order by ID"""
         return self.orders.get(order_id)
 
@@ -112,10 +107,9 @@ class TradeManager:
         self.matches[match.match_id] = match
         return match.match_id
 
-    def get_match(self, match_id: str) -> Optional[TradeMatch]:
+    def get_match(self, match_id: str) -> TradeMatch | None:
         """Get a match by ID"""
         return self.matches.get(match_id)
-
 
 __all__ = [
     "SwapOrderType",

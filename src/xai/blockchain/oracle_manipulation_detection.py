@@ -1,12 +1,12 @@
+from __future__ import annotations
+
 import logging
-from typing import Dict
 import time
 
-from .twap_oracle import TWAPOracle
 from ..security.circuit_breaker import CircuitBreaker
+from .twap_oracle import TWAPOracle
 
 logger = logging.getLogger("xai.blockchain.oracle_manipulation_detector")
-
 
 class OracleManipulationDetector:
     def __init__(
@@ -29,14 +29,14 @@ class OracleManipulationDetector:
         self.deviation_threshold_percentage = deviation_threshold_percentage
 
     def check_for_manipulation(
-        self, current_prices: Dict[str, float], current_timestamp: int = None
+        self, current_prices: dict[str, float], current_timestamp: int = None
     ) -> bool:
         """
         Checks for oracle manipulation by comparing current prices from multiple sources
         against each other and against the TWAP.
 
         Args:
-            current_prices (Dict[str, float]): A dictionary of current prices from different oracle sources
+            current_prices (dict[str, float]): A dictionary of current prices from different oracle sources
                                                 (e.g., {"Chainlink": 100.5, "Uniswap": 101.0}).
             current_timestamp (int): The current timestamp for TWAP calculation. If None, uses current time.
 

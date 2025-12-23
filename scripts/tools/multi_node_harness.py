@@ -18,7 +18,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import requests
 
@@ -26,7 +26,6 @@ from xai.core.wallet import Wallet
 
 PYTHON = Path(__file__).resolve().parents[2] / "venv" / "bin" / "python"
 NODE_MODULE = ["-m", "xai.core.node"]
-
 
 @dataclass
 class NodeProcess:
@@ -73,7 +72,6 @@ class NodeProcess:
             except subprocess.TimeoutExpired:
                 self.process.kill()
 
-
 def wait_for_health(port: int, timeout: int = 60) -> None:
     deadline = time.time() + timeout
     url = f"http://127.0.0.1:{port}/health"
@@ -87,21 +85,17 @@ def wait_for_health(port: int, timeout: int = 60) -> None:
         time.sleep(1)
     raise RuntimeError(f"Node on port {port} failed to become healthy")
 
-
 def call_api(port: int, path: str, method: str = "get", **kwargs: Any) -> requests.Response:
     url = f"http://127.0.0.1:{port}{path}"
     return getattr(requests, method)(url, timeout=5, **kwargs)
 
-
 def add_peer(port: int, peer_port: int) -> None:
     call_api(port, "/peers/add", method="post", json={"url": f"http://127.0.0.1:{peer_port}"})
 
-
-def fetch_stats(port: int) -> Dict[str, Any]:
+def fetch_stats(port: int) -> dict[str, Any]:
     resp = call_api(port, "/stats")
     resp.raise_for_status()
     return resp.json()
-
 
 def latest_block_hash(port: int) -> str:
     resp = call_api(port, "/blocks?limit=1")
@@ -111,12 +105,11 @@ def latest_block_hash(port: int) -> str:
         return ""
     return blocks[0].get("hash", "")
 
-
 def run_harness(node_count: int, base_port: int) -> None:
     wallet = Wallet()
     addresses = [Wallet().address for _ in range(node_count)]
     base_temp = Path(tempfile.mkdtemp(prefix="xai-multi-node-"))
-    nodes: List[NodeProcess] = []
+    nodes: list[NodeProcess] = []
 
     for idx in range(node_count):
         node = NodeProcess(
@@ -166,14 +159,12 @@ def run_harness(node_count: int, base_port: int) -> None:
             node.stop()
         print("Stopped all nodes")
 
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="Multi-node integration harness")
     parser.add_argument("--nodes", type=int, default=3, help="Number of nodes to run")
     parser.add_argument("--base-port", type=int, default=8550, help="First node port")
     args = parser.parse_args()
     run_harness(args.nodes, args.base_port)
-
 
 if __name__ == "__main__":
     main()

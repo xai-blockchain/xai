@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Chain Validation System
 
@@ -14,26 +16,24 @@ This validator detects corruption and provides detailed diagnostics.
 
 import hashlib
 import json
-import time
 import logging
-from typing import Dict, List, Tuple, Optional, Set
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
+
 from xai.core.crypto_utils import verify_signature_hex
 
 logger = logging.getLogger(__name__)
-
 
 @dataclass
 class ValidationIssue:
     """Represents a validation issue found during chain validation"""
 
     severity: str  # 'critical', 'error', 'warning'
-    block_index: Optional[int]
+    block_index: int | None
     issue_type: str
     description: str
     details: Dict = field(default_factory=dict)
-
 
 @dataclass
 class ValidationReport:
@@ -43,7 +43,7 @@ class ValidationReport:
     total_blocks: int
     total_transactions: int
     validation_time: float
-    issues: List[ValidationIssue] = field(default_factory=list)
+    issues: list[ValidationIssue] = field(default_factory=list)
     utxo_count: int = 0
     total_supply: float = 0.0
     genesis_valid: bool = False
@@ -57,7 +57,7 @@ class ValidationReport:
     def add_issue(
         self,
         severity: str,
-        block_index: Optional[int],
+        block_index: int | None,
         issue_type: str,
         description: str,
         details: Dict = None,
@@ -72,15 +72,15 @@ class ValidationReport:
         )
         self.issues.append(issue)
 
-    def get_critical_issues(self) -> List[ValidationIssue]:
+    def get_critical_issues(self) -> list[ValidationIssue]:
         """Get all critical issues"""
         return [i for i in self.issues if i.severity == "critical"]
 
-    def get_error_issues(self) -> List[ValidationIssue]:
+    def get_error_issues(self) -> list[ValidationIssue]:
         """Get all error issues"""
         return [i for i in self.issues if i.severity == "error"]
 
-    def get_warning_issues(self) -> List[ValidationIssue]:
+    def get_warning_issues(self) -> list[ValidationIssue]:
         """Get all warning issues"""
         return [i for i in self.issues if i.severity == "warning"]
 
@@ -120,7 +120,6 @@ class ValidationReport:
             ],
         }
 
-
 class ChainValidator:
     """
     Comprehensive blockchain validator
@@ -155,7 +154,7 @@ class ChainValidator:
             )
 
     def validate_chain(
-        self, blockchain_data: dict, expected_genesis_hash: Optional[str] = None
+        self, blockchain_data: dict, expected_genesis_hash: str | None = None
     ) -> ValidationReport:
         """
         Validate entire blockchain
@@ -247,7 +246,7 @@ class ChainValidator:
         return self.report
 
     def _validate_genesis_block(
-        self, genesis_block: dict, expected_hash: Optional[str] = None
+        self, genesis_block: dict, expected_hash: str | None = None
     ) -> bool:
         """
         Validate genesis block
@@ -309,7 +308,7 @@ class ChainValidator:
 
         return valid
 
-    def _validate_chain_integrity(self, chain: List[dict]) -> bool:
+    def _validate_chain_integrity(self, chain: list[dict]) -> bool:
         """
         Validate chain integrity (hash links)
 
@@ -370,7 +369,7 @@ class ChainValidator:
 
         return valid
 
-    def _validate_proof_of_work(self, chain: List[dict]) -> bool:
+    def _validate_proof_of_work(self, chain: list[dict]) -> bool:
         """
         Validate proof-of-work for all blocks
 
@@ -406,7 +405,7 @@ class ChainValidator:
 
         return valid
 
-    def _validate_transaction_signatures(self, chain: List[dict]) -> bool:
+    def _validate_transaction_signatures(self, chain: list[dict]) -> bool:
         """
         Validate all transaction signatures
 
@@ -474,7 +473,7 @@ class ChainValidator:
 
         return valid
 
-    def _rebuild_utxo_set(self, chain: List[dict]) -> Tuple[Dict[str, List[dict]], float]:
+    def _rebuild_utxo_set(self, chain: list[dict]) -> tuple[dict[str, list[dict]], float]:
         """
         Rebuild UTXO set from chain
 
@@ -538,7 +537,7 @@ class ChainValidator:
         return utxo_set, total_supply
 
     def _validate_balance_consistency(
-        self, chain: List[dict], utxo_set: Dict[str, List[dict]]
+        self, chain: list[dict], utxo_set: dict[str, list[dict]]
     ) -> bool:
         """
         Validate balance consistency (no double spends)
@@ -615,7 +614,7 @@ class ChainValidator:
 
         return valid
 
-    def _validate_merkle_roots(self, chain: List[dict]) -> bool:
+    def _validate_merkle_roots(self, chain: list[dict]) -> bool:
         """
         Validate merkle roots for all blocks
 
@@ -674,7 +673,7 @@ class ChainValidator:
         block_string = json.dumps(block_data, sort_keys=True)
         return hashlib.sha256(block_string.encode()).hexdigest()
 
-    def _calculate_merkle_root(self, transactions: List[dict]) -> str:
+    def _calculate_merkle_root(self, transactions: list[dict]) -> str:
         """
         Calculate merkle root for transactions
 
@@ -825,13 +824,12 @@ class ChainValidator:
                 if len(errors) > 5:
                     logger.error(f"... and {len(errors) - 5} more errors")
 
-
 def validate_blockchain_on_startup(
     blockchain_data: dict,
     max_supply: float = 121000000.0,
-    expected_genesis_hash: Optional[str] = None,
+    expected_genesis_hash: str | None = None,
     verbose: bool = True,
-) -> Tuple[bool, ValidationReport]:
+) -> tuple[bool, ValidationReport]:
     """
     Validate blockchain on startup
 

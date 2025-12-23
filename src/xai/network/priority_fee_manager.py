@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 import heapq
-from typing import Dict, Any, List, Tuple
+from typing import Any
 
 # Assuming FeeAdjuster is available from a previous implementation
 from src.xai.network.fee_adjuster import FeeAdjuster
-
 
 class PriorityFeeManager:
     def __init__(self, fee_adjuster: FeeAdjuster, min_priority_fee: float = 0.0001):
@@ -16,7 +17,7 @@ class PriorityFeeManager:
         self.min_priority_fee = min_priority_fee
 
         # Priority queue for transactions: min-heap of (total_fee, tx_id, transaction_details)
-        self.transaction_priority_queue: List[Tuple[float, str, Any]] = []
+        self.transaction_priority_queue: list[tuple[float, str, Any]] = []
         self._transaction_id_counter = 0
         print(f"PriorityFeeManager initialized. Minimum priority fee: {self.min_priority_fee:.4f}.")
 
@@ -62,7 +63,7 @@ class PriorityFeeManager:
         heapq.heappush(self.transaction_priority_queue, (-total_fee, tx_id, transaction_details))
         print(f"Transaction {tx_id} added to queue with Total Fee: {total_fee:.4f}.")
 
-    def process_next_transaction(self) -> Tuple[str, Any, float] | None:
+    def process_next_transaction(self) -> tuple[str, Any, float] | None:
         """
         Simulates processing the next highest-priority transaction.
         Returns (tx_id, transaction_details, total_fee) or None if queue is empty.
@@ -76,7 +77,6 @@ class PriorityFeeManager:
         total_fee = -neg_total_fee
         print(f"Processing transaction {tx_id} with Total Fee: {total_fee:.4f}.")
         return tx_id, details, total_fee
-
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

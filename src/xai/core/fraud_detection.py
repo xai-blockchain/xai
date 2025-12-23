@@ -3,18 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Any, List
-
+from typing import Any
 
 SUSPICIOUS_COUNTRIES = {"KP", "IR", "SY"}
 HIGH_RISK_TX_TYPES = {"anonymous_bridge", "obfuscated_transfer"}
-
 
 @dataclass
 class FraudSignal:
     reason: str
     weight: float
-
 
 class FraudDetector:
     """Rule-based fraud analysis engine."""
@@ -22,9 +19,9 @@ class FraudDetector:
     def __init__(self) -> None:
         self.base_threshold = 0.6
 
-    def analyze_transaction(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def analyze_transaction(self, data: dict[str, Any]) -> dict[str, Any]:
         score = 0.0
-        signals: List[FraudSignal] = []
+        signals: list[FraudSignal] = []
 
         amount = float(data.get("amount", 0))
         if amount >= 10_000:
@@ -52,6 +49,5 @@ class FraudDetector:
             "flags": justification,
             "action": "review" if score >= self.base_threshold else "allow",
         }
-
 
 __all__ = ["FraudDetector"]

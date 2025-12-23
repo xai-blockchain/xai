@@ -1,6 +1,7 @@
-import logging
-from typing import Dict, Any
+from __future__ import annotations
 
+import logging
+from typing import Any
 
 class ValidatorStake:
     def __init__(self, address: str, staked_amount: int):
@@ -20,7 +21,7 @@ class ValidatorStake:
         self.staked_amount -= amount
         self.slashed_amount += amount
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "address": self.address,
             "staked_amount": self.staked_amount,
@@ -29,7 +30,6 @@ class ValidatorStake:
 
     def __repr__(self):
         return f"ValidatorStake(address='{self.address[:8]}...', staked={self.staked_amount}, slashed={self.slashed_amount})"
-
 
 class SlashingManager:
     OFFENSE_PENALTIES = {
@@ -40,7 +40,7 @@ class SlashingManager:
     }
 
     def __init__(self):
-        self.validator_stakes: Dict[str, ValidatorStake] = {}
+        self.validator_stakes: dict[str, ValidatorStake] = {}
         self.slashed_funds_treasury = 0  # Represents funds collected from slashing
         self.logger = logging.getLogger("xai.blockchain.slashing")
 

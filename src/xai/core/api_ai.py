@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 AI and Personal AI API Handler
 
@@ -14,13 +16,14 @@ Handles all AI-related API endpoints including:
 
 import json
 import logging
-from typing import Dict, Any, Tuple, Optional
-from flask import Flask, jsonify, request, Response, stream_with_context
+from typing import Any
+
+from flask import Flask, Response, jsonify, request, stream_with_context
+
 from xai.core.security_validation import ValidationError
 
 logger = logging.getLogger(__name__)
 ATTACHMENT_SAFE = True
-
 
 class AIAPIHandler:
     """Handles all AI and Personal AI-related API endpoints."""
@@ -43,52 +46,52 @@ class AIAPIHandler:
         """Register all AI routes."""
 
         @self.app.route("/personal-ai/atomic-swap", methods=["POST"])
-        def personal_atomic_swap() -> Tuple[Dict[str, Any], int]:
+        def personal_atomic_swap() -> tuple[dict[str, Any], int]:
             """Execute atomic swap with AI."""
             return self.personal_atomic_swap_handler()
 
         @self.app.route("/personal-ai/smart-contract/create", methods=["POST"])
-        def personal_contract_create() -> Tuple[Dict[str, Any], int]:
+        def personal_contract_create() -> tuple[dict[str, Any], int]:
             """Create smart contract with AI."""
             return self.personal_contract_create_handler()
 
         @self.app.route("/personal-ai/smart-contract/deploy", methods=["POST"])
-        def personal_contract_deploy() -> Tuple[Dict[str, Any], int]:
+        def personal_contract_deploy() -> tuple[dict[str, Any], int]:
             """Deploy smart contract with AI."""
             return self.personal_contract_deploy_handler()
 
         @self.app.route("/personal-ai/transaction/optimize", methods=["POST"])
-        def personal_transaction_optimize() -> Tuple[Dict[str, Any], int]:
+        def personal_transaction_optimize() -> tuple[dict[str, Any], int]:
             """Optimize transaction with AI."""
             return self.personal_transaction_optimize_handler()
 
         @self.app.route("/personal-ai/analyze", methods=["POST"])
-        def personal_analyze() -> Tuple[Dict[str, Any], int]:
+        def personal_analyze() -> tuple[dict[str, Any], int]:
             """Analyze blockchain with AI."""
             return self.personal_analyze_handler()
 
         @self.app.route("/personal-ai/wallet/analyze", methods=["POST"])
-        def personal_wallet_analyze() -> Tuple[Dict[str, Any], int]:
+        def personal_wallet_analyze() -> tuple[dict[str, Any], int]:
             """Analyze wallet with AI."""
             return self.personal_wallet_analyze_handler()
 
         @self.app.route("/personal-ai/wallet/recovery", methods=["POST"])
-        def personal_wallet_recovery() -> Tuple[Dict[str, Any], int]:
+        def personal_wallet_recovery() -> tuple[dict[str, Any], int]:
             """Get wallet recovery advice."""
             return self.personal_wallet_recovery_handler()
 
         @self.app.route("/personal-ai/node/setup", methods=["POST"])
-        def personal_node_setup() -> Tuple[Dict[str, Any], int]:
+        def personal_node_setup() -> tuple[dict[str, Any], int]:
             """Get node setup recommendations."""
             return self.personal_node_setup_handler()
 
         @self.app.route("/personal-ai/liquidity/alert", methods=["POST"])
-        def personal_liquidity_alert() -> Tuple[Dict[str, Any], int]:
+        def personal_liquidity_alert() -> tuple[dict[str, Any], int]:
             """Handle liquidity pool alert."""
             return self.personal_liquidity_alert_handler()
 
         @self.app.route("/personal-ai/assistants", methods=["GET"])
-        def personal_ai_assistants() -> Tuple[Dict[str, Any], int]:
+        def personal_ai_assistants() -> tuple[dict[str, Any], int]:
             """List available AI assistants."""
             return self.personal_ai_assistants_handler()
 
@@ -98,21 +101,21 @@ class AIAPIHandler:
             return self.personal_ai_stream_handler()
 
         @self.app.route("/questioning/submit", methods=["POST"])
-        def submit_question() -> Tuple[Dict[str, Any], int]:
+        def submit_question() -> tuple[dict[str, Any], int]:
             """AI submits question to node operators."""
             return self.submit_question_handler()
 
         @self.app.route("/questioning/answer", methods=["POST"])
-        def submit_answer() -> Tuple[Dict[str, Any], int]:
+        def submit_answer() -> tuple[dict[str, Any], int]:
             """Node operator submits answer."""
             return self.submit_answer_handler()
 
         @self.app.route("/questioning/pending", methods=["GET"])
-        def get_pending_questions() -> Tuple[Dict[str, Any], int]:
+        def get_pending_questions() -> tuple[dict[str, Any], int]:
             """Get questions needing answers."""
             return self.get_pending_questions_handler()
 
-    def personal_atomic_swap_handler(self) -> Tuple[Dict[str, Any], int]:
+    def personal_atomic_swap_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle atomic swap with AI assistance.
 
@@ -151,7 +154,7 @@ class AIAPIHandler:
                 "message": str(e)
             }), 500
 
-    def personal_contract_create_handler(self) -> Tuple[Dict[str, Any], int]:
+    def personal_contract_create_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle smart contract creation with AI.
 
@@ -177,7 +180,7 @@ class AIAPIHandler:
         )
         return self._personal_ai_response(result)
 
-    def personal_contract_deploy_handler(self) -> Tuple[Dict[str, Any], int]:
+    def personal_contract_deploy_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle smart contract deployment with AI.
 
@@ -203,7 +206,7 @@ class AIAPIHandler:
         )
         return self._personal_ai_response(result)
 
-    def personal_transaction_optimize_handler(self) -> Tuple[Dict[str, Any], int]:
+    def personal_transaction_optimize_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle transaction optimization with AI.
 
@@ -239,7 +242,7 @@ class AIAPIHandler:
         )
         return self._personal_ai_response(result)
 
-    def personal_analyze_handler(self) -> Tuple[Dict[str, Any], int]:
+    def personal_analyze_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle blockchain analysis with AI.
 
@@ -275,7 +278,7 @@ class AIAPIHandler:
         )
         return self._personal_ai_response(result)
 
-    def personal_wallet_analyze_handler(self) -> Tuple[Dict[str, Any], int]:
+    def personal_wallet_analyze_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle wallet analysis with AI.
 
@@ -299,7 +302,7 @@ class AIAPIHandler:
         )
         return self._personal_ai_response(result)
 
-    def personal_wallet_recovery_handler(self) -> Tuple[Dict[str, Any], int]:
+    def personal_wallet_recovery_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle wallet recovery advice with AI.
 
@@ -348,7 +351,7 @@ class AIAPIHandler:
         )
         return self._personal_ai_response(result)
 
-    def personal_node_setup_handler(self) -> Tuple[Dict[str, Any], int]:
+    def personal_node_setup_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle node setup recommendations with AI.
 
@@ -391,7 +394,7 @@ class AIAPIHandler:
         )
         return self._personal_ai_response(result)
 
-    def personal_liquidity_alert_handler(self) -> Tuple[Dict[str, Any], int]:
+    def personal_liquidity_alert_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle liquidity pool alert with AI.
 
@@ -447,7 +450,7 @@ class AIAPIHandler:
         )
         return self._personal_ai_response(result)
 
-    def personal_ai_assistants_handler(self) -> Tuple[Dict[str, Any], int]:
+    def personal_ai_assistants_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle listing of available AI assistants.
 
@@ -505,7 +508,7 @@ class AIAPIHandler:
             mimetype="text/event-stream",
         )
 
-    def submit_question_handler(self) -> Tuple[Dict[str, Any], int]:
+    def submit_question_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle AI question submission to node operators.
 
@@ -536,7 +539,7 @@ class AIAPIHandler:
             200,
         )
 
-    def submit_answer_handler(self) -> Tuple[Dict[str, Any], int]:
+    def submit_answer_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle node operator answer submission.
 
@@ -559,7 +562,7 @@ class AIAPIHandler:
             200,
         )
 
-    def get_pending_questions_handler(self) -> Tuple[Dict[str, Any], int]:
+    def get_pending_questions_handler(self) -> tuple[dict[str, Any], int]:
         """
         Handle pending questions retrieval.
 
@@ -569,7 +572,7 @@ class AIAPIHandler:
         # In production, query from questioning system
         return jsonify({"count": 0, "questions": []}), 200
 
-    def _personal_ai_context(self) -> Dict[str, Any]:
+    def _personal_ai_context(self) -> dict[str, Any]:
         """
         Extract and validate Personal AI context from request headers.
 
@@ -632,7 +635,7 @@ class AIAPIHandler:
             "assistant_name": assistant_name or None,
         }
 
-    def _personal_ai_response(self, result: Dict[str, Any]) -> Tuple[Dict[str, Any], int]:
+    def _personal_ai_response(self, result: dict[str, Any]) -> tuple[dict[str, Any], int]:
         """
         Format Personal AI response.
 

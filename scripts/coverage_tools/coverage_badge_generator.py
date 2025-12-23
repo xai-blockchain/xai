@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 """
 Generate SVG coverage badges and update README files.
 
@@ -19,10 +21,9 @@ Examples:
 import json
 import sys
 from pathlib import Path
-from typing import Tuple, Optional
+
 import argparse
 import re
-
 
 class CoverageBadgeGenerator:
     """Generate coverage badges and update documentation."""
@@ -56,14 +57,14 @@ class CoverageBadgeGenerator:
         except Exception as e:
             print(f"Error reading coverage: {e}", file=sys.stderr)
 
-    def get_color_for_percentage(self, percentage: float) -> Tuple[str, str]:
+    def get_color_for_percentage(self, percentage: float) -> tuple[str, str]:
         """Get color and label for coverage percentage."""
         for threshold, color, label in self.COLOR_SCHEME:
             if percentage >= threshold:
                 return color, label
         return self.COLOR_SCHEME[-1][1], self.COLOR_SCHEME[-1][2]
 
-    def generate_svg_badge(self, percentage: Optional[float] = None) -> str:
+    def generate_svg_badge(self, percentage: float | None = None) -> str:
         """Generate SVG badge for coverage."""
         if percentage is None:
             percentage = self.coverage_percentage
@@ -90,7 +91,7 @@ class CoverageBadgeGenerator:
 
         return svg
 
-    def generate_html_badge(self, percentage: Optional[float] = None) -> str:
+    def generate_html_badge(self, percentage: float | None = None) -> str:
         """Generate HTML badge for coverage."""
         if percentage is None:
             percentage = self.coverage_percentage
@@ -103,7 +104,7 @@ class CoverageBadgeGenerator:
 
         return html
 
-    def generate_markdown_badge(self, percentage: Optional[float] = None) -> str:
+    def generate_markdown_badge(self, percentage: float | None = None) -> str:
         """Generate Markdown badge for coverage."""
         if percentage is None:
             percentage = self.coverage_percentage
@@ -118,7 +119,7 @@ class CoverageBadgeGenerator:
         output_file.write_text(svg_content)
         print(f"SVG badge written to: {output_file}")
 
-    def update_readme(self, readme_file: Path, percentage: Optional[float] = None) -> bool:
+    def update_readme(self, readme_file: Path, percentage: float | None = None) -> bool:
         """Update README with coverage badge."""
         if percentage is None:
             percentage = self.coverage_percentage
@@ -191,7 +192,6 @@ class CoverageBadgeGenerator:
             print(f"Error updating workflow: {e}", file=sys.stderr)
             return False
 
-
     return """
   - name: Generate Coverage Badge
     if: always()
@@ -208,7 +208,6 @@ class CoverageBadgeGenerator:
       name: coverage-badge
       path: badges/coverage.svg
 """
-
 
 def main():
     """Main entry point."""
@@ -310,7 +309,6 @@ Examples:
         print(generator.generate_svg_badge())
 
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

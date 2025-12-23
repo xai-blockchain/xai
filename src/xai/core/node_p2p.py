@@ -11,28 +11,30 @@ Handles all peer-to-peer networking functionality including:
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
+import logging
 import os
 import threading
 import time
-from urllib.parse import urlparse
 from collections import defaultdict, deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
+
 import websockets
 from websockets.exceptions import ConnectionClosed, WebSocketException
 from websockets.server import WebSocketServerProtocol
-import json
-import hashlib
-import logging
-from typing import TYPE_CHECKING, Set, Optional, Dict, Any, Union, Tuple, List
 
 logger = logging.getLogger(__name__)
 
 try:
     import aioquic  # type: ignore
+
     from xai.core.p2p_quic import (  # type: ignore
-        QUICServer,
-        QuicDialTimeout,
         QuicConfiguration,
+        QuicDialTimeout,
+        QUICServer,
         quic_client_send_with_timeout,
     )
     QUIC_AVAILABLE = True
@@ -43,24 +45,29 @@ except (ImportError, ModuleNotFoundError) as e:
     logger.debug(f"QUIC support disabled: {e}")
 
 import requests
-from xai.network.peer_manager import PeerManager
+
 from xai.core.block_header import BlockHeader
-from xai.core.p2p_security import MessageRateLimiter, BandwidthLimiter, HEADER_VERSION, P2PSecurityConfig
-from xai.core.security_validation import SecurityEventRouter
-from xai.core.config import Config
-from xai.core.checkpoint_sync import CheckpointSyncManager
 from xai.core.blockchain_exceptions import (
+    DatabaseError,
     NetworkError,
     PeerError,
-    ValidationError,
-    DatabaseError,
     StorageError,
+    ValidationError,
 )
+from xai.core.checkpoint_sync import CheckpointSyncManager
+from xai.core.config import Config
+from xai.core.p2p_security import (
+    HEADER_VERSION,
+    BandwidthLimiter,
+    MessageRateLimiter,
+    P2PSecurityConfig,
+)
+from xai.core.security_validation import SecurityEventRouter
+from xai.network.peer_manager import PeerManager
 
 if TYPE_CHECKING:
-    from xai.core.blockchain import Blockchain, Transaction, Block
+    from xai.core.blockchain import Block, Blockchain, Transaction
     from xai.core.node_consensus import ConsensusManager
-
 
 class P2PNetworkManager:
     """
@@ -70,15 +77,15 @@ class P2PNetworkManager:
     def __init__(
         self,
         blockchain: Blockchain,
-        peer_manager: Optional[PeerManager] = None,
-        consensus_manager: Optional["ConsensusManager"] = None,
+        peer_manager: PeerManager | None = None,
+        consensus_manager: "ConsensusManager" | None = None,
         host: str = "0.0.0.0",
         port: int = 8765,
         max_connections: int = 50,
         max_bandwidth_in: int = 1024 * 1024, # 1 MB/s
         max_bandwidth_out: int = 1024 * 1024, # 1 MB/s
-        peer_api_key: Optional[str] = None,
-        api_port: Optional[int] = None,
+        peer_api_key: str | None = None,
+        api_port: int | None = None,
     ) -> None:
         # Configure logger with handler if not already configured
         if not logger.handlers:
@@ -118,13 +125,13 @@ class P2PNetworkManager:
         self.host = host
         self.port = port
         self.api_port = api_port  # HTTP API port for this node
-        self.peer_api_endpoints: Dict[str, str] = {}  # Map peer_id -> HTTP API endpoint
+        self.peer_api_endpoints: dict[str, str] = {}  # Map peer_id -> HTTP API endpoint
         self.quic_enabled = bool(getattr(Config, "P2P_ENABLE_QUIC", False) and QUIC_AVAILABLE)
         self.quic_dial_timeout = float(getattr(Config, "P2P_QUIC_DIAL_TIMEOUT", 1.0))
-        self.server: Optional[websockets.WebSocketServer] = None
-        self.connections: Dict[str, Any] = {}
-        self.websocket_peer_ids: Dict[Any, str] = {}
-        self.http_peers: Set[str] = set()
+        self.server: websockets.WebSocketServer | None = None
+        self.connections: dict[str, Any] = {}
+        self.websocket_peer_ids: dict[Any, str] = {}
+        self.http_peers: set[str] = set()
         self.peers = self.http_peers  # Alias used by legacy callers/tests
         self._peer_lock = threading.RLock()
         self.max_connections = max_connections
@@ -141,18 +148,18 @@ class P2PNetworkManager:
         self.global_bandwidth_in = BandwidthLimiter(global_in, max(1, global_in // 10)) if global_in > 0 else None
         self.global_bandwidth_out = BandwidthLimiter(global_out, max(1, global_out // 10)) if global_out > 0 else None
         self.received_chains = []
-        self._quic_server: Optional[QUICServer] = None
+        self._quic_server: QUICServer | None = None
         self._dedup_max_items = max(100, int(getattr(Config, "P2P_DEDUP_MAX_ITEMS", 5000)))
         self._dedup_ttl = max(1.0, float(getattr(Config, "P2P_DEDUP_TTL_SECONDS", 900.0)))
-        self._tx_seen_ids: Set[str] = set()
-        self._tx_seen_queue: deque[Tuple[str, float]] = deque()
-        self._block_seen_ids: Set[str] = set()
-        self._block_seen_queue: deque[Tuple[str, float]] = deque()
+        self._tx_seen_ids: set[str] = set()
+        self._tx_seen_queue: deque[tuple[str, float]] = deque()
+        self._block_seen_ids: set[str] = set()
+        self._block_seen_queue: deque[tuple[str, float]] = deque()
         self.idle_timeout_seconds = max(60, int(getattr(Config, "P2P_CONNECTION_IDLE_TIMEOUT_SECONDS", 900)))
         self.handshake_timeout_seconds = max(1, int(getattr(Config, "P2P_HANDSHAKE_TIMEOUT_SECONDS", 15)))
-        self._connection_last_seen: Dict[str, float] = {}
-        self._handshake_received: Dict[str, Optional[float]] = {}
-        self._handshake_deadlines: Dict[str, float] = {}
+        self._connection_last_seen: dict[str, float] = {}
+        self._handshake_received: dict[str, float | None] = {}
+        self._handshake_deadlines: dict[str, float] = {}
         self.peer_api_key = peer_api_key
         self._http_timeout = getattr(Config, "P2P_HTTP_TIMEOUT_SECONDS", 2)
         self.parallel_sync_workers = max(1, int(getattr(Config, "P2P_PARALLEL_SYNC_WORKERS", 4)))
@@ -164,17 +171,17 @@ class P2PNetworkManager:
         self.parallel_sync_retry_limit = max(1, int(getattr(Config, "P2P_PARALLEL_SYNC_RETRY", 2)))
         self._reset_window_seconds = int(getattr(Config, "P2P_RESET_STORM_WINDOW_SECONDS", 300))
         self._reset_threshold = max(1, int(getattr(Config, "P2P_RESET_STORM_THRESHOLD", 5)))
-        self._reset_events: Dict[str, deque[float]] = defaultdict(deque)
-        self.peer_features: Dict[str, Dict[str, Any]] = {}
+        self._reset_events: dict[str, deque[float]] = defaultdict(deque)
+        self.peer_features: dict[str, dict[str, Any]] = {}
         self.partial_sync_min_delta = max(0, int(getattr(Config, "P2P_PARTIAL_SYNC_MIN_DELTA", 100)))
         self.partial_sync_enabled = bool(getattr(Config, "P2P_PARTIAL_SYNC_ENABLED", True))
-        self.checkpoint_sync: Optional[CheckpointSyncManager] = (
+        self.checkpoint_sync: CheckpointSyncManager | None = (
             CheckpointSyncManager(self.blockchain, p2p_manager=self) if self.partial_sync_enabled else None
         )
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
-        self._persistent_peers: Set[str] = set()  # Peers to maintain connections to
-        self._reconnect_tasks: Dict[str, asyncio.Task] = {}  # Ongoing reconnection tasks
-        self._connection_monitor_task: Optional[asyncio.Task] = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._persistent_peers: set[str] = set()  # Peers to maintain connections to
+        self._reconnect_tasks: dict[str, asyncio.Task] = {}  # Ongoing reconnection tasks
+        self._connection_monitor_task: asyncio.Task | None = None
 
     @staticmethod
     def _normalize_peer_uri(peer_uri: str) -> str:
@@ -183,7 +190,7 @@ class P2PNetworkManager:
             raise ValueError(f"Invalid peer URI: {peer_uri}")
         return f"{parsed.scheme}://{parsed.netloc}"
 
-    def _record_quic_error(self, host: Optional[str] = None) -> None:
+    def _record_quic_error(self, host: str | None = None) -> None:
         """Increment QUIC error counter and emit a security event if configured."""
         try:
             from xai.core.monitoring import MetricsCollector
@@ -205,7 +212,7 @@ class P2PNetworkManager:
                 extra={"event": "p2p.quic_error_metric_failed", "peer": host}
             )
 
-    def _record_quic_timeout(self, host: Optional[str] = None) -> None:
+    def _record_quic_timeout(self, host: str | None = None) -> None:
         """Increment QUIC timeout counter, track it as an error, and emit a security event."""
         try:
             from xai.core.monitoring import MetricsCollector
@@ -302,7 +309,7 @@ class P2PNetworkManager:
             http_count = len(self.http_peers)
         return max(http_count, len(unique_hosts))
 
-    def get_peers(self) -> Set[str]:
+    def get_peers(self) -> set[str]:
         """
         Return a combined set of peers from HTTP registration and active connections.
 
@@ -310,7 +317,7 @@ class P2PNetworkManager:
         P2P port so APIs can surface something meaningful even when no HTTP peers
         have been registered explicitly.
         """
-        peers: Set[str] = set()
+        peers: set[str] = set()
         with self._peer_lock:
             peers.update(self.http_peers)
         for host in {
@@ -438,7 +445,7 @@ class P2PNetworkManager:
         }
         await self._send_signed_message(websocket, peer_id, handshake_payload)
 
-    async def _handler(self, websocket: Any, path: Optional[str] = None) -> None:
+    async def _handler(self, websocket: Any, path: str | None = None) -> None:
         """Handles incoming WebSocket connections."""
         remote_ip = websocket.remote_address[0]
         if not self.peer_manager.can_connect(remote_ip):
@@ -528,7 +535,7 @@ class P2PNetworkManager:
                 extra={"event": "p2p.outbound_disconnected", "peer": peer_id}
             )
 
-    def _record_connection_reset_event(self, peer_id: str, *, reason: Optional[str] = None, now: Optional[float] = None) -> None:
+    def _record_connection_reset_event(self, peer_id: str, *, reason: str | None = None, now: float | None = None) -> None:
         """
         Track connection reset/disconnect storms and ban peers that repeatedly reset
         connections within a short time window to mitigate connection reset floods.
@@ -1031,7 +1038,7 @@ class P2PNetworkManager:
             )
         return applied
 
-    def _disconnect_peer(self, peer_id: str, conn: Optional[Any]) -> None:
+    def _disconnect_peer(self, peer_id: str, conn: Any | None) -> None:
         """Centralized cleanup for peer disconnections without duplicating dict removals."""
         if peer_id in self.connections:
             self.connections.pop(peer_id, None)
@@ -1058,7 +1065,7 @@ class P2PNetworkManager:
         self,
         event_type: str,
         severity: str = "WARNING",
-        payload: Optional[Dict[str, Any]] = None,
+        payload: dict[str, Any] | None = None,
     ) -> None:
         """
         Forward P2P security events through the global router so metrics and webhooks
@@ -1110,7 +1117,7 @@ class P2PNetworkManager:
             payload={"peer": peer_id},
         )
         
-    async def _handle_message(self, websocket: Optional[WebSocketServerProtocol], message: Union[str, bytes]) -> None:
+    async def _handle_message(self, websocket: WebSocketServerProtocol | None, message: str | bytes) -> None:
         """Handles incoming messages from peers, splitting concatenated messages on newlines."""
         remote_addr = getattr(websocket, "remote_address", ("<quic>", 0))
         fallback_peer = remote_addr[0] if isinstance(remote_addr, (tuple, list)) and remote_addr else str(remote_addr)
@@ -1124,10 +1131,10 @@ class P2PNetworkManager:
         for msg in individual_messages:
             await self._process_single_message(websocket, peer_id, msg.encode("utf-8"))
 
-    async def _process_single_message(self, websocket: Optional[WebSocketServerProtocol], peer_id: str, raw_bytes: bytes) -> None:
+    async def _process_single_message(self, websocket: WebSocketServerProtocol | None, peer_id: str, raw_bytes: bytes) -> None:
         """Process a single message from a peer."""
         debug_signing = bool(int(os.getenv("XAI_P2P_DEBUG_SIGNING", "0")))
-        message_data: Optional[Dict[str, Any]] = None
+        message_data: dict[str, Any] | None = None
         now = time.time()
         if peer_id in self._connection_last_seen:
             self._connection_last_seen[peer_id] = now
@@ -1412,9 +1419,9 @@ class P2PNetworkManager:
 
     async def _handle_inventory_announcement(
         self,
-        websocket: Optional[WebSocketServerProtocol],
+        websocket: WebSocketServerProtocol | None,
         peer_id: str,
-        payload: Optional[Dict[str, Any]],
+        payload: dict[str, Any] | None,
     ) -> None:
         if not websocket:
             return
@@ -1425,7 +1432,7 @@ class P2PNetworkManager:
         missing_blocks = [block_hash for block_hash in block_hashes if not self._has_block(block_hash)]
         if not missing_txs and not missing_blocks:
             return
-        request_payload: Dict[str, List[str]] = {}
+        request_payload: dict[str, list[str]] = {}
         if missing_txs:
             request_payload["transactions"] = missing_txs
         if missing_blocks:
@@ -1438,9 +1445,9 @@ class P2PNetworkManager:
 
     async def _handle_getdata_request(
         self,
-        websocket: Optional[WebSocketServerProtocol],
+        websocket: WebSocketServerProtocol | None,
         peer_id: str,
-        payload: Optional[Dict[str, Any]],
+        payload: dict[str, Any] | None,
     ) -> None:
         if not websocket:
             return
@@ -1466,9 +1473,9 @@ class P2PNetworkManager:
 
     async def _handle_checkpoint_request(
         self,
-        websocket: Optional[WebSocketServerProtocol],
+        websocket: WebSocketServerProtocol | None,
         peer_id: str,
-        payload: Optional[Dict[str, Any]],
+        payload: dict[str, Any] | None,
     ) -> None:
         """
         Serve checkpoint payload metadata/URL to peers requesting partial sync.
@@ -1505,7 +1512,7 @@ class P2PNetworkManager:
         self,
         websocket: Any,
         peer_id: str,
-        message: Dict[str, Any],
+        message: dict[str, Any],
     ) -> None:
         """Sign and send a message to a single peer with bandwidth enforcement."""
         try:
@@ -1556,7 +1563,7 @@ class P2PNetworkManager:
                     self.websocket_peer_ids.pop(conn, None)
                 self.peer_manager.disconnect_peer(peer_id)
     
-    async def broadcast(self, message: Dict[str, Any]) -> None:
+    async def broadcast(self, message: dict[str, Any]) -> None:
         """Broadcasts a message to all connected peers."""
         if not self.connections:
             return
@@ -1632,9 +1639,9 @@ class P2PNetworkManager:
             # Loop exists but not running yet - create task directly
             loop.create_task(coro)
 
-    def _get_checkpoint_metadata(self) -> Optional[Dict[str, Any]]:
+    def _get_checkpoint_metadata(self) -> dict[str, Any] | None:
         """Return highest checkpoint metadata from peers or local store."""
-        candidates: list[Dict[str, Any]] = []
+        candidates: list[dict[str, Any]] = []
 
         # Peer-advertised checkpoints
         for info in self.peer_features.values():
@@ -1674,7 +1681,7 @@ class P2PNetworkManager:
             return None
         return max(candidates, key=lambda c: c.get("height", -1))
 
-    def _derive_payload_fingerprint(self, payload: Any, candidate_fields: Tuple[str, ...]) -> Optional[str]:
+    def _derive_payload_fingerprint(self, payload: Any, candidate_fields: tuple[str, ...]) -> str | None:
         """Return a stable fingerprint for deduplication."""
         if payload is None:
             return None
@@ -1692,8 +1699,8 @@ class P2PNetworkManager:
     def _is_duplicate_message(
         self,
         category: str,
-        message_id: Optional[str],
-        now: Optional[float] = None,
+        message_id: str | None,
+        now: float | None = None,
     ) -> bool:
         """Track recently seen messages and detect duplicates."""
         if not message_id:
@@ -1712,8 +1719,8 @@ class P2PNetworkManager:
 
     def _purge_dedup_cache(
         self,
-        cache_queue: deque[Tuple[str, float]],
-        cache_set: Set[str],
+        cache_queue: deque[tuple[str, float]],
+        cache_set: set[str],
         now: float,
     ) -> None:
         """Remove expired or excess entries from the dedup cache."""
@@ -1724,14 +1731,14 @@ class P2PNetworkManager:
     def _select_dedup_cache(
         self,
         category: str,
-    ) -> Tuple[Optional[Set[str]], Optional[deque]]:
+    ) -> tuple[set[str] | None, deque | None]:
         if category == "transaction":
             return self._tx_seen_ids, self._tx_seen_queue
         if category == "block":
             return self._block_seen_ids, self._block_seen_queue
         return None, None
 
-    def _peer_headers(self) -> Optional[Dict[str, str]]:
+    def _peer_headers(self) -> dict[str, str] | None:
         if not self.peer_api_key:
             return None
         return {"X-API-Key": self.peer_api_key}
@@ -1739,10 +1746,10 @@ class P2PNetworkManager:
     def _announce_inventory(
         self,
         *,
-        transactions: Optional[List[str]] = None,
-        blocks: Optional[List[str]] = None,
+        transactions: list[str] | None = None,
+        blocks: list[str] | None = None,
     ) -> None:
-        payload: Dict[str, List[str]] = {}
+        payload: dict[str, list[str]] = {}
         if transactions:
             payload["transactions"] = [txid for txid in transactions if txid]
         if blocks:
@@ -1752,7 +1759,7 @@ class P2PNetworkManager:
         message = {"type": "inv", "payload": payload}
         self._dispatch_async(self.broadcast(message))
 
-    def _has_transaction(self, txid: Optional[str]) -> bool:
+    def _has_transaction(self, txid: str | None) -> bool:
         if not txid:
             return False
         if txid in getattr(self.blockchain, "seen_txids", set()):
@@ -1760,7 +1767,7 @@ class P2PNetworkManager:
         pending = getattr(self.blockchain, "pending_transactions", []) or []
         return any(getattr(tx, "txid", None) == txid for tx in pending)
 
-    def _find_pending_transaction(self, txid: Optional[str]):
+    def _find_pending_transaction(self, txid: str | None):
         if not txid:
             return None
         for tx in getattr(self.blockchain, "pending_transactions", []) or []:
@@ -1768,7 +1775,7 @@ class P2PNetworkManager:
                 return tx
         return None
 
-    def _has_block(self, block_hash: Optional[str]) -> bool:
+    def _has_block(self, block_hash: str | None) -> bool:
         if not block_hash:
             return False
         lookup = getattr(self.blockchain, "get_block_by_hash", None)
@@ -1781,7 +1788,7 @@ class P2PNetworkManager:
                 return True
         return False
 
-    def _normalize_remote_header(self, header_dict: Dict[str, Any]) -> Dict[str, Any]:
+    def _normalize_remote_header(self, header_dict: dict[str, Any]) -> dict[str, Any]:
         """Fill missing header fields with safe defaults for sync fallback paths."""
         defaults = {
             "previous_hash": "0" * 64,
@@ -1945,7 +1952,7 @@ class P2PNetworkManager:
                     continue
                 self._dispatch_async(self._quic_send_payload(host, payload))
 
-    def _fetch_peer_chain_summary(self, peer_uri: str) -> Optional[Dict[str, Any]]:
+    def _fetch_peer_chain_summary(self, peer_uri: str) -> dict[str, Any] | None:
         """Return quick height summary for a peer without downloading full chain."""
         endpoint = f"{peer_uri.rstrip('/')}/blocks"
         try:
@@ -1994,16 +2001,16 @@ class P2PNetworkManager:
             "latest_block": latest_block,
         }
 
-    def _collect_peer_chain_summaries(self, peers: List[str]) -> List[Dict[str, Any]]:
+    def _collect_peer_chain_summaries(self, peers: list[str]) -> list[dict[str, Any]]:
         """Collect summaries for every peer we are connected to."""
-        summaries: List[Dict[str, Any]] = []
+        summaries: list[dict[str, Any]] = []
         for peer_uri in peers:
             summary = self._fetch_peer_chain_summary(peer_uri)
             if summary:
                 summaries.append(summary)
         return summaries
 
-    def _should_parallel_sync(self, summaries: List[Dict[str, Any]], local_height: int) -> bool:
+    def _should_parallel_sync(self, summaries: list[dict[str, Any]], local_height: int) -> bool:
         """Decide if we should attempt chunked parallel sync based on peer heights."""
         if not self.parallel_chunk_sync_enabled or not summaries:
             return False
@@ -2015,7 +2022,7 @@ class P2PNetworkManager:
                 return True
         return False
 
-    def _parallel_chunk_sync(self, peer_summaries: List[Dict[str, Any]], local_height: int) -> bool:
+    def _parallel_chunk_sync(self, peer_summaries: list[dict[str, Any]], local_height: int) -> bool:
         """Download blocks from multiple peers concurrently in deterministic chunks."""
         if not peer_summaries:
             return False
@@ -2024,7 +2031,7 @@ class P2PNetworkManager:
         if target_height <= local_height:
             return False
 
-        chunk_ranges: List[Tuple[int, int]] = []
+        chunk_ranges: list[tuple[int, int]] = []
         cursor = local_height
         chunk_size = self.parallel_sync_chunk_size or 1
         while cursor < target_height:
@@ -2036,7 +2043,7 @@ class P2PNetworkManager:
             return False
 
         worker_count = min(len(chunk_ranges), self.parallel_sync_workers)
-        chunk_results: Dict[Tuple[int, int], List[Dict[str, Any]]] = {}
+        chunk_results: dict[tuple[int, int], list[dict[str, Any]]] = {}
 
         with ThreadPoolExecutor(max_workers=worker_count) as executor:
             futures = {
@@ -2073,7 +2080,7 @@ class P2PNetworkManager:
                 chunk_results[chunk_range] = chunk_blocks
 
         ordered_ranges = sorted(chunk_results.keys(), key=lambda rng: rng[0])
-        deserialized_blocks: List[Any] = []
+        deserialized_blocks: list[Any] = []
         expected_index = local_height
         for chunk_range in ordered_ranges:
             chunk_blocks = chunk_results[chunk_range]
@@ -2125,9 +2132,9 @@ class P2PNetworkManager:
     def _download_chunk_with_failover(
         self,
         chunk_number: int,
-        chunk_range: Tuple[int, int],
-        peer_summaries: List[Dict[str, Any]],
-    ) -> Optional[List[Dict[str, Any]]]:
+        chunk_range: tuple[int, int],
+        peer_summaries: list[dict[str, Any]],
+    ) -> list[dict[str, Any]] | None:
         """Download a specific chunk, rotating peers on failure."""
         if chunk_range[0] >= chunk_range[1]:
             return None
@@ -2156,7 +2163,7 @@ class P2PNetworkManager:
         start_height: int,
         end_height: int,
         remote_total: int,
-    ) -> Optional[List[Dict[str, Any]]]:
+    ) -> list[dict[str, Any]] | None:
         """Fetch a contiguous range of blocks from a peer."""
         if start_height >= end_height:
             return None
@@ -2195,7 +2202,7 @@ class P2PNetworkManager:
         blocks = payload.get("blocks")
         if not isinstance(blocks, list):
             return None
-        filtered: List[Dict[str, Any]] = []
+        filtered: list[dict[str, Any]] = []
         for entry in blocks:
             index = self._extract_block_index(entry)
             if index is None:
@@ -2217,7 +2224,7 @@ class P2PNetworkManager:
         return filtered
 
     @staticmethod
-    def _extract_block_index(block_payload: Any) -> Optional[int]:
+    def _extract_block_index(block_payload: Any) -> int | None:
         """Return block index from a serialized block payload."""
         if not isinstance(block_payload, dict):
             return None
@@ -2232,7 +2239,7 @@ class P2PNetworkManager:
         except (TypeError, ValueError):
             return None
 
-    def _deserialize_block_payload(self, block_payload: Dict[str, Any]) -> Optional[Any]:
+    def _deserialize_block_payload(self, block_payload: dict[str, Any]) -> Any | None:
         """Deserialize a block payload using blockchain helper."""
         deserializer = getattr(self.blockchain, "deserialize_block", None)
         if not callable(deserializer):
@@ -2334,8 +2341,8 @@ class P2PNetworkManager:
     def _download_remote_blocks(
         self,
         peer_uri: str,
-        summary: Optional[Dict[str, Any]] = None,
-    ) -> Optional[List[Dict[str, Any]]]:
+        summary: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]] | None:
         """Download remote blocks snapshot from peer, returning None if not ahead."""
         base_endpoint = f"{peer_uri.rstrip('/')}/blocks"
         if summary is None:
@@ -2380,12 +2387,12 @@ class P2PNetworkManager:
             return None
         return remote_blocks
 
-    def _apply_remote_chain(self, peer_uri: str, remote_blocks: List[Dict[str, Any]]) -> bool:
+    def _apply_remote_chain(self, peer_uri: str, remote_blocks: list[dict[str, Any]]) -> bool:
         """Normalize remote chain and attempt to replace local state."""
-        new_chain_headers: List[BlockHeader] = []
+        new_chain_headers: list[BlockHeader] = []
         valid_chain = True
         for block_data in remote_blocks:
-            header_dict: Optional[Dict[str, Any]] = None
+            header_dict: dict[str, Any] | None = None
             txs = []
             if isinstance(block_data, dict):
                 header_dict = block_data.get("header") or block_data

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Centralized Validation Utilities
 
@@ -13,21 +15,16 @@ This module provides:
 All validation functions raise ValueError with clear error messages.
 """
 
-from typing import Any, Optional, Union, Iterable
-from decimal import Decimal, ROUND_DOWN, getcontext, InvalidOperation
 import re
+from decimal import ROUND_DOWN, Decimal, InvalidOperation, getcontext
+from typing import Any
 
+from xai.core.address_checksum import is_checksum_valid, normalize_address, to_checksum_address
+from xai.core.address_checksum import validate_address as validate_checksum
 from xai.core.security_validation import SecurityValidator, ValidationError
-from xai.core.address_checksum import (
-    validate_address as validate_checksum,
-    normalize_address,
-    is_checksum_valid,
-    to_checksum_address
-)
 
 # Set global decimal precision for blockchain operations
 getcontext().prec = 28
-
 
 # Constants
 MAX_SUPPLY = 121_000_000.0
@@ -41,7 +38,6 @@ SPECIAL_ADDRESSES = ("COINBASE", "XAITRADEFEE", "TXAITRADEFEE", "GOVERNANCE", "S
 MIN_ADDRESS_LENGTH = 40
 MAX_ADDRESS_LENGTH = 100
 
-
 class AddressFormatValidator:
     """
     Dedicated XAI address validator with network-aware prefix enforcement.
@@ -54,7 +50,7 @@ class AddressFormatValidator:
         self,
         *,
         allowed_prefixes: Iterable[str] = VALID_PREFIXES,
-        expected_prefix: Optional[str] = None,
+        expected_prefix: str | None = None,
         allow_special: bool = True,
         allow_legacy: bool = True,
     ) -> None:
@@ -129,7 +125,6 @@ class AddressFormatValidator:
         except ValueError:
             return False
 
-
 def validate_address(address: str, *, allow_special: bool = True, require_checksum: bool = False, apply_checksum: bool = True) -> str:
     """
     Validate and normalize XAI blockchain address.
@@ -158,13 +153,12 @@ def validate_address(address: str, *, allow_special: bool = True, require_checks
 
     return validated
 
-
 def validate_amount(
     amount: Any,
     *,
     allow_zero: bool = False,
-    min_value: Optional[float] = None,
-    max_value: Optional[float] = None
+    min_value: float | None = None,
+    max_value: float | None = None
 ) -> float:
     """
     Validate transaction amount.
@@ -251,7 +245,6 @@ def validate_amount(
 
     return amount_float
 
-
 def validate_fee(fee: Any) -> float:
     """
     Validate transaction fee.
@@ -279,12 +272,11 @@ def validate_fee(fee: Any) -> float:
     """
     return validate_amount(fee, allow_zero=True, max_value=MAX_FEE)
 
-
 def validate_positive_integer(
     value: Any,
     *,
     min_value: int = 0,
-    max_value: Optional[int] = None
+    max_value: int | None = None
 ) -> int:
     """
     Validate positive integer value.
@@ -314,7 +306,6 @@ def validate_positive_integer(
         raise ValueError(f"Value must be <= {effective_max}")
 
     return value
-
 
 def validate_string(
     value: Any,
@@ -353,13 +344,12 @@ def validate_string(
 
     return value
 
-
 def validate_hex_string(
     value: Any,
     *,
-    exact_length: Optional[int] = None,
-    min_length: Optional[int] = None,
-    max_length: Optional[int] = None
+    exact_length: int | None = None,
+    min_length: int | None = None,
+    max_length: int | None = None
 ) -> str:
     """
     Validate hexadecimal string.
@@ -395,7 +385,6 @@ def validate_hex_string(
 
     return value
 
-
 class MonetaryAmount:
     """
     Fixed-precision monetary amount for blockchain financial calculations.
@@ -409,7 +398,7 @@ class MonetaryAmount:
     PRECISION = 8  # Decimal places (1 XAI = 100_000_000 base units)
     _quantizer = Decimal(f"1e-{PRECISION}")
 
-    def __init__(self, value: Union[str, int, Decimal]):
+    def __init__(self, value: str | int | Decimal):
         """
         Create a MonetaryAmount from string, int, or Decimal.
 
@@ -456,7 +445,7 @@ class MonetaryAmount:
             raise ValueError("Subtraction would result in negative amount")
         return MonetaryAmount(str(result))
 
-    def __mul__(self, other: Union["MonetaryAmount", int, Decimal]) -> "MonetaryAmount":
+    def __mul__(self, other: "MonetaryAmount" | int | Decimal) -> "MonetaryAmount":
         if isinstance(other, MonetaryAmount):
             result = self._value * other._value
         elif isinstance(other, (int, Decimal)):
@@ -465,7 +454,7 @@ class MonetaryAmount:
             raise TypeError(f"Cannot multiply MonetaryAmount by {type(other)}")
         return MonetaryAmount(str(result.quantize(self._quantizer, rounding=ROUND_DOWN)))
 
-    def __truediv__(self, other: Union["MonetaryAmount", int, Decimal]) -> "MonetaryAmount":
+    def __truediv__(self, other: "MonetaryAmount" | int | Decimal) -> "MonetaryAmount":
         if isinstance(other, MonetaryAmount):
             if other._value == 0:
                 raise ZeroDivisionError("Cannot divide by zero")
@@ -516,7 +505,6 @@ class MonetaryAmount:
     def zero(cls) -> "MonetaryAmount":
         """Return a zero amount."""
         return cls("0")
-
 
 # Backwards compatibility: expose SecurityValidator for advanced use cases
 __all__ = [

@@ -4,14 +4,14 @@ XAI Blockchain - Secure Wallet Encryption
 AES-256 encryption for wallet private keys with PBKDF2 key derivation.
 """
 
-import os
-import json
 import base64
-from typing import Dict, Optional
+import json
+import os
+
+from cryptography.fernet import Fernet, InvalidToken
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.backends import default_backend
-from cryptography.fernet import Fernet, InvalidToken
 
 
 class WalletEncryption:

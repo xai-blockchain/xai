@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - JWT Authentication and API Key Manager
 
@@ -10,19 +12,18 @@ Comprehensive authentication system with:
 - Audit logging
 """
 
-import jwt
-import secrets
 import hashlib
 import logging
-from typing import Dict, Optional, Tuple, List
-from datetime import datetime, timezone, timedelta
-from functools import wraps
-from dataclasses import dataclass, asdict
+import secrets
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta, timezone
 from enum import Enum
-from flask import request, jsonify
+from functools import wraps
+
+import jwt
+from flask import jsonify, request
 
 security_logger = logging.getLogger('xai.security')
-
 
 class UserRole(Enum):
     """User roles for RBAC"""
@@ -32,7 +33,6 @@ class UserRole(Enum):
     USER = "user"
     PUBLIC = "public"
 
-
 class APIKeyScope(Enum):
     """Scopes for API keys"""
     READ = "read"
@@ -40,7 +40,6 @@ class APIKeyScope(Enum):
     ADMIN = "admin"
     MINING = "mining"
     GOVERNANCE = "governance"
-
 
 @dataclass
 class TokenClaims:
@@ -65,7 +64,6 @@ class TokenClaims:
             'jti': self.jti,
         }
 
-
 @dataclass
 class APIKey:
     """API Key representation"""
@@ -73,13 +71,12 @@ class APIKey:
     key_hash: str  # SHA256 hash of the actual key
     user_id: str
     name: str
-    scopes: List[APIKeyScope]
+    scopes: list[APIKeyScope]
     created_at: datetime
-    expires_at: Optional[datetime]
-    last_used: Optional[datetime]
+    expires_at: datetime | None
+    last_used: datetime | None
     is_active: bool
-    rate_limit_per_hour: Optional[int]
-
+    rate_limit_per_hour: int | None
 
 class JWTAuthManager:
     """
@@ -108,17 +105,17 @@ class JWTAuthManager:
         self.refresh_token_expiration = timedelta(days=refresh_token_expiration_days)
 
         # Token revocation list (for logout)
-        self.revoked_tokens: Dict[str, datetime] = {}
+        self.revoked_tokens: dict[str, datetime] = {}
 
         # Active sessions
-        self.active_sessions: Dict[str, Dict] = {}
+        self.active_sessions: dict[str, Dict] = {}
 
     def generate_token(
         self,
         user_id: str,
         username: str,
         role: UserRole,
-        additional_claims: Optional[Dict] = None,
+        additional_claims: Dict | None = None,
     ) -> str:
         """
         Generate a JWT access token.
@@ -160,7 +157,7 @@ class JWTAuthManager:
             security_logger.error(f"Error generating token: {str(e)}", extra={"error_type": type(e).__name__})
             raise
 
-    def validate_token(self, token: str) -> Tuple[bool, Optional[Dict], Optional[str]]:
+    def validate_token(self, token: str) -> tuple[bool, Dict | None, str | None]:
         """
         Validate JWT token with explicit expiration verification.
 
@@ -175,7 +172,7 @@ class JWTAuthManager:
             token: JWT token to validate
 
         Returns:
-            Tuple[bool, Optional[Dict], Optional[str]]: (valid, claims, error_message)
+            tuple[bool, Dict | None, str | None]: (valid, claims, error_message)
         """
         try:
             # Decode token with explicit security options
@@ -210,7 +207,7 @@ class JWTAuthManager:
             security_logger.error(f"Error validating token: {str(e)}", extra={"error_type": type(e).__name__})
             return False, None, "Token validation failed"
 
-    def refresh_token(self, token: str) -> Tuple[bool, Optional[str], Optional[str]]:
+    def refresh_token(self, token: str) -> tuple[bool, str | None, str | None]:
         """
         Generate a new access token from a valid token.
 
@@ -218,7 +215,7 @@ class JWTAuthManager:
             token: Current valid JWT token
 
         Returns:
-            Tuple[bool, Optional[str], Optional[str]]: (success, new_token, error_message)
+            tuple[bool, str | None, str | None]: (success, new_token, error_message)
         """
         valid, claims, error = self.validate_token(token)
         if not valid:
@@ -284,7 +281,6 @@ class JWTAuthManager:
 
         return len(expired)
 
-
 class APIKeyManager:
     """
     Manages API keys for programmatic access.
@@ -293,23 +289,23 @@ class APIKeyManager:
     def __init__(self):
         """Initialize API key manager"""
         # API keys: {key_id: APIKey}
-        self.api_keys: Dict[str, APIKey] = {}
+        self.api_keys: dict[str, APIKey] = {}
 
         # User API keys: {user_id: [key_id1, key_id2, ...]}
-        self.user_keys: Dict[str, List[str]] = {}
+        self.user_keys: dict[str, list[str]] = {}
 
         # Actual keys (stored separately for security): {key_hash: key}
         # In production, these should be in a secure vault
-        self._key_store: Dict[str, str] = {}
+        self._key_store: dict[str, str] = {}
 
     def generate_api_key(
         self,
         user_id: str,
         name: str,
-        scopes: List[APIKeyScope],
-        expiration_days: Optional[int] = 90,
-        rate_limit_per_hour: Optional[int] = 1000,
-    ) -> Tuple[str, APIKey]:
+        scopes: list[APIKeyScope],
+        expiration_days: int | None = 90,
+        rate_limit_per_hour: int | None = 1000,
+    ) -> tuple[str, APIKey]:
         """
         Generate a new API key.
 
@@ -321,7 +317,7 @@ class APIKeyManager:
             rate_limit_per_hour: Rate limit per hour
 
         Returns:
-            Tuple[str, APIKey]: (actual_key, key_metadata)
+            tuple[str, APIKey]: (actual_key, key_metadata)
         """
         # Generate actual key
         actual_key = f"xai_{secrets.token_urlsafe(32)}"
@@ -364,7 +360,7 @@ class APIKeyManager:
 
         return actual_key, api_key
 
-    def validate_api_key(self, api_key: str) -> Tuple[bool, Optional[APIKey], Optional[str]]:
+    def validate_api_key(self, api_key: str) -> tuple[bool, APIKey | None, str | None]:
         """
         Validate an API key.
 
@@ -372,7 +368,7 @@ class APIKeyManager:
             api_key: API key to validate
 
         Returns:
-            Tuple[bool, Optional[APIKey], Optional[str]]: (valid, key_info, error_message)
+            tuple[bool, APIKey | None, str | None]: (valid, key_info, error_message)
         """
         try:
             # Hash the provided key
@@ -426,7 +422,7 @@ class APIKeyManager:
 
         return True
 
-    def get_user_keys(self, user_id: str) -> List[APIKey]:
+    def get_user_keys(self, user_id: str) -> list[APIKey]:
         """
         Get all API keys for a user.
 
@@ -434,12 +430,12 @@ class APIKeyManager:
             user_id: User ID
 
         Returns:
-            List[APIKey]: List of user's API keys
+            list[APIKey]: List of user's API keys
         """
         key_ids = self.user_keys.get(user_id, [])
         return [self.api_keys[kid] for kid in key_ids if kid in self.api_keys]
 
-    def check_rate_limit(self, api_key: str) -> Tuple[bool, Optional[str]]:
+    def check_rate_limit(self, api_key: str) -> tuple[bool, str | None]:
         """
         Check if API key is within rate limits.
 
@@ -447,7 +443,7 @@ class APIKeyManager:
             api_key: API key to check
 
         Returns:
-            Tuple[bool, Optional[str]]: (allowed, error_message)
+            tuple[bool, str | None]: (allowed, error_message)
         """
         valid, key_info, error = self.validate_api_key(api_key)
         if not valid:
@@ -459,7 +455,6 @@ class APIKeyManager:
             pass
 
         return True, None
-
 
 # Decorator for JWT authentication
 def require_jwt(f):
@@ -487,7 +482,6 @@ def require_jwt(f):
 
     return decorated_function
 
-
 # Decorator for API key authentication
 def require_api_key(f):
     """Decorator to require API key authentication"""
@@ -513,7 +507,6 @@ def require_api_key(f):
 
     return decorated_function
 
-
 # Decorator for role-based access control
 def require_role(required_role: UserRole):
     """Decorator to require specific user role"""
@@ -534,11 +527,9 @@ def require_role(required_role: UserRole):
 
     return decorator
 
-
 # Global instances
 _jwt_manager = None
 _api_key_manager = None
-
 
 def get_jwt_manager(
     secret_key: str = None,
@@ -552,7 +543,6 @@ def get_jwt_manager(
             secret_key = secrets.token_hex(32)
         _jwt_manager = JWTAuthManager(secret_key, algorithm)
     return _jwt_manager
-
 
 def get_api_key_manager() -> APIKeyManager:
     """Get global API key manager instance"""

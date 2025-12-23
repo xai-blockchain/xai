@@ -25,9 +25,9 @@ Usage:
 
 from __future__ import annotations
 
-from typing import Final, Optional
-from ..vm.exceptions import VMExecutionError
+from typing import Final
 
+from ..vm.exceptions import VMExecutionError
 
 # ==================== Constants ====================
 

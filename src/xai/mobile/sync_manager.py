@@ -12,25 +12,24 @@ Provides mobile-optimized state synchronization with:
 
 from __future__ import annotations
 
-import time
-import shutil
-import os
 import asyncio
+import os
+import shutil
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Callable, Set
 from threading import Lock
+from typing import Any, Callable
 
-from xai.core.structured_logger import get_structured_logger
+from xai.core.checkpoint_payload import CheckpointPayload
 from xai.core.chunked_sync import (
     ChunkedStateSyncService,
-    SyncProgress,
     ChunkPriority,
     SyncChunk,
+    SyncProgress,
 )
-from xai.core.checkpoint_payload import CheckpointPayload
-
+from xai.core.structured_logger import get_structured_logger
 
 class SyncState(Enum):
     """State of the sync operation."""
@@ -42,7 +41,6 @@ class SyncState(Enum):
     APPLYING = "applying"
     COMPLETED = "completed"
     FAILED = "failed"
-
 
 @dataclass
 class NetworkCondition:
@@ -76,7 +74,6 @@ class NetworkCondition:
         else:
             return 1_000_000  # 1MB default
 
-
 @dataclass
 class SyncStatistics:
     """
@@ -96,7 +93,6 @@ class SyncStatistics:
     average_speed: float = 0.0
     elapsed_time: float = 0.0
     estimated_time_remaining: float = 0.0
-
 
 class BandwidthThrottle:
     """
@@ -156,7 +152,6 @@ class BandwidthThrottle:
             else:
                 self.tokens -= byte_count
 
-
 class MobileSyncManager:
     """
     Mobile-optimized sync manager.
@@ -205,7 +200,7 @@ class MobileSyncManager:
         self.start_time = 0.0
 
         # Progress callback
-        self.progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None
+        self.progress_callback: Callable[[dict[str, Any]], None] | None = None
 
         # Ensure storage directory exists
         self.storage_dir.mkdir(parents=True, exist_ok=True)
@@ -227,7 +222,7 @@ class MobileSyncManager:
             is_metered=condition.is_metered,
         )
 
-    def set_progress_callback(self, callback: Callable[[Dict[str, Any]], None]) -> None:
+    def set_progress_callback(self, callback: Callable[[dict[str, Any]], None]) -> None:
         """
         Set progress callback function.
 
@@ -272,9 +267,9 @@ class MobileSyncManager:
 
     def get_priority_ordered_chunks(
         self,
-        remaining_chunks: List[int],
-        priority_map: Dict[int, ChunkPriority],
-    ) -> List[int]:
+        remaining_chunks: list[int],
+        priority_map: dict[int, ChunkPriority],
+    ) -> list[int]:
         """
         Order chunks by priority for download.
 
@@ -375,8 +370,8 @@ class MobileSyncManager:
     def sync_snapshot(
         self,
         snapshot_id: str,
-        chunk_fetcher: Callable[[str, int], Optional[SyncChunk]],
-    ) -> Optional[CheckpointPayload]:
+        chunk_fetcher: Callable[[str, int], SyncChunk | None],
+    ) -> CheckpointPayload | None:
         """
         Sync a snapshot with mobile optimizations.
 
@@ -437,7 +432,7 @@ class MobileSyncManager:
             )
 
             # Download chunks
-            chunks: List[SyncChunk] = []
+            chunks: list[SyncChunk] = []
             for chunk_index in range(metadata.total_chunks):
                 # Check if paused
                 while self.is_paused():
@@ -551,8 +546,8 @@ class MobileSyncManager:
         self,
         snapshot_id: str,
         chunk_index: int,
-        chunk_fetcher: Callable[[str, int], Optional[SyncChunk]],
-    ) -> Optional[SyncChunk]:
+        chunk_fetcher: Callable[[str, int], SyncChunk | None],
+    ) -> SyncChunk | None:
         """
         Download a chunk with bandwidth throttling.
 
@@ -585,7 +580,7 @@ class MobileSyncManager:
             )
             return None
 
-    def get_sync_state(self) -> Dict[str, Any]:
+    def get_sync_state(self) -> dict[str, Any]:
         """
         Get current sync state and statistics.
 

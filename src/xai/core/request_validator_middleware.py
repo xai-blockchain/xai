@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Request Validator Middleware
 
@@ -11,23 +13,22 @@ Provides:
 - Request fingerprinting for security analysis
 """
 
-import json
 import hashlib
+import json
 import logging
-from typing import Callable, Dict, Any, Optional, Tuple, Type
-from functools import wraps
 from datetime import datetime, timezone
-from pydantic import ValidationError, BaseModel
-from flask import request, jsonify, Response
+from functools import wraps
+from typing import Any, Callable, Type
+
+from flask import Response, jsonify, request
+from pydantic import BaseModel, ValidationError
 
 # Setup security logger
 security_logger = logging.getLogger('xai.security')
 
-
 class RequestValidationError(Exception):
     """Raised when request validation fails"""
     pass
-
 
 class RequestValidator:
     """
@@ -47,7 +48,7 @@ class RequestValidator:
         max_json_size: int = 1_000_000,  # 1MB
         max_form_size: int = 10_000_000,  # 10MB
         max_url_length: int = 2048,
-        allowed_content_types: Optional[list] = None,
+        allowed_content_types: list | None = None,
     ):
         """
         Initialize request validator.
@@ -67,12 +68,12 @@ class RequestValidator:
             'multipart/form-data',
         ]
 
-    def validate_request_size(self) -> Tuple[bool, Optional[str]]:
+    def validate_request_size(self) -> tuple[bool, str | None]:
         """
         Validate request size doesn't exceed limits.
 
         Returns:
-            Tuple[bool, Optional[str]]: (valid, error_message)
+            tuple[bool, str | None]: (valid, error_message)
         """
         # Check Content-Length header
         content_length = request.content_length
@@ -90,12 +91,12 @@ class RequestValidator:
 
         return True, None
 
-    def validate_content_type(self) -> Tuple[bool, Optional[str]]:
+    def validate_content_type(self) -> tuple[bool, str | None]:
         """
         Validate Content-Type header.
 
         Returns:
-            Tuple[bool, Optional[str]]: (valid, error_message)
+            tuple[bool, str | None]: (valid, error_message)
         """
         # Skip validation for GET/HEAD requests
         if request.method in ['GET', 'HEAD', 'DELETE']:
@@ -116,7 +117,7 @@ class RequestValidator:
 
         return True, None
 
-    def validate_json_structure(self, max_depth: int = 10) -> Tuple[bool, Optional[str]]:
+    def validate_json_structure(self, max_depth: int = 10) -> tuple[bool, str | None]:
         """
         Validate JSON structure for safety.
 
@@ -124,7 +125,7 @@ class RequestValidator:
             max_depth: Maximum nesting depth allowed
 
         Returns:
-            Tuple[bool, Optional[str]]: (valid, error_message)
+            tuple[bool, str | None]: (valid, error_message)
         """
         if request.method in ['GET', 'HEAD', 'DELETE']:
             return True, None
@@ -159,7 +160,7 @@ class RequestValidator:
 
     def validate_pydantic_model(
         self, model: Type[BaseModel]
-    ) -> Tuple[bool, Optional[str], Optional[BaseModel]]:
+    ) -> tuple[bool, str | None, BaseModel | None]:
         """
         Validate request body against Pydantic model.
 
@@ -167,7 +168,7 @@ class RequestValidator:
             model: Pydantic model class to validate against
 
         Returns:
-            Tuple[bool, Optional[str]]: (valid, error_message)
+            tuple[bool, str | None]: (valid, error_message)
         """
         try:
             data = request.get_json(force=True, silent=True)
@@ -205,12 +206,12 @@ class RequestValidator:
         fingerprint_str = json.dumps(fingerprint_data, sort_keys=True)
         return hashlib.sha256(fingerprint_str.encode()).hexdigest()[:16]
 
-    def get_request_metadata(self) -> Dict[str, Any]:
+    def get_request_metadata(self) -> dict[str, Any]:
         """
         Extract metadata from request for logging and analysis.
 
         Returns:
-            Dict[str, Any]: Request metadata
+            dict[str, Any]: Request metadata
         """
         return {
             'timestamp': datetime.now(timezone.utc).isoformat(),
@@ -249,10 +250,9 @@ class RequestValidator:
 
         return response
 
-
 def validate_request(
     validator: RequestValidator,
-    pydantic_model: Optional[Type[BaseModel]] = None,
+    pydantic_model: Type[BaseModel] | None = None,
 ) -> Callable:
     """
     Decorator to validate requests before handler execution.
@@ -306,7 +306,6 @@ def validate_request(
 
     return decorator
 
-
 def add_security_headers_middleware(app):
     """
     Add security headers middleware to Flask app.
@@ -332,7 +331,6 @@ def add_security_headers_middleware(app):
         valid, error = validator.validate_content_type()
         if not valid:
             return jsonify({'error': error}), 415
-
 
 # Convenience function for Flask app initialization
 def setup_request_validation(

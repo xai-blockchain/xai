@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Address Transaction Index - O(log n) transaction history lookups
 
@@ -14,12 +16,11 @@ Security considerations:
 
 import sqlite3
 import threading
-from typing import List, Tuple, Optional, Any
 from pathlib import Path
+from typing import Any
 
-from xai.core.transaction import Transaction
 from xai.core.structured_logger import get_structured_logger
-
+from xai.core.transaction import Transaction
 
 class AddressTransactionIndex:
     """
@@ -198,7 +199,7 @@ class AddressTransactionIndex:
         address: str,
         limit: int = 100,
         offset: int = 0
-    ) -> List[Tuple[int, int, str, bool, int, float]]:
+    ) -> list[tuple[int, int, str, bool, int, float]]:
         """
         Retrieve transaction history for an address with pagination.
 

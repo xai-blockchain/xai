@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Recovery Strategies and Backup Management
 
@@ -9,14 +11,13 @@ Comprehensive recovery mechanisms:
 - Network partition handling
 """
 
-import time
 import json
+import logging
 import os
 import shutil
-import logging
-from typing import Dict, List, Optional, Tuple, Any
+import time
 from datetime import datetime
-
+from typing import Any
 
 class BlockchainBackup:
     """
@@ -39,7 +40,7 @@ class BlockchainBackup:
         self.logger: logging.Logger = logging.getLogger("blockchain_backup")
         self.logger.setLevel(logging.INFO)
 
-    def create_backup(self, blockchain: Any, name: Optional[str] = None) -> str:
+    def create_backup(self, blockchain: Any, name: str | None = None) -> str:
         """
         Create comprehensive blockchain backup.
 
@@ -80,7 +81,7 @@ class BlockchainBackup:
         self.logger.info(f"Backup created: {backup_path} (chain height: {len(blockchain.chain)})")
         return backup_path
 
-    def restore_backup(self, backup_path: str) -> Tuple[bool, Optional[Dict], Optional[str]]:
+    def restore_backup(self, backup_path: str) -> tuple[bool, Dict | None, str | None]:
         """
         Load backup data from file.
 
@@ -100,14 +101,14 @@ class BlockchainBackup:
             self.logger.error(f"Failed to load backup: {e}")
             return False, None, str(e)
 
-    def list_backups(self) -> List[Dict[str, Any]]:
+    def list_backups(self) -> list[dict[str, Any]]:
         """
         List all available backups with metadata.
 
         Returns:
             List of backup information dictionaries
         """
-        backups: List[Dict[str, Any]] = []
+        backups: list[dict[str, Any]] = []
 
         for filename in os.listdir(self.backup_dir):
             if filename.endswith(".json"):
@@ -156,7 +157,7 @@ class BlockchainBackup:
 
         return removed_count
 
-    def validate_backup(self, backup_data: Dict) -> Tuple[bool, List[str]]:
+    def validate_backup(self, backup_data: Dict) -> tuple[bool, list[str]]:
         """
         Validate backup data integrity before restoration.
 
@@ -166,7 +167,7 @@ class BlockchainBackup:
         Returns:
             Tuple of (is_valid, list of validation errors)
         """
-        errors: List[str] = []
+        errors: list[str] = []
 
         # Check required fields
         required_fields = ["chain", "utxo_set", "timestamp"]
@@ -186,7 +187,6 @@ class BlockchainBackup:
 
         return len(errors) == 0, errors
 
-
 class StateRecovery:
     """
     State recovery and rollback mechanisms.
@@ -200,7 +200,7 @@ class StateRecovery:
         self.logger: logging.Logger = logging.getLogger("state_recovery")
         self.logger.setLevel(logging.INFO)
 
-    def apply_backup(self, blockchain: Any, backup_data: Dict) -> Tuple[bool, Optional[str]]:
+    def apply_backup(self, blockchain: Any, backup_data: Dict) -> tuple[bool, str | None]:
         """
         Apply backup data to blockchain.
 
@@ -215,10 +215,10 @@ class StateRecovery:
             from xai.core.blockchain import Block, Transaction
 
             # Rebuild chain from backup
-            new_chain: List[Any] = []
+            new_chain: list[Any] = []
             for block_data in backup_data["chain"]:
                 # Recreate transactions
-                transactions: List[Any] = []
+                transactions: list[Any] = []
                 for tx_data in block_data["transactions"]:
                     tx = Transaction(
                         tx_data["sender"], tx_data["recipient"], tx_data["amount"], tx_data["fee"]
@@ -263,7 +263,7 @@ class StateRecovery:
 
     def preserve_pending_transactions(
         self, blockchain: Any, filepath: str = "data/recovery/pending_transactions.json"
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """
         Preserve pending transactions to disk.
 
@@ -294,7 +294,7 @@ class StateRecovery:
 
     def restore_pending_transactions(
         self, blockchain: Any, filepath: str = "data/recovery/pending_transactions.json"
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """
         Restore preserved pending transactions.
 
@@ -339,7 +339,6 @@ class StateRecovery:
             self.logger.error(f"Failed to restore transactions: {e}")
             return False, str(e)
 
-
 class CorruptionRecovery:
     """
     Specialized recovery for blockchain corruption.
@@ -361,8 +360,8 @@ class CorruptionRecovery:
         self.logger.setLevel(logging.INFO)
 
     def recover_from_corruption(
-        self, blockchain: Any, corruption_issues: List[str]
-    ) -> Tuple[bool, Optional[str]]:
+        self, blockchain: Any, corruption_issues: list[str]
+    ) -> tuple[bool, str | None]:
         """
         Attempt to recover from blockchain corruption.
 
@@ -420,7 +419,6 @@ class CorruptionRecovery:
             self.logger.error(f"Corruption recovery failed: {e}")
             return False, str(e)
 
-
 class NetworkPartitionRecovery:
     """
     Recovery strategies for network partition scenarios.
@@ -436,7 +434,7 @@ class NetworkPartitionRecovery:
 
     def attempt_reconnection(
         self, node: Any, max_attempts: int = 3, retry_delay: float = 5.0
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """
         Attempt to reconnect to network after partition.
 
@@ -468,7 +466,7 @@ class NetworkPartitionRecovery:
 
         return False, f"Reconnection failed after {max_attempts} attempts"
 
-    def enter_degraded_mode(self, node: Any) -> Tuple[bool, Optional[str]]:
+    def enter_degraded_mode(self, node: Any) -> tuple[bool, str | None]:
         """
         Enter degraded operation mode (offline).
 
@@ -492,7 +490,6 @@ class NetworkPartitionRecovery:
             self.logger.error(f"Failed to enter degraded mode: {e}")
             return False, str(e)
 
-
 class GracefulShutdown:
     """
     Graceful shutdown coordinator.
@@ -514,8 +511,8 @@ class GracefulShutdown:
         self.logger.setLevel(logging.INFO)
 
     def shutdown(
-        self, blockchain: Any, node: Optional[Any] = None, reason: str = "manual"
-    ) -> Tuple[bool, Optional[str]]:
+        self, blockchain: Any, node: Any | None = None, reason: str = "manual"
+    ) -> tuple[bool, str | None]:
         """
         Perform graceful shutdown.
 

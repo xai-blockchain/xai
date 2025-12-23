@@ -1,20 +1,19 @@
+from __future__ import annotations
+
 """
 AXN Social Recovery System
 Allow users to designate trusted guardians who can vote to recover a lost wallet
 """
 
+import hashlib
 import json
+import logging
 import time
 import uuid
-import hashlib
-from pathlib import Path
-from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
+from pathlib import Path
 
-import logging
 logger = logging.getLogger(__name__)
-
-
 
 class SocialRecoveryManager:
     """Manage social recovery configurations and requests for AXN wallets"""
@@ -37,8 +36,8 @@ class SocialRecoveryManager:
         self.requests_file = self.data_dir / "recovery_requests.json"
 
         # In-memory storage
-        self.recovery_configs: Dict[str, dict] = {}  # owner_address -> config
-        self.recovery_requests: Dict[str, dict] = {}  # request_id -> request
+        self.recovery_configs: dict[str, dict] = {}  # owner_address -> config
+        self.recovery_requests: dict[str, dict] = {}  # request_id -> request
 
         # Load existing data
         self._load_data()
@@ -121,7 +120,7 @@ class SocialRecoveryManager:
     def setup_guardians(
         self,
         owner_address: str,
-        guardian_addresses: List[str],
+        guardian_addresses: list[str],
         threshold: int,
         signature: str = None,
     ) -> Dict:
@@ -197,7 +196,7 @@ class SocialRecoveryManager:
             "message": "Social recovery configured successfully",
         }
 
-    def get_recovery_config(self, owner_address: str) -> Optional[Dict]:
+    def get_recovery_config(self, owner_address: str) -> Dict | None:
         """Get recovery configuration for an address
 
         Args:
@@ -608,7 +607,7 @@ class SocialRecoveryManager:
             "pending_votes": pending_votes,
         }
 
-    def get_all_requests(self, status: str = None) -> List[Dict]:
+    def get_all_requests(self, status: str = None) -> list[Dict]:
         """Get all recovery requests, optionally filtered by status
 
         Args:
@@ -669,7 +668,6 @@ class SocialRecoveryManager:
             },
             "success_rate": (executed / total_requests * 100) if total_requests > 0 else 0,
         }
-
 
 # Example usage and testing
 if __name__ == "__main__":

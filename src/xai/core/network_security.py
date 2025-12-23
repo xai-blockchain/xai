@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Blockchain - Network Security Module
 
@@ -10,35 +12,31 @@ Comprehensive network security implementation with:
 - Network encryption
 """
 
-import ssl
 import logging
-from typing import Optional, Dict, Tuple
-from pathlib import Path
-from datetime import datetime, timedelta
 import socket
+import ssl
+from datetime import datetime, timedelta
+from pathlib import Path
 
 security_logger = logging.getLogger('xai.security')
-
 
 # Network security exceptions
 class NetworkSecurityError(Exception):
     """Base exception for network security operations"""
     pass
 
-
 class CertificateLoadError(NetworkSecurityError):
     """Raised when certificate loading fails"""
     pass
-
 
 class CertificateConfig:
     """Configuration for SSL/TLS certificates"""
 
     def __init__(
         self,
-        cert_file: Optional[str] = None,
-        key_file: Optional[str] = None,
-        ca_cert_file: Optional[str] = None,
+        cert_file: str | None = None,
+        key_file: str | None = None,
+        ca_cert_file: str | None = None,
     ):
         """
         Initialize certificate configuration.
@@ -52,12 +50,12 @@ class CertificateConfig:
         self.key_file = key_file
         self.ca_cert_file = ca_cert_file
 
-    def validate(self) -> Tuple[bool, Optional[str]]:
+    def validate(self) -> tuple[bool, str | None]:
         """
         Validate certificate files exist and are readable.
 
         Returns:
-            Tuple[bool, Optional[str]]: (valid, error_message)
+            tuple[bool, str | None]: (valid, error_message)
         """
         if self.cert_file and not Path(self.cert_file).exists():
             return False, f"Certificate file not found: {self.cert_file}"
@@ -70,7 +68,6 @@ class CertificateConfig:
 
         return True, None
 
-
 class TLSConfig:
     """Configuration for TLS/SSL connections"""
 
@@ -78,7 +75,7 @@ class TLSConfig:
         self,
         min_version: int = ssl.TLSVersion.TLSv1_2,
         max_version: int = ssl.TLSVersion.TLSv1_3,
-        cipher_suites: Optional[list] = None,
+        cipher_suites: list | None = None,
         verify_mode: int = ssl.CERT_REQUIRED,
     ):
         """
@@ -132,7 +129,6 @@ class TLSConfig:
 
         return context
 
-
 class NetworkSecurityManager:
     """
     Manages all network security aspects including TLS, certificates, and P2P encryption.
@@ -140,8 +136,8 @@ class NetworkSecurityManager:
 
     def __init__(
         self,
-        cert_config: Optional[CertificateConfig] = None,
-        tls_config: Optional[TLSConfig] = None,
+        cert_config: CertificateConfig | None = None,
+        tls_config: TLSConfig | None = None,
         enable_https: bool = True,
         hsts_max_age: int = 31536000,  # 1 year
     ):
@@ -160,7 +156,7 @@ class NetworkSecurityManager:
         self.hsts_max_age = hsts_max_age
 
         # Certificate pinning storage: {hostname: [pin1, pin2, ...]}
-        self.pinned_certificates: Dict[str, list] = {}
+        self.pinned_certificates: dict[str, list] = {}
 
         # Validate certificates if provided
         if self.cert_config.cert_file and self.cert_config.key_file:
@@ -232,7 +228,7 @@ class NetworkSecurityManager:
 
         return context
 
-    def create_secure_socket(self, host: str, port: int) -> Tuple[bool, Optional[socket.socket], Optional[str]]:
+    def create_secure_socket(self, host: str, port: int) -> tuple[bool, socket.socket | None, str | None]:
         """
         Create a secure socket connection.
 
@@ -241,7 +237,7 @@ class NetworkSecurityManager:
             port: Port number
 
         Returns:
-            Tuple[bool, Optional[socket.socket], Optional[str]]: (success, socket, error_message)
+            tuple[bool, socket.socket | None, str | None]: (success, socket, error_message)
         """
         try:
             # Create socket
@@ -358,7 +354,6 @@ class NetworkSecurityManager:
             'hsts_max_age': self.hsts_max_age,
         }
 
-
 class P2PNetworkSecurity:
     """
     Handles security for peer-to-peer network communications.
@@ -366,9 +361,9 @@ class P2PNetworkSecurity:
 
     def __init__(self):
         """Initialize P2P network security"""
-        self.trusted_peers: Dict[str, str] = {}  # {peer_address: peer_id}
-        self.blocked_peers: Dict[str, str] = {}  # {peer_address: reason}
-        self.peer_versions: Dict[str, str] = {}  # {peer_address: version}
+        self.trusted_peers: dict[str, str] = {}  # {peer_address: peer_id}
+        self.blocked_peers: dict[str, str] = {}  # {peer_address: reason}
+        self.peer_versions: dict[str, str] = {}  # {peer_address: version}
 
     def add_trusted_peer(self, peer_address: str, peer_id: str) -> bool:
         """
@@ -431,11 +426,9 @@ class P2PNetworkSecurity:
         security_logger.debug(f"Message verification for peer: {peer_address}")
         return True
 
-
 # Global instances
 _network_security_manager = None
 _p2p_security = None
-
 
 def get_network_security_manager() -> NetworkSecurityManager:
     """Get global network security manager instance"""
@@ -443,7 +436,6 @@ def get_network_security_manager() -> NetworkSecurityManager:
     if _network_security_manager is None:
         _network_security_manager = NetworkSecurityManager()
     return _network_security_manager
-
 
 def get_p2p_security() -> P2PNetworkSecurity:
     """Get global P2P network security instance"""

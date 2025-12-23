@@ -140,9 +140,9 @@ Remaining Items:
 
 *Added: 2025-12-22 - Comprehensive 8-agent parallel review for public release*
 
-**Overall Assessment: 95% Ready - Most P1 items completed** ✅
+**Overall Assessment: 97% Ready - All P1 performance items completed** ✅
 
-*Updated: 2025-12-23 - 8 parallel agents completed P1 performance and documentation tasks*
+*Updated: 2025-12-23 - All P1 performance bottlenecks resolved, documentation complete*
 
 ### 🔴 CRITICAL (P1) - Must Fix Before Public Release
 
@@ -156,8 +156,10 @@ Remaining Items:
   - Fixed: Added `_spent_inputs: set[str]` for O(1) lookup
   - All mempool operations now maintain the spent_inputs set
 
-- [ ] **validate_chain() Full Rebuild** - Rebuilds entire UTXO set on every call
-  - Fix: Incremental validation with checkpoints
+- [x] **validate_chain() Full Rebuild** - Rebuilds entire UTXO set on every call ✅ DONE
+  - Fixed: Added checkpoint-based incremental validation
+  - Now O(k) where k = blocks since checkpoint, instead of O(n)
+  - Commit: 52fcc76
 
 - [x] **Unbounded Memory Growth** - No eviction in caches/mempools ✅ DONE
   - Fixed: Added LRU eviction to mobile_cache.py and light_clients/manager.py
@@ -176,8 +178,8 @@ Remaining Items:
   - Added v0.1.0 and v0.2.0 with proper semantic versioning
   - Commit: a3901be
 
-- [ ] **Missing Deployment Docs** - No production deployment guide
-  - Add: `docs/deployment/production.md` with step-by-step
+- [x] **Missing Deployment Docs** - No production deployment guide ✅ EXISTS
+  - File exists: `docs/deployment/production.md` (56 lines of production guidance)
 
 #### Repository Cleanup (Blocks Professional Presentation)
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import os
 import time
-from typing import Dict, Any, List
+from typing import Any
 
 import requests
 from web3 import Web3
@@ -23,12 +23,10 @@ from xai.core.refund_sweep_manager import RefundSweepManager
 from xai.core.htlc_p2wsh import build_refund_witness
 from xai.core.aixn_blockchain.atomic_swap_11_coins import CrossChainVerifier
 
-
 RPC_URL = os.getenv("XAI_BTC_RPC_URL", "http://127.0.0.1:18443")
 RPC_USER = os.getenv("XAI_BTC_RPC_USER", "user")
 RPC_PASS = os.getenv("XAI_BTC_RPC_PASS", "pass")
 ETH_RPC = os.getenv("XAI_ETH_RPC", "http://127.0.0.1:8545")
-
 
 def btc_rpc(method: str, params=None):
     resp = requests.post(
@@ -43,8 +41,7 @@ def btc_rpc(method: str, params=None):
         raise RuntimeError(payload["error"])
     return payload["result"]
 
-
-def sweep_utxo(swaps: List[Dict[str, Any]], manager: RefundSweepManager) -> None:
+def sweep_utxo(swaps: list[dict[str, Any]], manager: RefundSweepManager) -> None:
     expired = manager.find_expired_swaps(swaps, now=time.time())
     for swap in expired:
         utxo = swap.get("utxo")
@@ -63,8 +60,7 @@ def sweep_utxo(swaps: List[Dict[str, Any]], manager: RefundSweepManager) -> None
         except Exception as exc:
             print(f"Refund broadcast failed for swap {swap['id']}: {exc}")
 
-
-def sweep_eth(swaps: List[Dict[str, Any]], manager: RefundSweepManager) -> None:
+def sweep_eth(swaps: list[dict[str, Any]], manager: RefundSweepManager) -> None:
     expired = manager.find_expired_swaps(swaps, now=time.time())
     w3 = Web3(Web3.HTTPProvider(ETH_RPC))
     for swap in expired:
@@ -83,25 +79,24 @@ def sweep_eth(swaps: List[Dict[str, Any]], manager: RefundSweepManager) -> None:
         except Exception as exc:
             print(f"Refund failed for {swap['id']}: {exc}")
 
-
-def load_swaps(path: str) -> List[Dict[str, Any]]:
+def load_swaps(path: str) -> list[dict[str, Any]]:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 def filter_refundable_swaps(
-    swaps: List[Dict[str, Any]],
+    swaps: list[dict[str, Any]],
     verifier: CrossChainVerifier,
     *,
     min_confirmations: int = 3,
     safety_margin_seconds: int = 1800,
     now: float | None = None,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Apply timelock + confirmation filtering prior to sweeping refunds.
     Each swap is expected to carry: funding_txid, coin, timelock, sender_address/utxo.
     """
     current = now if now is not None else time.time()
-    eligible: List[Dict[str, Any]] = []
+    eligible: list[dict[str, Any]] = []
     for swap in swaps:
         timelock = swap.get("timelock")
         txid = swap.get("funding_txid") or swap.get("txid")
@@ -118,7 +113,6 @@ def filter_refundable_swaps(
         eligible.append(enriched)
     return eligible
 
-
 def main() -> int:
     swaps_path = os.getenv("XAI_SWAPS_FILE", "swaps.json")
     swaps = load_swaps(swaps_path)
@@ -128,7 +122,6 @@ def main() -> int:
     sweep_utxo(swaps, manager)
     sweep_eth(swaps, manager)
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

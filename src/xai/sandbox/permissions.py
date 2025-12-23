@@ -14,13 +14,12 @@ from __future__ import annotations
 import json
 import logging
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Set, Any
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
-
 
 class PermissionLevel(Enum):
     """Permission levels for mini-app capabilities"""
@@ -28,7 +27,6 @@ class PermissionLevel(Enum):
     READ = "read"
     WRITE = "write"
     EXECUTE = "execute"
-
 
 class Permission(Enum):
     """Available permissions for mini-apps"""
@@ -66,7 +64,6 @@ class Permission(Enum):
     KEYRING_ACCESS = "keyring_access"
     PRIVATE_KEY_EXPORT = "private_key_export"
 
-
 class PermissionDeniedError(Exception):
     """Raised when a permission is denied"""
     def __init__(self, permission: Permission, app_id: str, reason: str = ""):
@@ -78,17 +75,16 @@ class PermissionDeniedError(Exception):
             + (f": {reason}" if reason else "")
         )
 
-
 @dataclass
 class PermissionGrant:
     """A granted permission with metadata"""
     permission: Permission
     level: PermissionLevel
     granted_at: float
-    expires_at: Optional[float] = None
+    expires_at: float | None = None
     user_approved: bool = False
-    approval_timestamp: Optional[float] = None
-    restrictions: Dict[str, Any] = field(default_factory=dict)
+    approval_timestamp: float | None = None
+    restrictions: dict[str, Any] = field(default_factory=dict)
 
     def is_valid(self) -> bool:
         """Check if grant is still valid"""
@@ -100,7 +96,7 @@ class PermissionGrant:
 
         return True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary"""
         data = asdict(self)
         data["permission"] = self.permission.value
@@ -108,13 +104,12 @@ class PermissionGrant:
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> PermissionGrant:
+    def from_dict(cls, data: dict[str, Any]) -> PermissionGrant:
         """Deserialize from dictionary"""
         data = data.copy()
         data["permission"] = Permission(data["permission"])
         data["level"] = PermissionLevel(data["level"])
         return cls(**data)
-
 
 @dataclass
 class AuditLogEntry:
@@ -124,22 +119,21 @@ class AuditLogEntry:
     permission: Permission
     action: str
     success: bool
-    details: Dict[str, Any] = field(default_factory=dict)
-    user_address: Optional[str] = None
+    details: dict[str, Any] = field(default_factory=dict)
+    user_address: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary"""
         data = asdict(self)
         data["permission"] = self.permission.value
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> AuditLogEntry:
+    def from_dict(cls, data: dict[str, Any]) -> AuditLogEntry:
         """Deserialize from dictionary"""
         data = data.copy()
         data["permission"] = Permission(data["permission"])
         return cls(**data)
-
 
 class AuditLog:
     """
@@ -148,9 +142,9 @@ class AuditLog:
     Provides immutable audit trail of all permission usage
     """
 
-    def __init__(self, log_path: Optional[Path] = None):
+    def __init__(self, log_path: Path | None = None):
         self.log_path = log_path
-        self.entries: List[AuditLogEntry] = []
+        self.entries: list[AuditLogEntry] = []
         self.max_memory_entries = 10000
 
         if log_path:
@@ -162,8 +156,8 @@ class AuditLog:
         permission: Permission,
         action: str,
         success: bool,
-        details: Optional[Dict[str, Any]] = None,
-        user_address: Optional[str] = None,
+        details: dict[str, Any] | None = None,
+        user_address: str | None = None,
     ) -> None:
         """Log a permission usage event"""
         entry = AuditLogEntry(
@@ -204,12 +198,12 @@ class AuditLog:
 
     def get_entries(
         self,
-        app_id: Optional[str] = None,
-        permission: Optional[Permission] = None,
-        start_time: Optional[float] = None,
-        end_time: Optional[float] = None,
+        app_id: str | None = None,
+        permission: Permission | None = None,
+        start_time: float | None = None,
+        end_time: float | None = None,
         limit: int = 1000,
-    ) -> List[AuditLogEntry]:
+    ) -> list[AuditLogEntry]:
         """Query audit log entries with filters"""
         filtered = self.entries
 
@@ -230,7 +224,7 @@ class AuditLog:
 
         return filtered[:limit]
 
-    def get_suspicious_activity(self, app_id: str, threshold: int = 10) -> List[AuditLogEntry]:
+    def get_suspicious_activity(self, app_id: str, threshold: int = 10) -> list[AuditLogEntry]:
         """
         Get potentially suspicious activity
 
@@ -289,7 +283,6 @@ class AuditLog:
         except Exception as e:
             logger.error(f"Failed to load audit log: {e}")
 
-
 class PermissionManager:
     """
     Manages permissions for mini-apps
@@ -324,17 +317,17 @@ class PermissionManager:
 
     def __init__(
         self,
-        storage_path: Optional[Path] = None,
-        audit_log: Optional[AuditLog] = None,
+        storage_path: Path | None = None,
+        audit_log: AuditLog | None = None,
     ):
         self.storage_path = storage_path
         self.audit_log = audit_log or AuditLog()
 
         # app_id -> {permission -> grant}
-        self.grants: Dict[str, Dict[Permission, PermissionGrant]] = {}
+        self.grants: dict[str, dict[Permission, PermissionGrant]] = {}
 
         # Verified app IDs (can auto-grant safe permissions)
-        self.verified_apps: Set[str] = set()
+        self.verified_apps: set[str] = set()
 
         if storage_path:
             self._load_from_disk()
@@ -344,7 +337,7 @@ class PermissionManager:
         app_id: str,
         permission: Permission,
         level: PermissionLevel = PermissionLevel.READ,
-        duration_seconds: Optional[int] = None,
+        duration_seconds: int | None = None,
         auto_approve: bool = False,
     ) -> bool:
         """
@@ -448,7 +441,7 @@ class PermissionManager:
         self,
         app_id: str,
         permission: Permission,
-        user_address: Optional[str] = None,
+        user_address: str | None = None,
     ) -> None:
         """Revoke a granted permission"""
         if app_id in self.grants and permission in self.grants[app_id]:
@@ -557,7 +550,7 @@ class PermissionManager:
             details={"level": level.value}
         )
 
-    def get_app_permissions(self, app_id: str) -> Dict[Permission, PermissionGrant]:
+    def get_app_permissions(self, app_id: str) -> dict[Permission, PermissionGrant]:
         """Get all permissions for an app"""
         if app_id not in self.grants:
             return {}

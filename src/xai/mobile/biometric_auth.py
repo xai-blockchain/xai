@@ -30,10 +30,9 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Callable, Dict, Any
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
-
 
 class BiometricType(Enum):
     """Types of biometric authentication supported."""
@@ -44,7 +43,6 @@ class BiometricType(Enum):
     FACE = "face"                 # Android Face Unlock
     NONE = "none"
 
-
 class BiometricStrength(Enum):
     """Security strength levels for biometric authentication."""
     STRONG = "strong"             # Class 3 biometric (hardware-backed)
@@ -52,14 +50,12 @@ class BiometricStrength(Enum):
     DEVICE_CREDENTIAL = "device"  # PIN/password/pattern
     NONE = "none"
 
-
 class ProtectionLevel(Enum):
     """Key protection levels matching platform security."""
     BIOMETRIC_STRONG = "biometric_strong"         # Requires Class 3 biometric
     BIOMETRIC_WEAK = "biometric_weak"             # Accepts Class 2 or 3
     DEVICE_CREDENTIAL = "device_credential"       # PIN/password/pattern
     BIOMETRIC_OR_CREDENTIAL = "biometric_or_credential"  # Either biometric or device credential
-
 
 class BiometricError(Enum):
     """Biometric authentication error codes."""
@@ -74,18 +70,16 @@ class BiometricError(Enum):
     SESSION_EXPIRED = "session_expired"
     UNKNOWN = "unknown"
 
-
 @dataclass
 class BiometricResult:
     """Result of a biometric authentication attempt."""
     success: bool
     auth_type: BiometricType
     strength: BiometricStrength
-    token: Optional[bytes] = None  # Cryptographic token from successful auth
-    error_code: Optional[BiometricError] = None
-    error_message: Optional[str] = None
+    token: bytes | None = None  # Cryptographic token from successful auth
+    error_code: BiometricError | None = None
+    error_message: str | None = None
     timestamp: int = field(default_factory=lambda: int(time.time()))
-
 
 @dataclass
 class BiometricCapability:
@@ -97,7 +91,6 @@ class BiometricCapability:
     security_level: BiometricStrength
     can_authenticate: bool = True
 
-
 @dataclass
 class SessionConfig:
     """Configuration for biometric authentication sessions."""
@@ -106,7 +99,6 @@ class SessionConfig:
     require_reauth_on_sensitive: bool = True  # Re-auth for sensitive ops
     invalidate_on_background: bool = True    # Invalidate when app backgrounds
     grace_period_seconds: int = 30           # Grace period after timeout
-
 
 class BiometricSession:
     """
@@ -123,11 +115,11 @@ class BiometricSession:
     def __init__(self, config: SessionConfig):
         self.config = config
         self._lock = threading.RLock()
-        self._token: Optional[bytes] = None
+        self._token: bytes | None = None
         self._auth_type: BiometricType = BiometricType.NONE
         self._strength: BiometricStrength = BiometricStrength.NONE
-        self._start_time: Optional[float] = None
-        self._last_access: Optional[float] = None
+        self._start_time: float | None = None
+        self._last_access: float | None = None
         self._operation_count: int = 0
         self._is_valid: bool = False
 
@@ -154,7 +146,7 @@ class BiometricSession:
                 }
             )
 
-    def is_valid(self, require_strength: Optional[BiometricStrength] = None) -> bool:
+    def is_valid(self, require_strength: BiometricStrength | None = None) -> bool:
         """
         Check if session is still valid.
 
@@ -205,7 +197,7 @@ class BiometricSession:
         }
         return strength_order.get(self._strength, 0) >= strength_order.get(required, 0)
 
-    def get_token(self) -> Optional[bytes]:
+    def get_token(self) -> bytes | None:
         """Get authentication token if session is valid."""
         with self._lock:
             if self.is_valid():
@@ -234,7 +226,7 @@ class BiometricSession:
                 extra={"event": "biometric.session_invalidated"}
             )
 
-    def get_info(self) -> Dict[str, Any]:
+    def get_info(self) -> dict[str, Any]:
         """Get session information for monitoring."""
         with self._lock:
             if not self._is_valid:
@@ -250,7 +242,6 @@ class BiometricSession:
                 "operations": self._operation_count,
                 "remaining_operations": self.config.max_operations - self._operation_count
             }
-
 
 class BiometricAuthProvider(ABC):
     """
@@ -294,7 +285,6 @@ class BiometricAuthProvider(ABC):
         """Invalidate current authentication session."""
         pass
 
-
 class BiometricAuthManager:
     """
     High-level biometric authentication manager with session handling.
@@ -319,7 +309,7 @@ class BiometricAuthManager:
     def __init__(
         self,
         provider: BiometricAuthProvider,
-        session_config: Optional[SessionConfig] = None
+        session_config: SessionConfig | None = None
     ):
         """
         Initialize biometric authentication manager.
@@ -410,8 +400,8 @@ class BiometricAuthManager:
 
     def get_session_token(
         self,
-        require_strength: Optional[BiometricStrength] = None
-    ) -> Optional[bytes]:
+        require_strength: BiometricStrength | None = None
+    ) -> bytes | None:
         """
         Get authentication token from active session.
 
@@ -428,7 +418,7 @@ class BiometricAuthManager:
 
     def is_session_valid(
         self,
-        require_strength: Optional[BiometricStrength] = None
+        require_strength: BiometricStrength | None = None
     ) -> bool:
         """Check if session is valid."""
         with self._lock:
@@ -456,7 +446,7 @@ class BiometricAuthManager:
             extra={"event": "biometric.foreground"}
         )
 
-    def get_session_info(self) -> Dict[str, Any]:
+    def get_session_info(self) -> dict[str, Any]:
         """Get current session information."""
         with self._lock:
             return self.session.get_info()
@@ -472,7 +462,6 @@ class BiometricAuthManager:
                 "BiometricAuthManager config updated",
                 extra={"event": "biometric.config_updated"}
             )
-
 
 class MockBiometricProvider(BiometricAuthProvider):
     """

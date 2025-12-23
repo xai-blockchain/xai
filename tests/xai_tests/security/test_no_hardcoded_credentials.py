@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Security test to ensure no hardcoded credentials in source code.
 
@@ -8,12 +10,10 @@ never be committed to source control.
 import os
 import re
 from pathlib import Path
-from typing import List, Tuple
 
 import pytest
 
-
-def get_source_files() -> List[Path]:
+def get_source_files() -> list[Path]:
     """Get all Python source files in the src/xai directory."""
     src_dir = Path(__file__).parent.parent.parent.parent / "src" / "xai"
     python_files = []
@@ -26,8 +26,7 @@ def get_source_files() -> List[Path]:
 
     return python_files
 
-
-def scan_file_for_credentials(file_path: Path) -> List[Tuple[int, str, str]]:
+def scan_file_for_credentials(file_path: Path) -> list[tuple[int, str, str]]:
     """
     Scan a file for hardcoded credentials.
 
@@ -81,7 +80,6 @@ def scan_file_for_credentials(file_path: Path) -> List[Tuple[int, str, str]]:
 
     return issues
 
-
 def test_no_hardcoded_api_keys():
     """
     Test that no hardcoded API keys exist in source code.
@@ -112,7 +110,6 @@ def test_no_hardcoded_api_keys():
         error_msg += "   Use: os.environ.get('API_KEY_NAME')\n"
 
         pytest.fail(error_msg)
-
 
 def test_environment_variable_usage():
     """
@@ -149,7 +146,6 @@ def test_environment_variable_usage():
         assert "ANTHROPIC_API_KEY" in content, (
             f"{file_rel_path} should reference ANTHROPIC_API_KEY environment variable"
         )
-
 
 def test_no_placeholder_api_keys():
     """
@@ -199,7 +195,6 @@ def test_no_placeholder_api_keys():
         error_msg += "\nUse environment variables instead.\n"
         pytest.fail(error_msg)
 
-
 def test_env_file_not_committed():
     """
     Test that .env files with potential secrets are not in the repository.
@@ -228,7 +223,6 @@ def test_env_file_not_committed():
                     f".env files should never be committed to git!"
                 )
 
-
 def test_gitignore_includes_env():
     """
     Test that .gitignore properly excludes .env files.
@@ -247,7 +241,6 @@ def test_gitignore_includes_env():
     assert ".env" in gitignore_content or "*.env" in gitignore_content, (
         ".gitignore should include .env files to prevent credential leaks"
     )
-
 
 def test_api_key_validation_function_exists():
     """
@@ -277,7 +270,6 @@ def test_api_key_validation_function_exists():
     assert "INVALID_DEMO_KEYS" in content, (
         "Demo key blacklist should exist"
     )
-
 
 if __name__ == "__main__":
     # Allow running this test directly

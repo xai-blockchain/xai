@@ -5,12 +5,10 @@ Utility for deriving P2WSH bech32 addresses for HTLC scripts.
 from __future__ import annotations
 
 import hashlib
-from typing import Optional
 
 import bech32
 
-
-def redeem_script_to_p2wsh_address(redeem_script: bytes | str, hrp: str = "bc") -> Optional[str]:
+def redeem_script_to_p2wsh_address(redeem_script: bytes | str, hrp: str = "bc") -> str | None:
     """
     Convert a redeem script string to a P2WSH bech32 address.
     """

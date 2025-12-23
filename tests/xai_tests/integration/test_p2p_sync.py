@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 """
 Integration tests for P2P sync and fork resolution.
 """
 
 import pytest
 import asyncio
-from typing import List
+
 from xai.core.node import BlockchainNode
 from xai.core.blockchain import Blockchain
 
@@ -13,7 +15,7 @@ async def multi_node_network(tmp_path_factory):
     """
     Creates a network of 3 nodes.
     """
-    nodes: List[BlockchainNode] = []
+    nodes: list[BlockchainNode] = []
     for i in range(3):
         data_dir = tmp_path_factory.mktemp(f"node_{i}")
         bc = Blockchain(data_dir=str(data_dir))
@@ -41,7 +43,6 @@ async def multi_node_network(tmp_path_factory):
     # Shutdown the nodes
     for node in nodes:
         await node.stop_services()
-
 
 async def test_fork_resolution(multi_node_network):
     """

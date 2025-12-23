@@ -8,17 +8,17 @@ adopt the new smart-contract plan.
 """
 
 from .base import (  # noqa: F401
-    ModuleMetadata,
-    ModuleContext,
-    TransactionContext,
     BlockContext,
-    TransactionModule,
     BlockModule,
     ConsensusModule,
     DataModule,
-    ObserverModule,
     InteropModule,
+    ModuleContext,
+    ModuleMetadata,
+    ObserverModule,
     ServiceModule,
+    TransactionContext,
+    TransactionModule,
 )
 
 __all__ = [

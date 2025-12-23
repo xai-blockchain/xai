@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Interface for blockchain data needed by external modules (e.g., monitoring and gamification).
 
@@ -6,10 +8,10 @@ abstract views of blockchain data without directly importing the full
 Blockchain implementation.
 """
 
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, Any, List, Optional
-import time
+from typing import Any
 
 @dataclass
 class BlockchainDataProvider:
@@ -25,7 +27,7 @@ class BlockchainDataProvider:
     difficulty: int
     mempool_size_bytes: int = 0
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Return a dictionary of the provided statistics."""
         return {
             "chain_height": self.chain_height,
@@ -51,7 +53,7 @@ class GamificationBlockchainInterface(ABC):
         """Get the current length of the blockchain."""
 
     @abstractmethod
-    def get_block_by_index(self, index: int) -> Optional[Any]:
+    def get_block_by_index(self, index: int) -> Any | None:
         """Get a block by its index (returns a simplified view or header)."""
 
     @abstractmethod
@@ -59,7 +61,7 @@ class GamificationBlockchainInterface(ABC):
         """Get the hash of the latest block."""
 
     @abstractmethod
-    def get_pending_transactions(self) -> List[Any]:
+    def get_pending_transactions(self) -> list[Any]:
         """Get the list of pending transactions."""
     
     @abstractmethod

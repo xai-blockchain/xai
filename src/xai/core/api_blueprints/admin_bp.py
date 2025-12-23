@@ -8,7 +8,7 @@ Extracted from node_api.py as part of god class refactoring.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from flask import Blueprint, jsonify, request
 
@@ -27,9 +27,8 @@ logger = logging.getLogger(__name__)
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
-
 @admin_bp.route("/api-keys", methods=["GET"])
-def list_api_keys() -> Tuple[Dict[str, Any], int]:
+def list_api_keys() -> tuple[dict[str, Any], int]:
     """List all API keys (admin only)."""
     ctx = get_api_context()
     api_auth = ctx.get("api_auth")
@@ -41,9 +40,8 @@ def list_api_keys() -> Tuple[Dict[str, Any], int]:
     metadata = api_auth.list_key_metadata()
     return success_response(metadata)
 
-
 @admin_bp.route("/api-keys", methods=["POST"])
-def create_api_key() -> Tuple[Dict[str, Any], int]:
+def create_api_key() -> tuple[dict[str, Any], int]:
     """Create a new API key (admin only)."""
     ctx = get_api_context()
     api_auth = ctx.get("api_auth")
@@ -77,9 +75,8 @@ def create_api_key() -> Tuple[Dict[str, Any], int]:
         )
         return error_response(str(exc), status=500, code="admin_error")
 
-
 @admin_bp.route("/api-keys/<key_id>", methods=["DELETE"])
-def delete_api_key(key_id: str) -> Tuple[Dict[str, Any], int]:
+def delete_api_key(key_id: str) -> tuple[dict[str, Any], int]:
     """Delete an API key (admin only)."""
     ctx = get_api_context()
     api_auth = ctx.get("api_auth")
@@ -105,9 +102,8 @@ def delete_api_key(key_id: str) -> Tuple[Dict[str, Any], int]:
 
     return error_response("API key not found", status=404, code="not_found")
 
-
 @admin_bp.route("/api-key-events", methods=["GET"])
-def list_api_key_events() -> Tuple[Dict[str, Any], int]:
+def list_api_key_events() -> tuple[dict[str, Any], int]:
     """List API key events (admin only)."""
     ctx = get_api_context()
     api_key_store = ctx.get("api_key_store")
@@ -120,9 +116,8 @@ def list_api_key_events() -> Tuple[Dict[str, Any], int]:
     events = api_key_store.get_events(limit=limit)
     return success_response({"events": events})
 
-
 @admin_bp.route("/withdrawals/telemetry", methods=["GET"])
-def get_withdrawal_telemetry() -> Tuple[Dict[str, Any], int]:
+def get_withdrawal_telemetry() -> tuple[dict[str, Any], int]:
     """Get withdrawal telemetry data (admin only)."""
     node = get_node()
 
@@ -164,9 +159,8 @@ def get_withdrawal_telemetry() -> Tuple[Dict[str, Any], int]:
     )
     return success_response(payload)
 
-
 @admin_bp.route("/withdrawals/status", methods=["GET"])
-def get_withdrawal_status_snapshot() -> Tuple[Dict[str, Any], int]:
+def get_withdrawal_status_snapshot() -> tuple[dict[str, Any], int]:
     """Get withdrawal status snapshot (admin only)."""
     node = get_node()
 
@@ -235,9 +229,8 @@ def get_withdrawal_status_snapshot() -> Tuple[Dict[str, Any], int]:
     )
     return success_response(payload)
 
-
 @admin_bp.route("/spend-limit", methods=["POST"])
-def set_spend_limit() -> Tuple[Dict[str, Any], int]:
+def set_spend_limit() -> tuple[dict[str, Any], int]:
     """Set per-address daily spending limit (admin only)."""
     ctx = get_api_context()
     spending_limits = ctx.get("spending_limits")

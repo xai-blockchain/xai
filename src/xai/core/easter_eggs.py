@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 XAI Easter Eggs & Hidden Features
 
@@ -7,32 +9,31 @@ XAI Easter Eggs & Hidden Features
 """
 
 import hashlib
-import time
-from typing import Dict, List, Optional
 import secrets
-from xai.core.wallet_encryption import WalletEncryption
-from xai.core.wallet import Wallet
+import time
+
 from xai.core.constants import (
-    LUCKY_BLOCK_PROBABILITY,
-    LUCKY_BLOCK_NORMAL_REWARD,
-    LUCKY_BLOCK_BONUS_REWARD,
-    TREASURE_WALLET_COUNT,
-    TREASURE_WALLET_BALANCE,
-    TREASURE_TOTAL_VALUE,
-    TREASURE_MIN_BLOCK,
-    TREASURE_MAX_BLOCK,
     AIRDROP_90_DAY_AMOUNT,
     AIRDROP_90_DAY_RECIPIENTS,
     AIRDROP_180_DAY_AMOUNT,
     AIRDROP_180_DAY_RECIPIENTS,
     AIRDROP_365_DAY_AMOUNT,
     AIRDROP_365_DAY_RECIPIENTS,
-    SECONDS_PER_DAY,
     BLOCK_TIME_TARGET_SECONDS,
-    TEST_BLOCKS_FOR_STATS,
     GENESIS_TIMESTAMP,
+    LUCKY_BLOCK_BONUS_REWARD,
+    LUCKY_BLOCK_NORMAL_REWARD,
+    LUCKY_BLOCK_PROBABILITY,
+    SECONDS_PER_DAY,
+    TEST_BLOCKS_FOR_STATS,
+    TREASURE_MAX_BLOCK,
+    TREASURE_MIN_BLOCK,
+    TREASURE_TOTAL_VALUE,
+    TREASURE_WALLET_BALANCE,
+    TREASURE_WALLET_COUNT,
 )
-
+from xai.core.wallet import Wallet
+from xai.core.wallet_encryption import WalletEncryption
 
 class LuckyBlockSystem:
     """
@@ -85,7 +86,7 @@ class LuckyBlockSystem:
             return base_reward * 2
         return base_reward
 
-    def get_lucky_blocks_in_range(self, start: int, end: int) -> List[int]:
+    def get_lucky_blocks_in_range(self, start: int, end: int) -> list[int]:
         """Get all lucky blocks in range"""
         return [b for b in range(start, end + 1) if self.is_lucky_block(b)]
 
@@ -102,7 +103,6 @@ class LuckyBlockSystem:
             )[:5],
         }
 
-
 class HiddenTreasureWallets:
     """
     100 hidden wallets with 1000 XAI each
@@ -116,7 +116,7 @@ class HiddenTreasureWallets:
 
     def generate_treasure_wallets(
         self, count: int = TREASURE_WALLET_COUNT, password: str = "treasure-secret"
-    ) -> List[Dict]:
+    ) -> list[Dict]:
         """
         Generate hidden treasure wallets
 
@@ -194,7 +194,6 @@ class HiddenTreasureWallets:
 
         return clue_map
 
-
 class AirdropClueSystem:
     """
     Cryptic messages that hint at upcoming airdrops
@@ -241,7 +240,7 @@ class AirdropClueSystem:
 
     def _generate_airdrop_clues(
         self, timestamp: int, amount: float, recipient_count: int
-    ) -> List[Dict]:
+    ) -> list[Dict]:
         """
         Generate cryptic clues about upcoming airdrop
 
@@ -301,7 +300,7 @@ class AirdropClueSystem:
 
         return clues
 
-    def get_clues_for_block(self, block_number: int) -> List[Dict]:
+    def get_clues_for_block(self, block_number: int) -> list[Dict]:
         """Get any clues that should appear in this block"""
 
         clues_in_block = []
@@ -319,7 +318,7 @@ class AirdropClueSystem:
 
         return clues_in_block
 
-    def get_upcoming_airdrops(self) -> List[Dict]:
+    def get_upcoming_airdrops(self) -> list[Dict]:
         """Get list of upcoming airdrops (without revealing clues)"""
 
         current_time = time.time()
@@ -337,7 +336,6 @@ class AirdropClueSystem:
         ]
 
         return sorted(upcoming, key=lambda x: x["days_until"])
-
 
 class EasterEggManager:
     """
@@ -436,7 +434,6 @@ class EasterEggManager:
             "treasure_clues": self.treasure_wallets.treasure_wallets,
             "airdrop_clues": self.airdrops.get_clues_for_block(block_number),
         }
-
 
 # Example usage
 if __name__ == "__main__":

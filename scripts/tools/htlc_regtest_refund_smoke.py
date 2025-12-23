@@ -10,7 +10,6 @@ from __future__ import annotations
 import hashlib
 import time
 from decimal import Decimal
-from typing import List, Tuple
 
 import requests
 from ecdsa import SECP256k1, SigningKey, util as ecdsa_util
@@ -21,7 +20,6 @@ RPC_URL = "http://127.0.0.1:18443"
 RPC_USER = "user"
 RPC_PASS = "pass"
 RPC_WALLET = "regtest_htlc"
-
 
 def rpc(method: str, params=None):
     resp = requests.post(
@@ -36,7 +34,6 @@ def rpc(method: str, params=None):
         raise RuntimeError(data["error"])
     return data["result"]
 
-
 def _encode_varint(value: int) -> bytes:
     if value < 0xFD:
         return value.to_bytes(1, "little")
@@ -46,8 +43,7 @@ def _encode_varint(value: int) -> bytes:
         return b"\xFE" + value.to_bytes(4, "little")
     return b"\xFF" + value.to_bytes(8, "little")
 
-
-def _read_varint(data: bytes, offset: int) -> Tuple[int, int]:
+def _read_varint(data: bytes, offset: int) -> tuple[int, int]:
     prefix = data[offset]
     if prefix < 0xFD:
         return prefix, offset + 1
@@ -56,7 +52,6 @@ def _read_varint(data: bytes, offset: int) -> Tuple[int, int]:
     if prefix == 0xFE:
         return int.from_bytes(data[offset + 1 : offset + 5], "little"), offset + 5
     return int.from_bytes(data[offset + 1 : offset + 9], "little"), offset + 9
-
 
 def _parse_transaction(raw_hex: str):
     tx = bytes.fromhex(raw_hex)
@@ -91,7 +86,7 @@ def _parse_transaction(raw_hex: str):
         script_pubkey = tx[cursor : cursor + pk_len]
         cursor += pk_len
         outputs.append({"amount": amount, "script_pubkey": script_pubkey})
-    witness_stacks: List[List[bytes]] = [[] for _ in range(vin_count)]
+    witness_stacks: list[list[bytes]] = [[] for _ in range(vin_count)]
     if has_witness:
         for idx in range(vin_count):
             item_count, cursor = _read_varint(tx, cursor)
@@ -104,7 +99,6 @@ def _parse_transaction(raw_hex: str):
             witness_stacks[idx] = stack
     locktime = tx[cursor : cursor + 4]
     return version, marker_flag, inputs, outputs, witness_stacks, locktime
-
 
 def _serialize_transaction(version, marker_flag, inputs, outputs, witness_stacks, locktime) -> str:
     marker_flag = marker_flag or b"\x00\x01"
@@ -134,7 +128,6 @@ def _serialize_transaction(version, marker_flag, inputs, outputs, witness_stacks
             parts.extend([_encode_varint(len(item)), item])
     parts.append(locktime)
     return b"".join(parts).hex()
-
 
 def _bip143_sighash(
     version: bytes,
@@ -179,7 +172,6 @@ def _bip143_sighash(
         + sighash_type.to_bytes(4, "little")
     )
     return _double_sha256(data)
-
 
 def main() -> int:
     requests.post(
@@ -273,7 +265,6 @@ def main() -> int:
     rpc("generatetoaddress", [1, sender_addr])
     print("Refunded txid:", txid_refund)
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

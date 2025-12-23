@@ -7,12 +7,12 @@ storing headers via SPVHeaderStore.
 
 from __future__ import annotations
 
-from typing import Iterable, Dict, Any, List, Tuple, Optional
-
-from .spv_header_store import SPVHeaderStore, Header
-import requests
 import json
+from typing import Any
 
+import requests
+
+from .spv_header_store import Header, SPVHeaderStore
 
 class SPVHeaderIngestor:
     """Validate linkage and ingest headers into SPVHeaderStore."""
@@ -20,14 +20,14 @@ class SPVHeaderIngestor:
     def __init__(self, store: SPVHeaderStore | None = None):
         self.store = store or SPVHeaderStore()
 
-    def ingest(self, headers: Iterable[Dict[str, Any]]) -> Tuple[int, List[str]]:
+    def ingest(self, headers: Iterable[dict[str, Any]]) -> tuple[int, list[str]]:
         """
         Ingest a batch of headers. Returns count added and list of rejected hashes.
 
         Headers must be provided in height order and include: height, block_hash, prev_hash, bits.
         """
         added = 0
-        rejected: List[str] = []
+        rejected: list[str] = []
         for h in headers:
             try:
                 header = Header(
@@ -54,16 +54,16 @@ class SPVHeaderIngestor:
         rpc_password: str,
         start_height: int,
         end_height: int,
-    ) -> Tuple[int, List[str]]:
+    ) -> tuple[int, list[str]]:
         """
         Ingest headers from a Bitcoin-compatible JSON-RPC endpoint (e.g., regtest).
         """
         added = 0
-        rejected: List[str] = []
+        rejected: list[str] = []
         session = requests.Session()
         headers = []
 
-        def rpc_call(method: str, params: Optional[List[Any]] = None) -> Any:
+        def rpc_call(method: str, params: list[Any] | None = None) -> Any:
             resp = session.post(
                 rpc_url,
                 auth=(rpc_user, rpc_password),

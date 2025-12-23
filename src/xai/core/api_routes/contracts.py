@@ -4,24 +4,23 @@ import json
 import logging
 import time
 import uuid
-from typing import TYPE_CHECKING, Dict, Optional, Tuple, Any, Type
+from typing import TYPE_CHECKING, Any, Type
 
 from flask import request
 
+from xai.core.config import Config
+from xai.core.governance_execution import ProposalType
 from xai.core.input_validation_schemas import (
-    ContractDeployInput,
     ContractCallInput,
+    ContractDeployInput,
     ContractFeatureToggleInput,
 )
 from xai.core.request_validator_middleware import validate_request
-from xai.core.config import Config
-from xai.core.governance_execution import ProposalType
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from xai.core.node_api import NodeAPIRoutes, InputSanitizer
-
+    from xai.core.node_api import InputSanitizer, NodeAPIRoutes
 
 def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSanitizer"]) -> None:
     """Expose the smart-contract operations when the VM is enabled."""
@@ -30,7 +29,7 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
 
     @app.route("/contracts/deploy", methods=["POST"])
     @validate_request(routes.request_validator, ContractDeployInput)
-    def deploy_contract() -> Tuple[Dict[str, Any], int]:
+    def deploy_contract() -> tuple[dict[str, Any], int]:
         """Deploy a smart contract to the blockchain (admin only).
 
         Creates and broadcasts a contract deployment transaction. The contract
@@ -74,7 +73,7 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
                 status=503,
                 code="vm_feature_disabled",
             )
-        model: Optional[ContractDeployInput] = getattr(request, "validated_model", None)
+        model: ContractDeployInput | None = getattr(request, "validated_model", None)
         if model is None:
             return routes._error_response(
                 "Invalid contract deployment payload", status=400, code="invalid_payload"
@@ -128,10 +127,10 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
             tx.verify_signature()
         except Exception as e:
             from xai.core.transaction import (
-                SignatureVerificationError,
-                MissingSignatureError,
                 InvalidSignatureError,
-                SignatureCryptoError
+                MissingSignatureError,
+                SignatureCryptoError,
+                SignatureVerificationError,
             )
 
             if isinstance(e, MissingSignatureError):
@@ -182,7 +181,7 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
 
     @app.route("/contracts/call", methods=["POST"])
     @validate_request(routes.request_validator, ContractCallInput)
-    def call_contract() -> Tuple[Dict[str, Any], int]:
+    def call_contract() -> tuple[dict[str, Any], int]:
         """Call a deployed smart contract function (admin only).
 
         Executes a contract function by creating a contract call transaction.
@@ -224,7 +223,7 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
                 status=503,
                 code="vm_feature_disabled",
             )
-        model: Optional[ContractCallInput] = getattr(request, "validated_model", None)
+        model: ContractCallInput | None = getattr(request, "validated_model", None)
         if model is None:
             return routes._error_response(
                 "Invalid contract call payload", status=400, code="invalid_payload"
@@ -287,10 +286,10 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
             tx.verify_signature()
         except Exception as e:
             from xai.core.transaction import (
-                SignatureVerificationError,
-                MissingSignatureError,
                 InvalidSignatureError,
-                SignatureCryptoError
+                MissingSignatureError,
+                SignatureCryptoError,
+                SignatureVerificationError,
             )
 
             if isinstance(e, MissingSignatureError):
@@ -334,7 +333,7 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
         )
 
     @app.route("/contracts/<address>/state", methods=["GET"])
-    def contract_state(address: str) -> Tuple[Dict[str, Any], int]:
+    def contract_state(address: str) -> tuple[dict[str, Any], int]:
         """Get current state storage of a deployed contract.
 
         Returns the contract's state variables and storage data.
@@ -380,7 +379,7 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
         return routes._success_response({"contract_address": normalized, "state": state})
 
     @app.route("/contracts/<address>/abi", methods=["GET"])
-    def contract_abi(address: str) -> Tuple[Dict[str, Any], int]:
+    def contract_abi(address: str) -> tuple[dict[str, Any], int]:
         """Get contract ABI (Application Binary Interface).
 
         Returns the contract's ABI defining its functions, events, and data structures.
@@ -421,7 +420,7 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
         return routes._success_response(response)
 
     @app.route("/contracts/<address>/interfaces", methods=["GET"])
-    def contract_interfaces(address: str) -> Tuple[Dict[str, Any], int]:
+    def contract_interfaces(address: str) -> tuple[dict[str, Any], int]:
         """Detect supported ERC interfaces for a contract.
 
         Probes contract for ERC-165 interface support and caches results.
@@ -510,7 +509,7 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
         )
 
     @app.route("/contracts/<address>/events", methods=["GET"])
-    def contract_events(address: str) -> Tuple[Dict[str, Any], int]:
+    def contract_events(address: str) -> tuple[dict[str, Any], int]:
         """Get contract events with pagination.
 
         Returns events emitted by the contract during execution, with pagination support.
@@ -581,7 +580,7 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
         )
 
     @app.route("/contracts/governance/status", methods=["GET"])
-    def contract_feature_status() -> Tuple[Dict[str, Any], int]:
+    def contract_feature_status() -> tuple[dict[str, Any], int]:
         """Expose smart-contract feature enablement status across config/governance/manager."""
         executor = getattr(blockchain, "governance_executor", None)
         feature_enabled = bool(
@@ -604,7 +603,7 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
 
     @app.route("/contracts/governance/feature", methods=["POST"])
     @validate_request(routes.request_validator, ContractFeatureToggleInput)
-    def contract_feature_toggle() -> Tuple[Dict[str, Any], int]:
+    def contract_feature_toggle() -> tuple[dict[str, Any], int]:
         """Enable or disable smart contract feature via governance (admin only).
 
         Executes a governance proposal to enable/disable the smart contract VM feature.
@@ -644,7 +643,7 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
                 context={"reason": admin_error},
             )
 
-        model: Optional[ContractFeatureToggleInput] = getattr(request, "validated_model", None)
+        model: ContractFeatureToggleInput | None = getattr(request, "validated_model", None)
         if model is None:
             return routes._error_response(
                 "Request must be a JSON object",
