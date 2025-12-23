@@ -77,6 +77,7 @@ class DummyBlockchain(BlockchainMempoolMixin):
         self._mempool_invalid_window_seconds = 60
         self._mempool_invalid_ban_seconds = 30
         self._mempool_rejected_sender_cap_total = 0
+        self._spent_inputs = set()  # O(1) double-spend detection
         self.logger = _DummyLogger()
         self.utxo_manager = _DummyUTXOManager()
         self.transaction_validator = _DummyValidator()

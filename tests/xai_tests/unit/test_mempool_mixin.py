@@ -94,6 +94,7 @@ class DummyMempool(BlockchainMempoolMixin):
         self._mempool_rejected_sender_cap_total = 0
         self._mempool_evicted_low_fee_total = 0
         self._mempool_expired_total = 0
+        self._spent_inputs = set()  # O(1) double-spend detection
         self.utxo_manager = _UTXOManager()
         self.nonce_tracker = type(
             "NonceTracker",
