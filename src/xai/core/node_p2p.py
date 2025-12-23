@@ -44,6 +44,7 @@ except (ImportError, ModuleNotFoundError) as e:
     QuicDialTimeout = ConnectionError  # type: ignore[assignment]
     logger.debug(f"QUIC support disabled: {e}")
 
+import httpx
 import requests
 
 from xai.core.block_header import BlockHeader
@@ -792,7 +793,7 @@ class P2PNetworkManager:
 
                 local_height = len(getattr(self.blockchain, "chain", []))
                 logger.info("Periodic sync: Local height=%d", local_height, extra={"event": "p2p.periodic_sync_local_height"})
-                summaries = self._collect_peer_chain_summaries(peers)
+                summaries = await self._collect_peer_chain_summaries(peers)
                 logger.info("Periodic sync got %d summaries", len(summaries), extra={"event": "p2p.periodic_sync_summaries"})
 
                 if not summaries:
@@ -818,9 +819,8 @@ class P2PNetworkManager:
                         }
                     )
 
-                    # Call sync in a thread since it's not async
-                    loop = asyncio.get_event_loop()
-                    await loop.run_in_executor(None, self.sync_with_network)
+                    # Call async sync directly (no longer needs run_in_executor)
+                    await self.sync_with_network()
 
                     # Log result
                     new_height = len(getattr(self.blockchain, "chain", []))
@@ -1975,16 +1975,19 @@ class P2PNetworkManager:
                     continue
                 self._dispatch_async(self._quic_send_payload(host, payload))
 
-    def _fetch_peer_chain_summary(self, peer_uri: str) -> dict[str, Any] | None:
-        """Return quick height summary for a peer without downloading full chain."""
+    async def _fetch_peer_chain_summary(self, peer_uri: str) -> dict[str, Any] | None:
+        """Return quick height summary for a peer without downloading full chain.
+
+        Async implementation using httpx for non-blocking HTTP requests.
+        """
         endpoint = f"{peer_uri.rstrip('/')}/blocks"
         try:
-            response = requests.get(
-                endpoint,
-                params={"limit": 1, "offset": 0},
-                timeout=self._http_timeout,
-            )
-        except requests.RequestException as exc:
+            async with httpx.AsyncClient(timeout=self._http_timeout) as client:
+                response = await client.get(
+                    endpoint,
+                    params={"limit": 1, "offset": 0},
+                )
+        except (httpx.RequestError, httpx.TimeoutException) as exc:
             logger.debug(
                 "Failed to contact peer %s for summary: %s",
                 peer_uri,
@@ -2024,13 +2027,28 @@ class P2PNetworkManager:
             "latest_block": latest_block,
         }
 
-    def _collect_peer_chain_summaries(self, peers: list[str]) -> list[dict[str, Any]]:
-        """Collect summaries for every peer we are connected to."""
+    async def _collect_peer_chain_summaries(self, peers: list[str]) -> list[dict[str, Any]]:
+        """Collect summaries for every peer we are connected to.
+
+        Async implementation using asyncio.gather() for parallel fetching.
+        """
+        if not peers:
+            return []
+
+        # Fetch all peer summaries in parallel
+        tasks = [self._fetch_peer_chain_summary(peer_uri) for peer_uri in peers]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
         summaries: list[dict[str, Any]] = []
-        for peer_uri in peers:
-            summary = self._fetch_peer_chain_summary(peer_uri)
-            if summary:
-                summaries.append(summary)
+        for result in results:
+            if isinstance(result, dict):
+                summaries.append(result)
+            elif isinstance(result, Exception):
+                logger.debug(
+                    "Exception during peer summary fetch: %s",
+                    result,
+                    extra={"event": "p2p.parallel_summary_exception"},
+                )
         return summaries
 
     def _should_parallel_sync(self, summaries: list[dict[str, Any]], local_height: int) -> bool:
@@ -2287,8 +2305,11 @@ class P2PNetworkManager:
             )
             return None
 
-    def _http_sync(self) -> bool:
-        """HTTP-based synchronization for manually registered peers."""
+    async def _http_sync(self) -> bool:
+        """HTTP-based synchronization for manually registered peers.
+
+        Async implementation using httpx and asyncio.gather() for parallel downloads.
+        """
         # Get API endpoints from connected peers (via handshake)
         peers = self._get_peer_api_endpoints()
         if not peers:
@@ -2297,7 +2318,7 @@ class P2PNetworkManager:
         if not peers:
             return False
 
-        summaries = self._collect_peer_chain_summaries(peers)
+        summaries = await self._collect_peer_chain_summaries(peers)
         if not summaries:
             return False
 
@@ -2324,52 +2345,47 @@ class P2PNetworkManager:
             if not sequential_candidates:
                 return False
 
-        worker_count = min(len(sequential_candidates), self.parallel_sync_workers)
-        if worker_count <= 1:
-            for summary in sequential_candidates:
-                peer_uri = summary["peer"]
-                remote_blocks = self._download_remote_blocks(peer_uri, summary)
-                if remote_blocks and self._apply_remote_chain(peer_uri, remote_blocks):
-                    return True
-            return False
+        # Use asyncio.gather() for parallel downloads (replaces ThreadPoolExecutor)
+        download_tasks = [
+            self._download_remote_blocks(summary["peer"], summary)
+            for summary in sequential_candidates
+        ]
+        results = await asyncio.gather(*download_tasks, return_exceptions=True)
 
-        with ThreadPoolExecutor(max_workers=worker_count) as executor:
-            futures = {
-                executor.submit(self._download_remote_blocks, summary["peer"], summary): summary["peer"]
-                for summary in sequential_candidates
-            }
-            for future in as_completed(futures):
-                peer_uri = futures[future]
-                try:
-                    remote_blocks = future.result()
-                except (NetworkError, ValidationError, ValueError, RuntimeError) as exc:
-                    logger.debug(
-                        "Parallel sync failed for %s: %s",
-                        peer_uri,
-                        exc,
-                        extra={
-                            "event": "p2p.parallel_sync_download_failed",
-                            "error_type": type(exc).__name__,
-                        },
-                    )
-                    continue
+        # Process results and apply first successful chain
+        for i, result in enumerate(results):
+            peer_uri = sequential_candidates[i]["peer"]
+            if isinstance(result, Exception):
+                logger.debug(
+                    "Parallel sync failed for %s: %s",
+                    peer_uri,
+                    result,
+                    extra={
+                        "event": "p2p.parallel_sync_download_failed",
+                        "error_type": type(result).__name__,
+                    },
+                )
+                continue
 
-                if not remote_blocks:
-                    continue
+            if not result:
+                continue
 
-                if self._apply_remote_chain(peer_uri, remote_blocks):
-                    return True
+            if self._apply_remote_chain(peer_uri, result):
+                return True
         return False
 
-    def _download_remote_blocks(
+    async def _download_remote_blocks(
         self,
         peer_uri: str,
         summary: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]] | None:
-        """Download remote blocks snapshot from peer, returning None if not ahead."""
+        """Download remote blocks snapshot from peer, returning None if not ahead.
+
+        Async implementation using httpx for non-blocking HTTP requests.
+        """
         base_endpoint = f"{peer_uri.rstrip('/')}/blocks"
         if summary is None:
-            summary = self._fetch_peer_chain_summary(peer_uri)
+            summary = await self._fetch_peer_chain_summary(peer_uri)
             if summary is None:
                 return None
         try:
@@ -2383,12 +2399,12 @@ class P2PNetworkManager:
             return None
 
         try:
-            response_full = requests.get(
-                base_endpoint,
-                params={"limit": remote_total, "offset": 0},
-                timeout=self._http_timeout,
-            )
-        except requests.RequestException as exc:
+            async with httpx.AsyncClient(timeout=self._http_timeout) as client:
+                response_full = await client.get(
+                    base_endpoint,
+                    params={"limit": remote_total, "offset": 0},
+                )
+        except (httpx.RequestError, httpx.TimeoutException) as exc:
             logger.debug(
                 "Failed to fetch full chain from %s: %s",
                 peer_uri,
@@ -2495,17 +2511,13 @@ class P2PNetworkManager:
             return True
         return False
 
-    def sync_with_network(self, force_partial: bool = False) -> bool:
-        """Synchronize blockchain with peers (checkpoint/HTTP/WebSocket)."""
+    async def sync_with_network(self, force_partial: bool = False) -> bool:
+        """Synchronize blockchain with peers (checkpoint/HTTP/WebSocket).
+
+        Async implementation - no longer needs run_in_executor workaround.
+        """
         partial_applied = self._attempt_partial_sync(force=force_partial)
-        if self._http_sync():
+        if await self._http_sync():
             return True
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            ws_synced = asyncio.run(self._ws_sync())
-        else:
-            # Already inside an event loop; schedule without blocking
-            self._dispatch_async(self._ws_sync())
-            ws_synced = False
+        ws_synced = await self._ws_sync()
         return partial_applied or ws_synced

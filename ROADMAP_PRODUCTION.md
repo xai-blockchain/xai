@@ -263,18 +263,16 @@ Remaining Items:
     - admin.py → admin_keys_routes.py + admin_emergency_routes.py + admin_monitoring_routes.py + admin_profiling_routes.py
   - Priority: MEDIUM - files are well-structured, splitting is polish not critical
 
-- [ ] **Async P2P Handlers** - Some handlers still synchronous (ANALYZED 2025-12-23)
-  - Current: 22 handlers total, 11 already async (77% correct)
-  - Critical (blocking HTTP I/O) - 4 handlers need conversion:
-    - `_fetch_peer_chain_summary()` - requests.get() blocking
-    - `_download_remote_blocks()` - requests.get() blocking
-    - `_http_sync()` - orchestrates blocking calls
-    - `_collect_peer_chain_summaries()` - sequential blocking calls
-  - Should convert (dispatch wrappers) - 2 handlers:
-    - `_announce_inventory()` - uses workaround dispatch
-    - `sync_with_network()` - main orchestrator
-  - Can stay sync (correct) - 5 handlers: state mutations, cleanup
-  - Fix: Convert to httpx.AsyncClient, use asyncio.gather() for parallel requests
+- [x] **Async P2P Handlers** - Some handlers still synchronous ✅ DONE (2025-12-23)
+  - Converted 6 critical handlers from blocking to async:
+    - `_fetch_peer_chain_summary()` → async with httpx.AsyncClient
+    - `_download_remote_blocks()` → async with httpx.AsyncClient
+    - `_http_sync()` → async with asyncio.gather() for parallel downloads
+    - `_collect_peer_chain_summaries()` → async with asyncio.gather() for parallel fetching
+    - `sync_with_network()` → async (no longer needs run_in_executor)
+    - Removed ThreadPoolExecutor workaround in favor of native async
+  - Benefits: Non-blocking HTTP calls, parallel peer requests, proper event loop integration
+  - Tests: All 11 P2P unit tests passing
 
 #### Code Standards
 
