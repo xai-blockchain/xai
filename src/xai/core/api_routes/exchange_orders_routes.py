@@ -1,10 +1,22 @@
+"""Exchange order and trading API routes.
+
+This module provides REST API endpoints for exchange order book management,
+placing and canceling orders, viewing user orders, and trade history.
+
+Endpoints:
+- GET /exchange/orders - Get order book
+- POST /exchange/place-order - Place buy/sell order
+- POST /exchange/cancel-order - Cancel an order
+- GET /exchange/my-orders/<address> - Get user's orders
+- GET /exchange/trades - Get recent trades
+- GET /exchange/price-history - Get price history
+- GET /exchange/stats - Get exchange statistics
+"""
+
 from __future__ import annotations
 
-import logging
-
-logger = logging.getLogger(__name__)
-
 import json
+import logging
 import os
 import time
 from typing import TYPE_CHECKING, Any
@@ -13,9 +25,7 @@ from flask import jsonify, request
 
 from xai.core.input_validation_schemas import (
     ExchangeCancelInput,
-    ExchangeCardPurchaseInput,
     ExchangeOrderInput,
-    ExchangeTransferInput,
 )
 from xai.core.node_utils import get_base_dir
 from xai.core.request_validator_middleware import validate_request
@@ -23,13 +33,14 @@ from xai.core.request_validator_middleware import validate_request
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
 
-def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
-    """Register all exchange-related endpoints."""
+logger = logging.getLogger(__name__)
+
+
+def register_exchange_orders_routes(routes: "NodeAPIRoutes") -> None:
+    """Register exchange order and trading endpoints."""
     app = routes.app
     blockchain = routes.blockchain
     node = routes.node
-
-    # --- core exchange order/trade routes ---
 
     @app.route("/exchange/orders", methods=["GET"])
     def get_order_book() -> tuple[dict[str, Any], int]:
@@ -376,216 +387,6 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
         except (RuntimeError, OSError, json.JSONDecodeError) as exc:
             return jsonify({"error": str(exc)}), 500
 
-    # --- balance/transfer routes ---
-
-    @app.route("/exchange/deposit", methods=["POST"])
-    @validate_request(routes.request_validator, ExchangeTransferInput)
-    def deposit_funds() -> tuple[dict[str, Any], int]:
-        """Deposit funds to exchange wallet (admin only).
-
-        Credits user's exchange balance with specified currency and amount.
-        Used for both manual deposits and automated deposit processing.
-
-        This endpoint requires API authentication.
-
-        Request Body (ExchangeTransferInput):
-            {
-                "to_address": "user address",
-                "currency": "XAI" | "USD" | etc,
-                "amount": float,
-                "deposit_type": "manual" | "credit_card" (optional),
-                "tx_hash": "transaction hash" (optional)
-            }
-
-        Returns:
-            Tuple containing (response_dict, http_status_code) where:
-                - response_dict: Deposit confirmation
-                - http_status_code: 200 on success, 400/401/503 on error
-
-        Raises:
-            AuthenticationError: If API key is missing or invalid (401).
-            ServiceUnavailable: If exchange module is disabled (503).
-            ValidationError: If deposit data is invalid (400).
-        """
-        if not node.exchange_wallet_manager:
-            return routes._error_response(
-                "Exchange module disabled", status=503, code="module_disabled"
-            )
-        auth_error = routes._require_api_auth()
-        if auth_error:
-            return auth_error
-
-        try:
-            model = getattr(request, "validated_model", None)
-            if model is None:
-                return routes._error_response("Invalid deposit payload", status=400, code="invalid_payload")
-            result = node.exchange_wallet_manager.deposit(
-                user_address=model.to_address,
-                currency=model.currency,
-                amount=float(model.amount),
-                deposit_type=request.json.get("deposit_type", "manual"),
-                tx_hash=request.json.get("tx_hash"),
-            )
-            return routes._success_response(result if isinstance(result, dict) else {"result": result})
-        except ValueError as exc:
-            logger.warning(
-                "ValueError in deposit_funds",
-                extra={
-                    "error_type": "ValueError",
-                    "error": str(exc),
-                    "function": "deposit_funds"
-                }
-            )
-            return routes._error_response(str(exc), status=400, code="deposit_invalid")
-        except (RuntimeError, OSError, json.JSONDecodeError) as exc:
-            return routes._handle_exception(exc, "exchange_deposit")
-
-    @app.route("/exchange/withdraw", methods=["POST"])
-    @validate_request(routes.request_validator, ExchangeTransferInput)
-    def withdraw_funds() -> tuple[dict[str, Any], int]:
-        """Withdraw funds from exchange wallet (admin only).
-
-        Debits user's exchange balance and initiates withdrawal to destination address.
-        Includes fraud checks and withdrawal limits.
-
-        This endpoint requires API authentication.
-
-        Request Body (ExchangeTransferInput):
-            {
-                "from_address": "user address",
-                "destination": "withdrawal destination address",
-                "currency": "XAI" | "USD" | etc,
-                "amount": float
-            }
-
-        Returns:
-            Tuple containing (response_dict, http_status_code) where:
-                - response_dict: Withdrawal confirmation
-                - http_status_code: 200 on success, 400/401/503 on error
-
-        Raises:
-            AuthenticationError: If API key is missing or invalid (401).
-            ServiceUnavailable: If exchange module is disabled (503).
-            ValidationError: If withdrawal data is invalid or insufficient balance (400).
-        """
-        if not node.exchange_wallet_manager:
-            return routes._error_response(
-                "Exchange module disabled", status=503, code="module_disabled"
-            )
-        auth_error = routes._require_api_auth()
-        if auth_error:
-            return auth_error
-
-        try:
-            model = getattr(request, "validated_model", None)
-            if model is None or not (model.destination or model.to_address):
-                return routes._error_response("Invalid withdraw payload", status=400, code="invalid_payload")
-            result = node.exchange_wallet_manager.withdraw(
-                user_address=model.from_address,
-                currency=model.currency,
-                amount=float(model.amount),
-                destination=model.destination or model.to_address,
-            )
-            return routes._success_response(result if isinstance(result, dict) else {"result": result})
-        except ValueError as exc:
-            logger.warning(
-                "ValueError in withdraw_funds",
-                extra={
-                    "error_type": "ValueError",
-                    "error": str(exc),
-                    "function": "withdraw_funds"
-                }
-            )
-            return routes._error_response(str(exc), status=400, code="withdraw_invalid")
-        except (RuntimeError, OSError, json.JSONDecodeError) as exc:
-            return routes._handle_exception(exc, "exchange_withdraw")
-
-    @app.route("/exchange/balance/<address>", methods=["GET"])
-    def get_user_balance(address: str) -> tuple[dict[str, Any], int]:
-        """Get all exchange balances for a user.
-
-        Returns all currency balances (available and locked) for the specified address.
-
-        Path Parameters:
-            address (str): The user's blockchain address
-
-        Returns:
-            Tuple containing (response_dict, http_status_code) where:
-                - response_dict: Contains address and balances object
-                - http_status_code: 200 on success, 500/503 on error
-
-        Response balances include:
-            - available_balances: Currencies and amounts available for trading
-            - locked_balances: Currencies and amounts locked in open orders
-
-        Raises:
-            ServiceUnavailable: If exchange module is disabled (503).
-        """
-        if not node.exchange_wallet_manager:
-            return jsonify({"success": False, "error": "Exchange module disabled"}), 503
-        try:
-            balances = node.exchange_wallet_manager.get_all_balances(address)
-            return jsonify({"success": True, "address": address, "balances": balances}), 200
-        except (RuntimeError, OSError, json.JSONDecodeError, ValueError) as exc:
-            return jsonify({"error": str(exc)}), 500
-
-    @app.route("/exchange/balance/<address>/<currency>", methods=["GET"])
-    def get_currency_balance(address: str, currency: str) -> tuple[dict[str, Any], int]:
-        """Get specific currency balance for a user.
-
-        Returns available and locked balance for a single currency.
-
-        Path Parameters:
-            address (str): The user's blockchain address
-            currency (str): The currency code (e.g., "XAI", "USD")
-
-        Returns:
-            Tuple containing (response_dict, http_status_code) where:
-                - response_dict: Contains address, available, and locked amounts
-                - http_status_code: 200 on success, 500/503 on error
-
-        Raises:
-            ServiceUnavailable: If exchange module is disabled (503).
-        """
-        if not node.exchange_wallet_manager:
-            return jsonify({"success": False, "error": "Exchange module disabled"}), 503
-        try:
-            balance = node.exchange_wallet_manager.get_balance(address, currency)
-            return jsonify({"success": True, "address": address, **balance}), 200
-        except (RuntimeError, OSError, json.JSONDecodeError, ValueError) as exc:
-            return jsonify({"error": str(exc)}), 500
-
-    @app.route("/exchange/transactions/<address>", methods=["GET"])
-    def get_transactions(address: str) -> tuple[dict[str, Any], int]:
-        """Get transaction history for a user's exchange wallet.
-
-        Returns deposit and withdrawal transaction history.
-
-        Path Parameters:
-            address (str): The user's blockchain address
-
-        Query Parameters:
-            limit (int, optional): Maximum transactions to return (default: 50)
-
-        Returns:
-            Tuple containing (response_dict, http_status_code) where:
-                - response_dict: Contains address and transactions list
-                - http_status_code: 200 on success, 500/503 on error
-
-        Raises:
-            ServiceUnavailable: If exchange module is disabled (503).
-        """
-        if not node.exchange_wallet_manager:
-            return jsonify({"success": False, "error": "Exchange module disabled"}), 503
-        try:
-            limit = int(request.args.get("limit", 50))
-            transactions = node.exchange_wallet_manager.get_transaction_history(address, limit)
-            return jsonify({"success": True, "address": address, "transactions": transactions}), 200
-        except (RuntimeError, OSError, json.JSONDecodeError, ValueError) as exc:
-            return jsonify({"error": str(exc)}), 500
-
-    # --- stats routes ---
-
     @app.route("/exchange/price-history", methods=["GET"])
     def get_price_history() -> tuple[dict[str, Any], int]:
         """Get historical price data for charting.
@@ -699,164 +500,3 @@ def register_exchange_routes(routes: "NodeAPIRoutes") -> None:
             return jsonify({"success": True, "stats": stats}), 200
         except (RuntimeError, OSError, json.JSONDecodeError, ValueError) as exc:
             return jsonify({"error": str(exc)}), 500
-
-    # --- payment routes ---
-
-    @app.route("/exchange/buy-with-card", methods=["POST"])
-    @validate_request(routes.request_validator, ExchangeCardPurchaseInput)
-    def buy_with_card() -> tuple[dict[str, Any], int]:
-        """Purchase tokens with credit card (admin only).
-
-        Processes credit card payment and deposits purchased tokens to user's
-        exchange wallet.
-
-        This endpoint requires API authentication.
-
-        Request Body (ExchangeCardPurchaseInput):
-            {
-                "from_address": "payer address",
-                "to_address": "recipient address",
-                "usd_amount": float,
-                "payment_token": "stripe token or card ID",
-                "email": "user email",
-                "card_id": "card identifier" (optional),
-                "user_id": "user identifier" (optional)
-            }
-
-        Returns:
-            Tuple containing (response_dict, http_status_code) where:
-                - response_dict: Contains payment and deposit confirmations
-                - http_status_code: 200 on success, 400/401/503 on error
-
-        Raises:
-            AuthenticationError: If API key is missing or invalid (401).
-            ServiceUnavailable: If payment or exchange module is disabled (503).
-            ValidationError: If payment data is invalid (400).
-            PaymentError: If card processing fails (400).
-        """
-        if not (node.payment_processor and node.exchange_wallet_manager):
-            return routes._error_response(
-                "Payment module disabled", status=503, code="module_disabled"
-            )
-        auth_error = routes._require_api_auth()
-        if auth_error:
-            return auth_error
-        try:
-            model = getattr(request, "validated_model", None)
-            if model is None:
-                return routes._error_response("Invalid payload", status=400, code="invalid_payload")
-
-            calc = node.payment_processor.calculate_purchase(model.usd_amount)
-            if not calc.get("success"):
-                return jsonify(calc), 400
-
-            payment_result = node.payment_processor.process_card_payment(
-                user_address=model.from_address,
-                usd_amount=model.usd_amount,
-                card_token=model.payment_token or request.json.get("payment_token", "tok_test"),
-                email=model.email,
-                card_id=model.card_id,
-                user_id=model.user_id,
-            )
-            if not payment_result.get("success"):
-                return jsonify(payment_result), 400
-
-            deposit_result = node.exchange_wallet_manager.deposit(
-                user_address=model.to_address,
-                currency="AXN",
-                amount=payment_result["axn_amount"],
-                deposit_type="credit_card",
-                tx_hash=payment_result["payment_id"],
-            )
-
-            return routes._success_response(
-                {
-                    "payment": payment_result,
-                    "deposit": deposit_result,
-                    "message": f"Successfully purchased {payment_result['axn_amount']:.2f} AXN",
-                }
-            )
-        except ValueError as exc:
-            logger.warning(
-                "ValueError in buy_with_card",
-                extra={
-                    "error_type": "ValueError",
-                    "error": str(exc),
-                    "function": "buy_with_card"
-                }
-            )
-            return routes._error_response(str(exc), status=400, code="payment_invalid")
-        except (RuntimeError, KeyError, TypeError) as exc:
-            return routes._handle_exception(exc, "exchange_buy_with_card")
-
-    @app.route("/exchange/payment-methods", methods=["GET"])
-    def get_payment_methods() -> tuple[dict[str, Any], int]:
-        """Get supported payment methods.
-
-        Returns list of available payment methods for purchasing tokens.
-
-        Returns:
-            Tuple containing (response_dict, http_status_code) where:
-                - response_dict: Contains success flag and methods list
-                - http_status_code: 200 on success, 500/503 on error
-
-        Raises:
-            ServiceUnavailable: If payment module is disabled (503).
-        """
-        if not node.payment_processor:
-            return jsonify({"success": False, "error": "Payment module disabled"}), 503
-        try:
-            methods = node.payment_processor.get_supported_payment_methods()
-            return jsonify({"success": True, "methods": methods}), 200
-        except (RuntimeError, ValueError, KeyError, TypeError) as exc:
-            return routes._handle_exception(exc, "exchange_payment_methods")
-
-    @app.route("/exchange/calculate-purchase", methods=["POST"])
-    def calculate_purchase() -> tuple[dict[str, Any], int]:
-        """Calculate token purchase amount and fees.
-
-        Calculates how many tokens will be received for a USD amount,
-        including fees and exchange rate.
-
-        Request Body:
-            {
-                "usd_amount": float
-            }
-
-        Returns:
-            Tuple containing (response_dict, http_status_code) where:
-                - response_dict: Contains calculation breakdown
-                - http_status_code: 200 on success, 400/500/503 on error
-
-        Response includes:
-            - success: Calculation succeeded
-            - axn_amount: Tokens to be received
-            - usd_amount: USD amount input
-            - fee_amount: Processing fees
-            - exchange_rate: Current rate
-
-        Raises:
-            ServiceUnavailable: If payment module is disabled (503).
-            ValidationError: If usd_amount is missing or invalid (400).
-        """
-        if not node.payment_processor:
-            return jsonify({"success": False, "error": "Payment module disabled"}), 503
-        data = request.get_json(silent=True) or {}
-        if "usd_amount" not in data:
-            return jsonify({"error": "Missing usd_amount"}), 400
-
-        try:
-            calc = node.payment_processor.calculate_purchase(data["usd_amount"])
-            return jsonify(calc), 200
-        except ValueError as exc:
-            logger.warning(
-                "ValueError in calculate_purchase",
-                extra={
-                    "error_type": "ValueError",
-                    "error": str(exc),
-                    "function": "calculate_purchase"
-                }
-            )
-            return routes._error_response(str(exc), status=400, code="payment_invalid")
-        except (RuntimeError, KeyError, TypeError) as exc:
-            return routes._handle_exception(exc, "exchange_calculate_purchase")

@@ -34,7 +34,7 @@ TEST_ADDRESS_2 = "XAI9876543210fedcba9876543210fedcba98765432"
 class TestAddressQRGeneration:
     """Test simple address QR code generation."""
 
-    @patch("xai.core.api_routes.payment.validate_address")
+    @patch("xai.core.api_routes.payment_qr_routes.validate_address")
     def test_get_address_qr_image_format(self, mock_validate, client, mock_blockchain):
         """Test generating QR code as PNG image."""
         if not QRCODE_AVAILABLE:
@@ -45,7 +45,7 @@ class TestAddressQRGeneration:
         assert response.content_type == "image/png"
         assert len(response.data) > 0
 
-    @patch("xai.core.api_routes.payment.validate_address")
+    @patch("xai.core.api_routes.payment_qr_routes.validate_address")
     def test_get_address_qr_base64_format(self, mock_validate, client, mock_blockchain):
         """Test generating QR code as base64 JSON."""
         if not QRCODE_AVAILABLE:
@@ -65,7 +65,7 @@ class TestAddressQRGeneration:
         except Exception as e:
             pytest.fail(f"Invalid base64 data: {e}")
 
-    @patch("xai.core.api_routes.payment.validate_address")
+    @patch("xai.core.api_routes.payment_qr_routes.validate_address")
     def test_get_address_qr_default_format(self, mock_validate, client, mock_blockchain):
         """Test default format is image."""
         if not QRCODE_AVAILABLE:
@@ -75,7 +75,7 @@ class TestAddressQRGeneration:
         assert response.status_code == 200
         assert response.content_type == "image/png"
 
-    @patch("xai.core.api_routes.payment.validate_address", side_effect=ValueError("Invalid"))
+    @patch("xai.core.api_routes.payment_qr_routes.validate_address", side_effect=ValueError("Invalid"))
     def test_get_address_qr_invalid_address(self, mock_validate, client, mock_blockchain):
         """Test error handling for invalid address."""
         if not QRCODE_AVAILABLE:
@@ -90,7 +90,7 @@ class TestAddressQRGeneration:
 class TestPaymentQRGeneration:
     """Test payment request QR code generation with amount and memo."""
 
-    @patch("xai.core.api_routes.payment.validate_address")
+    @patch("xai.core.api_routes.payment_qr_routes.validate_address")
     def test_create_payment_qr_minimal(self, mock_validate, client, mock_blockchain):
         """Test creating payment QR with just address."""
         if not QRCODE_AVAILABLE:
@@ -107,7 +107,7 @@ class TestPaymentQRGeneration:
         assert "qr_code" in data
         assert data["uri"] == f"xai:{TEST_ADDRESS}"
 
-    @patch("xai.core.api_routes.payment.validate_address")
+    @patch("xai.core.api_routes.payment_qr_routes.validate_address")
     def test_create_payment_qr_with_amount(self, mock_validate, client, mock_blockchain):
         """Test creating payment QR with amount."""
         if not QRCODE_AVAILABLE:
@@ -125,7 +125,7 @@ class TestPaymentQRGeneration:
         assert data["amount"] == 100.50
         assert "amount=100.5" in data["uri"]
 
-    @patch("xai.core.api_routes.payment.validate_address")
+    @patch("xai.core.api_routes.payment_qr_routes.validate_address")
     def test_create_payment_qr_with_memo(self, mock_validate, client, mock_blockchain):
         """Test creating payment QR with memo."""
         if not QRCODE_AVAILABLE:
@@ -143,7 +143,7 @@ class TestPaymentQRGeneration:
         assert data["memo"] == "Invoice #123"
         assert "memo=" in data["uri"]
 
-    @patch("xai.core.api_routes.payment.validate_address")
+    @patch("xai.core.api_routes.payment_qr_routes.validate_address")
     def test_create_payment_qr_with_expiry(self, mock_validate, client, mock_blockchain):
         """Test creating payment QR with expiry."""
         if not QRCODE_AVAILABLE:
@@ -163,7 +163,7 @@ class TestPaymentQRGeneration:
         expected_expiry = int(time.time()) + (30 * 60)
         assert abs(data["expires_at"] - expected_expiry) < 5  # Within 5 seconds
 
-    @patch("xai.core.api_routes.payment.validate_address")
+    @patch("xai.core.api_routes.payment_qr_routes.validate_address")
     def test_create_payment_qr_image_format(self, mock_validate, client, mock_blockchain):
         """Test creating payment QR as PNG image."""
         if not QRCODE_AVAILABLE:
@@ -196,7 +196,7 @@ class TestPaymentQRGeneration:
 class TestPaymentRequestTracking:
     """Test payment request creation and tracking."""
 
-    @patch("xai.core.api_routes.payment.validate_address")
+    @patch("xai.core.api_routes.payment_qr_routes.validate_address")
     def test_create_payment_request_minimal(self, mock_validate, client, mock_blockchain):
         """Test creating minimal payment request."""
         if not QRCODE_AVAILABLE:
@@ -234,7 +234,7 @@ class TestPaymentRequestTracking:
 class TestPaymentRequestStatus:
     """Test payment request status checking."""
 
-    @patch("xai.core.api_routes.payment.validate_address")
+    @patch("xai.core.api_routes.payment_qr_routes.validate_address")
     def test_get_payment_request_pending(self, mock_validate, client, mock_blockchain):
         """Test getting payment request in pending status."""
         if not QRCODE_AVAILABLE:
@@ -399,7 +399,7 @@ class TestQRCodeValidator:
 class TestPaymentVerification:
     """Test payment verification endpoint."""
 
-    @patch("xai.core.api_routes.payment.validate_address")
+    @patch("xai.core.api_routes.payment_request_routes.validate_address")
     def test_verify_payment_with_request_id(self, mock_validate, client, mock_blockchain):
         """Test verifying payment against a payment request."""
         if not QRCODE_AVAILABLE:
@@ -431,7 +431,7 @@ class TestPaymentVerification:
         assert data["request_id"] == request_id
         assert data["status"] == "paid"
 
-    @patch("xai.core.api_routes.payment.validate_address")
+    @patch("xai.core.api_routes.payment_request_routes.validate_address")
     def test_verify_payment_amount_mismatch(self, mock_validate, client, mock_blockchain):
         """Test verification fails for amount mismatch."""
         if not QRCODE_AVAILABLE:
@@ -460,7 +460,7 @@ class TestPaymentVerification:
         assert data["verified"] is False
         assert data["error_code"] == "amount_mismatch"
 
-    @patch("xai.core.api_routes.payment.validate_address")
+    @patch("xai.core.api_routes.payment_request_routes.validate_address")
     def test_verify_payment_recipient_mismatch(self, mock_validate, client, mock_blockchain):
         """Test verification fails for recipient mismatch."""
         if not QRCODE_AVAILABLE:
@@ -578,7 +578,7 @@ def mock_blockchain():
 def client(mock_blockchain):
     """Create a Flask test client with payment routes."""
     from flask import Flask
-    from xai.core.api_routes.payment import register_payment_routes
+    from xai.core.api_routes import register_payment_routes
 
     app = Flask(__name__)
     app.config["TESTING"] = True
