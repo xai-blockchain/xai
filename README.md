@@ -1,6 +1,6 @@
 # XAI Blockchain
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/) [![XAI Testnet](https://img.shields.io/badge/Testnet-Active-success)](https://faucet.xai.network) [![Discord](https://img.shields.io/badge/Discord-Join%20Us-7289da.svg)](https://discord.gg/xai) [![Twitter](https://img.shields.io/badge/Twitter-@XAIBlockchain-1DA1F2.svg)](https://twitter.com/XAIBlockchain)
+[![CI](https://github.com/xai-blockchain/xai/actions/workflows/ci.yml/badge.svg)](https://github.com/xai-blockchain/xai/actions/workflows/ci.yml) [![Security](https://github.com/xai-blockchain/xai/actions/workflows/security.yml/badge.svg)](https://github.com/xai-blockchain/xai/actions/workflows/security.yml) [![codecov](https://codecov.io/gh/xai-blockchain/xai/branch/main/graph/badge.svg)](https://codecov.io/gh/xai-blockchain/xai) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/) [![XAI Testnet](https://img.shields.io/badge/Testnet-Active-success)](https://faucet.xai.network)
 
 ## A Proof-of-Work Blockchain with AI Governance and Integrated Wallets
 
