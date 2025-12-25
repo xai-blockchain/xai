@@ -181,6 +181,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         # IMPORTANT: Must initialize BEFORE _load_from_disk() because create_genesis_block() depends on them
         from xai.core.block_processor import BlockProcessor
         from xai.core.chain_state import ChainState
+        from xai.core.contract_manager import ContractManager
         from xai.core.fork_manager import ForkManager
         from xai.core.mining import MiningCoordinator
         from xai.core.mining_manager import MiningManager
@@ -194,11 +195,16 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         self.chain_state = ChainState(self)
         self.block_processor = BlockProcessor(self)
         self.mining_coordinator = MiningCoordinator(self)
+        self.contract_manager = ContractManager(self)
 
         if not self._load_from_disk():
             self.create_genesis_block()
 
         self._init_governance()
+
+        # Initialize GovernanceManager after governance_state is available
+        from xai.core.governance_manager import GovernanceManager
+        self.governance_manager = GovernanceManager(self)
 
         # Rebuild address index if chain exists but index is empty
         # This handles migration from old chains without index
@@ -1190,14 +1196,12 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             )
             return {"success": False, "error": str(exc)}
 
+    # ==================== CONTRACT PUBLIC API ====================
+    # Delegated to ContractManager for god class refactoring
+
     def derive_contract_address(self, sender: str, nonce: int | None) -> str:
-        """Deterministically derive a contract address from sender and nonce."""
-        # Use network-appropriate prefix
-        from xai.core.config import NETWORK
-        prefix = "XAI" if NETWORK.lower() == "mainnet" else "TXAI"
-        base_nonce = nonce if nonce is not None else self.nonce_tracker.get_next_nonce(sender)
-        digest = hashlib.sha256(f"{sender.lower()}:{base_nonce}".encode("utf-8")).hexdigest()
-        return f"{prefix}{digest[:38].upper()}"
+        """Derive contract address. Delegates to ContractManager."""
+        return self.contract_manager.derive_contract_address(sender, nonce)
 
     def register_contract(
         self,
@@ -1207,68 +1211,16 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         gas_limit: int,
         value: float = 0.0,
     ) -> None:
-        normalized = address.upper()
-        self.contracts[normalized] = {
-            "creator": creator,
-            "code": code or b"",
-            "storage": {},
-            "gas_limit": gas_limit,
-            "balance": value,
-            "created_at": time.time(),
-            "abi": None,
-            "abi_verified": False,
-            "interfaces": {
-                "supports": {},
-                "detected_at": None,
-                "source": "unknown",
-            },
-        }
+        """Register a contract. Delegates to ContractManager."""
+        self.contract_manager.register_contract(address, creator, code, gas_limit, value)
 
     def get_contract_state(self, address: str) -> dict[str, Any] | None:
-        contract = self.contracts.get(address.upper())
-        if not contract:
-            return None
-        return {
-            "creator": contract["creator"],
-            "code": contract["code"].hex() if isinstance(contract["code"], (bytes, bytearray)) else contract["code"],
-            "storage": contract.get("storage", {}).copy(),
-            "gas_limit": contract.get("gas_limit"),
-            "balance": contract.get("balance"),
-            "created_at": contract.get("created_at"),
-            "abi_available": bool(contract.get("abi")),
-            "interfaces": dict(contract.get("interfaces") or {}),
-        }
+        """Get contract state. Delegates to ContractManager."""
+        return self.contract_manager.get_contract_state(address)
 
     def normalize_contract_abi(self, abi: Any) -> list[dict[str, Any]] | None:
-        if abi is None:
-            return None
-        payload = abi
-        if isinstance(payload, str):
-            try:
-                payload = json.loads(payload)
-            except json.JSONDecodeError as exc:
-                raise ValueError(f"ABI must be valid JSON: {exc}")
-        if isinstance(payload, dict):
-            payload = [payload]
-        if not isinstance(payload, list):
-            raise ValueError("ABI must be a list of entries")
-
-        sanitized: list[dict[str, Any]] = []
-        for entry in payload:
-            if not isinstance(entry, dict):
-                raise ValueError("ABI entries must be JSON objects")
-            normalized_entry: dict[str, Any] = {}
-            for key, value in entry.items():
-                if not isinstance(key, str):
-                    raise ValueError("ABI entry keys must be strings")
-                normalized_entry[key] = value
-            sanitized.append(normalized_entry)
-
-        serialized = json.dumps(sanitized, sort_keys=True, separators=(",", ":"))
-        if len(serialized.encode("utf-8")) > self._max_contract_abi_bytes:
-            raise ValueError("ABI exceeds maximum size limit")
-
-        return json.loads(serialized)
+        """Normalize contract ABI. Delegates to ContractManager."""
+        return self.contract_manager.normalize_contract_abi(abi)
 
     def store_contract_abi(
         self,
@@ -1278,52 +1230,16 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         verified: bool = True,
         source: str = "deployment",
     ) -> bool:
-        normalized = address.upper()
-        contract = self.contracts.get(normalized)
-        if not contract:
-            raise ValueError("Contract not registered")
-
-        normalized_abi = self.normalize_contract_abi(abi)
-        if normalized_abi is None:
-            raise ValueError("ABI payload is empty")
-
-        contract["abi"] = normalized_abi
-        contract["abi_verified"] = bool(verified)
-        contract["abi_source"] = source
-        contract["abi_updated_at"] = time.time()
-        return True
+        """Store contract ABI. Delegates to ContractManager."""
+        return self.contract_manager.store_contract_abi(address, abi, verified=verified, source=source)
 
     def get_contract_abi(self, address: str) -> dict[str, Any] | None:
-        contract = self.contracts.get(address.upper())
-        if not contract:
-            return None
-        abi = contract.get("abi")
-        if not abi:
-            return None
-        return {
-            "abi": abi,
-            "verified": bool(contract.get("abi_verified", False)),
-            "source": contract.get("abi_source", "unknown"),
-            "updated_at": contract.get("abi_updated_at"),
-        }
+        """Get contract ABI. Delegates to ContractManager."""
+        return self.contract_manager.get_contract_abi(address)
 
     def get_contract_interface_metadata(self, address: str) -> dict[str, Any] | None:
-        """Return cached interface detection metadata, if available."""
-        contract = self.contracts.get(address.upper())
-        if not contract:
-            return None
-
-        metadata = contract.get("interfaces")
-        if not metadata:
-            return None
-        supports = metadata.get("supports")
-        if not isinstance(supports, dict) or not supports:
-            return None
-        return {
-            "supports": {key: bool(value) for key, value in supports.items()},
-            "detected_at": metadata.get("detected_at"),
-            "source": metadata.get("source", "unknown"),
-        }
+        """Get contract interface metadata. Delegates to ContractManager."""
+        return self.contract_manager.get_contract_interface_metadata(address)
 
     def update_contract_interface_metadata(
         self,
@@ -1332,72 +1248,20 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         *,
         source: str = "probe",
     ) -> dict[str, Any]:
-        """Persist interface detection results for downstream consumers."""
-        normalized = address.upper()
-        contract = self.contracts.get(normalized)
-        if not contract:
-            raise ValueError("Contract not registered")
-
-        metadata = {
-            "supports": {key: bool(value) for key, value in supports.items()},
-            "detected_at": time.time(),
-            "source": source,
-        }
-        if "interfaces" not in contract or not isinstance(contract["interfaces"], dict):
-            contract["interfaces"] = metadata
-        else:
-            contract["interfaces"].update(metadata)
-        return metadata
+        """Update contract interface metadata. Delegates to ContractManager."""
+        return self.contract_manager.update_contract_interface_metadata(address, supports, source=source)
 
     def get_contract_events(self, address: str, limit: int, offset: int) -> tuple[list[dict[str, Any]], int]:
-        normalized = address.upper()
-        events: list[dict[str, Any]] = []
-        for receipt in reversed(self.contract_receipts):
-            if receipt.get("contract") != normalized:
-                continue
-            logs = receipt.get("logs") or []
-            for idx, log in enumerate(logs):
-                log_copy = dict(log)
-                events.append(
-                    {
-                        "event": log_copy.get("event") or log_copy.get("name") or "Log",
-                        "log_index": idx,
-                        "txid": receipt.get("txid"),
-                        "block_index": receipt.get("block_index"),
-                        "block_hash": receipt.get("block_hash"),
-                        "timestamp": receipt.get("timestamp"),
-                        "success": receipt.get("success"),
-                        "data": log_copy,
-                    }
-                )
-        total = len(events)
-        window = events[offset : offset + limit] if limit is not None else events
-        return window, total
+        """Get contract events. Delegates to ContractManager."""
+        return self.contract_manager.get_contract_events(address, limit, offset)
 
     def _rebuild_contract_state(self) -> None:
-        if not self.smart_contract_manager:
-            return
-        self.contracts.clear()
-        self.contract_receipts.clear()
-        for header in self.chain:
-            block = self.storage.load_block_from_disk(header.index)
-            if block:
-                receipts = self.smart_contract_manager.process_block(block)
-                self.contract_receipts.extend(receipts)
+        """Rebuild contract state. Delegates to ContractManager."""
+        self.contract_manager._rebuild_contract_state()
 
     def sync_smart_contract_vm(self) -> None:
-        """Ensure the smart-contract manager matches governance + config gates."""
-        config_enabled = bool(getattr(Config, "FEATURE_FLAGS", {}).get("vm"))
-        governance_enabled = bool(
-            self.governance_executor and self.governance_executor.is_feature_enabled("smart_contracts")
-        )
-        should_enable = config_enabled and governance_enabled
-
-        if should_enable:
-            if self.smart_contract_manager is None:
-                self.smart_contract_manager = SmartContractManager(self)
-        else:
-            self.smart_contract_manager = None
+        """Sync smart contract VM. Delegates to ContractManager."""
+        self.contract_manager.sync_smart_contract_vm()
 
     def create_genesis_block(self) -> None:
         """Create or load the genesis block (delegated to BlockProcessor)"""
@@ -3401,6 +3265,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
     # get_mempool_overview is inherited from BlockchainMempoolMixin
 
     # ==================== GOVERNANCE PUBLIC API ====================
+    # Delegated to GovernanceManager for god class refactoring
 
     def submit_governance_proposal(
         self,
@@ -3410,56 +3275,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         proposal_type: str,
         proposal_data: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """
-        Submit a governance proposal to the blockchain.
-
-        Creates a governance transaction and adds it to pending transactions.
-        The proposal will be processed when included in a mined block.
-
-        Args:
-            submitter: Address of the proposal submitter
-            title: Short title for the proposal
-            description: Detailed description of what the proposal does
-            proposal_type: Type of proposal (ai_improvement, parameter_change, emergency)
-            proposal_data: Additional payload data for the proposal
-
-        Returns:
-            Dict with proposal_id, txid, and status
-        """
-        if not self.governance_state:
-            return {"success": False, "error": "Governance not initialized"}
-
-        import uuid
-        proposal_id = f"prop_{uuid.uuid4().hex[:12]}"
-
-        # Get submitter's voting power (based on balance)
-        submitter_voting_power = self.get_balance(submitter)
-
-        # Create governance transaction
-        gtx = GovernanceTransaction(
-            tx_type=GovernanceTxType.SUBMIT_PROPOSAL,
-            submitter=submitter,
-            proposal_id=proposal_id,
-            data={
-                "title": title,
-                "description": description,
-                "proposal_type": proposal_type,
-                "submitter_voting_power": submitter_voting_power,
-                "proposal_payload": proposal_data or {},
-            },
+        """Submit a governance proposal. Delegates to GovernanceManager."""
+        return self.governance_manager.submit_governance_proposal(
+            submitter, title, description, proposal_type, proposal_data
         )
-
-        # Process the proposal in governance state
-        result = self.governance_state.submit_proposal(gtx)
-
-        # Add to pending as a governance marker (for block inclusion)
-        # We use a special marker transaction for governance
-        return {
-            "proposal_id": proposal_id,
-            "txid": gtx.txid,
-            "status": "pending",
-            "success": result.get("success", True),
-        }
 
     def cast_governance_vote(
         self,
@@ -3468,43 +3287,8 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         vote: str,
         voting_power: float = 0.0,
     ) -> dict[str, Any]:
-        """
-        Cast a vote on a governance proposal.
-
-        Args:
-            voter: Address of the voter
-            proposal_id: ID of the proposal to vote on
-            vote: Vote value ("yes", "no", "abstain")
-            voting_power: Voting power of the voter (0 = auto-calculate from balance)
-
-        Returns:
-            Dict with txid, status, and vote details
-        """
-        if not self.governance_state:
-            return {"success": False, "error": "Governance not initialized"}
-
-        # Auto-calculate voting power from balance if not provided
-        if voting_power <= 0:
-            voting_power = self.get_balance(voter)
-
-        gtx = GovernanceTransaction(
-            tx_type=GovernanceTxType.CAST_VOTE,
-            submitter=voter,
-            proposal_id=proposal_id,
-            data={
-                "vote": vote.lower(),
-                "voting_power": voting_power,
-            },
-        )
-
-        result = self.governance_state.cast_vote(gtx)
-
-        return {
-            "txid": gtx.txid,
-            "status": "recorded" if result.get("success", True) else "failed",
-            "vote_count": result.get("vote_count", 0),
-            "success": result.get("success", True),
-        }
+        """Cast a vote on a governance proposal. Delegates to GovernanceManager."""
+        return self.governance_manager.cast_governance_vote(voter, proposal_id, vote, voting_power)
 
     def submit_code_review(
         self,
@@ -3514,80 +3298,14 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         comments: str = "",
         voting_power: float = 0.0,
     ) -> dict[str, Any]:
-        """
-        Submit a code review for a governance proposal.
-
-        Args:
-            reviewer: Address of the reviewer
-            proposal_id: ID of the proposal being reviewed
-            approved: Whether the reviewer approves the code changes
-            comments: Optional review comments
-            voting_power: Reviewer's voting power (0 = auto-calculate)
-
-        Returns:
-            Dict with txid, status, and review count
-        """
-        if not self.governance_state:
-            return {"success": False, "error": "Governance not initialized"}
-
-        if voting_power <= 0:
-            voting_power = self.get_balance(reviewer)
-
-        gtx = GovernanceTransaction(
-            tx_type=GovernanceTxType.SUBMIT_CODE_REVIEW,
-            submitter=reviewer,
-            proposal_id=proposal_id,
-            data={
-                "approved": approved,
-                "comments": comments,
-                "voting_power": voting_power,
-            },
+        """Submit a code review. Delegates to GovernanceManager."""
+        return self.governance_manager.submit_code_review(
+            reviewer, proposal_id, approved, comments, voting_power
         )
-
-        result = self.governance_state.submit_code_review(gtx)
-
-        return {
-            "txid": gtx.txid,
-            "status": "submitted" if result.get("success", True) else "failed",
-            "review_count": result.get("review_count", 0),
-            "success": result.get("success", True),
-        }
 
     def execute_governance_proposal(self, proposal_id: str, executor: str = "system") -> dict[str, Any]:
-        """
-        Execute an approved governance proposal.
-
-        Args:
-            proposal_id: ID of the proposal to execute
-            executor: Address executing the proposal
-
-        Returns:
-            Dict with execution status and details
-        """
-        if not self.governance_state:
-            return {"success": False, "error": "Governance not initialized"}
-
-        proposal = self.governance_state.proposals.get(proposal_id)
-        if not proposal:
-            return {"success": False, "error": "Proposal not found"}
-
-        gtx = GovernanceTransaction(
-            tx_type=GovernanceTxType.EXECUTE_PROPOSAL,
-            submitter=executor,
-            proposal_id=proposal_id,
-            data={
-                "proposal_payload": proposal.payload,
-            },
-        )
-
-        result = self.governance_state.execute_proposal(gtx)
-
-        if result.get("success"):
-            # Run actual execution logic
-            exec_result = self._run_governance_execution(proposal_id)
-            result["execution_result"] = exec_result
-
-        return result
+        """Execute an approved governance proposal. Delegates to GovernanceManager."""
+        return self.governance_manager.execute_governance_proposal(proposal_id, executor)
 
     def vote_implementation(
         self,
@@ -3596,82 +3314,20 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         approved: bool = True,
         voting_power: float = 0.0,
     ) -> dict[str, Any]:
-        """
-        Vote on a governance proposal implementation.
-
-        Args:
-            voter: Address of the voter
-            proposal_id: ID of the proposal to vote on
-            approved: Whether to approve the implementation
-            voting_power: Voting power (defaults to balance if 0)
-
-        Returns:
-            Dict with txid, status, and vote result
-        """
-        if not self.governance_state:
-            return {"success": False, "error": "Governance not initialized"}
-
-        if voting_power <= 0:
-            voting_power = self.get_balance(voter)
-
-        gtx = GovernanceTransaction(
-            tx_type=GovernanceTxType.VOTE_IMPLEMENTATION,
-            submitter=voter,
-            proposal_id=proposal_id,
-            data={
-                "approved": approved,
-                "voting_power": voting_power,
-            },
-        )
-
-        result = self.governance_state.vote_implementation(gtx)
-
-        return {
-            "txid": gtx.txid,
-            "status": "approved" if result.get("success", True) else "failed",
-            "success": result.get("success", True),
-            "error": result.get("error"),
-        }
+        """Vote on a governance proposal implementation. Delegates to GovernanceManager."""
+        return self.governance_manager.vote_implementation(voter, proposal_id, approved, voting_power)
 
     def execute_proposal(self, executor: str, proposal_id: str) -> dict[str, Any]:
-        """
-        Execute an approved governance proposal (alias for execute_governance_proposal).
-
-        Args:
-            executor: Address executing the proposal
-            proposal_id: ID of the proposal to execute
-
-        Returns:
-            Dict with execution status and details
-        """
-        return self.execute_governance_proposal(proposal_id, executor)
+        """Execute an approved governance proposal. Delegates to GovernanceManager."""
+        return self.governance_manager.execute_proposal(executor, proposal_id)
 
     def get_governance_proposal(self, proposal_id: str) -> dict[str, Any] | None:
-        """Get details of a governance proposal."""
-        if not self.governance_state:
-            return None
-        return self.governance_state.get_proposal_state(proposal_id)
+        """Get details of a governance proposal. Delegates to GovernanceManager."""
+        return self.governance_manager.get_governance_proposal(proposal_id)
 
     def list_governance_proposals(self, status: str | None = None) -> list[dict[str, Any]]:
-        """
-        List all governance proposals, optionally filtered by status.
-
-        Args:
-            status: Filter by status (active, approved, executed, rejected)
-
-        Returns:
-            List of proposal dictionaries
-        """
-        if not self.governance_state:
-            return []
-
-        proposals = []
-        for proposal_id, proposal in self.governance_state.proposals.items():
-            proposal_dict = proposal.to_dict()
-            if status is None or proposal_dict.get("status") == status:
-                proposals.append(proposal_dict)
-
-        return proposals
+        """List all governance proposals. Delegates to GovernanceManager."""
+        return self.governance_manager.list_governance_proposals(status)
 
     # ==================== BLOCKCHAIN SERIALIZATION ====================
 
