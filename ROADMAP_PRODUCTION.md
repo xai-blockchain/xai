@@ -304,7 +304,7 @@ Remaining Items:
 - [ ] **Video Tutorials** - Text guides exist, videos would improve onboarding
 - [x] **API Documentation** - OpenAPI/Swagger spec generation ✅ DONE (docs/api/openapi.yaml - 4758 lines, 93 endpoints)
 - [ ] **Contributor Dashboard** - GitHub Actions badge dashboard
-- [ ] **Performance Benchmarks** - Automated TPS benchmarking in CI
+- [x] **Performance Benchmarks** - Automated TPS benchmarking in CI ✅ DONE (scripts/benchmark_tps.py, runs in CI)
 
 ---
 
