@@ -180,11 +180,11 @@ class BlockchainMiningMixin:
         if hasattr(self.nonce_tracker, "pending_nonces"):
             self.nonce_tracker.pending_nonces.clear()
 
-        # Prioritize pending transactions by fee rate
+        # Prioritize pending transactions by fee rate with topological ordering
+        # Note: _prioritize_transactions now includes topological sorting to handle
+        # intra-block dependencies. We must NOT re-sort here as that would undo
+        # the topological order. Nonce sequencing is enforced during selection below.
         prioritized_txs = self._prioritize_transactions(self.pending_transactions)
-        prioritized_txs.sort(
-            key=lambda tx: (tx.sender, tx.nonce if tx.nonce is not None else 0)
-        )
 
         # Enforce strict in-block nonce sequencing per sender
         sender_next_nonce: dict[str, int] = {}

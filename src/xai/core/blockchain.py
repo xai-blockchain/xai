@@ -18,7 +18,7 @@ from collections import defaultdict, deque
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Sequence
 
 import base58
 
@@ -2282,35 +2282,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         Convert a block's declared difficulty into an absolute work value using the
         2^256 / (target + 1) formulation popularized by Bitcoin. This prevents
         peers from gaming fork choice with chains that merely have more headers.
+
+        Delegated to ForkManager.
         """
-        header = block_like.header if hasattr(block_like, "header") else block_like
-        if header is None:
-            return 0
-
-        block_hash = getattr(header, "hash", None)
-        if block_hash:
-            cached = self._block_work_cache.get(block_hash)
-            if cached is not None:
-                return cached
-
-        try:
-            claimed_difficulty = int(getattr(header, "difficulty", 0))
-        except (TypeError, ValueError):
-            claimed_difficulty = 0
-        claimed_difficulty = max(0, claimed_difficulty)
-
-        shift_bits = min(claimed_difficulty * 4, 256)
-        if shift_bits >= 256:
-            target = 0
-        else:
-            target = self._max_pow_target >> shift_bits
-
-        denominator = max(target + 1, 1)
-        work = self._max_pow_target // denominator
-
-        if block_hash:
-            self._block_work_cache[block_hash] = work
-        return work
+        return self.fork_manager._calculate_block_work(block_like)
 
     def _calculate_chain_work(self, chain: list["Block" | BlockHeader | Any]) -> int:
         """
@@ -2321,13 +2296,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
         Returns:
             Integer work sum suitable for fork choice comparisons.
+
+        Delegated to ForkManager.
         """
-        if not chain:
-            return 0
-        total = 0
-        for block_like in chain:
-            total += self._calculate_block_work(block_like)
-        return total
+        return self.fork_manager._calculate_chain_work(chain)
 
     def _handle_fork(self, block: Block) -> bool:
         """

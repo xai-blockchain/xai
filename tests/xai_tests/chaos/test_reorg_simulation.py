@@ -9,13 +9,15 @@ from xai.core.reorg_simulator import ReorgSimulator
 def _make_block(index: int, prev_hash: str, txs: list[Transaction], blockchain: Blockchain) -> Block:
     # Calculate proper difficulty for this block
     difficulty = blockchain.calculate_next_difficulty()
+    # Calculate proper merkle root from transactions
+    merkle_root = blockchain.calculate_merkle_root(txs)
 
     header = BlockHeader(
         index=index,
         previous_hash=prev_hash,
         timestamp=time.time(),
         difficulty=difficulty,
-        merkle_root="",
+        merkle_root=merkle_root,
         nonce=0,
         miner_pubkey="miner",
     )

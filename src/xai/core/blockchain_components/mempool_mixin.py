@@ -666,7 +666,109 @@ class BlockchainMempoolMixin:
         if max_count is not None:
             all_txs = all_txs[:max_count]
 
+        # Topologically sort to ensure intra-block dependencies are respected
+        # (transactions spending outputs from other transactions in the same block
+        # must come after the creating transaction)
+        all_txs = self._topological_sort_transactions(all_txs)
+
         return all_txs
+
+    def _topological_sort_transactions(self, transactions: list["Transaction"]) -> list["Transaction"]:
+        """
+        Topologically sort transactions to satisfy two ordering constraints:
+        1. UTXO dependencies: If tx A spends an output created by tx B, B comes first
+        2. Nonce ordering: For same-sender transactions, lower nonce comes first
+
+        This ensures that when transactions are validated in order during block
+        creation and chain validation:
+        - UTXOs exist before they're spent
+        - Nonce sequences are maintained per sender
+
+        Uses Kahn's algorithm for topological sorting with cycle detection.
+        Maintains original order for transactions without dependencies.
+
+        Args:
+            transactions: List of transactions to sort
+
+        Returns:
+            Topologically sorted list of transactions
+        """
+        if not transactions or len(transactions) <= 1:
+            return transactions
+
+        # Build txid lookup for transactions in this batch
+        # Also track original position to maintain stable ordering
+        txid_to_tx: dict[str, "Transaction"] = {}
+        txid_to_pos: dict[str, int] = {}
+        for pos, tx in enumerate(transactions):
+            txid = tx.txid or tx.calculate_hash()
+            txid_to_tx[txid] = tx
+            txid_to_pos[txid] = pos
+
+        # Build dependency graph (edges from parent to child)
+        # child depends on parent means parent must come first
+        # in_degree counts how many parents a transaction has (within this batch)
+        in_degree: dict[str, int] = {(tx.txid or tx.calculate_hash()): 0 for tx in transactions}
+        children: dict[str, list[str]] = {(tx.txid or tx.calculate_hash()): [] for tx in transactions}
+
+        # Add UTXO dependencies
+        for tx in transactions:
+            tx_txid = tx.txid or tx.calculate_hash()
+            if tx.inputs:
+                for tx_input in tx.inputs:
+                    parent_txid = tx_input.get("txid")
+                    if parent_txid and parent_txid in txid_to_tx:
+                        # This tx depends on parent_txid (also in this batch)
+                        in_degree[tx_txid] += 1
+                        children[parent_txid].append(tx_txid)
+
+        # Add nonce dependencies (same sender, lower nonce must come first)
+        # Group by sender and sort by nonce
+        by_sender: dict[str, list[tuple[int, str]]] = defaultdict(list)
+        for tx in transactions:
+            if tx.sender and tx.sender != "COINBASE":
+                tx_txid = tx.txid or tx.calculate_hash()
+                nonce = tx.nonce if tx.nonce is not None else 0
+                by_sender[tx.sender].append((nonce, tx_txid))
+
+        for sender, nonce_txids in by_sender.items():
+            # Sort by nonce
+            nonce_txids.sort(key=lambda x: x[0])
+            # Add edges: each tx depends on the previous one from same sender
+            for i in range(1, len(nonce_txids)):
+                prev_txid = nonce_txids[i - 1][1]
+                curr_txid = nonce_txids[i][1]
+                # curr depends on prev
+                if prev_txid not in children[curr_txid]:  # Avoid duplicate edges
+                    in_degree[curr_txid] += 1
+                    children[prev_txid].append(curr_txid)
+
+        # Kahn's algorithm: start with nodes that have no dependencies
+        # Use a heap/sorted list to maintain original order as tie-breaker
+        import heapq
+        ready = [(txid_to_pos[txid], txid) for txid, degree in in_degree.items() if degree == 0]
+        heapq.heapify(ready)
+        sorted_txids: list[str] = []
+
+        while ready:
+            # Pop transaction with no remaining dependencies (in original order)
+            _, current = heapq.heappop(ready)
+            sorted_txids.append(current)
+
+            # Reduce in-degree for all children
+            for child_txid in children[current]:
+                in_degree[child_txid] -= 1
+                if in_degree[child_txid] == 0:
+                    heapq.heappush(ready, (txid_to_pos[child_txid], child_txid))
+
+        # Check for cycles (would mean sorted_txids is shorter than input)
+        if len(sorted_txids) != len(transactions):
+            # Cycle detected - fall back to original order
+            # This shouldn't happen with valid transactions, but be defensive
+            return transactions
+
+        # Return transactions in topologically sorted order
+        return [txid_to_tx[txid] for txid in sorted_txids]
 
     def get_mempool_size_kb(self) -> float:
         """
