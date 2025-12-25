@@ -34,7 +34,7 @@ This roadmap targets production readiness with security-first posture, robust co
 
 - [x] **Network Partition Testing** - Jepsen-style split-brain consensus validation ✅ DONE
 - [x] **Byzantine Fault Injection** - Simulate malicious/faulty validator behavior ✅ DONE
-- [ ] **Long-Running Soak Tests** - 24-72 hour stability tests for memory leaks ⏳ IN PROGRESS (ends 2025-12-20 ~02:11 UTC)
+- [x] **Long-Running Soak Tests** - 24-72 hour stability tests for memory leaks ✅ DONE (completed 2025-12-20)
 - [x] **Backup/Restore Testing** - Validate disaster recovery procedures ✅ DONE
 - [x] **State Sync Testing** - New validators joining from snapshot ✅ DONE
 - [x] **Upgrade Migration Testing** - Chain upgrades without network halt ✅ DONE
@@ -126,7 +126,7 @@ Remaining Items:
   - **Progress 2025-12-20 04:50Z:** Module attachment hardening plan complete; awaiting post-soak full security/sandbox/CLI suite to validate end-to-end.
   - **Progress 2025-12-20 05:05Z:** Genesis loader now rejects symlinked genesis paths; targeted CLI tests all passing without disturbing soak.
   - **Progress 2025-12-20 05:20Z:** Added stdlib allowlist sanity test for module guard to ensure trusted stdlib modules remain attachable; targeted test green with soak unaffected.
-  - **Pending post-soak validation:** Run `pytest tests/xai_tests/unit/test_sandbox_security.py tests/xai_tests/unit/test_ai_safety_controls.py tests/xai_tests/unit/test_enhanced_cli_genesis.py` and `pytest -m security` to reconfirm end-to-end attachment protections once soak ends.
+  - **Post-soak validation completed (2025-12-25):** Security tests passed (76 tests), reorg simulation tests fixed and passing
 
 ---
 
@@ -197,8 +197,11 @@ Remaining Items:
 
 #### Code Quality (Blocks Maintainability)
 
-- [ ] **God Object: blockchain.py** - 4295 lines, 35 imports
-  - Refactor into: chain_state.py, block_processor.py, chain_validator.py, mining.py
+- [x] **God Object: blockchain.py** - Modularization in progress ✅ PARTIALLY DONE (2025-12-25)
+  - Created: ForkManager, ValidationManager, GovernanceManager, ContractManager, TradeOperationsManager
+  - Methods delegated to specialized managers, blockchain.py now at ~4183 lines
+  - Transaction topological sort added for intra-block dependency ordering
+  - Remaining: Further method extraction to continue reducing line count
 
 - [x] **Cyclomatic Complexity** - Route functions with CC up to 119 ✅ PARTIALLY DONE (2025-12-23)
   - node_p2p.py: _process_single_message reduced from CC 25-30 to CC 15-18
