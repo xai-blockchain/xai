@@ -203,10 +203,10 @@ Remaining Items:
   - Transaction topological sort added for intra-block dependency ordering
   - Remaining: Further method extraction to continue reducing line count
 
-- [x] **Cyclomatic Complexity** - Route functions with CC up to 119 ✅ PARTIALLY DONE (2025-12-23)
+- [x] **Cyclomatic Complexity** - Route functions with CC up to 119 ✅ DONE (2025-12-25)
   - node_p2p.py: _process_single_message reduced from CC 25-30 to CC 15-18
   - blockchain.py: TransactionValidator.validate_transaction reduced from CC 80 to 3 (commit e446858)
-  - Remaining: Route files in api_routes/ (see complexity analysis in commit history)
+  - api_routes/: Split into focused modules (commit 491406e)
 
 - [x] **Temp Files in Repo** - `soak_test_baseline_*.json` committed ✅ DONE
   - Already in .gitignore (lines 43-44)
@@ -302,7 +302,7 @@ Remaining Items:
 
 - [ ] **Mobile App** - Infrastructure exists but no actual iOS/Android app
 - [ ] **Video Tutorials** - Text guides exist, videos would improve onboarding
-- [ ] **API Documentation** - OpenAPI/Swagger spec generation
+- [x] **API Documentation** - OpenAPI/Swagger spec generation ✅ DONE (docs/api/openapi.yaml - 4758 lines, 93 endpoints)
 - [ ] **Contributor Dashboard** - GitHub Actions badge dashboard
 - [ ] **Performance Benchmarks** - Automated TPS benchmarking in CI
 
