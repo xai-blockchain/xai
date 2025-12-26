@@ -817,5 +817,237 @@ def marketplace_stats(ctx: click.Context):
     except (click.ClickException, requests.RequestException, ValueError, KeyError, TypeError) as exc:
         _handle_cli_error(exc)
 
+
+@ai.command('analyze')
+@click.argument('input_data')
+@click.option('--model', default='default', help='AI model to use for analysis')
+@click.option('--wallet', required=True, help='Wallet address for payment')
+@click.option('--output-format', type=click.Choice(['json', 'text', 'markdown']),
+              default='text', help='Output format')
+@click.pass_context
+def analyze_data(ctx: click.Context, input_data: str, model: str, wallet: str, output_format: str):
+    """
+    Analyze data using AI compute network.
+
+    Submit data for AI analysis and receive structured results.
+    Supports text, JSON, or file paths as input.
+
+    Example:
+        xai ai analyze "Analyze this smart contract for vulnerabilities" --wallet ADDR
+        xai ai analyze @contract.sol --model security --wallet ADDR
+    """
+    client = AIComputeClient(ctx.obj['client'].node_url)
+
+    # Handle file input
+    actual_input = input_data
+    if input_data.startswith('@'):
+        try:
+            with open(input_data[1:], 'r') as f:
+                actual_input = f.read()
+        except (IOError, OSError) as e:
+            raise click.ClickException(f"Failed to read file: {e}")
+
+    task_data = {
+        "task_type": "analysis",
+        "description": "AI analysis request",
+        "priority": "medium",
+        "max_cost": 0.1,
+        "timeout": 300,
+        "wallet": wallet,
+        "input_data": actual_input,
+        "preferred_model": model if model != 'default' else None,
+        "submitted_at": time.time(),
+        "output_format": output_format,
+    }
+
+    try:
+        logger.info("Submitting analysis task: model=%s, wallet=%s", model, wallet[:16])
+        with console.status("[bold cyan]Submitting analysis request..."):
+            result = client.submit_task(task_data)
+
+        if ctx.obj['json_output']:
+            click.echo(json.dumps(result, indent=2))
+            return
+
+        if result.get('success'):
+            task_id = result.get('task_id')
+            logger.info("Analysis submitted: task_id=%s", task_id)
+            console.print(f"\n[bold green]Analysis request submitted![/]")
+            console.print(f"Task ID: [cyan]{task_id}[/]")
+            console.print(f"\nQuery results: [bold]xai ai query {task_id}[/]")
+        else:
+            console.print(f"[bold red]Submission failed:[/] {result.get('error', 'Unknown')}")
+            sys.exit(1)
+
+    except (click.ClickException, requests.RequestException, ValueError, KeyError) as exc:
+        _handle_cli_error(exc)
+
+
+@ai.command('predict')
+@click.argument('query')
+@click.option('--model', default='inference', help='Prediction model to use')
+@click.option('--wallet', required=True, help='Wallet address for payment')
+@click.option('--context', help='Additional context for prediction')
+@click.option('--confidence-threshold', type=float, default=0.7,
+              help='Minimum confidence threshold (0.0-1.0)')
+@click.pass_context
+def predict(ctx: click.Context, query: str, model: str, wallet: str,
+            context: str | None, confidence_threshold: float):
+    """
+    Get AI predictions for market or blockchain data.
+
+    Request predictive analysis from the AI network including
+    price forecasts, trend analysis, or custom predictions.
+
+    Example:
+        xai ai predict "XAI price trend next 24h" --wallet ADDR
+        xai ai predict "Transaction volume forecast" --model forecasting --wallet ADDR
+    """
+    client = AIComputeClient(ctx.obj['client'].node_url)
+
+    task_data = {
+        "task_type": "inference",
+        "description": f"Prediction: {query}",
+        "priority": "medium",
+        "max_cost": 0.05,
+        "timeout": 120,
+        "wallet": wallet,
+        "input_data": query,
+        "preferred_model": model,
+        "submitted_at": time.time(),
+        "metadata": {
+            "prediction_type": "forecast",
+            "context": context,
+            "confidence_threshold": confidence_threshold,
+        },
+    }
+
+    try:
+        logger.info("Submitting prediction task: model=%s", model)
+        with console.status("[bold cyan]Submitting prediction request..."):
+            result = client.submit_task(task_data)
+
+        if ctx.obj['json_output']:
+            click.echo(json.dumps(result, indent=2))
+            return
+
+        if result.get('success'):
+            task_id = result.get('task_id')
+            logger.info("Prediction submitted: task_id=%s", task_id)
+            console.print(f"\n[bold green]Prediction request submitted![/]")
+            console.print(f"Task ID: [cyan]{task_id}[/]")
+            console.print(f"Model: [yellow]{model}[/]")
+            console.print(f"\nGet results: [bold]xai ai query {task_id}[/]")
+        else:
+            console.print(f"[bold red]Submission failed:[/] {result.get('error', 'Unknown')}")
+            sys.exit(1)
+
+    except (click.ClickException, requests.RequestException, ValueError, KeyError) as exc:
+        _handle_cli_error(exc)
+
+
+@ai.command('model-status')
+@click.option('--model', help='Specific model to check')
+@click.option('--provider', help='Filter by provider ID')
+@click.pass_context
+def model_status(ctx: click.Context, model: str | None, provider: str | None):
+    """
+    Check AI model availability and status.
+
+    Shows available models across the network including their status,
+    performance metrics, and pricing.
+
+    Example:
+        xai ai model-status
+        xai ai model-status --model gpt-4
+    """
+    client = AIComputeClient(ctx.obj['client'].node_url)
+
+    try:
+        with console.status("[bold cyan]Fetching model status..."):
+            # Get providers and extract model info
+            data = client.get_providers()
+
+        if ctx.obj['json_output']:
+            click.echo(json.dumps(data, indent=2))
+            return
+
+        providers = data.get('providers', [])
+
+        # Aggregate model info from providers
+        models: dict[str, dict[str, Any]] = {}
+        for prov in providers:
+            prov_models = prov.get('models', [])
+            prov_id = prov.get('provider_id', 'unknown')
+            for m in prov_models:
+                if model and m != model:
+                    continue
+                if provider and prov_id != provider:
+                    continue
+                if m not in models:
+                    models[m] = {
+                        'name': m,
+                        'providers': [],
+                        'avg_cost': 0,
+                        'total_tasks': 0,
+                    }
+                models[m]['providers'].append(prov_id)
+                models[m]['avg_cost'] = (models[m]['avg_cost'] + prov.get('avg_cost', 0)) / 2
+                models[m]['total_tasks'] += prov.get('tasks_completed', 0)
+
+        if not models:
+            console.print("[yellow]No models found matching criteria[/]")
+            return
+
+        # Create models table
+        table = Table(
+            title="AI Model Status",
+            box=box.ROUNDED,
+            show_lines=True,
+        )
+        table.add_column("Model", style="cyan")
+        table.add_column("Providers", style="green", justify="right")
+        table.add_column("Avg Cost", style="yellow", justify="right")
+        table.add_column("Total Tasks", style="magenta", justify="right")
+        table.add_column("Status", style="green")
+
+        for m_name, m_info in sorted(models.items()):
+            provider_count = len(m_info['providers'])
+            status = "[green]Available[/]" if provider_count > 0 else "[red]Unavailable[/]"
+            table.add_row(
+                m_name,
+                str(provider_count),
+                f"{m_info['avg_cost']:.6f} XAI",
+                f"{m_info['total_tasks']:,}",
+                status,
+            )
+
+        console.print(table)
+
+        # Show provider details if specific model requested
+        if model and model in models:
+            console.print(f"\n[bold]Providers for {model}:[/]")
+            for prov_id in models[model]['providers'][:10]:
+                console.print(f"  - {prov_id}")
+
+    except (click.ClickException, requests.RequestException, ValueError, KeyError) as exc:
+        _handle_cli_error(exc)
+
+
+@ai.command('models')
+@click.pass_context
+def list_models(ctx: click.Context):
+    """
+    List all available AI models on the network.
+
+    Quick overview of supported models for AI compute tasks.
+
+    Example:
+        xai ai models
+    """
+    # Delegate to model-status with no filters
+    ctx.invoke(model_status, model=None, provider=None)
+
+
 if __name__ == '__main__':
     ai()

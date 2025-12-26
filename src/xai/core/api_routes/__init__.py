@@ -11,6 +11,7 @@ from xai.core.api_routes.admin_keys_routes import register_admin_keys_routes
 from xai.core.api_routes.admin_monitoring_routes import register_admin_monitoring_routes
 from xai.core.api_routes.admin_profiling_routes import register_admin_profiling_routes
 from xai.core.api_routes.algo import register_algo_routes
+from xai.core.api_routes.batch import register_batch_routes
 from xai.core.api_routes.blockchain import register_blockchain_routes
 from xai.core.api_routes.contracts import register_contract_routes
 from xai.core.api_routes.core import register_core_routes
@@ -31,6 +32,7 @@ from xai.core.api_routes.recovery import register_recovery_routes
 from xai.core.api_routes.sync import register_sync_routes
 from xai.core.api_routes.transactions import register_transaction_routes
 from xai.core.api_routes.wallet import register_wallet_routes
+from xai.core.api_routes.webhooks import register_webhook_routes
 
 
 def register_payment_routes(routes):
@@ -74,6 +76,8 @@ __all__ = [
     "register_notification_routes",
     "register_sync_routes",
     "register_light_client_routes",
+    "register_batch_routes",
+    "register_webhook_routes",
     # New modular route functions
     "register_payment_qr_routes",
     "register_payment_request_routes",

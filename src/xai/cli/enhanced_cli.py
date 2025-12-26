@@ -1949,6 +1949,24 @@ from xai.cli.ai_commands import ai
 cli.add_command(ai)
 
 # ============================================================================
+# Governance Commands - Proposal and Voting Interface
+# ============================================================================
+
+from xai.cli.governance_commands import governance
+
+# Register governance commands group
+cli.add_command(governance)
+
+# ============================================================================
+# Treasury Commands - Treasury Management Interface
+# ============================================================================
+
+from xai.cli.treasury_commands import treasury
+
+# Register treasury commands group
+cli.add_command(treasury)
+
+# ============================================================================
 # Main Entry Point
 # ============================================================================
 

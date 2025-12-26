@@ -666,6 +666,11 @@ class NodeAPIRoutes:
         register_light_client_routes(self)
         register_admin_routes(self)
 
+        # Agent accessibility: batch transactions and webhooks
+        from xai.core.api_routes import register_batch_routes, register_webhook_routes
+        register_batch_routes(self)
+        register_webhook_routes(self)
+
         # Register backward compatibility redirects
         self._setup_legacy_redirects()
 
