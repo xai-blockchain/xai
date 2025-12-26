@@ -262,8 +262,12 @@ class AuditLog:
         try:
             with open(self.log_path, 'a') as f:
                 f.write(json.dumps(entry.to_dict()) + '\n')
+        except (IOError, OSError) as e:
+            logger.error(f"Failed to write audit log (I/O error): {e}")
+        except (TypeError, ValueError) as e:
+            logger.error(f"Failed to serialize audit log entry: {type(e).__name__}: {e}")
         except Exception as e:
-            logger.error(f"Failed to write audit log: {e}")
+            logger.error(f"Unexpected error writing audit log: {type(e).__name__}: {e}")
 
     def _load_from_disk(self) -> None:
         """Load recent entries from disk"""
@@ -278,10 +282,16 @@ class AuditLog:
                     try:
                         data = json.loads(line)
                         self.entries.append(AuditLogEntry.from_dict(data))
-                    except Exception:
+                    except json.JSONDecodeError as e:
+                        logger.debug(f"Skipping malformed audit log line: {e}")
                         continue
+                    except (KeyError, TypeError, ValueError) as e:
+                        logger.debug(f"Skipping invalid audit log entry: {type(e).__name__}: {e}")
+                        continue
+        except (IOError, OSError) as e:
+            logger.error(f"Failed to read audit log file: {e}")
         except Exception as e:
-            logger.error(f"Failed to load audit log: {e}")
+            logger.error(f"Unexpected error loading audit log: {type(e).__name__}: {e}")
 
 class PermissionManager:
     """
@@ -597,8 +607,12 @@ class PermissionManager:
         try:
             with open(self.storage_path, 'w') as f:
                 json.dump(data, f, indent=2)
+        except (IOError, OSError) as e:
+            logger.error(f"Failed to write permissions file: {e}")
+        except (TypeError, ValueError) as e:
+            logger.error(f"Failed to serialize permissions: {type(e).__name__}: {e}")
         except Exception as e:
-            logger.error(f"Failed to save permissions: {e}")
+            logger.error(f"Unexpected error saving permissions: {type(e).__name__}: {e}")
 
     def _load_from_disk(self) -> None:
         """Load permissions from disk"""
@@ -617,11 +631,15 @@ class PermissionManager:
                         permission = Permission(perm_value)
                         grant = PermissionGrant.from_dict(grant_data)
                         self.grants[app_id][permission] = grant
-                    except Exception as e:
-                        logger.warning(f"Failed to load grant: {e}")
+                    except (KeyError, TypeError, ValueError) as e:
+                        logger.warning(f"Failed to load grant for {app_id}/{perm_value}: {type(e).__name__}: {e}")
 
             # Load verified apps
             self.verified_apps = set(data.get("verified_apps", []))
 
+        except json.JSONDecodeError as e:
+            logger.error(f"Malformed permissions file: {e}")
+        except (IOError, OSError) as e:
+            logger.error(f"Failed to read permissions file: {e}")
         except Exception as e:
-            logger.error(f"Failed to load permissions: {e}")
+            logger.error(f"Unexpected error loading permissions: {type(e).__name__}: {e}")

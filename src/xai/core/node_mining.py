@@ -1,3 +1,9 @@
+# Manager Consolidation: This module handles mining orchestration (start/stop).
+# For the core mining logic (PoW, block building, transaction selection), use:
+#     from xai.core.mining_manager import MiningManager
+#
+# This module provides high-level mining control for nodes.
+
 """
 AXN Blockchain Node - Mining Module
 
@@ -21,12 +27,15 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from xai.core.blockchain import Block, Blockchain
 
-class MiningManager:
+class MiningController:
     """
-    Manages mining operations for a blockchain node.
+    Controls mining thread operations for a blockchain node.
 
     Handles continuous mining in a background thread, broadcasting mined blocks,
     and controlling mining state.
+
+    Note: For core mining logic (block mining, transaction selection, reward calculation),
+    see MiningManager in mining_manager.py.
     """
 
     def __init__(self, blockchain: Blockchain, miner_address: str) -> None:

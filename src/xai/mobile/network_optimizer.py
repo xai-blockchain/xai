@@ -343,8 +343,14 @@ class NetworkOptimizer:
             else:
                 return json_data, False
 
+        except (OSError, IOError) as e:
+            logger.error(f"Compression I/O error: {e}")
+            return json_data, False
+        except (TypeError, ValueError) as e:
+            logger.error(f"Invalid data for compression: {type(e).__name__}: {e}")
+            return json_data, False
         except Exception as e:
-            logger.error(f"Compression failed: {e}")
+            logger.error(f"Unexpected compression error: {type(e).__name__}: {e}")
             return json_data, False
 
     def decompress_request(self, data: bytes) -> dict[str, Any]:
@@ -363,8 +369,14 @@ class NetworkOptimizer:
         try:
             decompressed = gzip.decompress(data)
             return json.loads(decompressed)
+        except (gzip.BadGzipFile, OSError) as e:
+            raise ValueError(f"Invalid gzip data: {e}") from e
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in decompressed data: {e}") from e
+        except (TypeError, UnicodeDecodeError) as e:
+            raise ValueError(f"Data decoding error: {e}") from e
         except Exception as e:
-            raise ValueError(f"Failed to decompress request: {e}")
+            raise ValueError(f"Unexpected decompression error: {type(e).__name__}: {e}") from e
 
     def queue_transaction(
         self,

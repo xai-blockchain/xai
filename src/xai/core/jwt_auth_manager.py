@@ -1,3 +1,9 @@
+# Manager Consolidation: This module provides a standalone JWT/API auth manager.
+# For production API authentication, use:
+#     from xai.core.api_auth import APIAuthManager, JWTAuthManager
+#
+# This module is kept for standalone JWT authentication scenarios.
+
 from __future__ import annotations
 
 """

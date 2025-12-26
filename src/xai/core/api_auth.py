@@ -1,4 +1,10 @@
-"""API authentication helper for protecting sensitive endpoints with rotation support."""
+"""API authentication helper for protecting sensitive endpoints with rotation support.
+
+Manager Consolidation Note:
+- JWTAuthManager in this module is the primary implementation for API-integrated JWT auth
+- For standalone JWT authentication, see also: xai.core.jwt_auth_manager.JWTAuthManager
+- Both provide similar functionality; this one integrates with Flask request handling
+"""
 
 from __future__ import annotations
 

@@ -1,18 +1,21 @@
+# Manager Consolidation: This module is DEPRECATED.
+# For production secure enclave operations, use:
+#     from xai.mobile.secure_enclave import SecureEnclaveManager
+#
+# This file contains only a conceptual simulation for educational purposes.
+
 from __future__ import annotations
 
 import hashlib
 import logging
 import os
 from typing import Any
+import warnings
 
 logger = logging.getLogger(__name__)
 
-# This is a highly simplified conceptual model of a Secure Enclave Manager.
-# It does NOT interact with actual hardware secure enclaves (e.g., Intel SGX, ARM TrustZone).
-# Its purpose is to illustrate the concept of offloading sensitive operations to a secure environment.
-# DO NOT use this for any production or security-sensitive applications.
 
-class SecureEnclaveManager:
+class MockSecureEnclaveManager:
     def __init__(self, simulate_enclave_available: bool = True):
         self._simulate_enclave_available = simulate_enclave_available
         self._enclave_keys: dict[str, tuple[bytes, bytes]] = (
@@ -146,4 +149,14 @@ class SecureEnclaveManager:
         )
         return False
 
-# Example usage is intentionally omitted in production modules.
+# DEPRECATED: Backwards-compatible alias
+# Use xai.mobile.secure_enclave.SecureEnclaveManager for production code
+def SecureEnclaveManager(*args, **kwargs):
+    """DEPRECATED: Use xai.mobile.secure_enclave.SecureEnclaveManager instead."""
+    warnings.warn(
+        "security.secure_enclave_manager.SecureEnclaveManager is deprecated. "
+        "Use xai.mobile.secure_enclave.SecureEnclaveManager instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    return MockSecureEnclaveManager(*args, **kwargs)

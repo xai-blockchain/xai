@@ -1,3 +1,9 @@
+# Manager Consolidation: This module provides a lightweight in-memory slashing manager.
+# For persistent slashing with database storage, use:
+#     from xai.blockchain.slashing_manager import SlashingManager
+#
+# This in-memory version is kept for testing and simple use cases.
+
 from __future__ import annotations
 
 import logging
@@ -5,6 +11,8 @@ from typing import Any
 
 
 class ValidatorStake:
+    """Represents a validator's stake with slashing tracking."""
+
     def __init__(self, address: str, staked_amount: int):
         if not isinstance(address, str) or not address:
             raise ValueError("Validator address must be a non-empty string.")
@@ -32,7 +40,15 @@ class ValidatorStake:
     def __repr__(self):
         return f"ValidatorStake(address='{self.address[:8]}...', staked={self.staked_amount}, slashed={self.slashed_amount})"
 
-class SlashingManager:
+
+class InMemorySlashingManager:
+    """
+    In-memory slashing manager for lightweight/test usage.
+
+    For production use with database persistence, use:
+        from xai.blockchain.slashing_manager import SlashingManager
+    """
+
     OFFENSE_PENALTIES = {
         "double_signing": 0.25,  # 25% of stake
         "offline_long_period": 0.05,  # 5% of stake
@@ -42,7 +58,7 @@ class SlashingManager:
 
     def __init__(self):
         self.validator_stakes: dict[str, ValidatorStake] = {}
-        self.slashed_funds_treasury = 0  # Represents funds collected from slashing
+        self.slashed_funds_treasury = 0
         self.logger = logging.getLogger("xai.blockchain.slashing")
 
     def add_validator_stake(self, validator_stake: ValidatorStake):
@@ -54,6 +70,7 @@ class SlashingManager:
         self.validator_stakes.pop(address, None)
 
     def report_malicious_behavior(self, validator_address: str, offense_type: str):
+        """Report and process validator misbehavior with automatic slashing."""
         if validator_address not in self.validator_stakes:
             self.logger.warning("Validator %s not found in stake registry.", validator_address)
             return
@@ -66,9 +83,7 @@ class SlashingManager:
         penalty_percentage = self.OFFENSE_PENALTIES[offense_type]
 
         slash_amount = int(validator.staked_amount * penalty_percentage)
-        if (
-            slash_amount == 0 and penalty_percentage > 0
-        ):  # Ensure at least 1 unit is slashed if penalty > 0
+        if slash_amount == 0 and penalty_percentage > 0:
             slash_amount = 1 if validator.staked_amount > 0 else 0
 
         if slash_amount > 0:
@@ -84,9 +99,13 @@ class SlashingManager:
         else:
             self.logger.info("No stake to slash for validator %s.", validator_address)
 
-    def get_validator_stake(self, address: str) -> ValidatorStake:
+    def get_validator_stake(self, address: str) -> ValidatorStake | None:
         return self.validator_stakes.get(address)
 
     def get_slashed_funds_treasury(self) -> int:
         return self.slashed_funds_treasury
 
+
+# Backwards-compatible alias - prefer InMemorySlashingManager or
+# xai.blockchain.slashing_manager.SlashingManager for new code
+SlashingManager = InMemorySlashingManager

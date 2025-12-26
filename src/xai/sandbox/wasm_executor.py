@@ -112,11 +112,32 @@ class WasmExecutor:
             result.execution_time = time.time() - start_time
             return result
 
-        except Exception as e:
-            logger.error(f"WASM execution failed: {e}")
+        except WasmExecutionError as e:
+            logger.error(f"WASM execution error: {e}")
             return WasmResult(
                 success=False,
                 error=str(e),
+                execution_time=time.time() - start_time,
+            )
+        except (ValueError, TypeError) as e:
+            logger.error(f"Invalid WASM input: {type(e).__name__}: {e}")
+            return WasmResult(
+                success=False,
+                error=f"Invalid input: {str(e)}",
+                execution_time=time.time() - start_time,
+            )
+        except MemoryError as e:
+            logger.error(f"WASM memory limit exceeded: {e}")
+            return WasmResult(
+                success=False,
+                error="Memory limit exceeded",
+                execution_time=time.time() - start_time,
+            )
+        except Exception as e:
+            logger.error(f"Unexpected WASM execution error: {type(e).__name__}: {e}")
+            return WasmResult(
+                success=False,
+                error=f"Unexpected error: {str(e)}",
                 execution_time=time.time() - start_time,
             )
 
@@ -154,8 +175,14 @@ class WasmExecutor:
 
             return False
 
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Invalid WASM module format: {type(e).__name__}: {e}")
+            return False
+        except MemoryError as e:
+            logger.warning(f"WASM module too large: {e}")
+            return False
         except Exception as e:
-            logger.warning(f"WASM validation failed: {e}")
+            logger.warning(f"Unexpected WASM validation error: {type(e).__name__}: {e}")
             return False
 
     def _initialize_runtime(self, runtime: str) -> Any | None:
@@ -248,8 +275,14 @@ class WasmExecutor:
                 def wrapped_func(*args):
                     try:
                         return func(*args)
+                    except (ValueError, TypeError, KeyError) as e:
+                        logger.error(f"Host function {name} argument error: {type(e).__name__}: {e}")
+                        raise
+                    except RuntimeError as e:
+                        logger.error(f"Host function {name} runtime error: {e}")
+                        raise
                     except Exception as e:
-                        logger.error(f"Host function {name} failed: {e}")
+                        logger.error(f"Host function {name} unexpected error: {type(e).__name__}: {e}")
                         raise
 
                 # Create Function (simplified - would need proper type annotations)
@@ -272,13 +305,39 @@ class WasmExecutor:
                     return_value=result,
                 )
 
-            except Exception as e:
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Wasmer function argument error: {type(e).__name__}: {e}")
+                return WasmResult(
+                    success=False,
+                    error=f"Function argument error: {str(e)}",
+                )
+            except RuntimeError as e:
+                logger.warning(f"Wasmer function runtime error: {e}")
                 return WasmResult(
                     success=False,
                     error=f"Function execution failed: {str(e)}",
                 )
+            except Exception as e:
+                logger.error(f"Unexpected wasmer function error: {type(e).__name__}: {e}")
+                return WasmResult(
+                    success=False,
+                    error=f"Unexpected function error: {str(e)}",
+                )
 
+        except ImportError as e:
+            logger.error(f"Wasmer import error: {e}")
+            return WasmResult(
+                success=False,
+                error="Wasmer runtime not available",
+            )
+        except MemoryError as e:
+            logger.error(f"Wasmer memory error: {e}")
+            return WasmResult(
+                success=False,
+                error="Memory limit exceeded",
+            )
         except Exception as e:
+            logger.error(f"Unexpected wasmer execution error: {type(e).__name__}: {e}")
             return WasmResult(
                 success=False,
                 error=f"Wasmer execution failed: {str(e)}",
@@ -344,12 +403,32 @@ class WasmExecutor:
                 )
 
             except wasmtime.Trap as e:
+                logger.warning(f"Wasmtime trap: {e}")
                 return WasmResult(
                     success=False,
                     error=f"WASM trap: {str(e)}",
                 )
 
+        except ImportError as e:
+            logger.error(f"Wasmtime import error: {e}")
+            return WasmResult(
+                success=False,
+                error="Wasmtime runtime not available",
+            )
+        except AttributeError as e:
+            logger.error(f"Wasmtime configuration error: {e}")
+            return WasmResult(
+                success=False,
+                error=f"Wasmtime configuration error: {str(e)}",
+            )
+        except MemoryError as e:
+            logger.error(f"Wasmtime memory error: {e}")
+            return WasmResult(
+                success=False,
+                error="Memory limit exceeded",
+            )
         except Exception as e:
+            logger.error(f"Unexpected wasmtime error: {type(e).__name__}: {e}")
             return WasmResult(
                 success=False,
                 error=f"Wasmtime execution failed: {str(e)}",
@@ -396,13 +475,39 @@ class WasmExecutor:
                     return_value=result,
                 )
 
-            except Exception as e:
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Wasm3 function argument error: {type(e).__name__}: {e}")
+                return WasmResult(
+                    success=False,
+                    error=f"Function argument error: {str(e)}",
+                )
+            except RuntimeError as e:
+                logger.warning(f"Wasm3 function runtime error: {e}")
                 return WasmResult(
                     success=False,
                     error=f"Function execution failed: {str(e)}",
                 )
+            except Exception as e:
+                logger.error(f"Unexpected wasm3 function error: {type(e).__name__}: {e}")
+                return WasmResult(
+                    success=False,
+                    error=f"Unexpected function error: {str(e)}",
+                )
 
+        except ImportError as e:
+            logger.error(f"Wasm3 import error: {e}")
+            return WasmResult(
+                success=False,
+                error="Wasm3 runtime not available",
+            )
+        except MemoryError as e:
+            logger.error(f"Wasm3 memory error: {e}")
+            return WasmResult(
+                success=False,
+                error="Memory limit exceeded",
+            )
         except Exception as e:
+            logger.error(f"Unexpected wasm3 error: {type(e).__name__}: {e}")
             return WasmResult(
                 success=False,
                 error=f"Wasm3 execution failed: {str(e)}",
@@ -420,7 +525,14 @@ class WasmExecutor:
             # Basic validation - module compiled successfully
             return True
 
-        except Exception:
+        except ImportError:
+            logger.debug("Wasmer not available for validation")
+            return False
+        except (ValueError, RuntimeError) as e:
+            logger.debug(f"Wasmer validation failed: {type(e).__name__}: {e}")
+            return False
+        except Exception as e:
+            logger.warning(f"Unexpected wasmer validation error: {type(e).__name__}: {e}")
             return False
 
     def _validate_wasmtime(self, wasm_bytes: bytes) -> bool:
@@ -436,7 +548,14 @@ class WasmExecutor:
 
             return True
 
-        except Exception:
+        except ImportError:
+            logger.debug("Wasmtime not available for validation")
+            return False
+        except (ValueError, RuntimeError) as e:
+            logger.debug(f"Wasmtime validation failed: {type(e).__name__}: {e}")
+            return False
+        except Exception as e:
+            logger.warning(f"Unexpected wasmtime validation error: {type(e).__name__}: {e}")
             return False
 
     def _validate_wasm3(self, wasm_bytes: bytes) -> bool:
@@ -450,7 +569,14 @@ class WasmExecutor:
             # Basic validation - module parsed successfully
             return True
 
-        except Exception:
+        except ImportError:
+            logger.debug("Wasm3 not available for validation")
+            return False
+        except (ValueError, RuntimeError) as e:
+            logger.debug(f"Wasm3 validation failed: {type(e).__name__}: {e}")
+            return False
+        except Exception as e:
+            logger.warning(f"Unexpected wasm3 validation error: {type(e).__name__}: {e}")
             return False
 
 class WasmHostAPI:

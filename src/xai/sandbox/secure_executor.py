@@ -150,14 +150,45 @@ class SecureExecutor:
             result.execution_time = time.time() - start_time
             return result
 
-        except Exception as e:
-            logger.error(
-                f"Execution failed for app {context.app_id}: {e}",
-                extra={"event": "sandbox.execution_failed", "app_id": context.app_id}
+        except ResourceLimitExceeded as e:
+            logger.warning(
+                f"Resource limit exceeded for app {context.app_id}: {e}",
+                extra={"event": "sandbox.resource_limit_exceeded", "app_id": context.app_id}
             )
             return ExecutionResult(
                 success=False,
                 error=str(e),
+                execution_time=time.time() - start_time,
+                resource_exceeded=True,
+            )
+        except SecurityViolation as e:
+            logger.warning(
+                f"Security violation for app {context.app_id}: {e}",
+                extra={"event": "sandbox.security_violation", "app_id": context.app_id}
+            )
+            return ExecutionResult(
+                success=False,
+                error=str(e),
+                execution_time=time.time() - start_time,
+            )
+        except (SyntaxError, ValueError, TypeError) as e:
+            logger.warning(
+                f"Code error for app {context.app_id}: {type(e).__name__}: {e}",
+                extra={"event": "sandbox.code_error", "app_id": context.app_id}
+            )
+            return ExecutionResult(
+                success=False,
+                error=str(e),
+                execution_time=time.time() - start_time,
+            )
+        except Exception as e:
+            logger.error(
+                f"Unexpected execution error for app {context.app_id}: {type(e).__name__}: {e}",
+                extra={"event": "sandbox.unexpected_error", "app_id": context.app_id}
+            )
+            return ExecutionResult(
+                success=False,
+                error=f"Unexpected error: {str(e)}",
                 execution_time=time.time() - start_time,
             )
 
@@ -303,10 +334,29 @@ class SecureExecutor:
                 resource_exceeded=True,
             )
 
-        except Exception as e:
+        except NameError as e:
+            logger.warning(f"Undefined name in sandbox code: {e}")
             return ExecutionResult(
                 success=False,
-                error=f"Execution error: {str(e)}",
+                error=f"Name error: {str(e)}",
+            )
+        except AttributeError as e:
+            logger.warning(f"Attribute error in sandbox code: {e}")
+            return ExecutionResult(
+                success=False,
+                error=f"Attribute error: {str(e)}",
+            )
+        except (ValueError, TypeError, KeyError, IndexError) as e:
+            logger.warning(f"Data error in sandbox code: {type(e).__name__}: {e}")
+            return ExecutionResult(
+                success=False,
+                error=f"{type(e).__name__}: {str(e)}",
+            )
+        except Exception as e:
+            logger.error(f"Unexpected sandbox execution error: {type(e).__name__}: {e}")
+            return ExecutionResult(
+                success=False,
+                error=f"Unexpected execution error: {str(e)}",
             )
 
     def _validate_allowed_imports(self, allowed_imports: set[str]) -> set[str]:
@@ -429,7 +479,20 @@ class SecureExecutor:
                         killed_by_signal=signal.SIGKILL,
                     )
 
+            except OSError as e:
+                logger.error(f"OS error during subprocess execution: {e}")
+                return ExecutionResult(
+                    success=False,
+                    error=f"System error: {str(e)}",
+                )
+            except ValueError as e:
+                logger.error(f"Invalid subprocess parameters: {e}")
+                return ExecutionResult(
+                    success=False,
+                    error=f"Invalid parameters: {str(e)}",
+                )
             except Exception as e:
+                logger.error(f"Unexpected subprocess error: {type(e).__name__}: {e}")
                 return ExecutionResult(
                     success=False,
                     error=f"Subprocess execution failed: {str(e)}",
@@ -515,8 +578,12 @@ if __name__ == "__main__":
             # Number of processes (limit to 1)
             resource.setrlimit(resource.RLIMIT_NPROC, (1, 1))
 
+        except (OSError, ValueError) as e:
+            # OSError: permission denied or unsupported limit
+            # ValueError: invalid limit values
+            logger.warning(f"Failed to set subprocess resource limits ({type(e).__name__}): {e}")
         except Exception as e:
-            logger.warning(f"Failed to set resource limits: {e}")
+            logger.error(f"Unexpected error setting subprocess limits: {type(e).__name__}: {e}")
 
         # Apply seccomp filter if available
         if self.has_seccomp:
@@ -556,8 +623,12 @@ if __name__ == "__main__":
 
             logger.debug("Seccomp filter would be applied here in production")
 
+        except OSError as e:
+            logger.warning(f"Failed to apply seccomp filter (OS error): {e}")
+        except AttributeError as e:
+            logger.warning(f"Seccomp library attribute error: {e}")
         except Exception as e:
-            logger.warning(f"Failed to apply seccomp filter: {e}")
+            logger.error(f"Unexpected error applying seccomp filter: {type(e).__name__}: {e}")
 
     def _set_resource_limits(self) -> None:
         """Set resource limits for current process"""
@@ -574,8 +645,12 @@ if __name__ == "__main__":
             if hard == resource.RLIM_INFINITY or mem_bytes < hard:
                 resource.setrlimit(resource.RLIMIT_AS, (mem_bytes, hard))
 
+        except (OSError, ValueError) as e:
+            # OSError: permission denied or unsupported limit
+            # ValueError: invalid limit values
+            logger.warning(f"Failed to set resource limits ({type(e).__name__}): {e}")
         except Exception as e:
-            logger.warning(f"Failed to set resource limits: {e}")
+            logger.error(f"Unexpected error setting resource limits: {type(e).__name__}: {e}")
 
     def _create_safe_builtins(self) -> dict[str, Any]:
         """Create dictionary of safe builtin functions"""

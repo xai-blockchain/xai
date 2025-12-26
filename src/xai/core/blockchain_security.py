@@ -313,9 +313,13 @@ class OverflowProtection:
             )
             return False, str(e)
 
-class MempoolManager:
+class MempoolBytesTracker:
     """
-    Manage pending transaction pool with size limits
+    Simple byte-tracking helper for mempool size limits.
+
+    For the full-featured mempool manager with transaction ordering,
+    double-spend detection, and orphan handling, use:
+        from xai.network.mempool_manager import MempoolManager
     """
 
     def __init__(self) -> None:
@@ -326,21 +330,10 @@ class MempoolManager:
     def can_add_transaction(
         self, tx: 'Transaction', pending_transactions: list['Transaction']
     ) -> tuple[bool, str | None]:
-        """
-        Check if transaction can be added to mempool
-
-        Args:
-            tx: Transaction to add
-            pending_transactions: Current pending transactions
-
-        Returns:
-            (can_add, error_message)
-        """
-        # Check count limit
+        """Check if transaction can be added based on size limits."""
         if len(pending_transactions) >= self.max_count:
             return False, f"Mempool full: {len(pending_transactions)} transactions"
 
-        # Check size limit (estimate transaction size)
         tx_size = len(json.dumps(tx.to_dict()).encode())
 
         if self.current_bytes + tx_size > self.max_bytes:
@@ -349,18 +342,23 @@ class MempoolManager:
         return True, None
 
     def add_transaction(self, tx: 'Transaction') -> None:
-        """Track transaction addition"""
+        """Track transaction addition."""
         tx_size = len(json.dumps(tx.to_dict()).encode())
         self.current_bytes += tx_size
 
     def remove_transaction(self, tx: 'Transaction') -> None:
-        """Track transaction removal"""
+        """Track transaction removal."""
         tx_size = len(json.dumps(tx.to_dict()).encode())
         self.current_bytes = max(0, self.current_bytes - tx_size)
 
     def clear(self) -> None:
-        """Clear mempool tracking"""
+        """Clear mempool tracking."""
         self.current_bytes = 0
+
+
+# DEPRECATED: Use xai.network.mempool_manager.MempoolManager for full functionality.
+# This alias preserved for backward compatibility only.
+MempoolManager = MempoolBytesTracker
 
 class BlockSizeValidator:
     """

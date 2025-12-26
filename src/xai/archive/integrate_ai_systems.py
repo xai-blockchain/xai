@@ -180,11 +180,33 @@ class IntegratedXAINode:
 
             self.safety_controls = AISafetyControls(self.blockchain)
             print("   ✅ Emergency stop system initialized")
+        except ImportError as e:
+            logger.warning(
+                "AI Safety Controls import failed",
+                extra={
+                    "error_type": "ImportError",
+                    "error": str(e),
+                    "function": "__init__"
+                }
+            )
+            print(f"   ⚠️  AI Safety Controls not available: {e}")
+            self.safety_controls = None
+        except (TypeError, ValueError, AttributeError) as e:
+            logger.error(
+                f"AI Safety Controls configuration error: {type(e).__name__}",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                    "function": "__init__"
+                }
+            )
+            print(f"   ⚠️  AI Safety Controls configuration failed: {e}")
+            self.safety_controls = None
         except Exception as e:
             logger.error(
-                "Exception in __init__",
+                f"Unexpected error initializing AI Safety Controls: {type(e).__name__}",
                 extra={
-                    "error_type": "Exception",
+                    "error_type": type(e).__name__,
                     "error": str(e),
                     "function": "__init__"
                 }
@@ -211,13 +233,33 @@ class IntegratedXAINode:
             self.api_extensions = extend_node_api(self.node)
             print("   ✅ Mining control API added")
             print("   ✅ Governance API added")
-            print("   ✅ ✅ Personal AI API added")
+            print("   ✅ Personal AI API added")
             print("   ✅ WebSocket support added")
+        except NameError as e:
+            logger.warning(
+                "API extensions not defined",
+                extra={
+                    "error_type": "NameError",
+                    "error": str(e)
+                }
+            )
+            print(f"   ⚠️  API extensions not available: {e}")
+            self.api_extensions = None
+        except (TypeError, AttributeError) as e:
+            logger.error(
+                f"API extension configuration error: {type(e).__name__}",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error": str(e)
+                }
+            )
+            print(f"   ⚠️  API extensions configuration failed: {e}")
+            self.api_extensions = None
         except Exception as e:
             logger.error(
-                "Exception occurred",
+                f"Unexpected API extension error: {type(e).__name__}",
                 extra={
-                    "error_type": "Exception",
+                    "error_type": type(e).__name__,
                     "error": str(e)
                 }
             )
@@ -239,11 +281,29 @@ class IntegratedXAINode:
             print("   ✅ Time Capsule system initialized")
             print("   ✅ Lock XAI or other crypto until future date")
             print("   ✅ Cross-chain time-locks supported")
+        except ImportError as e:
+            logger.warning(
+                "Time Capsule API import failed",
+                extra={
+                    "error_type": "ImportError",
+                    "error": str(e)
+                }
+            )
+            print(f"   ⚠️  Time Capsule API not available: {e}")
+        except AttributeError as e:
+            logger.warning(
+                "Time Capsule manager not configured",
+                extra={
+                    "error_type": "AttributeError",
+                    "error": str(e)
+                }
+            )
+            print(f"   ⚠️  Time Capsule manager not configured: {e}")
         except Exception as e:
             logger.error(
-                "Exception occurred",
+                f"Unexpected Time Capsule error: {type(e).__name__}",
                 extra={
-                    "error_type": "Exception",
+                    "error_type": type(e).__name__,
                     "error": str(e)
                 }
             )
@@ -260,11 +320,29 @@ class IntegratedXAINode:
             print("   ✅ Trading bot emergency stop")
             print("   ✅ Governance AI task pause/resume")
             print("   ✅ Global AI kill switch")
+        except ImportError as e:
+            logger.warning(
+                "AI Safety Control API import failed",
+                extra={
+                    "error_type": "ImportError",
+                    "error": str(e)
+                }
+            )
+            print(f"   ⚠️  AI Safety Control API not available: {e}")
+        except (TypeError, AttributeError) as e:
+            logger.error(
+                f"AI Safety Control API configuration error: {type(e).__name__}",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error": str(e)
+                }
+            )
+            print(f"   ⚠️  AI Safety Control API configuration failed: {e}")
         except Exception as e:
             logger.error(
-                "Exception occurred",
+                f"Unexpected AI Safety Control API error: {type(e).__name__}",
                 extra={
-                    "error_type": "Exception",
+                    "error_type": type(e).__name__,
                     "error": str(e)
                 }
             )

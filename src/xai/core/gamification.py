@@ -941,8 +941,13 @@ class FeeRefundCalculator:
 
 class TimeCapsuleManager:
     """
-    Time Capsule Transactions - Lock AXN to be sent on a future date with message
-    Transactions are held until unlock_time, then can be released
+    Time Capsule Transactions - Lock AXN to be sent on a future date with message.
+    Transactions are held until unlock_time, then can be released.
+
+    Note: For full blockchain-integrated time capsules with HTLC, multi-coin,
+    and deterministic addresses, use:
+        from xai.core.time_capsule import TimeCapsuleManager
+    This gamification version is simpler for game mechanics.
     """
 
     def __init__(self, blockchain_interface: GamificationBlockchainInterface, data_dir: str = None):

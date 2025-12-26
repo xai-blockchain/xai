@@ -186,8 +186,14 @@ class MobileTelemetryCollector:
 
             return True
 
+        except (TypeError, ValueError) as e:
+            logger.error(f"Invalid telemetry event data: {type(e).__name__}: {e}")
+            return False
+        except RuntimeError as e:
+            logger.error(f"Thread lock error recording telemetry: {e}")
+            return False
         except Exception as e:
-            logger.error(f"Failed to record telemetry event: {e}")
+            logger.error(f"Unexpected error recording telemetry: {type(e).__name__}: {e}")
             return False
 
     def record_sync_event(

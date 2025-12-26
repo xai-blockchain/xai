@@ -666,6 +666,128 @@ WALLET_TRADE_PEERS = [
 # Allow Config classes to expose the global peer list
 Config.WALLET_TRADE_PEERS = WALLET_TRADE_PEERS
 
+# ============================================================================
+# Pydantic Configuration Validation
+# ============================================================================
+
+try:
+    from pydantic import BaseModel, Field, field_validator, model_validator
+    from pydantic_settings import BaseSettings
+    PYDANTIC_AVAILABLE = True
+except ImportError:
+    PYDANTIC_AVAILABLE = False
+
+if PYDANTIC_AVAILABLE:
+    class NetworkSettings(BaseModel):
+        """Validated network configuration."""
+        network_type: str = Field(default="testnet", pattern=r"^(testnet|mainnet)$")
+        node_mode: str = Field(default="full", pattern=r"^(full|light|archive)$")
+        max_peers: int = Field(default=50, ge=1, le=1000)
+
+        @field_validator("network_type")
+        @classmethod
+        def validate_network_type(cls, v: str) -> str:
+            return v.lower()
+
+    class APISettings(BaseModel):
+        """Validated API configuration."""
+        rate_limit: int = Field(default=120, ge=1, le=10000)
+        rate_window_seconds: int = Field(default=60, ge=1, le=3600)
+        max_json_bytes: int = Field(default=1048576, ge=1024, le=104857600)
+        auth_required: bool = Field(default=False)
+
+        @field_validator("rate_limit")
+        @classmethod
+        def validate_rate_limit(cls, v: int) -> int:
+            if v < 1:
+                raise ValueError("rate_limit must be at least 1")
+            return v
+
+    class P2PSettings(BaseModel):
+        """Validated P2P configuration."""
+        max_peers_per_prefix: int = Field(default=8, ge=1, le=100)
+        max_peers_per_asn: int = Field(default=16, ge=1, le=200)
+        ping_interval_seconds: int = Field(default=20, ge=5, le=300)
+        ping_timeout_seconds: int = Field(default=20, ge=5, le=300)
+        max_message_rate: int = Field(default=100, ge=1, le=10000)
+        enable_quic: bool = Field(default=False)
+        pow_enabled: bool = Field(default=True)
+        pow_difficulty_bits: int = Field(default=18, ge=8, le=32)
+
+    class SecuritySettings(BaseModel):
+        """Validated security configuration."""
+        emergency_pauser_address: str = Field(default="0xAdmin", min_length=1)
+        circuit_breaker_threshold: int = Field(default=3, ge=1, le=100)
+        circuit_breaker_timeout_seconds: int = Field(default=300, ge=60, le=86400)
+        peer_nonce_ttl_seconds: int = Field(default=300, ge=60, le=3600)
+
+    class ValidatedConfig(BaseModel):
+        """Complete validated configuration model."""
+        network: NetworkSettings = Field(default_factory=NetworkSettings)
+        api: APISettings = Field(default_factory=APISettings)
+        p2p: P2PSettings = Field(default_factory=P2PSettings)
+        security: SecuritySettings = Field(default_factory=SecuritySettings)
+
+        @classmethod
+        def from_environment(cls) -> "ValidatedConfig":
+            """Create validated config from current environment variables."""
+            return cls(
+                network=NetworkSettings(
+                    network_type=NETWORK,
+                    node_mode=NODE_MODE,
+                ),
+                api=APISettings(
+                    rate_limit=API_RATE_LIMIT,
+                    rate_window_seconds=API_RATE_WINDOW_SECONDS,
+                    max_json_bytes=API_MAX_JSON_BYTES,
+                    auth_required=API_AUTH_REQUIRED,
+                ),
+                p2p=P2PSettings(
+                    max_peers_per_prefix=P2P_MAX_PEERS_PER_PREFIX,
+                    max_peers_per_asn=P2P_MAX_PEERS_PER_ASN,
+                    ping_interval_seconds=P2P_PING_INTERVAL_SECONDS,
+                    ping_timeout_seconds=P2P_PING_TIMEOUT_SECONDS,
+                    max_message_rate=P2P_MAX_MESSAGE_RATE,
+                    enable_quic=P2P_ENABLE_QUIC,
+                    pow_enabled=P2P_POW_ENABLED,
+                    pow_difficulty_bits=P2P_POW_DIFFICULTY_BITS,
+                ),
+                security=SecuritySettings(
+                    emergency_pauser_address=EMERGENCY_PAUSER_ADDRESS,
+                    circuit_breaker_threshold=EMERGENCY_CIRCUIT_BREAKER_THRESHOLD,
+                    circuit_breaker_timeout_seconds=EMERGENCY_CIRCUIT_BREAKER_TIMEOUT_SECONDS,
+                    peer_nonce_ttl_seconds=PEER_NONCE_TTL_SECONDS,
+                ),
+            )
+
+    def validate_config() -> tuple[bool, list[str]]:
+        """
+        Validate current configuration using Pydantic models.
+
+        Returns:
+            Tuple of (is_valid, list_of_errors)
+        """
+        errors: list[str] = []
+        try:
+            ValidatedConfig.from_environment()
+        except Exception as e:
+            errors.append(str(e))
+        return len(errors) == 0, errors
+
+else:
+    # Fallback if Pydantic is not available
+    def validate_config() -> tuple[bool, list[str]]:
+        """Validate configuration (Pydantic not available, basic checks only)."""
+        errors: list[str] = []
+        if API_RATE_LIMIT < 1:
+            errors.append("API_RATE_LIMIT must be at least 1")
+        if API_RATE_WINDOW_SECONDS < 1:
+            errors.append("API_RATE_WINDOW_SECONDS must be at least 1")
+        if NETWORK.lower() not in ("testnet", "mainnet"):
+            errors.append("NETWORK must be 'testnet' or 'mainnet'")
+        return len(errors) == 0, errors
+
+
 # Export config
 __all__ = [
     "Config",
@@ -686,4 +808,6 @@ __all__ = [
     "PRUNE_BLOCKS",
     "CHECKPOINT_SYNC_ENABLED",
     "reload_runtime",
+    "validate_config",
+    "PYDANTIC_AVAILABLE",
 ]
