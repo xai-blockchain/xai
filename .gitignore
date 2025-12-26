@@ -39,9 +39,11 @@ htmlcov/
 
 # Test artifacts
 test_cleanup_*/
+test_data_*/
 test_*_data/
 soak_test_*.json
 soak_test_baseline_*.json
+soak-test-results/
 
 # Temporary and backup files
 *.tmp
@@ -111,4 +113,17 @@ wallets/
 # Keep example files
 !.env.example
 !.env.template
+
+# Kubernetes
 .kube/
+
+# Benchmarks (local results)
+.benchmarks/
+
+# Coverage reports
+coverage.xml
+.coverage.*
+
+# Profile data
+*.prof
+*.pstat
