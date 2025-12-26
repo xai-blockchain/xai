@@ -162,6 +162,7 @@ class ChainState:
             self.blockchain.seen_txids.clear()
             self.blockchain._sender_pending_count.clear()
             self.blockchain._spent_inputs.clear()
+            self.blockchain._pending_tx_by_txid.clear()
 
         # Clear orphan blocks
         self.blockchain.orphan_blocks.clear()
@@ -269,6 +270,7 @@ class ChainState:
                 self.blockchain.pending_transactions.clear()
                 self.blockchain.orphan_transactions.clear()
                 self.blockchain.seen_txids.clear()
+                self.blockchain._pending_tx_by_txid.clear()
 
         # Rebuild nonce tracker
         self.blockchain._rebuild_nonce_tracker(restored_chain)

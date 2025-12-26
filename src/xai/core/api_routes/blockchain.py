@@ -137,6 +137,78 @@ def register_blockchain_routes(routes: "NodeAPIRoutes") -> None:
 
         return jsonify(payload), 200
 
+    @app.route("/chain/range", methods=["GET"])
+    @app.route("/api/v1/chain/range", methods=["GET"])
+    def get_chain_range() -> tuple[dict[str, Any], int]:
+        """
+        Get paginated chain data for incremental sync.
+
+        Provides O(limit) serialization instead of O(n) for the full chain.
+        Suitable for large chains where full sync would be prohibitive.
+
+        Query Parameters:
+            offset: Starting block height (default: 0)
+            limit: Maximum blocks to return (default: 100, max: 500)
+            include_pending: Include pending transactions (default: true for offset=0)
+
+        Returns:
+            JSON with:
+            - chain: List of block objects
+            - pagination: {offset, limit, count, total_blocks, has_more, next_offset}
+            - difficulty: Current difficulty
+            - stats: Chain statistics
+            - pending_transactions: (optional) List of pending tx
+        """
+        try:
+            offset = request.args.get("offset", 0, type=int)
+            limit = request.args.get("limit", 100, type=int)
+            include_pending_param = request.args.get("include_pending", "").lower()
+        except (ValueError, TypeError) as exc:
+            return routes._error_response(
+                f"Invalid query parameters: {exc}",
+                status=400,
+                code="invalid_params",
+            )
+
+        # Validate parameters
+        if offset < 0:
+            return routes._error_response(
+                "offset must be non-negative",
+                status=400,
+                code="invalid_offset",
+            )
+
+        # Cap limit to prevent abuse
+        max_limit = 500
+        if limit < 1 or limit > max_limit:
+            return routes._error_response(
+                f"limit must be between 1 and {max_limit}",
+                status=400,
+                code="invalid_limit",
+            )
+
+        # Determine include_pending: default to True only for first page
+        if include_pending_param in ("true", "1", "yes"):
+            include_pending = True
+        elif include_pending_param in ("false", "0", "no"):
+            include_pending = False
+        else:
+            include_pending = (offset == 0)
+
+        try:
+            paginated_data = blockchain.to_dict_paginated(
+                offset=offset,
+                limit=limit,
+                include_pending=include_pending,
+            )
+            return jsonify(paginated_data), 200
+        except (ValueError, RuntimeError, AttributeError) as exc:
+            return routes._error_response(
+                f"Failed to get chain range: {exc}",
+                status=500,
+                code="chain_range_error",
+            )
+
     @app.route("/block/receive", methods=["POST"])
     def receive_block() -> tuple[dict[str, Any], int]:
         """Receive a block from a peer node."""

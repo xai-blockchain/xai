@@ -277,9 +277,141 @@ class BlockchainSerializer:
         self.blockchain.logger.info(f"Full blockchain load complete: {len(self.blockchain.chain)} blocks")
         return True
 
+    # Default batch size for paginated chain sync (100 blocks per batch)
+    DEFAULT_CHAIN_SYNC_BATCH_SIZE: int = 100
+
+    def get_blocks_range(
+        self,
+        start_height: int,
+        end_height: int | None = None,
+        limit: int | None = None,
+    ) -> list[Block]:
+        """
+        Retrieve blocks within a height range.
+
+        Supports two modes:
+        1. Range mode: start_height to end_height (inclusive)
+        2. Limit mode: start_height with max `limit` blocks
+
+        Args:
+            start_height: Starting block height (0-indexed, inclusive)
+            end_height: Ending block height (inclusive). If None, uses limit.
+            limit: Maximum number of blocks to return. If None, defaults to
+                   DEFAULT_CHAIN_SYNC_BATCH_SIZE.
+
+        Returns:
+            List of Block objects in ascending height order.
+            Empty list if start_height is beyond chain length.
+
+        Raises:
+            ValueError: If start_height is negative or end_height < start_height
+        """
+        if start_height < 0:
+            raise ValueError("start_height must be non-negative")
+
+        chain_length = len(self.blockchain.chain)
+        if start_height >= chain_length:
+            return []
+
+        # Determine effective end based on mode
+        if end_height is not None:
+            if end_height < start_height:
+                raise ValueError("end_height must be >= start_height")
+            effective_end = min(end_height, chain_length - 1)
+        else:
+            batch_size = limit if limit is not None else self.DEFAULT_CHAIN_SYNC_BATCH_SIZE
+            effective_end = min(start_height + batch_size - 1, chain_length - 1)
+
+        # Load blocks, ensuring we get full blocks (not just headers)
+        blocks: list[Block] = []
+        for idx in range(start_height, effective_end + 1):
+            block = self.blockchain.get_block(idx)
+            if block is not None:
+                blocks.append(block)
+            else:
+                # If we can't load a block, stop here to maintain contiguity
+                self.blockchain.logger.warning(
+                    "Failed to load block during range retrieval",
+                    extra={"height": idx, "start": start_height, "end": effective_end}
+                )
+                break
+
+        return blocks
+
+    def to_dict_paginated(
+        self,
+        offset: int = 0,
+        limit: int | None = None,
+        include_pending: bool = True,
+    ) -> dict[str, Any]:
+        """
+        Export blockchain state with paginated chain serialization.
+
+        This method provides O(limit) serialization instead of O(n) for the
+        entire chain, suitable for incremental chain sync over P2P.
+
+        Args:
+            offset: Starting block height (0-indexed)
+            limit: Maximum number of blocks to include. Defaults to
+                   DEFAULT_CHAIN_SYNC_BATCH_SIZE.
+            include_pending: Whether to include pending transactions.
+                           Set to False after first batch for efficiency.
+
+        Returns:
+            Dict containing:
+            - chain: List of block dicts for the requested range
+            - pending_transactions: List of pending tx dicts (if include_pending)
+            - difficulty: Current difficulty
+            - pagination: Metadata about the current page
+            - stats: Chain statistics
+        """
+        effective_limit = limit if limit is not None else self.DEFAULT_CHAIN_SYNC_BATCH_SIZE
+        chain_length = len(self.blockchain.chain)
+
+        # Get blocks for this page
+        blocks = self.get_blocks_range(offset, limit=effective_limit)
+        serialized_blocks = [self._block_to_full_dict(block) for block in blocks]
+
+        # Calculate pagination metadata
+        has_more = (offset + len(blocks)) < chain_length
+        next_offset = offset + len(blocks) if has_more else None
+
+        result: dict[str, Any] = {
+            "chain": serialized_blocks,
+            "difficulty": self.blockchain.difficulty,
+            "pagination": {
+                "offset": offset,
+                "limit": effective_limit,
+                "count": len(serialized_blocks),
+                "total_blocks": chain_length,
+                "has_more": has_more,
+                "next_offset": next_offset,
+            },
+            "stats": {
+                "blocks": chain_length,
+                "total_transactions": sum(
+                    len(block.transactions) if hasattr(block, "transactions") else 0
+                    for block in blocks
+                ),
+                "total_supply": self.blockchain.get_circulating_supply(),
+                "difficulty": self.blockchain.difficulty,
+            },
+        }
+
+        # Only include pending transactions on first page or when explicitly requested
+        if include_pending:
+            result["pending_transactions"] = [
+                tx.to_dict() for tx in self.blockchain.pending_transactions
+            ]
+
+        return result
+
     def to_dict(self) -> dict[str, Any]:
         """
         Export the entire blockchain state to a dictionary.
+
+        WARNING: This method has O(n) complexity where n is chain length.
+        For long chains, prefer to_dict_paginated() for incremental sync.
 
         Returns:
             Dict containing chain, pending transactions, difficulty, and stats

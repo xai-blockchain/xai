@@ -24,6 +24,8 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_sock import Sock
 
+from xai.core.config import API_ALLOWED_ORIGINS
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -1491,7 +1493,8 @@ class MempoolMonitor:
 # ==================== FLASK APP ====================
 
 app = Flask(__name__)
-CORS(app)
+# Configure CORS with explicit origin allowlist (empty list = allow all for dev)
+CORS(app, origins=API_ALLOWED_ORIGINS if API_ALLOWED_ORIGINS else ["*"])
 sock = Sock(app)
 
 # Initialize components

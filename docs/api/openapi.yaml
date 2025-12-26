@@ -71,7 +71,7 @@ paths:
                     example: online
                   node:
                     type: string
-                    example: AXN Full Node
+                    example: XAI Full Node
                   version:
                     type: string
                     example: 1.0.0
@@ -3511,8 +3511,8 @@ paths:
     post:
       tags:
       - Exchange
-      summary: Buy AXN with card
-      description: Processes a credit/debit card payment and credits AXN.
+      summary: Buy XAI with card
+      description: Processes a credit/debit card payment and credits XAI.
       requestBody:
         required: true
         content:
@@ -3607,7 +3607,7 @@ paths:
       tags:
       - Exchange
       summary: Estimate purchase amount
-      description: Returns the AXN amount and fees for a USD purchase.
+      description: Returns the XAI amount and fees for a USD purchase.
       requestBody:
         required: true
         content:

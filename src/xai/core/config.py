@@ -151,7 +151,7 @@ API_AUDITOR_KEYS = [key.strip() for key in os.getenv("XAI_API_AUDITOR_KEYS", "")
 API_ADMIN_TOKEN = os.getenv("XAI_API_ADMIN_TOKEN", "")
 if API_ADMIN_TOKEN:
     API_ADMIN_KEYS.append(API_ADMIN_TOKEN)
-API_AUTH_REQUIRED = bool(int(os.getenv("XAI_API_AUTH_REQUIRED", "0")))
+API_AUTH_REQUIRED = bool(int(os.getenv("XAI_API_AUTH_REQUIRED", "1")))
 API_AUTH_KEYS = [key.strip() for key in os.getenv("XAI_API_KEYS", "").split(",") if key.strip()]
 
 _RUNTIME_MUTABLE_FIELDS: dict[str, tuple[str, Callable[[str], Any]]] = {

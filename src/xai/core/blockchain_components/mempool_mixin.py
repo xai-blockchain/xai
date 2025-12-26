@@ -69,12 +69,14 @@ class BlockchainMempoolMixin:
         sender_counts: dict[str, int] = defaultdict(int)
         seen_txids: set[str] = set()
         spent_inputs: set[str] = set()
+        pending_tx_by_txid: dict[str, Transaction] = {}
 
         for tx in self.pending_transactions:
             if current_time - tx.timestamp < self._mempool_max_age_seconds:
                 kept.append(tx)
                 if tx.txid:
                     seen_txids.add(tx.txid)
+                    pending_tx_by_txid[tx.txid] = tx
                 if tx.sender and tx.sender != "COINBASE":
                     sender_counts[tx.sender] += 1
                 # Rebuild spent_inputs set for kept transactions
@@ -100,6 +102,7 @@ class BlockchainMempoolMixin:
         self.seen_txids = seen_txids
         self._sender_pending_count = defaultdict(int, sender_counts)
         self._spent_inputs = spent_inputs
+        self._pending_tx_by_txid = pending_tx_by_txid
         if removed:
             self._mempool_expired_total += removed
         return removed
@@ -270,6 +273,7 @@ class BlockchainMempoolMixin:
                             self._spent_inputs.discard(input_key)
 
                 self.seen_txids.discard(txid)
+                self._pending_tx_by_txid.pop(txid, None)
                 sender = eviction_metadata.get("sender")
                 if sender and sender in self._sender_pending_count:
                     self._sender_pending_count[sender] = max(
@@ -477,6 +481,7 @@ class BlockchainMempoolMixin:
                         try:
                             self.pending_transactions.remove(lowest)
                             self.seen_txids.discard(lowest.txid)
+                            self._pending_tx_by_txid.pop(lowest.txid, None)
                             # Remove evicted transaction's inputs from spent_inputs set
                             if lowest.tx_type != "coinbase" and lowest.inputs:
                                 for inp in lowest.inputs:
@@ -511,6 +516,7 @@ class BlockchainMempoolMixin:
             # This ensures no gap between validation and insertion
             self.pending_transactions.append(transaction)
             self.seen_txids.add(transaction.txid)
+            self._pending_tx_by_txid[transaction.txid] = transaction  # O(1) lookup index
             # Add transaction inputs to spent_inputs set for O(1) double-spend detection
             if transaction.tx_type != "coinbase" and transaction.inputs:
                 for inp in transaction.inputs:
@@ -612,6 +618,7 @@ class BlockchainMempoolMixin:
 
         del self.pending_transactions[original_index]
         self.seen_txids.discard(original_tx.txid)
+        self._pending_tx_by_txid.pop(original_tx.txid, None)
         # Remove original transaction's inputs from spent_inputs set
         if original_tx.tx_type != "coinbase" and original_tx.inputs:
             for inp in original_tx.inputs:
@@ -698,38 +705,36 @@ class BlockchainMempoolMixin:
 
         # Build txid lookup for transactions in this batch
         # Also track original position to maintain stable ordering
+        # Note: All transactions in mempool have txid set (ensured at add_transaction)
         txid_to_tx: dict[str, "Transaction"] = {}
         txid_to_pos: dict[str, int] = {}
         for pos, tx in enumerate(transactions):
-            txid = tx.txid or tx.calculate_hash()
-            txid_to_tx[txid] = tx
-            txid_to_pos[txid] = pos
+            txid_to_tx[tx.txid] = tx
+            txid_to_pos[tx.txid] = pos
 
         # Build dependency graph (edges from parent to child)
         # child depends on parent means parent must come first
         # in_degree counts how many parents a transaction has (within this batch)
-        in_degree: dict[str, int] = {(tx.txid or tx.calculate_hash()): 0 for tx in transactions}
-        children: dict[str, list[str]] = {(tx.txid or tx.calculate_hash()): [] for tx in transactions}
+        in_degree: dict[str, int] = {tx.txid: 0 for tx in transactions}
+        children: dict[str, list[str]] = {tx.txid: [] for tx in transactions}
 
         # Add UTXO dependencies
         for tx in transactions:
-            tx_txid = tx.txid or tx.calculate_hash()
             if tx.inputs:
                 for tx_input in tx.inputs:
                     parent_txid = tx_input.get("txid")
                     if parent_txid and parent_txid in txid_to_tx:
                         # This tx depends on parent_txid (also in this batch)
-                        in_degree[tx_txid] += 1
-                        children[parent_txid].append(tx_txid)
+                        in_degree[tx.txid] += 1
+                        children[parent_txid].append(tx.txid)
 
         # Add nonce dependencies (same sender, lower nonce must come first)
         # Group by sender and sort by nonce
         by_sender: dict[str, list[tuple[int, str]]] = defaultdict(list)
         for tx in transactions:
             if tx.sender and tx.sender != "COINBASE":
-                tx_txid = tx.txid or tx.calculate_hash()
                 nonce = tx.nonce if tx.nonce is not None else 0
-                by_sender[tx.sender].append((nonce, tx_txid))
+                by_sender[tx.sender].append((nonce, tx.txid))
 
         for sender, nonce_txids in by_sender.items():
             # Sort by nonce

@@ -21,6 +21,7 @@ Comprehensive authentication system with:
 
 import atexit
 import hashlib
+import hmac
 import logging
 import secrets
 import threading
@@ -92,6 +93,9 @@ class JWTAuthManager:
     Manages JWT token generation, validation, and revocation with automatic cleanup.
     """
 
+    # Minimum entropy requirements for JWT secrets (128 bits = 16 bytes = 32 hex chars)
+    MIN_SECRET_ENTROPY_BYTES = 16
+
     def __init__(
         self,
         secret_key: str,
@@ -105,13 +109,25 @@ class JWTAuthManager:
         Initialize JWT authentication manager.
 
         Args:
-            secret_key: Secret key for signing tokens
+            secret_key: Secret key for signing tokens (minimum 128 bits entropy)
             algorithm: JWT algorithm (HS256, RS256, etc.)
             token_expiration_hours: Access token expiration in hours
             refresh_token_expiration_days: Refresh token expiration in days
             cleanup_enabled: Enable automatic blacklist cleanup (default: True)
             cleanup_interval_seconds: Cleanup interval in seconds (default: 900 = 15 minutes)
+
+        Raises:
+            ValueError: If secret_key has insufficient entropy (< 128 bits)
         """
+        # Validate secret key entropy
+        if len(secret_key) < self.MIN_SECRET_ENTROPY_BYTES * 2:  # Hex encoding doubles length
+            security_logger.warning(
+                f"JWT secret key has insufficient entropy: {len(secret_key)} chars < {self.MIN_SECRET_ENTROPY_BYTES * 2} minimum"
+            )
+            raise ValueError(
+                f"JWT secret key must be at least {self.MIN_SECRET_ENTROPY_BYTES * 2} characters "
+                f"(128 bits entropy). Got {len(secret_key)} characters."
+            )
         self.secret_key = secret_key
         self.algorithm = algorithm
         self.token_expiration = timedelta(hours=token_expiration_hours)
@@ -495,9 +511,9 @@ class APIKeyManager:
             # Hash the provided key
             key_hash = hashlib.sha256(api_key.encode()).hexdigest()
 
-            # Find key
+            # Find key using constant-time comparison to prevent timing attacks
             for key_id, key_info in self.api_keys.items():
-                if key_info.key_hash == key_hash:
+                if hmac.compare_digest(key_info.key_hash, key_hash):
                     # Check if active
                     if not key_info.is_active:
                         return False, None, "API key is inactive"

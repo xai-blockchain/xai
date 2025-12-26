@@ -17,6 +17,7 @@ Supports multiple WASM runtimes:
 from __future__ import annotations
 
 import logging
+import secrets
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -622,9 +623,8 @@ class WasmHostAPI:
         return int(time.time() * 1000)
 
     def random_u32(self) -> int:
-        """Get random uint32"""
-        import random
-        return random.randint(0, 2**32 - 1)
+        """Get cryptographically secure random uint32"""
+        return secrets.randbelow(2**32)
 
 def compile_to_wasm(source_code: str, language: str = "rust") -> bytes:
     """

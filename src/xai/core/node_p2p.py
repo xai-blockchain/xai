@@ -1276,10 +1276,28 @@ class P2PNetworkManager:
                 if not self._handle_block_message(peer_id, payload):
                     return  # Duplicate, already handled
             elif message_type == "get_chain":
+                # Legacy full chain request - uses O(n) serialization
+                # Prefer get_chain_range for paginated sync
                 await self._send_signed_message(
                     websocket, peer_id, {"type": "chain", "payload": self.blockchain.to_dict()}
                 )
+            elif message_type == "get_chain_range":
+                # Paginated chain sync - O(limit) instead of O(n)
+                offset = payload.get("offset", 0) if isinstance(payload, dict) else 0
+                limit = payload.get("limit") if isinstance(payload, dict) else None
+                include_pending = payload.get("include_pending", offset == 0) if isinstance(payload, dict) else (offset == 0)
+                paginated_data = self.blockchain.to_dict_paginated(
+                    offset=offset,
+                    limit=limit,
+                    include_pending=include_pending,
+                )
+                await self._send_signed_message(
+                    websocket, peer_id, {"type": "chain_range", "payload": paginated_data}
+                )
             elif message_type == "chain":
+                self.received_chains.append(payload)
+            elif message_type == "chain_range":
+                # Paginated chain response - append to received chains for processing
                 self.received_chains.append(payload)
             elif message_type == "get_peers":
                 await self._handle_get_peers_message(websocket, peer_id)

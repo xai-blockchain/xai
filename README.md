@@ -395,8 +395,8 @@ pytest --cov=src/xai --cov-fail-under=80
 
 | Document | Purpose |
 |----------|---------|
-| **[TESTING-GUIDE.md](TESTING-GUIDE.md)** | Complete testing guide with examples and best practices |
-| **[LOCAL-TESTING-QUICK-REF.md](LOCAL-TESTING-QUICK-REF.md)** | Quick reference for common test commands |
+| **[TESTING-GUIDE.md](docs/development/TESTING-GUIDE.md)** | Complete testing guide with examples and best practices |
+| **[LOCAL-TESTING-QUICK-REF.md](docs/development/LOCAL-TESTING-QUICK-REF.md)** | Quick reference for common test commands |
 
 ### Test Coverage
 
@@ -506,9 +506,9 @@ pre-commit run --all-files
 
 ### Technical Documentation
 
-- **[Whitepaper](WHITEPAPER.md)** - Complete technical specification and design rationale
-- **[Technical Specifications](TECHNICAL.md)** - Detailed system documentation
-- **[Project Structure](PROJECT_STRUCTURE.md)** - Codebase organization and module descriptions
+- **[Whitepaper](docs/development/WHITEPAPER.md)** - Complete technical specification and design rationale
+- **[Technical Specifications](docs/development/TECHNICAL.md)** - Detailed system documentation
+- **[Project Structure](docs/development/PROJECT_STRUCTURE.md)** - Codebase organization and module descriptions
 - **[API Documentation](docs/api/)** - REST API endpoint reference
 - **[CLI Guide](docs/CLI_GUIDE.md)** - Complete command-line reference
 
@@ -516,7 +516,7 @@ pre-commit run --all-files
 
 - **[Security Policy](SECURITY.md)** - Vulnerability disclosure and security best practices
 - **[Contributing Guide](CONTRIBUTING.md)** - Development guidelines and contribution process
-- **[Testing Guide](TESTING-GUIDE.md)** - Comprehensive testing documentation
+- **[Testing Guide](docs/development/TESTING-GUIDE.md)** - Comprehensive testing documentation
 
 ## Network Parameters
 
@@ -617,9 +617,9 @@ XAI is a proof-of-concept blockchain implementation. While striving for producti
 
 - Source Code: Provided by your organization
 - Issue Tracker: Provided by your organization
-- **Documentation**: [docs/README.md](docs/README.md)
-- **Whitepaper**: [WHITEPAPER.md](WHITEPAPER.md)
-- **Community Guidelines**: [docs/xai_docs/community_expectations.md](docs/xai_docs/community_expectations.md)
+- **Documentation**: [docs/index.md](docs/index.md)
+- **Whitepaper**: [docs/development/WHITEPAPER.md](docs/development/WHITEPAPER.md)
+- **Community Guidelines**: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - **P2P Security Profiles**: See `docs/security/env_profiles.md` and `.env.example` for validator/seeder/devnet env blocks.
 
 ---

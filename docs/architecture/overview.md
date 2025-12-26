@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This document provides a comprehensive overview of the blockchain project's architecture, design principles, and core components.
+This document provides a comprehensive overview of the XAI blockchain architecture, design principles, and core components. XAI is a Python-based Proof of Work blockchain using SHA-256 hashing, UTXO transaction model, and a Flask-based API layer.
 
 ## System Architecture
 
@@ -66,7 +66,7 @@ The blockchain engine is responsible for:
 
 The consensus mechanism ensures network agreement on the blockchain state.
 
-**Consensus Algorithm**: [PoW/PoS/DPoS/BFT - specify your consensus]
+**Consensus Algorithm**: Proof of Work (PoW) with SHA-256 and dynamic difficulty adjustment
 
 **Key Responsibilities:**
 - Leader election
@@ -87,12 +87,12 @@ Manages pending transactions before they're included in blocks.
 
 ### 4. State Manager
 
-Maintains the current state of the blockchain.
+Maintains the current state of the blockchain using a UTXO (Unspent Transaction Output) model.
 
 **Components:**
-- Account balances
+- UTXO set management
 - Smart contract storage
-- Merkle Patricia trie
+- Merkle tree verification
 - State snapshots
 - State pruning
 
@@ -207,11 +207,11 @@ Executes smart contracts and transaction scripts.
    - Used for analytics
    - Higher storage requirements
 
-4. **Validator Nodes**
-   - Participate in consensus
-   - Produce new blocks
-   - Require staking (if PoS)
-   - Higher uptime requirements
+4. **Mining Nodes**
+   - Participate in consensus via PoW
+   - Produce new blocks through mining
+   - Require computational resources
+   - Submit valid proof-of-work solutions
 
 ## Security Architecture
 
@@ -233,10 +233,10 @@ Executes smart contracts and transaction scripts.
 
 ### Throughput
 
-- **Block Time**: [e.g., 10 seconds]
-- **Block Size**: [e.g., 2MB]
-- **TPS**: [e.g., 1000 transactions per second]
-- **Finality**: [e.g., 12 confirmations]
+- **Block Time**: 2 minutes (120 seconds)
+- **Block Size**: 1MB maximum
+- **TPS**: ~50-100 transactions per second
+- **Finality**: 6 confirmations recommended
 
 ### Latency
 

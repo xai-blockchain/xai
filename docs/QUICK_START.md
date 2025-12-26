@@ -1,5 +1,7 @@
 # XAI Blockchain - Quick Start Guide
 
+> **Note:** This is the detailed step-by-step quick start guide. For additional installation options (Docker, package managers, one-line install), see the [main QUICKSTART guide](QUICKSTART.md).
+
 Get started with XAI blockchain in just 5 minutes! This guide will walk you through installation, wallet creation, and your first transaction.
 
 ---

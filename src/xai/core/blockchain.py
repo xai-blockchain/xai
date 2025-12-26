@@ -245,6 +245,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             raise Exception("Blockchain data integrity check failed. Data may be corrupted.")
 
         self.chain: list[BlockHeader] = []
+        self._block_hash_index: dict[str, int] = {}  # Maps normalized block hash to chain index
         self.pending_transactions: list[Transaction] = []
         self.orphan_transactions: list[Transaction] = []
         self._draft_transactions: list[Transaction] = []
@@ -360,6 +361,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         self.seen_txids: set[str] = set()
         self._sender_pending_count: dict[str, int] = defaultdict(int)
         self._spent_inputs: set[str] = set()  # O(1) double-spend detection for mempool
+        self._pending_tx_by_txid: dict[str, "Transaction"] = {}  # O(1) lookup for pending tx by txid
 
         # Mining coordination to prevent race conditions during block propagation
         # When a peer block is received, mining pauses for a cooldown period to allow
@@ -602,31 +604,47 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             self.logger.debug(f"Failed to load block {index} from disk: {type(e).__name__}: {e}")
             return None
 
+    @staticmethod
+    def _normalize_hash(value: str | None) -> str | None:
+        """Normalize a block hash to lowercase without 0x prefix."""
+        if not value:
+            return None
+        lowered = value.lower()
+        if lowered.startswith("0x"):
+            lowered = lowered[2:]
+        return lowered if lowered else None
+
     def get_block_by_hash(self, block_hash: str) -> Block | None:
         """
         Return a block matching the provided hash.
 
+        Uses O(1) index lookup. Falls back to O(n) scan if index is stale.
+
         Args:
             block_hash: Hex-encoded hash with or without 0x prefix.
         """
-
-        def _normalize(value: str | None) -> str | None:
-            if not value:
-                return None
-            lowered = value.lower()
-            if lowered.startswith("0x"):
-                lowered = lowered[2:]
-            return lowered if lowered else None
-
-        normalized = _normalize(block_hash)
+        normalized = self._normalize_hash(block_hash)
         if not normalized:
             return None
 
-        for candidate in self.chain:
-            current_hash = getattr(candidate, "hash", None)
-            if not current_hash and isinstance(candidate, dict):
-                current_hash = candidate.get("hash") or candidate.get("block_hash")
-            if _normalize(current_hash) == normalized:
+        # O(1) index lookup
+        index = self._block_hash_index.get(normalized)
+        if index is not None and index < len(self.chain):
+            candidate = self.chain[index]
+            candidate_hash = getattr(candidate, "hash", None)
+            if not candidate_hash and isinstance(candidate, dict):
+                candidate_hash = candidate.get("hash") or candidate.get("block_hash")
+            if self._normalize_hash(candidate_hash) == normalized:
+                return candidate
+
+        # Fallback: O(n) scan if index miss (shouldn't happen in normal operation)
+        for i, candidate in enumerate(self.chain):
+            candidate_hash = getattr(candidate, "hash", None)
+            if not candidate_hash and isinstance(candidate, dict):
+                candidate_hash = candidate.get("hash") or candidate.get("block_hash")
+            if self._normalize_hash(candidate_hash) == normalized:
+                # Repair index
+                self._block_hash_index[normalized] = i
                 return candidate
         return None
 
@@ -975,6 +993,9 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 self.contracts = loaded_state.get("contracts", {})
                 self.contract_receipts = loaded_state.get("receipts", [])
 
+                # Rebuild block hash index for O(1) lookups
+                self._rebuild_block_hash_index()
+
                 self.logger.info(f"Fast recovery successful: loaded {len(self.chain)} blocks "
                       f"(checkpoint at {checkpoint.height}, "
                       f"validated {len(self.chain) - checkpoint.height - 1} new blocks)")
@@ -1011,6 +1032,9 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         
         # Store only headers in memory
         self.chain = [block.header for block in full_chain]
+
+        # Rebuild block hash index for O(1) lookups
+        self._rebuild_block_hash_index()
 
         self.logger.info(f"Loaded {len(self.chain)} blocks from disk (full validation).")
         return True
@@ -2918,9 +2942,26 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         """
         return self.mining_coordinator.should_pause_mining()
 
+    def _update_block_hash_index(self, block: Block | BlockHeader, index: int) -> None:
+        """Update the block hash index for O(1) lookups."""
+        block_hash = getattr(block, "hash", None)
+        if not block_hash and isinstance(block, dict):
+            block_hash = block.get("hash") or block.get("block_hash")
+        normalized = self._normalize_hash(block_hash)
+        if normalized:
+            self._block_hash_index[normalized] = index
+
+    def _rebuild_block_hash_index(self) -> None:
+        """Rebuild the entire block hash index from the current chain."""
+        self._block_hash_index.clear()
+        for i, block in enumerate(self.chain):
+            self._update_block_hash_index(block, i)
+
     def _add_block_to_chain(self, block: Block) -> bool:
         """Helper method to add a validated block to the chain."""
+        block_index = len(self.chain)
         self.chain.append(block)
+        self._update_block_hash_index(block, block_index)
 
         # Update mining coordination timestamp when receiving peer blocks
         # This signals mining to pause for the cooldown period to prevent race conditions
@@ -3331,9 +3372,141 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
     # ==================== BLOCKCHAIN SERIALIZATION ====================
 
+    # Default batch size for paginated chain sync (100 blocks per batch)
+    DEFAULT_CHAIN_SYNC_BATCH_SIZE: int = 100
+
+    def get_blocks_range(
+        self,
+        start_height: int,
+        end_height: int | None = None,
+        limit: int | None = None,
+    ) -> list[Block]:
+        """
+        Retrieve blocks within a height range.
+
+        Supports two modes:
+        1. Range mode: start_height to end_height (inclusive)
+        2. Limit mode: start_height with max `limit` blocks
+
+        Args:
+            start_height: Starting block height (0-indexed, inclusive)
+            end_height: Ending block height (inclusive). If None, uses limit.
+            limit: Maximum number of blocks to return. If None, defaults to
+                   DEFAULT_CHAIN_SYNC_BATCH_SIZE.
+
+        Returns:
+            List of Block objects in ascending height order.
+            Empty list if start_height is beyond chain length.
+
+        Raises:
+            ValueError: If start_height is negative or end_height < start_height
+        """
+        if start_height < 0:
+            raise ValueError("start_height must be non-negative")
+
+        chain_length = len(self.chain)
+        if start_height >= chain_length:
+            return []
+
+        # Determine effective end based on mode
+        if end_height is not None:
+            if end_height < start_height:
+                raise ValueError("end_height must be >= start_height")
+            effective_end = min(end_height, chain_length - 1)
+        else:
+            batch_size = limit if limit is not None else self.DEFAULT_CHAIN_SYNC_BATCH_SIZE
+            effective_end = min(start_height + batch_size - 1, chain_length - 1)
+
+        # Load blocks, ensuring we get full blocks (not just headers)
+        blocks: list[Block] = []
+        for idx in range(start_height, effective_end + 1):
+            block = self.get_block(idx)
+            if block is not None:
+                blocks.append(block)
+            else:
+                # If we can't load a block, stop here to maintain contiguity
+                self.logger.warning(
+                    "Failed to load block during range retrieval",
+                    extra={"height": idx, "start": start_height, "end": effective_end}
+                )
+                break
+
+        return blocks
+
+    def to_dict_paginated(
+        self,
+        offset: int = 0,
+        limit: int | None = None,
+        include_pending: bool = True,
+    ) -> dict[str, Any]:
+        """
+        Export blockchain state with paginated chain serialization.
+
+        This method provides O(limit) serialization instead of O(n) for the
+        entire chain, suitable for incremental chain sync over P2P.
+
+        Args:
+            offset: Starting block height (0-indexed)
+            limit: Maximum number of blocks to include. Defaults to
+                   DEFAULT_CHAIN_SYNC_BATCH_SIZE.
+            include_pending: Whether to include pending transactions.
+                           Set to False after first batch for efficiency.
+
+        Returns:
+            Dict containing:
+            - chain: List of block dicts for the requested range
+            - pending_transactions: List of pending tx dicts (if include_pending)
+            - difficulty: Current difficulty
+            - pagination: Metadata about the current page
+            - stats: Chain statistics
+        """
+        effective_limit = limit if limit is not None else self.DEFAULT_CHAIN_SYNC_BATCH_SIZE
+        chain_length = len(self.chain)
+
+        # Get blocks for this page
+        blocks = self.get_blocks_range(offset, limit=effective_limit)
+        serialized_blocks = [self._block_to_full_dict(block) for block in blocks]
+
+        # Calculate pagination metadata
+        has_more = (offset + len(blocks)) < chain_length
+        next_offset = offset + len(blocks) if has_more else None
+
+        result: dict[str, Any] = {
+            "chain": serialized_blocks,
+            "difficulty": self.difficulty,
+            "pagination": {
+                "offset": offset,
+                "limit": effective_limit,
+                "count": len(serialized_blocks),
+                "total_blocks": chain_length,
+                "has_more": has_more,
+                "next_offset": next_offset,
+            },
+            "stats": {
+                "blocks": chain_length,
+                "total_transactions": sum(
+                    len(block.transactions) if hasattr(block, "transactions") else 0
+                    for block in blocks
+                ),
+                "total_supply": self.get_circulating_supply(),
+                "difficulty": self.difficulty,
+            },
+        }
+
+        # Only include pending transactions on first page or when explicitly requested
+        if include_pending:
+            result["pending_transactions"] = [
+                tx.to_dict() for tx in self.pending_transactions
+            ]
+
+        return result
+
     def to_dict(self) -> dict[str, Any]:
         """
         Export the entire blockchain state to a dictionary.
+
+        WARNING: This method has O(n) complexity where n is chain length.
+        For long chains, prefer to_dict_paginated() for incremental sync.
 
         Returns:
             Dict containing chain, pending transactions, difficulty, and stats
