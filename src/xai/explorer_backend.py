@@ -25,6 +25,7 @@ from flask_cors import CORS
 from flask_sock import Sock
 
 from xai.core.config import API_ALLOWED_ORIGINS
+from xai.core.api_blueprints.base import require_admin_auth
 
 # Configure logging
 logging.basicConfig(
@@ -1156,6 +1157,23 @@ class AddressLabelingManager:
     def __init__(self, db: ExplorerDatabase):
         self.db = db
 
+    @staticmethod
+    def _escape_like_pattern(pattern: str) -> str:
+        """Escape SQL LIKE special characters to prevent pattern manipulation.
+
+        Args:
+            pattern: User-provided search pattern
+
+        Returns:
+            Escaped pattern safe for use in SQL LIKE queries
+        """
+        # Escape backslash first, then LIKE special chars
+        return (
+            pattern.replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
+
     def import_from_csv(self, csv_path: str) -> tuple[int, int]:
         """Import address labels from CSV file
 
@@ -1242,14 +1260,19 @@ class AddressLabelingManager:
             return 0
 
     def search_labels(self, query: str) -> list[AddressLabel]:
-        """Search labels by name or address"""
+        """Search labels by name or address.
+
+        Uses escaped LIKE patterns to prevent SQL pattern manipulation.
+        """
+        # Escape LIKE special characters to prevent pattern injection
+        escaped_query = self._escape_like_pattern(query)
         cursor = self.db.conn.cursor()
         cursor.execute("""
             SELECT address, label, category, description, created_at
             FROM address_labels
-            WHERE label LIKE ? OR address LIKE ?
+            WHERE label LIKE ? ESCAPE '\\' OR address LIKE ? ESCAPE '\\'
             LIMIT 100
-        """, (f"%{query}%", f"%{query}%"))
+        """, (f"%{escaped_query}%", f"%{escaped_query}%"))
 
         return [AddressLabel(*row) for row in cursor.fetchall()]
 
@@ -1723,7 +1746,11 @@ def get_metric_history(metric_type):
 @app.route("/api/labels/import", methods=["POST"])
 def import_labels():
     """Import labels from CSV file (admin endpoint)"""
-    # In production, add authentication/authorization
+    # Require admin authentication
+    auth_error = require_admin_auth()
+    if auth_error:
+        return auth_error
+
     if 'file' not in request.files:
         return jsonify({"error": "No file provided"}), 400
 

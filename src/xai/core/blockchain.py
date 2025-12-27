@@ -14,8 +14,9 @@ import statistics
 import tempfile
 import threading
 import time
-from collections import defaultdict, deque
+from collections import OrderedDict, defaultdict, deque
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Sequence
@@ -286,6 +287,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         self.governance_state: GovernanceState | None = None
         self.governance_executor: GovernanceExecutionEngine | None = None
 
+        # P2 Performance: Cumulative transaction count for O(1) lookups
+        # Incremented on block add, recalculated on reorg/load
+        self._cumulative_tx_count: int = 0
+
     def _init_consensus(self) -> None:
         """Load validator configuration and consensus security parameters."""
         self._finality_quorum_threshold = float(os.getenv("XAI_FINALITY_QUORUM", "0.67"))
@@ -341,7 +346,9 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             getattr(BlockchainSecurityConfig, "MAX_TRANSACTIONS_PER_BLOCK", 10_000)
         )
         self._max_pow_target = int("f" * 64, 16)
-        self._block_work_cache: dict[str, int] = {}
+        # P1: Bounded LRU cache for block work (max 10,000 entries)
+        self._block_work_cache: OrderedDict[str, int] = OrderedDict()
+        self._block_work_cache_max_size = 10_000
         self._median_time_span = int(
             getattr(BlockchainSecurityConfig, "MEDIAN_TIME_SPAN", 11)
         )
@@ -349,6 +356,28 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             getattr(BlockchainSecurityConfig, "MAX_FUTURE_BLOCK_TIME", 2 * 3600)
         )
         self._timestamp_drift_history: deque[dict[str, float]] = deque(maxlen=256)
+
+    def cache_block_work(self, block_hash: str, work: int) -> None:
+        """Cache block work with LRU eviction (P1 performance fix).
+
+        Maintains bounded cache of block work calculations to prevent
+        unbounded memory growth. Evicts oldest entries when max size exceeded.
+
+        Args:
+            block_hash: Block hash as cache key
+            work: Calculated work value
+        """
+        if not block_hash:
+            return
+        # Move to end if exists (LRU update)
+        if block_hash in self._block_work_cache:
+            self._block_work_cache.move_to_end(block_hash)
+            self._block_work_cache[block_hash] = work
+            return
+        # Evict oldest if at capacity
+        while len(self._block_work_cache) >= self._block_work_cache_max_size:
+            self._block_work_cache.popitem(last=False)
+        self._block_work_cache[block_hash] = work
 
     def _init_mining(self) -> None:
         """Configure mining, mempool, and transaction validation subsystems."""
@@ -359,9 +388,11 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         self._chain_lock = threading.RLock()
         self._mempool_lock = threading.RLock()
         self.seen_txids: set[str] = set()
-        self._sender_pending_count: dict[str, int] = defaultdict(int)
+        self._sender_pending_count: defaultdict[str, int] = defaultdict(int)
         self._spent_inputs: set[str] = set()  # O(1) double-spend detection for mempool
         self._pending_tx_by_txid: dict[str, "Transaction"] = {}  # O(1) lookup for pending tx by txid
+        # P2 Performance: O(1) nonce duplicate detection in mempool
+        self._pending_nonces: set[tuple[str, int]] = set()  # (sender, nonce) tuples
 
         # Mining coordination to prevent race conditions during block propagation
         # When a peer block is received, mining pauses for a cooldown period to allow
@@ -424,6 +455,11 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         self._mempool_evicted_low_fee_total = 0
         self._mempool_expired_total = 0
         self._state_integrity_snapshots: list[dict[str, Any]] = []
+
+        # P2 Performance: Cache mempool overview stats with TTL (5 seconds)
+        self._mempool_stats_cache: dict[str, Any] = {}
+        self._mempool_stats_cache_time: float = 0.0
+        self._mempool_stats_cache_ttl: float = 5.0
 
     def _init_governance(self) -> None:
         """Initialize governance state once the chain is loaded."""
@@ -596,8 +632,10 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         """Return a full block by index, loading from disk if only header is cached."""
         if index < len(self.chain):
             candidate = self.chain[index]
-            if hasattr(candidate, "transactions") and getattr(candidate, "transactions", None):
+            # Check if candidate is a full Block (not just a BlockHeader)
+            if isinstance(candidate, Block) and getattr(candidate, "transactions", None) is not None:
                 return candidate  # already a full block
+        # Load full block from disk (chain stores headers only)
         try:
             return self.storage.load_block_from_disk(index)
         except (StorageError, DatabaseError, OSError, KeyError) as e:
@@ -635,7 +673,8 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             if not candidate_hash and isinstance(candidate, dict):
                 candidate_hash = candidate.get("hash") or candidate.get("block_hash")
             if self._normalize_hash(candidate_hash) == normalized:
-                return candidate
+                # Load full block from disk (chain stores headers only)
+                return self.get_block(index)
 
         # Fallback: O(n) scan if index miss (shouldn't happen in normal operation)
         for i, candidate in enumerate(self.chain):
@@ -645,7 +684,8 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             if self._normalize_hash(candidate_hash) == normalized:
                 # Repair index
                 self._block_hash_index[normalized] = i
-                return candidate
+                # Load full block from disk (chain stores headers only)
+                return self.get_block(i)
         return None
 
     def get_circulating_supply(self) -> float:
@@ -996,6 +1036,9 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 # Rebuild block hash index for O(1) lookups
                 self._rebuild_block_hash_index()
 
+                # P2 Performance: Recalculate cumulative transaction count from chain
+                self._recalculate_cumulative_tx_count()
+
                 self.logger.info(f"Fast recovery successful: loaded {len(self.chain)} blocks "
                       f"(checkpoint at {checkpoint.height}, "
                       f"validated {len(self.chain) - checkpoint.height - 1} new blocks)")
@@ -1035,6 +1078,9 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
         # Rebuild block hash index for O(1) lookups
         self._rebuild_block_hash_index()
+
+        # P2 Performance: Recalculate cumulative transaction count from chain
+        self._recalculate_cumulative_tx_count()
 
         self.logger.info(f"Loaded {len(self.chain)} blocks from disk (full validation).")
         return True
@@ -1345,6 +1391,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             self.orphan_blocks.clear()
             self.seen_txids.clear()
             self._sender_pending_count.clear()
+            self._pending_nonces.clear()  # P2 Performance
             self.utxo_manager.clear()
             self.nonce_tracker.reset()
             self.contracts.clear()
@@ -1448,6 +1495,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             self.orphan_blocks.clear()
             self.seen_txids.clear()
             self._sender_pending_count.clear()
+            self._pending_nonces.clear()  # P2 Performance
             self.nonce_tracker.reset()
             self._rebuild_nonce_tracker(truncated_chain)
             self._rebuild_governance_state_from_chain()
@@ -2398,7 +2446,8 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             # Calculate cumulative work (difficulty) for both chains
             current_work = self._calculate_chain_work(self.chain)
             new_work = self._calculate_chain_work(materialized_chain)
-            current_tx_count = sum(len(getattr(b, "transactions", []) or []) for b in self.chain)
+            # P2 Performance: Use cached count for current chain (O(1)), compute for new chain
+            current_tx_count = self._cumulative_tx_count
             new_tx_count = sum(len(getattr(b, "transactions", []) or []) for b in materialized_chain)
 
             if new_work > current_work:
@@ -2459,6 +2508,8 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
             # Replace chain
             self.chain = materialized_chain
+            # P2 Performance: Recalculate cumulative tx count for new chain
+            self._recalculate_cumulative_tx_count()
             if self.smart_contract_manager:
                 self._rebuild_contract_state()
             self._rebuild_governance_state_from_chain()
@@ -2957,11 +3008,33 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         for i, block in enumerate(self.chain):
             self._update_block_hash_index(block, i)
 
+    def _recalculate_cumulative_tx_count(self) -> None:
+        """
+        Recalculate cumulative transaction count from the entire chain.
+
+        Called during chain load and after reorganizations. This is O(n) but
+        happens only during startup/reorg, not on every API call.
+        """
+        total = 0
+        for header_or_block in self.chain:
+            # Check if we have full block with transactions
+            if hasattr(header_or_block, 'transactions'):
+                total += len(header_or_block.transactions)
+            else:
+                # Load full block from disk for headers-only chain
+                block = self.storage.load_block_from_disk(header_or_block.index)
+                if block:
+                    total += len(block.transactions)
+        self._cumulative_tx_count = total
+
     def _add_block_to_chain(self, block: Block) -> bool:
         """Helper method to add a validated block to the chain."""
         block_index = len(self.chain)
         self.chain.append(block)
         self._update_block_hash_index(block, block_index)
+
+        # P2 Performance: Update cumulative transaction count (O(1) vs O(n) sum)
+        self._cumulative_tx_count += len(block.transactions)
 
         # Update mining coordination timestamp when receiving peer blocks
         # This signals mining to pause for the cooldown period to prevent race conditions
@@ -3063,6 +3136,8 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 if orphan.header.previous_hash == self.chain[-1].hash:
                     # This orphan can now be connected
                     self.chain.append(orphan)
+                    # P2 Performance: Update cumulative transaction count
+                    self._cumulative_tx_count += len(orphan.transactions)
                     self._process_governance_block_transactions(orphan)
 
                     # Update UTXO set
@@ -3484,7 +3559,9 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             },
             "stats": {
                 "blocks": chain_length,
-                "total_transactions": sum(
+                # P2 Performance: Use cached cumulative tx count (O(1) vs O(n) sum)
+                "total_transactions": self._cumulative_tx_count,
+                "page_transactions": sum(
                     len(block.transactions) if hasattr(block, "transactions") else 0
                     for block in blocks
                 ),
@@ -3517,10 +3594,8 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
             "difficulty": self.difficulty,
             "stats": {
                 "blocks": len(self.chain),
-                "total_transactions": sum(
-                    len(block.transactions) if hasattr(block, "transactions") else 0
-                    for block in self.chain
-                ),
+                # P2 Performance: Use cached cumulative tx count (O(1) vs O(n) sum)
+                "total_transactions": self._cumulative_tx_count,
                 "total_supply": self.get_circulating_supply(),
                 "difficulty": self.difficulty,
             },

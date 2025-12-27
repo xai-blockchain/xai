@@ -18,7 +18,8 @@ from xai.core.security_validation import (
     log_security_event,
     SecurityEventRouter,
 )
-from xai.core.node import BlockchainNode, _SecurityWebhookForwarder
+from xai.core.node import BlockchainNode
+from xai.core.security_webhook_forwarder import SecurityWebhookForwarder as _SecurityWebhookForwarder
 
 
 class TestSecurityValidatorConstants:

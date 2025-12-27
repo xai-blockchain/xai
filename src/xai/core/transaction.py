@@ -375,6 +375,9 @@ class Transaction:
         self.gas_sponsor = gas_sponsor
         self.gas_sponsor_signature = None  # Sponsor's authorization signature
 
+        # Cached size for O(1) validation (P1 performance fix)
+        self._cached_size: int | None = None
+
         # Create default output if needed
         if not self.outputs and self.recipient and self.amount > 0:
             self.outputs.append({"address": self.recipient, "amount": self.amount})
@@ -484,10 +487,18 @@ class Transaction:
     def get_size(self) -> int:
         """
         Calculate transaction size in bytes for fee-per-byte calculations.
+
+        Uses cached size for O(1) repeated access. Size is computed once and
+        cached since transaction data is immutable after construction.
         """
+        # Return cached size if available (P1 performance fix)
+        if self._cached_size is not None:
+            return self._cached_size
+
         try:
             serialized = canonical_json(self.to_dict())
-            return len(serialized.encode('utf-8'))
+            self._cached_size = len(serialized.encode('utf-8'))
+            return self._cached_size
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
             logger.debug(
                 "Failed to serialize transaction for size calculation, using estimate",

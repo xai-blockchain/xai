@@ -302,7 +302,7 @@ class ForkManager:
         work = self.blockchain._max_pow_target // denominator
 
         if block_hash:
-            self.blockchain._block_work_cache[block_hash] = work
+            self.blockchain.cache_block_work(block_hash, work)
         return work
 
     def _rollback_to_fork_point(self, fork_point: int) -> None:

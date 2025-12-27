@@ -268,7 +268,17 @@ class TransactionValidator:
         return None
 
     def _is_pending_output_consumed(self, transaction: "Transaction", tx_input: dict[str, Any]) -> bool:
-        """Check if a pending output is already consumed by another transaction."""
+        """
+        Check if a pending output is already consumed by another transaction.
+
+        P2 Performance: Uses _spent_inputs set for O(1) lookup instead of O(p*i)
+        nested loop over pending transactions and their inputs.
+        """
+        input_key = f"{tx_input['txid']}:{tx_input['vout']}"
+        # Use the blockchain's spent_inputs set if available (O(1) lookup)
+        if hasattr(self.blockchain, '_spent_inputs'):
+            return input_key in self.blockchain._spent_inputs
+        # Fallback to O(p*i) search if _spent_inputs not available
         return any(
             inp.get("txid") == tx_input["txid"] and inp.get("vout") == tx_input["vout"]
             for t in self.blockchain.pending_transactions
@@ -306,6 +316,12 @@ class TransactionValidator:
         if transaction.sender == "COINBASE":
             return
 
+        # Guard against None nonce - validate_nonce expects int
+        if transaction.nonce is None:
+            raise ValidationError(
+                f"Transaction nonce is required for sender {transaction.sender}"
+            )
+
         expected_nonce = self.nonce_tracker.get_next_nonce(transaction.sender)
         if not self.nonce_tracker.validate_nonce(transaction.sender, transaction.nonce):
             if self._is_first_spend_backward_compatible(transaction, expected_nonce):
@@ -330,7 +346,17 @@ class TransactionValidator:
         )
 
     def _has_duplicate_nonce_in_pending(self, transaction: "Transaction") -> bool:
-        """Check if nonce is duplicated in pending transactions."""
+        """
+        Check if nonce is duplicated in pending transactions.
+
+        P2 Performance: Uses _pending_nonces set for O(1) lookup instead of O(p)
+        loop over pending transactions.
+        """
+        if transaction.sender and transaction.nonce is not None:
+            # Use the blockchain's pending_nonces set if available (O(1) lookup)
+            if hasattr(self.blockchain, '_pending_nonces'):
+                return (transaction.sender, transaction.nonce) in self.blockchain._pending_nonces
+        # Fallback to O(p) search if _pending_nonces not available
         return any(
             getattr(tx, "sender", None) == transaction.sender and
             getattr(tx, "nonce", None) == transaction.nonce

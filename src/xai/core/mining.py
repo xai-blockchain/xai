@@ -104,9 +104,9 @@ class MiningCoordinator:
         # Calculate work
         work = 2 ** difficulty
 
-        # Cache for future lookups
+        # Cache for future lookups (using bounded LRU cache method)
         if block_hash:
-            self.blockchain._block_work_cache[block_hash] = work
+            self.blockchain.cache_block_work(block_hash, work)
 
         return work
 

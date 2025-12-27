@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from cryptography.fernet import Fernet
 
-from xai.core.node import _SecurityWebhookForwarder
+from xai.core.security_webhook_forwarder import SecurityWebhookForwarder as _SecurityWebhookForwarder
 
 
 def wait_for(condition, timeout=3.0, interval=0.05):
