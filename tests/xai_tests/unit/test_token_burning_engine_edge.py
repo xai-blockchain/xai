@@ -2,7 +2,7 @@
 Additional edge tests for TokenBurningEngine burn history/stats updates.
 """
 
-from xai.core.token_burning_engine import TokenBurningEngine, ServiceType
+from xai.core.governance.token_burning_engine import TokenBurningEngine, ServiceType
 
 
 class InMemoryEngine(TokenBurningEngine):

@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 
 from xai.core.aixn_blockchain.atomic_swap_11_coins import CrossChainVerifier
-from xai.core.spv_header_store import SPVHeaderStore, Header
+from xai.core.p2p.spv_header_store import SPVHeaderStore, Header
 
 class FixtureVerifier(CrossChainVerifier):
     """

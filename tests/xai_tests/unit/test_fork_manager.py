@@ -6,7 +6,7 @@ import json
 import os
 from types import SimpleNamespace
 
-from xai.core.fork_manager import ForkManager
+from xai.core.chain.fork_manager import ForkManager
 
 
 class DummyBlockchain:

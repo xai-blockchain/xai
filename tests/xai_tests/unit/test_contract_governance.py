@@ -6,7 +6,7 @@ from typing import Any
 
 from xai.core.blockchain import Blockchain
 from xai.core.config import Config
-from xai.core.governance_execution import ProposalType
+from xai.core.governance.governance_execution import ProposalType
 
 def _save_contract_snapshot(blockchain: Blockchain) -> None:
     blockchain.storage.save_state_to_disk(

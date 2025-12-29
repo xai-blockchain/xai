@@ -302,7 +302,7 @@ def receive_block() -> tuple[dict[str, Any], int]:
     try:
         # P2P metrics: received block
         try:
-            from xai.core.monitoring import MetricsCollector
+            from xai.core.api.monitoring import MetricsCollector
             MetricsCollector.instance().record_p2p_message("received")
         except (ImportError, RuntimeError, ValueError) as exc:
             logger.warning(

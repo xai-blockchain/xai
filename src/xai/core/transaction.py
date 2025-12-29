@@ -24,8 +24,8 @@ from typing import Any
 
 import base58
 
-from xai.core.crypto_utils import derive_public_key_hex, sign_message_hex, verify_signature_hex
-from xai.core.validation import validate_address, validate_amount
+from xai.core.security.crypto_utils import derive_public_key_hex, sign_message_hex, verify_signature_hex
+from xai.core.consensus.validation import validate_address, validate_amount
 
 logger = logging.getLogger(__name__)
 
@@ -452,7 +452,7 @@ class Transaction:
             raw_address = f"{prefix}{pub_hash[:40]}"
 
             # Apply checksum encoding to match wallet address format
-            from xai.core.address_checksum import to_checksum_address
+            from xai.core.wallets.address_checksum import to_checksum_address
             expected_address = to_checksum_address(raw_address)
 
             if expected_address != self.sender:

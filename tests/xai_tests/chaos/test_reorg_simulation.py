@@ -3,7 +3,7 @@ import time
 import pytest
 
 from xai.core.blockchain import Blockchain, Block, BlockHeader, Transaction
-from xai.core.reorg_simulator import ReorgSimulator
+from xai.core.chain.reorg_simulator import ReorgSimulator
 
 
 def _make_block(index: int, prev_hash: str, txs: list[Transaction], blockchain: Blockchain) -> Block:

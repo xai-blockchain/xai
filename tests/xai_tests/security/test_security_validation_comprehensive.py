@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
 
-from xai.core.security_validation import (
+from xai.core.security.security_validation import (
     SecurityValidator,
     ValidationError,
     log_security_event,

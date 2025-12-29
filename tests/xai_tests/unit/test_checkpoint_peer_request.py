@@ -1,8 +1,8 @@
 import asyncio
 from types import SimpleNamespace
 
-from xai.core.checkpoint_sync import CheckpointSyncManager
-from xai.core.checkpoint_payload import CheckpointPayload
+from xai.core.p2p.checkpoint_sync import CheckpointSyncManager
+from xai.core.consensus.checkpoint_payload import CheckpointPayload
 
 
 class DummyP2P:

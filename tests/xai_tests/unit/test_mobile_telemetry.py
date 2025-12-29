@@ -26,7 +26,7 @@ from xai.mobile.network_optimizer import (
     BandwidthMode,
     QueuedTransaction
 )
-from xai.core.api_mobile_telemetry import MobileTelemetryAPIHandler
+from xai.core.api.api_mobile_telemetry import MobileTelemetryAPIHandler
 
 
 class TestTelemetryEvent:

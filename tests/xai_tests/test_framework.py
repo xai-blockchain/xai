@@ -19,8 +19,8 @@ import tempfile
 import pytest
 from xai.core.blockchain import Blockchain, Transaction, Block
 from xai.core.wallet import Wallet
-from xai.core.blockchain_security import BlockchainSecurityManager, BlockchainSecurityConfig
-from xai.core.advanced_consensus import AdvancedConsensusManager
+from xai.core.security.blockchain_security import BlockchainSecurityManager, BlockchainSecurityConfig
+from xai.core.consensus.advanced_consensus import AdvancedConsensusManager
 
 class FrameworkResult:
     """Test result tracking"""

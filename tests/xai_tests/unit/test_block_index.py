@@ -17,7 +17,7 @@ import json
 import pytest
 from pathlib import Path
 
-from xai.core.block_index import BlockIndex, LRUBlockCache
+from xai.core.chain.block_index import BlockIndex, LRUBlockCache
 
 
 class TestLRUBlockCache:

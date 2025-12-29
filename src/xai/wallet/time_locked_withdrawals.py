@@ -8,8 +8,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from xai.core.monitoring import MetricsCollector
-from xai.core.security_validation import log_security_event
+from xai.core.api.monitoring import MetricsCollector
+from xai.core.security.security_validation import log_security_event
 
 logger = logging.getLogger("xai.wallet.time_lock")
 

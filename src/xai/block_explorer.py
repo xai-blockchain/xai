@@ -162,7 +162,7 @@ def get_from_node(endpoint: str, use_cache: bool = True) -> dict[str, Any] | Non
             return cached
 
     try:
-        response = requests.get(f"{NODE_URL}{endpoint}", timeout=5)
+        response = requests.get(f"{NODE_URL}{endpoint}", timeout=15)
         response.raise_for_status()
         data = response.json()
 
@@ -204,7 +204,7 @@ def post_to_node(endpoint: str, data: dict[str, Any]) -> dict[str, Any] | None:
         JSON response as dictionary or None on error
     """
     try:
-        response = requests.post(f"{NODE_URL}{endpoint}", json=data, timeout=5)
+        response = requests.post(f"{NODE_URL}{endpoint}", json=data, timeout=15)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.Timeout:

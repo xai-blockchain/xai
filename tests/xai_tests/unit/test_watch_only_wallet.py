@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from xai.core.watch_only_wallet import (
+from xai.core.wallets.watch_only_wallet import (
     WatchOnlyWalletStore,
     DuplicateWatchAddressError,
 )

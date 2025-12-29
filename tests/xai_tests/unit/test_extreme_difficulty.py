@@ -24,8 +24,8 @@ import math
 from unittest.mock import patch
 
 from xai.core.blockchain import Blockchain, Block
-from xai.core.block_header import BlockHeader
-from xai.core.advanced_consensus import DynamicDifficultyAdjustment
+from xai.core.chain.block_header import BlockHeader
+from xai.core.consensus.advanced_consensus import DynamicDifficultyAdjustment
 from xai.core.wallet import Wallet
 
 

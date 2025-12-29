@@ -1,6 +1,6 @@
 import json
 
-from xai.core.checkpoint_sync import CheckpointSyncManager
+from xai.core.p2p.checkpoint_sync import CheckpointSyncManager
 
 
 class DummyUtxoManager:

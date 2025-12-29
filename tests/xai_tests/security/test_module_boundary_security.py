@@ -23,11 +23,11 @@ from unittest.mock import Mock, MagicMock, patch
 from decimal import Decimal
 
 from xai.core.blockchain import Blockchain
-from xai.core.transaction_validator import TransactionValidator
-from xai.core.utxo_manager import UTXOManager
+from xai.core.consensus.transaction_validator import TransactionValidator
+from xai.core.transactions.utxo_manager import UTXOManager
 from xai.core.wallet import Wallet
 from xai.core.node import Node
-from xai.core.advanced_consensus import AdvancedConsensus
+from xai.core.consensus.advanced_consensus import AdvancedConsensus
 
 
 @pytest.mark.security

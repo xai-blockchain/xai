@@ -1,7 +1,7 @@
 from flask import Flask
 import pytest
 
-from xai.core.security_middleware import SecurityConfig, SessionManager
+from xai.core.security.security_middleware import SecurityConfig, SessionManager
 
 
 @pytest.fixture(name="app")

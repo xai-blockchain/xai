@@ -59,8 +59,8 @@ def test_wallet_manager_create_and_list(tmp_path):
 
 def test_hardware_wallet_path(monkeypatch):
     """When hardware wallet is present, Wallet uses it for address/signing."""
-    monkeypatch.setattr("xai.core.wallet.HARDWARE_WALLET_ENABLED", True)
-    monkeypatch.setattr("xai.core.wallet.get_default_hardware_wallet", lambda: StubHardwareWallet())
+    monkeypatch.setattr("xai.core.wallets.HARDWARE_WALLET_ENABLED", True)
+    monkeypatch.setattr("xai.core.wallets.get_default_hardware_wallet", lambda: StubHardwareWallet())
 
     wallet = Wallet()
     assert wallet.address == "HWADDR"
@@ -69,13 +69,13 @@ def test_hardware_wallet_path(monkeypatch):
 
 def test_hardware_wallet_sign_failure_bubbles(monkeypatch):
     """Hardware wallet signing failures propagate to callers for visibility."""
-    monkeypatch.setattr("xai.core.wallet.HARDWARE_WALLET_ENABLED", True)
+    monkeypatch.setattr("xai.core.wallets.HARDWARE_WALLET_ENABLED", True)
 
     class FailingWallet(StubHardwareWallet):
         def sign_transaction(self, data: bytes) -> bytes:
             raise RuntimeError("device locked")
 
-    monkeypatch.setattr("xai.core.wallet.get_default_hardware_wallet", lambda: FailingWallet())
+    monkeypatch.setattr("xai.core.wallets.get_default_hardware_wallet", lambda: FailingWallet())
 
     wallet = Wallet()
     with pytest.raises(RuntimeError, match="device locked"):
@@ -100,9 +100,9 @@ def test_concurrent_software_signing_thread_safe():
 
 def test_concurrent_hardware_signing_uses_device_once_per_call(monkeypatch):
     """Hardware signing path remains deterministic across concurrent requests."""
-    monkeypatch.setattr("xai.core.wallet.HARDWARE_WALLET_ENABLED", True)
+    monkeypatch.setattr("xai.core.wallets.HARDWARE_WALLET_ENABLED", True)
     hardware = StubHardwareWallet()
-    monkeypatch.setattr("xai.core.wallet.get_default_hardware_wallet", lambda: hardware)
+    monkeypatch.setattr("xai.core.wallets.get_default_hardware_wallet", lambda: hardware)
 
     wallet = Wallet()
     messages = [f"hw-msg-{i}" for i in range(10)]

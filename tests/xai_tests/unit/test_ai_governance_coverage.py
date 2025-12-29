@@ -18,7 +18,7 @@ import pytest
 import time
 import math
 from unittest.mock import Mock, patch
-from xai.core.ai_governance import (
+from xai.core.governance.ai_governance import (
     VotingPowerDisplay,
     VotingPower,
     AIWorkloadDistribution,
@@ -882,7 +882,7 @@ class TestAIGovernanceProposal:
 
     def test_activate_timelock_success(self):
         """Test activating timelock after approval."""
-        from xai.core.governance_parameters import GovernanceParameters
+        from xai.core.governance.governance_parameters import GovernanceParameters
 
         proposal = AIGovernanceProposal(
             title="Test",
@@ -904,7 +904,7 @@ class TestAIGovernanceProposal:
 
     def test_activate_timelock_wrong_status(self):
         """Test activating timelock with wrong status."""
-        from xai.core.governance_parameters import GovernanceParameters
+        from xai.core.governance.governance_parameters import GovernanceParameters
 
         proposal = AIGovernanceProposal(
             title="Test",

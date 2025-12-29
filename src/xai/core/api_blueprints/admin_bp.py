@@ -20,8 +20,8 @@ from xai.core.api_blueprints.base import (
     require_admin_auth,
     success_response,
 )
-from xai.core.monitoring import MetricsCollector
-from xai.core.rate_limiter import get_rate_limiter
+from xai.core.api.monitoring import MetricsCollector
+from xai.core.security.rate_limiter import get_rate_limiter
 
 logger = logging.getLogger(__name__)
 

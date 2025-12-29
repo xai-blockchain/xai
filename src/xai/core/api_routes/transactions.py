@@ -6,9 +6,10 @@ from typing import TYPE_CHECKING, Any
 
 from flask import jsonify, request
 
-from xai.core.input_validation_schemas import NodeTransactionInput
-from xai.core.monitoring import MetricsCollector
-from xai.core.request_validator_middleware import validate_request
+from xai.core.security.api_rate_limiting import rate_limit_read, rate_limit_write
+from xai.core.security.input_validation_schemas import NodeTransactionInput
+from xai.core.api.monitoring import MetricsCollector
+from xai.core.security.request_validator_middleware import validate_request
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
     blockchain = routes.blockchain
 
     @app.route("/transactions", methods=["GET"])
+    @rate_limit_read  # High limits for read operations
     def get_pending_transactions() -> dict[str, Any]:
         """Get pending transactions."""
         try:
@@ -47,6 +49,7 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
         )
 
     @app.route("/transaction/<txid>", methods=["GET"])
+    @rate_limit_read  # High limits for read operations
     def get_transaction(txid: str) -> tuple[dict[str, Any], int]:
         """Get transaction by ID."""
         chain = getattr(blockchain, "chain", [])
@@ -119,6 +122,7 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
         return jsonify({"found": False, "error": "Transaction not found"}), 404
 
     @app.route("/send", methods=["POST"])
+    @rate_limit_write  # Medium limits for write operations
     @validate_request(routes.request_validator, NodeTransactionInput)
     def send_transaction() -> tuple[dict[str, Any], int]:
         """Submit new transaction with strict validation and sanitized errors."""
@@ -130,7 +134,7 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
             return paused
 
         try:
-            from xai.core.advanced_rate_limiter import get_rate_limiter as get_advanced_rate_limiter
+            from xai.core.security.advanced_rate_limiter import get_rate_limiter as get_advanced_rate_limiter
 
             limiter = get_advanced_rate_limiter()
             allowed, error = limiter.check_rate_limit("/send")
@@ -230,46 +234,61 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
                 )
 
             # Verify signature - now raises exceptions
+            # Import signature verification exceptions at top of block for clarity
+            from xai.core.transaction import (
+                InvalidSignatureError,
+                MissingSignatureError,
+                SignatureCryptoError,
+                SignatureVerificationError,
+            )
             try:
                 verification_result = tx.verify_signature()
-            except Exception as e:
-                # Import signature verification exceptions
-                from xai.core.transaction import (
-                    InvalidSignatureError,
-                    MissingSignatureError,
-                    SignatureCryptoError,
-                    SignatureVerificationError,
+            except MissingSignatureError as e:
+                return routes._error_response(
+                    "Missing signature or public key",
+                    status=400,
+                    code="missing_signature",
+                    context={"sender": model.sender, "error": str(e)}
                 )
-
-                if isinstance(e, MissingSignatureError):
-                    return routes._error_response(
-                        "Missing signature or public key",
-                        status=400,
-                        code="missing_signature",
-                        context={"sender": model.sender, "error": str(e)}
-                    )
-                elif isinstance(e, InvalidSignatureError):
-                    return routes._error_response(
-                        "Invalid signature",
-                        status=400,
-                        code="invalid_signature",
-                        context={"sender": model.sender, "error": str(e)}
-                    )
-                elif isinstance(e, SignatureCryptoError):
-                    return routes._error_response(
-                        "Signature verification error",
-                        status=500,
-                        code="crypto_error",
-                        context={"sender": model.sender, "error": str(e)}
-                    )
-                else:
-                    # Unexpected error
-                    return routes._error_response(
-                        "Unexpected signature verification error",
-                        status=500,
-                        code="verification_error",
-                        context={"sender": model.sender, "error": str(e)}
-                    )
+            except InvalidSignatureError as e:
+                return routes._error_response(
+                    "Invalid signature",
+                    status=400,
+                    code="invalid_signature",
+                    context={"sender": model.sender, "error": str(e)}
+                )
+            except SignatureCryptoError as e:
+                return routes._error_response(
+                    "Signature verification error",
+                    status=500,
+                    code="crypto_error",
+                    context={"sender": model.sender, "error": str(e)}
+                )
+            except SignatureVerificationError as e:
+                # Catch remaining SignatureVerificationError subclasses
+                return routes._error_response(
+                    "Signature verification failed",
+                    status=400,
+                    code="signature_error",
+                    context={"sender": model.sender, "error": str(e)}
+                )
+            except Exception as e:
+                # Log unexpected errors for debugging, but return generic message
+                logger.error(
+                    "Unexpected error during transaction signature verification",
+                    extra={
+                        "error_type": type(e).__name__,
+                        "error": str(e),
+                        "sender": model.sender,
+                    },
+                    exc_info=True
+                )
+                return routes._error_response(
+                    "Unexpected signature verification error",
+                    status=500,
+                    code="verification_error",
+                    context={"sender": model.sender, "error": str(e)}
+                )
             else:
                 if verification_result is False:
                     return routes._error_response(

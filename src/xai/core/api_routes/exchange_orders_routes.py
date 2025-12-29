@@ -23,12 +23,12 @@ from typing import TYPE_CHECKING, Any
 
 from flask import jsonify, request
 
-from xai.core.input_validation_schemas import (
+from xai.core.security.input_validation_schemas import (
     ExchangeCancelInput,
     ExchangeOrderInput,
 )
-from xai.core.node_utils import get_base_dir
-from xai.core.request_validator_middleware import validate_request
+from xai.core.chain.node_utils import get_base_dir
+from xai.core.security.request_validator_middleware import validate_request
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
@@ -425,9 +425,56 @@ def register_exchange_orders_routes(routes: "NodeAPIRoutes") -> None:
             recent_trades = [trade for trade in all_trades if trade["timestamp"] >= cutoff_time]
             recent_trades.sort(key=lambda entry: entry["timestamp"])
 
-            price_data: list = []
-            volume_data: list = []
-            # Aggregation logic placeholder—existing endpoint returned empty arrays
+            # OHLC aggregation logic
+            # Determine bucket size based on timeframe
+            bucket_sizes = {
+                "1h": 60,        # 1-minute buckets for 1h
+                "24h": 900,      # 15-minute buckets for 24h
+                "7d": 3600,      # 1-hour buckets for 7d
+                "30d": 14400,    # 4-hour buckets for 30d
+            }
+            bucket_size = bucket_sizes.get(timeframe, 900)
+
+            if not recent_trades:
+                return jsonify({
+                    "success": True,
+                    "timeframe": timeframe,
+                    "prices": [],
+                    "volumes": [],
+                    "ohlc": [],
+                }), 200
+
+            # Group trades into time buckets
+            buckets: dict[int, list] = {}
+            for trade in recent_trades:
+                bucket_key = int(trade["timestamp"] // bucket_size) * bucket_size
+                if bucket_key not in buckets:
+                    buckets[bucket_key] = []
+                buckets[bucket_key].append(trade)
+
+            # Calculate OHLC for each bucket
+            ohlc_data = []
+            price_data = []
+            volume_data = []
+
+            for bucket_time in sorted(buckets.keys()):
+                bucket_trades = buckets[bucket_time]
+                prices = [t.get("price", 0) for t in bucket_trades if t.get("price")]
+                volumes = [t.get("amount", 0) for t in bucket_trades if t.get("amount")]
+
+                if prices:
+                    ohlc = {
+                        "timestamp": bucket_time,
+                        "open": prices[0],
+                        "high": max(prices),
+                        "low": min(prices),
+                        "close": prices[-1],
+                        "volume": sum(volumes),
+                    }
+                    ohlc_data.append(ohlc)
+                    price_data.append({"timestamp": bucket_time, "price": ohlc["close"]})
+                    volume_data.append({"timestamp": bucket_time, "volume": ohlc["volume"]})
+
             return (
                 jsonify(
                     {
@@ -435,6 +482,7 @@ def register_exchange_orders_routes(routes: "NodeAPIRoutes") -> None:
                         "timeframe": timeframe,
                         "prices": price_data,
                         "volumes": volume_data,
+                        "ohlc": ohlc_data,
                     }
                 ),
                 200,

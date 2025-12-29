@@ -18,7 +18,7 @@ from urllib.parse import quote
 
 from flask import Response, jsonify, request, send_file
 
-from xai.core.validation import validate_address
+from xai.core.consensus.validation import validate_address
 from xai.mobile.qr_transactions import (
     QRCODE_AVAILABLE,
     TransactionQRGenerator,

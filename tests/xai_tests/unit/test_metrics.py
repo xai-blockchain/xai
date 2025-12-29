@@ -12,8 +12,8 @@ if "pythonjsonlogger" not in sys.modules:
     jsonlogger = types.SimpleNamespace(JsonFormatter=lambda *a, **k: None)
     sys.modules["pythonjsonlogger"] = types.SimpleNamespace(jsonlogger=jsonlogger)
 
-import xai.core.metrics as metrics_mod
-from xai.core.prometheus_metrics import BlockchainMetrics as SimpleMetrics
+import xai.core.api.metrics as metrics_mod
+from xai.core.api.prometheus_metrics import BlockchainMetrics as SimpleMetrics
 
 
 # Stub StructuredLogger to avoid LogRecord 'message' clashes during tests

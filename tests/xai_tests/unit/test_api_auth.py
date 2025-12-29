@@ -8,7 +8,7 @@ from pathlib import Path
 
 from flask import Flask
 
-from xai.core.api_auth import APIAuthManager, APIKeyStore
+from xai.core.api.api_auth import APIAuthManager, APIKeyStore
 
 
 def test_api_key_store_issue_rotate_revoke(tmp_path):

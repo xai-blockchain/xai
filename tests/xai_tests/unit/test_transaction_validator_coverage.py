@@ -14,8 +14,8 @@ import pytest
 import time
 from xai.core.blockchain import Blockchain, Transaction
 from xai.core.wallet import Wallet
-from xai.core.transaction_validator import TransactionValidator
-from xai.core.security_validation import ValidationError
+from xai.core.consensus.transaction_validator import TransactionValidator
+from xai.core.security.security_validation import ValidationError
 
 
 class TestTimeCapsuleValidation:
@@ -768,7 +768,7 @@ class TestGetTransactionValidator:
 
     def test_get_transaction_validator(self, tmp_path):
         """Test getting global validator instance"""
-        from xai.core.transaction_validator import get_transaction_validator
+        from xai.core.consensus.transaction_validator import get_transaction_validator
 
         bc = Blockchain(data_dir=str(tmp_path))
 
@@ -779,7 +779,7 @@ class TestGetTransactionValidator:
 
     def test_get_transaction_validator_singleton(self, tmp_path):
         """Test global validator is singleton"""
-        from xai.core.transaction_validator import get_transaction_validator
+        from xai.core.consensus.transaction_validator import get_transaction_validator
 
         bc = Blockchain(data_dir=str(tmp_path))
 

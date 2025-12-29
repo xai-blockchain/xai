@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import secrets as secrets_module
+import threading
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Callable
@@ -129,6 +130,35 @@ def _parse_origin_list(raw: str) -> list[str]:
 API_RATE_LIMIT = int(os.getenv("XAI_API_RATE_LIMIT", "120"))
 API_RATE_WINDOW_SECONDS = int(os.getenv("XAI_API_RATE_WINDOW_SECONDS", "60"))
 API_MAX_JSON_BYTES = int(os.getenv("XAI_API_MAX_JSON_BYTES", "1048576"))
+
+# Enhanced Rate Limiting Configuration (DDoS Protection)
+# Categories: read (high), write (medium), sensitive (strict), admin (very strict)
+RATE_LIMIT_ENABLED = bool(int(os.getenv("XAI_RATE_LIMIT_ENABLED", "1")))
+
+# Read endpoints - higher limits (info queries, status checks)
+RATE_LIMIT_READ_REQUESTS = int(os.getenv("XAI_RATE_LIMIT_READ", "300"))
+RATE_LIMIT_READ_WINDOW = int(os.getenv("XAI_RATE_LIMIT_READ_WINDOW", "60"))
+
+# Write endpoints - medium limits (transactions, state changes)
+RATE_LIMIT_WRITE_REQUESTS = int(os.getenv("XAI_RATE_LIMIT_WRITE", "50"))
+RATE_LIMIT_WRITE_WINDOW = int(os.getenv("XAI_RATE_LIMIT_WRITE_WINDOW", "60"))
+
+# Sensitive endpoints - strict limits (faucet, auth, registration)
+RATE_LIMIT_SENSITIVE_REQUESTS = int(os.getenv("XAI_RATE_LIMIT_SENSITIVE", "5"))
+RATE_LIMIT_SENSITIVE_WINDOW = int(os.getenv("XAI_RATE_LIMIT_SENSITIVE_WINDOW", "300"))
+
+# Admin endpoints - very strict limits
+RATE_LIMIT_ADMIN_REQUESTS = int(os.getenv("XAI_RATE_LIMIT_ADMIN", "20"))
+RATE_LIMIT_ADMIN_WINDOW = int(os.getenv("XAI_RATE_LIMIT_ADMIN_WINDOW", "60"))
+
+# DDoS detection thresholds
+RATE_LIMIT_DDOS_THRESHOLD = int(os.getenv("XAI_RATE_LIMIT_DDOS_THRESHOLD", "1000"))
+RATE_LIMIT_DDOS_WINDOW = int(os.getenv("XAI_RATE_LIMIT_DDOS_WINDOW", "60"))
+RATE_LIMIT_BLOCK_DURATION = int(os.getenv("XAI_RATE_LIMIT_BLOCK_DURATION", "3600"))
+
+# Faucet specific limits (very strict to prevent abuse)
+RATE_LIMIT_FAUCET_REQUESTS = int(os.getenv("XAI_RATE_LIMIT_FAUCET", "1"))
+RATE_LIMIT_FAUCET_WINDOW = int(os.getenv("XAI_RATE_LIMIT_FAUCET_WINDOW", "86400"))
 API_ALLOWED_ORIGINS = _parse_origin_list(os.getenv("XAI_API_ALLOWED_ORIGINS", ""))
 API_KEY_STORE_PATH = os.getenv(
     "XAI_API_KEY_STORE",
@@ -154,6 +184,9 @@ if API_ADMIN_TOKEN:
 API_AUTH_REQUIRED = bool(int(os.getenv("XAI_API_AUTH_REQUIRED", "1")))
 API_AUTH_KEYS = [key.strip() for key in os.getenv("XAI_API_KEYS", "").split(",") if key.strip()]
 
+# Thread-safe configuration lock for runtime modifications
+_config_lock = threading.RLock()
+
 _RUNTIME_MUTABLE_FIELDS: dict[str, tuple[str, Callable[[str], Any]]] = {
     "API_RATE_LIMIT": ("XAI_API_RATE_LIMIT", int),
     "API_RATE_WINDOW_SECONDS": ("XAI_API_RATE_WINDOW_SECONDS", int),
@@ -165,6 +198,9 @@ _RUNTIME_INITIAL_VALUES = {key: globals()[key] for key in _RUNTIME_MUTABLE_FIELD
 def reload_runtime(overrides: dict[str, str] | None = None) -> dict[str, Any]:
     """
     Reload selected runtime configuration values from environment.
+
+    Thread-safe: Uses _config_lock to ensure atomic updates across all
+    configuration sources (globals, TestnetConfig, MainnetConfig).
 
     Args:
         overrides: Optional mapping of env var -> value to apply for this reload
@@ -180,6 +216,9 @@ def reload_runtime(overrides: dict[str, str] | None = None) -> dict[str, Any]:
         env.update({key: str(value) for key, value in overrides.items()})
 
     changes: dict[str, dict[str, Any]] = {}
+
+    # Validate all values before acquiring lock to minimize lock hold time
+    pending_updates: list[tuple[str, Any, Any]] = []
     for attr, (env_var, parser) in _RUNTIME_MUTABLE_FIELDS.items():
         raw = env.get(env_var)
         if raw is None:
@@ -190,15 +229,44 @@ def reload_runtime(overrides: dict[str, str] | None = None) -> dict[str, Any]:
             raise ConfigurationError(f"Invalid value for {env_var}: {exc}") from exc
         current_value = globals()[attr]
         if new_value != current_value:
+            pending_updates.append((attr, current_value, new_value))
+
+    # Apply all updates atomically under lock
+    with _config_lock:
+        for attr, old_value, new_value in pending_updates:
             globals()[attr] = new_value
             setattr(TestnetConfig, attr, new_value)
             setattr(MainnetConfig, attr, new_value)
-            changes[attr] = {"old": current_value, "new": new_value}
+            changes[attr] = {"old": old_value, "new": new_value}
+        logger.info(
+            "Configuration reloaded: %d changes",
+            len(changes),
+            extra={"event": "config.reload", "changes": list(changes.keys())}
+        )
 
     return {
         "changed": changes,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def get_runtime_config(attr: str) -> Any:
+    """
+    Thread-safe getter for runtime-mutable configuration values.
+
+    Args:
+        attr: Configuration attribute name (e.g., 'API_RATE_LIMIT')
+
+    Returns:
+        Current value of the configuration attribute.
+
+    Raises:
+        KeyError: If attr is not a runtime-mutable field.
+    """
+    if attr not in _RUNTIME_MUTABLE_FIELDS:
+        raise KeyError(f"'{attr}' is not a runtime-mutable configuration field")
+    with _config_lock:
+        return globals()[attr]
 
 def _parse_supported_versions(raw: str) -> list[str]:
     versions = [segment.strip() for segment in raw.split(",") if segment.strip()]
@@ -808,6 +876,22 @@ __all__ = [
     "PRUNE_BLOCKS",
     "CHECKPOINT_SYNC_ENABLED",
     "reload_runtime",
+    "get_runtime_config",
     "validate_config",
     "PYDANTIC_AVAILABLE",
+    # Enhanced rate limiting exports
+    "RATE_LIMIT_ENABLED",
+    "RATE_LIMIT_READ_REQUESTS",
+    "RATE_LIMIT_READ_WINDOW",
+    "RATE_LIMIT_WRITE_REQUESTS",
+    "RATE_LIMIT_WRITE_WINDOW",
+    "RATE_LIMIT_SENSITIVE_REQUESTS",
+    "RATE_LIMIT_SENSITIVE_WINDOW",
+    "RATE_LIMIT_ADMIN_REQUESTS",
+    "RATE_LIMIT_ADMIN_WINDOW",
+    "RATE_LIMIT_DDOS_THRESHOLD",
+    "RATE_LIMIT_DDOS_WINDOW",
+    "RATE_LIMIT_BLOCK_DURATION",
+    "RATE_LIMIT_FAUCET_REQUESTS",
+    "RATE_LIMIT_FAUCET_WINDOW",
 ]

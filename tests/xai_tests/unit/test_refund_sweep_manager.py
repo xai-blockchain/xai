@@ -2,7 +2,7 @@
 Tests for RefundSweepManager expired swap detection.
 """
 
-from xai.core.refund_sweep_manager import RefundSweepManager
+from xai.core.wallets.refund_sweep_manager import RefundSweepManager
 
 
 def test_find_expired_swaps_respects_status_and_margin():

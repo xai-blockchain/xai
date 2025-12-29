@@ -4,7 +4,7 @@ Tests for CheckpointSyncManager partial-sync helper.
 
 from types import SimpleNamespace
 
-from xai.core.checkpoint_sync import CheckpointSyncManager
+from xai.core.p2p.checkpoint_sync import CheckpointSyncManager
 
 
 class DummyCheckpoint:

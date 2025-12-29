@@ -1,10 +1,10 @@
-from xai.core.crypto_utils import (
+from xai.core.security.crypto_utils import (
     deterministic_keypair_from_seed,
     sign_message_hex,
     verify_signature_hex,
     derive_public_key_hex,
 )
-from xai.core.block_header import BlockHeader
+from xai.core.chain.block_header import BlockHeader
 
 
 def test_deterministic_keypair_from_seed_is_stable():

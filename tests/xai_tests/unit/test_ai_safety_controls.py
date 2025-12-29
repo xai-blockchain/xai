@@ -8,7 +8,7 @@ import json
 import os
 import pytest
 import time
-from xai.core.ai_safety_controls import (
+from xai.core.security.ai_safety_controls import (
     StopReason,
     AISafetyLevel,
     AISafetyControls,

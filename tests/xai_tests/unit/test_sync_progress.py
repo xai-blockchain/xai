@@ -15,7 +15,7 @@ from unittest.mock import Mock, patch, MagicMock
 
 import pytest
 
-from xai.core.light_client_service import LightClientService, SyncProgress
+from xai.core.p2p.light_client_service import LightClientService, SyncProgress
 
 
 class MockBlockchain:
@@ -418,7 +418,7 @@ class TestWebSocketSyncBroadcast:
 
     def test_header_sync_progress_broadcast_structure(self):
         """Test that header sync progress messages have correct structure."""
-        from xai.core.api_websocket import WebSocketAPIHandler
+        from xai.core.api.api_websocket import WebSocketAPIHandler
         from flask import Flask
 
         app = Flask(__name__)

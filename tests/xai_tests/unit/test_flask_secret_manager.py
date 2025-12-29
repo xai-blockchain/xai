@@ -14,7 +14,7 @@ import tempfile
 import stat
 from pathlib import Path
 import pytest
-from xai.core.flask_secret_manager import FlaskSecretManager, get_flask_secret_key
+from xai.core.security.flask_secret_manager import FlaskSecretManager, get_flask_secret_key
 
 
 class TestFlaskSecretManager:

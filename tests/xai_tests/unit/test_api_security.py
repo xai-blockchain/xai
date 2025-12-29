@@ -7,8 +7,8 @@ import types
 import pytest
 from flask import Flask
 
-from xai.core import api_security
-from xai.core.api_security import APISecurityManager, RateLimitExceeded
+from xai.core.security import api_security
+from xai.core.security.api_security import APISecurityManager, RateLimitExceeded
 
 
 class DummyConfig:

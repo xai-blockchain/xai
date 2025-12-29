@@ -18,7 +18,7 @@ from typing import Any
 
 from xai.core.blockchain import Blockchain, Transaction, Block
 from xai.core.wallet import Wallet
-from xai.core.blockchain_security import BlockchainSecurityConfig
+from xai.core.security.blockchain_security import BlockchainSecurityConfig
 from xai.core.config import Config
 
 

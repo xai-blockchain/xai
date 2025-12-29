@@ -2,8 +2,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from xai.core.nonce_tracker import NonceTracker
-from xai.core.security_validation import SecurityValidator, ValidationError
+from xai.core.transactions.nonce_tracker import NonceTracker
+from xai.core.security.security_validation import SecurityValidator, ValidationError
 
 
 def test_nonce_tracker_enforces_strict_sequence(tmp_path):

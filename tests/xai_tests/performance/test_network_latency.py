@@ -19,7 +19,7 @@ from unittest.mock import Mock, AsyncMock
 from xai.core.blockchain import Blockchain
 from xai.core.wallet import Wallet
 from xai.core.transaction import Transaction
-from xai.core.node_p2p import P2PNetworkManager
+from xai.core.p2p.node_p2p import P2PNetworkManager
 
 # Check if QUIC is available
 QUIC_AVAILABLE = False
@@ -29,9 +29,9 @@ quic_client_send_with_timeout = None
 generate_ec_certificate = None
 
 try:
-    from xai.core.p2p_quic import AIOQUIC_AVAILABLE
+    from xai.core.p2p.p2p_quic import AIOQUIC_AVAILABLE
     if AIOQUIC_AVAILABLE:
-        from xai.core.p2p_quic import (
+        from xai.core.p2p.p2p_quic import (
             QUICServer,
             QuicConfiguration,
             quic_client_send_with_timeout,

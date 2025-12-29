@@ -5,8 +5,8 @@ import json
 import pytest
 
 from xai.core.blockchain import Blockchain
-from xai.core.crypto_utils import generate_secp256k1_keypair_hex, sign_message_hex
-from xai.core.finality import FinalityValidationError
+from xai.core.security.crypto_utils import generate_secp256k1_keypair_hex, sign_message_hex
+from xai.core.consensus.finality import FinalityValidationError
 
 
 def _pubkey_to_address(public_key_hex: str) -> str:

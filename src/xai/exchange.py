@@ -33,7 +33,7 @@ from decimal import Decimal, InvalidOperation
 from enum import Enum
 from typing import Any, Callable
 
-from xai.core.exchange_wallet import ExchangeWalletManager
+from xai.core.wallets.exchange_wallet import ExchangeWalletManager
 from xai.core.transaction import Transaction
 
 logger = logging.getLogger(__name__)

@@ -18,7 +18,7 @@ import pytest
 import json
 from unittest.mock import Mock, patch, MagicMock
 import requests
-from xai.core.additional_ai_providers import (
+from xai.core.api.additional_ai_providers import (
     PerplexityProvider,
     GroqProvider,
     XAIProvider,
@@ -527,7 +527,7 @@ class TestExtendExecutor:
         assert hasattr(MockExecutor, "_call_fireworks_with_limit")
         assert hasattr(MockExecutor, "_call_deepseek_with_limit")
 
-    @patch("xai.core.additional_ai_providers.PerplexityProvider")
+    @patch("xai.core.api.additional_ai_providers.PerplexityProvider")
     def test_call_perplexity_method(self, mock_provider_class):
         """Test _call_perplexity_with_limit method"""
         # Setup mock
@@ -554,7 +554,7 @@ class TestExtendExecutor:
         assert result["success"] is True
         assert result["output"] == "test"
 
-    @patch("xai.core.additional_ai_providers.GroqProvider")
+    @patch("xai.core.api.additional_ai_providers.GroqProvider")
     def test_call_groq_method(self, mock_provider_class):
         """Test _call_groq_with_limit method"""
         # Setup mock
@@ -580,7 +580,7 @@ class TestExtendExecutor:
         assert result["success"] is True
         assert result["output"] == "groq response"
 
-    @patch("xai.core.additional_ai_providers.XAIProvider")
+    @patch("xai.core.api.additional_ai_providers.XAIProvider")
     def test_call_xai_method(self, mock_provider_class):
         """Test _call_xai_with_limit method"""
         # Setup mock
@@ -606,7 +606,7 @@ class TestExtendExecutor:
         assert result["success"] is True
         assert result["output"] == "xai response"
 
-    @patch("xai.core.additional_ai_providers.TogetherAIProvider")
+    @patch("xai.core.api.additional_ai_providers.TogetherAIProvider")
     def test_call_together_method(self, mock_provider_class):
         """Test _call_together_with_limit method"""
         # Setup mock
@@ -632,7 +632,7 @@ class TestExtendExecutor:
         assert result["success"] is True
         assert result["output"] == "together response"
 
-    @patch("xai.core.additional_ai_providers.FireworksAIProvider")
+    @patch("xai.core.api.additional_ai_providers.FireworksAIProvider")
     def test_call_fireworks_method(self, mock_provider_class):
         """Test _call_fireworks_with_limit method"""
         # Setup mock
@@ -658,7 +658,7 @@ class TestExtendExecutor:
         assert result["success"] is True
         assert result["output"] == "fireworks response"
 
-    @patch("xai.core.additional_ai_providers.DeepSeekProvider")
+    @patch("xai.core.api.additional_ai_providers.DeepSeekProvider")
     def test_call_deepseek_method(self, mock_provider_class):
         """Test _call_deepseek_with_limit method"""
         # Setup mock

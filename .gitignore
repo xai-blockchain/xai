@@ -36,6 +36,7 @@ wheels/
 htmlcov/
 .tox/
 .nox/
+MagicMock/
 
 # Test artifacts
 test_cleanup_*/

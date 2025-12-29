@@ -15,7 +15,7 @@ import time
 from decimal import Decimal
 from unittest.mock import Mock, patch
 
-from xai.core.account_abstraction import (
+from xai.core.transactions.account_abstraction import (
     GasSponsor,
     SponsoredTransaction,
     SponsoredTransactionProcessor,
@@ -28,7 +28,7 @@ from xai.core.account_abstraction import (
     AccountAbstractionManager,
 )
 from xai.core.transaction import Transaction
-from xai.core.crypto_utils import generate_secp256k1_keypair_hex
+from xai.core.security.crypto_utils import generate_secp256k1_keypair_hex
 
 
 class TestGasSponsor:

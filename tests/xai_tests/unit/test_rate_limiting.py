@@ -15,14 +15,14 @@ import pytest
 import time
 from unittest.mock import patch
 
-from xai.core.account_abstraction import (
+from xai.core.transactions.account_abstraction import (
     RateLimitConfig,
     SlidingWindowRateLimiter,
     GasSponsor,
     SponsoredTransactionProcessor,
     SponsorshipResult,
 )
-from xai.core.crypto_utils import generate_secp256k1_keypair_hex
+from xai.core.security.crypto_utils import generate_secp256k1_keypair_hex
 from xai.core.transaction import Transaction
 
 

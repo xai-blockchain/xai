@@ -1,7 +1,7 @@
 """Simple coverage test for error_recovery module"""
 import pytest
 from unittest.mock import Mock, MagicMock, patch
-from xai.core.error_recovery import (
+from xai.core.chain.error_recovery import (
     ErrorRecoveryManager,
     create_recovery_manager,
 )

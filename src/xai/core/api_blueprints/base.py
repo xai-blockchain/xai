@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from flask import g, jsonify, request
 
-from xai.core.security_validation import SecurityValidator, log_security_event
+from xai.core.security.security_validation import SecurityValidator, log_security_event
 
 if TYPE_CHECKING:
     from xai.network.peer_manager import PeerManager
@@ -67,8 +67,82 @@ def log_event(
     log_security_event(event_type, {"details": sanitized}, severity=severity)
 
 def success_response(payload: dict[str, Any], status: int = 200) -> tuple[Any, int]:
-    """Return a success payload with consistent structure."""
+    """Return a success payload with consistent structure.
+
+    Standard format:
+        {"success": true, "data": {...}, "metadata": {"timestamp": "..."}}
+
+    For backward compatibility, payload fields are merged at top level.
+    New code should use: success_response({"data": {...}})
+    """
     body = {"success": True, **payload}
+    return jsonify(body), status
+
+
+def data_response(data: Any, status: int = 200) -> tuple[Any, int]:
+    """Return data wrapped in standard envelope.
+
+    Format:
+        {"success": true, "data": <data>, "metadata": {"timestamp": "..."}}
+    """
+    body = {
+        "success": True,
+        "data": data,
+        "metadata": {"timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())},
+    }
+    return jsonify(body), status
+
+
+def paginated_response(
+    data: list[Any],
+    total: int,
+    limit: int,
+    offset: int,
+    status: int = 200,
+) -> tuple[Any, int]:
+    """Return paginated data with standard pagination metadata.
+
+    Format:
+        {
+            "success": true,
+            "data": [...],
+            "pagination": {"limit": 50, "offset": 0, "total": 150, "has_more": true},
+            "metadata": {"timestamp": "..."}
+        }
+    """
+    has_more = offset + len(data) < total
+    body = {
+        "success": True,
+        "data": data,
+        "pagination": {
+            "limit": limit,
+            "offset": offset,
+            "total": total,
+            "has_more": has_more,
+            "next_offset": offset + limit if has_more else None,
+        },
+        "metadata": {
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "count": len(data),
+        },
+    }
+    return jsonify(body), status
+
+
+def list_response(data: list[Any], status: int = 200) -> tuple[Any, int]:
+    """Return a list wrapped in standard envelope with count metadata.
+
+    Format:
+        {"success": true, "data": [...], "metadata": {"count": 5, "timestamp": "..."}}
+    """
+    body = {
+        "success": True,
+        "data": data,
+        "metadata": {
+            "count": len(data),
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        },
+    }
     return jsonify(body), status
 
 def error_response(

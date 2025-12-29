@@ -2,7 +2,7 @@
 
 import pytest
 
-from xai.core.typed_signing import (
+from xai.core.wallets.typed_signing import (
     hash_personal_message,
     hash_typed_data,
     TypedDataDomain,

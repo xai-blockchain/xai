@@ -12,7 +12,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from xai.core.block_header import BlockHeader
+    from xai.core.chain.block_header import BlockHeader
     from xai.core.blockchain_components.block import Block
 
 class BlockchainConsensusMixin:
@@ -192,7 +192,7 @@ class BlockchainConsensusMixin:
         Returns:
             int: New difficulty level (number of leading zeros required)
         """
-        from xai.core.advanced_consensus import DynamicDifficultyAdjustment
+        from xai.core.consensus.advanced_consensus import DynamicDifficultyAdjustment
 
         override_chain = chain is not None
         override_difficulty = current_difficulty is not None

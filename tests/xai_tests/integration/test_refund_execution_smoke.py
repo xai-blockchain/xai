@@ -1,7 +1,7 @@
 import time
 
 from scripts.tools import refund_sweep_runner
-from xai.core.refund_sweep_manager import RefundSweepManager
+from xai.core.wallets.refund_sweep_manager import RefundSweepManager
 
 
 def test_refund_sweep_runs_with_mocked_btc_rpc(monkeypatch):

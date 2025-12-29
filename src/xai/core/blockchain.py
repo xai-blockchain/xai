@@ -10,34 +10,30 @@ import hashlib
 import json
 import math
 import os
-import statistics
 import tempfile
 import threading
 import time
 from collections import OrderedDict, defaultdict, deque
 from datetime import datetime
-from functools import lru_cache
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Sequence
 
-import base58
-
 from xai.blockchain.slashing_manager import SlashingManager
-from xai.core.account_abstraction import (
+from xai.core.transactions.account_abstraction import (
     SponsorshipResult,
     get_sponsored_transaction_processor,
 )
-from xai.core.address_index import AddressTransactionIndex
-from xai.core.advanced_consensus import DynamicDifficultyAdjustment
-from xai.core.block_header import BlockHeader, canonical_json
+from xai.core.chain.address_index import AddressTransactionIndex
+from xai.core.consensus.advanced_consensus import DynamicDifficultyAdjustment
+from xai.core.chain.block_header import BlockHeader, canonical_json
 
 # Block class and mixins extracted to separate modules for maintainability
 from xai.core.blockchain_components.block import Block
 from xai.core.blockchain_components.consensus_mixin import BlockchainConsensusMixin
 from xai.core.blockchain_components.mempool_mixin import BlockchainMempoolMixin
 from xai.core.blockchain_components.mining_mixin import BlockchainMiningMixin
-from xai.core.blockchain_exceptions import (
+from xai.core.chain.blockchain_exceptions import (
     ChainReorgError,
     ConfigurationError,
     DatabaseError,
@@ -47,42 +43,54 @@ from xai.core.blockchain_exceptions import (
     StorageError,
     ValidationError,
 )
-from xai.core.blockchain_interface import BlockchainDataProvider, GamificationBlockchainInterface
-from xai.core.blockchain_security import BlockchainSecurityConfig, BlockSizeValidator
-from xai.core.blockchain_storage import BlockchainStorage
-from xai.core.checkpoints import CheckpointManager
+from xai.core.chain.blockchain_interface import BlockchainDataProvider, GamificationBlockchainInterface
+from xai.core.security.blockchain_security import BlockchainSecurityConfig, BlockSizeValidator
+from xai.core.chain.blockchain_storage import BlockchainStorage
+from xai.core.consensus.checkpoints import CheckpointManager
 from xai.core.config import Config
-from xai.core.crypto_utils import sign_message_hex, verify_signature_hex
-from xai.core.finality import (
+from xai.core.security.crypto_utils import sign_message_hex, verify_signature_hex
+from xai.core.consensus.finality import (
     FinalityCertificate,
     FinalityConfigurationError,
     FinalityManager,
     FinalityValidationError,
     ValidatorIdentity,
 )
-from xai.core.gamification import (
+from xai.core.governance.gamification import (
     AirdropManager,
     FeeRefundCalculator,
     StreakTracker,
     TimeCapsuleManager,
     TreasureHuntManager,
 )
-from xai.core.governance_execution import GovernanceExecutionEngine
-from xai.core.governance_transactions import (
+from xai.core.governance.governance_execution import GovernanceExecutionEngine
+from xai.core.governance.governance_transactions import (
     GovernanceState,
     GovernanceTransaction,
     GovernanceTxType,
 )
-from xai.core.node_identity import load_or_create_identity
-from xai.core.nonce_tracker import NonceTracker
-from xai.core.security_validation import SecurityEventRouter
-from xai.core.structured_logger import StructuredLogger, get_structured_logger
-from xai.core.trading import SwapOrderType
+from xai.core.p2p.node_identity import load_or_create_identity
+from xai.core.transactions.nonce_tracker import NonceTracker
+from xai.core.security.security_validation import SecurityEventRouter
+from xai.core.api.structured_logger import StructuredLogger, get_structured_logger
+from xai.core.transactions.trading import SwapOrderType
 from xai.core.transaction import Transaction, TransactionValidationError
-from xai.core.transaction_validator import TransactionValidator
-from xai.core.utxo_manager import UTXOManager
+from xai.core.consensus.transaction_validator import TransactionValidator
+from xai.core.transactions.utxo_manager import UTXOManager
 from xai.core.vm.manager import SmartContractManager
-from xai.core.wallet_trade_manager_impl import WalletTradeManager
+
+# Protocol interfaces for decoupling managers from Blockchain class
+from xai.core.manager_interfaces import (
+    ChainProvider,
+    ConfigProvider,
+    StateProvider,
+    UTXOProvider,
+    ValidationProvider,
+    StorageProvider,
+    MiningProvider,
+    GovernanceProvider,
+)
+from xai.core.wallets.wallet_trade_manager_impl import WalletTradeManager
 
 # Module-level logger for early initialization logging
 logger = get_structured_logger()
@@ -126,6 +134,162 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
         def add_transaction_to_mempool(self, transaction: Transaction) -> bool:
             return self._blockchain.add_transaction(transaction)
+
+    class _ManagerProtocolProvider:
+        """
+        Adapter providing Protocol interfaces for managers.
+
+        This implements ChainProvider, ConfigProvider, StateProvider, UTXOProvider,
+        ValidationProvider, StorageProvider, MiningProvider, and GovernanceProvider
+        protocols. Managers can depend on these interfaces instead of the full
+        Blockchain class, improving testability and reducing coupling.
+
+        Usage:
+            # In __init__, create provider after base initialization:
+            self._protocol_provider = self._ManagerProtocolProvider(self)
+
+            # Managers can accept specific protocols they need:
+            self.mining_manager = MiningManager(
+                chain=self._protocol_provider,
+                config=self._protocol_provider,
+            )
+        """
+
+        def __init__(self, blockchain: 'Blockchain') -> None:
+            self._blockchain = blockchain
+
+        # === ChainProvider Implementation ===
+        @property
+        def chain(self) -> list[BlockHeader]:
+            return self._blockchain.chain
+
+        @property
+        def pending_transactions(self) -> list[Transaction]:
+            return self._blockchain.pending_transactions
+
+        @property
+        def orphan_transactions(self) -> list[Transaction]:
+            return self._blockchain.orphan_transactions
+
+        def get_block(self, index: int) -> Block | None:
+            return self._blockchain.get_block(index)
+
+        def get_block_by_hash(self, block_hash: str) -> Block | None:
+            return self._blockchain.get_block_by_hash(block_hash)
+
+        def get_latest_block(self) -> BlockHeader:
+            return self._blockchain.chain[-1] if self._blockchain.chain else None
+
+        def get_height(self) -> int:
+            return len(self._blockchain.chain) - 1 if self._blockchain.chain else -1
+
+        # === ConfigProvider Implementation ===
+        @property
+        def difficulty(self) -> int:
+            return self._blockchain.difficulty
+
+        @property
+        def max_supply(self) -> float:
+            return self._blockchain.max_supply
+
+        @property
+        def network_type(self) -> str:
+            return self._blockchain.network_type
+
+        @property
+        def data_dir(self) -> str:
+            return self._blockchain.data_dir
+
+        @property
+        def logger(self) -> StructuredLogger:
+            return self._blockchain.logger
+
+        @property
+        def block_reward(self) -> float:
+            return self._blockchain.get_block_reward(len(self._blockchain.chain))
+
+        # === StateProvider Implementation ===
+        @property
+        def _block_hash_index(self) -> dict[str, int]:
+            return self._blockchain._block_hash_index
+
+        @property
+        def _chain_lock(self) -> threading.RLock:
+            return self._blockchain._chain_lock
+
+        @property
+        def _mempool_lock(self) -> threading.RLock:
+            return self._blockchain._mempool_lock
+
+        @property
+        def address_index(self) -> AddressTransactionIndex:
+            return self._blockchain.address_index
+
+        @property
+        def nonce_tracker(self) -> NonceTracker:
+            return self._blockchain.nonce_tracker
+
+        # === UTXOProvider Implementation ===
+        @property
+        def utxo_manager(self) -> UTXOManager:
+            return self._blockchain.utxo_manager
+
+        def get_balance(self, address: str) -> float:
+            return self._blockchain.utxo_manager.get_balance(address)
+
+        def get_utxo_set(self) -> dict[str, list[dict[str, Any]]]:
+            return self._blockchain.utxo_manager.utxo_set
+
+        # === ValidationProvider Implementation ===
+        def validate_block(self, block: Block) -> tuple[bool, str]:
+            return self._blockchain.validate_block(block)
+
+        def validate_transaction(self, tx: Transaction) -> bool:
+            return self._blockchain.validate_transaction(tx)
+
+        def is_valid_proof_of_work(self, block: Block) -> bool:
+            return self._blockchain.is_valid_proof_of_work(block)
+
+        # === StorageProvider Implementation ===
+        def load_block_from_disk(self, index: int) -> Block | None:
+            return self._blockchain.storage.load_block_from_disk(index)
+
+        def save_block_to_disk(self, index: int, block_data: dict[str, Any]) -> None:
+            self._blockchain.storage.save_block_to_disk(index, block_data)
+
+        def verify_integrity(self) -> bool:
+            return self._blockchain.storage.verify_integrity()
+
+        def save_blockchain_sync(self) -> None:
+            self._blockchain.save_blockchain()
+
+        # === MiningProvider Implementation ===
+        @property
+        def mining_active(self) -> bool:
+            return getattr(self._blockchain, 'mining_active', False)
+
+        def calculate_block_reward(self, height: int) -> float:
+            return self._blockchain.get_block_reward(height)
+
+        def get_mining_stats(self) -> dict[str, Any]:
+            return {
+                'difficulty': self._blockchain.difficulty,
+                'height': len(self._blockchain.chain),
+                'pending_tx_count': len(self._blockchain.pending_transactions),
+            }
+
+        # === GovernanceProvider Implementation ===
+        @property
+        def governance_state(self) -> Any:
+            return self._blockchain.governance_state
+
+        def get_active_proposals(self) -> list[dict[str, Any]]:
+            if self._blockchain.governance_state:
+                return [
+                    p.to_dict() for p in self._blockchain.governance_state.proposals.values()
+                    if p.status in ('pending', 'active', 'voting')
+                ]
+            return []
 
     def __init__(
         self,
@@ -180,14 +344,18 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         # Initialize manager components for god class refactoring
         # These managers encapsulate specific areas of blockchain functionality
         # IMPORTANT: Must initialize BEFORE _load_from_disk() because create_genesis_block() depends on them
-        from xai.core.block_processor import BlockProcessor
-        from xai.core.chain_state import ChainState
-        from xai.core.contract_manager import ContractManager
-        from xai.core.fork_manager import ForkManager
-        from xai.core.mining import MiningCoordinator
-        from xai.core.mining_manager import MiningManager
-        from xai.core.state_manager import StateManager
-        from xai.core.validation_manager import ValidationManager
+        from xai.core.chain.block_processor import BlockProcessor
+        from xai.core.chain.chain_state import ChainState
+        from xai.core.chain.contract_manager import ContractManager
+        from xai.core.chain.fork_manager import ForkManager
+        from xai.core.mining.mining import MiningCoordinator
+        from xai.core.mining.mining_manager import MiningManager
+        from xai.core.chain.state_manager import StateManager
+        from xai.core.consensus.validation_manager import ValidationManager
+
+        # Protocol provider for decoupling - managers can use this instead of self
+        # Migration path: gradually update managers to accept protocol interfaces
+        self._protocol_provider = self._ManagerProtocolProvider(self)
 
         self.mining_manager = MiningManager(self)
         self.validation_manager = ValidationManager(self)
@@ -204,7 +372,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         self._init_governance()
 
         # Initialize GovernanceManager after governance_state is available
-        from xai.core.governance_manager import GovernanceManager
+        from xai.core.governance.governance_manager import GovernanceManager
         self.governance_manager = GovernanceManager(self)
 
         # Rebuild address index if chain exists but index is empty
@@ -2960,7 +3128,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 median_drift_seconds=median_drift,
             )
         try:
-            from xai.core.monitoring import MetricsCollector
+            from xai.core.api.monitoring import MetricsCollector
 
             collector = MetricsCollector.instance()
             if collector:
@@ -3735,7 +3903,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         """
         import json
 
-        from xai.core.crypto_utils import verify_signature_hex
+        from xai.core.security.crypto_utils import verify_signature_hex
 
         # Extract and validate signature
         signature = order_data.get("signature")

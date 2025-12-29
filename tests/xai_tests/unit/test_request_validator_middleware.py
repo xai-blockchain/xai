@@ -4,7 +4,7 @@ Unit tests for request validator middleware (schema validation and error handlin
 
 from flask import Flask, jsonify, request
 
-from xai.core.request_validator_middleware import RequestValidator
+from xai.core.security.request_validator_middleware import RequestValidator
 
 
 def test_request_validator_schema_enforces_required_fields(monkeypatch):

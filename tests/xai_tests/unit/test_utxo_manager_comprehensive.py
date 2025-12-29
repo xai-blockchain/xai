@@ -12,7 +12,7 @@ Tests all UTXO operations including:
 
 import pytest
 from collections import defaultdict
-from xai.core.utxo_manager import UTXOManager, get_utxo_manager
+from xai.core.transactions.utxo_manager import UTXOManager, get_utxo_manager
 from xai.core.blockchain import Transaction
 from xai.core.wallet import Wallet
 
@@ -25,13 +25,14 @@ class TestUTXOManagerInitialization:
         manager = UTXOManager()
 
         assert manager.utxo_set is not None
-        assert isinstance(manager.utxo_set, defaultdict)
+        # utxo_set returns a dict (from storage backend's to_dict())
+        assert isinstance(manager.utxo_set, dict)
         assert manager.total_utxos == 0
         assert manager.total_value == 0.0
 
     def test_utxo_manager_with_logger(self):
         """Test initialization with custom logger"""
-        from xai.core.structured_logger import get_structured_logger
+        from xai.core.api.structured_logger import get_structured_logger
 
         logger = get_structured_logger()
         manager = UTXOManager(logger=logger)
@@ -595,7 +596,7 @@ class TestGlobalUTXOManager:
 
     def test_get_utxo_manager_with_logger(self):
         """Test getting global manager with custom logger"""
-        from xai.core.structured_logger import get_structured_logger
+        from xai.core.api.structured_logger import get_structured_logger
 
         logger = get_structured_logger()
         manager = get_utxo_manager(logger=logger)
@@ -619,7 +620,7 @@ class TestUTXOEdgeCases:
 
     def test_excessive_amount_rejected(self):
         """Test that amounts exceeding supply cap are rejected"""
-        from xai.core.utxo_manager import UTXOValidationError
+        from xai.core.transactions.utxo_manager import UTXOValidationError
 
         manager = UTXOManager()
 

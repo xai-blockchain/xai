@@ -6,7 +6,7 @@ Tests error classification, corruption detection, and health monitoring
 
 import pytest
 import time
-from xai.core.error_detection import (
+from xai.core.chain.error_detection import (
     ErrorSeverity,
     RecoveryState,
     ErrorDetector,

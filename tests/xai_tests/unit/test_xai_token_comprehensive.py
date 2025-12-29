@@ -12,7 +12,7 @@ Tests all XAI token operations including:
 
 import pytest
 import time
-from xai.core.xai_token import (
+from xai.core.governance.xai_token import (
     XAIToken,
     SupplyCapExceededError,
     InsufficientBalanceError

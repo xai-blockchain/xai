@@ -25,7 +25,7 @@ from xai.core.config import Config
 logger = logging.getLogger(__name__)
 
 try:
-    from xai.core.additional_ai_providers import (
+    from xai.core.api.additional_ai_providers import (
         DeepSeekProvider,
         FireworksAIProvider,
         GroqProvider,

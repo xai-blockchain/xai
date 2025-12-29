@@ -8,13 +8,13 @@ from typing import TYPE_CHECKING, Any
 
 from flask import jsonify, request
 
-from xai.core.input_validation_schemas import (
+from xai.core.security.input_validation_schemas import (
     MiningBonusClaimInput,
     MiningRegisterInput,
     ReferralCreateInput,
     ReferralUseInput,
 )
-from xai.core.request_validator_middleware import validate_request
+from xai.core.security.request_validator_middleware import validate_request
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes

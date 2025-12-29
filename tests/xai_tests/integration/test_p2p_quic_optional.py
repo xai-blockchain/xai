@@ -2,7 +2,7 @@ import pytest
 
 pytest.importorskip("aioquic")
 
-from xai.core.node_p2p import P2PNetworkManager
+from xai.core.p2p.node_p2p import P2PNetworkManager
 from xai.core.blockchain import Blockchain
 
 

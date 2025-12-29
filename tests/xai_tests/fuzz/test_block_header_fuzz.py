@@ -12,7 +12,7 @@ import string
 
 import pytest
 
-from xai.core.block_header import BlockHeader, canonical_json
+from xai.core.chain.block_header import BlockHeader, canonical_json
 
 
 def _random_hash() -> str:

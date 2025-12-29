@@ -626,24 +626,199 @@ class WasmHostAPI:
         """Get cryptographically secure random uint32"""
         return secrets.randbelow(2**32)
 
-def compile_to_wasm(source_code: str, language: str = "rust") -> bytes:
+def get_available_toolchains() -> dict[str, bool]:
     """
-    Compile source code to WASM
+    Detect available WASM compilation toolchains.
+
+    Returns:
+        Dict mapping language to availability (True if toolchain found)
+    """
+    import shutil
+
+    toolchains = {
+        "rust": False,
+        "c": False,
+        "go": False,
+        "assemblyscript": False,
+    }
+
+    # Check Rust (requires wasm32 target)
+    if shutil.which("rustc"):
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["rustup", "target", "list", "--installed"],
+                capture_output=True, text=True, timeout=5
+            )
+            if "wasm32-unknown-unknown" in result.stdout:
+                toolchains["rust"] = True
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+            pass
+
+    # Check Clang with WASM target
+    if shutil.which("clang"):
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["clang", "--print-targets"],
+                capture_output=True, text=True, timeout=5
+            )
+            if "wasm32" in result.stdout or "wasm64" in result.stdout:
+                toolchains["c"] = True
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+            # Assume clang supports wasm if it exists (most modern versions do)
+            toolchains["c"] = True
+
+    # Check TinyGo
+    if shutil.which("tinygo"):
+        toolchains["go"] = True
+
+    # Check AssemblyScript compiler
+    if shutil.which("asc") or shutil.which("npx"):
+        toolchains["assemblyscript"] = True
+
+    return toolchains
+
+
+def compile_to_wasm(
+    source_code: str,
+    language: str = "rust",
+    timeout: int = 30,
+    optimize: bool = True,
+) -> bytes:
+    """
+    Compile source code to WASM using available toolchains.
 
     Args:
         source_code: Source code to compile
         language: Source language ("rust", "c", "go", "assemblyscript")
+        timeout: Compilation timeout in seconds (default 30)
+        optimize: Whether to optimize the output (default True)
 
     Returns:
         Compiled WASM bytes
 
-    Note: This is a stub - actual compilation would require
-    language-specific toolchains (rustc, clang, tinygo, asc)
+    Raises:
+        NotImplementedError: If toolchain for language is not available
+        RuntimeError: If compilation fails
+        TimeoutError: If compilation exceeds timeout
     """
-    raise NotImplementedError(
-        "WASM compilation requires language-specific toolchains. "
-        "For Rust: rustc --target wasm32-unknown-unknown "
-        "For C: clang --target=wasm32-unknown-unknown "
-        "For Go: tinygo build -target=wasm "
-        "For AssemblyScript: asc file.ts -o file.wasm"
-    )
+    import os
+    import shutil
+    import subprocess
+    import tempfile
+
+    language = language.lower()
+    toolchains = get_available_toolchains()
+
+    if language not in toolchains:
+        raise ValueError(f"Unsupported language: {language}. Supported: {list(toolchains.keys())}")
+
+    if not toolchains[language]:
+        install_hints = {
+            "rust": "rustup target add wasm32-unknown-unknown",
+            "c": "Install clang with WASM support",
+            "go": "Install tinygo: https://tinygo.org/getting-started/install/",
+            "assemblyscript": "npm install -g assemblyscript",
+        }
+        raise NotImplementedError(
+            f"Toolchain for '{language}' not available. "
+            f"Install with: {install_hints.get(language, 'See documentation')}"
+        )
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir) if 'Path' in dir() else __import__('pathlib').Path(temp_dir)
+        output_file = temp_path / "output.wasm"
+
+        try:
+            if language == "rust":
+                # Rust compilation
+                input_file = temp_path / "input.rs"
+                input_file.write_text(source_code)
+
+                cmd = [
+                    "rustc",
+                    "--target", "wasm32-unknown-unknown",
+                    "--crate-type", "cdylib",
+                    "-o", str(output_file),
+                ]
+                if optimize:
+                    cmd.extend(["-C", "opt-level=s", "-C", "lto=yes"])
+                cmd.append(str(input_file))
+
+            elif language == "c":
+                # Clang compilation
+                input_file = temp_path / "input.c"
+                input_file.write_text(source_code)
+
+                cmd = [
+                    "clang",
+                    "--target=wasm32-unknown-unknown",
+                    "-nostdlib",
+                    "-Wl,--no-entry",
+                    "-Wl,--export-all",
+                    "-o", str(output_file),
+                ]
+                if optimize:
+                    cmd.append("-O2")
+                cmd.append(str(input_file))
+
+            elif language == "go":
+                # TinyGo compilation
+                input_file = temp_path / "main.go"
+                input_file.write_text(source_code)
+
+                cmd = [
+                    "tinygo", "build",
+                    "-target=wasm",
+                    "-o", str(output_file),
+                ]
+                if optimize:
+                    cmd.extend(["-opt", "s"])
+                cmd.append(str(input_file))
+
+            elif language == "assemblyscript":
+                # AssemblyScript compilation
+                input_file = temp_path / "input.ts"
+                input_file.write_text(source_code)
+
+                # Try direct asc first, then npx
+                if shutil.which("asc"):
+                    cmd = ["asc", str(input_file), "-o", str(output_file)]
+                else:
+                    cmd = ["npx", "asc", str(input_file), "-o", str(output_file)]
+                if optimize:
+                    cmd.append("--optimize")
+
+            # Run compilation with resource limits
+            env = os.environ.copy()
+            env["TMPDIR"] = temp_dir  # Contain temp files
+
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=temp_dir,
+                env=env,
+            )
+
+            if result.returncode != 0:
+                error_msg = result.stderr or result.stdout or "Unknown error"
+                raise RuntimeError(f"Compilation failed: {error_msg[:500]}")
+
+            if not output_file.exists():
+                raise RuntimeError("Compilation produced no output")
+
+            wasm_bytes = output_file.read_bytes()
+
+            # Validate WASM magic bytes
+            if len(wasm_bytes) < 8 or wasm_bytes[:4] != b'\x00asm':
+                raise RuntimeError("Invalid WASM output: missing magic bytes")
+
+            return wasm_bytes
+
+        except subprocess.TimeoutExpired:
+            raise TimeoutError(f"Compilation timed out after {timeout} seconds")
+        except FileNotFoundError as e:
+            raise RuntimeError(f"Toolchain executable not found: {e}")

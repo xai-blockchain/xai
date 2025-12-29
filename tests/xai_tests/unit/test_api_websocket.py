@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 import pytest
 from flask import Flask
 
-from xai.core.api_websocket import WebSocketAPIHandler, WebSocketLimiter
+from xai.core.api.api_websocket import WebSocketAPIHandler, WebSocketLimiter
 
 
 class _DummyThread:

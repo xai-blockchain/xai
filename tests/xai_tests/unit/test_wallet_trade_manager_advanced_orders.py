@@ -1,7 +1,7 @@
 import time
 
-from xai.core.wallet_trade_manager_impl import WalletTradeManager
-from xai.core.trading import SwapOrderType
+from xai.core.wallets.wallet_trade_manager_impl import WalletTradeManager
+from xai.core.transactions.trading import SwapOrderType
 
 
 def test_create_and_process_twap_order(tmp_path):

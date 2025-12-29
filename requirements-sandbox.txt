@@ -18,5 +18,8 @@ RestrictedPython>=6.0
 # wasmtime>=1.0        # Alternative - good WASI support
 # wasm3                # Lightweight interpreter
 
-# Linux syscall filtering (OPTIONAL - Linux only)
-# python-seccomp>=0.2  # Enhanced subprocess isolation
+# Linux syscall filtering (RECOMMENDED - Linux only)
+# Provides kernel-level syscall blocking for subprocess isolation
+# Install with: pip install python-seccomp
+# Falls back to libseccomp via ctypes if not installed
+python-seccomp>=0.2; sys_platform == "linux"

@@ -347,7 +347,7 @@ def create_proposal(
         table.add_row("[bold cyan]Payload", json.dumps(payload, indent=2)[:100])
     console.print(table)
 
-    if not Confirm.ask("\n[bold]Submit this proposal?[/]", default=True):
+    if not ctx.obj.get('assume_yes') and not Confirm.ask("\n[bold]Submit this proposal?[/]", default=True):
         console.print("[yellow]Proposal submission cancelled[/]")
         return
 
@@ -431,7 +431,7 @@ def vote_proposal(
     table.add_row("[bold cyan]Voting Power", str(voting_power))
     console.print(table)
 
-    if not Confirm.ask(f"\n[bold]Cast {choice.upper()} vote?[/]", default=True):
+    if not ctx.obj.get('assume_yes') and not Confirm.ask(f"\n[bold]Cast {choice.upper()} vote?[/]", default=True):
         console.print("[yellow]Vote cancelled[/]")
         return
 

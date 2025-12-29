@@ -13,7 +13,7 @@ import time
 from hmac import compare_digest
 from typing import Any
 
-from xai.core.crypto_utils import derive_public_key_hex, sign_message_hex, verify_signature_hex
+from xai.core.security.crypto_utils import derive_public_key_hex, sign_message_hex, verify_signature_hex
 from xai.core.transaction import Transaction, TransactionValidationError
 
 # Minimum number of characters of the signing digest a user must acknowledge

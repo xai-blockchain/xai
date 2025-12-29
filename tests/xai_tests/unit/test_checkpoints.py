@@ -10,8 +10,8 @@ import shutil
 import tempfile
 import pytest
 from xai.core.blockchain import Blockchain, Block, Transaction
-from xai.core.checkpoints import Checkpoint, CheckpointManager
-from xai.core.utxo_manager import UTXOManager
+from xai.core.consensus.checkpoints import Checkpoint, CheckpointManager
+from xai.core.transactions.utxo_manager import UTXOManager
 
 
 class TestCheckpoint:

@@ -10,10 +10,10 @@ from __future__ import annotations
 import hashlib
 from typing import TYPE_CHECKING, Any
 
-from xai.core.block_header import BlockHeader, canonical_json
+from xai.core.chain.block_header import BlockHeader, canonical_json
 from xai.core.config import Config
-from xai.core.crypto_utils import sign_message_hex, verify_signature_hex
-from xai.core.structured_logger import get_structured_logger
+from xai.core.security.crypto_utils import sign_message_hex, verify_signature_hex
+from xai.core.api.structured_logger import get_structured_logger
 
 if TYPE_CHECKING:
     from xai.core.transaction import Transaction

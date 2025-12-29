@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from xai.core.crypto_deposit_manager import CryptoDepositManager
+from xai.core.wallets.crypto_deposit_manager import CryptoDepositManager
 
 
 class DummyExchangeWalletManager:

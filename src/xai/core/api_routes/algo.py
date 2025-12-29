@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING, Any
 
 from flask import jsonify, request
 
-from xai.core import node_utils
-from xai.core.input_validation_schemas import FraudCheckInput
-from xai.core.node_utils import ALGO_FEATURES_ENABLED
+from xai.core.chain import node_utils
+from xai.core.security.input_validation_schemas import FraudCheckInput
+from xai.core.chain.node_utils import ALGO_FEATURES_ENABLED
 
 logger = logging.getLogger(__name__)
 

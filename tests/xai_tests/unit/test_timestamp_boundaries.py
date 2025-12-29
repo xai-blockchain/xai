@@ -22,10 +22,10 @@ import time
 from unittest.mock import patch
 
 from xai.core.blockchain import Blockchain, Block
-from xai.core.block_header import BlockHeader
+from xai.core.chain.block_header import BlockHeader
 from xai.core.wallet import Wallet
-from xai.core.blockchain_security import BlockchainSecurityConfig
-from xai.core.blockchain_exceptions import InvalidBlockError, ValidationError
+from xai.core.security.blockchain_security import BlockchainSecurityConfig
+from xai.core.chain.blockchain_exceptions import InvalidBlockError, ValidationError
 
 
 class TestMaxFutureBlockTime:

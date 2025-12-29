@@ -4,7 +4,7 @@ Unit tests for XAITokenManager mint/transfer/vesting wiring.
 
 from types import SimpleNamespace
 
-from xai.core.xai_token_manager import XAITokenManager
+from xai.core.governance.xai_token_manager import XAITokenManager
 
 
 class StubLogger:

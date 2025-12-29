@@ -25,7 +25,7 @@ from urllib.parse import quote, unquote
 from flask import Blueprint, Response, jsonify, request, send_file
 
 from xai.core.api_blueprints.base import error_response, get_blockchain
-from xai.core.validation import validate_address
+from xai.core.consensus.validation import validate_address
 from xai.mobile.qr_transactions import (
     QRCODE_AVAILABLE,
     QRCodeValidator,

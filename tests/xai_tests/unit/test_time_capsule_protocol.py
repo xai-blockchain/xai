@@ -6,7 +6,7 @@ import json
 import time
 from pathlib import Path
 
-from xai.core.time_capsule_protocol import TimeCapsuleProtocol
+from xai.core.governance.time_capsule_protocol import TimeCapsuleProtocol
 
 
 class DummyWallet:

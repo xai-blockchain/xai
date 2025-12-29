@@ -1,6 +1,6 @@
 """Focused tests for ProposalImpactAnalyzer's production-grade analytics."""
 
-from xai.core.ai_governance import ProposalImpactAnalyzer
+from xai.core.governance.ai_governance import ProposalImpactAnalyzer
 
 
 def test_analysis_reflects_community_feedback():

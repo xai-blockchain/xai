@@ -17,8 +17,8 @@ import time
 import threading
 from unittest.mock import Mock, patch, MagicMock
 from xai.core.blockchain import Blockchain, Transaction
-from xai.core.node_p2p import P2PNetworkManager
-from xai.core.peer_discovery import PeerDiscoveryManager
+from xai.core.p2p.node_p2p import P2PNetworkManager
+from xai.core.p2p.peer_discovery import PeerDiscoveryManager
 
 
 class TestMultiNodeNetwork:
@@ -307,7 +307,7 @@ class TestPeerDiscoveryIntegration:
         manager = PeerDiscoveryManager(max_peers=5)
 
         # Manually add some known peers
-        from xai.core.peer_discovery import PeerInfo
+        from xai.core.p2p.peer_discovery import PeerInfo
         for i in range(3):
             peer = PeerInfo(f"http://peer{i}:5000")
             manager.known_peers[peer.url] = peer
@@ -362,7 +362,7 @@ class TestNodeFailureRecovery:
         """Test peer is removed after timeout"""
         manager = PeerDiscoveryManager()
 
-        from xai.core.peer_discovery import PeerInfo
+        from xai.core.p2p.peer_discovery import PeerInfo
         import time
 
         # Add peer with old last_seen

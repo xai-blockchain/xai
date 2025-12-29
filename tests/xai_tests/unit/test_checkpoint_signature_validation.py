@@ -2,7 +2,7 @@ import json
 
 from ecdsa import SigningKey, SECP256k1
 
-from xai.core.checkpoint_sync import CheckpointSyncManager
+from xai.core.p2p.checkpoint_sync import CheckpointSyncManager
 
 
 def _sign_payload(sk: SigningKey, payload_data):

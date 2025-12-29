@@ -9,7 +9,7 @@ Coverage targets:
 
 import pytest
 
-from xai.core.block_header import BlockHeader
+from xai.core.chain.block_header import BlockHeader
 from xai.core.blockchain_components.block import Block
 
 

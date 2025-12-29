@@ -1,0 +1,319 @@
+# XAI Validator Nodes - Consensus participation and block validation
+# StatefulSet with 200Gi storage, 3 replicas for BFT minimum
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: xai-validator-node
+  namespace: xai-staging
+  labels:
+    app: xai-blockchain
+    component: validator-node
+    tier: stateful
+spec:
+  serviceName: xai-validator-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: xai-blockchain
+      component: validator-node
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0
+  template:
+    metadata:
+      labels:
+        app: xai-blockchain
+        component: validator-node
+        tier: stateful
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: xai-blockchain
+                  component: validator-node
+              topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: blockchain/xai-validator
+                    operator: In
+                    values:
+                      - "true"
+
+      serviceAccountName: xai-blockchain-sa
+      automountServiceAccountToken: true
+
+      initContainers:
+        - name: init-data-dirs
+          image: busybox:1.35
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /data/blockchain /data/consensus /data/logs
+              chmod 755 /data/blockchain /data/consensus /data/logs
+              echo "Validator data directories initialized"
+          volumeMounts:
+            - name: validator-data
+              mountPath: /data
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
+
+        - name: init-config
+          image: busybox:1.35
+          command:
+            - sh
+            - -c
+            - |
+              cp /config/genesis-config.json /data/blockchain/genesis.json || true
+              cp /config/validators.json /data/consensus/validators.json || true
+              chmod 644 /data/blockchain/genesis.json || true
+              chmod 644 /data/consensus/validators.json || true
+              echo "Validator configuration initialized"
+          volumeMounts:
+            - name: validator-data
+              mountPath: /data
+            - name: config
+              mountPath: /config
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
+
+      containers:
+        - name: xai-validator
+          image: xai-blockchain:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--mode=validator"
+            - "--enable-mining"
+            - "--enable-consensus"
+            - "--p2p-mesh"
+          ports:
+            - name: rpc
+              containerPort: 8546
+              protocol: TCP
+            - name: p2p
+              containerPort: 8545
+              protocol: TCP
+            - name: p2p-quic
+              containerPort: 8548
+              protocol: UDP
+            - name: consensus
+              containerPort: 26657
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+
+          env:
+            - name: NODE_MODE
+              value: "validator"
+            - name: ENABLE_MINING
+              value: "true"
+            - name: ENABLE_CONSENSUS
+              value: "true"
+            - name: ENABLE_P2P_MESH
+              value: "true"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: BLOCKCHAIN_DATA_DIR
+              value: "/data/blockchain"
+            - name: CONSENSUS_DATA_DIR
+              value: "/data/consensus"
+            # Validator identity from secret
+            - name: VALIDATOR_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: xai-validator-secrets
+                  key: "$(POD_NAME)-private-key"
+                  optional: true
+            - name: VALIDATOR_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: xai-validator-config
+                  key: "$(POD_NAME)-address"
+                  optional: true
+            # Peer discovery
+            - name: VALIDATOR_PEERS
+              value: "xai-validator-node-0.xai-validator-headless:8545,xai-validator-node-1.xai-validator-headless:8545,xai-validator-node-2.xai-validator-headless:8545"
+            - name: XAI_P2P_ENABLE_QUIC
+              value: "true"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+
+          resources:
+            requests:
+              cpu: 2000m
+              memory: 4Gi
+            limits:
+              cpu: 4000m
+              memory: 8Gi
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+
+          volumeMounts:
+            - name: validator-data
+              mountPath: /data
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: secrets
+              mountPath: /run/secrets
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+
+          startupProbe:
+            httpGet:
+              path: /health
+              port: rpc
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+
+          readinessProbe:
+            httpGet:
+              path: /health/consensus
+              port: rpc
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: rpc
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    echo "Validator graceful shutdown - waiting for consensus round"
+                    curl -X POST http://localhost:8546/consensus/prepare-shutdown || true
+                    sleep 45
+                    curl -X POST http://localhost:8546/shutdown || true
+                    sleep 15
+
+      volumes:
+        - name: config
+          configMap:
+            name: xai-validator-config
+            defaultMode: 0644
+        - name: secrets
+          secret:
+            secretName: xai-validator-secrets
+            defaultMode: 0400
+        - name: tmp
+          emptyDir:
+            sizeLimit: 1Gi
+
+      terminationGracePeriodSeconds: 90
+      priorityClassName: high-priority
+
+  volumeClaimTemplates:
+    - metadata:
+        name: validator-data
+        labels:
+          app: xai-blockchain
+          component: validator-node
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: xai-validator-storage
+        resources:
+          requests:
+            storage: 200Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xai-validator-headless
+  namespace: xai-staging
+  labels:
+    app: xai-blockchain
+    component: validator-node
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: xai-blockchain
+    component: validator-node
+  ports:
+    - name: rpc
+      port: 8546
+      targetPort: rpc
+    - name: p2p
+      port: 8545
+      targetPort: p2p
+    - name: consensus
+      port: 26657
+      targetPort: consensus
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xai-validator
+  namespace: xai-staging
+  labels:
+    app: xai-blockchain
+    component: validator-node
+spec:
+  type: ClusterIP
+  selector:
+    app: xai-blockchain
+    component: validator-node
+  ports:
+    - name: rpc
+      port: 8546
+      targetPort: rpc
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: xai-validator-pdb
+  namespace: xai-staging
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: xai-blockchain
+      component: validator-node

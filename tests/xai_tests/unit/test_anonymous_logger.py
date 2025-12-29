@@ -5,7 +5,7 @@ Unit tests for anonymous logger sanitization and address truncation helpers.
 import logging
 from pathlib import Path
 
-from xai.core.anonymous_logger import AnonymousLogger
+from xai.core.security.anonymous_logger import AnonymousLogger
 
 
 def _read_last_line(log_path: Path) -> str:

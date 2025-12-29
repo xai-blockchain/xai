@@ -30,7 +30,7 @@ from collections import defaultdict
 
 from xai.core.blockchain import Blockchain, Block, Transaction
 from xai.core.wallet import Wallet
-from xai.core.blockchain_storage import BlockchainStorage
+from xai.core.chain.blockchain_storage import BlockchainStorage
 
 # ============================================================================
 # Test Class 1: Database Corruption Tests (7.1)

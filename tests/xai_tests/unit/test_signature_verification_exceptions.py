@@ -15,7 +15,7 @@ from xai.core.transaction import (
 )
 from xai.core.wallet import Wallet
 from xai.core.blockchain import Blockchain
-from xai.core.transaction_validator import TransactionValidator
+from xai.core.consensus.transaction_validator import TransactionValidator
 
 
 class TestSignatureVerificationExceptions:

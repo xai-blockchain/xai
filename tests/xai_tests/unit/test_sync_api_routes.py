@@ -17,9 +17,9 @@ from unittest.mock import Mock, MagicMock, patch
 from flask import Flask
 
 from xai.core.api_routes.sync import register_sync_routes
-from xai.core.chunked_sync import ChunkedStateSyncService, SnapshotMetadata, SyncProgress
-from xai.core.checkpoint_sync import CheckpointSyncManager
-from xai.core.checkpoint_payload import CheckpointPayload
+from xai.core.p2p.chunked_sync import ChunkedStateSyncService, SnapshotMetadata, SyncProgress
+from xai.core.p2p.checkpoint_sync import CheckpointSyncManager
+from xai.core.consensus.checkpoint_payload import CheckpointPayload
 
 
 @pytest.fixture

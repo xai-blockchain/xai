@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ api_title }} - API Explorer</title>
+    <meta name="description" content="Interactive API documentation for {{ api_title }}">
+
+    <!-- Swagger UI CSS from unpkg CDN -->
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x1F4D6;</text></svg>">
+
+    <style>
+        /* Custom theme for XAI branding */
+        :root {
+            --xai-primary: #667eea;
+            --xai-secondary: #764ba2;
+            --xai-bg-dark: #0f0f23;
+            --xai-bg-light: #1a1a2e;
+            --xai-text: #e0e0e0;
+            --xai-accent: #00d4ff;
+        }
+
+        html {
+            box-sizing: border-box;
+        }
+
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+
+        body {
+            margin: 0;
+            background: var(--xai-bg-dark);
+        }
+
+        /* Header styling */
+        .swagger-ui .topbar {
+            background: linear-gradient(135deg, var(--xai-primary) 0%, var(--xai-secondary) 100%);
+            padding: 15px 0;
+        }
+
+        .swagger-ui .topbar-wrapper {
+            max-width: 1460px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .swagger-ui .topbar .download-url-wrapper {
+            display: flex;
+            flex: 3;
+            justify-content: flex-end;
+        }
+
+        .swagger-ui .topbar .download-url-wrapper input[type=text] {
+            border-radius: 4px;
+            border: none;
+        }
+
+        /* Info section */
+        .swagger-ui .info {
+            margin: 30px 0;
+        }
+
+        .swagger-ui .info .title {
+            color: var(--xai-text);
+        }
+
+        .swagger-ui .info .description p,
+        .swagger-ui .info .description {
+            color: #b0b0c0;
+        }
+
+        /* Scheme container */
+        .swagger-ui .scheme-container {
+            background: var(--xai-bg-light);
+            padding: 20px;
+            box-shadow: none;
+        }
+
+        /* Operations */
+        .swagger-ui .opblock {
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            margin: 0 0 15px 0;
+        }
+
+        .swagger-ui .opblock .opblock-summary {
+            border-radius: 8px;
+        }
+
+        .swagger-ui .opblock.opblock-get {
+            background: rgba(97, 175, 254, 0.1);
+            border-color: #61affe;
+        }
+
+        .swagger-ui .opblock.opblock-post {
+            background: rgba(73, 204, 144, 0.1);
+            border-color: #49cc90;
+        }
+
+        .swagger-ui .opblock.opblock-put {
+            background: rgba(252, 161, 48, 0.1);
+            border-color: #fca130;
+        }
+
+        .swagger-ui .opblock.opblock-delete {
+            background: rgba(249, 62, 62, 0.1);
+            border-color: #f93e3e;
+        }
+
+        .swagger-ui .opblock.opblock-patch {
+            background: rgba(80, 227, 194, 0.1);
+            border-color: #50e3c2;
+        }
+
+        /* Tag sections */
+        .swagger-ui .opblock-tag {
+            color: var(--xai-text);
+            border-bottom: 1px solid #333;
+        }
+
+        .swagger-ui .opblock-tag:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        /* Parameters and responses */
+        .swagger-ui .parameters-col_description,
+        .swagger-ui .response-col_description {
+            color: #b0b0c0;
+        }
+
+        .swagger-ui table thead tr th {
+            color: var(--xai-text);
+        }
+
+        .swagger-ui table tbody tr td {
+            color: #b0b0c0;
+        }
+
+        /* Models section */
+        .swagger-ui section.models {
+            border: 1px solid #333;
+            border-radius: 8px;
+        }
+
+        .swagger-ui section.models h4 {
+            color: var(--xai-text);
+        }
+
+        .swagger-ui .model-container {
+            background: var(--xai-bg-light);
+        }
+
+        /* Buttons */
+        .swagger-ui .btn {
+            border-radius: 4px;
+        }
+
+        .swagger-ui .btn.execute {
+            background: var(--xai-primary);
+            border-color: var(--xai-primary);
+        }
+
+        .swagger-ui .btn.execute:hover {
+            background: var(--xai-secondary);
+            border-color: var(--xai-secondary);
+        }
+
+        /* Try it out button */
+        .swagger-ui .try-out__btn {
+            border-color: var(--xai-accent);
+            color: var(--xai-accent);
+        }
+
+        .swagger-ui .try-out__btn:hover {
+            background: var(--xai-accent);
+            color: var(--xai-bg-dark);
+        }
+
+        /* Response section */
+        .swagger-ui .responses-wrapper {
+            background: var(--xai-bg-light);
+            border-radius: 4px;
+        }
+
+        .swagger-ui .response {
+            color: var(--xai-text);
+        }
+
+        /* Code blocks */
+        .swagger-ui .highlight-code {
+            background: #1e1e3f !important;
+        }
+
+        .swagger-ui .microlight {
+            background: #1e1e3f !important;
+            color: #d4d4d4 !important;
+            font-family: 'Fira Code', 'Monaco', 'Consolas', monospace;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--xai-bg-dark);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Loading animation */
+        .loading-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 400px;
+            color: var(--xai-text);
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid var(--xai-bg-light);
+            border-top-color: var(--xai-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Custom header bar */
+        .xai-header {
+            background: linear-gradient(135deg, var(--xai-primary) 0%, var(--xai-secondary) 100%);
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        .xai-header h1 {
+            color: white;
+            margin: 0;
+            font-size: 1.5em;
+            font-weight: 600;
+        }
+
+        .xai-header .version-badge {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            margin-left: 10px;
+        }
+
+        .xai-header-links {
+            display: flex;
+            gap: 15px;
+        }
+
+        .xai-header-links a {
+            color: white;
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .xai-header-links a:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Hide default swagger topbar since we have custom header */
+        .swagger-ui .topbar {
+            display: none;
+        }
+
+        /* Footer */
+        .xai-footer {
+            background: var(--xai-bg-light);
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 40px;
+        }
+
+        .xai-footer a {
+            color: var(--xai-accent);
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Custom XAI Header -->
+    <header class="xai-header">
+        <div>
+            <h1>
+                {{ api_title }}
+                <span class="version-badge">v{{ api_version }}</span>
+            </h1>
+        </div>
+        <nav class="xai-header-links">
+            <a href="/">Node Info</a>
+            <a href="/health">Health</a>
+            <a href="/dashboard/">Dashboard</a>
+            <a href="{{ openapi_url }}" target="_blank">OpenAPI Spec</a>
+        </nav>
+    </header>
+
+    <!-- Swagger UI container -->
+    <div id="swagger-ui">
+        <div class="loading-container">
+            <div class="loading-spinner"></div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="xai-footer">
+        XAI Blockchain API Documentation |
+        <a href="/api/openapi">YAML</a> |
+        <a href="{{ openapi_url }}">JSON</a> |
+        <a href="/api/docs/endpoints">Endpoint List</a>
+    </footer>
+
+    <!-- Swagger UI Bundle from unpkg CDN -->
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js" charset="UTF-8"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-standalone-preset.js" charset="UTF-8"></script>
+
+    <script>
+        window.onload = function() {
+            const ui = SwaggerUIBundle({
+                url: "{{ openapi_url }}",
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: "StandaloneLayout",
+
+                // Configuration options
+                docExpansion: "list",           // Show operations collapsed by default
+                filter: true,                    // Enable filtering
+                showExtensions: true,            // Show vendor extensions
+                showCommonExtensions: true,      // Show common extensions
+                tryItOutEnabled: true,           // Enable "Try it out" by default
+                requestSnippetsEnabled: true,    // Show request snippets
+                displayRequestDuration: true,    // Show request duration
+
+                // Syntax highlighting
+                syntaxHighlight: {
+                    activate: true,
+                    theme: "monokai"
+                },
+
+                // Persist authorization
+                persistAuthorization: true,
+
+                // Validation
+                validatorUrl: null,              // Disable external validator
+
+                // Custom request interceptor for CORS
+                requestInterceptor: function(request) {
+                    // Add any custom headers if needed
+                    return request;
+                },
+
+                // Response interceptor
+                responseInterceptor: function(response) {
+                    return response;
+                },
+
+                // Error handling
+                onComplete: function() {
+                    console.log("Swagger UI loaded successfully");
+                },
+
+                // Failure callback
+                onFailure: function(err) {
+                    console.error("Swagger UI failed to load:", err);
+                    document.getElementById('swagger-ui').innerHTML =
+                        '<div style="padding: 40px; text-align: center; color: #f93e3e;">' +
+                        '<h2>Failed to load API documentation</h2>' +
+                        '<p>Error: ' + (err.message || 'Unknown error') + '</p>' +
+                        '<p>Try refreshing the page or check the console for details.</p>' +
+                        '</div>';
+                }
+            });
+
+            window.ui = ui;
+        };
+    </script>
+</body>
+</html>

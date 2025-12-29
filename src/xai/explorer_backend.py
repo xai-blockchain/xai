@@ -722,7 +722,7 @@ class AnalyticsEngine:
             return json.loads(cached)
 
         try:
-            response = requests.get(f"{self.node_url}/transactions", timeout=5)
+            response = requests.get(f"{self.node_url}/transactions", timeout=15)
             response.raise_for_status()
             data = response.json()
 
@@ -795,7 +795,7 @@ class AnalyticsEngine:
     def _fetch_stats(self) -> dict[str, Any] | None:
         """Fetch stats from node"""
         try:
-            response = requests.get(f"{self.node_url}/stats", timeout=5)
+            response = requests.get(f"{self.node_url}/stats", timeout=15)
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:
@@ -818,7 +818,7 @@ class AnalyticsEngine:
         try:
             response = requests.get(
                 f"{self.node_url}/blocks?limit={limit}&offset={offset}",
-                timeout=5
+                timeout=15
             )
             response.raise_for_status()
             return response.json()
@@ -932,7 +932,7 @@ class SearchEngine:
     def _search_block_height(self, height: int) -> dict[str, Any] | None:
         """Search by block height"""
         try:
-            response = requests.get(f"{self.node_url}/blocks/{height}", timeout=5)
+            response = requests.get(f"{self.node_url}/blocks/{height}", timeout=15)
             if response.status_code == 200:
                 return response.json()
         except requests.RequestException as e:
@@ -946,7 +946,7 @@ class SearchEngine:
     def _search_block_hash(self, block_hash: str) -> dict[str, Any] | None:
         """Search by block hash"""
         try:
-            blocks_response = requests.get(f"{self.node_url}/blocks?limit=1000", timeout=5)
+            blocks_response = requests.get(f"{self.node_url}/blocks?limit=1000", timeout=15)
             if blocks_response.status_code == 200:
                 blocks = blocks_response.json().get("blocks", [])
                 for block in blocks:
@@ -963,7 +963,7 @@ class SearchEngine:
     def _search_transaction(self, txid: str) -> dict[str, Any] | None:
         """Search by transaction ID"""
         try:
-            response = requests.get(f"{self.node_url}/transaction/{txid}", timeout=5)
+            response = requests.get(f"{self.node_url}/transaction/{txid}", timeout=15)
             if response.status_code == 200:
                 return response.json()
         except requests.RequestException as e:
@@ -977,8 +977,8 @@ class SearchEngine:
     def _search_address(self, address: str) -> dict[str, Any] | None:
         """Search by address"""
         try:
-            balance_response = requests.get(f"{self.node_url}/balance/{address}", timeout=5)
-            history_response = requests.get(f"{self.node_url}/history/{address}", timeout=5)
+            balance_response = requests.get(f"{self.node_url}/balance/{address}", timeout=15)
+            history_response = requests.get(f"{self.node_url}/history/{address}", timeout=15)
 
             if balance_response.status_code == 200:
                 balance_data = balance_response.json()
@@ -1045,7 +1045,7 @@ class RichListManager:
     def _calculate_rich_list(self, limit: int) -> list[dict[str, Any]]:
         """Calculate rich list from blockchain"""
         try:
-            blocks_response = requests.get(f"{self.node_url}/blocks?limit=10000", timeout=10)
+            blocks_response = requests.get(f"{self.node_url}/blocks?limit=10000", timeout=30)
             blocks_response.raise_for_status()
             blocks = blocks_response.json().get("blocks", [])
 
@@ -1111,7 +1111,7 @@ class ExportManager:
     def export_transactions_csv(self, address: str) -> str | None:
         """Export address transactions as CSV"""
         try:
-            history_response = requests.get(f"{self.node_url}/history/{address}", timeout=5)
+            history_response = requests.get(f"{self.node_url}/history/{address}", timeout=15)
             if history_response.status_code != 200:
                 return None
 
@@ -1373,7 +1373,7 @@ class MempoolMonitor:
     def get_mempool_metrics(self) -> dict[str, Any]:
         """Get current mempool metrics"""
         try:
-            response = requests.get(f"{self.node_url}/transactions", timeout=5)
+            response = requests.get(f"{self.node_url}/transactions", timeout=15)
             data = response.json()
 
             transactions = data.get("transactions", [])
@@ -1519,6 +1519,14 @@ app = Flask(__name__)
 # Configure CORS with explicit origin allowlist (empty list = allow all for dev)
 CORS(app, origins=API_ALLOWED_ORIGINS if API_ALLOWED_ORIGINS else ["*"])
 sock = Sock(app)
+
+# Enable response compression (gzip) for API payloads > threshold
+try:
+    from xai.core.api.response_compression import setup_compression
+    compression_enabled = setup_compression(app)
+except ImportError:
+    compression_enabled = False
+    logger.debug("Response compression module not available")
 
 # Initialize components
 NODE_URL = os.getenv("XAI_NODE_URL", "http://localhost:12001")
@@ -1864,7 +1872,7 @@ def get_mempool_stats_endpoint():
 def health_check():
     """Health check"""
     try:
-        response = requests.get(f"{NODE_URL}/health", timeout=5)
+        response = requests.get(f"{NODE_URL}/health", timeout=15)
         node_status = response.status_code == 200
     except (requests.RequestException, Exception) as e:
         logger.debug(f"Health check failed: {e}")
@@ -1892,7 +1900,8 @@ def explorer_info():
             "address_labels": True,
             "csv_export": True,
             "websocket_updates": True,
-            "address_labeling": True
+            "address_labeling": True,
+            "response_compression": compression_enabled
         },
         "endpoints": {
             "analytics": "/api/analytics/*",

@@ -6,7 +6,7 @@ ensuring error detection and compatibility with the EIP-55 standard.
 """
 
 import pytest
-from xai.core.address_checksum import (
+from xai.core.wallets.address_checksum import (
     to_checksum_address,
     is_checksum_valid,
     validate_address,
@@ -342,7 +342,7 @@ class TestIntegrationWithValidation:
 
     def test_validation_module_integration(self):
         """Test that validation module properly uses checksum."""
-        from xai.core.validation import validate_address as val_validate
+        from xai.core.consensus.validation import validate_address as val_validate
 
         address = "XAI7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b"
         validated = val_validate(address, allow_special=False, apply_checksum=True)

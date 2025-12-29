@@ -557,7 +557,7 @@ class TestNodeAPITransactionRoutes:
         data = response.get_json()
         assert data['found'] == False
 
-    @patch('xai.core.blockchain.Transaction')
+    @patch('xai.core.chain.Transaction')
     def test_send_transaction_success(self, mock_tx_class, client, mock_node_with_tx):
         """Test POST /send - successful transaction."""
         # Setup mock transaction
@@ -590,7 +590,7 @@ class TestNodeAPITransactionRoutes:
         assert data['txid'] == 'new_tx_id'
         assert 'message' in data
 
-    @patch('xai.core.blockchain.Transaction')
+    @patch('xai.core.chain.Transaction')
     def test_send_transaction_rate_limiter_failure(
         self,
         mock_tx_class,
@@ -639,7 +639,7 @@ class TestNodeAPITransactionRoutes:
         assert 'error' in data
         assert 'Validation error' in data['error']
 
-    @patch('xai.core.blockchain.Transaction')
+    @patch('xai.core.chain.Transaction')
     def test_send_transaction_invalid_signature(self, mock_tx_class, client, mock_node_with_tx):
         """Test POST /send - invalid signature."""
         mock_tx = Mock()
@@ -664,7 +664,7 @@ class TestNodeAPITransactionRoutes:
         assert 'Invalid signature' in data['error']
         assert data['code'] == 'invalid_signature'
 
-    @patch('xai.core.blockchain.Transaction')
+    @patch('xai.core.chain.Transaction')
     def test_send_transaction_validation_failed(self, mock_tx_class, client, mock_node_with_tx):
         """Test POST /send - transaction validation failed."""
         mock_tx = Mock()
@@ -692,7 +692,7 @@ class TestNodeAPITransactionRoutes:
         assert data['success'] == False
         assert data['code'] == 'transaction_rejected'
 
-    @patch('xai.core.blockchain.Transaction')
+    @patch('xai.core.chain.Transaction')
     def test_send_transaction_requires_api_key(self, mock_tx_class, mock_node_with_tx, monkeypatch):
         """Ensure 401 is returned when API auth is required but missing."""
         monkeypatch.setattr(Config, "API_AUTH_REQUIRED", True, raising=False)
@@ -717,7 +717,7 @@ class TestNodeAPITransactionRoutes:
         data = response.get_json()
         assert data['code'] == 'unauthorized'
 
-    @patch('xai.core.blockchain.Transaction')
+    @patch('xai.core.chain.Transaction')
     def test_send_transaction_with_api_key(self, mock_tx_class, mock_node_with_tx, monkeypatch):
         """Ensure authorized requests succeed when API key provided."""
         monkeypatch.setattr(Config, "API_AUTH_REQUIRED", True, raising=False)
@@ -1470,7 +1470,7 @@ class TestNodeAPIAdminAPIKeys:
         response = client.get('/admin/withdrawals/telemetry')
         assert response.status_code == 401
 
-    @patch('xai.core.blockchain.Transaction')
+    @patch('xai.core.chain.Transaction')
     def test_issue_api_key_and_use(self, mock_tx_class, admin_setup):
         client = admin_setup["client"]
         mock_tx = Mock()
@@ -1745,7 +1745,7 @@ class TestNodeAPIGamificationRoutes:
                               content_type='application/json')
         assert response.status_code == 200
 
-    @patch('xai.core.blockchain.Transaction')
+    @patch('xai.core.chain.Transaction')
     def test_claim_treasure_success(self, mock_tx, client):
         """Test POST /treasure/claim - success."""
         data = {

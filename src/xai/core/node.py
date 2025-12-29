@@ -14,43 +14,38 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import base64
-import json
 import logging
 import os
-import re
-import sys
 import threading
 import time
 import weakref
-from queue import Full, Queue
 from typing import Any, Callable
 
 import requests
-from cryptography.fernet import Fernet, InvalidToken
 from flask import Flask, jsonify, make_response, request
-from flask_cors import CORS
 
 logger = logging.getLogger(__name__)
 
-from xai.core.account_abstraction import AccountAbstractionManager
+from xai.core.transactions.account_abstraction import AccountAbstractionManager
 
 # Import blockchain core
 from xai.core.blockchain import Blockchain, Transaction
+from xai.core.api.cors_policy import CORSPolicyManager
+from xai.core.security.security_webhook_forwarder import create_security_webhook_sink
 from xai.core.config import Config
-from xai.core.crypto_deposit_monitor import (
+from xai.core.wallets.crypto_deposit_monitor import (
     CryptoDepositMonitor,
     create_deposit_source,
 )
-from xai.core.flask_secret_manager import get_flask_secret_key
-from xai.core.monitoring import MetricsCollector
+from xai.core.security.flask_secret_manager import get_flask_secret_key
+from xai.core.api.monitoring import MetricsCollector
 from xai.core.node_api import NodeAPIRoutes
-from xai.core.node_consensus import ConsensusManager
-from xai.core.node_identity import load_or_create_identity
-from xai.core.node_p2p import P2PNetworkManager
+from xai.core.consensus.node_consensus import ConsensusManager
+from xai.core.p2p.node_identity import load_or_create_identity
+from xai.core.p2p.node_p2p import P2PNetworkManager
 
 # Import refactored modules
-from xai.core.node_utils import (
+from xai.core.chain.node_utils import (
     ALGO_FEATURES_ENABLED,
     DEFAULT_HOST,
     DEFAULT_MINER_ADDRESS,
@@ -58,292 +53,24 @@ from xai.core.node_utils import (
     get_allowed_origins,
     get_base_dir,
 )
-from xai.core.partial_sync import PartialSyncCoordinator
-from xai.core.process_sandbox import maybe_enable_process_sandbox
-from xai.core.request_validator_middleware import setup_request_validation
-from xai.core.security_middleware import SecurityConfig, setup_security_middleware
-from xai.core.security_validation import SecurityEventRouter, SecurityValidator
+from xai.core.p2p.partial_sync import PartialSyncCoordinator
+from xai.core.security.process_sandbox import maybe_enable_process_sandbox
+from xai.core.security.request_validator_middleware import setup_request_validation
+from xai.core.api.response_compression import setup_compression
+from xai.core.security.security_middleware import SecurityConfig, setup_security_middleware
+from xai.core.security.security_validation import SecurityEventRouter, SecurityValidator
 from xai.core.transaction import Transaction
+from xai.core.security.api_rate_limiting import init_rate_limiting
 from xai.core.wallet import WalletManager
-from xai.core.withdrawal_processor import WithdrawalProcessor
+from xai.core.wallets.withdrawal_processor import WithdrawalProcessor
 from xai.network.peer_manager import PeerManager
 
 
-class CORSPolicyManager:
-    """Production-grade CORS policy management.
+# CORSPolicyManager and SecurityWebhookForwarder have been extracted to:
+# - cors_policy.py
+# - security_webhook_forwarder.py
 
-    Implements Task 67: CORS Policy with environment-based whitelist,
-    strict validation, and proper headers.
-    """
-
-    def __init__(self, app: Flask):
-        """Initialize CORS policy manager.
-
-        Args:
-            app: Flask application instance
-        """
-        self.app = app
-        self.allowed_origins = self._load_allowed_origins()
-        self.setup_cors()
-
-    def _load_allowed_origins(self) -> list[str]:
-        """Load allowed origins from environment.
-
-        Returns:
-            List of allowed origin URLs
-        """
-        # Config-driven origins have highest precedence
-        config_origins = getattr(Config, "API_ALLOWED_ORIGINS", None)
-        if config_origins:
-            return list(config_origins)
-
-        # Load from environment variable
-        env_origins = os.getenv("XAI_ALLOWED_ORIGINS", "")
-        if env_origins:
-            origins = [origin.strip() for origin in env_origins.split(",") if origin.strip()]
-            return origins
-
-        # Network-specific defaults
-        network = os.getenv("XAI_NETWORK_TYPE", "mainnet")
-        if network == "testnet":
-            # More permissive for testnet
-            return ["http://localhost:*", "http://127.0.0.1:*"]
-        elif network == "development":
-            return ["*"]  # Allow all in development
-
-        # Production: only specific domains
-        return []
-
-    def setup_cors(self) -> None:
-        """Setup CORS with strict policies."""
-        if not self.allowed_origins or len(self.allowed_origins) == 0:
-            # No CORS - same origin only
-            logger.info("CORS: Same-origin only (production mode)")
-            return
-
-        # Configure CORS
-        CORS(
-            self.app,
-            origins=self.allowed_origins,
-            methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            allow_headers=["Content-Type", "Authorization", "X-API-Key", "X-Admin-Token"],
-            expose_headers=["Content-Range", "X-Content-Range"],
-            supports_credentials=True,
-            max_age=3600  # Cache preflight for 1 hour
-        )
-
-        logger.info(f"CORS configured with origins: {self.allowed_origins}")
-
-        # Register request/response hooks
-        self._register_hooks()
-
-    def _register_hooks(self) -> None:
-        """Register Flask hooks for CORS validation."""
-
-        @self.app.before_request
-        def check_cors() -> Any | None:
-            """Validate origin on all requests."""
-            origin = request.headers.get("Origin")
-
-            if origin and not self.validate_origin(origin):
-                logger.warning(f"CORS: Blocked request from unauthorized origin: {origin}")
-                return make_response(jsonify({
-                    "error": "Origin not allowed",
-                    "code": "cors_violation"
-                }), 403)
-            return None
-
-        @self.app.after_request
-        def add_cors_headers(response: Any) -> Any:
-            """Add proper CORS headers to response."""
-            origin = request.headers.get("Origin")
-
-            if origin and self.validate_origin(origin):
-                response.headers["Access-Control-Allow-Origin"] = origin
-                response.headers["Access-Control-Allow-Credentials"] = "true"
-                response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-                response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-API-Key"
-
-            return response
-
-    def validate_origin(self, origin: str) -> bool:
-        """Validate origin against whitelist.
-
-        Args:
-            origin: Origin URL to validate
-
-        Returns:
-            True if origin is allowed
-        """
-        if not origin:
-            return False
-
-        # Wildcard check
-        if "*" in self.allowed_origins:
-            return True
-
-        # Exact match
-        if origin in self.allowed_origins:
-            return True
-
-        # Pattern matching (e.g., http://localhost:*)
-        for allowed in self.allowed_origins:
-            if "*" in allowed:
-                pattern = allowed.replace("*", ".*")
-                if re.match(pattern, origin):
-                    return True
-
-        return False
-
-class _SecurityWebhookForwarder:
-    """Asynchronous webhook sender with retry/backoff."""
-
-    def __init__(
-        self,
-        url: str,
-        headers: dict[str, str],
-        timeout: int = 5,
-        max_retries: int = 3,
-        backoff: float = 1.5,
-        max_queue: int = 500,
-        start_worker: bool = True,
-        queue_path: str | None = None,
-        encryption_key: str | None = None,
-    ) -> None:
-        self.url = url
-        self.headers = dict(headers)
-        self.timeout = timeout
-        self.max_retries = max_retries
-        self.backoff = backoff
-        self.max_backoff = 30.0
-        self.dropped_events = 0
-        self.queue_path = queue_path
-        self._fernet = self._build_fernet(encryption_key)
-        self.queue: Queue = Queue(maxsize=max_queue)
-        self._load_persisted_events()
-        self._worker_thread = None
-        if start_worker:
-            self._worker_thread = threading.Thread(target=self._worker, daemon=True)
-            self._worker_thread.start()
-
-    def enqueue(self, payload: dict[str, Any]) -> None:
-        try:
-            self.queue.put_nowait(payload)
-            self._persist_queue()
-        except Full:
-            self.dropped_events += 1
-            logger.warning(
-                "Dropping webhook event %s (queue full)",
-                payload.get("event_type"),
-                extra={"event": "security.webhook_queue_full"}
-            )
-
-    def _worker(self) -> None:
-        while True:
-            payload = self.queue.get()
-            try:
-                self._deliver(payload)
-            finally:
-                self.queue.task_done()
-                self._persist_queue()
-
-    def _deliver(self, payload: dict[str, Any]) -> None:
-        attempt = 0
-        while attempt < self.max_retries:
-            try:
-                requests.post(
-                    self.url,
-                    json=payload,
-                    timeout=self.timeout,
-                    headers=self.headers,
-                )
-                return
-            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
-                attempt += 1
-                if attempt >= self.max_retries:
-                    logger.error(
-                        "Failed to deliver webhook event %s after %d attempts: %s",
-                        payload.get("event_type"),
-                        self.max_retries,
-                        type(exc).__name__,
-                        extra={"event": "security.webhook_delivery_failed"}
-                    )
-                    return
-                delay = min(self.backoff * attempt, self.max_backoff)
-                time.sleep(delay)
-
-    def _persist_queue(self) -> None:
-        if not self.queue_path:
-            return
-        try:
-            directory = os.path.dirname(self.queue_path) or os.getcwd()
-            os.makedirs(directory, exist_ok=True)
-            snapshot = list(self.queue.queue)
-            data = json.dumps(snapshot).encode("utf-8")
-            if self._fernet:
-                data = self._fernet.encrypt(data)
-            with open(self.queue_path, "wb") as handle:
-                handle.write(data)
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
-            logger.warning(
-                "Failed to persist webhook queue: %s",
-                type(exc).__name__,
-                extra={"event": "security.webhook_queue_persist_failed"}
-            )
-
-    def _load_persisted_events(self) -> None:
-        if not self.queue_path or not os.path.exists(self.queue_path):
-            return
-        try:
-            with open(self.queue_path, "rb") as handle:
-                data = handle.read()
-            if self._fernet:
-                try:
-                    data = self._fernet.decrypt(data)
-                except InvalidToken as exc:
-                    logger.error(
-                        "Failed to decrypt webhook queue: invalid token",
-                        extra={"event": "security.webhook_queue_decrypt_failed"}
-                    )
-                    return
-            payloads = json.loads(data.decode("utf-8"))
-            for item in payloads:
-                try:
-                    self.queue.put_nowait(item)
-                except Full:
-                    self.dropped_events += 1
-                    break
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
-            logger.warning(
-                "Failed to load webhook queue: %s",
-                type(exc).__name__,
-                extra={"event": "security.webhook_queue_load_failed"}
-            )
-
-    @staticmethod
-    def _build_fernet(raw_key: str | None) -> Fernet | None:
-        if not raw_key:
-            return None
-        key = raw_key.strip().encode("utf-8")
-        try:
-            return Fernet(key)
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
-            logger.debug(
-                "Failed to create Fernet cipher from raw key, trying hex decode",
-                error=str(e)
-            )
-            try:
-                hex_bytes = bytes.fromhex(raw_key.strip())
-                return Fernet(base64.urlsafe_b64encode(hex_bytes))
-            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
-                logger.error(
-                    "Invalid webhook queue encryption key",
-                    extra={"event": "security.webhook_queue_key_invalid"},
-                    error=str(exc)
-                )
-                return None
-
-from xai.core.blockchain_interface import BlockchainDataProvider
+from xai.core.chain.blockchain_interface import BlockchainDataProvider
 
 
 class BlockchainNode:
@@ -400,6 +127,9 @@ class BlockchainNode:
         self.app = Flask(__name__)
         # Use persistent secret key manager to prevent session invalidation on restart
         self.app.secret_key = get_flask_secret_key(data_dir=os.path.expanduser("~/.xai"))
+
+        # Enable response compression (gzip) for API payloads > threshold
+        self.compression_enabled = setup_compression(self.app)
 
         # Load or create node identity (used for P2P message signing)
         try:
@@ -478,6 +208,10 @@ class BlockchainNode:
         )
         logger.info("Security middleware initialized", extra={"event": "node.security_middleware_init"})
 
+        # Initialize API rate limiting (DDoS protection)
+        init_rate_limiting(self.app)
+        logger.info("API rate limiting initialized", extra={"event": "node.rate_limiting_init"})
+
         # Initialize optional features (these may not exist in all setups)
         self._initialize_optional_features()
         self._initialize_embedded_wallets()
@@ -536,43 +270,29 @@ class BlockchainNode:
         max_retries: int = 3,
         backoff: float = 1.5,
     ) -> Callable[[str, dict[str, Any], str], None] | None:
-        sanitized_url = (url or "").strip()
-        if not sanitized_url:
-            return None
+        """Create a security webhook sink using the extracted module.
 
-        base_headers = {"Content-Type": "application/json"}
-        auth_token = (token or "").strip()
-        if auth_token:
-            scheme = "Bearer " if not auth_token.lower().startswith("bearer ") else ""
-            base_headers["Authorization"] = f"{scheme}{auth_token}".strip()
+        Args:
+            url: Webhook endpoint URL
+            token: Bearer token for authentication
+            timeout: Request timeout in seconds
+            max_retries: Maximum retry attempts
+            backoff: Exponential backoff multiplier
 
+        Returns:
+            Sink function or None if URL is empty
+        """
         queue_path = getattr(Config, "SECURITY_WEBHOOK_QUEUE_PATH", "") or None
         encryption_key = getattr(Config, "SECURITY_WEBHOOK_QUEUE_KEY", "") or None
-        forwarder = _SecurityWebhookForwarder(
-            sanitized_url,
-            base_headers,
+        return create_security_webhook_sink(
+            url=url,
+            token=token,
             timeout=timeout,
-            max_retries=max(1, max_retries),
-            backoff=max(backoff, 0.1),
+            max_retries=max_retries,
+            backoff=backoff,
             queue_path=queue_path,
-             encryption_key=encryption_key,
+            encryption_key=encryption_key,
         )
-
-        def _sink(event_type: str, details: dict[str, Any], severity: str) -> None:
-            normalized = (severity or "INFO").upper()
-            if normalized not in {"WARNING", "WARN", "ERROR", "CRITICAL"}:
-                return
-
-            payload = {
-                "event_type": event_type,
-                "severity": normalized,
-                "timestamp": time.time(),
-                "details": details,
-            }
-
-            forwarder.enqueue(payload)
-
-        return _sink
 
     def _initialize_optional_features(self) -> None:
         """
@@ -595,8 +315,8 @@ class BlockchainNode:
         # Algorithmic features
         if ALGO_FEATURES_ENABLED:
             try:
-                from xai.core.algo_fee_optimizer import FeeOptimizer
-                from xai.core.fraud_detection import FraudDetector
+                from xai.core.transactions.algo_fee_optimizer import FeeOptimizer
+                from xai.core.security.fraud_detection import FraudDetector
 
                 self.fee_optimizer = FeeOptimizer()
                 self.fraud_detector = FraudDetector()
@@ -606,7 +326,7 @@ class BlockchainNode:
 
         # Social recovery
         try:
-            from xai.core.social_recovery import SocialRecoveryManager
+            from xai.core.wallets.social_recovery import SocialRecoveryManager
 
             self.recovery_manager = SocialRecoveryManager()
         except (ImportError, AttributeError) as exc:
@@ -614,7 +334,7 @@ class BlockchainNode:
 
         # Mining bonuses
         try:
-            from xai.core.mining_bonus_system import MiningBonusSystem
+            from xai.core.mining.mining_bonus_system import MiningBonusSystem
 
             self.bonus_manager = MiningBonusSystem()
         except (ImportError, AttributeError):
@@ -622,7 +342,7 @@ class BlockchainNode:
 
         # Exchange features
         try:
-            from xai.core.exchange_wallet import ExchangeWalletManager
+            from xai.core.wallets.exchange_wallet import ExchangeWalletManager
 
             self.exchange_wallet_manager = ExchangeWalletManager()
             self.blockchain.trade_manager.attach_exchange_manager(self.exchange_wallet_manager)
@@ -656,7 +376,7 @@ class BlockchainNode:
 
         if self.exchange_wallet_manager:
             try:
-                from xai.core.crypto_deposit_manager import CryptoDepositManager
+                from xai.core.wallets.crypto_deposit_manager import CryptoDepositManager
 
                 self.crypto_deposit_manager = CryptoDepositManager(
                     exchange_wallet_manager=self.exchange_wallet_manager
@@ -667,7 +387,7 @@ class BlockchainNode:
             self._configure_crypto_deposit_monitor(getattr(Config, "CRYPTO_DEPOSIT_MONITOR", {}))
 
             try:
-                from xai.core.payment_processor import PaymentProcessor
+                from xai.core.transactions.payment_processor import PaymentProcessor
 
                 self.payment_processor = PaymentProcessor()
             except (ImportError, AttributeError):
@@ -1163,7 +883,7 @@ class BlockchainNode:
         )
 
         # Start Prometheus metrics server
-        from xai.core.node_metrics_server import start_metrics_server_if_enabled
+        from xai.core.api.node_metrics_server import start_metrics_server_if_enabled
         metrics_port = int(os.getenv("XAI_METRICS_PORT", "8000"))
         start_metrics_server_if_enabled(port=metrics_port, enabled=True)
 

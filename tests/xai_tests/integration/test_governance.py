@@ -11,7 +11,7 @@ import time
 
 # Add core directory to path
 
-from xai.core.ai_governance import AIGovernance, VoterType, VotingPowerDisplay
+from xai.core.governance.ai_governance import AIGovernance, VoterType, VotingPowerDisplay
 from xai.core.blockchain import Blockchain, Transaction
 from xai.core.wallet import Wallet
 

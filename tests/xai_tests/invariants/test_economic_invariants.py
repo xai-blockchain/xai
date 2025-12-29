@@ -19,7 +19,7 @@ import os
 # Add src to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'src'))
 
-from xai.core.validation import MonetaryAmount, MAX_SUPPLY
+from xai.core.consensus.validation import MonetaryAmount, MAX_SUPPLY
 
 class TestMonetaryAmountInvariants:
     """Property-based tests for MonetaryAmount precision guarantees."""

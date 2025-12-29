@@ -1,0 +1,204 @@
+# XAI API Nodes - Stateless RPC/WebSocket endpoints
+# HPA-scaled for high availability, no persistent storage
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xai-api-node
+  namespace: xai-staging
+  labels:
+    app: xai-blockchain
+    component: api-node
+    tier: stateless
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: xai-blockchain
+      component: api-node
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: xai-blockchain
+        component: api-node
+        tier: stateless
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: xai-blockchain
+                    component: api-node
+                topologyKey: kubernetes.io/hostname
+
+      serviceAccountName: xai-blockchain-sa
+      automountServiceAccountToken: false
+
+      containers:
+        - name: xai-api
+          image: xai-blockchain:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--mode=api"
+            - "--no-mining"
+            - "--no-validation"
+          ports:
+            - name: rpc
+              containerPort: 8546
+              protocol: TCP
+            - name: ws
+              containerPort: 8547
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+
+          env:
+            - name: NODE_MODE
+              value: "api"
+            - name: ENABLE_MINING
+              value: "false"
+            - name: ENABLE_VALIDATION
+              value: "false"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: VALIDATOR_ENDPOINTS
+              value: "http://xai-validator-headless:8546"
+            - name: ARCHIVE_ENDPOINTS
+              value: "http://xai-archive-headless:8546"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /var/cache/xai
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: rpc
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: rpc
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 100Mi
+        - name: cache
+          emptyDir:
+            sizeLimit: 500Mi
+
+      terminationGracePeriodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xai-api
+  namespace: xai-staging
+  labels:
+    app: xai-blockchain
+    component: api-node
+spec:
+  type: ClusterIP
+  selector:
+    app: xai-blockchain
+    component: api-node
+  ports:
+    - name: rpc
+      port: 8546
+      targetPort: rpc
+    - name: ws
+      port: 8547
+      targetPort: ws
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: xai-api-hpa
+  namespace: xai-staging
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: xai-api-node
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120

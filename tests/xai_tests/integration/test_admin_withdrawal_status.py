@@ -6,7 +6,7 @@ import pytest
 from flask import Flask
 
 from xai.core.config import Config
-from xai.core.exchange_wallet import ExchangeWalletManager
+from xai.core.wallets.exchange_wallet import ExchangeWalletManager
 from xai.core.node_api import NodeAPIRoutes
 
 

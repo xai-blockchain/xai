@@ -6,9 +6,9 @@ import pytest
 
 from xai.core.blockchain import Blockchain, Transaction
 from xai.core.config import Config
-from xai.core.monitoring import MetricsCollector
-from xai.core.nonce_tracker import NonceTracker
-from xai.core.transaction_validator import TransactionValidator
+from xai.core.api.monitoring import MetricsCollector
+from xai.core.transactions.nonce_tracker import NonceTracker
+from xai.core.consensus.transaction_validator import TransactionValidator
 from xai.core.wallet import Wallet
 
 

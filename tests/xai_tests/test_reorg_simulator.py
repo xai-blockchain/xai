@@ -1,6 +1,6 @@
 from unittest.mock import Mock
 
-from xai.core.reorg_simulator import ReorgSimulator
+from xai.core.chain.reorg_simulator import ReorgSimulator
 
 
 def test_reorg_simulator_collects_snapshots():

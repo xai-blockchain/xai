@@ -364,7 +364,7 @@ class MockAttacker:
 
     def attempt_dust_attack(self, blockchain: Blockchain, victims: list[Wallet]) -> list[Transaction]:
         """Attempt dust attack on multiple victims"""
-        from xai.core.blockchain_security import BlockchainSecurityConfig
+        from xai.core.security.blockchain_security import BlockchainSecurityConfig
 
         dust_amount = BlockchainSecurityConfig.MIN_TRANSACTION_AMOUNT / 2
         dust_transactions = []

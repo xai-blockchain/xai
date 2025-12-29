@@ -1,0 +1,882 @@
+from __future__ import annotations
+
+"""
+XAI Blockchain - Persistent Storage System
+
+Provides secure, reliable blockchain persistence with:
+- Atomic writes (temp file + rename)
+- Checksum verification
+- Auto-recovery from corruption
+- Automated backups
+- Checkpoint system every 1000 blocks
+"""
+
+import hashlib
+import json
+import logging
+import os
+import shutil
+import time
+from datetime import datetime
+from threading import Lock
+
+from xai.core.api.monitoring import MetricsCollector
+
+from .blockchain_exceptions import (
+    CorruptedDataError,
+    DatabaseError,
+    StorageError,
+    ValidationError,
+)
+
+logger = logging.getLogger(__name__)
+
+class BlockchainStorageConfig:
+    """Configuration for blockchain storage"""
+
+    # Data directory
+    DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+
+    # Storage files
+    BLOCKCHAIN_FILE = os.path.join(DATA_DIR, "blockchain.json")
+    BACKUP_DIR = os.path.join(DATA_DIR, "backups")
+    CHECKPOINT_DIR = os.path.join(DATA_DIR, "checkpoints")
+
+    # Checkpoint interval (blocks)
+    CHECKPOINT_INTERVAL = 1000
+
+    # Max backup files to keep
+    MAX_BACKUPS = 10
+
+    # Auto-save interval (blocks)
+    AUTO_SAVE_INTERVAL = 1
+
+class BlockchainStorage:
+    """
+    Blockchain persistent storage with data integrity and recovery
+
+    Features:
+    - Atomic writes (write to temp, then rename)
+    - SHA-256 checksums for data integrity
+    - Automatic backups on save
+    - Recovery from corrupted data
+    - Checkpoint system every 1000 blocks
+    """
+
+    def __init__(self, data_dir: str = None):
+        """
+        Initialize blockchain storage
+
+        Args:
+            data_dir: Custom data directory (uses default if None)
+        """
+        # Setup directories
+        if data_dir:
+            self.data_dir = data_dir
+            self.blockchain_file = os.path.join(data_dir, "blockchain.json")
+            self.backup_dir = os.path.join(data_dir, "backups")
+            self.checkpoint_dir = os.path.join(data_dir, "checkpoints")
+        else:
+            self.data_dir = BlockchainStorageConfig.DATA_DIR
+            self.blockchain_file = BlockchainStorageConfig.BLOCKCHAIN_FILE
+            self.backup_dir = BlockchainStorageConfig.BACKUP_DIR
+            self.checkpoint_dir = BlockchainStorageConfig.CHECKPOINT_DIR
+
+        # Create directories
+        os.makedirs(self.data_dir, exist_ok=True)
+        os.makedirs(self.backup_dir, exist_ok=True)
+        os.makedirs(self.checkpoint_dir, exist_ok=True)
+
+        # Thread safety
+        self.lock = Lock()
+        self._metrics: MetricsCollector | bool | None = None
+
+        # Metadata file
+        self.metadata_file = os.path.join(self.data_dir, "blockchain_metadata.json")
+
+    def _calculate_checksum(self, data: str) -> str:
+        """
+        Calculate SHA-256 checksum of data
+
+        Args:
+            data: Data string to checksum
+
+        Returns:
+            str: Hex checksum
+        """
+        return hashlib.sha256(data.encode("utf-8")).hexdigest()
+
+    def _verify_checksum(self, data: str, expected_checksum: str) -> bool:
+        """
+        Verify data checksum
+
+        Args:
+            data: Data to verify
+            expected_checksum: Expected checksum
+
+        Returns:
+            bool: True if checksum matches
+        """
+        actual_checksum = self._calculate_checksum(data)
+        return actual_checksum == expected_checksum
+
+    def _get_metrics_collector(self) -> MetricsCollector | None:
+        """Lazily acquire the shared metrics collector without breaking storage flow on errors."""
+        if self._metrics is False:
+            return None
+        if self._metrics is None:
+            try:
+                self._metrics = MetricsCollector.instance()
+            except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
+                logger.debug(
+                    "Metrics collector unavailable for storage instrumentation",
+                    extra={
+                        "event": "storage.metrics_unavailable",
+                        "error": str(exc),
+                        "error_type": type(exc).__name__,
+                    },
+                )
+                self._metrics = False
+        return self._metrics if self._metrics is not False else None
+
+    def _calculate_data_dir_size(self) -> int:
+        """Calculate total size of the data directory without following symlinks."""
+        total_size = 0
+        stack = [self.data_dir]
+        while stack:
+            path = stack.pop()
+            try:
+                with os.scandir(path) as entries:
+                    for entry in entries:
+                        try:
+                            if entry.is_symlink():
+                                continue
+                            if entry.is_dir(follow_symlinks=False):
+                                stack.append(entry.path)
+                            else:
+                                total_size += entry.stat(follow_symlinks=False).st_size
+                        except (OSError, FileNotFoundError, PermissionError):
+                            continue
+            except (OSError, FileNotFoundError, PermissionError):
+                continue
+        return total_size
+
+    def _update_data_dir_gauge(self) -> None:
+        collector = self._get_metrics_collector()
+        if not collector:
+            return
+        gauge = collector.get_metric("xai_storage_data_dir_bytes")
+        if gauge:
+            gauge.set(float(self._calculate_data_dir_size()))
+
+    def _record_storage_write(self, duration_seconds: float, bytes_written: int) -> None:
+        collector = self._get_metrics_collector()
+        if not collector:
+            return
+        histogram = collector.get_metric("xai_storage_write_latency_seconds")
+        if hasattr(histogram, "observe"):
+            histogram.observe(duration_seconds)
+        counter = collector.get_metric("xai_storage_writes_total")
+        if counter:
+            counter.inc()
+        byte_counter = collector.get_metric("xai_storage_bytes_written_total")
+        if byte_counter and bytes_written:
+            byte_counter.inc(float(bytes_written))
+        self._update_data_dir_gauge()
+
+    def _record_storage_read(self, duration_seconds: float, bytes_read: int) -> None:
+        collector = self._get_metrics_collector()
+        if not collector:
+            return
+        histogram = collector.get_metric("xai_storage_read_latency_seconds")
+        if hasattr(histogram, "observe"):
+            histogram.observe(duration_seconds)
+        counter = collector.get_metric("xai_storage_reads_total")
+        if counter:
+            counter.inc()
+        byte_counter = collector.get_metric("xai_storage_bytes_read_total")
+        if byte_counter and bytes_read:
+            byte_counter.inc(float(bytes_read))
+
+    def _record_storage_error(self, operation: str, duration_seconds: float = 0.0) -> None:
+        collector = self._get_metrics_collector()
+        if not collector:
+            return
+        error_counter = collector.get_metric("xai_storage_errors_total")
+        if error_counter:
+            error_counter.inc()
+        if operation.startswith("load"):
+            histogram = collector.get_metric("xai_storage_read_latency_seconds")
+        else:
+            histogram = collector.get_metric("xai_storage_write_latency_seconds")
+        if hasattr(histogram, "observe") and duration_seconds:
+            histogram.observe(duration_seconds)
+
+    def save_to_disk(self, blockchain_data: dict, create_backup: bool = True) -> tuple[bool, str]:
+        """
+        Save blockchain to disk with atomic write
+
+        Uses temp file + rename for atomicity.
+        Creates backup before overwriting.
+
+        Args:
+            blockchain_data: Blockchain dictionary to save
+            create_backup: Whether to create backup
+
+        Returns:
+            tuple: (success: bool, message: str)
+        """
+        start = time.perf_counter()
+        bytes_written = 0
+        with self.lock:
+            try:
+                # Serialize blockchain data
+                json_data = json.dumps(blockchain_data, indent=2, sort_keys=True)
+
+                # Calculate checksum
+                checksum = self._calculate_checksum(json_data)
+
+                # Create metadata
+                metadata = {
+                    "timestamp": time.time(),
+                    "block_height": len(blockchain_data.get("chain", [])),
+                    "checksum": checksum,
+                    "version": "1.0",
+                }
+
+                # Package data with metadata
+                package = {"metadata": metadata, "blockchain": blockchain_data}
+
+                package_json = json.dumps(package, indent=2, sort_keys=True)
+                bytes_written = len(package_json.encode("utf-8"))
+
+                # Create backup if requested and file exists
+                if create_backup and os.path.exists(self.blockchain_file):
+                    self._create_backup()
+
+                # Atomic write: write to temp file, then rename
+                temp_file = self.blockchain_file + ".tmp"
+
+                # Write to temp file
+                with open(temp_file, "w") as f:
+                    f.write(package_json)
+                    f.flush()
+                    os.fsync(f.fileno())  # Force write to disk
+
+                # Atomic rename
+                if os.path.exists(self.blockchain_file):
+                    os.replace(temp_file, self.blockchain_file)
+                else:
+                    os.rename(temp_file, self.blockchain_file)
+
+                # Save metadata separately for quick access
+                with open(self.metadata_file, "w") as f:
+                    json.dump(metadata, f, indent=2)
+
+                # Create checkpoint if needed
+                block_height = metadata["block_height"]
+                if block_height % BlockchainStorageConfig.CHECKPOINT_INTERVAL == 0:
+                    self._create_checkpoint(blockchain_data, block_height)
+
+                self._record_storage_write(time.perf_counter() - start, bytes_written)
+                return (
+                    True,
+                    f"Blockchain saved successfully (height: {block_height}, checksum: {checksum[:8]}...)",
+                )
+
+            except (DatabaseError, StorageError, OSError, IOError, PermissionError) as e:
+                self._record_storage_error("save_to_disk", time.perf_counter() - start)
+                logger.error(
+                    "Failed to save blockchain to disk",
+                    extra={
+                        "operation": "save_to_disk",
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
+                )
+                return False, f"Failed to save blockchain: {str(e)}"
+
+    def load_from_disk(self) -> tuple[bool, dict | None, str]:
+        """
+        Load blockchain from disk with integrity checks
+
+        Attempts recovery if corruption detected.
+
+        Returns:
+            tuple: (success: bool, blockchain_data: dict or None, message: str)
+        """
+        start = time.perf_counter()
+        bytes_read = 0
+        with self.lock:
+            # Check if blockchain file exists
+            if not os.path.exists(self.blockchain_file):
+                return False, None, "No blockchain file found"
+
+            try:
+                bytes_read = os.path.getsize(self.blockchain_file)
+                # Read file
+                with open(self.blockchain_file, "r") as f:
+                    package = json.load(f)
+
+                # Extract metadata and blockchain
+                metadata = package.get("metadata", {})
+                blockchain_data = package.get("blockchain", {})
+
+                # Verify checksum
+                blockchain_json = json.dumps(blockchain_data, indent=2, sort_keys=True)
+                expected_checksum = metadata.get("checksum")
+
+                if expected_checksum:
+                    if not self._verify_checksum(blockchain_json, expected_checksum):
+                        # Checksum failed - attempt recovery
+                        print("WARNING: Checksum verification failed. Attempting recovery...")
+                        return self._attempt_recovery()
+
+                block_height = len(blockchain_data.get("chain", []))
+
+                self._record_storage_read(time.perf_counter() - start, bytes_read)
+                return (
+                    True,
+                    blockchain_data,
+                    f"Blockchain loaded successfully (height: {block_height})",
+                )
+
+            except json.JSONDecodeError as e:
+                # Corrupted JSON - attempt recovery
+                logger.warning(
+                    "JSON decode error during blockchain load",
+                    extra={
+                        "error": str(e),
+                        "error_type": "JSONDecodeError"
+                    }
+                )
+                print(f"WARNING: JSON decode error: {e}. Attempting recovery...")
+                self._record_storage_error("load_from_disk", time.perf_counter() - start)
+                return self._attempt_recovery()
+
+            except (DatabaseError, StorageError, CorruptedDataError, OSError, IOError) as e:
+                self._record_storage_error("load_from_disk", time.perf_counter() - start)
+                logger.error(
+                    "Failed to load blockchain from disk",
+                    extra={
+                        "operation": "load_from_disk",
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
+                )
+                return False, None, f"Failed to load blockchain: {str(e)}"
+
+    def _create_backup(self) -> bool:
+        """
+        Create timestamped backup of current blockchain
+
+        Returns:
+            bool: Success
+        """
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_file = os.path.join(self.backup_dir, f"blockchain_backup_{timestamp}.json")
+
+            # Copy current blockchain to backup
+            shutil.copy2(self.blockchain_file, backup_file)
+
+            # Clean old backups
+            self._cleanup_old_backups()
+
+            return True
+
+        except (OSError, IOError, PermissionError, shutil.Error) as e:
+            logger.warning(
+                "Failed to create blockchain backup",
+                extra={
+                    "operation": "_create_backup",
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
+            )
+            print(f"Warning: Failed to create backup: {e}")
+            return False
+
+    def _cleanup_old_backups(self):
+        """Remove old backups, keeping only MAX_BACKUPS most recent"""
+        try:
+            # Get all backup files
+            backups = [
+                os.path.join(self.backup_dir, f)
+                for f in os.listdir(self.backup_dir)
+                if f.startswith("blockchain_backup_") and f.endswith(".json")
+            ]
+
+            # Sort by modification time
+            backups.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+
+            # Remove old backups
+            for backup in backups[BlockchainStorageConfig.MAX_BACKUPS :]:
+                os.remove(backup)
+
+        except (OSError, IOError, PermissionError) as e:
+            logger.warning(
+                "Failed to cleanup old backups",
+                extra={
+                    "operation": "_cleanup_old_backups",
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
+            )
+            print(f"Warning: Failed to cleanup old backups: {e}")
+
+    def _create_checkpoint(self, blockchain_data: dict, block_height: int):
+        """
+        Create checkpoint file for blockchain state
+
+        Args:
+            blockchain_data: Blockchain data to checkpoint
+            block_height: Current block height
+        """
+        try:
+            checkpoint_file = os.path.join(self.checkpoint_dir, f"checkpoint_{block_height}.json")
+
+            # Calculate checksum
+            json_data = json.dumps(blockchain_data, indent=2, sort_keys=True)
+            checksum = self._calculate_checksum(json_data)
+
+            # Create checkpoint package
+            checkpoint = {
+                "block_height": block_height,
+                "timestamp": time.time(),
+                "checksum": checksum,
+                "blockchain": blockchain_data,
+            }
+
+            # Write checkpoint
+            with open(checkpoint_file, "w") as f:
+                json.dump(checkpoint, f, indent=2)
+
+            print(f"Checkpoint created at block {block_height}")
+
+        except (OSError, IOError, PermissionError) as e:
+            logger.warning(
+                "Failed to create checkpoint",
+                extra={
+                    "operation": "_create_checkpoint",
+                    "block_height": block_height,
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
+            )
+            print(f"Warning: Failed to create checkpoint: {e}")
+
+    def _attempt_recovery(self) -> tuple[bool, dict | None, str]:
+        """
+        Attempt to recover blockchain from backups or checkpoints
+
+        Recovery priority:
+        1. Most recent backup
+        2. Most recent checkpoint
+        3. Genesis block only
+
+        Returns:
+            tuple: (success: bool, blockchain_data: dict or None, message: str)
+        """
+        print("Attempting blockchain recovery...")
+
+        # Try backups first
+        recovery_data = self._recover_from_backup()
+        if recovery_data:
+            return True, recovery_data, "Recovered from backup"
+
+        # Try checkpoints
+        recovery_data = self._recover_from_checkpoint()
+        if recovery_data:
+            return True, recovery_data, "Recovered from checkpoint"
+
+        # All recovery attempts failed
+        return False, None, "Recovery failed - no valid backup or checkpoint found"
+
+    def _recover_from_backup(self) -> dict | None:
+        """
+        Recover from most recent valid backup
+
+        Returns:
+            dict or None: Blockchain data if successful
+        """
+        try:
+            # Get all backups sorted by time (newest first)
+            backups = [
+                os.path.join(self.backup_dir, f)
+                for f in os.listdir(self.backup_dir)
+                if f.startswith("blockchain_backup_") and f.endswith(".json")
+            ]
+            backups.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+
+            # Try each backup
+            for backup_file in backups:
+                try:
+                    with open(backup_file, "r") as f:
+                        package = json.load(f)
+
+                    # Check format
+                    if "metadata" in package and "blockchain" in package:
+                        # New format
+                        blockchain_data = package.get("blockchain", {})
+                        metadata = package.get("metadata", {})
+
+                        # Verify checksum if available
+                        blockchain_json = json.dumps(blockchain_data, indent=2, sort_keys=True)
+                        expected_checksum = metadata.get("checksum")
+
+                        if expected_checksum and self._verify_checksum(
+                            blockchain_json, expected_checksum
+                        ):
+                            print(f"Recovered from backup: {os.path.basename(backup_file)}")
+                            return blockchain_data
+                        elif not expected_checksum:
+                            # No checksum, accept anyway
+                            print(
+                                f"Recovered from backup (no checksum): {os.path.basename(backup_file)}"
+                            )
+                            return blockchain_data
+                    else:
+                        # Old format - direct blockchain data
+                        blockchain_data = package
+                        print(
+                            f"Recovered from backup (old format): {os.path.basename(backup_file)}"
+                        )
+                        return blockchain_data
+
+                except (json.JSONDecodeError, CorruptedDataError, OSError, IOError, KeyError, ValueError) as e:
+                    logger.debug(
+                        "Backup file is invalid, trying next",
+                        extra={
+                            "operation": "_recover_from_backup",
+                            "backup_file": os.path.basename(backup_file),
+                            "error": str(e),
+                            "error_type": type(e).__name__
+                        }
+                    )
+                    print(f"Backup {os.path.basename(backup_file)} is invalid: {e}")
+                    continue
+
+            return None
+
+        except (OSError, IOError, PermissionError) as e:
+            logger.error(
+                "Failed to recover from backups",
+                extra={
+                    "operation": "_recover_from_backup",
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
+            )
+            print(f"Failed to recover from backups: {e}")
+            return None
+
+    def _recover_from_checkpoint(self) -> dict | None:
+        """
+        Recover from most recent valid checkpoint
+
+        Returns:
+            dict or None: Blockchain data if successful
+        """
+        try:
+            # Get all checkpoints sorted by block height (highest first)
+            checkpoints = [
+                os.path.join(self.checkpoint_dir, f)
+                for f in os.listdir(self.checkpoint_dir)
+                if f.startswith("checkpoint_") and f.endswith(".json")
+            ]
+
+            # Extract block heights and sort
+            checkpoint_data = []
+            for cp_file in checkpoints:
+                try:
+                    height = int(
+                        os.path.basename(cp_file).replace("checkpoint_", "").replace(".json", "")
+                    )
+                    checkpoint_data.append((height, cp_file))
+                except ValueError:
+                    continue
+
+            checkpoint_data.sort(reverse=True)
+
+            # Try each checkpoint
+            for height, checkpoint_file in checkpoint_data:
+                try:
+                    with open(checkpoint_file, "r") as f:
+                        checkpoint = json.load(f)
+
+                    blockchain_data = checkpoint.get("blockchain", {})
+                    expected_checksum = checkpoint.get("checksum")
+
+                    # Verify checksum
+                    blockchain_json = json.dumps(blockchain_data, indent=2, sort_keys=True)
+
+                    if expected_checksum and self._verify_checksum(
+                        blockchain_json, expected_checksum
+                    ):
+                        print(f"Recovered from checkpoint at block {height}")
+                        return blockchain_data
+
+                except (json.JSONDecodeError, CorruptedDataError, OSError, IOError, KeyError, ValueError) as e:
+                    logger.debug(
+                        "Checkpoint file is invalid, trying next",
+                        extra={
+                            "operation": "_recover_from_checkpoint",
+                            "checkpoint_height": height,
+                            "error": str(e),
+                            "error_type": type(e).__name__
+                        }
+                    )
+                    print(f"Checkpoint {height} is invalid: {e}")
+                    continue
+
+            return None
+
+        except (OSError, IOError, PermissionError, ValueError) as e:
+            logger.error(
+                "Failed to recover from checkpoints",
+                extra={
+                    "operation": "_recover_from_checkpoint",
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
+            )
+            print(f"Failed to recover from checkpoints: {e}")
+            return None
+
+    def restore_from_backup(self, backup_filename: str) -> tuple[bool, dict | None, str]:
+        """
+        Manually restore from specific backup file
+
+        Args:
+            backup_filename: Name of backup file
+
+        Returns:
+            tuple: (success: bool, blockchain_data: dict or None, message: str)
+        """
+        with self.lock:
+            backup_path = os.path.join(self.backup_dir, backup_filename)
+
+            if not os.path.exists(backup_path):
+                return False, None, f"Backup file not found: {backup_filename}"
+
+            try:
+                with open(backup_path, "r") as f:
+                    package = json.load(f)
+
+                # Check if this is the new format (with metadata) or old format
+                if "metadata" in package and "blockchain" in package:
+                    # New format
+                    blockchain_data = package.get("blockchain", {})
+                    metadata = package.get("metadata", {})
+
+                    # Verify checksum if available
+                    blockchain_json = json.dumps(blockchain_data, indent=2, sort_keys=True)
+                    expected_checksum = metadata.get("checksum")
+
+                    if expected_checksum and not self._verify_checksum(
+                        blockchain_json, expected_checksum
+                    ):
+                        print(
+                            f"Warning: Checksum mismatch for {backup_filename}, but continuing with restore"
+                        )
+                        # Don't fail on checksum mismatch for backups - they may be from recovery
+                else:
+                    # Old format - direct blockchain data
+                    blockchain_data = package
+
+                return True, blockchain_data, f"Restored from backup: {backup_filename}"
+
+            except (json.JSONDecodeError, CorruptedDataError, OSError, IOError, KeyError, ValueError) as e:
+                logger.error(
+                    "Failed to restore from backup file",
+                    extra={
+                        "operation": "restore_from_backup",
+                        "backup_filename": backup_filename,
+                        "error": str(e),
+                        "error_type": type(e).__name__
+                    }
+                )
+                return False, None, f"Failed to restore from backup: {str(e)}"
+
+    def list_backups(self) -> list[dict]:
+        """
+        List all available backups
+
+        Returns:
+            list: Backup information
+        """
+        try:
+            backups = [
+                f
+                for f in os.listdir(self.backup_dir)
+                if f.startswith("blockchain_backup_") and f.endswith(".json")
+            ]
+
+            backup_info = []
+            for backup in backups:
+                backup_path = os.path.join(self.backup_dir, backup)
+                stat = os.stat(backup_path)
+
+                # Try to get block height from metadata
+                try:
+                    with open(backup_path, "r") as f:
+                        package = json.load(f)
+                    block_height = package.get("metadata", {}).get("block_height", "unknown")
+                except (IOError, json.JSONDecodeError, KeyError) as e:
+                    logger.debug(f"Could not read backup metadata: {e}")
+                    block_height = "unknown"
+
+                backup_info.append(
+                    {
+                        "filename": backup,
+                        "timestamp": datetime.fromtimestamp(stat.st_mtime).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
+                        "size_mb": stat.st_size / (1024 * 1024),
+                        "block_height": block_height,
+                    }
+                )
+
+            # Sort by timestamp (newest first)
+            backup_info.sort(key=lambda x: x["timestamp"], reverse=True)
+
+            return backup_info
+
+        except (OSError, IOError, PermissionError) as e:
+            logger.error(
+                "Failed to list backup files",
+                extra={
+                    "operation": "list_backups",
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
+            )
+            print(f"Failed to list backups: {e}")
+            return []
+
+    def list_checkpoints(self) -> list[dict]:
+        """
+        List all available checkpoints
+
+        Returns:
+            list: Checkpoint information
+        """
+        try:
+            checkpoints = [
+                f
+                for f in os.listdir(self.checkpoint_dir)
+                if f.startswith("checkpoint_") and f.endswith(".json")
+            ]
+
+            checkpoint_info = []
+            for checkpoint in checkpoints:
+                checkpoint_path = os.path.join(self.checkpoint_dir, checkpoint)
+                stat = os.stat(checkpoint_path)
+
+                # Extract block height
+                try:
+                    height = int(checkpoint.replace("checkpoint_", "").replace(".json", ""))
+                except ValueError:
+                    height = "unknown"
+
+                checkpoint_info.append(
+                    {
+                        "filename": checkpoint,
+                        "block_height": height,
+                        "timestamp": datetime.fromtimestamp(stat.st_mtime).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
+                        "size_mb": stat.st_size / (1024 * 1024),
+                    }
+                )
+
+            # Sort by block height (highest first)
+            checkpoint_info.sort(
+                key=lambda x: x["block_height"] if isinstance(x["block_height"], int) else 0,
+                reverse=True,
+            )
+
+            return checkpoint_info
+
+        except (OSError, IOError, PermissionError, ValueError) as e:
+            logger.error(
+                "Failed to list checkpoint files",
+                extra={
+                    "operation": "list_checkpoints",
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
+            )
+            print(f"Failed to list checkpoints: {e}")
+            return []
+
+    def get_metadata(self) -> dict | None:
+        """
+        Get blockchain metadata
+
+        Returns:
+            dict or None: Metadata
+        """
+        try:
+            if os.path.exists(self.metadata_file):
+                with open(self.metadata_file, "r") as f:
+                    return json.load(f)
+            return None
+        except (json.JSONDecodeError, OSError, IOError) as e:
+            logger.error(
+                "Failed to read metadata file",
+                extra={
+                    "operation": "get_metadata",
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
+            )
+            print(f"Failed to read metadata: {e}")
+            return None
+
+    def verify_integrity(self) -> tuple[bool, str]:
+        """
+        Verify blockchain file integrity
+
+        Returns:
+            tuple: (valid: bool, message: str)
+        """
+        try:
+            if not os.path.exists(self.blockchain_file):
+                return False, "Blockchain file not found"
+
+            # Load and verify
+            with open(self.blockchain_file, "r") as f:
+                package = json.load(f)
+
+            metadata = package.get("metadata", {})
+            blockchain_data = package.get("blockchain", {})
+
+            # Verify checksum
+            blockchain_json = json.dumps(blockchain_data, indent=2, sort_keys=True)
+            expected_checksum = metadata.get("checksum")
+
+            if not expected_checksum:
+                return False, "No checksum found in metadata"
+
+            if not self._verify_checksum(blockchain_json, expected_checksum):
+                return False, "Checksum verification failed"
+
+            block_height = len(blockchain_data.get("chain", []))
+
+            return (
+                True,
+                f"Integrity verified (height: {block_height}, checksum: {expected_checksum[:8]}...)",
+            )
+
+        except (json.JSONDecodeError, CorruptedDataError, OSError, IOError, KeyError, ValueError) as e:
+            logger.error(
+                "Blockchain integrity check failed",
+                extra={
+                    "operation": "verify_integrity",
+                    "error": str(e),
+                    "error_type": type(e).__name__
+                }
+            )
+            return False, f"Integrity check failed: {str(e)}"

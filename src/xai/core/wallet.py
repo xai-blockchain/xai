@@ -19,14 +19,14 @@ from cryptography.fernet import Fernet
 # BIP-39 mnemonic support
 from mnemonic import Mnemonic
 
-from xai.core.address_checksum import to_checksum_address
-from xai.core.crypto_utils import (
+from xai.core.wallets.address_checksum import to_checksum_address
+from xai.core.security.crypto_utils import (
     derive_public_key_hex,
     generate_secp256k1_keypair_hex,
     sign_message_hex,
     verify_signature_hex,
 )
-from xai.core.hardware_wallet import (
+from xai.core.wallets.hardware_wallet import (
     HARDWARE_WALLET_ENABLED,
     HardwareWallet,
     get_default_hardware_wallet,

@@ -15,7 +15,7 @@ import time
 from unittest.mock import Mock, patch, MagicMock
 from xai.core.blockchain import Blockchain, Block, Transaction
 from xai.core.wallet import Wallet
-from xai.core.advanced_consensus import (
+from xai.core.consensus.advanced_consensus import (
     BlockStatus,
     BlockPropagationMonitor,
     OrphanBlockPool,

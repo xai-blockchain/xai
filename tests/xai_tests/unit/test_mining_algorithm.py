@@ -16,7 +16,7 @@ import pytest
 from decimal import Decimal
 import time
 
-from xai.core.mining_algorithm import MiningAlgorithm, BrowserMiningAdapter
+from xai.core.mining.mining_algorithm import MiningAlgorithm, BrowserMiningAdapter
 
 
 class TestMiningAlgorithmConstants:

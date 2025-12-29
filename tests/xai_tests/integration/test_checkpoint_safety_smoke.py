@@ -2,7 +2,7 @@ import json
 import hashlib
 from types import SimpleNamespace
 
-from xai.core.checkpoint_sync import CheckpointSyncManager
+from xai.core.p2p.checkpoint_sync import CheckpointSyncManager
 
 
 def _payload(snapshot, height=5, block_hash="abc"):

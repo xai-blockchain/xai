@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from scripts.tools import api_key_rotate as cli
-from xai.core.api_auth import APIKeyStore
+from xai.core.api.api_auth import APIKeyStore
 
 
 def test_api_key_store_rotate_logs(tmp_path):

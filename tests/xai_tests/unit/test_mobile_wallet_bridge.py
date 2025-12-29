@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
-from xai.core.mobile_wallet_bridge import MobileWalletBridge
-from xai.core.validation import validate_address, validate_amount
+from xai.core.api.mobile_wallet_bridge import MobileWalletBridge
+from xai.core.consensus.validation import validate_address, validate_amount
 
 
 class DummyValidator:

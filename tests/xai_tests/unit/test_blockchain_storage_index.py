@@ -16,9 +16,9 @@ import json
 import pytest
 from pathlib import Path
 
-from xai.core.blockchain_storage import BlockchainStorage
+from xai.core.chain.blockchain_storage import BlockchainStorage
 from xai.core.blockchain import Block, Transaction
-from xai.core.block_header import BlockHeader
+from xai.core.chain.block_header import BlockHeader
 
 
 def create_test_block(index: int, previous_hash: str = "0" * 64) -> Block:

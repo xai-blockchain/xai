@@ -1,7 +1,7 @@
 """Simple coverage test for error_handlers module"""
 import pytest
 import time
-from xai.core.error_handlers import (
+from xai.core.api.error_handlers import (
     CircuitState,
     CircuitBreaker,
     RetryStrategy,

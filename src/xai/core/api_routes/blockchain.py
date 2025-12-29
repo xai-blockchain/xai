@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from flask import jsonify, make_response, request
 
 from xai.core.blockchain import Blockchain
-from xai.core.monitoring import MetricsCollector
+from xai.core.api.monitoring import MetricsCollector
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes

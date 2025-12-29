@@ -12,10 +12,10 @@ from unittest.mock import Mock, MagicMock
 
 from xai.core.blockchain import Transaction, Block  # Import Block and Transaction for context
 from xai.core.wallet import Wallet
-from xai.core.security_validation import ValidationError
-from xai.core.nonce_tracker import NonceTracker
-from xai.core.structured_logger import StructuredLogger
-from xai.core.transaction_validator import TransactionValidator, get_transaction_validator
+from xai.core.security.security_validation import ValidationError
+from xai.core.transactions.nonce_tracker import NonceTracker
+from xai.core.api.structured_logger import StructuredLogger
+from xai.core.consensus.transaction_validator import TransactionValidator, get_transaction_validator
 
 
 # Fixture for a mock blockchain

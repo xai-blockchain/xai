@@ -15,9 +15,9 @@ import statistics
 
 from xai.core.wallet import Wallet
 from xai.core.transaction import Transaction
-from xai.core.utxo_manager import UTXOManager
+from xai.core.transactions.utxo_manager import UTXOManager
 from xai.core.blockchain import Blockchain
-from xai.core.crypto_utils import sign_message_hex, verify_signature_hex, derive_public_key_hex
+from xai.core.security.crypto_utils import sign_message_hex, verify_signature_hex, derive_public_key_hex
 
 class TestSignatureVerificationBenchmarks:
     """Microbenchmarks for ECDSA signature operations."""
@@ -400,7 +400,7 @@ class TestMerkleTreeBenchmarks:
         transactions = blockchain.pending_transactions.copy()
 
         # Import Merkle calculation function
-        from xai.core.block_header import BlockHeader
+        from xai.core.chain.block_header import BlockHeader
 
         # Benchmark merkle root calculation
         iterations = 100

@@ -18,7 +18,7 @@ import pytest
 # Test will skip if jwt not installed
 jwt = pytest.importorskip("jwt")
 
-from xai.core.api_auth import JWTAuthManager
+from xai.core.api.api_auth import JWTAuthManager
 
 
 def make_request(headers=None):

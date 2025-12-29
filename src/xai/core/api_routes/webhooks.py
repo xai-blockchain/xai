@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 from flask import jsonify, request
 
-from xai.core.webhook_manager import WebhookEvent, get_webhook_manager
+from xai.core.api.webhook_manager import WebhookEvent, get_webhook_manager
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes

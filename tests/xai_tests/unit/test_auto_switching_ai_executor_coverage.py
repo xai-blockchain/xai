@@ -18,7 +18,7 @@ import time
 from unittest.mock import Mock, MagicMock, patch, call
 from enum import Enum
 
-from xai.core.auto_switching_ai_executor import (
+from xai.core.governance.auto_switching_ai_executor import (
     AutoSwitchingAIExecutor,
     ConversationContext,
     KeySwapEvent,

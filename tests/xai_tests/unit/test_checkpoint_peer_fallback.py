@@ -2,7 +2,7 @@ from types import SimpleNamespace
 import hashlib
 import json
 
-from xai.core.checkpoint_sync import CheckpointSyncManager
+from xai.core.p2p.checkpoint_sync import CheckpointSyncManager
 
 
 def test_fetch_validate_apply_requests_peers_when_no_metadata(monkeypatch):

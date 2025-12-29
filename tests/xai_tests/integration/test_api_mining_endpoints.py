@@ -13,7 +13,7 @@ import json
 import time
 from unittest.mock import Mock, patch, MagicMock
 from flask import Flask
-from xai.core.api_mining import MiningAPIHandler
+from xai.core.api.api_mining import MiningAPIHandler
 from xai.core.blockchain import Blockchain
 from xai.core.wallet import Wallet
 

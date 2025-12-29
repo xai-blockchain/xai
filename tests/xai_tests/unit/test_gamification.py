@@ -11,7 +11,7 @@ import shutil
 import hashlib
 from pathlib import Path
 
-from xai.core.gamification import (
+from xai.core.governance.gamification import (
     AirdropManager,
     StreakTracker,
     TreasureHuntManager,

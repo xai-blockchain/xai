@@ -7,8 +7,8 @@ Ensures that partial fork failures don't corrupt UTXO or nonce state.
 import pytest
 from unittest.mock import patch
 from xai.core.blockchain import Blockchain
-from xai.core.utxo_manager import UTXOManager
-from xai.core.nonce_tracker import NonceTracker
+from xai.core.transactions.utxo_manager import UTXOManager
+from xai.core.transactions.nonce_tracker import NonceTracker
 
 
 class TestBlockchainForkAtomicity:

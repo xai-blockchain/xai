@@ -52,7 +52,7 @@ except Exception:
         return cert_pem, key_pem
 
 
-from xai.core.p2p_quic import (
+from xai.core.p2p.p2p_quic import (
     QUICServer,
     quic_client_send,
     quic_client_send_with_timeout,
@@ -250,7 +250,7 @@ class TestQuicMetricsRecording:
 
     def test_record_quic_timeout_increments_counter(self):
         """_record_quic_timeout should increment timeout counter."""
-        from xai.core.node_p2p import P2PNetworkManager
+        from xai.core.p2p.node_p2p import P2PNetworkManager
         from xai.core.blockchain import Blockchain
 
         bc = Blockchain()
@@ -270,7 +270,7 @@ class TestQuicMetricsRecording:
 
     def test_record_quic_error_increments_counter(self):
         """_record_quic_error should increment error counter."""
-        from xai.core.node_p2p import P2PNetworkManager
+        from xai.core.p2p.node_p2p import P2PNetworkManager
         from xai.core.blockchain import Blockchain
 
         bc = Blockchain()

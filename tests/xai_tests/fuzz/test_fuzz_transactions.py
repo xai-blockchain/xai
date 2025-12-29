@@ -145,7 +145,7 @@ class TestAddressFuzzing:
     @settings(max_examples=500)
     def test_address_validation_never_crashes(self, address: str):
         """Address validation must never crash."""
-        from xai.core.validation import validate_address
+        from xai.core.consensus.validation import validate_address
 
         try:
             validate_address(address)
@@ -158,7 +158,7 @@ class TestAddressFuzzing:
     @settings(max_examples=300)
     def test_address_validation_handles_binary(self, data: bytes):
         """Address validation must handle binary input gracefully."""
-        from xai.core.validation import validate_address
+        from xai.core.consensus.validation import validate_address
 
         try:
             address = data.decode('utf-8', errors='replace')
@@ -180,7 +180,7 @@ class TestAmountFuzzing:
     @settings(max_examples=500)
     def test_amount_validation_never_crashes(self, amount):
         """Amount validation must never crash."""
-        from xai.core.validation import validate_amount
+        from xai.core.consensus.validation import validate_amount
 
         try:
             validate_amount(amount)
@@ -193,7 +193,7 @@ class TestAmountFuzzing:
     @settings(max_examples=300)
     def test_amount_string_parsing(self, amount_str: str):
         """Amount parsing must handle arbitrary strings."""
-        from xai.core.validation import validate_amount
+        from xai.core.consensus.validation import validate_amount
 
         try:
             validate_amount(amount_str)

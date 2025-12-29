@@ -5,7 +5,7 @@ from pathlib import Path
 
 from xai.blockchain.front_running_protection import FrontRunningProtectionManager
 from xai.blockchain.mev_mitigation import MEVMitigationManager
-from xai.core.advanced_consensus import TransactionOrdering
+from xai.core.consensus.advanced_consensus import TransactionOrdering
 from xai.core.transaction import Transaction
 
 

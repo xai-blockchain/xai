@@ -23,7 +23,7 @@ from unittest.mock import Mock, patch
 
 from xai.core.blockchain import Blockchain, Block, Transaction
 from xai.core.wallet import Wallet
-from xai.core.blockchain_security import BlockchainSecurityManager, ReorganizationProtection
+from xai.core.security.blockchain_security import BlockchainSecurityManager, ReorganizationProtection
 
 @pytest.mark.security
 class TestFiftyOnePercentAttack:

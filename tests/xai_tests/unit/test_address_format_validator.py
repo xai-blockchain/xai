@@ -1,4 +1,4 @@
-from xai.core.validation import AddressFormatValidator, validate_address
+from xai.core.consensus.validation import AddressFormatValidator, validate_address
 
 
 def test_address_validator_enforces_network_prefix():

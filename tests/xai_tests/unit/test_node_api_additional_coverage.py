@@ -44,7 +44,7 @@ class TestNodeAPISendTransactionErrorPaths:
         mock_node.app.config['TESTING'] = True
         return mock_node.app.test_client()
 
-    @patch('xai.core.blockchain.Transaction')
+    @patch('xai.core.chain.Transaction')
     def test_send_transaction_exception(self, mock_tx_class, client):
         """Test POST /send - exception during processing."""
         mock_tx_class.side_effect = Exception("Transaction creation failed")
@@ -424,7 +424,7 @@ class TestNodeAPIGamificationErrorHandling:
         result = response.get_json()
         assert result['success'] == False
 
-    @patch('xai.core.blockchain.Transaction')
+    @patch('xai.core.chain.Transaction')
     def test_claim_treasure_exception(self, mock_tx_class, client, mock_node):
         """Test POST /treasure/claim - exception."""
         mock_node.blockchain.treasure_manager.claim_treasure.side_effect = Exception("Error")

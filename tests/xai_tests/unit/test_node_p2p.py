@@ -19,7 +19,7 @@ import pytest
 from unittest.mock import Mock, MagicMock, patch, AsyncMock
 import requests
 
-from xai.core.p2p_security import P2PSecurityConfig
+from xai.core.security.p2p_security import P2PSecurityConfig
 
 class TestPeerManagement:
     """Test peer management functionality."""
@@ -34,7 +34,7 @@ class TestPeerManagement:
     @pytest.fixture
     def p2p_manager(self, blockchain):
         """Create P2PNetworkManager instance."""
-        from xai.core.node_p2p import P2PNetworkManager
+        from xai.core.p2p.node_p2p import P2PNetworkManager
         return P2PNetworkManager(blockchain)
 
     def test_add_peer_new(self, p2p_manager):
@@ -116,7 +116,7 @@ class TestTransactionBroadcasting:
     @pytest.fixture
     def p2p_manager(self, blockchain):
         """Create P2PNetworkManager instance."""
-        from xai.core.node_p2p import P2PNetworkManager
+        from xai.core.p2p.node_p2p import P2PNetworkManager
         manager = P2PNetworkManager(blockchain)
         manager.add_peer("http://peer1:5000")
         manager.add_peer("http://peer2:5000")
@@ -176,7 +176,7 @@ class TestTransactionBroadcasting:
     @patch('xai.core.node_p2p.requests.post')
     def test_broadcast_transaction_includes_peer_api_key(self, mock_post, blockchain, mock_transaction):
         """Ensure peer API key header is attached when configured."""
-        from xai.core.node_p2p import P2PNetworkManager
+        from xai.core.p2p.node_p2p import P2PNetworkManager
 
         manager = P2PNetworkManager(blockchain, peer_api_key="shared-secret")
         manager.add_peer("http://peer1:5000")
@@ -190,7 +190,7 @@ class TestTransactionBroadcasting:
     @patch('xai.core.node_p2p.requests.post')
     def test_broadcast_transaction_no_peers(self, mock_post, blockchain, mock_transaction):
         """Test transaction broadcast with no peers."""
-        from xai.core.node_p2p import P2PNetworkManager
+        from xai.core.p2p.node_p2p import P2PNetworkManager
         manager = P2PNetworkManager(blockchain)
 
         manager.broadcast_transaction(mock_transaction)
@@ -209,7 +209,7 @@ class TestBlockBroadcasting:
     @pytest.fixture
     def p2p_manager(self, blockchain):
         """Create P2PNetworkManager instance."""
-        from xai.core.node_p2p import P2PNetworkManager
+        from xai.core.p2p.node_p2p import P2PNetworkManager
         manager = P2PNetworkManager(blockchain)
         manager.add_peer("http://peer1:5000")
         manager.add_peer("http://peer2:5000")
@@ -246,7 +246,7 @@ class TestBlockBroadcasting:
     @patch('xai.core.node_p2p.requests.post')
     def test_broadcast_block_includes_peer_api_key(self, mock_post, blockchain, mock_block):
         """Block broadcasts also include peer headers."""
-        from xai.core.node_p2p import P2PNetworkManager
+        from xai.core.p2p.node_p2p import P2PNetworkManager
 
         manager = P2PNetworkManager(blockchain, peer_api_key="secret-key")
         manager.add_peer("http://peerA")
@@ -300,7 +300,7 @@ class TestBlockchainSynchronization:
     @pytest.fixture
     def p2p_manager(self, blockchain):
         """Create P2PNetworkManager instance."""
-        from xai.core.node_p2p import P2PNetworkManager
+        from xai.core.p2p.node_p2p import P2PNetworkManager
         manager = P2PNetworkManager(blockchain)
         manager.add_peer("http://peer1:5000")
         manager.add_peer("http://peer2:5000")
@@ -422,7 +422,7 @@ class TestBlockchainSynchronization:
 
     def test_parallel_chunk_sync_adds_blocks(self, blockchain):
         """Ensure chunked parallel sync stitches blocks from multiple peers."""
-        from xai.core.node_p2p import P2PNetworkManager
+        from xai.core.p2p.node_p2p import P2PNetworkManager
 
         blockchain.chain = [Mock(index=0)]
         blockchain.add_block = Mock(return_value=True)
@@ -447,7 +447,7 @@ class TestBlockchainSynchronization:
 
     def test_parallel_chunk_sync_missing_chunk_aborts(self, blockchain):
         """Parallel sync should abort when a chunk cannot be downloaded."""
-        from xai.core.node_p2p import P2PNetworkManager
+        from xai.core.p2p.node_p2p import P2PNetworkManager
 
         blockchain.chain = [Mock(index=0)]
         blockchain.add_block = Mock(return_value=True)
@@ -497,7 +497,7 @@ class TestNetworkErrorHandling:
     @pytest.fixture
     def p2p_manager(self, blockchain):
         """Create P2PNetworkManager instance."""
-        from xai.core.node_p2p import P2PNetworkManager
+        from xai.core.p2p.node_p2p import P2PNetworkManager
         manager = P2PNetworkManager(blockchain)
         manager.add_peer("http://peer1:5000")
         return manager
@@ -549,7 +549,7 @@ class TestP2PIntegration:
     @pytest.fixture
     def p2p_manager(self, blockchain):
         """Create P2PNetworkManager instance."""
-        from xai.core.node_p2p import P2PNetworkManager
+        from xai.core.p2p.node_p2p import P2PNetworkManager
         return P2PNetworkManager(blockchain)
 
     def test_full_peer_lifecycle(self, p2p_manager):
@@ -615,7 +615,7 @@ class TestEdgeCases:
     @pytest.fixture
     def p2p_manager(self, blockchain):
         """Create P2PNetworkManager instance."""
-        from xai.core.node_p2p import P2PNetworkManager
+        from xai.core.p2p.node_p2p import P2PNetworkManager
         return P2PNetworkManager(blockchain)
 
     @patch('xai.core.node_p2p.requests.get')
@@ -671,7 +671,7 @@ class TestMessageDeduplication:
 
     @pytest.fixture
     def p2p_manager(self, blockchain):
-        from xai.core.node_p2p import P2PNetworkManager
+        from xai.core.p2p.node_p2p import P2PNetworkManager
 
         manager = P2PNetworkManager(blockchain)
         # Relax rate/bandwidth guards for deterministic tests

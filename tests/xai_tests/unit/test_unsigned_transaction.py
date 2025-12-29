@@ -4,7 +4,7 @@ import json
 import pytest
 import time
 
-from xai.core.unsigned_transaction import (
+from xai.core.transactions.unsigned_transaction import (
     UnsignedTransaction,
     TxStatus,
     SignatureSlot,

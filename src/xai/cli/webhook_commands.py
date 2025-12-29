@@ -193,7 +193,7 @@ def subscribe(
         table.add_row("[bold cyan]Metadata", json.dumps(metadata_dict)[:60])
     console.print(table)
 
-    if not Confirm.ask("\n[bold]Create this webhook subscription?[/]", default=True):
+    if not ctx.obj.get('assume_yes') and not Confirm.ask("\n[bold]Create this webhook subscription?[/]", default=True):
         console.print("[yellow]Subscription cancelled[/]")
         return
 
@@ -252,7 +252,7 @@ def unsubscribe(ctx: click.Context, webhook_id: str, owner: str):
     console.print(f"Webhook ID: [cyan]{webhook_id}[/]")
     console.print(f"Owner: [cyan]{owner[:40]}...[/]")
 
-    if not Confirm.ask("\n[bold]Remove this webhook?[/]", default=False):
+    if not ctx.obj.get('assume_yes') and not Confirm.ask("\n[bold]Remove this webhook?[/]", default=False):
         console.print("[yellow]Unsubscribe cancelled[/]")
         return
 

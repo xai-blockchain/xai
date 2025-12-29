@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from xai.core.checkpoint_sync import CheckpointSyncManager
+from xai.core.p2p.checkpoint_sync import CheckpointSyncManager
 
 
 def test_checkpoint_requires_diverse_peers():

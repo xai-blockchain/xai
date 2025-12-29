@@ -226,7 +226,7 @@ def deploy_contract(
         table.add_row("[bold cyan]ABI", f"{len(abi)} entries")
     console.print(table)
 
-    if not Confirm.ask("\n[bold]Deploy this contract?[/]", default=False):
+    if not ctx.obj.get('assume_yes') and not Confirm.ask("\n[bold]Deploy this contract?[/]", default=False):
         console.print("[yellow]Deployment cancelled[/]")
         return
 
@@ -384,7 +384,7 @@ def call_contract(
     table.add_row("[bold cyan]Gas Limit", str(gas_limit))
     console.print(table)
 
-    if not Confirm.ask("\n[bold]Execute this contract call?[/]", default=False):
+    if not ctx.obj.get('assume_yes') and not Confirm.ask("\n[bold]Execute this contract call?[/]", default=False):
         console.print("[yellow]Call cancelled[/]")
         return
 

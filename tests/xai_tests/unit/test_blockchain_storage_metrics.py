@@ -1,7 +1,7 @@
 import os
 
-from xai.core.blockchain_persistence import BlockchainStorage
-from xai.core.monitoring import MetricsCollector
+from xai.core.chain.blockchain_persistence import BlockchainStorage
+from xai.core.api.monitoring import MetricsCollector
 
 
 def _get_metric_value(collector: MetricsCollector, name: str) -> float:

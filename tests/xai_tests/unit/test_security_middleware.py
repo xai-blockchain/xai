@@ -5,7 +5,7 @@ and session fingerprint binding.
 
 from flask import Flask, jsonify
 
-from xai.core.security_middleware import SecurityMiddleware, SecurityConfig
+from xai.core.security.security_middleware import SecurityMiddleware, SecurityConfig
 
 
 def _build_app(monkeypatch):

@@ -1,5 +1,5 @@
 from xai.core.blockchain import Blockchain, Block
-from xai.core.block_header import BlockHeader
+from xai.core.chain.block_header import BlockHeader
 
 
 def _block(height: int, prev_hash: str, nonce: int = 0) -> Block:

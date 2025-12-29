@@ -10,8 +10,11 @@ implementation plan is executed.
 from .exceptions import VMConfigurationError, VMExecutionError  # noqa: F401
 from .executor import (  # noqa: F401
     BaseExecutor,
+    DummyExecutor,
     ExecutionMessage,
     ExecutionResult,
+    ProductionContractExecutor,
+    create_executor,
 )
 from .manager import SmartContractManager  # noqa: F401
 from .state import AccountState, EVMState  # noqa: F401
@@ -25,6 +28,9 @@ __all__ = [
     "ExecutionMessage",
     "ExecutionResult",
     "BaseExecutor",
+    "DummyExecutor",
+    "ProductionContractExecutor",
+    "create_executor",
     "SmartContractManager",
     "ContractTransactionProcessor",
 ]

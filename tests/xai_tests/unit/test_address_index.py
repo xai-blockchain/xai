@@ -18,7 +18,7 @@ from pathlib import Path
 
 from xai.core.blockchain import Blockchain, Block
 from xai.core.transaction import Transaction
-from xai.core.block_header import BlockHeader
+from xai.core.chain.block_header import BlockHeader
 
 
 class TestAddressIndex:

@@ -17,6 +17,13 @@ from typing import TYPE_CHECKING, Any
 from flask import Flask, g, redirect, request
 
 from xai.core.api_blueprints.admin_bp import admin_bp
+from xai.core.api_blueprints.base import (
+    data_response,
+    error_response,
+    list_response,
+    paginated_response,
+    success_response,
+)
 from xai.core.api_blueprints.blockchain_bp import blockchain_bp
 from xai.core.api_blueprints.core_bp import core_bp
 from xai.core.api_blueprints.exchange_bp import exchange_bp
@@ -25,12 +32,13 @@ from xai.core.api_blueprints.payment_bp import payment_bp
 from xai.core.api_blueprints.wallet_bp import wallet_bp
 
 if TYPE_CHECKING:
-    from xai.core.api_auth import APIAuthManager, APIKeyStore
-    from xai.core.error_handlers import ErrorHandlerRegistry
+    from xai.core.api.api_auth import APIAuthManager, APIKeyStore
+    from xai.core.api.error_handlers import ErrorHandlerRegistry
     from xai.network.peer_manager import PeerManager
     from xai.wallet.spending_limits import SpendingLimitManager
 
 __all__ = [
+    # Blueprints
     "core_bp",
     "blockchain_bp",
     "wallet_bp",
@@ -38,9 +46,16 @@ __all__ = [
     "exchange_bp",
     "admin_bp",
     "payment_bp",
+    # Registration
     "register_blueprints",
     "register_legacy_redirects",
     "ALL_BLUEPRINTS",
+    # Response helpers (standard API response envelope)
+    "success_response",
+    "error_response",
+    "data_response",
+    "list_response",
+    "paginated_response",
 ]
 
 logger = logging.getLogger(__name__)
@@ -105,6 +120,14 @@ def register_blueprints(
     app.register_blueprint(exchange_bp)  # has url_prefix="/exchange"
     app.register_blueprint(admin_bp)  # has url_prefix="/admin"
     app.register_blueprint(payment_bp)  # has url_prefix="/payment"
+
+    # Import performance dashboard here to avoid circular import
+    from xai.dashboard.performance_dashboard import performance_bp
+    app.register_blueprint(performance_bp)  # has url_prefix="/dashboard"
+
+    # Import API explorer (Swagger UI) - routes: /api/docs, /swagger, /api/openapi
+    from xai.api_explorer import api_explorer_bp
+    app.register_blueprint(api_explorer_bp)
 
 
 def register_legacy_redirects(app: Flask) -> None:

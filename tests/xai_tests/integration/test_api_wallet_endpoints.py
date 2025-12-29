@@ -18,7 +18,7 @@ from unittest.mock import Mock, MagicMock, patch
 from flask import Flask
 from typing import Any
 
-from xai.core.api_wallet import WalletAPIHandler
+from xai.core.api.api_wallet import WalletAPIHandler
 from xai.core.wallet import Wallet
 from xai.core.blockchain import Blockchain
 from xai.core.node import BlockchainNode

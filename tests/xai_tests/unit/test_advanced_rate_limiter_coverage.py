@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch, Mock
 from datetime import datetime, timezone
 from flask import Flask, request, Response, jsonify
 
-from xai.core.advanced_rate_limiter import (
+from xai.core.security.advanced_rate_limiter import (
     RateLimitExceeded,
     LimitSeverity,
     RateLimitConfig,
@@ -666,7 +666,7 @@ class TestGlobalRateLimiter:
 
     def test_get_rate_limiter_singleton(self):
         """Test that get_rate_limiter returns singleton instance"""
-        from xai.core import advanced_rate_limiter
+        from xai.core.security import advanced_rate_limiter
 
         # Reset global instance
         advanced_rate_limiter._global_rate_limiter = None
@@ -678,7 +678,7 @@ class TestGlobalRateLimiter:
 
     def test_get_rate_limiter_creates_instance(self):
         """Test that get_rate_limiter creates instance if None"""
-        from xai.core import advanced_rate_limiter
+        from xai.core.security import advanced_rate_limiter
 
         # Reset global instance
         advanced_rate_limiter._global_rate_limiter = None
@@ -712,7 +712,7 @@ class TestRateLimitDecorator:
 
     def test_decorator_blocks_exceeded_limit(self, app):
         """Test decorator blocks when limit exceeded"""
-        from xai.core import advanced_rate_limiter
+        from xai.core.security import advanced_rate_limiter
         advanced_rate_limiter._global_rate_limiter = None
 
         limiter = get_rate_limiter()
@@ -740,7 +740,7 @@ class TestRateLimitDecorator:
 
     def test_decorator_uses_request_path_default(self, app):
         """Test decorator uses request.path if endpoint not specified"""
-        from xai.core import advanced_rate_limiter
+        from xai.core.security import advanced_rate_limiter
         advanced_rate_limiter._global_rate_limiter = None
 
         @app.route('/default')
@@ -754,7 +754,7 @@ class TestRateLimitDecorator:
 
     def test_decorator_adds_rate_limit_header(self, app):
         """Test decorator adds rate limit headers to response"""
-        from xai.core import advanced_rate_limiter
+        from xai.core.security import advanced_rate_limiter
         advanced_rate_limiter._global_rate_limiter = None
 
         @app.route('/test')
@@ -770,7 +770,7 @@ class TestRateLimitDecorator:
 
     def test_decorator_handles_tuple_response(self, app):
         """Test decorator handles tuple responses"""
-        from xai.core import advanced_rate_limiter
+        from xai.core.security import advanced_rate_limiter
         advanced_rate_limiter._global_rate_limiter = None
 
         @app.route('/test')
@@ -784,7 +784,7 @@ class TestRateLimitDecorator:
 
     def test_decorator_handles_response_object(self, app):
         """Test decorator handles Response objects"""
-        from xai.core import advanced_rate_limiter
+        from xai.core.security import advanced_rate_limiter
         advanced_rate_limiter._global_rate_limiter = None
 
         @app.route('/test')

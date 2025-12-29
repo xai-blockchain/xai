@@ -2,9 +2,9 @@ import hashlib
 import itertools
 from unittest.mock import patch
 
-from xai.core.advanced_consensus import AdvancedConsensusManager
-from xai.core.crypto_utils import sign_message_hex, deterministic_keypair_from_seed
-from xai.core.block_header import BlockHeader
+from xai.core.consensus.advanced_consensus import AdvancedConsensusManager
+from xai.core.security.crypto_utils import sign_message_hex, deterministic_keypair_from_seed
+from xai.core.chain.block_header import BlockHeader
 from xai.core.blockchain import Blockchain, Block
 
 

@@ -4,7 +4,7 @@ Unit tests for checkpoint metadata exposure in P2PNetworkManager.
 
 import types
 
-from xai.core.node_p2p import P2PNetworkManager
+from xai.core.p2p.node_p2p import P2PNetworkManager
 
 
 class DummyCheckpoint:

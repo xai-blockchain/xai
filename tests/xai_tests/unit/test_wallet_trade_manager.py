@@ -8,10 +8,10 @@ import pytest
 
 # Add core directory to path
 
-from xai.core.exchange_wallet import ExchangeWalletManager
-from xai.core.nonce_tracker import NonceTracker
-from xai.core.trading import SwapOrderType, TradeMatchStatus
-from xai.core.wallet_trade_manager import WalletTradeManager
+from xai.core.wallets.exchange_wallet import ExchangeWalletManager
+from xai.core.transactions.nonce_tracker import NonceTracker
+from xai.core.transactions.trading import SwapOrderType, TradeMatchStatus
+from xai.core.wallets.wallet_trade_manager import WalletTradeManager
 
 
 def test_wallet_trade_settlement(tmp_path):

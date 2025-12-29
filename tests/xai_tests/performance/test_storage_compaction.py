@@ -21,7 +21,7 @@ from typing import Any
 from xai.core.blockchain import Blockchain
 from xai.core.wallet import Wallet
 from xai.core.transaction import Transaction
-from xai.core.blockchain_storage import BlockchainStorage
+from xai.core.chain.blockchain_storage import BlockchainStorage
 
 # Mark all tests in this module as performance tests
 pytestmark = pytest.mark.performance

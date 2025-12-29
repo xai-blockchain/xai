@@ -11,11 +11,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from xai.core.governance_execution import (
+from xai.core.governance.governance_execution import (
     GovernanceExecutionEngine,
     ProposalType,
 )
-from xai.core.governance_transactions import GovernanceState
+from xai.core.governance.governance_transactions import GovernanceState
 
 
 class DummyAirdrop:

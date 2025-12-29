@@ -11,7 +11,7 @@ import time
 
 # Add core directory to path
 
-from xai.core.advanced_consensus import (
+from xai.core.consensus.advanced_consensus import (
     BlockStatus,
     BlockPropagationMonitor,
     OrphanBlockManager,

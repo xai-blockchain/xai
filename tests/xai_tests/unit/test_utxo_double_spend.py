@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch, MagicMock
 
 from xai.core.blockchain import Blockchain, Transaction
 from xai.core.wallet import Wallet
-from xai.core.utxo_manager import UTXOManager
+from xai.core.transactions.utxo_manager import UTXOManager
 
 
 class TestUTXODoubleSpend:

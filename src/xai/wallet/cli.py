@@ -33,14 +33,14 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf import pbkdf2
 
-from xai.core.hardware_wallet import (
+from xai.core.wallets.hardware_wallet import (
     HARDWARE_WALLET_ENABLED,
     HardwareWallet,
     get_default_hardware_wallet,
     get_hardware_wallet_manager,
 )
 from xai.core.wallet import Wallet
-from xai.core.watch_only_wallet import (
+from xai.core.wallets.watch_only_wallet import (
     DuplicateWatchAddressError,
     WatchAddressNotFoundError,
     WatchOnlyWalletError,
@@ -75,7 +75,7 @@ def _get_hardware_wallet(args: argparse.Namespace) -> HardwareWallet:
     """Get hardware wallet based on CLI args."""
     if getattr(args, 'ledger', False):
         try:
-            from xai.core.hardware_wallet_ledger import LedgerHardwareWallet
+            from xai.core.wallets.hardware_wallet_ledger import LedgerHardwareWallet
             wallet = LedgerHardwareWallet()
             wallet.connect()
             return wallet
@@ -87,7 +87,7 @@ def _get_hardware_wallet(args: argparse.Namespace) -> HardwareWallet:
             sys.exit(1)
     elif getattr(args, 'trezor', False):
         try:
-            from xai.core.hardware_wallet_trezor import TrezorHardwareWallet
+            from xai.core.wallets.hardware_wallet_trezor import TrezorHardwareWallet
             wallet = TrezorHardwareWallet()
             wallet.connect()
             return wallet
@@ -162,13 +162,13 @@ def derive_key_from_password(password: str, salt: bytes, kdf: str = "pbkdf2") ->
         return ph.hash(password.encode('utf-8'), salt=salt).split(b'$')[-1]
     
     # Default to PBKDF2
-    kdf = pbkdf2.PBKDF2HMAC(
+    kdf_instance = pbkdf2.PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=KEY_SIZE,
         salt=salt,
         iterations=PBKDF2_ITERATIONS,
     )
-    return kdf.derive(password.encode('utf-8'))
+    return kdf_instance.derive(password.encode('utf-8'))
 
 def encrypt_wallet_data(wallet_data: dict[str, Any], password: str, kdf: str = "pbkdf2") -> tuple[bytes, bytes, bytes, bytes]:
     """
@@ -1459,7 +1459,7 @@ def _multisig_create(args: argparse.Namespace) -> int:
     try:
         from cryptography.hazmat.primitives import serialization
 
-        from xai.core.crypto_utils import load_public_key_from_hex
+        from xai.core.security.crypto_utils import load_public_key_from_hex
 
         # Read public keys from file or args
         if args.keys_file:
@@ -1538,7 +1538,7 @@ def _multisig_sign(args: argparse.Namespace) -> int:
         # Derive public key from private key and convert to PEM format
         from cryptography.hazmat.primitives import serialization
 
-        from xai.core.crypto_utils import (
+        from xai.core.security.crypto_utils import (
             derive_public_key_hex,
             load_public_key_from_hex,
             sign_message_hex,

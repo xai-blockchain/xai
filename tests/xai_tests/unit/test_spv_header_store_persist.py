@@ -2,7 +2,7 @@
 Persistence tests for SPVHeaderStore.
 """
 
-from xai.core.spv_header_store import SPVHeaderStore, Header
+from xai.core.p2p.spv_header_store import SPVHeaderStore, Header
 
 
 def test_save_and_load_roundtrip(tmp_path):

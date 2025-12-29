@@ -16,8 +16,8 @@ from pathlib import Path
 
 import pytest
 
-from xai.core.encrypted_api_key_store import EncryptedAPIKeyStore
-from xai.core.api_key_encryption import APIKeyEncryptionManager
+from xai.core.security.encrypted_api_key_store import EncryptedAPIKeyStore
+from xai.core.security.api_key_encryption import APIKeyEncryptionManager
 
 
 class TestEncryptedAPIKeyStore:
@@ -219,7 +219,7 @@ class TestEncryptedAPIKeyStore:
         store_path = str(tmp_path / "keys.json")
 
         # Generate encryption key to use for both stores
-        from xai.core.api_key_encryption import APIKeyEncryptionManager
+        from xai.core.security.api_key_encryption import APIKeyEncryptionManager
 
         encryption_key = APIKeyEncryptionManager.generate_key()
 
@@ -352,7 +352,7 @@ class TestEncryptedAPIKeyStore:
     def test_encryption_with_custom_key(self, tmp_path: Path) -> None:
         """Test encryption with a custom Fernet key."""
         # Generate custom key
-        from xai.core.api_key_encryption import APIKeyEncryptionManager
+        from xai.core.security.api_key_encryption import APIKeyEncryptionManager
 
         custom_key = APIKeyEncryptionManager.generate_key()
 

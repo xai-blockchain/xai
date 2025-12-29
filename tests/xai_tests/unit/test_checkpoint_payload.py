@@ -2,7 +2,7 @@
 Tests for CheckpointPayload integrity helper.
 """
 
-from xai.core.checkpoint_payload import CheckpointPayload
+from xai.core.consensus.checkpoint_payload import CheckpointPayload
 
 
 def test_checkpoint_payload_integrity_passes():

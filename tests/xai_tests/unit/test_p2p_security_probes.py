@@ -3,9 +3,9 @@ import contextlib
 import pytest
 
 from xai.core.blockchain import Blockchain
-from xai.core.monitoring import MetricsCollector
-from xai.core.node_p2p import P2PNetworkManager
-from xai.core.security_validation import SecurityEventRouter
+from xai.core.api.monitoring import MetricsCollector
+from xai.core.p2p.node_p2p import P2PNetworkManager
+from xai.core.security.security_validation import SecurityEventRouter
 
 
 @pytest.fixture

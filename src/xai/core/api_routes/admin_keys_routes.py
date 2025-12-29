@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any
 
 from flask import request
 
+from xai.core.security.api_rate_limiting import rate_limit_admin
 from xai.core.config import Config
 
 if TYPE_CHECKING:
@@ -38,11 +39,23 @@ def register_admin_keys_routes(routes: "NodeAPIRoutes") -> None:
     spending_limits = routes.spending_limits
 
     @app.route("/admin/api-keys", methods=["GET"])
+    @rate_limit_admin  # Very strict limits for admin operations
     def list_api_keys() -> tuple[dict[str, Any], int]:
         """List all API key metadata (admin only)."""
         auth_error = routes._require_control_role({"admin"})
         if auth_error:
             return auth_error
+
+        limiter = routes._get_admin_rate_limiter()
+        identifier = f"admin-list-keys:{request.remote_addr or 'unknown'}"
+        allowed, error = limiter.check_rate_limit(identifier, "/admin/api-keys")
+        if not allowed:
+            return routes._error_response(
+                error or "Rate limit exceeded",
+                status=429,
+                code="rate_limited",
+                context={"identifier": identifier},
+            )
 
         metadata = api_auth.list_key_metadata()
         return routes._success_response(metadata)
@@ -73,11 +86,23 @@ def register_admin_keys_routes(routes: "NodeAPIRoutes") -> None:
         return ttl_seconds, None
 
     @app.route("/admin/api-keys", methods=["POST"])
+    @rate_limit_admin  # Very strict limits for admin operations
     def create_api_key() -> tuple[dict[str, Any], int]:
         """Create a new API key (admin only)."""
         auth_error = routes._require_control_role({"admin"})
         if auth_error:
             return auth_error
+
+        limiter = routes._get_admin_rate_limiter()
+        identifier = f"admin-create-key:{request.remote_addr or 'unknown'}"
+        allowed, error = limiter.check_rate_limit(identifier, "/admin/api-keys")
+        if not allowed:
+            return routes._error_response(
+                error or "Rate limit exceeded",
+                status=429,
+                code="rate_limited",
+                context={"identifier": identifier},
+            )
 
         payload = request.get_json(silent=True) or {}
         label = str(payload.get("label", "")).strip()
@@ -134,11 +159,23 @@ def register_admin_keys_routes(routes: "NodeAPIRoutes") -> None:
             return routes._error_response(str(exc), status=500, code="admin_error")
 
     @app.route("/admin/api-keys/<key_id>", methods=["DELETE"])
+    @rate_limit_admin  # Very strict limits for admin operations
     def delete_api_key(key_id: str) -> tuple[dict[str, Any], int]:
         """Revoke an API key (admin only)."""
         auth_error = routes._require_control_role({"admin"})
         if auth_error:
             return auth_error
+
+        limiter = routes._get_admin_rate_limiter()
+        identifier = f"admin-delete-key:{request.remote_addr or 'unknown'}"
+        allowed, error = limiter.check_rate_limit(identifier, "/admin/api-keys")
+        if not allowed:
+            return routes._error_response(
+                error or "Rate limit exceeded",
+                status=429,
+                code="rate_limited",
+                context={"identifier": identifier},
+            )
 
         try:
             if api_auth.revoke_key(key_id):
@@ -158,22 +195,46 @@ def register_admin_keys_routes(routes: "NodeAPIRoutes") -> None:
         return routes._error_response("API key not found", status=404, code="not_found")
 
     @app.route("/admin/api-key-events", methods=["GET"])
+    @rate_limit_admin  # Very strict limits for admin operations
     def list_api_key_events() -> tuple[dict[str, Any], int]:
         """List API key events with pagination (admin only)."""
         auth_error = routes._require_control_role({"admin", "auditor"})
         if auth_error:
             return auth_error
 
+        limiter = routes._get_admin_rate_limiter()
+        identifier = f"admin-key-events:{request.remote_addr or 'unknown'}"
+        allowed, error = limiter.check_rate_limit(identifier, "/admin/api-key-events")
+        if not allowed:
+            return routes._error_response(
+                error or "Rate limit exceeded",
+                status=429,
+                code="rate_limited",
+                context={"identifier": identifier},
+            )
+
         limit = request.args.get("limit", default=100, type=int)
         events = api_key_store.get_events(limit=limit)
         return routes._success_response({"events": events})
 
     @app.route("/admin/spend-limit", methods=["POST"])
+    @rate_limit_admin  # Very strict limits for admin operations
     def set_spend_limit() -> tuple[dict[str, Any], int]:
         """Set per-address daily spending limit (admin only)."""
         auth_error = routes._require_control_role({"admin"})
         if auth_error:
             return auth_error
+
+        limiter = routes._get_admin_rate_limiter()
+        identifier = f"admin-spend-limit:{request.remote_addr or 'unknown'}"
+        allowed, error = limiter.check_rate_limit(identifier, "/admin/spend-limit")
+        if not allowed:
+            return routes._error_response(
+                error or "Rate limit exceeded",
+                status=429,
+                code="rate_limited",
+                context={"identifier": identifier},
+            )
 
         payload = request.get_json(silent=True) or {}
         address = str(payload.get("address", "")).strip()
@@ -234,7 +295,7 @@ def register_admin_keys_routes(routes: "NodeAPIRoutes") -> None:
         if auth_error:
             return auth_error
 
-        from xai.core.monitoring import MetricsCollector
+        from xai.core.api.monitoring import MetricsCollector
 
         limiter = routes._get_admin_rate_limiter()
         identifier = f"admin-telemetry:{request.remote_addr or 'unknown'}"

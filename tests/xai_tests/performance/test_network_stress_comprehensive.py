@@ -32,7 +32,7 @@ from collections import defaultdict
 
 from xai.core.blockchain import Blockchain, Transaction, Block
 from xai.core.wallet import Wallet
-from xai.core.node_p2p import P2PNetworkManager
+from xai.core.p2p.node_p2p import P2PNetworkManager
 
 # Performance baselines (for assertions)
 BASELINE_TPS_CREATION = 100

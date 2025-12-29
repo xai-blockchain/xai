@@ -310,7 +310,7 @@ class TestBlockchainReorg:
         SECURITY: Prevents attackers from creating oversized blocks in a fork chain
         to bypass normal block size validation.
         """
-        from xai.core.blockchain_security import BlockchainSecurityConfig
+        from xai.core.security.blockchain_security import BlockchainSecurityConfig
         from copy import deepcopy
 
         bc = Blockchain(data_dir=str(tmp_path))
@@ -389,7 +389,7 @@ class TestBlockchainReorg:
         SECURITY: Prevents attackers from creating blocks with total size > 2MB
         in a fork chain.
         """
-        from xai.core.blockchain_security import BlockchainSecurityConfig
+        from xai.core.security.blockchain_security import BlockchainSecurityConfig
         from copy import deepcopy
 
         bc = Blockchain(data_dir=str(tmp_path))

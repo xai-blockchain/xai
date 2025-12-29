@@ -1,6 +1,6 @@
 import pytest
 
-from xai.core.security_middleware import TOTPManager
+from xai.core.security.security_middleware import TOTPManager
 
 
 @pytest.fixture(name="manager")

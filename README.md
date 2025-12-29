@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/xai-blockchain/xai/actions/workflows/ci.yml/badge.svg)](https://github.com/xai-blockchain/xai/actions/workflows/ci.yml) [![Security](https://github.com/xai-blockchain/xai/actions/workflows/security.yml/badge.svg)](https://github.com/xai-blockchain/xai/actions/workflows/security.yml) [![codecov](https://codecov.io/gh/xai-blockchain/xai/branch/main/graph/badge.svg)](https://codecov.io/gh/xai-blockchain/xai) [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/) [![XAI Testnet](https://img.shields.io/badge/Testnet-Active-success)](https://faucet.xai.network)
 
+**English** | **[简体中文](docs/i18n/zh-CN/README.md)** | **[한국어](docs/i18n/ko/README.md)** | **[日本語](docs/i18n/ja/README.md)**
+
 ## A Proof-of-Work Blockchain with AI Governance and Integrated Wallets
 
 XAI is a production-ready blockchain implementation featuring proof-of-work consensus, intelligent AI-based governance, atomic swap support for cross-chain trading, and comprehensive wallet management. Built for both individual users and enterprise compliance needs.

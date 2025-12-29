@@ -4,8 +4,8 @@ Unit tests for XAITokenVesting release and validation.
 
 import time
 
-from xai.core.xai_token_vesting import XAITokenVesting
-from xai.core.xai_token_manager import XAITokenManager
+from xai.core.governance.xai_token_vesting import XAITokenVesting
+from xai.core.governance.xai_token_manager import XAITokenManager
 
 
 class StubLogger:

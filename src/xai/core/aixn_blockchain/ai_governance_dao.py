@@ -7,10 +7,14 @@ Community-driven AI task proposal and voting system
 
 import hashlib
 import json
+import logging
 import time
 from enum import Enum
+from typing import Dict, List
 
 from cryptography.fernet import Fernet
+
+logger = logging.getLogger(__name__)
 
 
 class ProposalCategory(Enum):
@@ -693,8 +697,26 @@ class AIGovernanceDAO:
 
     def _refund_donors(self, proposal: AITaskProposal):
         """Refund AI tokens if proposal cancelled after funding"""
-        # Implementation would refund encrypted API keys back to donors
-        pass
+        if not hasattr(proposal, 'contributions') or not proposal.contributions:
+            return
+
+        for donor_address, contribution in proposal.contributions.items():
+            refund_tx = {
+                "tx_type": "ai_proposal_refund",
+                "proposal_id": proposal.proposal_id,
+                "recipient": donor_address,
+                "amount": contribution.get("amount", 0),
+                "timestamp": time.time(),
+            }
+            # Store refund record
+            if self.blockchain:
+                try:
+                    self.blockchain.add_transaction(refund_tx)
+                except Exception as e:
+                    logger.warning(f"Failed to record refund for {donor_address}: {e}")
+
+        proposal.funded_amount = 0
+        logger.info(f"Refunded {len(proposal.contributions)} donors for proposal {proposal.proposal_id}")
 
     def _store_proposal_on_chain(self, proposal: AITaskProposal):
         """Store proposal in blockchain"""
@@ -704,7 +726,12 @@ class AIGovernanceDAO:
             "timestamp": time.time(),
         }
         # Add to blockchain
-        # self.blockchain.add_transaction(tx)
+        if self.blockchain:
+            try:
+                self.blockchain.add_transaction(tx)
+                logger.debug(f"Stored proposal {proposal.proposal_id} on chain")
+            except Exception as e:
+                logger.warning(f"Failed to store proposal on chain: {e}")
 
     def _store_vote_on_chain(self, proposal_id: str, voter: str, vote: str, weight: float):
         """Store vote in blockchain"""
@@ -717,12 +744,26 @@ class AIGovernanceDAO:
             "timestamp": time.time(),
         }
         # Add to blockchain
-        # self.blockchain.add_transaction(tx)
+        if self.blockchain:
+            try:
+                self.blockchain.add_transaction(tx)
+                logger.debug(f"Stored vote from {voter} on proposal {proposal_id}")
+            except Exception as e:
+                logger.warning(f"Failed to store vote on chain: {e}")
 
     def _send_milestone_notification(self, notification: Dict):
         """Send notification to community about milestone"""
-        # Implementation would notify community
-        pass
+        notification["timestamp"] = time.time()
+        notification["type"] = "milestone_update"
+
+        # Store in proposal history
+        proposal_id = notification.get("proposal_id")
+        if proposal_id and proposal_id in self.proposals:
+            if not hasattr(self.proposals[proposal_id], 'notifications'):
+                self.proposals[proposal_id].notifications = []
+            self.proposals[proposal_id].notifications.append(notification)
+
+        logger.info(f"Milestone notification: {notification.get('title', 'Update')}")
 
     def get_proposal(self, proposal_id: str) -> Dict | None:
         """Get proposal details"""

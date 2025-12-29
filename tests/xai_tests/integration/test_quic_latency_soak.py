@@ -37,7 +37,7 @@ except Exception:
         )
         return cert_pem, key_pem
 
-from xai.core.p2p_quic import QUICServer, quic_client_send, quic_client_send_with_timeout, QuicConfiguration  # type: ignore
+from xai.core.p2p.p2p_quic import QUICServer, quic_client_send, quic_client_send_with_timeout, QuicConfiguration  # type: ignore
 
 
 def _free_port() -> int:

@@ -21,9 +21,9 @@ logger = logging.getLogger(__name__)
 
 import requests
 
-from xai.core import htlc_deployer, htlc_p2wsh
+from xai.core.transactions import htlc_deployer, htlc_p2wsh
 from xai.core.config import Config
-from xai.core.spv_header_ingestor import SPVHeaderIngestor
+from xai.core.p2p.spv_header_ingestor import SPVHeaderIngestor
 
 
 class CoinType(Enum):
@@ -301,16 +301,48 @@ class SwapStateMachine:
             with open(file_path, "w") as f:
                 json.dump(serializable_swap, f, indent=2)
 
-        except Exception as e:
+        except KeyError as e:
             logger.error(
-                "Exception in _persist_swap",
+                "Missing swap data in _persist_swap",
                 extra={
-                    "error_type": "Exception",
+                    "error_type": "KeyError",
                     "error": str(e),
+                    "swap_id": swap_id,
                     "function": "_persist_swap"
                 }
             )
-            print(f"Error persisting swap {swap_id}: {e}")
+        except (OSError, IOError) as e:
+            logger.error(
+                "File system error in _persist_swap",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                    "swap_id": swap_id,
+                    "function": "_persist_swap"
+                }
+            )
+        except (TypeError, json.JSONDecodeError) as e:
+            logger.error(
+                "Serialization error in _persist_swap",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                    "swap_id": swap_id,
+                    "function": "_persist_swap"
+                }
+            )
+        except Exception as e:
+            # Unexpected error - log with full context for debugging
+            logger.error(
+                "Unexpected error in _persist_swap",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                    "swap_id": swap_id,
+                    "function": "_persist_swap"
+                },
+                exc_info=True
+            )
 
     def _load_swaps(self) -> None:
         """Load all swaps from storage"""
@@ -333,16 +365,44 @@ class SwapStateMachine:
 
                 self.swaps[swap_id] = swap_data
 
-        except Exception as e:
+        except (OSError, IOError) as e:
             logger.error(
-                "Exception in _load_swaps",
+                "File system error in _load_swaps",
                 extra={
-                    "error_type": "Exception",
+                    "error_type": type(e).__name__,
                     "error": str(e),
                     "function": "_load_swaps"
                 }
             )
-            print(f"Error loading swaps: {e}")
+        except json.JSONDecodeError as e:
+            logger.error(
+                "JSON decode error in _load_swaps - possibly corrupted swap file",
+                extra={
+                    "error_type": "JSONDecodeError",
+                    "error": str(e),
+                    "function": "_load_swaps"
+                }
+            )
+        except (KeyError, ValueError) as e:
+            logger.error(
+                "Invalid swap data in _load_swaps",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                    "function": "_load_swaps"
+                }
+            )
+        except Exception as e:
+            # Unexpected error - log with full context for debugging
+            logger.error(
+                "Unexpected error in _load_swaps",
+                extra={
+                    "error_type": type(e).__name__,
+                    "error": str(e),
+                    "function": "_load_swaps"
+                },
+                exc_info=True
+            )
 
     def get_swap_history(self, swap_id: str) -> list[Dict]:
         """Get complete history of state transitions for a swap"""

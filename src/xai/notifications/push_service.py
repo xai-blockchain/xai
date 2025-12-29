@@ -15,7 +15,8 @@ import asyncio
 import json
 import logging
 import os
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from typing import Any
 
 import aiohttp
@@ -24,6 +25,37 @@ from xai.notifications.device_registry import DeviceInfo, DevicePlatform, Device
 from xai.notifications.notification_types import NotificationPayload
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class APNsConfig:
+    """Configuration for Apple Push Notification Service authentication."""
+
+    key_id: str
+    team_id: str
+    auth_key: str  # Contents of the .p8 file
+    bundle_id: str
+
+
+@dataclass
+class APNsJWTCache:
+    """Cache for APNs JWT tokens with expiration tracking."""
+
+    token: str | None = None
+    issued_at: float = 0.0
+    # APNs tokens are valid for 1 hour, but we refresh at 55 minutes
+    ttl_seconds: int = 55 * 60
+
+    def is_valid(self) -> bool:
+        """Check if the cached token is still valid."""
+        if not self.token:
+            return False
+        return (time.time() - self.issued_at) < self.ttl_seconds
+
+    def clear(self) -> None:
+        """Clear the cached token."""
+        self.token = None
+        self.issued_at = 0.0
 
 class NotificationError(Exception):
     """Base exception for notification delivery errors."""
@@ -59,6 +91,7 @@ class PushNotificationService:
     - XAI_APNS_KEY_ID: Apple Push Notification Service key ID
     - XAI_APNS_TEAM_ID: Apple team ID
     - XAI_APNS_KEY_PATH: Path to APNs .p8 key file
+    - XAI_APNS_BUNDLE_ID: iOS app bundle identifier
 
     If keys are not configured, the service logs warnings but doesn't raise errors,
     allowing the application to run in development mode.
@@ -68,12 +101,29 @@ class PushNotificationService:
     APNS_SANDBOX_URL = "https://api.sandbox.push.apple.com"
     APNS_PRODUCTION_URL = "https://api.push.apple.com"
 
+    # APNs error codes that indicate the token is invalid and device should be unregistered
+    APNS_INVALID_TOKEN_REASONS = frozenset({
+        "BadDeviceToken",
+        "Unregistered",
+        "DeviceTokenNotForTopic",
+        "ExpiredProviderToken",
+    })
+
+    # APNs error codes that are retryable
+    APNS_RETRYABLE_REASONS = frozenset({
+        "InternalServerError",
+        "ServiceUnavailable",
+        "Shutdown",
+    })
+
     def __init__(
         self,
         device_registry: DeviceRegistry,
         fcm_key: str | None = None,
-        apns_config: dict[str, str] | None = None,
+        apns_config: APNsConfig | dict[str, str] | None = None,
         use_apns_sandbox: bool = True,
+        apns_max_retries: int = 3,
+        apns_retry_delay: float = 1.0,
     ):
         """
         Initialize push notification service.
@@ -81,13 +131,28 @@ class PushNotificationService:
         Args:
             device_registry: Device registry for looking up devices
             fcm_key: FCM server key (if None, reads from XAI_FCM_SERVER_KEY env var)
-            apns_config: APNs configuration dict with key_id, team_id, key_path
+            apns_config: APNs configuration (APNsConfig or dict with key_id, team_id, key_path, bundle_id)
             use_apns_sandbox: Whether to use APNs sandbox (development) or production
+            apns_max_retries: Maximum number of retry attempts for APNs
+            apns_retry_delay: Base delay in seconds between retries (exponential backoff)
         """
         self.device_registry = device_registry
         self.fcm_key = fcm_key or os.getenv("XAI_FCM_SERVER_KEY")
-        self.apns_config = apns_config or self._load_apns_config()
+        self.use_apns_sandbox = use_apns_sandbox
         self.apns_url = self.APNS_SANDBOX_URL if use_apns_sandbox else self.APNS_PRODUCTION_URL
+        self.apns_max_retries = apns_max_retries
+        self.apns_retry_delay = apns_retry_delay
+
+        # Initialize APNs config
+        if isinstance(apns_config, APNsConfig):
+            self.apns_config = apns_config
+        elif isinstance(apns_config, dict):
+            self.apns_config = self._dict_to_apns_config(apns_config)
+        else:
+            self.apns_config = self._load_apns_config()
+
+        # JWT token cache for APNs
+        self._apns_jwt_cache = APNsJWTCache()
 
         # Warn if keys are not configured
         if not self.fcm_key:
@@ -99,23 +164,60 @@ class PushNotificationService:
         if not self.apns_config:
             logger.warning(
                 "APNs not configured. Push notifications to iOS will not work. "
-                "Set XAI_APNS_KEY_ID, XAI_APNS_TEAM_ID, and XAI_APNS_KEY_PATH environment variables."
+                "Set XAI_APNS_KEY_ID, XAI_APNS_TEAM_ID, XAI_APNS_KEY_PATH, and XAI_APNS_BUNDLE_ID "
+                "environment variables."
             )
 
-    def _load_apns_config(self) -> dict[str, str] | None:
+    def _dict_to_apns_config(self, config_dict: dict[str, str]) -> APNsConfig | None:
+        """Convert a configuration dict to APNsConfig, loading auth key from file if needed."""
+        key_id = config_dict.get("key_id")
+        team_id = config_dict.get("team_id")
+        bundle_id = config_dict.get("bundle_id")
+
+        # Get auth key either directly or from file path
+        auth_key = config_dict.get("auth_key")
+        if not auth_key and config_dict.get("key_path"):
+            try:
+                with open(config_dict["key_path"], "r") as f:
+                    auth_key = f.read()
+            except OSError as e:
+                logger.error(f"Failed to read APNs key file: {e}")
+                return None
+
+        if not all([key_id, team_id, auth_key, bundle_id]):
+            return None
+
+        return APNsConfig(
+            key_id=key_id,
+            team_id=team_id,
+            auth_key=auth_key,
+            bundle_id=bundle_id,
+        )
+
+    def _load_apns_config(self) -> APNsConfig | None:
         """Load APNs configuration from environment variables."""
         key_id = os.getenv("XAI_APNS_KEY_ID")
         team_id = os.getenv("XAI_APNS_TEAM_ID")
         key_path = os.getenv("XAI_APNS_KEY_PATH")
+        bundle_id = os.getenv("XAI_APNS_BUNDLE_ID")
 
-        if not all([key_id, team_id, key_path]):
+        if not all([key_id, team_id, key_path, bundle_id]):
             return None
 
-        return {
-            "key_id": key_id,
-            "team_id": team_id,
-            "key_path": key_path,
-        }
+        # Read the auth key from file
+        try:
+            with open(key_path, "r") as f:
+                auth_key = f.read()
+        except OSError as e:
+            logger.error(f"Failed to read APNs key file from {key_path}: {e}")
+            return None
+
+        return APNsConfig(
+            key_id=key_id,
+            team_id=team_id,
+            auth_key=auth_key,
+            bundle_id=bundle_id,
+        )
 
     async def send_to_address(
         self,
@@ -312,12 +414,78 @@ class PushNotificationService:
                 should_retry=True,
             )
 
+    def _generate_apns_jwt(self) -> str:
+        """
+        Generate a JWT token for APNs authentication.
+
+        The token is cached and reused until it expires (55 minutes).
+
+        Returns:
+            JWT token string for APNs authorization header
+
+        Raises:
+            NotificationError: If JWT generation fails
+        """
+        # Return cached token if still valid
+        if self._apns_jwt_cache.is_valid():
+            return self._apns_jwt_cache.token
+
+        try:
+            import jwt
+        except ImportError:
+            raise NotificationError(
+                "PyJWT is required for APNs. Install with: pip install PyJWT"
+            )
+
+        if not self.apns_config:
+            raise NotificationError("APNs not configured")
+
+        try:
+            now = int(time.time())
+            token = jwt.encode(
+                {
+                    "iss": self.apns_config.team_id,
+                    "iat": now,
+                },
+                self.apns_config.auth_key,
+                algorithm="ES256",
+                headers={
+                    "kid": self.apns_config.key_id,
+                },
+            )
+
+            # Cache the token
+            self._apns_jwt_cache.token = token
+            self._apns_jwt_cache.issued_at = now
+
+            logger.debug("Generated new APNs JWT token")
+            return token
+
+        except jwt.PyJWTError as e:
+            logger.error(f"Failed to generate APNs JWT: {e}")
+            raise NotificationError(f"Failed to generate APNs JWT: {e}") from e
+        except Exception as e:
+            logger.error(f"Unexpected error generating APNs JWT: {e}")
+            raise NotificationError(f"APNs JWT generation failed: {e}") from e
+
     async def _send_apns(
         self,
         device: DeviceInfo,
         payload: NotificationPayload,
     ) -> DeliveryResult:
-        """Send notification via Apple Push Notification Service."""
+        """
+        Send notification via Apple Push Notification Service.
+
+        Uses HTTP/2 connection with JWT-based authentication.
+        Includes retry logic with exponential backoff for transient errors.
+
+        Args:
+            device: Device info with iOS device token
+            payload: Notification payload to send
+
+        Returns:
+            DeliveryResult with delivery status
+        """
         if not self.apns_config:
             logger.warning("APNs not configured, skipping notification")
             return DeliveryResult(
@@ -326,22 +494,221 @@ class PushNotificationService:
                 error="APNs not configured",
             )
 
-        # For production implementation, would need:
-        # 1. JWT token generation from .p8 key
-        # 2. HTTP/2 connection to APNs
-        # 3. Proper APNs response parsing
+        try:
+            import httpx
+        except ImportError:
+            logger.error("httpx is required for APNs. Install with: pip install httpx[http2]")
+            return DeliveryResult(
+                success=False,
+                device_token=device.device_token,
+                error="httpx not installed (required for APNs HTTP/2)",
+            )
 
-        # This is a placeholder implementation showing the structure
-        logger.warning(
-            "APNs integration requires additional dependencies (jwt, h2). "
-            "Notification not sent."
-        )
+        # Get APNs-formatted payload
+        apns_data = payload.to_apns_payload()
+        apns_payload = apns_data["payload"]
+        priority = apns_data.get("priority", 10)
+        expiration = apns_data.get("expiration", 0)
 
+        # Retry loop with exponential backoff
+        last_error: str | None = None
+        for attempt in range(self.apns_max_retries + 1):
+            try:
+                result = await self._send_apns_request(
+                    device_token=device.device_token,
+                    payload=apns_payload,
+                    priority=priority,
+                    expiration=expiration,
+                )
+
+                if result.success:
+                    self.device_registry.update_last_active(device.device_token)
+                    return result
+
+                # Check if error is retryable
+                if result.should_retry and attempt < self.apns_max_retries:
+                    delay = self.apns_retry_delay * (2 ** attempt)
+                    logger.debug(
+                        f"APNs request failed with retryable error, "
+                        f"retrying in {delay}s (attempt {attempt + 1}/{self.apns_max_retries})"
+                    )
+                    await asyncio.sleep(delay)
+                    last_error = result.error
+                    continue
+
+                return result
+
+            except NotificationError as e:
+                # JWT generation or configuration errors - not retryable
+                return DeliveryResult(
+                    success=False,
+                    device_token=device.device_token,
+                    error=str(e),
+                )
+            except Exception as e:
+                logger.error(f"APNs request error (attempt {attempt + 1}): {e}")
+                last_error = str(e)
+
+                if attempt < self.apns_max_retries:
+                    delay = self.apns_retry_delay * (2 ** attempt)
+                    await asyncio.sleep(delay)
+                    continue
+
+                return DeliveryResult(
+                    success=False,
+                    device_token=device.device_token,
+                    error=f"APNs delivery failed after {self.apns_max_retries + 1} attempts: {last_error}",
+                    should_retry=True,
+                )
+
+        # Should not reach here, but handle it
         return DeliveryResult(
             success=False,
             device_token=device.device_token,
-            error="APNs integration not fully implemented",
+            error=f"APNs delivery failed: {last_error}",
+            should_retry=True,
         )
+
+    async def _send_apns_request(
+        self,
+        device_token: str,
+        payload: dict[str, Any],
+        priority: int = 10,
+        expiration: int = 0,
+    ) -> DeliveryResult:
+        """
+        Send a single APNs request via HTTP/2.
+
+        Args:
+            device_token: iOS device token
+            payload: APNs payload dictionary
+            priority: APNs priority (10 = immediate, 5 = power-efficient)
+            expiration: Unix timestamp when notification expires (0 = immediate delivery only)
+
+        Returns:
+            DeliveryResult with delivery status
+
+        Raises:
+            NotificationError: If JWT generation fails
+        """
+        import httpx
+
+        # Generate or use cached JWT
+        jwt_token = self._generate_apns_jwt()
+
+        url = f"{self.apns_url}/3/device/{device_token}"
+
+        headers = {
+            "authorization": f"bearer {jwt_token}",
+            "apns-topic": self.apns_config.bundle_id,
+            "apns-push-type": "alert",
+            "apns-priority": str(priority),
+        }
+
+        if expiration > 0:
+            headers["apns-expiration"] = str(expiration)
+
+        try:
+            async with httpx.AsyncClient(http2=True, timeout=30.0) as client:
+                response = await client.post(
+                    url,
+                    json=payload,
+                    headers=headers,
+                )
+
+                # Success
+                if response.status_code == 200:
+                    logger.debug(
+                        "APNs notification sent successfully",
+                        extra={"device_token": device_token[:10] + "..."}
+                    )
+                    return DeliveryResult(
+                        success=True,
+                        device_token=device_token,
+                    )
+
+                # Parse error response
+                try:
+                    error_data = response.json()
+                    reason = error_data.get("reason", "Unknown")
+                except (json.JSONDecodeError, ValueError):
+                    reason = f"HTTP {response.status_code}"
+
+                logger.warning(
+                    f"APNs notification failed",
+                    extra={
+                        "device_token": device_token[:10] + "...",
+                        "status_code": response.status_code,
+                        "reason": reason,
+                    }
+                )
+
+                # Check if token is invalid (device should be unregistered)
+                if reason in self.APNS_INVALID_TOKEN_REASONS:
+                    return DeliveryResult(
+                        success=False,
+                        device_token=device_token,
+                        error=reason,
+                        should_unregister=True,
+                    )
+
+                # Check if error is retryable
+                if reason in self.APNS_RETRYABLE_REASONS or response.status_code >= 500:
+                    return DeliveryResult(
+                        success=False,
+                        device_token=device_token,
+                        error=reason,
+                        should_retry=True,
+                    )
+
+                # Handle specific status codes
+                if response.status_code == 403:
+                    # Invalid JWT - clear cache and retry
+                    self._apns_jwt_cache.clear()
+                    return DeliveryResult(
+                        success=False,
+                        device_token=device_token,
+                        error=f"APNs authentication failed: {reason}",
+                        should_retry=True,
+                    )
+
+                if response.status_code == 429:
+                    # Rate limited
+                    return DeliveryResult(
+                        success=False,
+                        device_token=device_token,
+                        error="APNs rate limit exceeded",
+                        should_retry=True,
+                    )
+
+                # Other errors (400, 410, etc.)
+                return DeliveryResult(
+                    success=False,
+                    device_token=device_token,
+                    error=reason,
+                )
+
+        except httpx.TimeoutException:
+            return DeliveryResult(
+                success=False,
+                device_token=device_token,
+                error="APNs request timeout",
+                should_retry=True,
+            )
+        except httpx.ConnectError as e:
+            return DeliveryResult(
+                success=False,
+                device_token=device_token,
+                error=f"APNs connection error: {e}",
+                should_retry=True,
+            )
+        except httpx.HTTPStatusError as e:
+            return DeliveryResult(
+                success=False,
+                device_token=device_token,
+                error=f"APNs HTTP error: {e}",
+                should_retry=True,
+            )
 
     async def send_transaction_notification(
         self,

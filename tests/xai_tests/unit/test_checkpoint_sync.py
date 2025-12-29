@@ -1,8 +1,8 @@
 import types
 from decimal import Decimal
 
-from xai.core.checkpoint_sync import CheckpointSyncManager, CheckpointMetadata
-from xai.core.checkpoint_payload import CheckpointPayload
+from xai.core.p2p.checkpoint_sync import CheckpointSyncManager, CheckpointMetadata
+from xai.core.consensus.checkpoint_payload import CheckpointPayload
 
 
 class DummyCheckpoint:

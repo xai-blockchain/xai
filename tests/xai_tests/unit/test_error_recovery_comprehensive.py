@@ -9,11 +9,11 @@ import pytest
 import time
 import threading
 from unittest.mock import Mock, MagicMock, patch, PropertyMock
-from xai.core.error_recovery import (
+from xai.core.chain.error_recovery import (
     ErrorRecoveryManager,
     create_recovery_manager,
 )
-from xai.core.error_detection import (
+from xai.core.chain.error_detection import (
     ErrorSeverity,
     RecoveryState,
     ErrorDetector,
@@ -496,7 +496,7 @@ class TestErrorRecoveryManager:
 
         # Circuit should be open
         cb_state = manager.circuit_breakers["mining"].state
-        from xai.core.error_handlers import CircuitState
+        from xai.core.api.error_handlers import CircuitState
 
         assert cb_state == CircuitState.OPEN
 

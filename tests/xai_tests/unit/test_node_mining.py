@@ -29,7 +29,7 @@ class TestMiningManagerInit:
 
     def test_init(self, blockchain):
         """Test mining manager initialization."""
-        from xai.core.node_mining import MiningManager
+        from xai.core.mining.node_mining import MiningManager
 
         miner_address = "miner123"
         manager = MiningManager(blockchain, miner_address)
@@ -42,7 +42,7 @@ class TestMiningManagerInit:
 
     def test_set_broadcast_callback(self, blockchain):
         """Test setting broadcast callback."""
-        from xai.core.node_mining import MiningManager
+        from xai.core.mining.node_mining import MiningManager
 
         manager = MiningManager(blockchain, "miner123")
         callback = Mock()
@@ -64,7 +64,7 @@ class TestMiningControl:
     @pytest.fixture
     def mining_manager(self, blockchain):
         """Create mining manager instance."""
-        from xai.core.node_mining import MiningManager
+        from xai.core.mining.node_mining import MiningManager
         return MiningManager(blockchain, "miner123")
 
     def test_start_mining(self, mining_manager):
@@ -136,7 +136,7 @@ class TestContinuousMining:
     @pytest.fixture
     def mining_manager(self, blockchain):
         """Create mining manager instance."""
-        from xai.core.node_mining import MiningManager
+        from xai.core.mining.node_mining import MiningManager
         return MiningManager(blockchain, "miner123")
 
     def test_mine_continuously_mines_blocks(self, mining_manager):
@@ -168,7 +168,7 @@ class TestContinuousMining:
 
     def test_mine_continuously_no_pending_transactions(self, blockchain):
         """Test continuous mining with no pending transactions."""
-        from xai.core.node_mining import MiningManager
+        from xai.core.mining.node_mining import MiningManager
 
         blockchain.pending_transactions = []
         manager = MiningManager(blockchain, "miner123")
@@ -185,7 +185,7 @@ class TestContinuousMining:
 
     def test_mine_continuously_handles_errors(self, blockchain):
         """Test continuous mining handles mining errors."""
-        from xai.core.node_mining import MiningManager
+        from xai.core.mining.node_mining import MiningManager
 
         blockchain.mine_pending_transactions.side_effect = Exception("Mining failed")
         manager = MiningManager(blockchain, "miner123")
@@ -202,7 +202,7 @@ class TestContinuousMining:
 
     def test_mine_continuously_null_block(self, blockchain):
         """Test continuous mining when blockchain returns None."""
-        from xai.core.node_mining import MiningManager
+        from xai.core.mining.node_mining import MiningManager
 
         blockchain.mine_pending_transactions.return_value = None
         manager = MiningManager(blockchain, "miner123")
@@ -240,7 +240,7 @@ class TestSingleBlockMining:
     @pytest.fixture
     def mining_manager(self, blockchain):
         """Create mining manager instance."""
-        from xai.core.node_mining import MiningManager
+        from xai.core.mining.node_mining import MiningManager
         return MiningManager(blockchain, "miner123")
 
     def test_mine_single_block_success(self, mining_manager):
@@ -253,7 +253,7 @@ class TestSingleBlockMining:
 
     def test_mine_single_block_no_transactions(self, blockchain):
         """Test mining single block with no pending transactions."""
-        from xai.core.node_mining import MiningManager
+        from xai.core.mining.node_mining import MiningManager
 
         blockchain.pending_transactions = []
         manager = MiningManager(blockchain, "miner123")
@@ -265,7 +265,7 @@ class TestSingleBlockMining:
 
     def test_mine_single_block_error(self, blockchain):
         """Test mining single block with error."""
-        from xai.core.node_mining import MiningManager
+        from xai.core.mining.node_mining import MiningManager
 
         blockchain.mine_pending_transactions.side_effect = Exception("Mining error")
         manager = MiningManager(blockchain, "miner123")
@@ -295,7 +295,7 @@ class TestBroadcastCallback:
     @pytest.fixture
     def mining_manager(self, blockchain):
         """Create mining manager instance."""
-        from xai.core.node_mining import MiningManager
+        from xai.core.mining.node_mining import MiningManager
         return MiningManager(blockchain, "miner123")
 
     def test_broadcast_callback_called_after_mining(self, mining_manager):
@@ -324,7 +324,7 @@ class TestBroadcastCallback:
 
     def test_broadcast_callback_exception(self, blockchain):
         """Test mining continues even if broadcast fails."""
-        from xai.core.node_mining import MiningManager
+        from xai.core.mining.node_mining import MiningManager
 
         manager = MiningManager(blockchain, "miner123")
 
@@ -360,7 +360,7 @@ class TestThreadSafety:
     @pytest.fixture
     def mining_manager(self, blockchain):
         """Create mining manager instance."""
-        from xai.core.node_mining import MiningManager
+        from xai.core.mining.node_mining import MiningManager
         return MiningManager(blockchain, "miner123")
 
     def test_concurrent_start_stop(self, mining_manager):
@@ -409,14 +409,14 @@ class TestEdgeCases:
 
     def test_mining_manager_with_empty_address(self, blockchain):
         """Test creating mining manager with empty address."""
-        from xai.core.node_mining import MiningManager
+        from xai.core.mining.node_mining import MiningManager
 
         manager = MiningManager(blockchain, "")
         assert manager.miner_address == ""
 
     def test_rapid_start_stop(self, blockchain):
         """Test rapid start/stop cycles."""
-        from xai.core.node_mining import MiningManager
+        from xai.core.mining.node_mining import MiningManager
 
         manager = MiningManager(blockchain, "miner123")
 
@@ -428,7 +428,7 @@ class TestEdgeCases:
 
     def test_stop_with_timeout(self, blockchain):
         """Test stop_mining respects timeout."""
-        from xai.core.node_mining import MiningManager
+        from xai.core.mining.node_mining import MiningManager
 
         bc = Mock()
         bc.pending_transactions = [Mock()]
@@ -477,7 +477,7 @@ class TestMiningIntegration:
 
     def test_continuous_mining_mines_multiple_blocks(self, blockchain):
         """Test continuous mining can mine multiple blocks."""
-        from xai.core.node_mining import MiningManager
+        from xai.core.mining.node_mining import MiningManager
 
         # Add transactions for multiple blocks
         blockchain.pending_transactions = [Mock() for _ in range(10)]
@@ -495,7 +495,7 @@ class TestMiningIntegration:
 
     def test_mining_with_broadcast_integration(self, blockchain):
         """Test mining with broadcast integration."""
-        from xai.core.node_mining import MiningManager
+        from xai.core.mining.node_mining import MiningManager
 
         blockchain.pending_transactions = [Mock(), Mock()]
 

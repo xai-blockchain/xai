@@ -6,7 +6,7 @@ import os
 import tempfile
 import time
 
-from xai.core.secure_api_key_manager import (
+from xai.core.security.secure_api_key_manager import (
     AIProvider,
     KeyStatus,
     SecureAPIKeyManager,

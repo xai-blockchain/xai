@@ -12,7 +12,7 @@ import string
 import pytest
 from flask import Flask
 
-from xai.core.request_validator_middleware import RequestValidator
+from xai.core.security.request_validator_middleware import RequestValidator
 
 
 app = Flask(__name__)

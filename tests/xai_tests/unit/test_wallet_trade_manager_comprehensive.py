@@ -16,8 +16,8 @@ import uuid
 import tempfile
 import shutil
 from unittest.mock import Mock, MagicMock, call
-from xai.core.wallet_trade_manager_impl import WalletTradeManager, AuditSigner, OrderRateLimitError
-from xai.core.trading import SwapOrderType, TradeMatchStatus
+from xai.core.wallets.wallet_trade_manager_impl import WalletTradeManager, AuditSigner, OrderRateLimitError
+from xai.core.transactions.trading import SwapOrderType, TradeMatchStatus
 
 
 @pytest.fixture

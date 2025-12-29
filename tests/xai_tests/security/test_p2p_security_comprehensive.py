@@ -10,7 +10,7 @@ import pytest
 import time
 from unittest.mock import Mock, MagicMock, patch
 
-from xai.core.p2p_security import (
+from xai.core.security.p2p_security import (
     P2PSecurityConfig,
     PeerReputation,
     MessageRateLimiter,

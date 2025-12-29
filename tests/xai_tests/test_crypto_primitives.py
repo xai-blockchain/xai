@@ -13,7 +13,7 @@ across all nodes to maintain network integrity.
 
 import pytest
 import hashlib
-from xai.core.crypto_utils import (
+from xai.core.security.crypto_utils import (
     sign_message_hex,
     verify_signature_hex,
     derive_public_key_hex,

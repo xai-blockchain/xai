@@ -11,7 +11,7 @@ import pytest
 import time
 import threading
 from unittest.mock import Mock, patch, MagicMock, call
-from xai.core.peer_discovery import (
+from xai.core.p2p.peer_discovery import (
     PeerInfo,
     BootstrapNodes,
     PeerDiscoveryProtocol,

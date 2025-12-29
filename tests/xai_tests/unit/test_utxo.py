@@ -10,7 +10,7 @@ import threading
 import time
 from xai.core.blockchain import Blockchain
 from xai.core.wallet import Wallet
-from xai.core.utxo_manager import UTXOManager
+from xai.core.transactions.utxo_manager import UTXOManager
 
 
 class TestUTXODoubleSpendWindow:

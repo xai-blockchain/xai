@@ -15,7 +15,7 @@ import secrets
 
 import pytest
 
-from xai.core.crypto_utils import (
+from xai.core.security.crypto_utils import (
     _CURVE_ORDER,
     _normalize_private_value,
     _private_key_to_hex,

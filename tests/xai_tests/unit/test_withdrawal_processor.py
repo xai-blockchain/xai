@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from xai.core.exchange_wallet import ExchangeWalletManager
-from xai.core.withdrawal_processor import WithdrawalProcessor
+from xai.core.wallets.exchange_wallet import ExchangeWalletManager
+from xai.core.wallets.withdrawal_processor import WithdrawalProcessor
 
 
 @pytest.fixture()

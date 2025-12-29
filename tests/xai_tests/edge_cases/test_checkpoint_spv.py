@@ -13,7 +13,7 @@ import json
 
 from xai.core.blockchain import Blockchain
 from xai.core.wallet import Wallet
-from xai.core.checkpoints import CheckpointManager
+from xai.core.consensus.checkpoints import CheckpointManager
 from xai.core.blockchain_components.block import Block
 
 

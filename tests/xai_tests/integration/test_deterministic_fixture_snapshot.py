@@ -5,8 +5,8 @@ from unittest.mock import patch
 
 from xai.core.blockchain import Blockchain
 from xai.core.wallet import Wallet
-from xai.core.p2p_security import P2PSecurityConfig
-from xai.core.crypto_utils import deterministic_keypair_from_seed
+from xai.core.security.p2p_security import P2PSecurityConfig
+from xai.core.security.crypto_utils import deterministic_keypair_from_seed
 
 
 def _time_generator(start: int = 1_700_000_000, step: int = 7):

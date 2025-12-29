@@ -9,7 +9,7 @@ import pytest
 import time
 import threading
 from unittest.mock import MagicMock, patch
-from xai.core.ai_safety_controls import (
+from xai.core.security.ai_safety_controls import (
     StopReason,
     AISafetyLevel,
     AISafetyControls,

@@ -8,8 +8,8 @@ Tests all transaction validation logic including UTXO, nonces, signatures, and s
 import pytest
 import time
 from unittest.mock import Mock, MagicMock, patch
-from xai.core.transaction_validator import TransactionValidator, get_transaction_validator
-from xai.core.security_validation import ValidationError
+from xai.core.consensus.transaction_validator import TransactionValidator, get_transaction_validator
+from xai.core.security.security_validation import ValidationError
 from xai.core.blockchain import Transaction, Blockchain
 from xai.core.wallet import Wallet
 

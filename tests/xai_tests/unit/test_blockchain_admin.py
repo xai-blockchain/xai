@@ -3,7 +3,7 @@ from pathlib import Path
 
 from xai.core.blockchain import Blockchain
 from xai.core.blockchain_components.block import Block
-from xai.core.blockchain_storage import BlockchainStorage
+from xai.core.chain.blockchain_storage import BlockchainStorage
 
 
 def _mine_coinbase_block(blockchain: Blockchain, recipient: str) -> Block:

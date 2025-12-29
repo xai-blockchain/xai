@@ -9,8 +9,9 @@ from typing import TYPE_CHECKING, Any
 from flask import jsonify, request
 from pydantic import ValidationError as PydanticValidationError
 
+from xai.core.security.api_rate_limiting import rate_limit_sensitive
 from xai.core.config import Config, NetworkType
-from xai.core.input_validation_schemas import FaucetClaimInput
+from xai.core.security.input_validation_schemas import FaucetClaimInput
 
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
@@ -24,6 +25,7 @@ def register_faucet_routes(
     app = routes.app
 
     @app.route("/faucet/claim", methods=["POST"])
+    @rate_limit_sensitive  # Strict rate limit: 1 request per day per IP
     def claim_faucet() -> tuple[dict[str, Any], int]:
         auth_error = routes._require_api_auth()
         if auth_error:

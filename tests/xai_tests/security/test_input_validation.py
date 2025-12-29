@@ -395,7 +395,7 @@ class TestBufferOverflow:
 
     def test_large_block_rejection(self, tmp_path):
         """Test rejection of excessively large blocks"""
-        from xai.core.blockchain_security import ResourceLimiter, BlockchainSecurityConfig
+        from xai.core.security.blockchain_security import ResourceLimiter, BlockchainSecurityConfig
 
         limiter = ResourceLimiter()
 
@@ -459,7 +459,7 @@ class TestResourceLimitValidation:
 
     def test_transaction_count_limit(self, tmp_path):
         """Test transaction count limits per block"""
-        from xai.core.blockchain_security import BlockchainSecurityConfig
+        from xai.core.security.blockchain_security import BlockchainSecurityConfig
 
         max_tx_per_block = BlockchainSecurityConfig.MAX_TRANSACTIONS_PER_BLOCK
 
@@ -468,7 +468,7 @@ class TestResourceLimitValidation:
 
     def test_mempool_size_validation(self, tmp_path):
         """Test mempool size limits"""
-        from xai.core.blockchain_security import BlockchainSecurityConfig
+        from xai.core.security.blockchain_security import BlockchainSecurityConfig
 
         max_mempool = BlockchainSecurityConfig.MAX_MEMPOOL_SIZE
 
@@ -476,7 +476,7 @@ class TestResourceLimitValidation:
 
     def test_reject_dust_spam(self, tmp_path):
         """Test rejection of dust spam transactions"""
-        from xai.core.blockchain_security import BlockchainSecurityConfig
+        from xai.core.security.blockchain_security import BlockchainSecurityConfig
 
         min_amount = BlockchainSecurityConfig.MIN_TRANSACTION_AMOUNT
 

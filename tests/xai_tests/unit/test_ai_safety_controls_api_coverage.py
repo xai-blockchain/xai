@@ -20,8 +20,8 @@ import json
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 
-from xai.core.ai_safety_controls import AISafetyControls, StopReason, AISafetyLevel
-from xai.core.ai_safety_controls_api import add_safety_control_routes
+from xai.core.security.ai_safety_controls import AISafetyControls, StopReason, AISafetyLevel
+from xai.core.api.ai_safety_controls_api import add_safety_control_routes
 
 
 VALID_TEST_ADDRESS = "XAI" + "1" * 40

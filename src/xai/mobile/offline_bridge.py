@@ -185,7 +185,7 @@ class OfflineSigningBridge:
             True if signature is valid
         """
         # Import here to avoid circular dependencies
-        from xai.core.crypto_utils import verify_signature_hex
+        from xai.core.security.crypto_utils import verify_signature_hex
 
         # Recalculate txid
         tx_data = signed_tx.unsigned_tx.to_dict()

@@ -2,7 +2,7 @@
 Tests for SPVHeaderIngestor linkage validation.
 """
 
-from xai.core.spv_header_ingestor import SPVHeaderIngestor
+from xai.core.p2p.spv_header_ingestor import SPVHeaderIngestor
 
 
 def test_ingest_valid_chain():

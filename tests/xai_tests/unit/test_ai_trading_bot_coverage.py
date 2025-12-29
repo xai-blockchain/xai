@@ -18,7 +18,7 @@ import threading
 from unittest.mock import Mock, MagicMock, patch, call
 from dataclasses import dataclass
 
-from xai.core.ai_trading_bot import (
+from xai.core.transactions.ai_trading_bot import (
     AITradingBot,
     TradingStrategy,
     TradeAction,
@@ -1195,7 +1195,7 @@ class TestMainExecution:
     def test_main_block_classes_exist(self):
         """Test that main block mock classes work"""
         # Import the module to ensure main block can run
-        import xai.core.ai_trading_bot
+        import xai.core.transactions.ai_trading_bot
 
         # Verify classes exist
         assert hasattr(xai.core.ai_trading_bot, "AITradingBot")

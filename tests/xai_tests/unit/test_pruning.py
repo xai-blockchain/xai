@@ -24,7 +24,7 @@ from unittest.mock import Mock, patch, MagicMock
 
 import pytest
 
-from xai.core.pruning import (
+from xai.core.chain.pruning import (
     BlockPruningManager,
     PruningPolicy,
     PruneMode,

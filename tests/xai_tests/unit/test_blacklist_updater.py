@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from xai.core import blacklist_updater
+from xai.core.security import blacklist_updater
 
 
 @dataclass

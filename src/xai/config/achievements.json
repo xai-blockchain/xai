@@ -1,0 +1,202 @@
+{
+  "_comment": "Unified gamification configuration for mining bonuses, achievements, trophies, and daily challenges",
+  "version": "1.0.0",
+
+  "early_adopter_tiers": {
+    "100": 100,
+    "1000": 50,
+    "10000": 10
+  },
+
+  "achievement_bonuses": {
+    "first_block": 5,
+    "10_blocks": 25,
+    "100_blocks": 250,
+    "7day_streak": 100
+  },
+
+  "referral_bonuses": {
+    "refer_friend": 10,
+    "friend_10_blocks": 25
+  },
+
+  "social_bonuses": {
+    "tweet_verification": 5,
+    "discord_join": 2
+  },
+
+  "progression_rewards": {
+    "registration": 150.0
+  },
+
+  "xp_context_multipliers": {
+    "early_adopter": 1.15,
+    "achievement": 3.5,
+    "referral": 2.5,
+    "referral_milestone": 3.75,
+    "social": 1.5,
+    "default": 1.0
+  },
+
+  "progression_engine": {
+    "base_xp_per_level": 150.0,
+    "level_growth_rate": 1.18,
+    "max_xp_per_level": 4000.0,
+    "xp_per_token": 1.0,
+    "min_event_xp": 8.0,
+    "history_limit": 50
+  },
+
+  "referral_limits": {
+    "daily_limit": 25,
+    "recent_window_seconds": 120,
+    "burst_limit": 3
+  },
+
+  "achievements": [
+    {
+      "id": "first_block",
+      "description": "Mine your first block",
+      "category": "mining",
+      "condition": {"type": "blocks_mined", "threshold": 1},
+      "bonus": 5,
+      "xp": 50,
+      "tags": ["milestone", "early"],
+      "reward_badge": "bronze_pickaxe"
+    },
+    {
+      "id": "ten_blocks",
+      "description": "Reach 10 mined blocks",
+      "category": "mining",
+      "condition": {"type": "blocks_mined", "threshold": 10},
+      "bonus": 25,
+      "xp": 85,
+      "tags": ["milestone"],
+      "reward_badge": "silver_pickaxe"
+    },
+    {
+      "id": "hundred_blocks",
+      "description": "Reach 100 mined blocks",
+      "category": "mining",
+      "condition": {"type": "blocks_mined", "threshold": 100},
+      "bonus": 250,
+      "xp": 220,
+      "tags": ["milestone", "prestige"],
+      "reward_badge": "gold_pickaxe"
+    },
+    {
+      "id": "seven_day_streak",
+      "description": "Maintain a 7-day mining streak",
+      "category": "consistency",
+      "condition": {"type": "streak_days", "threshold": 7},
+      "bonus": 100,
+      "xp": 150,
+      "tags": ["streak"],
+      "reward_badge": "ember_chain"
+    },
+    {
+      "id": "thirty_day_streak",
+      "description": "Mine every day for 30 consecutive days",
+      "category": "consistency",
+      "condition": {"type": "streak_days", "threshold": 30},
+      "bonus": 0,
+      "xp": 400,
+      "tags": ["streak", "rare"],
+      "reward_badge": "eternal_flame"
+    },
+    {
+      "id": "referral_champion",
+      "description": "Successfully refer five new miners",
+      "category": "community",
+      "condition": {"type": "referral_count", "threshold": 5},
+      "bonus": 10,
+      "xp": 180,
+      "tags": ["social"],
+      "reward_badge": "alliance_seal"
+    },
+    {
+      "id": "veteran_miner",
+      "description": "Accumulate 2,500 XP from participation",
+      "category": "progression",
+      "condition": {"type": "xp_total", "threshold": 2500},
+      "bonus": 0,
+      "xp": 250,
+      "tags": ["progression"],
+      "reward_badge": "veteran_banner"
+    },
+    {
+      "id": "community_supporter",
+      "description": "Complete three social engagement bonuses",
+      "category": "community",
+      "condition": {"type": "social_actions", "threshold": 3},
+      "bonus": 0,
+      "xp": 120,
+      "tags": ["social"],
+      "reward_badge": "social_star"
+    }
+  ],
+
+  "daily_challenges": [
+    {
+      "id": "daily_blocks_5",
+      "description": "Mine 5 blocks today",
+      "condition": {"type": "blocks_mined", "threshold": 5},
+      "bonus": 4.0,
+      "xp": 45.0,
+      "tags": ["daily", "mining"]
+    },
+    {
+      "id": "daily_streak_guardian",
+      "description": "Maintain a 3 day streak",
+      "condition": {"type": "streak_days", "threshold": 3},
+      "bonus": 0.0,
+      "xp": 55.0,
+      "tags": ["daily", "streak"]
+    },
+    {
+      "id": "daily_socializer",
+      "description": "Complete one social action",
+      "condition": {"type": "social_actions", "threshold": 1},
+      "bonus": 2.5,
+      "xp": 35.0,
+      "tags": ["daily", "social"]
+    },
+    {
+      "id": "daily_referral_ping",
+      "description": "Register one new referral today",
+      "condition": {"type": "referral_count_daily", "threshold": 1},
+      "bonus": 6.0,
+      "xp": 60.0,
+      "tags": ["daily", "referral"]
+    }
+  ],
+
+  "trophies": [
+    {
+      "id": "triple_crown",
+      "description": "Hold gold_pickaxe, eternal_flame, and alliance_seal badges",
+      "required_badges": ["gold_pickaxe", "eternal_flame", "alliance_seal"],
+      "bonus": 25.0,
+      "xp": 350.0
+    },
+    {
+      "id": "social_vanguard",
+      "description": "Earn social_star badge plus complete three daily social challenges",
+      "required_badges": ["social_star"],
+      "daily_requirement": {"id": "daily_socializer", "count": 3},
+      "bonus": 0.0,
+      "xp": 180.0
+    }
+  ],
+
+  "badges": {
+    "bronze_pickaxe": {"tier": 1, "category": "mining"},
+    "silver_pickaxe": {"tier": 2, "category": "mining"},
+    "gold_pickaxe": {"tier": 3, "category": "mining"},
+    "ember_chain": {"tier": 1, "category": "streak"},
+    "eternal_flame": {"tier": 2, "category": "streak"},
+    "alliance_seal": {"tier": 1, "category": "community"},
+    "veteran_banner": {"tier": 1, "category": "progression"},
+    "social_star": {"tier": 1, "category": "social"}
+  }
+}

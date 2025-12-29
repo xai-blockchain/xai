@@ -11,7 +11,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any
 
-from xai.core.blockchain_exceptions import (
+from xai.core.chain.blockchain_exceptions import (
     DatabaseError,
     MiningAbortedError,
     StateError,
@@ -20,9 +20,9 @@ from xai.core.blockchain_exceptions import (
 )
 
 if TYPE_CHECKING:
-    from xai.core.block_header import BlockHeader
+    from xai.core.chain.block_header import BlockHeader
     from xai.core.blockchain_components.block import Block
-    from xai.core.gamification import GamificationBlockchainInterface
+    from xai.core.governance.gamification import GamificationBlockchainInterface
     from xai.core.transaction import Transaction
 
 def _record_mining_metrics(
@@ -41,7 +41,7 @@ def _record_mining_metrics(
         labels: Optional labels for the metric
     """
     try:
-        from xai.core.monitoring import MetricsCollector
+        from xai.core.api.monitoring import MetricsCollector
         collector = MetricsCollector.instance()
         if not collector:
             return
@@ -129,10 +129,10 @@ class BlockchainMiningMixin:
         Raises:
             ValueError: If node_identity is not provided or block violates size limits
         """
-        from xai.core.block_header import BlockHeader, canonical_json
+        from xai.core.chain.block_header import BlockHeader, canonical_json
         from xai.core.blockchain_components.block import Block
         from xai.core.config import Config
-        from xai.core.crypto_utils import sign_message_hex
+        from xai.core.security.crypto_utils import sign_message_hex
         from xai.core.transaction import Transaction
 
         # Require a real node identity for block signing

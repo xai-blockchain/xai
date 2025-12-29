@@ -15,7 +15,7 @@ import hashlib
 from unittest.mock import Mock, MagicMock, patch
 from decimal import Decimal
 
-from xai.core.blockchain_security import (
+from xai.core.security.blockchain_security import (
     BlockchainSecurityConfig,
     ReorganizationProtection,
     SupplyValidator,

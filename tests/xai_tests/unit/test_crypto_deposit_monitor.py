@@ -4,8 +4,8 @@ import time
 
 import pytest
 
-from xai.core.crypto_deposit_manager import CryptoDepositManager
-from xai.core.crypto_deposit_monitor import (
+from xai.core.wallets.crypto_deposit_manager import CryptoDepositManager
+from xai.core.wallets.crypto_deposit_monitor import (
     CryptoDepositMonitor,
     DepositEvent,
     ExplorerDepositSource,

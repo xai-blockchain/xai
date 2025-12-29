@@ -5,7 +5,7 @@ Unit tests for structured logger sanitization and correlation handling.
 import json
 from pathlib import Path
 
-from xai.core.structured_logger import StructuredLogger, correlation_id
+from xai.core.api.structured_logger import StructuredLogger, correlation_id
 
 
 def _read_json_log(log_dir: Path, name: str) -> dict:

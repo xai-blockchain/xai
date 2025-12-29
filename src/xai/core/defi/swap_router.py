@@ -1054,7 +1054,7 @@ class SwapRouter:
         """
         import hashlib
 
-        from xai.core.crypto_utils import derive_public_key_hex, verify_signature_hex
+        from xai.core.security.crypto_utils import derive_public_key_hex, verify_signature_hex
 
         # Validate signature format
         if not signature or len(signature) < 64:

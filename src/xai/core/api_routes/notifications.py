@@ -108,7 +108,7 @@ def register_notification_routes(routes: "NodeAPIRoutes") -> None:
 
             # Validate address format
             try:
-                from xai.core.validation import validate_address
+                from xai.core.consensus.validation import validate_address
                 validate_address(user_address, allow_special=False)
             except ValueError as e:
                 return routes._error_response(
@@ -432,7 +432,7 @@ def register_notification_routes(routes: "NodeAPIRoutes") -> None:
             GET /notifications/devices/XAI1234567890abcdef...
         """
         try:
-            from xai.core.validation import validate_address
+            from xai.core.consensus.validation import validate_address
             validate_address(address, allow_special=False)
         except ValueError as e:
             return routes._error_response(

@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from datetime import datetime, timedelta
 
-from xai.core.mining_bonuses import MiningBonusManager
+from xai.core.mining.mining_bonuses import MiningBonusManager
 
 
 class TestMiningBonusManager:

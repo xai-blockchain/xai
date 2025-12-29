@@ -15,7 +15,7 @@ Tests cover:
 import pytest
 import time
 from unittest.mock import Mock, MagicMock, patch, PropertyMock
-from xai.core.ai_pool_with_strict_limits import (
+from xai.core.security.ai_pool_with_strict_limits import (
     AIProvider,
     DonatedAPIKey,
     StrictAIPoolManager,

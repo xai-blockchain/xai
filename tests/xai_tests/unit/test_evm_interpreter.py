@@ -656,7 +656,7 @@ class TestEVMExecutor:
             def __init__(self):
                 self.contracts = {}
                 self.chain = []
-                from xai.core.nonce_tracker import NonceTracker
+                from xai.core.transactions.nonce_tracker import NonceTracker
                 self.nonce_tracker = NonceTracker(data_dir=os.path.join(os.getcwd(), "data", "nonces_test"))
 
             def get_balance(self, addr):

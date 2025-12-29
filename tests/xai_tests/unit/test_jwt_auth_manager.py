@@ -4,7 +4,7 @@ Unit tests for JWTAuthManager token generation/validation and blacklist.
 
 import pytest
 
-from xai.core.api_auth import JWTAuthManager
+from xai.core.api.api_auth import JWTAuthManager
 
 
 def test_generate_and_validate_token_round_trip(monkeypatch):

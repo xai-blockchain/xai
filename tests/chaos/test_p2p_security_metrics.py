@@ -1,4 +1,4 @@
-from xai.core.monitoring import MetricsCollector
+from xai.core.api.monitoring import MetricsCollector
 
 
 def test_p2p_security_metrics_spike_simulation():

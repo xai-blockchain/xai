@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from xai.core.utxo_manager import (
+from xai.core.transactions.utxo_manager import (
     MAX_UTXO_AMOUNT,
     MIN_UTXO_AMOUNT,
     UTXOManager,
@@ -559,7 +559,7 @@ class TestGlobalInstance:
     def test_get_utxo_manager_singleton(self):
         """get_utxo_manager should return same instance."""
         # Reset global instance first
-        import xai.core.utxo_manager as um
+        import xai.core.transactions.utxo_manager as um
         um._global_utxo_manager = None
 
         manager1 = get_utxo_manager()

@@ -6,7 +6,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-from xai.core.p2p_security import P2PSecurityConfig, P2PSecurityManager
+from xai.core.security.p2p_security import P2PSecurityConfig, P2PSecurityManager
 
 
 class NodeConnectionManager:

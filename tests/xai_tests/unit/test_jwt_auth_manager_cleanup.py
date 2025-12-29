@@ -10,7 +10,7 @@ import threading
 import pytest
 from datetime import datetime, timezone, timedelta
 
-from xai.core.jwt_auth_manager import JWTAuthManager, UserRole
+from xai.core.security.jwt_auth_manager import JWTAuthManager, UserRole
 
 
 class TestJWTAuthManagerCleanup:

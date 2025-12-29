@@ -4,7 +4,7 @@ Unit tests for WalletFactory collision resistance and wallet lifecycle helpers.
 
 from pathlib import Path
 
-from xai.core.wallet_factory import CollisionResistance, WalletFactory
+from xai.core.wallets.wallet_factory import CollisionResistance, WalletFactory
 
 
 def test_collision_resistance_uniqueness_and_stats():

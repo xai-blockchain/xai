@@ -9,13 +9,13 @@ from typing import TYPE_CHECKING, Any, Type
 from flask import request
 
 from xai.core.config import Config
-from xai.core.governance_execution import ProposalType
-from xai.core.input_validation_schemas import (
+from xai.core.governance.governance_execution import ProposalType
+from xai.core.security.input_validation_schemas import (
     ContractCallInput,
     ContractDeployInput,
     ContractFeatureToggleInput,
 )
-from xai.core.request_validator_middleware import validate_request
+from xai.core.security.request_validator_middleware import validate_request
 
 logger = logging.getLogger(__name__)
 
@@ -122,45 +122,57 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
         tx.metadata = metadata
         tx.signature = model.signature
 
-        # Verify signature - now raises exceptions
+        # Verify signature - now raises typed exceptions
+        from xai.core.transaction import (
+            InvalidSignatureError,
+            MissingSignatureError,
+            SignatureCryptoError,
+            SignatureVerificationError,
+        )
         try:
             tx.verify_signature()
-        except Exception as e:
-            from xai.core.transaction import (
-                InvalidSignatureError,
-                MissingSignatureError,
-                SignatureCryptoError,
-                SignatureVerificationError,
+        except MissingSignatureError as e:
+            return routes._error_response(
+                "Missing signature or public key",
+                status=400,
+                code="missing_signature",
+                context={"sender": model.sender, "error": str(e)}
             )
-
-            if isinstance(e, MissingSignatureError):
-                return routes._error_response(
-                    "Missing signature or public key",
-                    status=400,
-                    code="missing_signature",
-                    context={"sender": model.sender, "error": str(e)}
-                )
-            elif isinstance(e, InvalidSignatureError):
-                return routes._error_response(
-                    "Invalid signature",
-                    status=400,
-                    code="invalid_signature",
-                    context={"sender": model.sender, "error": str(e)}
-                )
-            elif isinstance(e, SignatureCryptoError):
-                return routes._error_response(
-                    "Signature verification error",
-                    status=500,
-                    code="crypto_error",
-                    context={"sender": model.sender, "error": str(e)}
-                )
-            else:
-                return routes._error_response(
-                    "Unexpected signature verification error",
-                    status=500,
-                    code="verification_error",
-                    context={"sender": model.sender, "error": str(e)}
-                )
+        except InvalidSignatureError as e:
+            return routes._error_response(
+                "Invalid signature",
+                status=400,
+                code="invalid_signature",
+                context={"sender": model.sender, "error": str(e)}
+            )
+        except SignatureCryptoError as e:
+            return routes._error_response(
+                "Signature verification error",
+                status=500,
+                code="crypto_error",
+                context={"sender": model.sender, "error": str(e)}
+            )
+        except SignatureVerificationError as e:
+            return routes._error_response(
+                "Signature verification failed",
+                status=400,
+                code="signature_error",
+                context={"sender": model.sender, "error": str(e)}
+            )
+        except Exception as e:
+            # Log unexpected errors for debugging
+            import logging
+            logging.getLogger(__name__).error(
+                "Unexpected error during contract deploy signature verification",
+                extra={"error_type": type(e).__name__, "error": str(e), "sender": model.sender},
+                exc_info=True
+            )
+            return routes._error_response(
+                "Unexpected signature verification error",
+                status=500,
+                code="verification_error",
+                context={"sender": model.sender, "error": str(e)}
+            )
 
         if blockchain.add_transaction(tx):
             routes.node.broadcast_transaction(tx)
@@ -281,45 +293,57 @@ def register_contract_routes(routes: "NodeAPIRoutes", sanitizer: Type["InputSani
                 context={"error": str(exc)},
             )
 
-        # Verify signature - now raises exceptions
+        # Verify signature - now raises typed exceptions
+        from xai.core.transaction import (
+            InvalidSignatureError,
+            MissingSignatureError,
+            SignatureCryptoError,
+            SignatureVerificationError,
+        )
         try:
             tx.verify_signature()
-        except Exception as e:
-            from xai.core.transaction import (
-                InvalidSignatureError,
-                MissingSignatureError,
-                SignatureCryptoError,
-                SignatureVerificationError,
+        except MissingSignatureError as e:
+            return routes._error_response(
+                "Missing signature or public key",
+                status=400,
+                code="missing_signature",
+                context={"sender": model.sender, "error": str(e)}
             )
-
-            if isinstance(e, MissingSignatureError):
-                return routes._error_response(
-                    "Missing signature or public key",
-                    status=400,
-                    code="missing_signature",
-                    context={"sender": model.sender, "error": str(e)}
-                )
-            elif isinstance(e, InvalidSignatureError):
-                return routes._error_response(
-                    "Invalid signature",
-                    status=400,
-                    code="invalid_signature",
-                    context={"sender": model.sender, "error": str(e)}
-                )
-            elif isinstance(e, SignatureCryptoError):
-                return routes._error_response(
-                    "Signature verification error",
-                    status=500,
-                    code="crypto_error",
-                    context={"sender": model.sender, "error": str(e)}
-                )
-            else:
-                return routes._error_response(
-                    "Unexpected signature verification error",
-                    status=500,
-                    code="verification_error",
-                    context={"sender": model.sender, "error": str(e)}
-                )
+        except InvalidSignatureError as e:
+            return routes._error_response(
+                "Invalid signature",
+                status=400,
+                code="invalid_signature",
+                context={"sender": model.sender, "error": str(e)}
+            )
+        except SignatureCryptoError as e:
+            return routes._error_response(
+                "Signature verification error",
+                status=500,
+                code="crypto_error",
+                context={"sender": model.sender, "error": str(e)}
+            )
+        except SignatureVerificationError as e:
+            return routes._error_response(
+                "Signature verification failed",
+                status=400,
+                code="signature_error",
+                context={"sender": model.sender, "error": str(e)}
+            )
+        except Exception as e:
+            # Log unexpected errors for debugging
+            import logging
+            logging.getLogger(__name__).error(
+                "Unexpected error during contract call signature verification",
+                extra={"error_type": type(e).__name__, "error": str(e), "sender": model.sender},
+                exc_info=True
+            )
+            return routes._error_response(
+                "Unexpected signature verification error",
+                status=500,
+                code="verification_error",
+                context={"sender": model.sender, "error": str(e)}
+            )
 
         if blockchain.add_transaction(tx):
             routes.node.broadcast_transaction(tx)

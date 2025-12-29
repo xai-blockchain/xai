@@ -35,7 +35,7 @@ class TestWalletAPICreation:
     @pytest.fixture
     def wallet_api(self, mock_node, app):
         """Create WalletAPIHandler instance."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
         broadcast_callback = Mock()
         trade_peers = {}
         return WalletAPIHandler(mock_node, app, broadcast_callback, trade_peers)
@@ -186,7 +186,7 @@ class TestWalletConnectRoutes:
     @pytest.fixture
     def wallet_api(self, mock_node):
         """Create WalletAPIHandler instance."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
         app = Flask(__name__)
         broadcast_callback = Mock()
         trade_peers = {}
@@ -282,7 +282,7 @@ class TestTradeOrderRoutes:
     @pytest.fixture
     def wallet_api(self, mock_node):
         """Create WalletAPIHandler instance."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
         app = Flask(__name__)
         broadcast_callback = Mock()
         trade_peers = {}
@@ -370,7 +370,7 @@ class TestTradeMatchRoutes:
     @pytest.fixture
     def wallet_api(self, mock_node):
         """Create WalletAPIHandler instance."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
         app = Flask(__name__)
         broadcast_callback = Mock()
         trade_peers = {}
@@ -442,7 +442,7 @@ class TestGossipAndSnapshotRoutes:
     @pytest.fixture
     def wallet_api(self, mock_node):
         """Create WalletAPIHandler instance."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
         app = Flask(__name__)
         broadcast_callback = Mock()
         trade_peers = {}
@@ -530,7 +530,7 @@ class TestWalletSeedsSnapshot:
     @pytest.fixture
     def wallet_api(self, mock_node):
         """Create WalletAPIHandler instance."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
         app = Flask(__name__)
         broadcast_callback = Mock()
         trade_peers = {}
@@ -579,7 +579,7 @@ class TestMetricsEndpoint:
     @pytest.fixture
     def wallet_api(self, mock_node):
         """Create WalletAPIHandler instance."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
         app = Flask(__name__)
         broadcast_callback = Mock()
         trade_peers = {}
@@ -605,7 +605,7 @@ class TestGossipTradeEvent:
     @pytest.fixture
     def wallet_api(self):
         """Create WalletAPIHandler instance."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
         node = Mock()
         app = Flask(__name__)
         broadcast_callback = Mock()
@@ -652,7 +652,7 @@ class TestWalletAPISigning:
 
     @pytest.fixture
     def wallet_api(self, mock_node, app):
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
         return WalletAPIHandler(mock_node, app, broadcast_callback=Mock(), trade_peers={})
 
     @pytest.fixture
@@ -662,7 +662,7 @@ class TestWalletAPISigning:
 
     def test_wallet_sign_requires_ack_prefix(self, client):
         from hashlib import sha256
-        from xai.core.crypto_utils import generate_secp256k1_keypair_hex, verify_signature_hex
+        from xai.core.security.crypto_utils import generate_secp256k1_keypair_hex, verify_signature_hex
 
         priv, pub = generate_secp256k1_keypair_hex()
         message_hash = sha256(b"sign-me").hexdigest()
@@ -684,7 +684,7 @@ class TestWalletAPISigning:
 
     def test_wallet_sign_rejects_mismatched_ack(self, client):
         from hashlib import sha256
-        from xai.core.crypto_utils import generate_secp256k1_keypair_hex
+        from xai.core.security.crypto_utils import generate_secp256k1_keypair_hex
 
         priv, _ = generate_secp256k1_keypair_hex()
         message_hash = sha256(b"bad-ack").hexdigest()
@@ -707,7 +707,7 @@ class TestRegisterTradePeer:
     @pytest.fixture
     def wallet_api(self):
         """Create WalletAPIHandler instance."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
         node = Mock()
         app = Flask(__name__)
         broadcast_callback = Mock()

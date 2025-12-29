@@ -17,14 +17,14 @@ import shutil
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from xai.core.chunked_sync import (
+from xai.core.p2p.chunked_sync import (
     ChunkedStateSyncService,
     SyncChunk,
     SnapshotMetadata,
     SyncProgress,
     ChunkPriority,
 )
-from xai.core.checkpoint_payload import CheckpointPayload
+from xai.core.consensus.checkpoint_payload import CheckpointPayload
 
 
 @pytest.fixture
@@ -469,7 +469,7 @@ class TestCheckpointSyncIntegration:
     @patch("xai.core.checkpoint_sync.ChunkedStateSyncService")
     def test_chunked_sync_manager_init(self, mock_service_class):
         """Test CheckpointSyncManager with chunked sync enabled."""
-        from xai.core.checkpoint_sync import CheckpointSyncManager
+        from xai.core.p2p.checkpoint_sync import CheckpointSyncManager
 
         mock_blockchain = Mock()
         mock_blockchain.base_dir = "/tmp/test"
@@ -492,7 +492,7 @@ class TestCheckpointSyncIntegration:
 
     def test_chunked_sync_disabled_by_default(self):
         """Test chunked sync is disabled by default."""
-        from xai.core.checkpoint_sync import CheckpointSyncManager
+        from xai.core.p2p.checkpoint_sync import CheckpointSyncManager
 
         mock_blockchain = Mock()
         mock_blockchain.checkpoint_manager = None

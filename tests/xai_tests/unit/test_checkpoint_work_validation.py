@@ -1,4 +1,4 @@
-from xai.core.checkpoint_sync import CheckpointSyncManager
+from xai.core.p2p.checkpoint_sync import CheckpointSyncManager
 
 
 def test_checkpoint_work_validation_blocks_lower_work():

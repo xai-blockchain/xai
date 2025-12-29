@@ -17,7 +17,7 @@ import copy
 from xai.core.blockchain import Blockchain, Block, Transaction
 from xai.core.node import BlockchainNode
 from xai.core.wallet import Wallet
-from xai.core.blockchain_security import ReorganizationProtection
+from xai.core.security.blockchain_security import ReorganizationProtection
 
 class TestBlockchainReorganization:
     """Test blockchain reorganization scenarios"""

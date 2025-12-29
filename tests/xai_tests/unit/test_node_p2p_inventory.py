@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from xai.core.node_p2p import P2PNetworkManager
+from xai.core.p2p.node_p2p import P2PNetworkManager
 
 
 class DummyTx:

@@ -14,7 +14,7 @@ from unittest.mock import Mock, patch
 
 from xai.core.blockchain import Blockchain, Transaction, Block
 from xai.core.wallet import Wallet
-from xai.core.blockchain_security import ReorganizationProtection
+from xai.core.security.blockchain_security import ReorganizationProtection
 
 
 @pytest.mark.security
@@ -285,7 +285,7 @@ class TestTimejackAttack:
 
     def test_reject_future_timestamp(self):
         """Test blocks with future timestamps are rejected"""
-        from xai.core.blockchain_security import TimeValidator
+        from xai.core.security.blockchain_security import TimeValidator
 
         validator = TimeValidator()
 
@@ -301,7 +301,7 @@ class TestTimejackAttack:
 
     def test_median_time_past_validation(self):
         """Test median-time-past validation"""
-        from xai.core.blockchain_security import TimeValidator
+        from xai.core.security.blockchain_security import TimeValidator
 
         validator = TimeValidator()
         bc = Blockchain()
@@ -337,7 +337,7 @@ class TestDustAttack:
 
     def test_reject_dust_amounts(self):
         """Test rejection of dust transactions"""
-        from xai.core.blockchain_security import BlockchainSecurityConfig
+        from xai.core.security.blockchain_security import BlockchainSecurityConfig
 
         bc = Blockchain()
         attacker = Wallet()
@@ -358,7 +358,7 @@ class TestDustAttack:
 
     def test_minimum_utxo_value(self):
         """Test minimum UTXO value enforcement"""
-        from xai.core.blockchain_security import BlockchainSecurityConfig
+        from xai.core.security.blockchain_security import BlockchainSecurityConfig
 
         min_value = BlockchainSecurityConfig.MIN_UTXO_VALUE
 
@@ -372,7 +372,7 @@ class TestResourceExhaustion:
 
     def test_block_size_limit(self):
         """Test block size is limited"""
-        from xai.core.blockchain_security import BlockchainSecurityConfig, ResourceLimiter
+        from xai.core.security.blockchain_security import BlockchainSecurityConfig, ResourceLimiter
 
         limiter = ResourceLimiter()
         bc = Blockchain()
@@ -387,7 +387,7 @@ class TestResourceExhaustion:
 
     def test_transaction_size_limit(self):
         """Test transaction size is limited"""
-        from xai.core.blockchain_security import ResourceLimiter
+        from xai.core.security.blockchain_security import ResourceLimiter
 
         limiter = ResourceLimiter()
         wallet = Wallet()
@@ -402,7 +402,7 @@ class TestResourceExhaustion:
 
     def test_mempool_size_limit(self):
         """Test mempool size is limited"""
-        from xai.core.blockchain_security import BlockchainSecurityConfig
+        from xai.core.security.blockchain_security import BlockchainSecurityConfig
 
         max_mempool = BlockchainSecurityConfig.MAX_MEMPOOL_SIZE
 
@@ -416,7 +416,7 @@ class TestInflationAttack:
 
     def test_supply_cap_enforcement(self):
         """Test supply cap is enforced"""
-        from xai.core.blockchain_security import SupplyValidator
+        from xai.core.security.blockchain_security import SupplyValidator
 
         validator = SupplyValidator()
 
@@ -440,7 +440,7 @@ class TestInflationAttack:
 
     def test_overflow_protection(self):
         """Test overflow protection"""
-        from xai.core.blockchain_security import OverflowProtection, BlockchainSecurityConfig
+        from xai.core.security.blockchain_security import OverflowProtection, BlockchainSecurityConfig
 
         protection = OverflowProtection()
 

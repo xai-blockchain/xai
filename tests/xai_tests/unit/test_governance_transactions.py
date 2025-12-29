@@ -6,7 +6,7 @@ Tests on-chain governance transaction types, voting, and proposal management
 
 import pytest
 import time
-from xai.core.governance_transactions import (
+from xai.core.governance.governance_transactions import (
     GovernanceTxType,
     GovernanceTransaction,
     OnChainProposal,

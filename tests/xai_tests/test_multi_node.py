@@ -23,7 +23,7 @@ from pathlib import Path
 
 from xai.core.blockchain import Blockchain, Block, Transaction
 from xai.core.wallet import Wallet
-from xai.core.advanced_consensus import AdvancedConsensusManager
+from xai.core.consensus.advanced_consensus import AdvancedConsensusManager
 
 class TestMultiNodeBaseline:
     """Test basic multi-node network functionality"""

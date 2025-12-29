@@ -11,7 +11,7 @@ import json
 import hashlib
 import time
 
-from xai.core.chain_validator import (
+from xai.core.consensus.chain_validator import (
     ChainValidator,
     ValidationReport,
     ValidationIssue,

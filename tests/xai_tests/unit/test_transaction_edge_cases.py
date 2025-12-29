@@ -143,7 +143,7 @@ class TestTransactionEdgeCases:
 
     def test_duplicate_inputs_should_fail(self, tmp_path):
         """Test that duplicate inputs in transaction are rejected by UTXO manager"""
-        from xai.core.utxo_manager import UTXOValidationError
+        from xai.core.transactions.utxo_manager import UTXOValidationError
 
         bc = Blockchain(data_dir=str(tmp_path))
         wallet1 = Wallet()

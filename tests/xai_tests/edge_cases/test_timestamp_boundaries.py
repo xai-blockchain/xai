@@ -10,7 +10,7 @@ import time
 import hashlib
 from xai.core.blockchain import Blockchain
 from xai.core.blockchain_components.block import Block
-from xai.core.block_header import BlockHeader
+from xai.core.chain.block_header import BlockHeader
 from xai.core.wallet import Wallet
 from xai.core.config import Config
 
@@ -176,7 +176,7 @@ class TestTimestampBoundaries:
         block.mine_block()
 
         # Sign the block after mining
-        from xai.core.crypto_utils import sign_message_hex
+        from xai.core.security.crypto_utils import sign_message_hex
         block.header.signature = sign_message_hex(miner.private_key, block.hash.encode())
 
         # Should be accepted

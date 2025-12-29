@@ -20,7 +20,7 @@ from xai.core.api_blueprints.base import (
     get_node,
     handle_exception,
 )
-from xai.core.node_utils import ALGO_FEATURES_ENABLED, NODE_VERSION, get_api_endpoints
+from xai.core.chain.node_utils import ALGO_FEATURES_ENABLED, NODE_VERSION, get_api_endpoints
 
 logger = logging.getLogger(__name__)
 

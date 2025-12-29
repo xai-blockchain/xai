@@ -21,7 +21,7 @@ if TYPE_CHECKING:  # pragma: no cover - avoid circular imports
     from xai.core.blockchain import Block, Blockchain, Transaction
 
 try:  # pragma: no cover - optional for lightweight test environments
-    from xai.core.monitoring import MetricsCollector  # type: ignore
+    from xai.core.api.monitoring import MetricsCollector  # type: ignore
 except ImportError:  # pragma: no cover
     MetricsCollector = None  # type: ignore
 

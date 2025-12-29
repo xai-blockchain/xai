@@ -10,14 +10,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from xai.core import htlc_p2wsh
+from xai.core.transactions import htlc_p2wsh
 from xai.core.aixn_blockchain.atomic_swap_11_coins import (
     AtomicSwapHTLC,
     CoinType,
     MeshDEXPairManager,
     SwapStateMachine,
 )
-from xai.core.htlc_deployer import compile_htlc_contract
+from xai.core.transactions.htlc_deployer import compile_htlc_contract
 
 
 class AtomicSwapArtifactError(Exception):

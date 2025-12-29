@@ -5,7 +5,7 @@ import tempfile
 import shutil
 import pytest
 
-from xai.core.exchange_wallet import ExchangeWalletManager
+from xai.core.wallets.exchange_wallet import ExchangeWalletManager
 from xai.exchange import BlockchainBalanceProvider
 
 

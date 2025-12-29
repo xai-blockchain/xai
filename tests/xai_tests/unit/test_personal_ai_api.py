@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from xai.core import api_extensions
-from xai.core.api_extensions import extend_node_api
+from xai.core.api import api_extensions
+from xai.core.api.api_extensions import extend_node_api
 from xai.core.node import BlockchainNode
 from xai.ai.ai_assistant.personal_ai_assistant import PersonalAIAssistant
 

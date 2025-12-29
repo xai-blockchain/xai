@@ -7,7 +7,7 @@ Coverage targets:
 - Hash recalculation when fields mutate
 """
 
-from xai.core.block_header import BlockHeader, canonical_json
+from xai.core.chain.block_header import BlockHeader, canonical_json
 
 
 def test_canonical_json_determinism():

@@ -15,10 +15,10 @@ from collections import defaultdict, deque
 from typing import Any
 
 import websockets
-from websockets.client import WebSocketClientProtocol
+from websockets.asyncio.client import ClientConnection
 
 from xai.core.config import Config
-from xai.core.p2p_security import P2PSecurityConfig
+from xai.core.security.p2p_security import P2PSecurityConfig
 from xai.network.geoip_resolver import GeoIPMetadata, GeoIPResolver
 
 # Fail fast: cryptography library is REQUIRED for P2P networking security
@@ -136,7 +136,7 @@ class PeerConnectionPool:
             }
         )
 
-    async def get_connection(self, peer_uri: str) -> WebSocketClientProtocol:
+    async def get_connection(self, peer_uri: str) -> ClientConnection:
         """
         Get a connection from the pool or create a new one.
 
@@ -271,7 +271,7 @@ class PeerConnectionPool:
     async def return_connection(
         self,
         peer_uri: str,
-        conn: WebSocketClientProtocol
+        conn: ClientConnection
     ) -> None:
         """
         Return a connection to the pool for reuse.
@@ -329,7 +329,7 @@ class PeerConnectionPool:
                 }
             )
 
-    async def _is_healthy(self, conn: WebSocketClientProtocol) -> bool:
+    async def _is_healthy(self, conn: ClientConnection) -> bool:
         """
         Check if connection is still alive via ping/pong.
 
@@ -393,7 +393,7 @@ class PeerConnectionPool:
             )
             return False
 
-    async def _close_connection(self, conn: WebSocketClientProtocol) -> None:
+    async def _close_connection(self, conn: ClientConnection) -> None:
         """
         Safely close a connection.
 
@@ -521,9 +521,9 @@ class PeerConnection:
         """
         self.pool = pool
         self.peer_uri = peer_uri
-        self.conn: WebSocketClientProtocol | None = None
+        self.conn: ClientConnection | None = None
 
-    async def __aenter__(self) -> WebSocketClientProtocol:
+    async def __aenter__(self) -> ClientConnection:
         """
         Acquire connection from pool.
 
@@ -800,7 +800,7 @@ class PeerDiscovery:
 
                     # Optionally consume the remote handshake before sending requests
                     try:
-                        raw_initial = await asyncio.wait_for(websocket.recv(), timeout=2)
+                        raw_initial = await asyncio.wait_for(websocket.recv(), timeout=5)
                         raw_bytes = raw_initial if isinstance(raw_initial, (bytes, bytearray)) else raw_initial.encode("utf-8")
                         self.encryption.verify_signed_message(raw_bytes)
                     except asyncio.TimeoutError:

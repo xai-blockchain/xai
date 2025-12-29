@@ -9,7 +9,7 @@ import pytest
 import time
 from xai.core.blockchain import Blockchain
 from xai.core.blockchain_components.block import Block
-from xai.core.block_header import BlockHeader
+from xai.core.chain.block_header import BlockHeader
 from xai.core.wallet import Wallet
 from xai.core.transaction import Transaction
 from xai.core.config import Config

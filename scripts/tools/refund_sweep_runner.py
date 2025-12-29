@@ -19,8 +19,8 @@ from typing import Any
 import requests
 from web3 import Web3
 
-from xai.core.refund_sweep_manager import RefundSweepManager
-from xai.core.htlc_p2wsh import build_refund_witness
+from xai.core.wallets.refund_sweep_manager import RefundSweepManager
+from xai.core.transactions.htlc_p2wsh import build_refund_witness
 from xai.core.aixn_blockchain.atomic_swap_11_coins import CrossChainVerifier
 
 RPC_URL = os.getenv("XAI_BTC_RPC_URL", "http://127.0.0.1:18443")

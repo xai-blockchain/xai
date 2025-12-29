@@ -11,7 +11,7 @@ import string
 
 import pytest
 
-from xai.core.utxo_manager import UTXOManager, UTXOValidationError
+from xai.core.transactions.utxo_manager import UTXOManager, UTXOValidationError
 
 
 def _random_script() -> str:

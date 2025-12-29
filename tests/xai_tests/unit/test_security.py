@@ -12,7 +12,7 @@ from decimal import Decimal
 
 # Add core directory to path
 
-from xai.core.blockchain_security import (
+from xai.core.security.blockchain_security import (
     BlockchainSecurityConfig,
     ReorganizationProtection,
     SupplyValidator,

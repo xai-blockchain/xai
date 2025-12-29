@@ -8,7 +8,7 @@ to ensure they work correctly and provide a single source of truth.
 import pytest
 from decimal import Decimal
 
-from xai.core.validation import (
+from xai.core.consensus.validation import (
     validate_address,
     validate_amount,
     validate_fee,
@@ -269,13 +269,13 @@ class TestBackwardsCompatibility:
 
     def test_can_import_security_validator(self):
         """Test SecurityValidator can still be imported."""
-        from xai.core.validation import SecurityValidator, ValidationError
+        from xai.core.consensus.validation import SecurityValidator, ValidationError
         assert SecurityValidator is not None
         assert ValidationError is not None
 
     def test_security_validator_methods(self):
         """Test SecurityValidator methods still work."""
-        from xai.core.validation import SecurityValidator
+        from xai.core.consensus.validation import SecurityValidator
         validator = SecurityValidator()
 
         # Test validate_address

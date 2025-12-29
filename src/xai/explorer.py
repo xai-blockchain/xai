@@ -17,8 +17,8 @@ from threading import Lock
 import requests
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 
-from xai.core.flask_secret_manager import get_flask_secret_key
-from xai.core.process_sandbox import maybe_enable_process_sandbox
+from xai.core.security.flask_secret_manager import get_flask_secret_key
+from xai.core.security.process_sandbox import maybe_enable_process_sandbox
 
 app = Flask(__name__)
 # Use persistent secret key manager to prevent session invalidation on restart
@@ -103,7 +103,7 @@ app.config.update(
 )
 
 # Setup security middleware
-from xai.core.security_middleware import SecurityConfig, setup_security_middleware
+from xai.core.security.security_middleware import SecurityConfig, setup_security_middleware
 
 security_config = SecurityConfig()
 security_config.CORS_ORIGINS = [
@@ -133,7 +133,7 @@ app.jinja_env.globals.update(format_timestamp=format_timestamp)
 def get_node_stats():
     """Get blockchain stats from node"""
     try:
-        response = requests.get(f"{NODE_URL}/stats", timeout=2)
+        response = requests.get(f"{NODE_URL}/stats", timeout=10)
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
@@ -149,7 +149,7 @@ def get_node_stats():
 def get_recent_blocks(limit=10):
     """Fetch recent blocks from node"""
     try:
-        response = requests.get(f"{NODE_URL}/blocks?limit={limit}", timeout=2)
+        response = requests.get(f"{NODE_URL}/blocks?limit={limit}", timeout=10)
         response.raise_for_status()
         data = response.json()
         return data.get("blocks", [])
@@ -168,7 +168,7 @@ def health_check():
     """Health check endpoint for Docker and monitoring"""
     try:
         # Try to connect to the node
-        response = requests.get(f"{NODE_URL}/stats", timeout=2)
+        response = requests.get(f"{NODE_URL}/stats", timeout=10)
         node_accessible = response.status_code == 200
 
         return jsonify(
@@ -233,7 +233,7 @@ def blocks():
     offset = (page - 1) * limit
 
     try:
-        response = requests.get(f"{NODE_URL}/blocks?limit={limit}&offset={offset}", timeout=2)
+        response = requests.get(f"{NODE_URL}/blocks?limit={limit}&offset={offset}", timeout=10)
         response.raise_for_status()
         data = response.json()
         return render_template(
@@ -256,7 +256,7 @@ def blocks():
 def block_detail(index):
     """Block detail page"""
     try:
-        response = requests.get(f"{NODE_URL}/blocks/{index}", timeout=2)
+        response = requests.get(f"{NODE_URL}/blocks/{index}", timeout=10)
         response.raise_for_status()
         block = response.json()
         return render_template("block.html", block=block)
@@ -277,7 +277,7 @@ def transaction_detail(txid):
         return "Invalid transaction ID format", 400
 
     try:
-        response = requests.get(f"{NODE_URL}/transaction/{txid}", timeout=2)
+        response = requests.get(f"{NODE_URL}/transaction/{txid}", timeout=10)
         response.raise_for_status()
         tx_data = response.json()
         return render_template("transaction.html", tx=tx_data)
@@ -306,7 +306,7 @@ def address_detail(address):
 
     try:
         # Get balance
-        response = requests.get(f"{NODE_URL}/balance/{address}", timeout=2)
+        response = requests.get(f"{NODE_URL}/balance/{address}", timeout=10)
         response.raise_for_status()
         balance = response.json().get("balance", 0)
     except requests.RequestException as e:
@@ -317,7 +317,7 @@ def address_detail(address):
 
     try:
         # Get history
-        response = requests.get(f"{NODE_URL}/history/{address}", timeout=2)
+        response = requests.get(f"{NODE_URL}/history/{address}", timeout=10)
         response.raise_for_status()
         history = response.json().get("transactions", [])
     except requests.RequestException as e:

@@ -11,7 +11,7 @@ import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from xai.core.time_capsule import (
+from xai.core.governance.time_capsule import (
     TimeCapsule,
     TimeCapsuleManager,
     TimeCapsuleType,

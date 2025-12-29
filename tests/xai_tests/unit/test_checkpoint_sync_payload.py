@@ -4,8 +4,8 @@ Tests for payload validation via CheckpointSyncManager.
 
 import hashlib
 
-from xai.core.checkpoint_sync import CheckpointSyncManager
-from xai.core.checkpoint_payload import CheckpointPayload
+from xai.core.p2p.checkpoint_sync import CheckpointSyncManager
+from xai.core.consensus.checkpoint_payload import CheckpointPayload
 
 
 def test_validate_payload_integrity():

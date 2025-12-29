@@ -10,7 +10,7 @@ import json
 from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
 from cryptography.fernet import Fernet
-from xai.core.security_validation import (
+from xai.core.security.security_validation import (
     SecurityValidator,
     ValidationError,
     validate_transaction_data,
@@ -19,7 +19,7 @@ from xai.core.security_validation import (
     SecurityEventRouter,
 )
 from xai.core.node import BlockchainNode
-from xai.core.security_webhook_forwarder import SecurityWebhookForwarder as _SecurityWebhookForwarder
+from xai.core.security.security_webhook_forwarder import SecurityWebhookForwarder as _SecurityWebhookForwarder
 
 
 class TestSecurityValidatorConstants:

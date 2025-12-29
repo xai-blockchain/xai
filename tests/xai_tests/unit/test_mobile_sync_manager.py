@@ -24,14 +24,14 @@ from xai.mobile.sync_manager import (
     SyncStatistics,
     BandwidthThrottle,
 )
-from xai.core.chunked_sync import (
+from xai.core.p2p.chunked_sync import (
     ChunkedStateSyncService,
     SyncChunk,
     SnapshotMetadata,
     SyncProgress,
     ChunkPriority,
 )
-from xai.core.checkpoint_payload import CheckpointPayload
+from xai.core.consensus.checkpoint_payload import CheckpointPayload
 
 
 @pytest.fixture

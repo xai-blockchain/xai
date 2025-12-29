@@ -9,7 +9,7 @@ Tests edge cases that could lead to security vulnerabilities:
 """
 
 import pytest
-from xai.core.crypto_utils import (
+from xai.core.security.crypto_utils import (
     generate_secp256k1_keypair_hex,
     sign_message_hex,
     verify_signature_hex,

@@ -37,7 +37,7 @@ def mine_block() -> tuple[dict[str, Any], int]:
 
     # Rate limit mining endpoint - fail closed when limiter unavailable
     try:
-        from xai.core.advanced_rate_limiter import get_rate_limiter as get_advanced_rate_limiter
+        from xai.core.security.advanced_rate_limiter import get_rate_limiter as get_advanced_rate_limiter
 
         limiter = get_advanced_rate_limiter()
         allowed, rate_error = limiter.check_rate_limit("/mine")

@@ -40,18 +40,83 @@ class FlashLoanProtectionManager:
         self, current_price: float, trade_volume: float, liquidity: float
     ) -> float:
         """
-        A very simplified simulation of price impact.
-        In a real AMM, this would be based on the constant product formula (x*y=k).
-        Here, we assume a linear impact for demonstration.
+        Simulate price impact using constant product AMM formula (x * y = k).
+
+        This models a Uniswap V2-style AMM where:
+        - x and y are the reserves of two tokens
+        - k is the constant product invariant
+        - Selling dx of token X gives dy of token Y where (x + dx) * (y - dy) = k
+
+        Args:
+            current_price: Current price (y/x ratio)
+            trade_volume: Amount of token being sold (in base units)
+            liquidity: Total liquidity in the pool (in base token terms)
+
+        Returns:
+            Simulated price after the trade
         """
         if liquidity <= 0:
-            return 0.0  # Infinite price impact if no liquidity
+            return 0.0  # No liquidity means undefined price
 
-        # Assume 1% of liquidity moved causes X% price impact
-        # This is a placeholder, real AMM math is more complex
-        impact_factor = (trade_volume / liquidity) * 100
-        simulated_new_price = current_price * (1 - (impact_factor / 200))  # Arbitrary impact model
-        return simulated_new_price
+        if trade_volume <= 0:
+            return current_price  # No trade, no impact
+
+        # Model the pool with constant product formula
+        # Assume liquidity represents x (base token reserve)
+        # and y = x * current_price (quote token reserve)
+        x = liquidity
+        y = liquidity * current_price
+        k = x * y  # Constant product invariant
+
+        # After selling trade_volume of base token:
+        # new_x = x + trade_volume
+        # new_y = k / new_x (to maintain invariant)
+        new_x = x + trade_volume
+        new_y = k / new_x
+
+        # New price is the ratio after trade
+        # Price impact is calculated as the effective execution price
+        # dy = y - new_y (amount of quote token received)
+        dy = y - new_y
+
+        if dy <= 0:
+            return 0.0  # Edge case: no output
+
+        # Effective execution price = dy / trade_volume
+        # This is the average price for this trade
+        effective_price = dy / trade_volume
+
+        # The new spot price after trade = new_y / new_x
+        new_spot_price = new_y / new_x
+
+        # Return the new spot price (post-trade market price)
+        return new_spot_price
+
+    def calculate_price_impact_percentage(
+        self, current_price: float, trade_volume: float, liquidity: float
+    ) -> float:
+        """
+        Calculate the price impact as a percentage.
+
+        Args:
+            current_price: Current price
+            trade_volume: Trade amount
+            liquidity: Pool liquidity
+
+        Returns:
+            Price impact as percentage (0-100)
+        """
+        if current_price <= 0:
+            return 100.0  # Maximum impact if invalid price
+
+        new_price = self._simulate_price_impact(current_price, trade_volume, liquidity)
+
+        if new_price <= 0:
+            return 100.0  # Maximum impact if price goes to zero
+
+        # Price impact = (old_price - new_price) / old_price * 100
+        impact = abs(current_price - new_price) / current_price * 100
+        return min(impact, 100.0)  # Cap at 100%
 
     def check_transaction_for_flash_loan_risk(
         self,

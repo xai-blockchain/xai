@@ -8,7 +8,7 @@ share the same hash, matching the deployed helpers and smokes.
 import hashlib
 
 from xai.core.aixn_blockchain.atomic_swap_11_coins import AtomicSwapHTLC, CoinType
-from xai.core.htlc_deployer import compile_htlc_contract
+from xai.core.transactions.htlc_deployer import compile_htlc_contract
 
 
 def test_htlc_hash_parity_sha256():

@@ -12,7 +12,7 @@ Uses Hypothesis for property-based testing with random inputs.
 import pytest
 from hypothesis import given, strategies as st, settings, assume, Phase
 
-from xai.core.liquidity_pools import LiquidityPool, PoolPair
+from xai.core.transactions.liquidity_pools import LiquidityPool, PoolPair
 from xai.blockchain.slippage_limits import LiquidityPool as SlippageLimitPool
 
 

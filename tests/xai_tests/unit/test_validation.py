@@ -12,7 +12,7 @@ import pytest
 from decimal import Decimal
 import math
 
-from xai.core.validation import (
+from xai.core.consensus.validation import (
     validate_address,
     validate_amount,
     validate_fee,

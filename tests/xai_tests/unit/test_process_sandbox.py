@@ -15,7 +15,7 @@ def _pythonpath_env():
 def test_process_sandbox_disabled_when_env_not_set(monkeypatch):
     env = _pythonpath_env()
     env.pop("XAI_ENABLE_PROCESS_SANDBOX", None)
-    script = "from xai.core.process_sandbox import maybe_enable_process_sandbox; print(maybe_enable_process_sandbox())"
+    script = "from xai.core.security.process_sandbox import maybe_enable_process_sandbox; print(maybe_enable_process_sandbox())"
     result = subprocess.run([sys.executable, "-c", script], env=env, capture_output=True, text=True, check=True)
     assert result.stdout.strip() in {"False", "{}", ""}  # {} on non-posix
 
@@ -38,7 +38,7 @@ try:
 except ImportError:
     resource = None
 
-from xai.core.process_sandbox import maybe_enable_process_sandbox
+from xai.core.security.process_sandbox import maybe_enable_process_sandbox
 
 res = maybe_enable_process_sandbox()
 limits = {}

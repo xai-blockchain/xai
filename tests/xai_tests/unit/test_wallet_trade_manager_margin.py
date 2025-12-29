@@ -1,7 +1,7 @@
 from decimal import Decimal
 
-from xai.core.margin_engine import MarginEngine
-from xai.core.wallet_trade_manager_impl import WalletTradeManager
+from xai.core.transactions.margin_engine import MarginEngine
+from xai.core.wallets.wallet_trade_manager_impl import WalletTradeManager
 
 
 def price_oracle(asset: str) -> Decimal:

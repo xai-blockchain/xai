@@ -38,7 +38,7 @@ class TestWalletAPIHandlerInit:
 
     def test_init_registers_routes(self):
         """Test that initialization registers all routes."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
 
         node = Mock()
         app = Flask(__name__)
@@ -86,7 +86,7 @@ class TestCreateWalletEndpoint:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
 
         node = Mock()
         app = Flask(__name__)
@@ -145,7 +145,7 @@ class TestEmbeddedWalletEndpoints:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
 
         node = Mock()
         app = Flask(__name__)
@@ -378,7 +378,7 @@ class TestWalletConnectEndpoints:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
 
         node = Mock()
         node.blockchain = Mock()
@@ -536,7 +536,7 @@ class TestTradeSessionEndpoint:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
 
         node = Mock()
         node.blockchain = Mock()
@@ -591,7 +591,7 @@ class TestTradeOrderEndpoints:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
 
         node = Mock()
         node.blockchain = Mock()
@@ -747,7 +747,7 @@ class TestTradeMatchEndpoints:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
 
         node = Mock()
         node.blockchain = Mock()
@@ -871,7 +871,7 @@ class TestGossipAndPeerEndpoints:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
 
         node = Mock()
         node.blockchain = Mock()
@@ -1060,7 +1060,7 @@ class TestWalletSeedsSnapshot:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
 
         node = Mock()
         app = Flask(__name__)
@@ -1111,7 +1111,7 @@ class TestMetricsEndpoint:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
 
         node = Mock()
         app = Flask(__name__)
@@ -1139,7 +1139,7 @@ class TestPrivateMethodsRegisterTradePeer:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
 
         node = Mock()
         app = Flask(__name__)
@@ -1200,7 +1200,7 @@ class TestPrivateMethodsGossipTradeEvent:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
 
         node = Mock()
         app = Flask(__name__)
@@ -1265,7 +1265,7 @@ class TestPrivateMethodsGossipTradeEvent:
     @patch('xai.core.api_wallet.requests.post')
     def test_gossip_trade_event_no_peers(self, mock_post):
         """Test gossip with no peers registered."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
 
         node = Mock()
         app = Flask(__name__)
@@ -1306,7 +1306,7 @@ class TestCounterMetrics:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
 
         node = Mock()
         node.blockchain = Mock()
@@ -1377,7 +1377,7 @@ class TestEdgeCasesAndErrorHandling:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_wallet import WalletAPIHandler
+        from xai.core.api.api_wallet import WalletAPIHandler
 
         node = Mock()
         node.blockchain = Mock()

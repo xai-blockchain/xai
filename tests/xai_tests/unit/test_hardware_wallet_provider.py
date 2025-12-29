@@ -8,7 +8,7 @@ import pytest
 def reload_hw_module(env: dict):
     for key, value in env.items():
         os.environ[key] = value
-    import xai.core.hardware_wallet as hw  # noqa: WPS433
+    import xai.core.wallets.hardware_wallet as hw  # noqa: WPS433
     importlib.reload(hw)
     return hw
 

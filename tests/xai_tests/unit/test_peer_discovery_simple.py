@@ -1,7 +1,7 @@
 """Simple coverage test for peer_discovery module"""
 import pytest
 from unittest.mock import Mock, patch, MagicMock
-from xai.core.peer_discovery import (
+from xai.core.p2p.peer_discovery import (
     PeerInfo,
     BootstrapNodes,
     PeerDiscoveryProtocol,

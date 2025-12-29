@@ -11,7 +11,7 @@ import os
 from unittest.mock import Mock, patch, mock_open
 
 from xai.core.wallet import Wallet
-from xai.core.wallet_encryption import WalletEncryption, save_encrypted_wallet, load_encrypted_wallet
+from xai.core.wallets.wallet_encryption import WalletEncryption, save_encrypted_wallet, load_encrypted_wallet
 
 
 class TestWalletBackup:

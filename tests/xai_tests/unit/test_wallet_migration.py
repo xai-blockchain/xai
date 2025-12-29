@@ -12,7 +12,7 @@ import hashlib
 from cryptography.fernet import Fernet
 
 from xai.core.wallet import Wallet
-from xai.core.wallet_encryption import WalletEncryption
+from xai.core.wallets.wallet_encryption import WalletEncryption
 
 
 class TestWalletMigration:

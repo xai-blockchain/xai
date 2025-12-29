@@ -1,7 +1,7 @@
 import time
 
-from xai.core.node_p2p import P2PNetworkManager
-from xai.core.p2p_security import BandwidthLimiter
+from xai.core.p2p.node_p2p import P2PNetworkManager
+from xai.core.security.p2p_security import BandwidthLimiter
 
 
 class DummyBlockchain:

@@ -1,7 +1,7 @@
 import math
 
 from xai.core.blockchain import Block, Blockchain
-from xai.core.block_header import BlockHeader
+from xai.core.chain.block_header import BlockHeader
 
 
 def _build_block(index: int, ts: float, difficulty: int) -> Block:

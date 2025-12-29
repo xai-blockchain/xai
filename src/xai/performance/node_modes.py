@@ -24,7 +24,7 @@ except ImportError:
     config = None
 
 try:
-    from xai.core.pruning import BlockPruningManager, PruningPolicy
+    from xai.core.chain.pruning import BlockPruningManager, PruningPolicy
 except ImportError:
     BlockPruningManager = None  # type: ignore
     PruningPolicy = None  # type: ignore

@@ -20,7 +20,7 @@ from unittest.mock import Mock, AsyncMock, patch
 from xai.core.blockchain import Blockchain
 from xai.core.wallet import Wallet
 from xai.core.transaction import Transaction
-from xai.core.node_p2p import P2PNetworkManager
+from xai.core.p2p.node_p2p import P2PNetworkManager
 
 # Mark all tests in this module as performance tests
 pytestmark = pytest.mark.performance

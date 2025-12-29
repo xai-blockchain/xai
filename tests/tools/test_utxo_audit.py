@@ -5,7 +5,7 @@ from unittest.mock import patch
 from scripts.tools import utxo_audit
 from xai.core.blockchain import Blockchain
 from xai.core.wallet import Wallet
-from xai.core.crypto_utils import deterministic_keypair_from_seed
+from xai.core.security.crypto_utils import deterministic_keypair_from_seed
 
 
 def _seed_chain(tmp_path: Path) -> Path:

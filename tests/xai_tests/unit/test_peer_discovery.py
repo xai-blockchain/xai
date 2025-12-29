@@ -9,7 +9,7 @@ import pytest
 import time
 import threading
 from unittest.mock import Mock, patch, MagicMock, call
-from xai.core.peer_discovery import (
+from xai.core.p2p.peer_discovery import (
     PeerInfo,
     BootstrapNodes,
     PeerDiscoveryProtocol,
@@ -647,7 +647,7 @@ class TestPeerDiscoveryAPI:
     def test_setup_peer_discovery_api(self):
         """Test API endpoint setup"""
         from flask import Flask
-        from xai.core.peer_discovery import setup_peer_discovery_api
+        from xai.core.p2p.peer_discovery import setup_peer_discovery_api
 
         app = Flask(__name__)
         node = Mock()

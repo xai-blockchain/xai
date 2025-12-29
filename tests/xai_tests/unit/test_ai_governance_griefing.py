@@ -5,7 +5,7 @@ Tests for governance fraud detector covering burst/griefing scenarios.
 import pytest
 import time
 
-from xai.core.ai_governance import GovernanceFraudDetector
+from xai.core.governance.ai_governance import GovernanceFraudDetector
 
 
 def test_burst_activity_triggers_alert(monkeypatch):

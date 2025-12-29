@@ -18,7 +18,7 @@ from typing import Any
 from xai.core.blockchain import Blockchain, Transaction
 from xai.core.node import BlockchainNode
 from xai.core.wallet import Wallet
-from xai.core.node_consensus import ConsensusManager
+from xai.core.consensus.node_consensus import ConsensusManager
 
 class TestMultiNodeConsensus:
     """Test consensus mechanisms across multiple nodes"""

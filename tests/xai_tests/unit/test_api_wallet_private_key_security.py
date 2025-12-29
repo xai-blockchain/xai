@@ -16,7 +16,7 @@ import json
 from flask import Flask
 from unittest.mock import Mock, patch
 
-from xai.core.api_wallet import WalletAPIHandler
+from xai.core.api.api_wallet import WalletAPIHandler
 from xai.core.wallet import Wallet
 
 
@@ -314,7 +314,7 @@ class TestOtherAPIEndpointsNoPrivateKeyExposure:
         # Note: This endpoint is designed for client-side signing and should
         # accept private keys over HTTPS, but must not return them.
 
-        from xai.core.crypto_utils import generate_secp256k1_keypair_hex
+        from xai.core.security.crypto_utils import generate_secp256k1_keypair_hex
         import hashlib
 
         priv, pub = generate_secp256k1_keypair_hex()
@@ -344,7 +344,7 @@ class TestOtherAPIEndpointsNoPrivateKeyExposure:
         """
         /wallet/derive-public-key must accept private key but not return it.
         """
-        from xai.core.crypto_utils import generate_secp256k1_keypair_hex
+        from xai.core.security.crypto_utils import generate_secp256k1_keypair_hex
 
         priv, _ = generate_secp256k1_keypair_hex()
 

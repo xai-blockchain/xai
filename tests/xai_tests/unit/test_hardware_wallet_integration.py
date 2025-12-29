@@ -1,6 +1,6 @@
-from xai.core.hardware_wallet import HardwareWalletManager, MockHardwareWallet
+from xai.core.wallets.hardware_wallet import HardwareWalletManager, MockHardwareWallet
 from xai.core.wallet import Wallet
-from xai.core.crypto_utils import verify_signature_hex
+from xai.core.security.crypto_utils import verify_signature_hex
 
 
 def test_wallet_with_hardware_provider():

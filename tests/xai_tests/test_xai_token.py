@@ -10,7 +10,7 @@ from unittest.mock import Mock
 
 # Add parent directory to path for imports
 
-from xai.core.xai_token import XAIToken
+from xai.core.governance.xai_token import XAIToken
 
 
 class TestXAIToken:

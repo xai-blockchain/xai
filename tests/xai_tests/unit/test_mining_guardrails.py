@@ -2,9 +2,9 @@ import os
 import pytest
 
 from xai.core.blockchain import Blockchain
-from xai.core.advanced_consensus import DynamicDifficultyAdjustment
+from xai.core.consensus.advanced_consensus import DynamicDifficultyAdjustment
 from xai.core.wallet import Wallet
-from xai.core import security_validation
+from xai.core.security import security_validation
 
 
 def test_fast_mining_rejected_on_mainnet(monkeypatch, tmp_path):

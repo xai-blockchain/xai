@@ -2,7 +2,7 @@ import binascii
 
 import pytest
 
-from xai.core.crypto_utils import (
+from xai.core.security.crypto_utils import (
     _CURVE_ORDER,  # pylint: disable=protected-access
     canonicalize_signature_components,
     generate_secp256k1_keypair_hex,

@@ -5,7 +5,7 @@ Coverage for password hashing/verification fallbacks in SecurityMiddleware.
 import pytest
 from flask import Flask
 
-from xai.core.security_middleware import SecurityMiddleware
+from xai.core.security.security_middleware import SecurityMiddleware
 
 
 def _middleware(monkeypatch, bcrypt_available: bool) -> SecurityMiddleware:

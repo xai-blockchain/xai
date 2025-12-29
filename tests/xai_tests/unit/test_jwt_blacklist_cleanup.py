@@ -9,7 +9,7 @@ import threading
 import pytest
 from datetime import datetime, timezone, timedelta
 
-from xai.core.api_auth import JWTAuthManager
+from xai.core.api.api_auth import JWTAuthManager
 
 
 class TestJWTBlacklistCleanup:

@@ -10,7 +10,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from xai.core.utxo_manager import UTXOManager
+from xai.core.transactions.utxo_manager import UTXOManager
 
 
 class TestUTXOManagerThreadSafety:

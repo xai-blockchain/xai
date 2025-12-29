@@ -6,7 +6,7 @@ Tests transaction risk scoring, blacklist management, and regulatory reporting
 
 import pytest
 import time
-from xai.core.aml_compliance import (
+from xai.core.security.aml_compliance import (
     RiskLevel,
     FlagReason,
     TransactionRiskScore,

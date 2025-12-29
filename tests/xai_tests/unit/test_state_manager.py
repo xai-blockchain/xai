@@ -6,7 +6,7 @@ import threading
 import time
 from types import SimpleNamespace
 
-from xai.core.state_manager import StateManager
+from xai.core.chain.state_manager import StateManager
 
 
 class DummyBlockchain:

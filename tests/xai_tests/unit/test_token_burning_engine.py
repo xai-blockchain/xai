@@ -4,7 +4,7 @@ Unit tests for TokenBurningEngine cost calculation and burn stats updates.
 
 from types import SimpleNamespace
 
-from xai.core.token_burning_engine import (
+from xai.core.governance.token_burning_engine import (
     SERVICE_PRICES_USD,
     ServiceType,
     TokenBurningEngine,

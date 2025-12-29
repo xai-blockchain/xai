@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from ..crypto_utils import verify_signature_hex
+from xai.core.security.crypto_utils import verify_signature_hex
 from ..vm.exceptions import VMExecutionError
 
 if TYPE_CHECKING:

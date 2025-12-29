@@ -5,7 +5,7 @@ Unit tests for NodeConnectionManager security integrations.
 import pytest
 
 from xai.network.node_connection_manager import NodeConnectionManager
-from xai.core.p2p_security import P2PSecurityManager
+from xai.core.security.p2p_security import P2PSecurityManager
 
 
 class MockSecurityManager(P2PSecurityManager):

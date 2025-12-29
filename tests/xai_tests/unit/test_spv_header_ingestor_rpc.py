@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from xai.core.spv_header_ingestor import SPVHeaderIngestor
+from xai.core.p2p.spv_header_ingestor import SPVHeaderIngestor
 
 
 class DummyResponse:

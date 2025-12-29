@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from xai.core.api_auth import APIKeyStore
+from xai.core.api.api_auth import APIKeyStore
 
 
 def _load_jsonl(path: Path):

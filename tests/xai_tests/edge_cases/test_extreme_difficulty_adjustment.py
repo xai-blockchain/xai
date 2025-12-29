@@ -9,9 +9,9 @@ import pytest
 import time
 from xai.core.blockchain import Blockchain
 from xai.core.blockchain_components.block import Block
-from xai.core.block_header import BlockHeader
+from xai.core.chain.block_header import BlockHeader
 from xai.core.wallet import Wallet
-from xai.core.advanced_consensus import DynamicDifficultyAdjustment
+from xai.core.consensus.advanced_consensus import DynamicDifficultyAdjustment
 from xai.core.config import Config
 
 

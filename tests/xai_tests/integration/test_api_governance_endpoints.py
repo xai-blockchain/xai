@@ -15,10 +15,10 @@ import hashlib
 import time
 from unittest.mock import Mock, patch, MagicMock
 from flask import Flask
-from xai.core.api_governance import GovernanceAPIHandler
+from xai.core.api.api_governance import GovernanceAPIHandler
 from xai.core.blockchain import Blockchain
 from xai.core.wallet import Wallet
-from xai.core.security_validation import ValidationError
+from xai.core.security.security_validation import ValidationError
 
 
 @pytest.fixture

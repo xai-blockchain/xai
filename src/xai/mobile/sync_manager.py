@@ -22,14 +22,14 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Callable
 
-from xai.core.checkpoint_payload import CheckpointPayload
-from xai.core.chunked_sync import (
+from xai.core.consensus.checkpoint_payload import CheckpointPayload
+from xai.core.p2p.chunked_sync import (
     ChunkedStateSyncService,
     ChunkPriority,
     SyncChunk,
     SyncProgress,
 )
-from xai.core.structured_logger import get_structured_logger
+from xai.core.api.structured_logger import get_structured_logger
 
 
 class SyncState(Enum):

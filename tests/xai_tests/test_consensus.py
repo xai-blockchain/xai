@@ -18,8 +18,8 @@ import hashlib
 
 from xai.core.blockchain import Blockchain, Block, Transaction
 from xai.core.wallet import Wallet
-from xai.core.node_consensus import ConsensusManager
-from xai.core.advanced_consensus import AdvancedConsensusManager, FinalityTracker
+from xai.core.consensus.node_consensus import ConsensusManager
+from xai.core.consensus.advanced_consensus import AdvancedConsensusManager, FinalityTracker
 
 
 class TestProofOfWork:

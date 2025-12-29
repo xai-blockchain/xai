@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch, mock_open
 
 from xai.core.blockchain import Blockchain
 from xai.core.wallet import Wallet
-from xai.core.checkpoints import CheckpointManager
+from xai.core.consensus.checkpoints import CheckpointManager
 
 
 class TestCheckpointCorruption:

@@ -14,8 +14,8 @@ import pytest
 import time
 from xai.core.blockchain import Blockchain, Transaction
 from xai.core.wallet import Wallet
-from xai.core.node_consensus import ConsensusManager
-from xai.core.advanced_consensus import AdvancedConsensusManager
+from xai.core.consensus.node_consensus import ConsensusManager
+from xai.core.consensus.advanced_consensus import AdvancedConsensusManager
 
 
 class TestSimpleChainReorg:
@@ -391,7 +391,7 @@ class TestReorgWithDifferentDifficulty:
 
     def test_reorg_with_adaptive_difficulty(self, tmp_path):
         """Test reorganization with adaptive difficulty adjustment"""
-        from xai.core.advanced_consensus import DynamicDifficultyAdjustment
+        from xai.core.consensus.advanced_consensus import DynamicDifficultyAdjustment
 
         bc = Blockchain(data_dir=str(tmp_path))
         adjuster = DynamicDifficultyAdjustment()
@@ -463,7 +463,7 @@ class TestFinalizationDuringReorg:
 
     def test_finalized_blocks_not_reorged(self, tmp_path):
         """Test finalized blocks resist reorganization"""
-        from xai.core.advanced_consensus import FinalityTracker
+        from xai.core.consensus.advanced_consensus import FinalityTracker
 
         bc = Blockchain(data_dir=str(tmp_path))
         tracker = FinalityTracker()
@@ -481,7 +481,7 @@ class TestFinalizationDuringReorg:
 
     def test_soft_finality_still_reorgable(self, tmp_path):
         """Test soft finalized blocks can still be reorganized"""
-        from xai.core.advanced_consensus import FinalityTracker
+        from xai.core.consensus.advanced_consensus import FinalityTracker
 
         bc = Blockchain(data_dir=str(tmp_path))
         tracker = FinalityTracker()

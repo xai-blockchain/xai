@@ -24,7 +24,7 @@ class TestAIAPIHandlerInit:
 
     def test_init_registers_routes(self):
         """Test that initialization registers all routes."""
-        from xai.core.api_ai import AIAPIHandler
+        from xai.core.api.api_ai import AIAPIHandler
 
         node = Mock()
         app = Flask(__name__)
@@ -63,7 +63,7 @@ class TestPersonalAIContext:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_ai import AIAPIHandler
+        from xai.core.api.api_ai import AIAPIHandler
 
         node = Mock()
         node.validator = Mock()
@@ -155,7 +155,7 @@ class TestPersonalAIContext:
 
     def test_context_invalid_address(self, setup):
         """Test context extraction with invalid address."""
-        from xai.core.security_validation import ValidationError
+        from xai.core.security.security_validation import ValidationError
 
         handler = setup['handler']
         node = setup['node']
@@ -223,7 +223,7 @@ class TestPersonalAIResponse:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_ai import AIAPIHandler
+        from xai.core.api.api_ai import AIAPIHandler
 
         node = Mock()
         app = Flask(__name__)
@@ -267,7 +267,7 @@ class TestAtomicSwapEndpoint:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_ai import AIAPIHandler
+        from xai.core.api.api_ai import AIAPIHandler
 
         node = Mock()
         node.validator = Mock()
@@ -347,7 +347,7 @@ class TestSmartContractCreateEndpoint:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_ai import AIAPIHandler
+        from xai.core.api.api_ai import AIAPIHandler
 
         node = Mock()
         node.validator = Mock()
@@ -440,7 +440,7 @@ class TestSmartContractDeployEndpoint:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_ai import AIAPIHandler
+        from xai.core.api.api_ai import AIAPIHandler
 
         node = Mock()
         node.validator = Mock()
@@ -516,7 +516,7 @@ class TestTransactionOptimizeEndpoint:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_ai import AIAPIHandler
+        from xai.core.api.api_ai import AIAPIHandler
 
         node = Mock()
         node.validator = Mock()
@@ -605,7 +605,7 @@ class TestAnalyzeEndpoint:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_ai import AIAPIHandler
+        from xai.core.api.api_ai import AIAPIHandler
 
         node = Mock()
         node.validator = Mock()
@@ -672,7 +672,7 @@ class TestWalletAnalyzeEndpoint:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_ai import AIAPIHandler
+        from xai.core.api.api_ai import AIAPIHandler
 
         node = Mock()
         node.validator = Mock()
@@ -742,7 +742,7 @@ class TestWalletRecoveryEndpoint:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_ai import AIAPIHandler
+        from xai.core.api.api_ai import AIAPIHandler
 
         node = Mock()
         node.validator = Mock()
@@ -787,7 +787,7 @@ class TestWalletRecoveryEndpoint:
 
     def test_wallet_recovery_invalid_guardian(self, setup):
         """Test wallet recovery with invalid guardian address."""
-        from xai.core.security_validation import ValidationError
+        from xai.core.security.security_validation import ValidationError
 
         node = setup['node']
         node.validator.validate_address.side_effect = [
@@ -843,7 +843,7 @@ class TestNodeSetupEndpoint:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_ai import AIAPIHandler
+        from xai.core.api.api_ai import AIAPIHandler
 
         node = Mock()
         node.validator = Mock()
@@ -891,7 +891,7 @@ class TestNodeSetupEndpoint:
 
     def test_node_setup_invalid_region(self, setup):
         """Test node setup with invalid region."""
-        from xai.core.security_validation import ValidationError
+        from xai.core.security.security_validation import ValidationError
 
         node = setup['node']
         node.validator.validate_address.return_value = None
@@ -945,7 +945,7 @@ class TestLiquidityAlertEndpoint:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_ai import AIAPIHandler
+        from xai.core.api.api_ai import AIAPIHandler
 
         node = Mock()
         node.validator = Mock()
@@ -1013,7 +1013,7 @@ class TestLiquidityAlertEndpoint:
 
     def test_liquidity_alert_invalid_pool_name(self, setup):
         """Test liquidity alert with invalid pool name."""
-        from xai.core.security_validation import ValidationError
+        from xai.core.security.security_validation import ValidationError
 
         node = setup['node']
         node.validator.validate_address.return_value = None
@@ -1042,7 +1042,7 @@ class TestPersonalAIAssistantsEndpoint:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_ai import AIAPIHandler
+        from xai.core.api.api_ai import AIAPIHandler
 
         node = Mock()
         app = Flask(__name__)
@@ -1097,7 +1097,7 @@ class TestPersonalAIStreamEndpoint:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_ai import AIAPIHandler
+        from xai.core.api.api_ai import AIAPIHandler
 
         node = Mock()
         node.personal_ai = Mock()
@@ -1150,7 +1150,7 @@ class TestQuestioningEndpoints:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_ai import AIAPIHandler
+        from xai.core.api.api_ai import AIAPIHandler
 
         node = Mock()
         app = Flask(__name__)
@@ -1246,7 +1246,7 @@ class TestEdgeCases:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_ai import AIAPIHandler
+        from xai.core.api.api_ai import AIAPIHandler
 
         node = Mock()
         node.validator = Mock()
@@ -1359,7 +1359,7 @@ class TestAllEndpointsCoverage:
     @pytest.fixture
     def setup(self):
         """Setup test environment."""
-        from xai.core.api_ai import AIAPIHandler
+        from xai.core.api.api_ai import AIAPIHandler
 
         node = Mock()
         node.validator = Mock()

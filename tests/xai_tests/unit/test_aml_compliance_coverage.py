@@ -15,7 +15,7 @@ import time
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 
-from xai.core.aml_compliance import (
+from xai.core.security.aml_compliance import (
     RiskLevel,
     FlagReason,
     TransactionRiskScore,

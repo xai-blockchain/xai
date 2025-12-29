@@ -15,9 +15,9 @@ from decimal import Decimal
 # Add core directory to path
 
 from xai.core.blockchain import Blockchain, Transaction, Block
-from xai.core.block_header import BlockHeader
-from xai.core.crypto_utils import sign_message_hex
-from xai.core.blockchain_security import BlockchainSecurityConfig, BlockSizeValidator
+from xai.core.chain.block_header import BlockHeader
+from xai.core.security.crypto_utils import sign_message_hex
+from xai.core.security.blockchain_security import BlockchainSecurityConfig, BlockSizeValidator
 from xai.core.wallet import Wallet
 
 class TestBlockchainInitialization:

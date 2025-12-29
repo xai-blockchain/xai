@@ -14,8 +14,8 @@ import pytest
 import time
 from xai.core.blockchain import Blockchain, Transaction
 from xai.core.wallet import Wallet
-from xai.core.node_consensus import ConsensusManager
-from xai.core.advanced_consensus import (
+from xai.core.consensus.node_consensus import ConsensusManager
+from xai.core.consensus.advanced_consensus import (
     AdvancedConsensusManager,
     BlockPropagationMonitor
 )

@@ -119,6 +119,11 @@ class AppSandbox:
         self.storage_used = 0
         self.allowed_domains: set[str] = set()
 
+        # App-specific key-value storage (sandboxed per app)
+        self._storage: dict[str, Any] = {}
+        self._storage_path = storage_path / f"{app.app_id}_storage.json" if storage_path else None
+        self._load_storage()
+
         # New secure sandbox components
         self.permission_manager = permission_manager or PermissionManager(
             storage_path=storage_path / "permissions.json" if storage_path else None,
@@ -319,17 +324,58 @@ class AppSandbox:
         # Would require user confirmation
         return "signature_pending"
 
+    def _load_storage(self) -> None:
+        """Load app storage from disk if available."""
+        if self._storage_path and self._storage_path.exists():
+            try:
+                with open(self._storage_path, 'r') as f:
+                    data = json.load(f)
+                    self._storage = data.get("data", {})
+                    self.storage_used = data.get("size", 0)
+            except (json.JSONDecodeError, IOError, OSError) as e:
+                logger.warning(f"Failed to load storage for {self.app.app_id}: {e}")
+                self._storage = {}
+                self.storage_used = 0
+
+    def _save_storage(self) -> None:
+        """Persist app storage to disk."""
+        if self._storage_path:
+            try:
+                self._storage_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(self._storage_path, 'w') as f:
+                    json.dump({"data": self._storage, "size": self.storage_used}, f)
+            except (IOError, OSError) as e:
+                logger.warning(f"Failed to save storage for {self.app.app_id}: {e}")
+
     def _storage_set(self, key: str, value: Any) -> bool:
         """Set storage value (sandboxed with quota)"""
         if not self._check_permission(AppPermission.STORAGE):
             raise PermissionError("No permission to use storage")
 
-        # Check storage quota
-        value_size = len(json.dumps(value).encode())
-        if self.storage_used + value_size > self.storage_limit_bytes:
-            raise RuntimeError("Storage quota exceeded")
+        # Validate key
+        if not isinstance(key, str) or len(key) > 256:
+            raise ValueError("Storage key must be a string <= 256 characters")
 
-        self.storage_used += value_size
+        # Calculate size change
+        new_value_json = json.dumps(value)
+        new_value_size = len(new_value_json.encode())
+        old_value_size = 0
+        if key in self._storage:
+            old_value_size = len(json.dumps(self._storage[key]).encode())
+
+        size_change = new_value_size - old_value_size
+
+        # Check storage quota
+        if self.storage_used + size_change > self.storage_limit_bytes:
+            raise RuntimeError(
+                f"Storage quota exceeded. Used: {self.storage_used}, "
+                f"Limit: {self.storage_limit_bytes}, Requested: {size_change}"
+            )
+
+        # Store value
+        self._storage[key] = value
+        self.storage_used += size_change
+        self._save_storage()
         return True
 
     def _storage_get(self, key: str) -> Any:
@@ -337,14 +383,21 @@ class AppSandbox:
         if not self._check_permission(AppPermission.STORAGE):
             raise PermissionError("No permission to use storage")
 
-        return None  # Placeholder
+        return self._storage.get(key)
 
     def _storage_remove(self, key: str) -> bool:
         """Remove storage value (sandboxed)"""
         if not self._check_permission(AppPermission.STORAGE):
             raise PermissionError("No permission to use storage")
 
-        return True
+        if key in self._storage:
+            # Reclaim storage space
+            old_value_size = len(json.dumps(self._storage[key]).encode())
+            del self._storage[key]
+            self.storage_used = max(0, self.storage_used - old_value_size)
+            self._save_storage()
+            return True
+        return False
 
     def _safe_fetch(self, url: str) -> Any:
         """Safe network request (sandboxed with whitelist)"""

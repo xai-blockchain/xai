@@ -43,14 +43,14 @@ def blockchain(temp_blockchain_dir):
 @pytest.fixture
 def security_validator():
     """Create a SecurityValidator instance for testing"""
-    from xai.core.security_validation import SecurityValidator
+    from xai.core.security.security_validation import SecurityValidator
     return SecurityValidator()
 
 
 @pytest.fixture
 def transaction_validator(blockchain):
     """Create a TransactionValidator instance for testing"""
-    from xai.core.transaction_validator import TransactionValidator
+    from xai.core.consensus.transaction_validator import TransactionValidator
     return TransactionValidator(blockchain)
 
 
@@ -100,7 +100,7 @@ def mock_attacker():
 def reorganization_protection(temp_blockchain_dir):
     """Create a ReorganizationProtection instance for testing"""
     import os
-    from xai.core.blockchain_security import ReorganizationProtection
+    from xai.core.security.blockchain_security import ReorganizationProtection
     reorg = ReorganizationProtection()
     reorg.checkpoint_file = os.path.join(temp_blockchain_dir, "checkpoints.json")
     return reorg
@@ -109,42 +109,42 @@ def reorganization_protection(temp_blockchain_dir):
 @pytest.fixture
 def supply_validator():
     """Create a SupplyValidator instance for testing"""
-    from xai.core.blockchain_security import SupplyValidator
+    from xai.core.security.blockchain_security import SupplyValidator
     return SupplyValidator()
 
 
 @pytest.fixture
 def overflow_protection():
     """Create an OverflowProtection instance for testing"""
-    from xai.core.blockchain_security import OverflowProtection
+    from xai.core.security.blockchain_security import OverflowProtection
     return OverflowProtection()
 
 
 @pytest.fixture
 def mempool_manager():
     """Create a MempoolManager instance for testing"""
-    from xai.core.blockchain_security import MempoolManager
+    from xai.core.security.blockchain_security import MempoolManager
     return MempoolManager()
 
 
 @pytest.fixture
 def p2p_security_manager():
     """Create a P2PSecurityManager instance for testing"""
-    from xai.core.p2p_security import P2PSecurityManager
+    from xai.core.security.p2p_security import P2PSecurityManager
     return P2PSecurityManager()
 
 
 @pytest.fixture
 def peer_reputation():
     """Create a PeerReputation instance for testing"""
-    from xai.core.p2p_security import PeerReputation
+    from xai.core.security.p2p_security import PeerReputation
     return PeerReputation()
 
 
 @pytest.fixture
 def message_rate_limiter():
     """Create a MessageRateLimiter instance for testing"""
-    from xai.core.p2p_security import MessageRateLimiter
+    from xai.core.security.p2p_security import MessageRateLimiter
     return MessageRateLimiter()
 
 

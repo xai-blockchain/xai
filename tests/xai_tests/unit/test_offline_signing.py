@@ -20,7 +20,7 @@ def test_offline_sign_and_verify_roundtrip():
     # Use a random-looking private key for test (hex string length 64)
     private_key_hex = "1" * 64
     from hashlib import sha256
-    from xai.core.crypto_utils import derive_public_key_hex
+    from xai.core.security.crypto_utils import derive_public_key_hex
 
     pub_key = derive_public_key_hex(private_key_hex)
     sender = "XAI" + sha256(bytes.fromhex(pub_key)).hexdigest()[:40]

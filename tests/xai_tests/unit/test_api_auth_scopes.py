@@ -3,7 +3,7 @@ import time
 
 import pytest
 
-from xai.core.api_auth import APIAuthManager, APIKeyStore, JWTAuthManager
+from xai.core.api.api_auth import APIAuthManager, APIKeyStore, JWTAuthManager
 
 
 def make_request(headers=None, args=None):

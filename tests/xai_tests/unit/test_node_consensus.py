@@ -31,7 +31,7 @@ class TestConsensusManager:
     @pytest.fixture
     def consensus_manager(self, blockchain):
         """Create ConsensusManager instance."""
-        from xai.core.node_consensus import ConsensusManager
+        from xai.core.consensus.node_consensus import ConsensusManager
         return ConsensusManager(blockchain)
 
     def test_init(self, consensus_manager, blockchain):
@@ -54,7 +54,7 @@ class TestBlockValidation:
     @pytest.fixture
     def consensus_manager(self, blockchain):
         """Create ConsensusManager instance."""
-        from xai.core.node_consensus import ConsensusManager
+        from xai.core.consensus.node_consensus import ConsensusManager
         return ConsensusManager(blockchain)
 
     @pytest.fixture
@@ -222,7 +222,7 @@ class TestTransactionValidation:
     @pytest.fixture
     def consensus_manager(self, blockchain):
         """Create ConsensusManager instance."""
-        from xai.core.node_consensus import ConsensusManager
+        from xai.core.consensus.node_consensus import ConsensusManager
         return ConsensusManager(blockchain)
 
     def test_validate_block_transactions_coinbase(self, consensus_manager):
@@ -315,7 +315,7 @@ class TestChainValidation:
     @pytest.fixture
     def consensus_manager(self, blockchain):
         """Create ConsensusManager instance."""
-        from xai.core.node_consensus import ConsensusManager
+        from xai.core.consensus.node_consensus import ConsensusManager
         return ConsensusManager(blockchain)
 
     def test_validate_chain_empty(self, consensus_manager):
@@ -388,7 +388,7 @@ class TestForkResolution:
     @pytest.fixture
     def consensus_manager(self, blockchain):
         """Create ConsensusManager instance."""
-        from xai.core.node_consensus import ConsensusManager
+        from xai.core.consensus.node_consensus import ConsensusManager
         return ConsensusManager(blockchain)
 
     def test_resolve_forks_no_chains(self, consensus_manager):
@@ -457,7 +457,7 @@ class TestChainIntegrity:
     @pytest.fixture
     def consensus_manager(self, blockchain):
         """Create ConsensusManager instance."""
-        from xai.core.node_consensus import ConsensusManager
+        from xai.core.consensus.node_consensus import ConsensusManager
         return ConsensusManager(blockchain)
 
     def test_check_chain_integrity_empty_chain(self, consensus_manager, blockchain):
@@ -521,7 +521,7 @@ class TestProofOfWork:
     @pytest.fixture
     def consensus_manager(self, blockchain):
         """Create ConsensusManager instance."""
-        from xai.core.node_consensus import ConsensusManager
+        from xai.core.consensus.node_consensus import ConsensusManager
         return ConsensusManager(blockchain)
 
     def test_verify_proof_of_work_valid(self, consensus_manager):
@@ -561,7 +561,7 @@ class TestChainWork:
     @pytest.fixture
     def consensus_manager(self, blockchain):
         """Create ConsensusManager instance."""
-        from xai.core.node_consensus import ConsensusManager
+        from xai.core.consensus.node_consensus import ConsensusManager
         return ConsensusManager(blockchain)
 
     def test_calculate_chain_work(self, consensus_manager):
@@ -605,7 +605,7 @@ class TestChainReplacement:
     @pytest.fixture
     def consensus_manager(self, blockchain):
         """Create ConsensusManager instance."""
-        from xai.core.node_consensus import ConsensusManager
+        from xai.core.consensus.node_consensus import ConsensusManager
         return ConsensusManager(blockchain)
 
     def test_should_replace_chain_longer_valid(self, consensus_manager):
@@ -669,7 +669,7 @@ class TestConsensusInfo:
     @pytest.fixture
     def consensus_manager(self, blockchain):
         """Create ConsensusManager instance."""
-        from xai.core.node_consensus import ConsensusManager
+        from xai.core.consensus.node_consensus import ConsensusManager
         return ConsensusManager(blockchain)
 
     def test_get_consensus_info(self, consensus_manager):

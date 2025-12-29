@@ -2,7 +2,7 @@
 import pytest
 import time
 from unittest.mock import Mock, patch
-from xai.core.time_capsule import (
+from xai.core.governance.time_capsule import (
     TimeCapsuleType,
     TimeCapsule,
 )

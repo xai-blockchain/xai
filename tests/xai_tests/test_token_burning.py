@@ -14,7 +14,7 @@ import sys
 import os
 import time
 
-from xai.core.token_burning_engine import TokenBurningEngine, ServiceType, SERVICE_PRICES_USD
+from xai.core.governance.token_burning_engine import TokenBurningEngine, ServiceType, SERVICE_PRICES_USD
 
 
 @pytest.fixture

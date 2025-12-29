@@ -4,7 +4,7 @@ Unit tests for time capsule API routes covering validation and wiring.
 
 from flask import Flask
 
-from xai.core.time_capsule_api import add_time_capsule_routes
+from xai.core.api.time_capsule_api import add_time_capsule_routes
 
 
 class DummyTimeCapsuleManager:

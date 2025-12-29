@@ -31,7 +31,7 @@ from flask import Flask, g, jsonify, make_response, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
 # Import typed exceptions
-from xai.core.blockchain_exceptions import (
+from xai.core.chain.blockchain_exceptions import (
     ConfigurationError,
     DatabaseError,
     NetworkError,
@@ -40,8 +40,8 @@ from xai.core.blockchain_exceptions import (
 )
 
 # Import centralized validation
-from xai.core.validation import validate_address as core_validate_address
-from xai.core.validation import validate_hex_string
+from xai.core.consensus.validation import validate_address as core_validate_address
+from xai.core.consensus.validation import validate_hex_string
 from xai.core.vm.evm.abi import keccak256
 
 logger = logging.getLogger(__name__)
@@ -54,8 +54,8 @@ KNOWN_TOKEN_RECEIVER_INTERFACES = {
 }
 
 from xai.blockchain.emergency_pause import EmergencyPauseManager
-from xai.core import node_utils
-from xai.core.api_auth import APIAuthManager, APIKeyStore
+from xai.core.chain import node_utils
+from xai.core.api.api_auth import APIAuthManager, APIKeyStore
 from xai.core.api_routes import (
     register_admin_routes,
     register_algo_routes,
@@ -76,8 +76,8 @@ from xai.core.api_routes import (
 )
 from xai.core.api_routes.blockchain import _block_to_payload, _build_block_summary
 from xai.core.config import Config
-from xai.core.error_handlers import ErrorHandlerRegistry
-from xai.core.input_validation_schemas import (
+from xai.core.api.error_handlers import ErrorHandlerRegistry
+from xai.core.security.input_validation_schemas import (
     CryptoDepositAddressInput,
     ExchangeCancelInput,
     ExchangeCardPurchaseInput,
@@ -86,16 +86,16 @@ from xai.core.input_validation_schemas import (
     PeerBlockInput,
     PeerTransactionInput,
 )
-from xai.core.monitoring import MetricsCollector
-from xai.core.node_utils import (
+from xai.core.api.monitoring import MetricsCollector
+from xai.core.chain.node_utils import (
     ALGO_FEATURES_ENABLED,
     NODE_VERSION,
     get_api_endpoints,
     get_base_dir,
 )
-from xai.core.rate_limiter import get_rate_limiter
-from xai.core.request_validator_middleware import RequestValidator, validate_request
-from xai.core.security_validation import SecurityValidator, log_security_event
+from xai.core.security.rate_limiter import get_rate_limiter
+from xai.core.security.request_validator_middleware import RequestValidator, validate_request
+from xai.core.security.security_validation import SecurityValidator, log_security_event
 from xai.core.vm.evm.abi import keccak256
 from xai.network.peer_manager import PeerManager
 from xai.performance.profiling import CPUProfiler, MemoryProfiler
@@ -182,7 +182,7 @@ class InputSanitizer:
     def validate_address(address: str) -> str:
         """Validate blockchain address format.
 
-        Uses centralized validation from xai.core.validation module.
+        Uses centralized validation from xai.core.consensus.validation module.
 
         XAI addresses follow the format:
         - Mainnet: XAI + 40 hex characters (e.g., XAI1234567890abcdef...)
@@ -204,7 +204,7 @@ class InputSanitizer:
     def validate_hash(hash_value: str, expected_length: int = 64) -> str:
         """Validate transaction/block hash format.
 
-        Uses centralized validation from xai.core.validation module.
+        Uses centralized validation from xai.core.consensus.validation module.
 
         Args:
             hash_value: Hash to validate
@@ -723,7 +723,7 @@ class NodeAPIRoutes:
     def _get_advanced_rate_limiter(self):
         """Best-effort accessor for the optional advanced rate limiter."""
         try:
-            from xai.core.advanced_rate_limiter import get_rate_limiter as get_advanced_rate_limiter
+            from xai.core.security.advanced_rate_limiter import get_rate_limiter as get_advanced_rate_limiter
 
             return get_advanced_rate_limiter()
         except (ImportError, RuntimeError, AttributeError):
@@ -1002,15 +1002,29 @@ class NodeAPIRoutes:
                         backlog["pending_transactions"] = stats.get("pending_transactions_count", 0)
                         backlog["orphan_blocks"] = stats.get("orphan_blocks_count", 0)
                         backlog["orphan_transactions"] = stats.get("orphan_transactions_count", 0)
-                    except Exception as exc:  # pragma: no cover - defensive
-                        blockchain_summary = {"accessible": False, "error": str(exc)}
+                    except (StorageError, DatabaseError) as exc:  # pragma: no cover - defensive
+                        blockchain_summary = {"accessible": False, "error": str(exc), "error_type": "storage"}
+                        overall_status = "unhealthy"
+                        http_status = 503
+                    except (AttributeError, KeyError) as exc:  # pragma: no cover - defensive
+                        blockchain_summary = {"accessible": False, "error": str(exc), "error_type": "data"}
+                        overall_status = "degraded"
+                        http_status = 503
+                    except Exception as exc:  # pragma: no cover - defensive fallback
+                        logger.warning("Unexpected error in blockchain health check", exc_info=True)
+                        blockchain_summary = {"accessible": False, "error": str(exc), "error_type": type(exc).__name__}
                         overall_status = "unhealthy"
                         http_status = 503
                 else:
                     blockchain_summary = {"accessible": False, "error": "Blockchain not initialized"}
                     degrade("blockchain_unavailable")
-            except Exception as exc:  # pragma: no cover - defensive
-                blockchain_summary = {"accessible": False, "error": str(exc)}
+            except (AttributeError, TypeError) as exc:  # pragma: no cover - defensive
+                blockchain_summary = {"accessible": False, "error": str(exc), "error_type": "initialization"}
+                overall_status = "degraded"
+                http_status = 503
+            except Exception as exc:  # pragma: no cover - defensive fallback
+                logger.warning("Unexpected error accessing blockchain for health check", exc_info=True)
+                blockchain_summary = {"accessible": False, "error": str(exc), "error_type": type(exc).__name__}
                 overall_status = "unhealthy"
                 http_status = 503
 
@@ -1109,8 +1123,16 @@ class NodeAPIRoutes:
             try:
                 metrics_output = self.node.metrics_collector.export_prometheus()
                 return metrics_output, 200, {"Content-Type": "text/plain; version=0.0.4"}
+            except AttributeError as e:
+                # Metrics collector not properly initialized
+                return f"# Metrics collector not available: {e}\n", 503, {"Content-Type": "text/plain"}
+            except (ValueError, TypeError) as e:
+                # Error formatting metrics
+                return f"# Error formatting metrics: {e}\n", 500, {"Content-Type": "text/plain"}
             except Exception as e:
-                return f"# Error generating metrics: {e}\n", 500, {"Content-Type": "text/plain"}
+                # Unexpected error - log for debugging
+                logger.warning("Unexpected error generating metrics: %s", e, exc_info=True)
+                return f"# Error generating metrics: {type(e).__name__}: {e}\n", 500, {"Content-Type": "text/plain"}
 
         @self.app.route("/stats", methods=["GET"])
         def get_stats() -> dict[str, Any]:
@@ -1852,7 +1874,7 @@ class NodeAPIRoutes:
             try:
                 # P2P metrics: received block
                 try:
-                    from xai.core.monitoring import MetricsCollector
+                    from xai.core.api.monitoring import MetricsCollector
                     MetricsCollector.instance().record_p2p_message("received")
                 except (RuntimeError, ValueError) as e:
                     logger.debug("P2P metrics record failed: %s", type(e).__name__)

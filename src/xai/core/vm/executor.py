@@ -13,7 +13,7 @@ import json
 import threading
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, Sequence
 
 from .exceptions import VMExecutionError
 
@@ -465,3 +465,41 @@ class ProductionContractExecutor(BaseExecutor):
 
 # Alias for backward compatibility
 SimpleContractExecutor = ProductionContractExecutor
+
+
+def create_executor(
+    blockchain: "Blockchain",
+    *,
+    use_dummy: bool = False,
+) -> BaseExecutor:
+    """
+    Factory function to create the appropriate contract executor.
+
+    By default, returns ProductionContractExecutor with full security controls.
+    Use use_dummy=True only for testing or when EVM dependencies are unavailable.
+
+    Args:
+        blockchain: The blockchain instance for state access
+        use_dummy: If True, return DummyExecutor instead of production executor
+
+    Returns:
+        A BaseExecutor implementation (ProductionContractExecutor or DummyExecutor)
+
+    Example:
+        >>> executor = create_executor(blockchain)
+        >>> result = executor.execute(message)
+    """
+    if use_dummy:
+        return DummyExecutor()
+    return ProductionContractExecutor(blockchain)
+
+
+__all__ = [
+    "BaseExecutor",
+    "DummyExecutor",
+    "ExecutionMessage",
+    "ExecutionResult",
+    "ProductionContractExecutor",
+    "SimpleContractExecutor",
+    "create_executor",
+]

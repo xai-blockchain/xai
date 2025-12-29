@@ -2,7 +2,7 @@ import time
 
 import pytest
 
-from xai.core.transaction_validator import TransactionValidator
+from xai.core.consensus.transaction_validator import TransactionValidator
 from xai.core.blockchain import Transaction
 from xai.core.vm.exceptions import VMExecutionError
 

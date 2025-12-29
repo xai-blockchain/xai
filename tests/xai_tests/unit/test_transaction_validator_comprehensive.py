@@ -8,10 +8,10 @@ import pytest
 import time
 from xai.core.blockchain import Blockchain, Transaction
 from xai.core.wallet import Wallet
-from xai.core.transaction_validator import TransactionValidator, get_transaction_validator
-from xai.core.security_validation import ValidationError
-from xai.core.nonce_tracker import get_nonce_tracker
-from xai.core.utxo_manager import get_utxo_manager
+from xai.core.consensus.transaction_validator import TransactionValidator, get_transaction_validator
+from xai.core.security.security_validation import ValidationError
+from xai.core.transactions.nonce_tracker import get_nonce_tracker
+from xai.core.transactions.utxo_manager import get_utxo_manager
 
 
 class TestTransactionValidatorInit:
@@ -29,9 +29,9 @@ class TestTransactionValidatorInit:
 
     def test_init_with_custom_dependencies(self, blockchain):
         """Test initialization with custom dependencies"""
-        from xai.core.nonce_tracker import NonceTracker
-        from xai.core.structured_logger import StructuredLogger
-        from xai.core.utxo_manager import UTXOManager
+        from xai.core.transactions.nonce_tracker import NonceTracker
+        from xai.core.api.structured_logger import StructuredLogger
+        from xai.core.transactions.utxo_manager import UTXOManager
 
         nonce_tracker = NonceTracker()
         logger = StructuredLogger()
@@ -690,9 +690,9 @@ class TestGlobalValidator:
 
     def test_get_transaction_validator_with_custom_dependencies(self, blockchain):
         """Test getting validator with custom dependencies"""
-        from xai.core.nonce_tracker import NonceTracker
-        from xai.core.structured_logger import StructuredLogger
-        from xai.core.utxo_manager import UTXOManager
+        from xai.core.transactions.nonce_tracker import NonceTracker
+        from xai.core.api.structured_logger import StructuredLogger
+        from xai.core.transactions.utxo_manager import UTXOManager
 
         nonce_tracker = NonceTracker()
         logger = StructuredLogger()

@@ -103,7 +103,7 @@ class TestWebhookManager:
 
     def test_webhook_event_types(self):
         """Test all webhook event types are defined."""
-        from xai.core.webhook_manager import WebhookEvent
+        from xai.core.api.webhook_manager import WebhookEvent
 
         expected_events = [
             "new_block",
@@ -123,7 +123,7 @@ class TestWebhookManager:
 
     def test_webhook_registration(self):
         """Test webhook registration."""
-        from xai.core.webhook_manager import WebhookManager
+        from xai.core.api.webhook_manager import WebhookManager
 
         manager = WebhookManager()
 
@@ -143,7 +143,7 @@ class TestWebhookManager:
 
     def test_webhook_registration_invalid_url(self):
         """Test webhook registration with invalid URL."""
-        from xai.core.webhook_manager import WebhookManager
+        from xai.core.api.webhook_manager import WebhookManager
 
         manager = WebhookManager()
 
@@ -161,7 +161,7 @@ class TestWebhookManager:
 
     def test_webhook_registration_invalid_events(self):
         """Test webhook registration with invalid events."""
-        from xai.core.webhook_manager import WebhookManager
+        from xai.core.api.webhook_manager import WebhookManager
 
         manager = WebhookManager()
 
@@ -178,7 +178,7 @@ class TestWebhookManager:
 
     def test_webhook_unregistration(self):
         """Test webhook unregistration."""
-        from xai.core.webhook_manager import WebhookManager
+        from xai.core.api.webhook_manager import WebhookManager
 
         manager = WebhookManager()
 
@@ -201,7 +201,7 @@ class TestWebhookManager:
 
     def test_webhook_unregistration_wrong_owner(self):
         """Test webhook unregistration with wrong owner."""
-        from xai.core.webhook_manager import WebhookManager
+        from xai.core.api.webhook_manager import WebhookManager
 
         manager = WebhookManager()
 
@@ -220,7 +220,7 @@ class TestWebhookManager:
 
     def test_webhook_update(self):
         """Test webhook update."""
-        from xai.core.webhook_manager import WebhookManager
+        from xai.core.api.webhook_manager import WebhookManager
 
         manager = WebhookManager()
 
@@ -246,7 +246,7 @@ class TestWebhookManager:
 
     def test_webhook_owner_limit(self):
         """Test webhook per-owner limit."""
-        from xai.core.webhook_manager import WebhookManager
+        from xai.core.api.webhook_manager import WebhookManager
 
         manager = WebhookManager()
 
@@ -272,7 +272,7 @@ class TestWebhookManager:
 
     def test_webhook_signature_generation(self):
         """Test webhook signature generation."""
-        from xai.core.webhook_manager import WebhookManager
+        from xai.core.api.webhook_manager import WebhookManager
 
         manager = WebhookManager()
 
@@ -287,7 +287,7 @@ class TestWebhookManager:
 
     def test_webhook_list_by_owner(self):
         """Test listing webhooks by owner."""
-        from xai.core.webhook_manager import WebhookManager
+        from xai.core.api.webhook_manager import WebhookManager
 
         manager = WebhookManager()
 
@@ -318,7 +318,7 @@ class TestStructuredErrorResponses:
 
     def test_error_code_enum(self):
         """Test error codes are properly defined."""
-        from xai.core.error_response import ErrorCode
+        from xai.core.api.error_response import ErrorCode
 
         assert ErrorCode.UNAUTHORIZED.value == "UNAUTHORIZED"
         assert ErrorCode.NOT_FOUND.value == "NOT_FOUND"
@@ -326,7 +326,7 @@ class TestStructuredErrorResponses:
 
     def test_api_error_structure(self):
         """Test APIError produces correct structure."""
-        from xai.core.error_response import APIError, ErrorCode
+        from xai.core.api.error_response import APIError, ErrorCode
 
         error = APIError(
             code=ErrorCode.VALIDATION_ERROR,
@@ -342,7 +342,7 @@ class TestStructuredErrorResponses:
 
     def test_error_response_function(self):
         """Test error_response helper function."""
-        from xai.core.error_response import ErrorCode, error_response
+        from xai.core.api.error_response import ErrorCode, error_response
 
         response, status = error_response(
             code=ErrorCode.NOT_FOUND,
@@ -355,7 +355,7 @@ class TestStructuredErrorResponses:
 
     def test_validation_error_helper(self):
         """Test validation_error helper."""
-        from xai.core.error_response import validation_error
+        from xai.core.api.error_response import validation_error
 
         response, status = validation_error(
             message="Invalid amount",
@@ -369,7 +369,7 @@ class TestStructuredErrorResponses:
 
     def test_not_found_error_helper(self):
         """Test not_found_error helper."""
-        from xai.core.error_response import not_found_error
+        from xai.core.api.error_response import not_found_error
 
         response, status = not_found_error("Transaction", "tx_123")
 
@@ -378,7 +378,7 @@ class TestStructuredErrorResponses:
 
     def test_rate_limit_error_helper(self):
         """Test rate_limit_error helper."""
-        from xai.core.error_response import rate_limit_error
+        from xai.core.api.error_response import rate_limit_error
 
         response, status = rate_limit_error(
             limit=100,
@@ -392,7 +392,7 @@ class TestStructuredErrorResponses:
 
     def test_error_responses_factory(self):
         """Test ErrorResponses factory methods."""
-        from xai.core.error_response import ErrorResponses
+        from xai.core.api.error_response import ErrorResponses
 
         # Invalid address
         response, status = ErrorResponses.invalid_address("INVALID_ADDR")

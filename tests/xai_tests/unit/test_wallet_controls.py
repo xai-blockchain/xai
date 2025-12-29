@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from xai.core.monitoring import MetricsCollector
+from xai.core.api.monitoring import MetricsCollector
 from xai.wallet.daily_withdrawal_limits import DailyWithdrawalLimitManager
 from xai.wallet.time_locked_withdrawals import TimeLockedWithdrawalManager
 

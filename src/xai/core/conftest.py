@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from xai.core.blockchain_persistence import BlockchainStorage
+from xai.core.chain.blockchain_persistence import BlockchainStorage
 
 
 @pytest.fixture(scope="module")

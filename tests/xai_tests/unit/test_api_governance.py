@@ -30,7 +30,7 @@ class TestGovernanceProposalRoutes:
     @pytest.fixture
     def gov_api(self, mock_node):
         """Create GovernanceAPIHandler instance."""
-        from xai.core.api_governance import GovernanceAPIHandler
+        from xai.core.api.api_governance import GovernanceAPIHandler
         return GovernanceAPIHandler(mock_node, mock_node.app)
 
     @pytest.fixture
@@ -93,7 +93,7 @@ class TestGovernanceVotingRoutes:
     @pytest.fixture
     def gov_api(self, mock_node):
         """Create GovernanceAPIHandler instance."""
-        from xai.core.api_governance import GovernanceAPIHandler
+        from xai.core.api.api_governance import GovernanceAPIHandler
         return GovernanceAPIHandler(mock_node, mock_node.app)
 
     @pytest.fixture
@@ -181,7 +181,7 @@ class TestFiatUnlockGovernance:
     @pytest.fixture
     def gov_api(self, mock_node):
         """Create GovernanceAPIHandler instance."""
-        from xai.core.api_governance import GovernanceAPIHandler
+        from xai.core.api.api_governance import GovernanceAPIHandler
         return GovernanceAPIHandler(mock_node, mock_node.app)
 
     @pytest.fixture
@@ -227,7 +227,7 @@ class TestFiatUnlockGovernance:
 
     def test_fiat_unlock_vote_invalid_address(self, client, mock_node):
         """Test POST /governance/fiat-unlock/vote - invalid address."""
-        from xai.core.security_validation import ValidationError
+        from xai.core.security.security_validation import ValidationError
 
         mock_node.validator.validate_address.side_effect = ValidationError("Invalid address")
 
@@ -282,7 +282,7 @@ class TestGovernanceErrorHandling:
     @pytest.fixture
     def gov_api(self, mock_node):
         """Create GovernanceAPIHandler instance."""
-        from xai.core.api_governance import GovernanceAPIHandler
+        from xai.core.api.api_governance import GovernanceAPIHandler
         return GovernanceAPIHandler(mock_node, mock_node.app)
 
     @pytest.fixture
@@ -326,7 +326,7 @@ class TestGovernanceIntegration:
     @pytest.fixture
     def gov_api(self, mock_node):
         """Create GovernanceAPIHandler instance."""
-        from xai.core.api_governance import GovernanceAPIHandler
+        from xai.core.api.api_governance import GovernanceAPIHandler
         return GovernanceAPIHandler(mock_node, mock_node.app)
 
     @pytest.fixture
@@ -398,7 +398,7 @@ class TestGovernanceVotingPowerCalculation:
     @pytest.fixture
     def gov_api(self, mock_node):
         """Create GovernanceAPIHandler instance."""
-        from xai.core.api_governance import GovernanceAPIHandler
+        from xai.core.api.api_governance import GovernanceAPIHandler
         return GovernanceAPIHandler(mock_node, mock_node.app)
 
     @pytest.fixture

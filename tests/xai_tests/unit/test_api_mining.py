@@ -35,7 +35,7 @@ class TestMiningAPIStartStop:
     @pytest.fixture
     def mining_api(self, mock_node):
         """Create MiningAPIHandler instance."""
-        from xai.core.api_mining import MiningAPIHandler
+        from xai.core.api.api_mining import MiningAPIHandler
         broadcast_callback = Mock()
         return MiningAPIHandler(mock_node, mock_node.app, broadcast_callback)
 
@@ -176,7 +176,7 @@ class TestMiningStatusEndpoint:
     @pytest.fixture
     def mining_api(self, mock_node):
         """Create MiningAPIHandler instance."""
-        from xai.core.api_mining import MiningAPIHandler
+        from xai.core.api.api_mining import MiningAPIHandler
         broadcast_callback = Mock()
         return MiningAPIHandler(mock_node, mock_node.app, broadcast_callback)
 
@@ -274,7 +274,7 @@ class TestMiningWorker:
     @pytest.fixture
     def mining_api(self, mock_node):
         """Create MiningAPIHandler instance."""
-        from xai.core.api_mining import MiningAPIHandler
+        from xai.core.api.api_mining import MiningAPIHandler
         broadcast_callback = Mock()
         return MiningAPIHandler(mock_node, mock_node.app, broadcast_callback)
 
@@ -454,7 +454,7 @@ class TestMiningThreadManagement:
     @pytest.fixture
     def mining_api(self, mock_node):
         """Create MiningAPIHandler instance."""
-        from xai.core.api_mining import MiningAPIHandler
+        from xai.core.api.api_mining import MiningAPIHandler
         broadcast_callback = Mock()
         return MiningAPIHandler(mock_node, mock_node.app, broadcast_callback)
 
@@ -527,7 +527,7 @@ class TestPrometheusMetrics:
     @pytest.fixture
     def mining_api(self, mock_node):
         """Create MiningAPIHandler instance."""
-        from xai.core.api_mining import MiningAPIHandler
+        from xai.core.api.api_mining import MiningAPIHandler
         broadcast_callback = Mock()
         return MiningAPIHandler(mock_node, mock_node.app, broadcast_callback)
 
@@ -577,7 +577,7 @@ class TestWebSocketBroadcasts:
     @pytest.fixture
     def mining_api(self, mock_node):
         """Create MiningAPIHandler instance."""
-        from xai.core.api_mining import MiningAPIHandler
+        from xai.core.api.api_mining import MiningAPIHandler
         broadcast_callback = Mock()
         return MiningAPIHandler(mock_node, mock_node.app, broadcast_callback)
 

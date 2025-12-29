@@ -24,8 +24,8 @@ from xai.core.api_blueprints.base import (
     success_response,
 )
 from xai.core.config import Config, NetworkType
-from xai.core.input_validation_schemas import FaucetClaimInput
-from xai.core.rate_limiter import get_rate_limiter
+from xai.core.security.input_validation_schemas import FaucetClaimInput
+from xai.core.security.rate_limiter import get_rate_limiter
 
 logger = logging.getLogger(__name__)
 

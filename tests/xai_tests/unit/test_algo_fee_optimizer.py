@@ -1,6 +1,6 @@
 import pytest
 
-from xai.core.algo_fee_optimizer import FeeOptimizer
+from xai.core.transactions.algo_fee_optimizer import FeeOptimizer
 
 
 class TestAlgoFeeOptimizer:

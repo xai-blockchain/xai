@@ -12,7 +12,7 @@ import time
 import logging
 from typing import Any
 from unittest.mock import Mock, MagicMock, patch
-from xai.core.error_handlers import (
+from xai.core.api.error_handlers import (
     CircuitState,
     CircuitBreaker,
     RetryStrategy,

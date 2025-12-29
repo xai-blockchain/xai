@@ -12,7 +12,7 @@ transaction lifecycle:
 """
 
 import pytest
-from xai.core.utxo_manager import UTXOManager
+from xai.core.transactions.utxo_manager import UTXOManager
 from xai.core.transaction import Transaction
 from xai.core.wallet import Wallet
 

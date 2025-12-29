@@ -51,6 +51,9 @@ class BlockchainMempoolMixin:
     - _mempool_evicted_low_fee_total: int
     - _mempool_expired_total: int
     - _spent_inputs: set[str]  # O(1) lookup for double-spend detection
+    - _mempool_stats_cache: dict[str, Any]  # Cached stats for O(1) lookups
+    - _mempool_stats_cache_time: float  # Last cache update time
+    - _mempool_stats_cache_ttl: float  # Cache TTL in seconds
     - utxo_manager: UTXOManager
     - transaction_validator: TransactionValidator
     - nonce_tracker: NonceTracker
@@ -70,6 +73,7 @@ class BlockchainMempoolMixin:
         seen_txids: set[str] = set()
         spent_inputs: set[str] = set()
         pending_tx_by_txid: dict[str, Transaction] = {}
+        pending_nonces: set[tuple[str, int]] = set()  # P2 Performance
 
         for tx in self.pending_transactions:
             if current_time - tx.timestamp < self._mempool_max_age_seconds:
@@ -79,6 +83,9 @@ class BlockchainMempoolMixin:
                     pending_tx_by_txid[tx.txid] = tx
                 if tx.sender and tx.sender != "COINBASE":
                     sender_counts[tx.sender] += 1
+                    # P2 Performance: Rebuild pending nonces set
+                    if tx.nonce is not None:
+                        pending_nonces.add((tx.sender, tx.nonce))
                 # Rebuild spent_inputs set for kept transactions
                 if tx.tx_type != "coinbase" and tx.inputs:
                     for inp in tx.inputs:
@@ -103,8 +110,11 @@ class BlockchainMempoolMixin:
         self._sender_pending_count = defaultdict(int, sender_counts)
         self._spent_inputs = spent_inputs
         self._pending_tx_by_txid = pending_tx_by_txid
+        self._pending_nonces = pending_nonces  # P2 Performance
         if removed:
             self._mempool_expired_total += removed
+            # P2 Performance: Invalidate mempool stats cache on prune
+            self._invalidate_mempool_stats_cache()
         return removed
 
     def _prune_orphan_pool(self, current_time: float) -> int:
@@ -280,6 +290,11 @@ class BlockchainMempoolMixin:
                         0,
                         self._sender_pending_count[sender] - 1,
                     )
+                # P2 Performance: Remove from pending nonces set
+                if sender and sender != "COINBASE":
+                    nonce = getattr(removed_tx, "nonce", None)
+                    if nonce is not None:
+                        self._pending_nonces.discard((sender, nonce))
                 if ban_sender and sender:
                     ban_state = self._invalid_sender_tracker.get(sender, {})
                     ban_state["banned_until"] = time.time() + self._mempool_invalid_ban_seconds
@@ -289,6 +304,8 @@ class BlockchainMempoolMixin:
                 break
 
         if removed:
+            # P2 Performance: Invalidate mempool stats cache on remove
+            self._invalidate_mempool_stats_cache()
             self.logger.info(
                 "Transaction evicted from mempool",
                 txid=txid,
@@ -309,7 +326,7 @@ class BlockchainMempoolMixin:
         Security: Prevents double-spend attacks via race conditions between
         validation (checking UTXO availability) and insertion (adding to mempool).
         """
-        from xai.core.account_abstraction import (
+        from xai.core.transactions.account_abstraction import (
             SponsorshipResult,
             get_sponsored_transaction_processor,
         )
@@ -525,6 +542,9 @@ class BlockchainMempoolMixin:
             if transaction.sender and transaction.sender != "COINBASE":
                 self._sender_pending_count[transaction.sender] = self._sender_pending_count.get(transaction.sender, 0) + 1
                 self.nonce_tracker.reserve_nonce(transaction.sender, transaction.nonce)
+                # P2 Performance: Add to pending nonces set for O(1) duplicate check
+                if transaction.nonce is not None:
+                    self._pending_nonces.add((transaction.sender, transaction.nonce))
             self._clear_sender_penalty(transaction.sender)
 
             # Process gas sponsorship if applicable (Task 178: Account Abstraction)
@@ -551,6 +571,9 @@ class BlockchainMempoolMixin:
                     )
             else:
                 self.logger.info("Transaction added to mempool", txid=transaction.txid, sender=transaction.sender)
+
+            # P2 Performance: Invalidate mempool stats cache on add
+            self._invalidate_mempool_stats_cache()
 
             return True
         # End of atomic lock section
@@ -626,6 +649,9 @@ class BlockchainMempoolMixin:
                 self._spent_inputs.discard(input_key)
         if original_tx.sender and original_tx.sender != "COINBASE":
             self._sender_pending_count[original_tx.sender] -= 1
+            # P2 Performance: Remove original nonce from pending nonces set
+            if original_tx.nonce is not None:
+                self._pending_nonces.discard((original_tx.sender, original_tx.nonce))
         return True
 
     def _prioritize_transactions(self, transactions: list["Transaction"], max_count: int | None = None) -> list["Transaction"]:
@@ -782,13 +808,63 @@ class BlockchainMempoolMixin:
         total_bytes = sum(tx.get_size() for tx in self.pending_transactions) if self.pending_transactions else 0
         return total_bytes / 1024.0
 
+    def _invalidate_mempool_stats_cache(self) -> None:
+        """
+        Invalidate the mempool stats cache.
+
+        Called when transactions are added or removed from mempool.
+        P2 Performance optimization.
+        """
+        self._mempool_stats_cache = {}
+        self._mempool_stats_cache_time = 0.0
+
     def get_mempool_overview(self, limit: int = 100) -> dict[str, Any]:
         """
         Return detailed mempool statistics and representative transactions.
+
+        P2 Performance: Uses cached stats if less than TTL seconds old.
+        Cache is invalidated when transactions are added/removed.
         """
         limit = max(0, min(int(limit), 1000))
-        pending = list(self.pending_transactions) if self.pending_transactions else []
         now = time.time()
+
+        # P2 Performance: Check if cached stats are still valid
+        cache_age = now - self._mempool_stats_cache_time
+        if self._mempool_stats_cache and cache_age < self._mempool_stats_cache_ttl:
+            # Return cached stats, but update timestamp and transaction list if needed
+            cached = self._mempool_stats_cache.copy()
+            cached["timestamp"] = now
+            cached["cache_age_seconds"] = cache_age
+            # Transaction list is always regenerated (limit may differ)
+            pending = list(self.pending_transactions) if self.pending_transactions else []
+            if limit > 0 and pending:
+                tx_summaries: list[dict[str, Any]] = []
+                for tx in pending[:limit]:
+                    tx_size = tx.get_size()
+                    summary = {
+                        "txid": tx.txid,
+                        "sender": tx.sender,
+                        "recipient": tx.recipient,
+                        "amount": tx.amount,
+                        "fee": tx.fee,
+                        "fee_rate": tx.get_fee_rate(),
+                        "size_bytes": tx_size,
+                        "timestamp": getattr(tx, "timestamp", None),
+                        "age_seconds": now - tx.timestamp if getattr(tx, "timestamp", None) else None,
+                        "nonce": tx.nonce,
+                        "type": tx.tx_type,
+                        "rbf_enabled": bool(getattr(tx, "rbf_enabled", False)),
+                        "gas_sponsor": getattr(tx, "gas_sponsor", None),
+                    }
+                    tx_summaries.append(summary)
+                cached["transactions"] = tx_summaries
+            else:
+                cached["transactions"] = []
+            cached["transactions_returned"] = len(cached["transactions"])
+            return cached
+
+        # Cache miss or expired - compute fresh stats
+        pending = list(self.pending_transactions) if self.pending_transactions else []
         size_bytes = sum(tx.get_size() for tx in pending) if pending else 0
         total_amount = sum(float(getattr(tx, "amount", 0.0)) for tx in pending)
         fees = [float(getattr(tx, "fee", 0.0)) for tx in pending]
@@ -845,7 +921,15 @@ class BlockchainMempoolMixin:
                 "rejected_sender_cap_total": self._mempool_rejected_sender_cap_total,
             },
             "timestamp": now,
+            "cache_age_seconds": 0.0,  # Fresh computation
         }
+
+        # P2 Performance: Cache the computed stats (without transaction list)
+        cache_entry = overview.copy()
+        cache_entry.pop("transactions", None)
+        cache_entry.pop("transactions_returned", None)
+        self._mempool_stats_cache = cache_entry
+        self._mempool_stats_cache_time = now
 
         if limit > 0 and pending:
             tx_summaries: list[dict[str, Any]] = []

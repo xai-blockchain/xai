@@ -9,7 +9,7 @@ import pytest
 import time
 from decimal import Decimal
 from unittest.mock import Mock, MagicMock, patch
-from xai.core.error_detection import (
+from xai.core.chain.error_detection import (
     ErrorSeverity,
     RecoveryState,
     ErrorDetector,

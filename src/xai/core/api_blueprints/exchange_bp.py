@@ -25,7 +25,7 @@ from xai.core.api_blueprints.base import (
     require_api_auth,
     success_response,
 )
-from xai.core.node_utils import get_base_dir
+from xai.core.chain.node_utils import get_base_dir
 
 logger = logging.getLogger(__name__)
 

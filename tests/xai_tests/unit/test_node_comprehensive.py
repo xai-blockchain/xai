@@ -11,7 +11,7 @@ import threading
 from unittest.mock import Mock, patch, MagicMock, call
 from xai.core.node import BlockchainNode
 from xai.core.blockchain import Blockchain, Transaction, Block
-from xai.core.node_utils import DEFAULT_HOST
+from xai.core.chain.node_utils import DEFAULT_HOST
 from xai.core.config import Config
 
 

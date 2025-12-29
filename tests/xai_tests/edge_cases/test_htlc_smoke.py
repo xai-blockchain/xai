@@ -26,7 +26,7 @@ except ImportError:
     BITCOIN_RPC_AVAILABLE = False
 
 from xai.core.aixn_blockchain.atomic_swap_11_coins import AtomicSwapHTLC, CoinType
-from xai.core.htlc_deployer import compile_htlc_contract, deploy_htlc, claim_htlc, refund_htlc
+from xai.core.transactions.htlc_deployer import compile_htlc_contract, deploy_htlc, claim_htlc, refund_htlc
 
 
 def check_bitcoin_regtest() -> bool:

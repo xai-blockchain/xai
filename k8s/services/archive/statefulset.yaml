@@ -1,0 +1,246 @@
+# XAI Archive Nodes - Full historical data storage
+# StatefulSet with 500Gi persistent storage for chain data
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: xai-archive-node
+  namespace: xai-staging
+  labels:
+    app: xai-blockchain
+    component: archive-node
+    tier: stateful
+spec:
+  serviceName: xai-archive-headless
+  replicas: 2
+  selector:
+    matchLabels:
+      app: xai-blockchain
+      component: archive-node
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0
+  template:
+    metadata:
+      labels:
+        app: xai-blockchain
+        component: archive-node
+        tier: stateful
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: xai-blockchain
+                  component: archive-node
+              topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: node.kubernetes.io/instance-type
+                    operator: In
+                    values:
+                      - storage-optimized
+                      - i3.xlarge
+                      - i3.2xlarge
+
+      serviceAccountName: xai-blockchain-sa
+      automountServiceAccountToken: true
+
+      initContainers:
+        - name: init-data-dirs
+          image: busybox:1.35
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /data/blockchain /data/archive /data/logs
+              chmod 755 /data/blockchain /data/archive /data/logs
+              echo "Archive data directories initialized"
+          volumeMounts:
+            - name: archive-data
+              mountPath: /data
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
+
+      containers:
+        - name: xai-archive
+          image: xai-blockchain:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--mode=archive"
+            - "--no-mining"
+            - "--enable-historical-queries"
+            - "--prune-mode=archive"
+          ports:
+            - name: rpc
+              containerPort: 8546
+              protocol: TCP
+            - name: p2p
+              containerPort: 8545
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+
+          env:
+            - name: NODE_MODE
+              value: "archive"
+            - name: ENABLE_MINING
+              value: "false"
+            - name: ENABLE_HISTORICAL_QUERIES
+              value: "true"
+            - name: PRUNE_MODE
+              value: "archive"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: BLOCKCHAIN_DATA_DIR
+              value: "/data/blockchain"
+            - name: ARCHIVE_DATA_DIR
+              value: "/data/archive"
+            - name: VALIDATOR_ENDPOINTS
+              value: "http://xai-validator-headless:8546"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 4Gi
+            limits:
+              cpu: 2000m
+              memory: 8Gi
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+
+          volumeMounts:
+            - name: archive-data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+
+          startupProbe:
+            httpGet:
+              path: /health
+              port: rpc
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 40
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: rpc
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: rpc
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    echo "Graceful shutdown initiated"
+                    curl -X POST http://localhost:8546/shutdown || true
+                    sleep 30
+
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 1Gi
+
+      terminationGracePeriodSeconds: 60
+
+  volumeClaimTemplates:
+    - metadata:
+        name: archive-data
+        labels:
+          app: xai-blockchain
+          component: archive-node
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: xai-archive-storage
+        resources:
+          requests:
+            storage: 500Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xai-archive-headless
+  namespace: xai-staging
+  labels:
+    app: xai-blockchain
+    component: archive-node
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app: xai-blockchain
+    component: archive-node
+  ports:
+    - name: rpc
+      port: 8546
+      targetPort: rpc
+    - name: p2p
+      port: 8545
+      targetPort: p2p
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xai-archive
+  namespace: xai-staging
+  labels:
+    app: xai-blockchain
+    component: archive-node
+spec:
+  type: ClusterIP
+  selector:
+    app: xai-blockchain
+    component: archive-node
+  ports:
+    - name: rpc
+      port: 8546
+      targetPort: rpc

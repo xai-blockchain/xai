@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
-from xai.core.partial_sync import PartialSyncCoordinator
-from xai.core.checkpoint_sync import CheckpointPayload
+from xai.core.p2p.partial_sync import PartialSyncCoordinator
+from xai.core.p2p.checkpoint_sync import CheckpointPayload
 
 
 class DummyCheckpoint:

@@ -218,7 +218,7 @@ def submit_task(ctx: click.Context, task_type: str, description: str,
     if max_cost and estimated_cost > max_cost:
         console.print(f"[yellow]Warning:[/] Estimated cost ({estimated_cost:.4f} XAI) "
                      f"exceeds max cost ({max_cost:.4f} XAI)")
-        if not Confirm.ask("Continue anyway?", default=False):
+        if not ctx.obj.get('assume_yes') and not Confirm.ask("Continue anyway?", default=False):
             return
 
     # Display task summary
@@ -240,7 +240,7 @@ def submit_task(ctx: click.Context, task_type: str, description: str,
 
     console.print(table)
 
-    if not Confirm.ask("\n[bold]Submit this task to AI network?[/]", default=True):
+    if not ctx.obj.get('assume_yes') and not Confirm.ask("\n[bold]Submit this task to AI network?[/]", default=True):
         console.print("[yellow]Task submission cancelled[/]")
         return
 
@@ -380,7 +380,7 @@ def cancel_task(ctx: click.Context, task_id: str):
     """
     client = AIComputeClient(ctx.obj['client'].node_url)
 
-    if not Confirm.ask(f"[bold]Cancel task {task_id}?[/]", default=False):
+    if not ctx.obj.get('assume_yes') and not Confirm.ask(f"[bold]Cancel task {task_id}?[/]", default=False):
         console.print("[yellow]Cancelled[/]")
         return
 
@@ -726,7 +726,7 @@ def register_provider(ctx: click.Context, wallet: str, models: str,
     console.print("  • API endpoint must pass health checks")
     console.print("  • Support for at least one AI model")
 
-    if not Confirm.ask("\n[bold]Register as provider?[/]", default=False):
+    if not ctx.obj.get('assume_yes') and not Confirm.ask("\n[bold]Register as provider?[/]", default=False):
         console.print("[yellow]Registration cancelled[/]")
         return
 

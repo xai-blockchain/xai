@@ -60,6 +60,23 @@ def _cli_fail(exc: Exception, exit_code: int = 1) -> None:
     console.print(f"[bold red]Error:[/] {exc}")
     sys.exit(exit_code)
 
+
+def cli_confirm(ctx: click.Context, message: str, default: bool = False) -> bool:
+    """Confirmation helper that respects --yes/--assume-yes flag.
+
+    Args:
+        ctx: Click context with obj['assume_yes']
+        message: Confirmation message to display
+        default: Default value if user just presses Enter
+
+    Returns:
+        True if confirmed, False otherwise
+    """
+    if ctx.obj.get('assume_yes'):
+        return True
+    return Confirm.ask(message, default=default)
+
+
 # Default configuration
 DEFAULT_NODE_URL = "http://localhost:12001"
 DEFAULT_TIMEOUT = 30.0
@@ -363,7 +380,7 @@ def _validate_genesis_path(path: Path) -> None:
 
 def _compute_genesis_hash(genesis_data: dict[str, Any]) -> tuple[str, str]:
     """Recompute declared vs actual genesis block hash."""
-    from xai.core.block_header import BlockHeader
+    from xai.core.chain.block_header import BlockHeader
     from xai.core.blockchain_components.block import Block
     from xai.core.config import Config
     from xai.core.transaction import Transaction
@@ -606,6 +623,13 @@ class LocalNodeClient:
     help='API key for authenticated endpoints',
 )
 @click.option(
+    '-y', '--yes', '--assume-yes',
+    'assume_yes',
+    is_flag=True,
+    envvar='XAI_ASSUME_YES',
+    help='Assume yes to all confirmation prompts (non-interactive mode)',
+)
+@click.option(
     '--transport',
     type=click.Choice(['http', 'local']),
     default='http',
@@ -631,6 +655,7 @@ def cli(
     timeout: float,
     json_output: bool,
     api_key: str | None,
+    assume_yes: bool,
     transport: str,
     local_data_dir: Path | None,
     local_mempool_limit: int,
@@ -656,6 +681,7 @@ def cli(
     ctx.obj['json_output'] = json_output
     ctx.obj['api_key'] = effective_api_key
     ctx.obj['transport'] = transport
+    ctx.obj['assume_yes'] = assume_yes
 
 def _generate_completion_script(prog_name: str, shell: str) -> str:
     """
@@ -989,7 +1015,7 @@ def wallet_send(ctx: click.Context, sender: str, recipient: str, amount: float,
     table.add_row("Total", f"{amount + fee:.8f} XAI")
     console.print(table)
 
-    if not Confirm.ask("\n[bold]Confirm transaction?[/]", default=False):
+    if not cli_confirm(ctx, "\n[bold]Confirm transaction?[/]", default=False):
         console.print("[yellow]Transaction cancelled[/]")
         return
 
@@ -1418,7 +1444,7 @@ def blockchain_genesis_verify(ctx: click.Context, genesis_path: Path | None):
 @click.pass_context
 def blockchain_checkpoints(ctx: click.Context, data_dir: Path, limit: int):
     """List checkpoints available on disk."""
-    from xai.core.checkpoints import CheckpointManager
+    from xai.core.consensus.checkpoints import CheckpointManager
 
     resolved = _determine_data_dir(data_dir, require_exists=True)
     manager = CheckpointManager(data_dir=str(resolved))
@@ -1477,7 +1503,7 @@ def blockchain_checkpoints(ctx: click.Context, data_dir: Path, limit: int):
 def blockchain_reset(ctx: click.Context, data_dir: Path, preserve_checkpoints: bool, yes: bool):
     """Reset local blockchain storage back to genesis."""
     resolved = _determine_data_dir(data_dir, require_exists=False)
-    if not yes:
+    if not yes and not ctx.obj.get('assume_yes'):
         if not Confirm.ask(
             f"[bold yellow]Reset blockchain data in {resolved}? This removes block files and UTXOs.[/]"
         ):
@@ -1513,7 +1539,7 @@ def blockchain_rollback(ctx: click.Context, data_dir: Path, height: int, yes: bo
     if height < 0:
         raise click.ClickException("Height must be non-negative.")
     resolved = _determine_data_dir(data_dir, require_exists=True)
-    if not yes:
+    if not yes and not ctx.obj.get('assume_yes'):
         if not Confirm.ask(
             f"[bold yellow]Restore checkpoint at height {height} in {resolved}? This rewinds the chain.[/]"
         ):

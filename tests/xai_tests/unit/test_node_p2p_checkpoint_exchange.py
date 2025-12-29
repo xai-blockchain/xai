@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from xai.core.node_p2p import P2PNetworkManager
+from xai.core.p2p.node_p2p import P2PNetworkManager
 
 
 class DummyCheckpoint:

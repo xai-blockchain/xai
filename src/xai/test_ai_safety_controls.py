@@ -11,7 +11,7 @@ Demonstrates how to use the AI safety control system to:
 import sys
 import time
 
-from xai.core.ai_safety_controls import AISafetyControls, AISafetyLevel, StopReason
+from xai.core.security.ai_safety_controls import AISafetyControls, AISafetyLevel, StopReason
 from xai.core.blockchain import Blockchain
 
 

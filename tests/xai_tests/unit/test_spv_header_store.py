@@ -2,7 +2,7 @@
 Tests for SPVHeaderStore chain selection.
 """
 
-from xai.core.spv_header_store import SPVHeaderStore, Header
+from xai.core.p2p.spv_header_store import SPVHeaderStore, Header
 
 
 def test_add_header_and_best_tip():
@@ -26,15 +26,16 @@ def test_reject_orphan_and_choose_heavier_fork():
     genesis = Header(height=0, block_hash="00" * 16, prev_hash="", bits=0x1f00ffff)
     store.add_header(genesis)
 
-    # main chain
-    h1 = Header(height=1, block_hash="00" * 16 + "a1", prev_hash=genesis.block_hash, bits=0x1f00fffe)
-    h2 = Header(height=2, block_hash="00" * 16 + "a2", prev_hash=h1.block_hash, bits=0x1f00fffe)
+    # main chain - uses higher bits value (larger target = less work)
+    h1 = Header(height=1, block_hash="00" * 16 + "a1", prev_hash=genesis.block_hash, bits=0x2000fffe)
+    h2 = Header(height=2, block_hash="00" * 16 + "a2", prev_hash=h1.block_hash, bits=0x2000fffe)
     store.add_header(h1)
     store.add_header(h2)
 
-    # fork with higher work at same height
-    f1 = Header(height=1, block_hash="00" * 16 + "b1", prev_hash=genesis.block_hash, bits=0x2000fffe)
-    f2 = Header(height=2, block_hash="00" * 16 + "b2", prev_hash=f1.block_hash, bits=0x2000fffe)
+    # fork with higher work at same height - uses lower bits value (smaller target = more work)
+    # With proper PoW calculation: work = 2^256/target, so smaller target = more work
+    f1 = Header(height=1, block_hash="00" * 16 + "b1", prev_hash=genesis.block_hash, bits=0x1f00fffe)
+    f2 = Header(height=2, block_hash="00" * 16 + "b2", prev_hash=f1.block_hash, bits=0x1f00fffe)
     store.add_header(f1)
     store.add_header(f2)
 

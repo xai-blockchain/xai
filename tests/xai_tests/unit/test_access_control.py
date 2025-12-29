@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 from xai.core.defi.access_control import RoleBasedAccessControl, SignedRequest, Role
-from xai.core.crypto_utils import generate_secp256k1_keypair_hex, sign_message_hex
+from xai.core.security.crypto_utils import generate_secp256k1_keypair_hex, sign_message_hex
 
 
 def _make_signed_request(private_hex: str, public_hex: str, address: str, message: str, nonce: int = 1, timestamp: int = 0) -> SignedRequest:

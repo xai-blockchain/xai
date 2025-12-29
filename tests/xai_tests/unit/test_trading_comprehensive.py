@@ -12,7 +12,7 @@ Tests all trading operations including:
 
 import pytest
 import time
-from xai.core.trading import (
+from xai.core.transactions.trading import (
     SwapOrderType,
     OrderStatus,
     TradeMatchStatus,

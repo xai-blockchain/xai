@@ -26,7 +26,7 @@ class TestLightClientPoWValidation:
     @pytest.fixture
     def light_client(self):
         """Create a light client instance."""
-        from xai.core.light_client import LightClient
+        from xai.core.p2p.light_client import LightClient
         return LightClient()
 
     def test_valid_hash_below_target(self, light_client):
@@ -127,7 +127,7 @@ class TestConsensusManagerPoWValidation:
     @pytest.fixture
     def consensus_manager(self):
         """Create a consensus manager with mocked blockchain."""
-        from xai.core.node_consensus import ConsensusManager
+        from xai.core.consensus.node_consensus import ConsensusManager
 
         mock_blockchain = Mock()
         mock_blockchain.difficulty = 4
@@ -201,7 +201,7 @@ class TestPoWSecurityScenarios:
     @pytest.fixture
     def consensus_manager(self):
         """Create a consensus manager."""
-        from xai.core.node_consensus import ConsensusManager
+        from xai.core.consensus.node_consensus import ConsensusManager
 
         mock_blockchain = Mock()
         mock_blockchain.difficulty = 4
@@ -262,8 +262,8 @@ class TestPoWSecurityScenarios:
 
     def test_consistent_with_mining_algorithm(self):
         """Test that consensus validation matches mining algorithm validation."""
-        from xai.core.mining_algorithm import MiningAlgorithm
-        from xai.core.node_consensus import ConsensusManager
+        from xai.core.mining.mining_algorithm import MiningAlgorithm
+        from xai.core.consensus.node_consensus import ConsensusManager
 
         mining = MiningAlgorithm()
         mock_blockchain = Mock()

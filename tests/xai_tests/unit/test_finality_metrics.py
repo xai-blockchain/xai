@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from xai.core.block_header import BlockHeader
-from xai.core.finality import (
+from xai.core.chain.block_header import BlockHeader
+from xai.core.consensus.finality import (
     FinalityCertificate,
     FinalityManager,
     FinalityValidationError,

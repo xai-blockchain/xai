@@ -9,7 +9,7 @@ import time
 from datetime import datetime, timezone, timedelta
 import jwt as pyjwt
 
-from xai.core.jwt_auth_manager import JWTAuthManager, UserRole
+from xai.core.security.jwt_auth_manager import JWTAuthManager, UserRole
 
 
 class TestJWTAuthManagerExpiration:

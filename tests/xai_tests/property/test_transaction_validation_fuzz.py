@@ -5,7 +5,7 @@ import hypothesis.strategies as st
 from hypothesis import given, settings
 
 from xai.core.transaction import Transaction
-from xai.core.transaction_validator import TransactionValidator
+from xai.core.consensus.transaction_validator import TransactionValidator
 from xai.core.blockchain import Blockchain
 
 

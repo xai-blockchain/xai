@@ -10,7 +10,7 @@ import tempfile
 import shutil
 from xai.core.blockchain import Blockchain, Block
 from xai.core.transaction import Transaction
-from xai.core.node_consensus import ConsensusManager
+from xai.core.consensus.node_consensus import ConsensusManager
 
 
 class TestCoinbaseValidation:

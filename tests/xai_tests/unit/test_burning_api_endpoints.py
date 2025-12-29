@@ -4,8 +4,8 @@ Unit tests for token burning API endpoints wiring and validation.
 
 from flask import Flask
 
-from xai.core import burning_api_endpoints as burn_api
-from xai.core.token_burning_engine import ServiceType
+from xai.core.api import burning_api_endpoints as burn_api
+from xai.core.governance.token_burning_engine import ServiceType
 
 
 class FakeEngine:

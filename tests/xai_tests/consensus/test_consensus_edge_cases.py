@@ -4,7 +4,7 @@ Tests for consensus edge cases.
 
 import pytest
 from xai.core.blockchain import Blockchain
-from xai.core.crypto_utils import deterministic_keypair_from_seed
+from xai.core.security.crypto_utils import deterministic_keypair_from_seed
 
 def test_halving_threshold(tmp_path):
     """

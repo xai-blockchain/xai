@@ -1,4 +1,4 @@
-from xai.core.p2p_security import (
+from xai.core.security.p2p_security import (
     HEADER_VERSION,
     HEADER_FEATURES,
     P2PSecurityConfig,

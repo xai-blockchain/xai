@@ -5,7 +5,7 @@ Tests for loading checkpoint payloads from file.
 import json
 import hashlib
 
-from xai.core.checkpoint_sync import CheckpointSyncManager
+from xai.core.p2p.checkpoint_sync import CheckpointSyncManager
 
 
 def test_load_payload_from_file(tmp_path):

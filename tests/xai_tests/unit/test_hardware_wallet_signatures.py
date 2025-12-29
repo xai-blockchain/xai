@@ -1,5 +1,5 @@
-from xai.core.crypto_utils import is_canonical_signature, verify_signature_hex
-from xai.core.hardware_wallet import MockHardwareWallet
+from xai.core.security.crypto_utils import is_canonical_signature, verify_signature_hex
+from xai.core.wallets.hardware_wallet import MockHardwareWallet
 
 
 def test_mock_hardware_wallet_signatures_are_canonical():
