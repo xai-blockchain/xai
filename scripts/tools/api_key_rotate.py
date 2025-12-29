@@ -12,9 +12,9 @@ import sys
 import time
 from pathlib import Path
 
-from xai.core.api_auth import APIAuthManager, APIKeyStore
+from xai.core.api.api_auth import APIAuthManager, APIKeyStore
 from xai.core.config import Config
-from xai.core.security_validation import log_security_event
+from xai.core.security.security_validation import log_security_event
 
 RATE_WINDOW_SEC = 60
 RATE_LIMIT = 20

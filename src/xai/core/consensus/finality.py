@@ -396,7 +396,7 @@ class FinalityManager:
                         "block_hash": v.block_hash,
                         "block_height": v.block_height,
                         "signatures": copy.deepcopy(v.signatures),
-                        "timestamp": v.timestamp,
+                        "created_at": v.created_at,
                     }
                     for k, v in self.certificates_by_hash.items()
                 },
