@@ -8,7 +8,7 @@ LABEL description="XAI Block Explorer Web Interface"
 # Environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/app \
+    PYTHONPATH=/app/src \
     EXPLORER_PORT=8082
 
 # Install dependencies
@@ -31,11 +31,9 @@ COPY constraints.txt /constraints.txt
 COPY src/xai/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application
-COPY --chown=explorer:explorer src/xai/explorer.py ./
-COPY --chown=explorer:explorer src/xai/block_explorer.py ./
+# Copy application - maintain xai package structure
+COPY --chown=explorer:explorer src/ ./src/
 COPY --chown=explorer:explorer src/xai/templates/ ./templates/
-COPY --chown=explorer:explorer src/xai/core/ ./core/
 
 USER explorer
 
@@ -45,4 +43,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 
 EXPOSE ${EXPLORER_PORT}
 
-CMD ["python", "explorer.py"]
+CMD ["python", "src/xai/explorer.py"]

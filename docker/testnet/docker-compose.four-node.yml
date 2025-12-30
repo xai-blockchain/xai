@@ -292,6 +292,7 @@ services:
     environment:
       XAI_API_URL: http://xai-testnet-bootstrap:12001
       EXPLORER_PORT: 12080
+      EXPLORER_HOST: 0.0.0.0
       EXPLORER_ENV: testnet
     ports:
       - "12080:12080"

@@ -35,4 +35,5 @@
    - To unblock: supply a populated kubeconfig (see `k8s/kubeconfig.staging-prod.example`), export it via `export KUBECONFIG=/path/to/kubeconfig`, then select `kubectl config use-context xai-staging-monitoring` (or `xai-prod-monitoring`) before running `./k8s/apply-monitoring-overlays.sh <namespace>` and `./k8s/verify-monitoring-overlays.sh --namespace=<monitoring-ns> --alertmanager-service=<svc> --probe-siem`.
 2) Validate Grafana auto-provisions `xai-grafana-security-ops` (datasource uid `prometheus`) and renders the fast-mining + QUIC error panels in staging/prod after overlays are applied (local validator now confirms datasource + QUIC panels).
 3) Re-run full suite or pre-merge CI gate once staging configs are applied to ensure no regressions.
-4) [ ] Rebuild docker 4-node testnet with the relaxed P2P fingerprint/diversity settings and confirm peers connect (health endpoints >0 peers, explorer stable).
+4) [x] Rebuild docker 4-node testnet with the relaxed P2P fingerprint/diversity settings and confirm peers connect (health endpoints >0 peers, explorer stable).
+   - Completed 2025-12-30: All 4 nodes healthy with 3-4 peers each, explorer accessible at :12080

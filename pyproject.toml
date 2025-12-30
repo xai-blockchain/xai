@@ -61,6 +61,7 @@ dependencies = [
     "click>=8.1.0", # For enhanced CLI
     "rich>=13.7.0", # For beautiful terminal output
     "aiohttp>=3.9.0", # For async HTTP in push notifications
+    "httpx>=0.27.0", # For async HTTP client in P2P module
     "rlp>=4.0.0", # For EVM RLP encoding
     "web3>=6.0.0", # For Web3/EVM interactions
     "eth-account>=0.11.0", # For Ethereum account management
