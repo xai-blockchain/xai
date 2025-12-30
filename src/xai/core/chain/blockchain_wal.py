@@ -12,6 +12,8 @@ import os
 import time
 from typing import TYPE_CHECKING, Any
 
+from xai.utils.secure_io import SECURE_FILE_MODE
+
 if TYPE_CHECKING:
     from xai.core.blockchain import Blockchain
 
@@ -64,7 +66,9 @@ class BlockchainWAL:
         }
 
         try:
-            with open(self.blockchain.reorg_wal_path, "w") as f:
+            # SECURITY: Use explicit permissions to prevent data leakage
+            fd = os.open(self.blockchain.reorg_wal_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, SECURE_FILE_MODE)
+            with os.fdopen(fd, "w") as f:
                 json.dump(wal_entry, f, indent=2)
                 f.flush()
                 os.fsync(f.fileno())  # Force write to disk
@@ -97,7 +101,9 @@ class BlockchainWAL:
             wal_entry["status"] = "committed"
             wal_entry["commit_timestamp"] = time.time()
 
-            with open(self.blockchain.reorg_wal_path, "w") as f:
+            # SECURITY: Use explicit permissions to prevent data leakage
+            fd = os.open(self.blockchain.reorg_wal_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, SECURE_FILE_MODE)
+            with os.fdopen(fd, "w") as f:
                 json.dump(wal_entry, f, indent=2)
                 f.flush()
                 os.fsync(f.fileno())
@@ -128,7 +134,9 @@ class BlockchainWAL:
             wal_entry["status"] = "rolled_back"
             wal_entry["rollback_timestamp"] = time.time()
 
-            with open(self.blockchain.reorg_wal_path, "w") as f:
+            # SECURITY: Use explicit permissions to prevent data leakage
+            fd = os.open(self.blockchain.reorg_wal_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, SECURE_FILE_MODE)
+            with os.fdopen(fd, "w") as f:
                 json.dump(wal_entry, f, indent=2)
                 f.flush()
                 os.fsync(f.fileno())

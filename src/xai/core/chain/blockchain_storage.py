@@ -17,8 +17,15 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from xai.core.chain.block_index import BlockIndex
+from xai.utils.secure_io import SECURE_FILE_MODE
 
 logger = logging.getLogger(__name__)
+
+
+class PathTraversalError(Exception):
+    """Raised when a path traversal attack is detected."""
+    pass
+
 
 if TYPE_CHECKING:
     from xai.core.chain.block_header import BlockHeader
@@ -59,6 +66,39 @@ class BlockchainStorage:
 
         if compact_on_startup:
             self.compact()
+
+    def _validate_safe_path(self, base_dir: str, filename: str) -> str:
+        """
+        Validate that a filename does not escape the base directory.
+
+        Prevents path traversal attacks by ensuring the resolved path
+        stays within the expected directory.
+
+        Args:
+            base_dir: The base directory that files must stay within
+            filename: The filename to validate (may be a relative path)
+
+        Returns:
+            The safe, normalized absolute path
+
+        Raises:
+            PathTraversalError: If the filename would escape the base directory
+        """
+        # Normalize the base directory
+        safe_base = os.path.normpath(os.path.abspath(base_dir))
+
+        # Construct and normalize the full path
+        full_path = os.path.normpath(os.path.abspath(os.path.join(base_dir, filename)))
+
+        # Verify the path stays within the base directory
+        if not full_path.startswith(safe_base + os.sep) and full_path != safe_base:
+            logger.error(
+                "Path traversal attempt detected",
+                extra={"target_file": filename, "attempted_path": full_path}
+            )
+            raise PathTraversalError(f"Invalid filename: path traversal detected")
+
+        return full_path
 
     def _set_block_file_index(self) -> None:
         """Sets the block file index to the latest one."""
@@ -484,7 +524,13 @@ class BlockchainStorage:
             stored_checksums = json.load(f)
 
         for filename, stored_checksum in stored_checksums.items():
-            filepath = os.path.join(self.data_dir, filename)
+            # SECURITY: Validate path to prevent path traversal attacks
+            try:
+                filepath = self._validate_safe_path(self.data_dir, filename)
+            except PathTraversalError:
+                # Path traversal attempt - treat as integrity failure
+                return False
+
             if not os.path.exists(filepath):
                 return False  # File is missing
             current_checksum = self._calculate_checksum(filepath)
@@ -631,24 +677,40 @@ class BlockchainStorage:
             return False
 
     def _atomic_write_json(self, path: str, payload: Any) -> None:
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        dir_path = os.path.dirname(path)
+        os.makedirs(dir_path, exist_ok=True)
+        # SECURITY: Ensure directory has secure permissions
+        os.chmod(dir_path, 0o700)
+
         tmp = f"{path}.tmp"
 
-        # Write to journal first
-        with open(self.journal_file, "a", encoding="utf-8") as jf:
-            jf.write(f"{path}\n")
-            jf.flush()
-            os.fsync(jf.fileno())
+        # Write to journal first with secure permissions
+        jf_fd = os.open(self.journal_file, os.O_WRONLY | os.O_CREAT | os.O_APPEND, SECURE_FILE_MODE)
+        try:
+            with os.fdopen(jf_fd, "a", encoding="utf-8") as jf:
+                jf.write(f"{path}\n")
+                jf.flush()
+                os.fsync(jf.fileno())
+        except Exception:
+            os.close(jf_fd)
+            raise
 
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2)
-            f.flush()
-            os.fsync(f.fileno())
+        # Write temp file with secure permissions
+        tmp_fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, SECURE_FILE_MODE)
+        try:
+            with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+        except Exception:
+            os.close(tmp_fd)
+            raise
+
         os.replace(tmp, path)
 
-        # Clear journal after successful write
-        with open(self.journal_file, "w", encoding="utf-8") as jf:
-            jf.truncate(0)
+        # Clear journal after successful write (with secure permissions)
+        jf_fd2 = os.open(self.journal_file, os.O_WRONLY | os.O_TRUNC, SECURE_FILE_MODE)
+        os.close(jf_fd2)
 
     def load_block_from_disk(self, block_index: int) -> Block | None:
         """
@@ -677,7 +739,16 @@ class BlockchainStorage:
             location = self.block_index.get_block_location(block_index)
             if location:
                 file_path, file_offset, file_size = location
-                full_path = os.path.join(self.data_dir, file_path)
+
+                # SECURITY: Validate path to prevent path traversal attacks
+                try:
+                    full_path = self._validate_safe_path(self.data_dir, file_path)
+                except PathTraversalError:
+                    logger.error(
+                        "Path traversal attempt in block index",
+                        extra={"block_index": block_index, "file_path": file_path}
+                    )
+                    return None
 
                 try:
                     with open(full_path, "r", encoding="utf-8") as f:

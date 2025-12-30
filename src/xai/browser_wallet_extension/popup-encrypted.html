@@ -226,8 +226,29 @@
     </div>
   </div>
 
-  <!-- Load secure storage first, then main script -->
-  <script src="secure-storage.js"></script>
-  <script src="popup-encrypted.js"></script>
+  <!--
+    Client-side cryptography for secure transaction signing.
+    SECURITY: Private keys NEVER leave the browser - all signing happens locally.
+  -->
+  <script type="module">
+    // Load noble-secp256k1 for client-side ECDSA signing
+    import * as secp from './node_modules/@noble/secp256k1/index.js';
+    window.secp256k1 = secp;
+
+    // Chain load: secure-storage → crypto-secp256k1 → popup-encrypted.js
+    const secureStorageScript = document.createElement('script');
+    secureStorageScript.src = 'secure-storage.js';
+    secureStorageScript.onload = () => {
+      const cryptoScript = document.createElement('script');
+      cryptoScript.src = 'crypto-secp256k1.js';
+      cryptoScript.onload = () => {
+        const popupScript = document.createElement('script');
+        popupScript.src = 'popup-encrypted.js';
+        document.body.appendChild(popupScript);
+      };
+      document.body.appendChild(cryptoScript);
+    };
+    document.body.appendChild(secureStorageScript);
+  </script>
 </body>
 </html>

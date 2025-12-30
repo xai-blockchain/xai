@@ -50,27 +50,28 @@ function stableStringify(value) {
  *
  * SECURITY ARCHITECTURE:
  * =====================
- * This replaces HMAC-SHA256 (which uses a shared secret) with proper ECDSA signatures.
+ * This uses CLIENT-SIDE signing with noble-secp256k1 library.
+ * Private keys NEVER leave the browser - all signing happens locally.
  *
- * Key differences:
- * - HMAC: Symmetric - both client and server know the secret
- * - ECDSA: Asymmetric - only signer has private key, anyone can verify with public key
+ * Key differences from previous implementation:
+ * - OLD: Private key sent to backend (INSECURE)
+ * - NEW: Private key stays in browser, signing done client-side (SECURE)
  *
  * IMPLEMENTATION:
  * ==============
- * Since Web Crypto API doesn't support secp256k1, we use the backend signing endpoint.
- * The backend has access to the cryptography library with proper secp256k1 support.
+ * Uses @noble/secp256k1 for pure JavaScript secp256k1 ECDSA signing.
+ * This is an audited, zero-dependency implementation.
  *
  * Flow:
  * 1. Hash payload with SHA-256 (deterministic, sorted JSON)
- * 2. Send hash + private key to backend /wallet/sign endpoint
- * 3. Backend signs with secp256k1 ECDSA
+ * 2. Sign hash locally using noble-secp256k1
+ * 3. Normalize signature to low-S form (BIP-62)
  * 4. Return signature for inclusion in transaction
  *
  * Security Note:
- * - Private key is sent to backend over HTTPS
- * - Backend should be trusted (same origin as wallet)
- * - Alternative: Load noble-secp256k1 library for client-side signing
+ * - Private key NEVER leaves the browser
+ * - No network requests during signing
+ * - Signatures use low-S normalization to prevent malleability
  *
  * @param {string} payloadStr - Serialized JSON (with sorted keys via stableStringify)
  * @param {string} privateKeyHex - Wallet's secp256k1 private key (64 hex chars)
@@ -84,9 +85,13 @@ async function signPayload(payloadStr, privateKeyHex) {
 
   if (!privateKeyHex || privateKeyHex.length !== 64) {
     throw new Error(
-      'Valid private key required: must be 64 hexadecimal characters. ' +
-        'Private keys should be provided securely (not stored in extension).'
+      'Valid private key required: must be 64 hexadecimal characters.'
     );
+  }
+
+  // Validate hex format
+  if (!/^[0-9a-fA-F]+$/.test(privateKeyHex)) {
+    throw new Error('Private key must be valid hexadecimal');
   }
 
   try {
@@ -96,32 +101,24 @@ async function signPayload(payloadStr, privateKeyHex) {
     const msgHashBuffer = await crypto.subtle.digest('SHA-256', payloadBytes);
     const msgHashHex = bufferToHex(msgHashBuffer);
 
-    // Step 2: Request ECDSA signature from backend
-    // The backend has Python cryptography library with secp256k1 support
-    const host = await getApiHost();
-    const response = await fetch(`${host}/wallet/sign`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message_hash: msgHashHex,
-        private_key: privateKeyHex,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Signing request failed (${response.status}): ${errorText}`);
+    // Step 2: Sign locally using XAICrypto (noble-secp256k1)
+    // Private key NEVER leaves the browser
+    if (typeof XAICrypto === 'undefined') {
+      throw new Error(
+        'XAICrypto not loaded. Ensure crypto-secp256k1.js and noble-secp256k1 are included.'
+      );
     }
 
-    const data = await response.json();
+    const signature = await XAICrypto.signMessageHash(msgHashHex, privateKeyHex);
 
-    if (!data.success || !data.signature) {
-      throw new Error(data.error || 'No signature returned from signing service');
+    // Validate signature format
+    if (!signature || signature.length !== 128) {
+      throw new Error('Invalid signature generated');
     }
 
     // Step 3: Return the ECDSA signature
     // Signature format: hex-encoded (r || s), 64 bytes = 128 hex characters
-    return data.signature;
+    return signature;
   } catch (error) {
     console.error('Transaction signing failed:', error);
     throw new Error(`Failed to sign transaction: ${error.message}`);
@@ -516,24 +513,15 @@ async function submitOrder(event) {
   try {
     const formData = new FormData(form);
 
-    // Step 1: Derive public key from private key
+    // Step 1: Derive public key from private key (CLIENT-SIDE - key never leaves browser)
     $('#tradeMessage').textContent = 'Deriving public key...';
-    const publicKeyResponse = await fetch(`${host}/wallet/derive-public-key`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ private_key: privateKey }),
-    });
 
-    if (!publicKeyResponse.ok) {
-      throw new Error('Failed to derive public key from private key');
+    if (typeof XAICrypto === 'undefined') {
+      throw new Error('XAICrypto not loaded. Ensure crypto-secp256k1.js and noble-secp256k1 are included.');
     }
 
-    const publicKeyData = await publicKeyResponse.json();
-    if (!publicKeyData.success || !publicKeyData.public_key) {
-      throw new Error(publicKeyData.error || 'No public key returned');
-    }
-
-    const publicKey = publicKeyData.public_key;
+    // Derive public key locally - private key NEVER sent over network
+    const publicKey = XAICrypto.derivePublicKey(privateKey, true);
 
     // Step 2: Build transaction payload
     const payload = {

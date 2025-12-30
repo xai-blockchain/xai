@@ -36,5 +36,8 @@
       "text-summary"
     ],
     "verbose": true
+  },
+  "dependencies": {
+    "@noble/secp256k1": "^2.1.0"
   }
 }

@@ -23,6 +23,8 @@ import os
 import shutil
 import time
 from datetime import datetime
+
+from xai.utils.secure_io import SECURE_FILE_MODE
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -269,8 +271,10 @@ class CheckpointManager:
         temp_file = checkpoint_file + ".tmp"
 
         try:
-            # Write to temporary file
-            with open(temp_file, "w") as f:
+            # Write to temporary file with secure permissions
+            # SECURITY: Checkpoints contain UTXO data - prevent data leakage
+            fd = os.open(temp_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, SECURE_FILE_MODE)
+            with os.fdopen(fd, "w") as f:
                 json.dump(checkpoint.to_dict(), f, indent=2)
 
             # Verify the written data

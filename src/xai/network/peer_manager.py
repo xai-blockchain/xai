@@ -1648,15 +1648,31 @@ class PeerEncryption:
                 pubkey.serialize(compressed=True)
             )
 
-            # Testnet-only bypass for emergency debugging
-            if os.getenv("XAI_P2P_DISABLE_SIGNATURE_VERIFY", "0").lower() in {"1", "true", "yes", "on"}:
-                return {
-                    "payload": message.get("payload"),
-                    "sender": pubkey_hex,
-                    "nonce": message.get("nonce"),
-                    "timestamp": message.get("timestamp"),
-                    "sender_id": claimed_sender or fingerprint_expected,
-                }
+            # SECURITY: Signature verification bypass - DEVELOPMENT ONLY
+            # This bypass is blocked in production mode by startup_validator.py
+            # Even if bypassed here, production nodes will refuse to start with this enabled
+            bypass_sig_verify = os.getenv("XAI_P2P_DISABLE_SIGNATURE_VERIFY", "0").lower() in {"1", "true", "yes", "on"}
+            is_prod = os.getenv("XAI_PRODUCTION_MODE", "0").lower() in {"1", "true", "yes", "on", "production"}
+            if bypass_sig_verify:
+                if is_prod:
+                    # CRITICAL: Never allow signature bypass in production
+                    logger.critical(
+                        "SECURITY: Signature verification bypass attempted in production mode - BLOCKED",
+                        extra={"event": "security.bypass_blocked"}
+                    )
+                    # Continue with normal verification
+                else:
+                    logger.warning(
+                        "SECURITY: Signature verification BYPASSED (non-production mode)",
+                        extra={"event": "security.sig_verify_bypass"}
+                    )
+                    return {
+                        "payload": message.get("payload"),
+                        "sender": pubkey_hex,
+                        "nonce": message.get("nonce"),
+                        "timestamp": message.get("timestamp"),
+                        "sender_id": claimed_sender or fingerprint_expected,
+                    }
 
             # Verify timestamp is recent (e.g., within the last 5 minutes)
             if time.time() - message["timestamp"] > 300:

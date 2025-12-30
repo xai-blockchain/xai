@@ -171,6 +171,24 @@
       <p id="aiKeyDeleted" class="meta"></p>
     </section>
   </div>
-  <script src="popup.js"></script>
+  <!--
+    Client-side cryptography for secure transaction signing.
+    SECURITY: Private keys NEVER leave the browser - all signing happens locally.
+  -->
+  <script type="module">
+    // Load noble-secp256k1 for client-side ECDSA signing
+    import * as secp from './node_modules/@noble/secp256k1/index.js';
+    window.secp256k1 = secp;
+
+    // After secp256k1 is loaded, load the crypto module and popup.js
+    const cryptoScript = document.createElement('script');
+    cryptoScript.src = 'crypto-secp256k1.js';
+    cryptoScript.onload = () => {
+      const popupScript = document.createElement('script');
+      popupScript.src = 'popup.js';
+      document.body.appendChild(popupScript);
+    };
+    document.body.appendChild(cryptoScript);
+  </script>
 </body>
 </html>
