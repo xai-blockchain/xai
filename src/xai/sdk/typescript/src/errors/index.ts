@@ -199,3 +199,14 @@ export class WebSocketError extends XAIError {
     Object.setPrototypeOf(this, WebSocketError.prototype);
   }
 }
+
+/**
+ * AI error - raised when AI operation fails
+ */
+export class AIError extends XAIError {
+  constructor(message: string, code?: number, errorDetails?: Record<string, unknown>) {
+    super(message, code, errorDetails);
+    this.name = 'AIError';
+    Object.setPrototypeOf(this, AIError.prototype);
+  }
+}

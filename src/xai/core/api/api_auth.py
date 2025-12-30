@@ -80,14 +80,21 @@ class APIKeyStore:
         self._hydrate_metadata()
 
     def _persist(self) -> None:
-        """Persist API key store atomically to disk."""
+        """Persist API key store atomically to disk with secure permissions."""
         directory = os.path.dirname(self.path)
         if directory:
             os.makedirs(directory, exist_ok=True)
         tmp_path = f"{self.path}.tmp"
         with open(tmp_path, "w", encoding="utf-8") as handle:
             json.dump(self._keys, handle, indent=2)
+        # Set secure permissions (owner read/write only) before moving to final path
+        os.chmod(tmp_path, 0o600)
         os.replace(tmp_path, self.path)
+        # Ensure final file also has secure permissions (in case replace doesn't preserve)
+        try:
+            os.chmod(self.path, 0o600)
+        except OSError:
+            pass  # Best effort - may fail on some filesystems
 
     def list_keys(self) -> dict[str, dict[str, Any]]:
         """Return all keys with computed expiration/expired fields."""

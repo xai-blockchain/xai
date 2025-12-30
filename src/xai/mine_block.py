@@ -2,7 +2,7 @@
 Ask the running XAI node to mine a block with the current mempool.
 
 Usage:
-  python mine-block.py --miner XAI1MinerAddress
+  python mine_block.py --miner XAI1MinerAddress
 """
 
 import argparse

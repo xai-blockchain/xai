@@ -9,6 +9,7 @@ import time
 import logging
 from flask import Flask, request, jsonify, render_template_string
 from datetime import datetime, timedelta
+from collections import defaultdict
 import requests
 
 # Configure logging
@@ -23,8 +24,39 @@ FAUCET_PORT = int(os.getenv('FAUCET_PORT', '8086'))
 FAUCET_AMOUNT = float(os.getenv('FAUCET_AMOUNT', '100'))
 FAUCET_COOLDOWN = int(os.getenv('FAUCET_COOLDOWN', '3600'))  # 1 hour in seconds
 
-# In-memory storage for cooldown tracking
-request_history = {}
+# hCaptcha configuration (optional)
+HCAPTCHA_SITE_KEY = os.getenv('HCAPTCHA_SITE_KEY', '')
+HCAPTCHA_SECRET_KEY = os.getenv('HCAPTCHA_SECRET_KEY', '')
+HCAPTCHA_ENABLED = bool(HCAPTCHA_SITE_KEY and HCAPTCHA_SECRET_KEY)
+
+# Redis configuration (optional)
+REDIS_URL = os.getenv('REDIS_URL', '')
+
+# Storage backends
+redis_client = None
+request_history = {}  # Fallback in-memory storage
+ip_history = {}  # IP-based rate limiting
+stats = {
+    'total_requests': 0,
+    'unique_addresses': set(),
+    'start_time': time.time()
+}
+
+# Initialize Redis if available
+if REDIS_URL:
+    try:
+        import redis
+        redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+        redis_client.ping()
+        logger.info(f"Connected to Redis at {REDIS_URL}")
+    except ImportError:
+        logger.warning("Redis URL provided but redis package not installed. Install with: pip install redis")
+        redis_client = None
+    except Exception as e:
+        logger.warning(f"Failed to connect to Redis: {e}. Falling back to in-memory storage.")
+        redis_client = None
+else:
+    logger.info("Redis URL not configured. Using in-memory storage for rate limits.")
 
 # HTML template
 TEMPLATE = """
@@ -32,6 +64,9 @@ TEMPLATE = """
 <html>
 <head>
     <title>XAI Testnet Faucet</title>
+    {% if hcaptcha_enabled %}
+    <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+    {% endif %}
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -53,6 +88,7 @@ TEMPLATE = """
             margin: 10px 0;
             border: 1px solid #ddd;
             border-radius: 5px;
+            box-sizing: border-box;
         }
         button {
             width: 100%;
@@ -85,6 +121,7 @@ TEMPLATE = """
             color: #0c5460;
             border: 1px solid #bee5eb;
         }
+        .h-captcha { margin: 10px 0; }
     </style>
 </head>
 <body>
@@ -96,6 +133,9 @@ TEMPLATE = """
         </div>
         <form id="faucetForm">
             <input type="text" id="address" placeholder="Enter your XAI address" required>
+            {% if hcaptcha_enabled %}
+            <div class="h-captcha" data-sitekey="{{ hcaptcha_sitekey }}"></div>
+            {% endif %}
             <button type="submit">Request Tokens</button>
         </form>
         <div id="result"></div>
@@ -106,21 +146,37 @@ TEMPLATE = """
             const address = document.getElementById('address').value;
             const resultDiv = document.getElementById('result');
 
+            // Get hCaptcha response if enabled
+            let captchaResponse = '';
+            {% if hcaptcha_enabled %}
+            captchaResponse = hcaptcha.getResponse();
+            if (!captchaResponse) {
+                resultDiv.innerHTML = '<div class="error message">Please complete the CAPTCHA</div>';
+                return;
+            }
+            {% endif %}
+
             resultDiv.innerHTML = '<div class="info message">Processing...</div>';
 
             try {
                 const response = await fetch('/api/request', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ address })
+                    body: JSON.stringify({ address, captcha: captchaResponse })
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
                     resultDiv.innerHTML = `<div class="success message">${data.message}</div>`;
+                    {% if hcaptcha_enabled %}
+                    hcaptcha.reset();
+                    {% endif %}
                 } else {
                     resultDiv.innerHTML = `<div class="error message">${data.error}</div>`;
+                    {% if hcaptcha_enabled %}
+                    hcaptcha.reset();
+                    {% endif %}
                 }
             } catch (error) {
                 resultDiv.innerHTML = `<div class="error message">Network error: ${error.message}</div>`;
@@ -132,8 +188,51 @@ TEMPLATE = """
 """
 
 
+def verify_hcaptcha(token: str) -> bool:
+    """Verify hCaptcha token with hCaptcha API"""
+    if not HCAPTCHA_ENABLED:
+        return True
+
+    if not token:
+        return False
+
+    try:
+        response = requests.post(
+            'https://hcaptcha.com/siteverify',
+            data={
+                'secret': HCAPTCHA_SECRET_KEY,
+                'response': token
+            },
+            timeout=10
+        )
+        result = response.json()
+        return result.get('success', False)
+    except Exception as e:
+        logger.error(f"hCaptcha verification failed: {e}")
+        return False
+
+
 def check_cooldown(address: str) -> tuple[bool, int]:
-    """Check if address is in cooldown period"""
+    """Check if address is in cooldown period. Uses Redis if available."""
+    # Try Redis first
+    if redis_client:
+        try:
+            key = f"faucet:cooldown:{address}"
+            last_request_str = redis_client.get(key)
+            if last_request_str is None:
+                return True, 0
+
+            last_request = float(last_request_str)
+            elapsed = time.time() - last_request
+            remaining = FAUCET_COOLDOWN - elapsed
+
+            if remaining <= 0:
+                return True, 0
+            return False, int(remaining)
+        except Exception as e:
+            logger.warning(f"Redis check failed, falling back to memory: {e}")
+
+    # Fallback to in-memory
     if address not in request_history:
         return True, 0
 
@@ -145,6 +244,28 @@ def check_cooldown(address: str) -> tuple[bool, int]:
         return True, 0
 
     return False, int(remaining)
+
+
+def record_request(address: str) -> None:
+    """Record a faucet request. Uses Redis if available."""
+    current_time = time.time()
+
+    # Always update in-memory for stats
+    request_history[address] = current_time
+    stats['total_requests'] += 1
+    stats['unique_addresses'].add(address)
+
+    # Also persist to Redis if available
+    if redis_client:
+        try:
+            key = f"faucet:cooldown:{address}"
+            redis_client.setex(key, FAUCET_COOLDOWN, str(current_time))
+
+            # Update stats in Redis
+            redis_client.incr("faucet:stats:total_requests")
+            redis_client.sadd("faucet:stats:unique_addresses", address)
+        except Exception as e:
+            logger.warning(f"Redis write failed: {e}")
 
 
 def send_tokens(address: str, amount: float) -> dict:
@@ -168,7 +289,9 @@ def index():
     return render_template_string(
         TEMPLATE,
         amount=FAUCET_AMOUNT,
-        cooldown=FAUCET_COOLDOWN
+        cooldown=FAUCET_COOLDOWN,
+        hcaptcha_enabled=HCAPTCHA_ENABLED,
+        hcaptcha_sitekey=HCAPTCHA_SITE_KEY
     )
 
 
@@ -181,6 +304,12 @@ def request_tokens():
         return jsonify({'success': False, 'error': 'Address is required'}), 400
 
     address = data['address']
+
+    # Verify hCaptcha if enabled
+    if HCAPTCHA_ENABLED:
+        captcha_token = data.get('captcha', '')
+        if not verify_hcaptcha(captcha_token):
+            return jsonify({'success': False, 'error': 'CAPTCHA verification failed'}), 400
 
     # Validate address format (basic check)
     if not address.startswith('AXN') or len(address) < 40:
@@ -198,7 +327,7 @@ def request_tokens():
     result = send_tokens(address, FAUCET_AMOUNT)
 
     if result.get('success'):
-        request_history[address] = time.time()
+        record_request(address)
         return jsonify({
             'success': True,
             'message': f'Successfully sent {FAUCET_AMOUNT} XAI to {address}',
@@ -217,10 +346,40 @@ def health():
     return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
 
 
+@app.route('/api/stats')
+def get_stats():
+    """Get faucet statistics"""
+    uptime = time.time() - stats['start_time']
+
+    # Try Redis for persistent stats
+    if redis_client:
+        try:
+            total_requests = int(redis_client.get("faucet:stats:total_requests") or 0)
+            unique_addresses = redis_client.scard("faucet:stats:unique_addresses") or 0
+        except Exception:
+            total_requests = stats['total_requests']
+            unique_addresses = len(stats['unique_addresses'])
+    else:
+        total_requests = stats['total_requests']
+        unique_addresses = len(stats['unique_addresses'])
+
+    return jsonify({
+        'total_requests': total_requests,
+        'unique_addresses': unique_addresses,
+        'uptime_seconds': int(uptime),
+        'faucet_amount': FAUCET_AMOUNT,
+        'cooldown_seconds': FAUCET_COOLDOWN,
+        'hcaptcha_enabled': HCAPTCHA_ENABLED,
+        'redis_enabled': redis_client is not None
+    })
+
+
 if __name__ == '__main__':
     logger.info(f"Starting XAI Testnet Faucet on port {FAUCET_PORT}")
     logger.info(f"Faucet amount: {FAUCET_AMOUNT} XAI")
     logger.info(f"Cooldown period: {FAUCET_COOLDOWN} seconds")
     logger.info(f"XAI API URL: {XAI_API_URL}")
+    logger.info(f"hCaptcha: {'enabled' if HCAPTCHA_ENABLED else 'disabled'}")
+    logger.info(f"Redis: {'connected' if redis_client else 'disabled (in-memory mode)'}")
 
     app.run(host='0.0.0.0', port=FAUCET_PORT, debug=False)

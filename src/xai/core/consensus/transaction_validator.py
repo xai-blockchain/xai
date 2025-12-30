@@ -19,7 +19,7 @@ from xai.core.transactions.nonce_tracker import NonceTracker, get_nonce_tracker
 from xai.core.security.security_validation import SecurityValidator, ValidationError
 from xai.core.api.structured_logger import StructuredLogger, get_structured_logger
 from xai.core.transactions.utxo_manager import UTXOManager, get_utxo_manager
-from xai.core.consensus.validation import validate_address, validate_amount, validate_fee
+from xai.core.consensus.validation import validate_address, validate_amount, validate_fee, MonetaryAmount
 from xai.core.wallet import Wallet
 
 # Security constants for transaction validation
@@ -197,7 +197,10 @@ class TransactionValidator:
 
     def _validate_utxo(self, transaction: "Transaction", is_settlement_receipt: bool) -> None:
         """Validate UTXO inputs and outputs."""
-        if transaction.tx_type == "coinbase" or is_settlement_receipt:
+        # Check both tx_type and sender for coinbase (sender == "COINBASE" is the
+        # canonical check used elsewhere, but tx_type == "coinbase" may also be set)
+        is_coinbase = transaction.tx_type == "coinbase" or transaction.sender == "COINBASE"
+        if is_coinbase or is_settlement_receipt:
             return
 
         if not transaction.inputs:
@@ -206,10 +209,24 @@ class TransactionValidator:
         input_sum = self._validate_inputs(transaction)
         output_sum = self._validate_outputs(transaction)
 
-        if input_sum + 1e-9 < (output_sum + transaction.fee):
-            raise ValidationError(
-                f"Insufficient input funds. Input sum: {input_sum}, Output sum: {output_sum}, Fee: {transaction.fee}"
-            )
+        # Use MonetaryAmount for precise financial comparison to avoid floating-point errors
+        # Convert floats to strings with sufficient precision for MonetaryAmount constructor
+        try:
+            input_amount = MonetaryAmount(f"{input_sum:.8f}")
+            output_amount = MonetaryAmount(f"{output_sum:.8f}")
+            fee_amount = MonetaryAmount(f"{transaction.fee:.8f}")
+            required_amount = output_amount + fee_amount
+
+            if input_amount < required_amount:
+                raise ValidationError(
+                    f"Insufficient input funds. Input sum: {input_sum}, Output sum: {output_sum}, Fee: {transaction.fee}"
+                )
+        except (ValueError, TypeError):
+            # Fallback to epsilon comparison if MonetaryAmount conversion fails
+            if input_sum + 1e-9 < (output_sum + transaction.fee):
+                raise ValidationError(
+                    f"Insufficient input funds. Input sum: {input_sum}, Output sum: {output_sum}, Fee: {transaction.fee}"
+                )
 
     def _validate_inputs(self, transaction: "Transaction") -> float:
         """Validate transaction inputs and return total input sum."""

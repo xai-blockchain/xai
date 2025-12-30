@@ -7,6 +7,7 @@
 
 import { HTTPClient } from './utils/http-client';
 import { WebSocketClient } from './utils/websocket-client';
+import { AIClient } from './clients/ai-client';
 import { WalletClient } from './clients/wallet-client';
 import { TransactionClient } from './clients/transaction-client';
 import { BlockchainClient } from './clients/blockchain-client';
@@ -58,6 +59,7 @@ export class XAIClient {
   public readonly blockchain: BlockchainClient;
   public readonly mining: MiningClient;
   public readonly governance: GovernanceClient;
+  public readonly ai: AIClient;
 
   constructor(config: XAIClientConfig = {}) {
     const baseUrl = config.baseUrl || 'http://localhost:5000';
@@ -80,6 +82,7 @@ export class XAIClient {
     this.blockchain = new BlockchainClient(this.httpClient);
     this.mining = new MiningClient(this.httpClient);
     this.governance = new GovernanceClient(this.httpClient);
+    this.ai = new AIClient(this.httpClient);
   }
 
   /**

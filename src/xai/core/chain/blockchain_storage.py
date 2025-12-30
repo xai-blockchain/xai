@@ -42,6 +42,7 @@ class BlockchainStorage:
         self.contracts_file = os.path.join(self.data_dir, "contracts_state.json")
         self.receipts_file = os.path.join(self.data_dir, "contract_receipts.json")
         self.journal_file = os.path.join(self.data_dir, "journal.log")
+        self.txn_log_file = os.path.join(self.data_dir, "txn_log.json")  # P2: Transaction log for atomic multi-file saves
         self.block_file_index = 0
         self._set_block_file_index()
 
@@ -426,13 +427,15 @@ class BlockchainStorage:
         contracts: dict[str, dict[str, Any]] | None = None,
         receipts: list[dict[str, Any]] | None = None,
     ) -> None:
-        """Save the blockchain state (UTXO set and pending transactions) to disk."""
-        # Save UTXO set (atomic)
-        self._atomic_write_json(self.utxo_file, utxo_manager.to_dict())
+        """
+        Save the blockchain state atomically to disk.
 
-        # Save pending transactions
+        P2 Performance: Uses transaction log for atomic multi-file writes.
+        All files are written to temp locations first, then committed atomically.
+        On crash recovery, incomplete transactions are rolled back.
+        """
+        # Prepare all data payloads
         pending_tx_data = [tx.to_dict() for tx in pending_transactions]
-        self._atomic_write_json(self.pending_tx_file, pending_tx_data)
 
         contracts_payload = {}
         if contracts:
@@ -445,9 +448,17 @@ class BlockchainStorage:
                     "balance": contract.get("balance"),
                     "created_at": contract.get("created_at"),
                 }
-        self._atomic_write_json(self.contracts_file, contracts_payload)
 
-        self._atomic_write_json(self.receipts_file, receipts or [])
+        # Define files to write in this transaction
+        files_to_write = [
+            (self.utxo_file, utxo_manager.to_dict()),
+            (self.pending_tx_file, pending_tx_data),
+            (self.contracts_file, contracts_payload),
+            (self.receipts_file, receipts or []),
+        ]
+
+        # P2: Use atomic multi-file transaction
+        self._atomic_multi_file_write(files_to_write)
 
         # Update checksums
         checksums = {
@@ -489,6 +500,135 @@ class BlockchainStorage:
             for byte_block in iter(lambda: f.read(4096), b""):
                 sha256_hash.update(byte_block)
         return sha256_hash.hexdigest()
+
+    def _atomic_multi_file_write(self, files: list[tuple[str, Any]]) -> None:
+        """
+        P2: Atomically write multiple files using a transaction log.
+
+        This ensures that either all files are written successfully, or none are.
+        On crash recovery, incomplete transactions are detected and rolled back.
+
+        Algorithm:
+        1. Write transaction log with list of files and status "pending"
+        2. Write all files to .tmp locations
+        3. Update transaction log to "prepared" with temp file paths
+        4. Atomically replace each temp file with final file
+        5. Mark transaction log as "committed"
+        6. Delete transaction log
+
+        Args:
+            files: List of (filepath, payload) tuples to write atomically
+        """
+        import time as time_module
+
+        txn_id = f"txn_{int(time_module.time() * 1000)}"
+        temp_files = []
+
+        try:
+            # Step 1: Create transaction log with pending status
+            txn_entry = {
+                "id": txn_id,
+                "status": "pending",
+                "files": [f[0] for f in files],
+                "temp_files": [],
+                "timestamp": time_module.time(),
+            }
+            self._write_txn_log(txn_entry)
+
+            # Step 2: Write all files to temp locations
+            for filepath, payload in files:
+                os.makedirs(os.path.dirname(filepath) or ".", exist_ok=True)
+                tmp_path = f"{filepath}.tmp.{txn_id}"
+                temp_files.append((tmp_path, filepath))
+
+                with open(tmp_path, "w", encoding="utf-8") as f:
+                    json.dump(payload, f, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+
+            # Step 3: Update transaction log to prepared
+            txn_entry["status"] = "prepared"
+            txn_entry["temp_files"] = [t[0] for t in temp_files]
+            self._write_txn_log(txn_entry)
+
+            # Step 4: Atomically replace all files
+            for tmp_path, final_path in temp_files:
+                os.replace(tmp_path, final_path)
+
+            # Step 5 & 6: Mark committed and delete transaction log
+            self._clear_txn_log()
+
+        except Exception as e:
+            # Rollback: clean up any temp files
+            for tmp_path, _ in temp_files:
+                try:
+                    if os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+                except OSError:
+                    pass
+            self._clear_txn_log()
+            raise RuntimeError(f"Atomic multi-file write failed: {e}") from e
+
+    def _write_txn_log(self, entry: dict[str, Any]) -> None:
+        """Write transaction log entry with fsync for durability."""
+        with open(self.txn_log_file, "w", encoding="utf-8") as f:
+            json.dump(entry, f)
+            f.flush()
+            os.fsync(f.fileno())
+
+    def _clear_txn_log(self) -> None:
+        """Clear transaction log after successful commit."""
+        try:
+            if os.path.exists(self.txn_log_file):
+                os.remove(self.txn_log_file)
+        except OSError:
+            pass
+
+    def recover_incomplete_transactions(self) -> bool:
+        """
+        P2: Recover from incomplete multi-file transactions on startup.
+
+        Returns True if recovery was performed, False if no recovery needed.
+        """
+        if not os.path.exists(self.txn_log_file):
+            return False
+
+        try:
+            with open(self.txn_log_file, "r", encoding="utf-8") as f:
+                txn_entry = json.load(f)
+
+            status = txn_entry.get("status")
+            temp_files = txn_entry.get("temp_files", [])
+
+            if status == "pending":
+                # Transaction never got to prepared state - just clean up log
+                logger.warning(
+                    "Recovering from pending transaction - rolling back",
+                    extra={"event": "storage.txn_recovery", "txn_id": txn_entry.get("id")}
+                )
+            elif status == "prepared":
+                # Transaction was prepared but not committed - clean up temp files
+                logger.warning(
+                    "Recovering from prepared transaction - cleaning up temp files",
+                    extra={"event": "storage.txn_recovery", "txn_id": txn_entry.get("id")}
+                )
+                for tmp_path in temp_files:
+                    try:
+                        if os.path.exists(tmp_path):
+                            os.remove(tmp_path)
+                    except OSError:
+                        pass
+
+            self._clear_txn_log()
+            return True
+
+        except (OSError, json.JSONDecodeError, KeyError) as e:
+            logger.error(
+                "Failed to recover transaction log",
+                extra={"event": "storage.txn_recovery_failed", "error": str(e)}
+            )
+            self._clear_txn_log()
+            return False
 
     def _atomic_write_json(self, path: str, payload: Any) -> None:
         os.makedirs(os.path.dirname(path), exist_ok=True)

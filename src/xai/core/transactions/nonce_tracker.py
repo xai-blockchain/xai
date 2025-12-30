@@ -2,6 +2,9 @@
 XAI Blockchain - Transaction Nonce Tracking
 
 Prevents replay attacks by tracking sequential nonces per address.
+
+P2 Performance: Batched disk I/O - saves are deferred until 100 changes
+accumulated or 1 second elapsed since last save, reducing disk I/O overhead.
 """
 
 from __future__ import annotations
@@ -9,9 +12,15 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from threading import RLock
 
 logger = logging.getLogger(__name__)
+
+# Batching configuration
+BATCH_SIZE = 100       # Save after this many changes
+BATCH_TIMEOUT = 1.0    # Save after this many seconds
+
 
 class NonceTracker:
     """
@@ -19,6 +28,9 @@ class NonceTracker:
 
     Each address has a sequential nonce starting from 0.
     Transactions must have nonce = current_nonce + 1.
+
+    P2 Performance: Uses batched disk I/O to reduce write overhead.
+    Changes are accumulated and flushed when batch size or timeout is reached.
     """
 
     def __init__(self, data_dir: str | None = None) -> None:
@@ -39,6 +51,11 @@ class NonceTracker:
         self.pending_nonces: dict[str, int] = {}
         self.lock = RLock()
 
+        # P2 Performance: Batching state
+        self._dirty = False
+        self._pending_changes = 0
+        self._last_save_time = time.monotonic()
+
         # Load existing nonces
         self._load_nonces()
 
@@ -57,17 +74,52 @@ class NonceTracker:
                 )
                 self.nonces = {}
 
-    def _save_nonces(self) -> None:
-        """Save nonces to file"""
+    def _save_nonces(self, force: bool = False) -> None:
+        """
+        Save nonces to file.
+
+        Args:
+            force: If True, save immediately regardless of batch state.
+        """
+        if not self._dirty and not force:
+            return
+
         try:
             with open(self.nonce_file, "w") as f:
                 json.dump(self.nonces, f, indent=2)
+            # Reset batching state after successful save
+            self._dirty = False
+            self._pending_changes = 0
+            self._last_save_time = time.monotonic()
         except (ValueError, KeyError, OSError, IOError) as e:
-            logger.error(                "Failed to save nonces to %s: %s",
+            logger.error(
+                "Failed to save nonces to %s: %s",
                 self.nonce_file,
                 type(e).__name__,
                 extra={"event": "nonce.save_failed", "error": str(e)}
             )
+
+    def _maybe_save_nonces(self) -> None:
+        """
+        P2 Performance: Batched save - only writes to disk when batch
+        size reached (100 changes) or timeout elapsed (1 second).
+        """
+        self._dirty = True
+        self._pending_changes += 1
+
+        # Check if we should save now
+        time_elapsed = time.monotonic() - self._last_save_time
+        if self._pending_changes >= BATCH_SIZE or time_elapsed >= BATCH_TIMEOUT:
+            self._save_nonces(force=True)
+
+    def flush(self) -> None:
+        """
+        Flush any pending nonce changes to disk.
+        Call this during graceful shutdown.
+        """
+        with self.lock:
+            if self._dirty:
+                self._save_nonces(force=True)
 
     def _get_confirmed_nonce(self, address: str) -> int:
         return self.nonces.get(address, -1)
@@ -149,7 +201,7 @@ class NonceTracker:
             if pending is not None and pending <= next_nonce:
                 self.pending_nonces.pop(address, None)
 
-            self._save_nonces()
+            self._maybe_save_nonces()  # P2: Batched save
 
     def set_nonce(self, address: str, nonce: int) -> None:
         """
@@ -164,7 +216,7 @@ class NonceTracker:
             pending = self.pending_nonces.get(address)
             if pending is not None and pending <= nonce:
                 self.pending_nonces.pop(address, None)
-            self._save_nonces()
+            self._maybe_save_nonces()  # P2: Batched save
 
     def reset(self) -> None:
         """
@@ -173,7 +225,7 @@ class NonceTracker:
         with self.lock:
             self.nonces.clear()
             self.pending_nonces.clear()
-            self._save_nonces()
+            self._save_nonces(force=True)  # Force immediate save for reset
 
     def reset_nonce(self, address: str) -> None:
         """
@@ -185,7 +237,7 @@ class NonceTracker:
         with self.lock:
             self.nonces[address] = -1
             self.pending_nonces.pop(address, None)
-            self._save_nonces()
+            self._maybe_save_nonces()  # P2: Batched save
 
     def get_stats(self) -> dict:
         """
@@ -230,8 +282,8 @@ class NonceTracker:
             self.nonces = copy.deepcopy(snapshot.get("nonces", {}))
             self.pending_nonces = copy.deepcopy(snapshot.get("pending_nonces", {}))
 
-            # Persist restored state to disk
-            self._save_nonces()
+            # Persist restored state to disk (force save for rollback safety)
+            self._save_nonces(force=True)
 
             logger.info(
                 "Nonce state restored from snapshot",

@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-xai-darker text-xai-text;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-xai-darker;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-xai-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-xai-muted;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-4 py-2 bg-xai-primary text-black rounded-lg font-medium hover:bg-xai-secondary transition-colors;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-4 py-2 bg-xai-card text-white rounded-lg font-medium hover:bg-xai-border transition-colors;
+  }
+
+  .input {
+    @apply block w-full rounded-lg border border-xai-border bg-xai-card py-2 px-4 text-sm text-white placeholder-xai-muted focus:border-xai-primary focus:outline-none focus:ring-1 focus:ring-xai-primary;
+  }
+
+  .link {
+    @apply text-xai-primary hover:underline;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-xai-primary to-xai-secondary bg-clip-text text-transparent;
+  }
+}

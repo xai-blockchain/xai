@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import logging
 import time
 from collections import defaultdict, deque
+
+logger = logging.getLogger(__name__)
 
 
 class DDoSProtector:
@@ -47,9 +50,15 @@ class DDoSProtector:
         self.last_adjustment_time = int(time.time())
         self.adjustment_interval = 60  # Adjust rate limit every 60 seconds
 
-        print(
-            f"DDoSProtector initialized. Rate limit: {self.rate_limit_per_second} req/s within {self.time_window_seconds}s window. "
-            f"Max tracked IPs: {self.max_tracked_ips}, Max connections per IP: {self.max_connections_per_ip}"
+        logger.info(
+            "DDoSProtector initialized",
+            extra={
+                "event": "ddos_protector.initialized",
+                "rate_limit_per_second": self.rate_limit_per_second,
+                "time_window_seconds": self.time_window_seconds,
+                "max_tracked_ips": self.max_tracked_ips,
+                "max_connections_per_ip": self.max_connections_per_ip,
+            }
         )
 
     def _clean_old_requests(self, ip_address: str, current_time: int):
@@ -125,9 +134,14 @@ class DDoSProtector:
                 del self.last_activity[ip_address]
 
         if removed_count > 0:
-            print(
-                f"DDoSProtector: Cleaned up {removed_count} inactive IPs. "
-                f"Tracked IPs: {len(self.request_timestamps)}/{self.max_tracked_ips}"
+            logger.debug(
+                "Cleaned up inactive IPs",
+                extra={
+                    "event": "ddos_protector.cleanup",
+                    "removed_count": removed_count,
+                    "tracked_ips": len(self.request_timestamps),
+                    "max_tracked_ips": self.max_tracked_ips,
+                }
             )
 
     def _adjust_rate_limit(self, current_time: int):
@@ -156,12 +170,26 @@ class DDoSProtector:
             # Reduce rate limit by 50% during high load
             new_rate_limit = max(1, int(self.base_rate_limit * 0.5))
             if new_rate_limit != self.rate_limit_per_second:
-                print(f"DDoSProtector: High load detected ({connection_load:.1%}). Reducing rate limit to {new_rate_limit} req/s")
+                logger.warning(
+                    "High load detected, reducing rate limit",
+                    extra={
+                        "event": "ddos_protector.rate_limit_reduced",
+                        "connection_load": f"{connection_load:.1%}",
+                        "new_rate_limit": new_rate_limit,
+                    }
+                )
                 self.rate_limit_per_second = new_rate_limit
         elif connection_load < 0.5:  # Low load (<50%)
             # Restore normal rate limit during low load
             if self.rate_limit_per_second != self.base_rate_limit:
-                print(f"DDoSProtector: Load normalized ({connection_load:.1%}). Restoring rate limit to {self.base_rate_limit} req/s")
+                logger.info(
+                    "Load normalized, restoring rate limit",
+                    extra={
+                        "event": "ddos_protector.rate_limit_restored",
+                        "connection_load": f"{connection_load:.1%}",
+                        "rate_limit": self.base_rate_limit,
+                    }
+                )
                 self.rate_limit_per_second = self.base_rate_limit
 
         self.last_adjustment_time = current_time
@@ -194,9 +222,15 @@ class DDoSProtector:
 
         # Check rate limit
         if len(self.request_timestamps[ip_address]) >= self.rate_limit_per_second:
-            print(
-                f"!!! DDoS ALERT !!! IP {ip_address} blocked due to rate limit ({self.rate_limit_per_second} req/{self.time_window_seconds}s) exceeded. "
-                f"Current requests in window: {len(self.request_timestamps[ip_address])}"
+            logger.warning(
+                "IP blocked due to rate limit exceeded",
+                extra={
+                    "event": "ddos_protector.rate_limit_blocked",
+                    "ip_address": ip_address,
+                    "rate_limit": self.rate_limit_per_second,
+                    "time_window": self.time_window_seconds,
+                    "requests_in_window": len(self.request_timestamps[ip_address]),
+                }
             )
             return False
 
@@ -225,18 +259,27 @@ class DDoSProtector:
         # Check global connection limit first
         total_connections = sum(self.active_connections.values())
         if total_connections >= self.max_global_connections:
-            print(
-                f"!!! DDoS ALERT !!! Global connection limit reached. "
-                f"Total connections: {total_connections}/{self.max_global_connections}. "
-                f"Connection from {ip_address} rejected."
+            logger.warning(
+                "Global connection limit reached",
+                extra={
+                    "event": "ddos_protector.global_limit_blocked",
+                    "ip_address": ip_address,
+                    "total_connections": total_connections,
+                    "max_global_connections": self.max_global_connections,
+                }
             )
             return False
 
         # Check connection limit for this IP
         if self.active_connections[ip_address] >= self.max_connections_per_ip:
-            print(
-                f"!!! DDoS ALERT !!! IP {ip_address} blocked due to connection limit exceeded. "
-                f"Active connections: {self.active_connections[ip_address]}/{self.max_connections_per_ip}"
+            logger.warning(
+                "IP blocked due to connection limit exceeded",
+                extra={
+                    "event": "ddos_protector.connection_limit_blocked",
+                    "ip_address": ip_address,
+                    "active_connections": self.active_connections[ip_address],
+                    "max_connections_per_ip": self.max_connections_per_ip,
+                }
             )
             return False
 

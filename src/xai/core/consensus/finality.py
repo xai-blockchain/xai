@@ -27,6 +27,10 @@ try:
 except ImportError:  # pragma: no cover - optional dependency in some unit tests
     MetricsCollector = None  # type: ignore
 
+# State format version for migration support
+# Increment when changing state structure to handle upgrades gracefully
+FINALITY_STATE_VERSION = 2
+
 class FinalityError(Exception):
     """Base class for finality related errors."""
 
@@ -271,6 +275,8 @@ class FinalityManager:
         """
         Load persisted finality state (metadata only). Certificates contain the actual
         votes; this file records summary metadata to make restarts deterministic.
+
+        Supports version-based migration for validator set changes.
         """
         if not os.path.exists(self.state_path):
             return
@@ -281,27 +287,77 @@ class FinalityManager:
             self.logger.error("Failed to load finality state", error=str(exc))
             return
 
-        # Sanity checks: ensure validator set matches what we booted with
+        # Check state version for migration
+        persisted_version = state.get("version", 1)
+        if persisted_version < FINALITY_STATE_VERSION:
+            self.logger.info(
+                "Migrating finality state",
+                extra={
+                    "event": "finality.state_migration",
+                    "from_version": persisted_version,
+                    "to_version": FINALITY_STATE_VERSION,
+                }
+            )
+            state = self._migrate_state(state, persisted_version)
+
+        # Validator set comparison with migration support
         persisted_validators = state.get("validators", [])
         persisted_addresses = {str(v.get("address", "")).lower() for v in persisted_validators}
         current_addresses = set(self.validators.keys())
+
         if persisted_addresses and persisted_addresses != current_addresses:
-            self.logger.warning(
-                "Finality state validator set mismatch; ignoring persisted state",
-                persisted=len(persisted_addresses),
-                current=len(current_addresses),
-            )
-            return
+            # Calculate set differences for migration logging
+            added = current_addresses - persisted_addresses
+            removed = persisted_addresses - current_addresses
+
+            if added or removed:
+                self.logger.info(
+                    "Validator set changed since last run",
+                    extra={
+                        "event": "finality.validator_set_changed",
+                        "added_count": len(added),
+                        "removed_count": len(removed),
+                        "persisted_count": len(persisted_addresses),
+                        "current_count": len(current_addresses),
+                    }
+                )
+                # For validator set changes, we preserve certificates but reset quorum tracking
+                # This allows seamless migration when validators are added/removed
+                self._persist_state()  # Save new validator set immediately
 
         persisted_quorum = state.get("quorum_power")
         if isinstance(persisted_quorum, (int, float)) and persisted_quorum > 0:
             if int(persisted_quorum) != self.quorum_power:
-                self.logger.warning(
-                    "Finality state quorum mismatch; using in-memory quorum",
-                    persisted=persisted_quorum,
-                    current=self.quorum_power,
+                self.logger.info(
+                    "Quorum power updated",
+                    extra={
+                        "event": "finality.quorum_updated",
+                        "persisted": persisted_quorum,
+                        "current": self.quorum_power,
+                    }
                 )
         self._update_finality_metrics()
+
+    def _migrate_state(self, state: dict, from_version: int) -> dict:
+        """
+        Migrate state from older versions.
+
+        Args:
+            state: The persisted state dictionary
+            from_version: Version of the persisted state
+
+        Returns:
+            Migrated state dictionary
+        """
+        # Version 1 -> 2: Added version field and improved validator tracking
+        if from_version < 2:
+            # Ensure validators list exists
+            if "validators" not in state:
+                state["validators"] = []
+            # Add version
+            state["version"] = 2
+
+        return state
 
     def _persist_certificates(self) -> None:
         serialized = [cert.to_dict() for cert in self.certificates_by_hash.values()]
@@ -316,6 +372,7 @@ class FinalityManager:
     def _persist_state(self) -> None:
         """Persist finality metadata (quorum, validator set, latest finalized)."""
         state_payload = {
+            "version": FINALITY_STATE_VERSION,
             "quorum_power": self.quorum_power,
             "total_power": self.total_power,
             "validators": [

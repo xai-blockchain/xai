@@ -7,6 +7,7 @@ Provides unified interface to all blockchain operations.
 """
 
 from .clients import (
+    AIClient,
     BlockchainClient,
     GovernanceClient,
     MiningClient,
@@ -22,13 +23,14 @@ class XAIClient:
     Main client for XAI blockchain operations.
 
     Provides unified interface to wallet, transaction, blockchain,
-    mining, governance, and trading operations.
+    mining, governance, trading, and AI operations.
 
     Example:
         >>> client = XAIClient(api_key="your-api-key")
         >>> wallet = client.wallet.create()
         >>> balance = client.wallet.get_balance(wallet.address)
         >>> tx = client.transaction.send(wallet.address, "0x...", "1000")
+        >>> analysis = client.ai.analyze_wallet(wallet.address)
     """
 
     def __init__(
@@ -71,6 +73,7 @@ class XAIClient:
         self.mining = MiningClient(self.http_client)
         self.governance = GovernanceClient(self.http_client)
         self.trading = TradingClient(self.http_client)
+        self.ai = AIClient(self.http_client)
 
     def close(self) -> None:
         """Close the HTTP client and cleanup resources."""

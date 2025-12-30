@@ -209,15 +209,43 @@ class UTXOManager:
 
         Performance: O(1) operation using hash-based indexing (storage handles internally).
 
+        Security: Validates ownership before marking spent to prevent unauthorized
+        spending attacks where an attacker could mark another user's UTXOs as spent.
+
         Args:
             address: The address that owned the UTXO.
             txid: The transaction ID of the UTXO to mark as spent.
             vout: The output index of the UTXO to mark as spent.
 
         Returns:
-            True if the UTXO was found and marked as spent, False otherwise.
+            True if the UTXO was found, owned by address, and marked as spent.
+            False if UTXO not found, already spent, or ownership mismatch.
         """
         with self._lock:
+            # Security: Validate ownership before marking spent
+            utxo = self._store.get_utxo(txid, vout)
+            if utxo is None:
+                self.logger.warn(
+                    f"UTXO not found or already spent: {txid}:{vout}",
+                    address=address,
+                    txid=txid,
+                    vout=vout,
+                )
+                return False
+
+            # Check ownership - UTXO must belong to the specified address
+            utxo_address = utxo.get("address")
+            if utxo_address and utxo_address != address:
+                self.logger.warn(
+                    f"Ownership validation failed for UTXO {txid}:{vout}: "
+                    f"expected {address}, found {utxo_address}",
+                    address=address,
+                    utxo_address=utxo_address,
+                    txid=txid,
+                    vout=vout,
+                )
+                return False
+
             # Delegate to storage backend
             marked = self._store.mark_spent(txid, vout)
 

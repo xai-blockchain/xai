@@ -156,6 +156,9 @@ class BlockIndex:
         self.cache = LRUBlockCache(capacity=cache_size)
         self.lock = threading.RLock()
 
+        # P2 Performance: Connection pooling - reuse single connection
+        self._conn: sqlite3.Connection | None = None
+
         # Create database and schema
         self._init_database()
 
@@ -167,6 +170,21 @@ class BlockIndex:
                 "cache_size": cache_size,
             }
         )
+
+    def _get_connection(self) -> sqlite3.Connection:
+        """
+        P2 Performance: Get pooled connection, creating if needed.
+
+        Returns a reusable connection instead of creating one per query.
+        Thread-safe via the class-level RLock.
+        """
+        if self._conn is None:
+            self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            # Apply optimizations to pooled connection
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn.execute("PRAGMA cache_size=-64000")
+            self._conn.execute("PRAGMA temp_store=MEMORY")
+        return self._conn
 
     def _init_database(self) -> None:
         """
@@ -243,23 +261,19 @@ class BlockIndex:
             file_size: Size of block JSON in bytes
         """
         with self.lock:
-            conn = sqlite3.connect(self.db_path, check_same_thread=False)
-            try:
-                conn.execute(
-                    '''
-                    INSERT OR REPLACE INTO block_index
-                    (block_index, block_hash, file_path, file_offset, file_size, indexed_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    ''',
-                    (block_index, block_hash, file_path, file_offset, file_size, time.time())
-                )
-                conn.commit()
+            conn = self._get_connection()  # P2: Use pooled connection
+            conn.execute(
+                '''
+                INSERT OR REPLACE INTO block_index
+                (block_index, block_hash, file_path, file_offset, file_size, indexed_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ''',
+                (block_index, block_hash, file_path, file_offset, file_size, time.time())
+            )
+            conn.commit()
 
-                # Invalidate cache for this block (in case of reorg)
-                self.cache.invalidate(block_index)
-
-            finally:
-                conn.close()
+            # Invalidate cache for this block (in case of reorg)
+            self.cache.invalidate(block_index)
 
     def get_block_location(self, block_index: int) -> tuple[str, int, int] | None:
         """
@@ -272,16 +286,13 @@ class BlockIndex:
             Tuple of (file_path, file_offset, file_size) or None if not indexed
         """
         with self.lock:
-            conn = sqlite3.connect(self.db_path, check_same_thread=False)
-            try:
-                cursor = conn.execute(
-                    'SELECT file_path, file_offset, file_size FROM block_index WHERE block_index = ?',
-                    (block_index,)
-                )
-                row = cursor.fetchone()
-                return tuple(row) if row else None  # type: ignore
-            finally:
-                conn.close()
+            conn = self._get_connection()  # P2: Use pooled connection
+            cursor = conn.execute(
+                'SELECT file_path, file_offset, file_size FROM block_index WHERE block_index = ?',
+                (block_index,)
+            )
+            row = cursor.fetchone()
+            return tuple(row) if row else None  # type: ignore
 
     def get_block_location_by_hash(self, block_hash: str) -> tuple[int, str, int, int] | None:
         """
@@ -294,20 +305,17 @@ class BlockIndex:
             Tuple of (block_index, file_path, file_offset, file_size) or None
         """
         with self.lock:
-            conn = sqlite3.connect(self.db_path, check_same_thread=False)
-            try:
-                cursor = conn.execute(
-                    '''
-                    SELECT block_index, file_path, file_offset, file_size
-                    FROM block_index
-                    WHERE block_hash = ?
-                    ''',
-                    (block_hash,)
-                )
-                row = cursor.fetchone()
-                return tuple(row) if row else None  # type: ignore
-            finally:
-                conn.close()
+            conn = self._get_connection()  # P2: Use pooled connection
+            cursor = conn.execute(
+                '''
+                SELECT block_index, file_path, file_offset, file_size
+                FROM block_index
+                WHERE block_hash = ?
+                ''',
+                (block_hash,)
+            )
+            row = cursor.fetchone()
+            return tuple(row) if row else None  # type: ignore
 
     def get_max_indexed_height(self) -> int | None:
         """
@@ -317,13 +325,10 @@ class BlockIndex:
             Maximum block height in index, or None if empty
         """
         with self.lock:
-            conn = sqlite3.connect(self.db_path, check_same_thread=False)
-            try:
-                cursor = conn.execute('SELECT MAX(block_index) FROM block_index')
-                row = cursor.fetchone()
-                return row[0] if row and row[0] is not None else None
-            finally:
-                conn.close()
+            conn = self._get_connection()  # P2: Use pooled connection
+            cursor = conn.execute('SELECT MAX(block_index) FROM block_index')
+            row = cursor.fetchone()
+            return row[0] if row and row[0] is not None else None
 
     def get_index_count(self) -> int:
         """
@@ -333,13 +338,10 @@ class BlockIndex:
             Count of indexed blocks
         """
         with self.lock:
-            conn = sqlite3.connect(self.db_path, check_same_thread=False)
-            try:
-                cursor = conn.execute('SELECT COUNT(*) FROM block_index')
-                row = cursor.fetchone()
-                return row[0] if row else 0
-            finally:
-                conn.close()
+            conn = self._get_connection()  # P2: Use pooled connection
+            cursor = conn.execute('SELECT COUNT(*) FROM block_index')
+            row = cursor.fetchone()
+            return row[0] if row else 0
 
     def verify_block_hash(self, block_index: int, expected_hash: str) -> bool:
         """
@@ -353,18 +355,15 @@ class BlockIndex:
             True if hash matches, False otherwise
         """
         with self.lock:
-            conn = sqlite3.connect(self.db_path, check_same_thread=False)
-            try:
-                cursor = conn.execute(
-                    'SELECT block_hash FROM block_index WHERE block_index = ?',
-                    (block_index,)
-                )
-                row = cursor.fetchone()
-                if not row:
-                    return False
-                return row[0] == expected_hash
-            finally:
-                conn.close()
+            conn = self._get_connection()  # P2: Use pooled connection
+            cursor = conn.execute(
+                'SELECT block_hash FROM block_index WHERE block_index = ?',
+                (block_index,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False
+            return row[0] == expected_hash
 
     def remove_blocks_from(self, start_height: int) -> int:
         """
@@ -377,30 +376,27 @@ class BlockIndex:
             Number of blocks removed
         """
         with self.lock:
-            conn = sqlite3.connect(self.db_path, check_same_thread=False)
-            try:
-                cursor = conn.execute(
-                    'DELETE FROM block_index WHERE block_index >= ?',
-                    (start_height,)
-                )
-                removed = cursor.rowcount
-                conn.commit()
+            conn = self._get_connection()  # P2: Use pooled connection
+            cursor = conn.execute(
+                'DELETE FROM block_index WHERE block_index >= ?',
+                (start_height,)
+            )
+            removed = cursor.rowcount
+            conn.commit()
 
-                # Clear cache since we may have removed cached blocks
-                self.cache.clear()
+            # Clear cache since we may have removed cached blocks
+            self.cache.clear()
 
-                logger.info(
-                    "Removed blocks from index for reorg",
-                    extra={
-                        "event": "block_index.reorg",
-                        "start_height": start_height,
-                        "blocks_removed": removed,
-                    }
-                )
+            logger.info(
+                "Removed blocks from index for reorg",
+                extra={
+                    "event": "block_index.reorg",
+                    "start_height": start_height,
+                    "blocks_removed": removed,
+                }
+            )
 
-                return removed
-            finally:
-                conn.close()
+            return removed
 
     def get_stats(self) -> dict[str, Any]:
         """
@@ -415,18 +411,23 @@ class BlockIndex:
             "cache": self.cache.get_stats(),
         }
 
-    def close(self) -> None:
-        """Close database connection and clear cache."""
+    def shutdown(self) -> None:
+        """Close database connection and clear cache. Call during graceful shutdown."""
         with self.lock:
             self.cache.clear()
 
-            # Checkpoint WAL to ensure durability
-            conn = sqlite3.connect(self.db_path, check_same_thread=False)
-            try:
-                conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                conn.close()
-            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
-                logger.warning(
-                    "Failed to checkpoint WAL on close",
-                    extra={"event": "block_index.close_error", "error": str(e)}
-                )
+            # P2: Checkpoint WAL and close pooled connection
+            if self._conn is not None:
+                try:
+                    self._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                    self._conn.close()
+                except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError, sqlite3.Error) as e:
+                    logger.warning(
+                        "Failed to checkpoint WAL on close",
+                        extra={"event": "block_index.close_error", "error": str(e)}
+                    )
+                finally:
+                    self._conn = None
+
+    # Backward-compatible alias
+    close = shutdown

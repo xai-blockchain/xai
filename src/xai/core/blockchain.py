@@ -424,6 +424,7 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
 
         # Write-Ahead Log for crash-safe chain reorganizations
         self.reorg_wal_path = os.path.join(data_dir, "reorg_wal.json")
+        self._needs_full_rebuild = False  # Set by WAL recovery if incomplete reorg detected
         self._recover_from_incomplete_reorg()
         try:
             self.node_identity = load_or_create_identity(data_dir)
@@ -1145,6 +1146,15 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
         If a valid checkpoint exists, load from it and only validate blocks after.
         Otherwise, fall back to full chain validation.
         """
+        # P2-4: If WAL recovery detected incomplete reorg, force full rebuild
+        if getattr(self, '_needs_full_rebuild', False):
+            self.logger.info(
+                "Full rebuild required due to WAL recovery. Skipping checkpoint fast-recovery.",
+                extra={"event": "load.forced_full_rebuild"}
+            )
+            self._needs_full_rebuild = False  # Clear flag after triggering rebuild
+            return self._load_from_disk_full()
+
         # Try to load from checkpoint first for fast recovery
         checkpoint = self.checkpoint_manager.load_latest_checkpoint()
 
@@ -4238,10 +4248,13 @@ class Blockchain(BlockchainConsensusMixin, BlockchainMempoolMixin, BlockchainMin
                 # Clear the WAL file - we'll rebuild state from disk
                 os.remove(self.reorg_wal_path)
 
+                # Set flag to trigger full rebuild during chain loading
+                self._needs_full_rebuild = True
+
                 # Log the recovery action
                 self.logger.info(
-                    "WAL: Cleared incomplete reorg entry. State will be rebuilt from persistent storage.",
-                    extra={"event": "wal.recovery_initiated"}
+                    "WAL: Cleared incomplete reorg entry. Full state rebuild will be triggered.",
+                    extra={"event": "wal.recovery_initiated", "needs_rebuild": True}
                 )
             else:
                 # WAL entry is committed or rolled back - safe to remove
