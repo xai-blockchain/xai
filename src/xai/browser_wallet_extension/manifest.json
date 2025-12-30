@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "XAI Browser Wallet",
   "description": "Secure XAI wallet with hardware wallet support (Ledger/Trezor), mining controls, and trading.",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "action": {
     "default_title": "XAI Wallet",
     "default_popup": "popup-hw.html",

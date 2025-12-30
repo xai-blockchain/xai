@@ -218,12 +218,14 @@ describe('Wallet Creation and Import', () => {
     });
 
     test('should derive XAI addresses from public keys', () => {
-      const popupCode = fs.readFileSync(
-        path.join(__dirname, '..', 'popup.js'),
+      const ledgerCode = fs.readFileSync(
+        path.join(__dirname, '..', 'ledger-hw.js'),
         'utf8'
       );
 
-      expect(popupCode).toContain('derive-public-key');
+      // XAI address derivation uses public key hashing (keccak256-style)
+      expect(ledgerCode).toContain('publicKeyToAddress');
+      expect(ledgerCode).toContain('XAI');
     });
   });
 

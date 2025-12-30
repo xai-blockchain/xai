@@ -1,6 +1,6 @@
 {
   "name": "xai-browser-wallet-extension",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "XAI Browser Wallet Extension - Secure cryptocurrency wallet with hardware wallet support",
   "private": true,
   "scripts": {

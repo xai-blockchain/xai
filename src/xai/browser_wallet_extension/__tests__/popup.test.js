@@ -106,8 +106,10 @@ describe('Popup Module', () => {
         expect(popupCode).toMatch(/digest.*SHA-256/);
       });
 
-      test('should call backend signing endpoint', () => {
-        expect(popupCode).toContain('/wallet/sign');
+      test('should use client-side signing with secp256k1', () => {
+        // Modern secure architecture: signing happens client-side, not via backend
+        expect(popupCode).toContain('secp256k1');
+        expect(popupCode).toContain('signPayload');
       });
     });
 
