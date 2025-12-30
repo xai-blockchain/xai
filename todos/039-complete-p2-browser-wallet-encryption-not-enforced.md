@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p2
 issue_id: "039"
 tags: [security, high, browser-wallet, encryption]

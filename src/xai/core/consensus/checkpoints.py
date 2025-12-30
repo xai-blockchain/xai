@@ -27,6 +27,17 @@ from datetime import datetime
 from xai.utils.secure_io import SECURE_FILE_MODE
 from typing import TYPE_CHECKING, Any
 
+try:
+    from xai.core.security.checkpoint_encryption import (
+        encrypt_utxo_snapshot,
+        decrypt_utxo_snapshot,
+    )
+    CHECKPOINT_ENCRYPTION_AVAILABLE = True
+except ImportError:
+    CHECKPOINT_ENCRYPTION_AVAILABLE = False
+    encrypt_utxo_snapshot = lambda x: x  # type: ignore
+    decrypt_utxo_snapshot = lambda x: x  # type: ignore
+
 if TYPE_CHECKING:
     from xai.core.blockchain import Block
     from xai.core.transactions.utxo_manager import UTXOManager
@@ -81,13 +92,25 @@ class Checkpoint:
         checkpoint_string = json.dumps(checkpoint_data, sort_keys=True)
         return hashlib.sha256(checkpoint_string.encode()).hexdigest()
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert checkpoint to dictionary for serialization"""
+    def to_dict(self, encrypt: bool = True) -> dict[str, Any]:
+        """Convert checkpoint to dictionary for serialization.
+
+        Args:
+            encrypt: If True, encrypt UTXO snapshot data (default: True)
+
+        Returns:
+            Serialized checkpoint dictionary
+        """
+        # SECURITY: Encrypt UTXO snapshot to protect address balances at rest
+        utxo_data = self.utxo_snapshot
+        if encrypt and CHECKPOINT_ENCRYPTION_AVAILABLE:
+            utxo_data = encrypt_utxo_snapshot(self.utxo_snapshot)
+
         return {
             "height": self.height,
             "block_hash": self.block_hash,
             "previous_hash": self.previous_hash,
-            "utxo_snapshot": self.utxo_snapshot,
+            "utxo_snapshot": utxo_data,
             "timestamp": self.timestamp,
             "difficulty": self.difficulty,
             "total_supply": self.total_supply,
@@ -99,12 +122,20 @@ class Checkpoint:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Checkpoint":
-        """Create checkpoint from dictionary"""
+        """Create checkpoint from dictionary.
+
+        SECURITY: Automatically decrypts encrypted UTXO data if present.
+        """
+        # SECURITY: Decrypt UTXO snapshot if encrypted
+        utxo_data = data["utxo_snapshot"]
+        if isinstance(utxo_data, dict) and utxo_data.get("_encrypted"):
+            utxo_data = decrypt_utxo_snapshot(utxo_data)
+
         checkpoint = cls(
             height=data["height"],
             block_hash=data["block_hash"],
             previous_hash=data["previous_hash"],
-            utxo_snapshot=data["utxo_snapshot"],
+            utxo_snapshot=utxo_data,
             timestamp=data["timestamp"],
             difficulty=data["difficulty"],
             total_supply=data["total_supply"],

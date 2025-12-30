@@ -710,6 +710,7 @@ async function promptUnlock() {
 
 /**
  * Prompts user to set up encryption (first time).
+ * SECURITY: Encryption is MANDATORY - wallet will not function without it.
  */
 async function promptSetupEncryption() {
   return new Promise((resolve) => {
@@ -717,7 +718,6 @@ async function promptSetupEncryption() {
     modal.style.display = 'block';
 
     const setupBtn = $('#setupEncryptionBtn');
-    const skipBtn = $('#skipEncryptionBtn');
 
     const handleSetup = async () => {
       const password = $('#setupPassword').value;
@@ -730,6 +730,15 @@ async function promptSetupEncryption() {
 
       if (password.length < 8) {
         $('#setupError').textContent = 'Password must be at least 8 characters';
+        return;
+      }
+
+      // Enforce password complexity for security
+      const hasUppercase = /[A-Z]/.test(password);
+      const hasLowercase = /[a-z]/.test(password);
+      const hasNumber = /[0-9]/.test(password);
+      if (!hasUppercase || !hasLowercase || !hasNumber) {
+        $('#setupError').textContent = 'Password must contain uppercase, lowercase, and numbers';
         return;
       }
 
@@ -748,21 +757,14 @@ async function promptSetupEncryption() {
       }
     };
 
-    const handleSkip = () => {
-      $('#setupPassword').value = '';
-      $('#setupPasswordConfirm').value = '';
-      modal.style.display = 'none';
-      $('#setupError').textContent = '';
-      resolve(false);
-    };
-
+    // SECURITY: No skip option - encryption is mandatory
     setupBtn.onclick = handleSetup;
-    skipBtn.onclick = handleSkip;
   });
 }
 
 /**
  * Initializes security features.
+ * SECURITY: Encryption is MANDATORY for wallet operation.
  */
 async function initializeSecurity() {
   await secureStorage.initialize();
@@ -776,19 +778,12 @@ async function initializeSecurity() {
     // Prompt for password immediately
     await promptUnlock();
   } else {
-    $('#encryptionStatus').textContent = 'Encryption: Disabled';
+    $('#encryptionStatus').textContent = 'Encryption: Required';
     $('#encryptionStatus').classList.remove('encryption-enabled');
 
-    // Offer to enable encryption
-    const shouldSetup = confirm(
-      'WARNING: Your wallet data is not encrypted.\n\n' +
-      'Session secrets, private keys, and API keys are stored in plaintext.\n\n' +
-      'Enable encryption now for better security?'
-    );
-
-    if (shouldSetup) {
-      await promptSetupEncryption();
-    }
+    // SECURITY: Encryption is mandatory - force setup before wallet can be used
+    // No skip option - private keys and API credentials must be protected
+    await promptSetupEncryption();
   }
 
   // Update lock status display

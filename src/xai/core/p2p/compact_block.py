@@ -108,10 +108,10 @@ class CompactBlock:
         Returns:
             CompactBlock representation of the block
         """
-        import random
+        import secrets
 
-        # Generate random nonce for short txid computation
-        short_txid_nonce = random.getrandbits(64)
+        # Generate random nonce for short txid computation (cryptographically secure)
+        short_txid_nonce = secrets.randbits(64)
 
         # Compute short txids for all transactions
         short_txids: list[bytes] = []
