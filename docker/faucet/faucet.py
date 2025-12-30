@@ -305,6 +305,10 @@ def request_tokens():
 
     address = data['address']
 
+    # Validate address is a string (security: prevent type confusion attacks)
+    if not isinstance(address, str):
+        return jsonify({'success': False, 'error': 'Address must be a string'}), 400
+
     # Verify hCaptcha if enabled
     if HCAPTCHA_ENABLED:
         captcha_token = data.get('captcha', '')

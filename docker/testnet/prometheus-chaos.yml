@@ -1,0 +1,26 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Scrape XAI node metrics
+  - job_name: 'xai-testnet-nodes'
+    static_configs:
+      - targets:
+        - 'xai-testnet-bootstrap:12070'
+        - 'xai-testnet-node1:12071'
+        - 'xai-testnet-node2:12072'
+        - 'xai-testnet-node3:12073'
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # Scrape node health endpoints
+  - job_name: 'xai-health'
+    static_configs:
+      - targets:
+        - 'xai-testnet-bootstrap:12001'
+        - 'xai-testnet-node1:12011'
+        - 'xai-testnet-node2:12021'
+        - 'xai-testnet-node3:12031'
+    metrics_path: /health
+    scrape_interval: 30s

@@ -145,7 +145,9 @@ class TimeLockedWithdrawalManager:
             )
             MetricsCollector.instance().record_time_locked_request(pending_count)
         else:
-            release_timestamp = ts
+            # For immediate withdrawals, set release_timestamp just after initiation
+            # to satisfy PendingWithdrawal validation (release must be after initiation)
+            release_timestamp = ts + 1
             withdrawal = PendingWithdrawal(
                 withdrawal_id, user_address, amount, ts, release_timestamp
             )

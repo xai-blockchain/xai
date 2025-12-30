@@ -14,6 +14,7 @@ export { TransactionClient } from './clients/transaction-client';
 export { BlockchainClient } from './clients/blockchain-client';
 export { MiningClient } from './clients/mining-client';
 export { GovernanceClient } from './clients/governance-client';
+export { AIClient } from './clients/ai-client';
 
 // Utilities
 export { HTTPClient } from './utils/http-client';

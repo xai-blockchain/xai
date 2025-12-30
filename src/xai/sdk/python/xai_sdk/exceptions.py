@@ -121,3 +121,9 @@ class GovernanceError(XAIError):
     """Raised when governance operation fails."""
 
     pass
+
+
+class APIError(XAIError):
+    """Raised when API operation fails."""
+
+    pass

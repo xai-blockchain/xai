@@ -4,7 +4,7 @@ import heapq
 from typing import Any
 
 # Assuming FeeAdjuster is available from a previous implementation
-from src.xai.network.fee_adjuster import FeeAdjuster
+from xai.network.fee_adjuster import FeeAdjuster
 
 
 class PriorityFeeManager:

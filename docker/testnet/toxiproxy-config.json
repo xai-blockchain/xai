@@ -1,0 +1,50 @@
+[
+  {
+    "name": "xai-bootstrap-rpc",
+    "listen": "0.0.0.0:12901",
+    "upstream": "xai-testnet-bootstrap:12001",
+    "enabled": true
+  },
+  {
+    "name": "xai-node1-rpc",
+    "listen": "0.0.0.0:12902",
+    "upstream": "xai-testnet-node1:12011",
+    "enabled": true
+  },
+  {
+    "name": "xai-node2-rpc",
+    "listen": "0.0.0.0:12903",
+    "upstream": "xai-testnet-node2:12021",
+    "enabled": true
+  },
+  {
+    "name": "xai-node3-rpc",
+    "listen": "0.0.0.0:12904",
+    "upstream": "xai-testnet-node3:12031",
+    "enabled": true
+  },
+  {
+    "name": "xai-bootstrap-p2p",
+    "listen": "0.0.0.0:12911",
+    "upstream": "xai-testnet-bootstrap:8765",
+    "enabled": true
+  },
+  {
+    "name": "xai-node1-p2p",
+    "listen": "0.0.0.0:12912",
+    "upstream": "xai-testnet-node1:8765",
+    "enabled": true
+  },
+  {
+    "name": "xai-node2-p2p",
+    "listen": "0.0.0.0:12913",
+    "upstream": "xai-testnet-node2:8765",
+    "enabled": true
+  },
+  {
+    "name": "xai-node3-p2p",
+    "listen": "0.0.0.0:12914",
+    "upstream": "xai-testnet-node3:8765",
+    "enabled": true
+  }
+]

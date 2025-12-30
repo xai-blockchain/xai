@@ -1,0 +1,94 @@
+# XAI Blockchain - Network Chaos Testing Configuration
+#
+# Extends the base 4-node testnet with Toxiproxy for network condition simulation:
+# - Latency injection (simulate WAN/satellite links)
+# - Jitter (variable latency)
+# - Packet loss
+# - Bandwidth throttling
+# - Connection resets
+#
+# Usage:
+#   docker-compose -f docker-compose.yml -f docker-compose.chaos.yml up -d
+#   ./scripts/network-chaos.sh add-latency xai-testnet-node1 200ms
+#   ./scripts/network-chaos.sh add-jitter xai-testnet-node2 50ms
+#   ./scripts/network-chaos.sh add-packet-loss xai-testnet-node3 5
+#   ./scripts/network-chaos.sh reset-all
+#
+# See scripts/network-chaos.sh for all available commands
+
+services:
+  # Toxiproxy for network chaos injection
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.10.0
+    container_name: xai-chaos-proxy
+    ports:
+      # Toxiproxy API
+      - "12800:8474"
+      # Proxied RPC ports (one per node)
+      - "12901:12901"
+      - "12902:12902"
+      - "12903:12903"
+      - "12904:12904"
+      # Proxied P2P ports
+      - "12911:12911"
+      - "12912:12912"
+      - "12913:12913"
+      - "12914:12914"
+    networks:
+      testnet-network:
+        ipv4_address: 172.30.1.250
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8474/version"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - ./toxiproxy-config.json:/config/toxiproxy.json:ro
+    command: ["-config", "/config/toxiproxy.json", "-host", "0.0.0.0"]
+
+  # Prometheus metrics for chaos testing
+  chaos-prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: xai-chaos-prometheus
+    ports:
+      - "12090:9090"
+    volumes:
+      - ./prometheus-chaos.yml:/etc/prometheus/prometheus.yml:ro
+      - chaos-prometheus-data:/prometheus
+    networks:
+      testnet-network:
+        ipv4_address: 172.30.1.251
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+
+  # Grafana dashboard for visualizing chaos effects
+  chaos-grafana:
+    image: grafana/grafana:10.2.0
+    container_name: xai-chaos-grafana
+    ports:
+      - "12091:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=chaos123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana-chaos:/etc/grafana/provisioning
+      - chaos-grafana-data:/var/lib/grafana
+    networks:
+      testnet-network:
+        ipv4_address: 172.30.1.252
+    restart: unless-stopped
+    depends_on:
+      - chaos-prometheus
+
+volumes:
+  chaos-prometheus-data:
+  chaos-grafana-data:
+
+networks:
+  testnet-network:
+    external: true
+    name: testnet_testnet-network
