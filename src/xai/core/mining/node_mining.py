@@ -19,9 +19,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-import random
+import secrets
 import threading
 import time
+
+# Cryptographically secure random for timing jitter (defense-in-depth)
+_secure_random = secrets.SystemRandom()
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -100,9 +103,9 @@ class MiningController:
                 time.sleep(0.5)  # Wait briefly and check again
                 continue
 
-            # Add random jitter (0-1 second) to prevent synchronized mining attempts
-            # This ensures nodes don't all start mining at exactly the same moment
-            time.sleep(random.uniform(0, 1.0))
+            # Add cryptographically-secure random jitter (0-1 second) to prevent
+            # synchronized mining attempts and timing side-channels (defense-in-depth)
+            time.sleep(_secure_random.uniform(0, 1.0))
 
             if self.blockchain.pending_transactions:
                 tx_count = len(self.blockchain.pending_transactions)

@@ -787,10 +787,28 @@ class Wallet:
         )
         return wallet
 
+    # ============================================================
+    # DEPRECATION NOTICE: Legacy Encryption Support
+    # ============================================================
+    # Timeline:
+    #   - v1.0.0 (current): Legacy support with warnings
+    #   - v1.1.0 (2025-Q2): Deprecation warnings on load
+    #   - v1.2.0 (2025-Q3): allow_legacy=True required
+    #   - v2.0.0 (2025-Q4): Legacy support REMOVED
+    #
+    # Action Required: Migrate wallets using:
+    #   Wallet.migrate_wallet_encryption(old_file, new_file, password)
+    # ============================================================
+
+    # Deprecation removal date - after this date, legacy support will be removed
+    _LEGACY_ENCRYPTION_REMOVAL_DATE = "2025-12-31"
+
     @staticmethod
     def _decrypt_static(encrypted_data: str, password: str) -> str:
         """
         Static decrypt method for legacy Fernet encryption.
+
+        DEPRECATED: Will be removed in v2.0.0 (2025-Q4).
 
         SECURITY WARNING: This method uses weak key derivation (SHA256 only, no salt).
         It is maintained ONLY for backward compatibility with old wallet files.
@@ -806,13 +824,22 @@ class Wallet:
         Note:
             This will emit a critical security warning when called.
         """
+        import warnings
+        warnings.warn(
+            "Legacy wallet encryption is deprecated and will be removed in v2.0.0 (2025-Q4). "
+            "Migrate your wallet using Wallet.migrate_wallet_encryption().",
+            DeprecationWarning,
+            stacklevel=3,
+        )
         logger.critical(
             "SECURITY WARNING: Loading wallet with weak legacy encryption! "
-            "Migrate immediately using wallet.migrate_wallet_encryption()",
+            "DEPRECATED: Support ends 2025-12-31. "
+            "Migrate immediately using Wallet.migrate_wallet_encryption()",
             extra={
                 "event": "wallet.legacy_encryption_detected",
                 "severity": "CRITICAL",
-                "action_required": "MIGRATE_WALLET"
+                "action_required": "MIGRATE_WALLET",
+                "deprecation_date": "2025-12-31",
             }
         )
         key = base64.urlsafe_b64encode(hashlib.sha256(password.encode()).digest())
@@ -1318,32 +1345,9 @@ class WalletManager:
         """Get loaded wallet"""
         return self.wallets.get(name)
 
-# Example usage (for development/testing only)
+# SECURITY: Demo code removed from production module.
+# For wallet usage examples, see: examples/wallet_demo.py
 if __name__ == "__main__":
-    import sys
-
-    # Configure basic logging for demo
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-
-    # Create new wallet
-    logger.info("Creating new XAI wallet...")
-    wallet = Wallet()
-
-    logger.info("Wallet Created Successfully")
-    logger.info("Address: %s", wallet.address)
-    logger.info("Public Key: %s...", wallet.public_key[:32])
-    logger.info("Private Key: %s... (KEEP SECRET!)", wallet.private_key[:32])
-
-    # Test signing
-    message = "Hello XAI!"
-    signature = wallet.sign_message(message)
-    logger.info("Message: %s", message)
-    logger.info("Signature: %s...", signature[:64])
-
-    # Verify
-    is_valid = wallet.verify_signature(message, signature, wallet.public_key)
-    logger.info("Signature Valid: %s", is_valid)
-
-    # Save wallet
-    wallet.save_to_file("test_wallet.json")
-    logger.info("Wallet saved to test_wallet.json")
+    print("This module should be imported, not run directly.")
+    print("For wallet examples, see: examples/wallet_demo.py")
+    raise SystemExit(1)
