@@ -1,13 +1,13 @@
-# XAI Project Guidelines
+# XAI Agent Guidelines
 
-**Read `../CLAUDE.md` first** - contains all general instructions.
+## Quick Reference
+- **Framework**: Python (NOT Cosmos SDK)
+- **Install**: `pip install .` in venv
 
-## Project-Specific
+## Testnet Access
+- **SSH**: `ssh xai-testnet` (54.39.129.11)
+- **VPN**: 10.10.0.3
+- **Node API**: http://localhost:8545
+- **CLI**: `~/xai-cli.sh stats` or `curl -s http://localhost:8545/stats | jq`
 
-**Node:** `~/.xai/` (not in repo)
-**Install:** `pip install -e .` (use venv if dependency conflicts)
-**Run:** `python -m xai.core.node` or `./src/xai/START_TESTNET.sh`
-**Test:** `pytest` (activate venv first if using one)
-
-**Tools:** black, isort, pylint, flake8, mypy, bandit
-**Pre-commit:** `pre-commit run --all-files`
+**Full docs**: `TESTNET_INFRASTRUCTURE.md`
