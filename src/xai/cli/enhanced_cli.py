@@ -121,11 +121,11 @@ class XAIClient:
 
     def get_block(self, block_id: str) -> dict[str, Any]:
         """Get block by index or hash"""
-        return self._request("GET", f"/block/{block_id}")
+        return self._request("GET", f"/blocks/{block_id}")
 
     def get_blockchain_info(self) -> dict[str, Any]:
         """Get blockchain information"""
-        return self._request("GET", "/info")
+        return self._request("GET", "/stats")
 
     def get_network_info(self) -> dict[str, Any]:
         """Get network information"""
@@ -136,20 +136,28 @@ class XAIClient:
         return self._request("GET", "/peers")
 
     def get_mining_status(self) -> dict[str, Any]:
-        """Get mining status"""
-        return self._request("GET", "/mining/status")
+        """Get mining status from stats endpoint"""
+        stats = self._request("GET", "/stats")
+        return {
+            "mining": stats.get("auto_mining", False),
+            "miner_address": stats.get("miner_address"),
+            "blocks_mined": stats.get("block_count", 0),
+            "hashrate": "N/A",
+            "threads": 1,
+            "total_rewards": 0,
+        }
 
     def start_mining(self, address: str, threads: int = 1, intensity: int = 1) -> dict[str, Any]:
-        """Start mining"""
-        return self._request("POST", "/mining/start", json={
+        """Start auto-mining"""
+        return self._request("POST", "/auto-mine/start", json={
             "miner_address": address,
             "threads": threads,
             "intensity": intensity
         })
 
     def stop_mining(self) -> dict[str, Any]:
-        """Stop mining"""
-        return self._request("POST", "/mining/stop")
+        """Stop auto-mining"""
+        return self._request("POST", "/auto-mine/stop")
 
     def submit_transaction(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """Deprecated: use submit_signed_transaction to avoid transmitting private keys."""
@@ -172,8 +180,8 @@ class XAIClient:
         return self._request("GET", "/api/v1/sync/headers/progress")
 
     def get_mempool(self) -> dict[str, Any]:
-        """Get mempool transactions"""
-        return self._request("GET", "/mempool")
+        """Get pending transactions"""
+        return self._request("GET", "/transactions")
 
     def get_state_snapshot(self) -> dict[str, Any]:
         """Retrieve deterministic state snapshot."""
