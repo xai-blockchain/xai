@@ -14,34 +14,99 @@ diverse, inclusive, and healthy community.
 
 ## Our Standards
 
-### Examples of behavior that contributes to a positive environment for our community include:
+### Positive Behaviors
 
-* Demonstrating empathy and kindness toward other people
-* Being respectful of differing opinions, viewpoints, and experiences
-* Giving and gracefully accepting constructive feedback
-* Accepting responsibility and apologizing to those affected by our mistakes,
+Examples of behavior that contributes to a positive environment include:
+
+- Demonstrating empathy and kindness toward other people
+- Being respectful of differing opinions, viewpoints, and experiences
+- Giving and gracefully accepting constructive feedback
+- Accepting responsibility and apologizing to those affected by our mistakes,
   and learning from the experience
-* Focusing on what is best not just for us as individuals, but for the overall
+- Focusing on what is best not just for us as individuals, but for the overall
   community
-* Using welcoming and inclusive language
-* Being patient with new contributors and those learning
-* Recognizing and respecting the time and effort of volunteers
-* Celebrating the achievements and contributions of others
+- Using welcoming and inclusive language
+- Being patient with new contributors and those learning
+- Recognizing and respecting the time and effort of volunteers
+- Celebrating the achievements and contributions of others
 
-### Examples of unacceptable behavior include:
+### Unacceptable Behaviors
 
-* The use of sexualized language or imagery, and sexual attention or advances of
-  any kind
-* Trolling, insulting or derogatory comments, and personal or political attacks
-* Public or private harassment
-* Publishing others' private information, such as a physical or email address,
-  without their explicit permission
-* Spamming or excessive self-promotion
-* Deliberately derailing discussions or being disruptive
-* Making false or misleading claims about the project or its technology
-* Encouraging or promoting any of the above behaviors
-* Other conduct which could reasonably be considered inappropriate in a
+Examples of unacceptable behavior include:
+
+- The use of sexualized language or imagery, and sexual attention or advances
+  of any kind
+- Trolling, insulting or derogatory comments, and personal or political attacks
+- Public or private harassment
+- Publishing others' private information, such as a physical or email address,
+  without their explicit permission (doxxing)
+- Impersonation or misrepresentation of affiliation with persons or organizations
+- Scamming, phishing, or social engineering attacks against community members
+- Spamming, excessive self-promotion, or unsolicited advertising
+- Deliberately derailing discussions or being disruptive
+- Ignoring or arguing with moderator decisions in public channels
+- Other conduct which could reasonably be considered inappropriate in a
   professional setting
+
+## Blockchain & Cryptocurrency Standards
+
+As a blockchain project, we hold ourselves to additional standards:
+
+### Prohibited Conduct
+
+- **No scam promotion**: Do not promote scams, rug pulls, pump-and-dump schemes,
+  or any fraudulent financial activity
+- **No financial advice**: Do not provide investment, financial, tax, or legal
+  advice; always recommend consulting qualified professionals
+- **No token shilling**: Do not promote tokens, NFTs, or investments for
+  personal gain within community spaces
+- **No false claims**: Do not make false or misleading claims about the project,
+  its technology, partnerships, or capabilities
+- **No market manipulation**: Do not coordinate or encourage market manipulation
+  of any kind
+
+### Expected Conduct
+
+- Be honest about risks, limitations, and experimental nature of blockchain technology
+- Respect regulatory and legal considerations across jurisdictions
+- Maintain transparency in all blockchain-related activities and discussions
+- Clearly distinguish between facts, opinions, and speculation
+- Acknowledge the experimental nature of DeFi and smart contracts
+
+## AI & Machine Learning Standards
+
+As an AI-focused blockchain project, additional considerations apply:
+
+- Be transparent about AI capabilities and limitations
+- Do not misrepresent AI-generated content as human-created
+- Acknowledge uncertainty in AI predictions and recommendations
+- Respect intellectual property rights in training data and models
+- Consider ethical implications of AI applications
+- Report potential AI safety concerns through appropriate channels
+
+## Technical Discussion Standards
+
+When engaging in technical discussions:
+
+- Focus on the technical merits of proposals and ideas
+- Base arguments on facts, data, evidence, and reproducible results
+- Be open to changing your position when presented with new information
+- Acknowledge when you don't know something rather than speculating
+- Help others learn and grow in their understanding
+- Provide constructive criticism with actionable suggestions
+- Respect that there are often multiple valid approaches to solving problems
+
+## Security & Privacy
+
+- Report security vulnerabilities responsibly through proper channels
+  (see [SECURITY.md](./SECURITY.md))
+- Never publicly disclose security vulnerabilities before they are patched
+- Respect the privacy of all community members
+- Never share private keys, seed phrases, passwords, or sensitive credentials
+- Do not request private keys or sensitive information from others
+- Handle user data with care and in compliance with applicable privacy laws
+- Do not attempt to exploit, attack, or test the security of production systems
+  without explicit authorization
 
 ## Enforcement Responsibilities
 
@@ -57,102 +122,133 @@ decisions when appropriate.
 
 ## Scope
 
-This Code of Conduct applies within all community spaces, and also applies when
-an individual is officially representing the community in public spaces.
-Examples of representing our community include using an official email address,
-posting via an official social media account, or acting as an appointed
-representative at an online or offline event.
+This Code of Conduct applies within all community spaces, including but not
+limited to:
 
-This Code of Conduct also applies to behavior outside the community spaces when
-such behavior has the potential to adversely affect the safety and well-being of
-community members.
+- GitHub repositories, issues, pull requests, and discussions
+- Discord servers and channels
+- Social media accounts and posts
+- Community forums and mailing lists
+- In-person and virtual events, meetups, and conferences
+- Direct communications related to project work
 
-## Enforcement
+This Code of Conduct also applies when an individual is officially representing
+the community in public spaces, such as using an official email address, posting
+via an official social media account, or acting as an appointed representative
+at an event.
 
-### Reporting
+Behavior outside community spaces may be considered if it has the potential to
+adversely affect the safety and well-being of community members.
+
+## Reporting & Enforcement
+
+### How to Report
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement at:
 
-**conduct@xai.io**
+**Email**: info@xaiblockchain.org
 
-All complaints will be reviewed and investigated promptly and fairly.
+When reporting, please include:
+
+- Your contact information
+- Names (usernames, real names) of any individuals involved
+- Description of the behavior and why you consider it a violation
+- Date, time, and location (channel, repository, etc.) of the incident
+- Any additional context or evidence (screenshots, links, etc.)
+- Whether you would like your report to remain confidential
+
+### Response Process
+
+1. **Acknowledgment**: Reports will be acknowledged within 48 hours
+2. **Investigation**: The report will be reviewed and investigated fairly
+3. **Decision**: Appropriate action will be determined based on the guidelines below
+4. **Communication**: The reporter and involved parties will be informed of the outcome
+5. **Follow-up**: The situation will be monitored to ensure compliance and safety
 
 All community leaders are obligated to respect the privacy and security of the
-reporter of any incident.
+reporter of any incident. We will maintain confidentiality to the extent possible
+while conducting a fair investigation.
 
-### Confidentiality
+## Addressing & Repairing Harm
 
-We will respect confidentiality requests for the purpose of protecting victims of
-abuse. We will not name harassment victims without their affirmative consent.
+We believe in restorative justice where possible. Our goal is not only to address
+violations but to repair harm and, when appropriate, provide paths for individuals
+to return to good standing in the community.
+
+Community leaders will consider:
+
+- The severity and impact of the violation
+- Whether this is a first-time or repeated offense
+- The violator's willingness to acknowledge harm and make amends
+- The safety and well-being of affected community members
+- The overall health of the community
 
 ## Enforcement Guidelines
 
-Community leaders will follow these Community Impact Guidelines in determining
-the consequences for any action they deem in violation of this Code of Conduct:
+Community leaders will follow these guidelines in determining consequences for
+violations of this Code of Conduct:
 
 ### 1. Correction
 
-**Community Impact**: Use of inappropriate language or other behavior deemed
-unprofessional or unwelcome in the community.
+**Community Impact**: Minor violations, inappropriate language, or unprofessional
+behavior that does not rise to the level of harassment.
 
 **Consequence**: A private, written warning from community leaders, providing
-clarity around the nature of the violation and an explanation of why the
-behavior was inappropriate. A public apology may be requested.
+clarity around the nature of the violation and an explanation of why the behavior
+was inappropriate. A public apology may be requested.
 
 ### 2. Warning
 
-**Community Impact**: A violation through a single incident or series of
-actions.
+**Community Impact**: A violation through a single incident or series of actions
+that negatively impact the community.
 
-**Consequence**: A warning with consequences for continued behavior. No
-interaction with the people involved, including unsolicited interaction with
-those enforcing the Code of Conduct, for a specified period of time. This
+**Consequence**: A formal warning with consequences for continued behavior. This
+includes no interaction with the people involved, including unsolicited interaction
+with those enforcing the Code of Conduct, for a specified period of time. This
 includes avoiding interactions in community spaces as well as external channels
-like social media. Violating these terms may lead to a temporary or permanent
-ban.
+like social media. Violating these terms may lead to a temporary or permanent ban.
 
 ### 3. Temporary Ban
 
 **Community Impact**: A serious violation of community standards, including
-sustained inappropriate behavior.
+sustained inappropriate behavior or a severe single incident.
 
 **Consequence**: A temporary ban from any sort of interaction or public
-communication with the community for a specified period of time. No public or
-private interaction with the people involved, including unsolicited interaction
-with those enforcing the Code of Conduct, is allowed during this period.
-Violating these terms may lead to a permanent ban.
+communication with the community for a specified period of time (typically 7-90
+days). No public or private interaction with the people involved, including
+unsolicited interaction with those enforcing the Code of Conduct, is allowed
+during this period. Violating these terms may lead to a permanent ban.
 
 ### 4. Permanent Ban
 
-**Community Impact**: Demonstrating a pattern of violation of community
-standards, including sustained inappropriate behavior, harassment of an
-individual, or aggression toward or disparagement of classes of individuals.
+**Community Impact**: Demonstrating a pattern of violation of community standards,
+including sustained inappropriate behavior, harassment of an individual, or
+aggression toward or disparagement of classes of individuals.
 
 **Consequence**: A permanent ban from any sort of public interaction within the
-community.
-
-## Enforcement Process
-
-When a community leader receives a report, they will:
-
-1. **Acknowledge Receipt**: Respond within 48 hours to acknowledge the report
-2. **Review**: Investigate the reported behavior and gather relevant information
-3. **Decide**: Determine appropriate action based on these guidelines
-4. **Communicate**: Inform the reporter and involved parties of the decision
-5. **Follow Up**: Monitor the situation to ensure compliance and safety
+community. This decision is reserved for severe cases and repeated violations.
 
 ## Appeals
 
 Anyone subject to enforcement action may appeal the decision by contacting
-the project leadership at conduct@xai.io within 14 days. Appeals will be
-reviewed by community leaders who were not involved in the original decision.
+the project leadership at info@xaiblockchain.org within 14 days of the
+decision. Appeals will be reviewed by community leaders who were not involved
+in the original decision when possible.
+
+Appeals should include:
+
+- The original decision being appealed
+- Why you believe the decision should be reconsidered
+- Any additional context or evidence not previously considered
 
 ## Attribution
 
 This Code of Conduct is adapted from the [Contributor Covenant][homepage],
 version 2.1, available at
-[https://www.contributor-covenant.org/version/2/1/code_of_conduct.html][v2.1].
+[https://www.contributor-covenant.org/version/2/1/code_of_conduct.html][v2.1],
+with additional guidance from the [Ethereum.org Code of Conduct][ethereum-coc]
+and blockchain industry best practices.
 
 Community Impact Guidelines were inspired by
 [Mozilla's code of conduct enforcement ladder][Mozilla CoC].
@@ -163,42 +259,14 @@ For answers to common questions about this code of conduct, see the FAQ at
 
 [homepage]: https://www.contributor-covenant.org
 [v2.1]: https://www.contributor-covenant.org/version/2/1/code_of_conduct.html
+[ethereum-coc]: https://ethereum.org/en/community/code-of-conduct/
+[Mozilla CoC]: https://github.com/mozilla/diversity
 [FAQ]: https://www.contributor-covenant.org/faq
 [translations]: https://www.contributor-covenant.org/translations
 
-## Additional Project-Specific Guidelines
-
-### Technical Discussions
-
-* Focus on the technical merits of proposals
-* Base arguments on facts, data, and evidence
-* Be open to changing your mind when presented with new information
-* Acknowledge when you don't know something
-* Help others learn and grow in their understanding
-
-### Blockchain and Crypto Conduct
-
-* Do not promote scams, rug pulls, or fraudulent schemes
-* Be honest about risks and limitations of technology
-* Do not provide financial advice
-* Respect regulatory and legal considerations
-* Maintain transparency in all blockchain-related activities
-
-### Security and Privacy
-
-* Report security vulnerabilities responsibly (see SECURITY.md)
-* Respect the privacy of community members
-* Do not share private keys, passwords, or sensitive information
-* Handle user data with care and in compliance with privacy laws
-
-## Contact
-
-For questions about this Code of Conduct:
-* **Email**: conduct@xai.io
-* **Community**: Use your organization’s standard discussion channel
-
 ---
 
-**Last Updated**: January 2025
+**Last Updated**: January 2026
 
-Thank you for helping make the XAI community welcoming and inclusive!
+Thank you for helping make the XAI community welcoming, inclusive, and safe
+for everyone.
