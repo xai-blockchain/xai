@@ -1,7 +1,8 @@
 # XAI Blockchain Testnet Infrastructure
 
 > **Last Updated**: 2026-01-01
-> **Maintainer**: AI Agents via Claude Code
+> **Maintainer**: Jeff DeCristofaro <info@xaiblockchain.org>
+> **License**: Apache 2.0
 
 ## Quick Reference
 
@@ -372,7 +373,22 @@ Defined in `src/xai/core/node_api.py` and related files.
 
 ---
 
-## 15. Related Documentation
+## 15. Contact & Support
 
-- [XAI GitHub Repository](https://github.com/xai-blockchain/xai)
-- Python Click documentation for CLI
+| Resource | Link |
+|----------|------|
+| **Maintainer** | Jeff DeCristofaro |
+| **Email** | info@xaiblockchain.org |
+| **Bug Reports** | GitHub Issues |
+| **Security Issues** | See SECURITY.md |
+
+---
+
+## 16. Related Documentation
+
+- [Python Click Documentation](https://click.palletsprojects.com/)
+- [Flask Documentation](https://flask.palletsprojects.com/)
+- [CONTRIBUTING.md](./CONTRIBUTING.md) - Contribution guidelines
+- [LICENSE](./LICENSE) - Apache 2.0 License
+- [AUTHORS](./AUTHORS) - Project authors and contributors
+- [SECURITY.md](./SECURITY.md) - Security policy and reporting
