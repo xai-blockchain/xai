@@ -50,5 +50,7 @@ xai-wallet request-faucet --address TXAI_YOUR_ADDRESS
 ## Notes
 
 - `XAI_NETWORK` defaults to `testnet` unless set to `mainnet`.
-- `XAI_API_PORT` controls the node HTTP port; `XAI_API_URL` controls CLI base URL.
+- `XAI_API_PORT` controls the node HTTP port; `XAI_API_URL` controls the CLI base URL.
+- `xai-wallet` defaults to `http://localhost:12001` unless `XAI_API_URL` or `--base-url` is set.
+- If you run `xai-node` without `--port`, it defaults to `8545`, so set `XAI_API_URL` to match.
 - See `docs/api/rest-api.md` for HTTP endpoints.

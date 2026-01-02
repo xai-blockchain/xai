@@ -32,6 +32,12 @@
 
 2. Request tokens from the faucet:
    - Visit https://testnet-faucet.xaiblockchain.com
+   - Or use the CLI:
+     ```bash
+     xai-wallet request-faucet \
+       --address TXAI_YOUR_ADDRESS \
+       --base-url https://testnet-faucet.xaiblockchain.com
+     ```
    - Or use the API:
      ```bash
      curl -X POST https://testnet-faucet.xaiblockchain.com/claim \
@@ -41,7 +47,7 @@
 
 3. Check your balance:
    ```bash
-   xai-wallet balance --address TXAI_YOUR_ADDRESS
+   xai-wallet balance --address TXAI_YOUR_ADDRESS --base-url https://testnet-rpc.xaiblockchain.com
    ```
 
 ## Quick Commands

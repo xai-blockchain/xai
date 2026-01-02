@@ -1,6 +1,6 @@
 # REST API (Quick Reference)
 
-Base URL: `http://<host>:<port>` (defaults to `localhost:8545` unless overridden).
+Base URL: `http://<host>:<port>` (node defaults to `localhost:8545` unless overridden). The `xai-wallet` CLI defaults to `http://localhost:12001` unless `XAI_API_URL` or `--base-url` is set.
 
 ## Authentication
 
