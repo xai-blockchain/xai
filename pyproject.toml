@@ -278,7 +278,7 @@ version_files = [
 
 # Setuptools configuration
 [tool.setuptools]
-packages = ["xai"]
+packages = { find = { where = ["src"] } }
 
 [tool.setuptools.package-dir]
 "" = "src"

@@ -412,7 +412,7 @@ class TestConsistencyVerification:
     def test_detect_count_mismatch(self, populated_manager):
         """Should detect UTXO count mismatch."""
         # Manually corrupt count
-        populated_manager.total_utxos = 999
+        populated_manager._store._total_utxos = 999
 
         result = populated_manager.verify_utxo_consistency()
         assert result["is_consistent"] is False
@@ -421,7 +421,7 @@ class TestConsistencyVerification:
     def test_detect_value_mismatch(self, populated_manager):
         """Should detect value mismatch."""
         # Manually corrupt value
-        populated_manager.total_value = 9999.0
+        populated_manager._store._total_value = 9999.0
 
         result = populated_manager.verify_utxo_consistency()
         assert result["is_consistent"] is False
