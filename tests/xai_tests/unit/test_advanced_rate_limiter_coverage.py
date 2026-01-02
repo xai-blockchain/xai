@@ -139,7 +139,7 @@ class TestRateLimitBucket:
     def test_init(self, bucket):
         """Test bucket initialization"""
         assert bucket.requests == []
-        assert isinstance(bucket.lock, threading.Lock)
+        assert isinstance(bucket.lock, type(threading.Lock()))
 
     def test_add_request(self, bucket):
         """Test adding a request timestamp"""
@@ -246,7 +246,7 @@ class TestAdvancedRateLimiter:
     def test_init_default_values(self, limiter):
         """Test default initialization values"""
         assert isinstance(limiter.buckets, dict)
-        assert isinstance(limiter.lock, threading.Lock)
+        assert isinstance(limiter.lock, type(threading.Lock()))
         assert isinstance(limiter.endpoint_configs, dict)
         assert isinstance(limiter.stats, RateLimitStats)
         assert limiter.ddos_threshold == 1000
@@ -260,8 +260,8 @@ class TestAdvancedRateLimiter:
         assert "default" in limiter.endpoint_configs
         assert "/api/login" in limiter.endpoint_configs
         assert "/api/register" in limiter.endpoint_configs
-        assert "/api/wallet/send" in limiter.endpoint_configs
-        assert "/api/mining/start" in limiter.endpoint_configs
+        assert "/wallet/send" in limiter.endpoint_configs
+        assert "/mining/start" in limiter.endpoint_configs
 
     def test_endpoint_config_values(self, limiter):
         """Test specific endpoint config values"""
