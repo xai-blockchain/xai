@@ -52,9 +52,30 @@ The wizard will guide you through:
 - **Raspberry Pi/IoT:** [Lightweight Node Guide](docs/user-guides/lightweight_node_guide.md)
 - **Light Client:** [Light Client Mode](docs/user-guides/light_client_mode.md) (SPV, minimal resources)
 
+## 🌐 Public Testnet
+
+**Chain ID**: `xai-testnet-1`
+
+| Service | URL |
+|---------|-----|
+| **RPC API** | https://testnet-rpc.xaiblockchain.com |
+| **Faucet** | https://testnet-faucet.xaiblockchain.com |
+| **Explorer** | https://testnet-explorer.xaiblockchain.com |
+| **Monitoring** | https://monitoring.xaiblockchain.com |
+| **Snapshots** | https://snapshots.xaiblockchain.com |
+| **Security Console** | https://console.xaiblockchain.com |
+
+### Direct Server Access (Development)
+
+| Service | Address |
+|---------|---------|
+| Server IP | 54.39.129.11 |
+| VPN IP | 10.10.0.3 |
+| RPC | http://54.39.129.11:8545 |
+
 ### 💧 Testnet Faucet - Get Free XAI
 
-**Official Public Faucet:** https://faucet.xai.network
+**Official Public Faucet:** https://testnet-faucet.xaiblockchain.com
 
 Get 100 free testnet XAI tokens instantly for testing and development!
 
@@ -62,7 +83,7 @@ Get 100 free testnet XAI tokens instantly for testing and development!
 
 **1. Web UI (Easiest):**
 ```
-Visit: https://faucet.xai.network
+Visit: https://testnet-faucet.xaiblockchain.com
 Enter your TXAI address
 Click "Request Tokens"
 ```
@@ -74,7 +95,7 @@ python src/xai/wallet/cli.py request-faucet --address TXAI_YOUR_ADDRESS
 
 **3. Direct API Call:**
 ```bash
-curl -X POST https://faucet.xai.network/claim \
+curl -X POST https://testnet-faucet.xaiblockchain.com/claim \
   -H "Content-Type: application/json" \
   -d '{"address": "TXAI_YOUR_ADDRESS"}'
 
@@ -92,7 +113,7 @@ curl -X POST http://localhost:12001/faucet/claim \
 | **Rate Limit** | 1 request per address per hour |
 | **Delivery Time** | Next block (~2 minutes) |
 | **Token Value** | Testnet only - no real value |
-| **Public Faucet** | https://faucet.xai.network |
+| **Public Faucet** | https://testnet-faucet.xaiblockchain.com |
 | **Local Endpoint** | `http://localhost:12001/faucet/claim` |
 
 **Note:** Testnet XAI has no real value. Use it freely for development and testing.
