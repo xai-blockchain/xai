@@ -10,6 +10,7 @@ import secrets
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
 

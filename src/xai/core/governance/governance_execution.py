@@ -293,7 +293,7 @@ class GovernanceExecutionEngine:
         self.capability_registry = GovernanceCapabilityRegistry()
         self.execution_history = []
 
-    def execute_proposal(self, proposal_id: str, proposal_data: Dict) -> Dict:
+    def execute_proposal(self, proposal_id: str, proposal_data: dict) -> dict:
         """
         Execute an approved proposal
 
@@ -335,7 +335,7 @@ class GovernanceExecutionEngine:
 
             return {"success": False, "error": f"Unknown proposal type: {proposal_type}"}
 
-    def _execute_protocol_parameter(self, proposal_id: str, proposal_data: Dict) -> Dict:
+    def _execute_protocol_parameter(self, proposal_id: str, proposal_data: dict) -> dict:
         """Execute protocol parameter change"""
         parameter = proposal_data.get("parameter")
         new_value = proposal_data.get("new_value")
@@ -407,7 +407,7 @@ class GovernanceExecutionEngine:
             "new_value": new_value,
         }
 
-    def _execute_feature_activation(self, proposal_id: str, proposal_data: Dict) -> Dict:
+    def _execute_feature_activation(self, proposal_id: str, proposal_data: dict) -> dict:
         """Execute feature activation/deactivation"""
         feature_name = proposal_data.get("feature_name")
         enabled = proposal_data.get("enabled", True)
@@ -432,7 +432,7 @@ class GovernanceExecutionEngine:
             "enabled": enabled,
         }
 
-    def _execute_treasury_allocation(self, proposal_id: str, proposal_data: Dict) -> Dict:
+    def _execute_treasury_allocation(self, proposal_id: str, proposal_data: dict) -> dict:
         """Execute treasury fund allocation"""
         recipient = proposal_data.get("recipient")
         amount = proposal_data.get("amount")
@@ -473,7 +473,7 @@ class GovernanceExecutionEngine:
             "txid": treasury_tx.txid,
         }
 
-    def _execute_emergency_action(self, proposal_id: str, proposal_data: Dict) -> Dict:
+    def _execute_emergency_action(self, proposal_id: str, proposal_data: dict) -> dict:
         """Execute emergency action with timelock"""
         # Check timelock
         current_height = len(self.blockchain.chain)
@@ -529,7 +529,7 @@ class GovernanceExecutionEngine:
 
         return result
 
-    def _execute_add_proposal_type(self, proposal_id: str, proposal_data: Dict) -> Dict:
+    def _execute_add_proposal_type(self, proposal_id: str, proposal_data: dict) -> dict:
         """Execute meta-governance: Add new proposal type"""
         type_name = proposal_data.get("new_type_name")
         description = proposal_data.get("new_type_description")
@@ -555,7 +555,7 @@ class GovernanceExecutionEngine:
 
         return {"success": True, "action": "proposal_type_added", "type_name": type_name}
 
-    def _execute_add_parameter(self, proposal_id: str, proposal_data: Dict) -> Dict:
+    def _execute_add_parameter(self, proposal_id: str, proposal_data: dict) -> dict:
         """Execute meta-governance: Add new parameter"""
         param_name = proposal_data.get("parameter_name")
         param_type = ParameterType(proposal_data.get("parameter_type"))
@@ -586,7 +586,7 @@ class GovernanceExecutionEngine:
 
         return {"success": True, "action": "parameter_added", "parameter_name": param_name}
 
-    def _execute_modify_governance_rules(self, proposal_id: str, proposal_data: Dict) -> Dict:
+    def _execute_modify_governance_rules(self, proposal_id: str, proposal_data: dict) -> dict:
         """Execute meta-governance: Modify governance rules"""
         rule_name = proposal_data.get("rule_name")
         new_value = proposal_data.get("new_value")
@@ -631,7 +631,7 @@ class GovernanceExecutionEngine:
             "new_value": new_value,
         }
 
-    def _execute_custom_proposal(self, proposal_id: str, proposal_data: Dict) -> Dict:
+    def _execute_custom_proposal(self, proposal_id: str, proposal_data: dict) -> dict:
         """Execute custom proposal type (added via meta-governance)"""
         proposal_type = proposal_data.get("proposal_type")
 
@@ -649,7 +649,7 @@ class GovernanceExecutionEngine:
             "note": "Custom proposal logged. Implementation handler required for actual execution.",
         }
 
-    def _log_execution(self, proposal_id: str, execution_type: str, details: Dict):
+    def _log_execution(self, proposal_id: str, execution_type: str, details: dict):
         """Log proposal execution"""
         self.execution_history.append(
             {
@@ -660,7 +660,7 @@ class GovernanceExecutionEngine:
             }
         )
 
-    def get_execution_history(self, limit: int = 100) -> list[Dict]:
+    def get_execution_history(self, limit: int = 100) -> list[dict]:
         """Get recent execution history"""
         return self.execution_history[-limit:]
 

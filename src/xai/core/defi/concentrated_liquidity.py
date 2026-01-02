@@ -982,7 +982,7 @@ class ConcentratedLiquidityPool:
 
     # ==================== View Functions ====================
 
-    def get_position(self, position_id: int) -> Dict | None:
+    def get_position(self, position_id: int) -> dict | None:
         """Get position details."""
         position = self.positions.get(position_id)
         if not position:
@@ -1040,7 +1040,7 @@ class ConcentratedLiquidityPool:
 
         return fees_0, fees_1
 
-    def get_pool_state(self) -> Dict:
+    def get_pool_state(self) -> dict:
         """Get current pool state."""
         return {
             "address": self.address,

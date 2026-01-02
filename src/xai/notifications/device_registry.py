@@ -402,7 +402,7 @@ class DeviceRegistry:
         Get registry statistics.
 
         Returns:
-            Dict with device counts by platform and status
+            dict with device counts by platform and status
         """
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute("""

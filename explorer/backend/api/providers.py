@@ -22,8 +22,7 @@ async def get_providers(
     limit: int = Query(20, ge=1, le=100)
 ):
     """
-    Get list of AI compute providers with ranking
-    Revolutionary: Provider leaderboard and marketplace
+    Get list of AI compute providers with ranking.
     """
     try:
         async with httpx.AsyncClient() as client:
@@ -60,8 +59,7 @@ async def get_providers(
 @router.get("/{provider_address}")
 async def get_provider_dashboard(provider_address: str):
     """
-    Get comprehensive provider dashboard
-    Revolutionary: Complete provider performance and earnings tracking
+    Get provider dashboard details.
     """
     try:
         async with httpx.AsyncClient() as client:
@@ -146,8 +144,7 @@ async def get_provider_leaderboard(
     limit: int = Query(10, ge=1, le=50)
 ):
     """
-    Get provider leaderboard
-    Revolutionary: Gamification of AI compute marketplace
+    Get provider leaderboard.
     """
     try:
         async with httpx.AsyncClient() as client:

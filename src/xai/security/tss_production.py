@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 """
-Production-Grade Threshold Signature Scheme (TSS)
+Threshold Signature Scheme (TSS).
 
 Implements distributed threshold cryptography using:
 - Shamir's Secret Sharing for key distribution
 - ECDSA threshold signatures
 - Secure multi-party computation principles
-
-This replaces the MockTSS with a production-ready implementation.
 """
 
 import hashlib

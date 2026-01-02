@@ -95,7 +95,7 @@ class GovernanceParameters:
         else:
             return self.timelock_ai_improvement
 
-    def update_parameter(self, param_name: str, new_value: float) -> Dict:
+    def update_parameter(self, param_name: str, new_value: float) -> dict:
         """
         Update governance parameter (called after vote passes and timelock expires)
         Similar to Compound's governance parameter changes
@@ -139,7 +139,7 @@ class GovernanceParameters:
             "new_value": new_value,
         }
 
-    def get_all_parameters(self) -> Dict:
+    def get_all_parameters(self) -> dict:
         """Get all current parameter values"""
 
         return {
@@ -176,7 +176,7 @@ class TimelockProposal:
         proposal_type: ProposalType,
         approval_time: float,
         timelock_days: int,
-        execution_data: Dict,
+        execution_data: dict,
     ):
         self.proposal_id = proposal_id
         self.proposal_type = proposal_type

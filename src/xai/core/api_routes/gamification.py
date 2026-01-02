@@ -26,7 +26,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
             limit (int, optional): Maximum airdrops to return (default: 10)
 
         Returns:
-            Dict containing:
+            dict containing:
                 - success (bool): Always True
                 - airdrops (list): Recent airdrop events
         """
@@ -45,7 +45,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
             address (str): The blockchain address to query
 
         Returns:
-            Dict containing:
+            dict containing:
                 - success (bool): Always True
                 - address (str): The queried address
                 - total_airdrops (int): Number of airdrops received
@@ -76,7 +76,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
                                     (default: "current_streak")
 
         Returns:
-            Dict containing:
+            dict containing:
                 - success (bool): Always True
                 - leaderboard (list): Ranked list of miners with streak stats
         """
@@ -119,7 +119,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
         excluding already claimed treasures.
 
         Returns:
-            Dict containing:
+            dict containing:
                 - success (bool): Always True
                 - count (int): Number of active treasures
                 - treasures (list): List of active treasure hunt objects
@@ -277,7 +277,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
         and can't be claimed yet.
 
         Returns:
-            Dict containing:
+            dict containing:
                 - success (bool): Always True
                 - count (int): Number of pending capsules
                 - capsules (list): List of pending time capsule objects
@@ -296,7 +296,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
             address (str): The blockchain address to query
 
         Returns:
-            Dict containing:
+            dict containing:
                 - success (bool): Always True
                 - address (str): The queried address
                 - sent (list): Time capsules sent by this address
@@ -320,7 +320,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
         processed, total amount refunded, and average refund amount.
 
         Returns:
-            Dict containing:
+            dict containing:
                 - success (bool): Always True
                 - stats (object): Refund statistics object
         """
@@ -338,7 +338,7 @@ def register_gamification_routes(routes: "NodeAPIRoutes") -> None:
             address (str): The blockchain address to query
 
         Returns:
-            Dict containing:
+            dict containing:
                 - success (bool): Always True
                 - address (str): The queried address
                 - total_refunds (int): Number of refunds received

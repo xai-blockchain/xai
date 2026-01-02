@@ -8,12 +8,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "xai-blockchain"
 version = "0.2.0"
-description = "XAI - AI-Enhanced Blockchain Platform"
+description = "Python-based proof-of-work blockchain implementation"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = {text = "Apache-2.0"}
 authors = [
-    {name = "Crypto Project Team"},
+    {name = "XAI contributors"},
 ]
 keywords = [
     "blockchain",
@@ -26,7 +26,7 @@ keywords = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -122,9 +122,7 @@ ai = [
     "google-generativeai>=0.3.0",
 ]
 
-[project.urls]
-Documentation = "https://xai-blockchain.readthedocs.io"
-Homepage = "https://example.com/xai-blockchain"
+#[project.urls]
 # Repository and issue tracker intentionally omitted during migration
 
 [project.scripts]

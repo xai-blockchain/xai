@@ -8,6 +8,7 @@ and coinbase validation.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 

@@ -10,7 +10,7 @@ import json
 import logging
 import time
 from enum import Enum
-from typing import Dict, List
+from typing import List
 
 from cryptography.fernet import Fernet
 
@@ -218,7 +218,7 @@ class ProposalSecurityAnalyzer:
         self.ai_model = ai_model
         self.fernet = Fernet(Fernet.generate_key())  # For API key encryption
 
-    def analyze_proposal(self, proposal: AITaskProposal) -> Dict:
+    def analyze_proposal(self, proposal: AITaskProposal) -> dict:
         """
         Multi-layer security analysis of proposal
         Returns security score and identified threats
@@ -283,7 +283,7 @@ class ProposalSecurityAnalyzer:
 
         return threats
 
-    def _analyze_intent(self, proposal: AITaskProposal) -> Dict:
+    def _analyze_intent(self, proposal: AITaskProposal) -> dict:
         """
         AI-powered intent analysis
         In production, this would call Claude/GPT to analyze proposal intent
@@ -320,7 +320,7 @@ class ProposalSecurityAnalyzer:
 
         return result
 
-    def _analyze_economics(self, proposal: AITaskProposal) -> Dict:
+    def _analyze_economics(self, proposal: AITaskProposal) -> dict:
         """Analyze economic impact on XAI value"""
         risks = []
 
@@ -425,7 +425,7 @@ class AIGovernanceDAO:
         estimated_tokens: int,
         best_ai_model: str,
         expected_outcome: str,
-    ) -> Dict:
+    ) -> dict:
         """
         Submit new AI task proposal
         Returns proposal_id if successful
@@ -496,7 +496,7 @@ class AIGovernanceDAO:
 
     def vote_on_proposal(
         self, proposal_id: str, voter_address: str, vote: str  # 'for', 'against', 'abstain'
-    ) -> Dict:
+    ) -> dict:
         """
         Cast vote on proposal
         Vote weight = XAI balance at snapshot height
@@ -577,7 +577,7 @@ class AIGovernanceDAO:
         ai_model: str,
         api_key_encrypted: str,
         token_amount: int,
-    ) -> Dict:
+    ) -> dict:
         """
         Donate AI tokens to fund proposal
         Triggers milestone votes when thresholds reached
@@ -751,7 +751,7 @@ class AIGovernanceDAO:
             except Exception as e:
                 logger.warning(f"Failed to store vote on chain: {e}")
 
-    def _send_milestone_notification(self, notification: Dict):
+    def _send_milestone_notification(self, notification: dict):
         """Send notification to community about milestone"""
         notification["timestamp"] = time.time()
         notification["type"] = "milestone_update"
@@ -765,7 +765,7 @@ class AIGovernanceDAO:
 
         logger.info(f"Milestone notification: {notification.get('title', 'Update')}")
 
-    def get_proposal(self, proposal_id: str) -> Dict | None:
+    def get_proposal(self, proposal_id: str) -> dict | None:
         """Get proposal details"""
         if proposal_id in self.proposals:
             return self.proposals[proposal_id].to_dict()
@@ -776,7 +776,7 @@ class AIGovernanceDAO:
         status: ProposalStatus | None = None,
         category: ProposalCategory | None = None,
         sort_by: str = "created",
-    ) -> list[Dict]:
+    ) -> list[dict]:
         """
         List proposals with optional filters
         """
@@ -800,7 +800,7 @@ class AIGovernanceDAO:
 
         return [p.to_dict() for p in proposals]
 
-    def get_active_votes(self) -> list[Dict]:
+    def get_active_votes(self) -> list[dict]:
         """Get all proposals currently open for voting"""
         active = [
             p

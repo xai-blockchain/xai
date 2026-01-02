@@ -78,7 +78,7 @@ class HDWallet:
 
         # Track derived accounts
         self.accounts: dict[int, dict[str, Any]] = {}
-        self.address_cache: dict[str, Dict] = {}
+        self.address_cache: dict[str, dict] = {}
         self.selected_account: int = 0
         self.next_account_index: int = 0
 
@@ -257,7 +257,7 @@ class HDWallet:
         change: int = 0,
         check_balance_func: callable | None = None,
         max_scan: int = 1000,
-    ) -> list[Dict]:
+    ) -> list[dict]:
         """
         Scan for used addresses following BIP-44 gap limit (TASK 99).
 
@@ -309,7 +309,7 @@ class HDWallet:
         self,
         check_balance_func: callable,
         accounts_to_scan: int = 5,
-    ) -> dict[str, list[Dict]]:
+    ) -> dict[str, list[dict]]:
         """
         Recover all wallet addresses by scanning with gap limit (TASK 99).
 

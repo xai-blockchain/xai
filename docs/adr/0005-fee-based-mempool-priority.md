@@ -23,7 +23,6 @@ Uses Python's `list.sort()` (Timsort, O(n log n)) with topological sort via Kahn
 - Fair fee market
 - Maintains nonce ordering per sender
 - Handles intra-block UTXO dependencies
-- Already production-ready
 
 **Alternatives Considered:**
 - Heap-based priority queue: marginal benefit for typical mempool sizes (<10k)

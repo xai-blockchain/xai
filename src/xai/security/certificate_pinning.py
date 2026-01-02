@@ -62,7 +62,7 @@ class CertificatePinner:
         self.grace_period = timedelta(days=grace_period_days)
 
         # Track violations for monitoring
-        self.violations: list[Dict] = []
+        self.violations: list[dict] = []
         self.max_violations_log = 100
 
         logger.info("CertificatePinner initialized with enforcement=%s", enforce_pinning)
@@ -308,7 +308,7 @@ class CertificatePinner:
 
         return removed
 
-    def get_pins(self, hostname: str) -> list[Dict]:
+    def get_pins(self, hostname: str) -> list[dict]:
         """Get all pins for hostname"""
         if hostname not in self.pinned_certificates:
             return []
@@ -324,11 +324,11 @@ class CertificatePinner:
             for pin in self.pinned_certificates[hostname]
         ]
 
-    def get_violations(self, limit: int = 10) -> list[Dict]:
+    def get_violations(self, limit: int = 10) -> list[dict]:
         """Get recent pinning violations"""
         return self.violations[-limit:]
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Get certificate pinning statistics"""
         return {
             "total_hosts": len(self.pinned_certificates),

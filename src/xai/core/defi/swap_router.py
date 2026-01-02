@@ -883,7 +883,7 @@ class SwapRouter:
         suspicious_pairs = []
 
         # Group by token pair
-        swaps_by_pair: dict[str, List] = defaultdict(list)
+        swaps_by_pair: dict[str, list] = defaultdict(list)
         for caller, path, amount in pending_swaps:
             swaps_by_pair[path].append((caller, amount))
 
@@ -909,7 +909,7 @@ class SwapRouter:
         token_in: str,
         token_out: str,
         amount_in: int,
-    ) -> Dict:
+    ) -> dict:
         """
         Get quote for a swap without executing.
 
@@ -983,7 +983,7 @@ class SwapRouter:
         """Get all pools containing a token."""
         return self.token_to_pools.get(token.upper(), [])
 
-    def get_order(self, order_id: str) -> Dict | None:
+    def get_order(self, order_id: str) -> dict | None:
         """Get order details."""
         order = self.orders.get(order_id)
         if not order:
@@ -1003,7 +1003,7 @@ class SwapRouter:
             "expiry": order.expiry,
         }
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Get router statistics."""
         return {
             "total_swaps": self.total_swaps,
@@ -1367,7 +1367,7 @@ class SwapRouter:
 
     # ==================== Serialization ====================
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Serialize router state."""
         return {
             "name": self.name,

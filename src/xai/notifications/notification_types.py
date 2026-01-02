@@ -70,7 +70,7 @@ class NotificationPayload:
         Convert to Firebase Cloud Messaging payload format.
 
         Returns:
-            Dict containing FCM-compatible notification structure
+            dict containing FCM-compatible notification structure
         """
         payload: dict[str, Any] = {
             "notification": {
@@ -103,7 +103,7 @@ class NotificationPayload:
         Convert to Apple Push Notification Service payload format.
 
         Returns:
-            Dict containing APNs-compatible notification structure
+            dict containing APNs-compatible notification structure
         """
         aps: dict[str, Any] = {
             "alert": {

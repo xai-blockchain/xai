@@ -149,7 +149,7 @@ class AITradingBot:
         ai_model: str,
         user_api_key: str,
         strategy: TradingStrategy,
-        config: Dict,
+        config: dict,
         blockchain,
         personal_ai,
         market_data_provider: Callable[[str], float | None] | None = None,
@@ -403,7 +403,7 @@ class AITradingBot:
                 if len(pair.price_history) > 50:
                     pair.price_history.pop(0)
 
-    def _analyze_market(self, pair: TradingPair) -> Dict:
+    def _analyze_market(self, pair: TradingPair) -> dict:
         """
         Use AI to analyze market and recommend action
 
@@ -488,7 +488,7 @@ class AITradingBot:
             }
 
     def _create_analysis_prompt(
-        self, pair: TradingPair, balance: float, recent_trades: List
+        self, pair: TradingPair, balance: float, recent_trades: list
     ) -> str:
         """Create AI prompt based on strategy"""
 
@@ -564,7 +564,7 @@ Return JSON:
 
         return full_prompt
 
-    def _execute_trade(self, pair: TradingPair, analysis: Dict):
+    def _execute_trade(self, pair: TradingPair, analysis: dict):
         """
         Execute trade based on AI analysis
 
@@ -721,7 +721,7 @@ Return JSON:
 
     def implement_stop_loss(
         self, entry_price: float, position_size: float, stop_loss_percent: float = None
-    ) -> Dict:
+    ) -> dict:
         """
         Implement stop-loss for a position
 
@@ -748,7 +748,7 @@ Return JSON:
             "auto_exit_enabled": True,
         }
 
-    def check_exposure_limits(self) -> Dict:
+    def check_exposure_limits(self) -> dict:
         """
         Check current market exposure against limits
 
@@ -802,7 +802,7 @@ Return JSON:
 
         return round(reward / risk, 2)
 
-    def apply_portfolio_diversification(self) -> Dict:
+    def apply_portfolio_diversification(self) -> dict:
         """
         Apply portfolio diversification rules
 
@@ -876,7 +876,7 @@ Return JSON:
             },
         )
 
-    def _call_user_ai(self, prompt: str) -> Dict:
+    def _call_user_ai(self, prompt: str) -> dict:
         """Call user's AI with the prompt"""
 
         try:
@@ -918,7 +918,7 @@ Return JSON:
             )
             return {"success": False, "error": f"{type(e).__name__}: {str(e)}"}
 
-    def _get_performance_summary(self) -> Dict:
+    def _get_performance_summary(self) -> dict:
         """Get performance summary"""
 
         return {
@@ -930,7 +930,7 @@ Return JSON:
             "roi": self.performance.roi,
         }
 
-    def get_status(self) -> Dict:
+    def get_status(self) -> dict:
         """Get current bot status"""
 
         return {

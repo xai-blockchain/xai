@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-XAI Blockchain - Revolutionary AI-Enhanced CLI
-Production-grade command-line interface with rich terminal UX
+XAI Blockchain CLI.
+Command-line interface for node and wallet operations.
 """
 
 from __future__ import annotations
@@ -669,11 +669,10 @@ def cli(
     local_mempool_limit: int,
 ):
     """
-    XAI Blockchain CLI - Revolutionary AI-Enhanced Blockchain
+    XAI Blockchain CLI.
 
-    A production-grade command-line interface for interacting with
-    the XAI blockchain network, featuring AI compute jobs, mining,
-    trading, and comprehensive blockchain operations.
+    Command-line interface for interacting with node, wallet, and
+    related services.
     """
     ctx.ensure_object(dict)
     if transport == 'local':
@@ -1973,7 +1972,7 @@ def sync_status(ctx: click.Context, watch: bool, interval: int):
         console.print("\n[yellow]Stopped watching sync status[/]")
 
 # ============================================================================
-# AI Commands (Revolutionary AI-Blockchain Features)
+# AI commands
 # Import production-grade AI commands module
 # ============================================================================
 

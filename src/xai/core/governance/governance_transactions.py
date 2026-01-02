@@ -40,7 +40,7 @@ class GovernanceTransaction:
     """
 
     def __init__(
-        self, tx_type: GovernanceTxType, submitter: str, proposal_id: str = None, data: Dict = None
+        self, tx_type: GovernanceTxType, submitter: str, proposal_id: str = None, data: dict = None
     ):
         self.tx_type = tx_type.value
         self.submitter = submitter
@@ -61,7 +61,7 @@ class GovernanceTransaction:
         tx_string = json.dumps(tx_data, sort_keys=True)
         return hashlib.sha256(tx_string.encode()).hexdigest()
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary for blockchain storage"""
         return {
             "txid": self.txid,
@@ -73,7 +73,7 @@ class GovernanceTransaction:
         }
 
     @staticmethod
-    def from_dict(data: Dict) -> "GovernanceTransaction":
+    def from_dict(data: dict) -> "GovernanceTransaction":
         """Reconstruct from blockchain data"""
         tx = GovernanceTransaction(
             tx_type=GovernanceTxType(data["tx_type"]),
@@ -121,7 +121,7 @@ class OnChainProposal:
         self.status = "proposed"
         self.payload = proposal_payload or {}
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Serialize for blockchain storage"""
         return {
             "proposal_id": self.proposal_id,
@@ -183,7 +183,7 @@ class GovernanceState:
         # Voting period duration (7 days in seconds)
         self.voting_period = 7 * 24 * 60 * 60
 
-    def submit_proposal(self, tx: GovernanceTransaction) -> Dict:
+    def submit_proposal(self, tx: GovernanceTransaction) -> dict:
         """Process proposal submission transaction"""
 
         proposal_data = tx.data
@@ -204,7 +204,7 @@ class GovernanceState:
 
         return {"success": True, "proposal_id": tx.proposal_id, "status": "active"}
 
-    def cast_vote(self, tx: GovernanceTransaction) -> Dict:
+    def cast_vote(self, tx: GovernanceTransaction) -> dict:
         """Process vote transaction"""
 
         if tx.proposal_id not in self.proposals:
@@ -243,7 +243,7 @@ class GovernanceState:
             "approval_details": details if approved else None,
         }
 
-    def submit_code_review(self, tx: GovernanceTransaction) -> Dict:
+    def submit_code_review(self, tx: GovernanceTransaction) -> dict:
         """Process code review transaction"""
 
         if tx.proposal_id not in self.proposals:
@@ -278,7 +278,7 @@ class GovernanceState:
 
         return {"success": True, "review_count": review_count}
 
-    def vote_implementation(self, tx: GovernanceTransaction) -> Dict:
+    def vote_implementation(self, tx: GovernanceTransaction) -> dict:
         """Process implementation approval vote transaction"""
 
         if tx.proposal_id not in self.proposals:
@@ -314,7 +314,7 @@ class GovernanceState:
             "approval_details": details if approved else None,
         }
 
-    def execute_proposal(self, tx: GovernanceTransaction) -> Dict:
+    def execute_proposal(self, tx: GovernanceTransaction) -> dict:
         """Process proposal execution transaction - VALIDATES ALL REQUIREMENTS"""
 
         if tx.proposal_id not in self.proposals:
@@ -420,7 +420,7 @@ class GovernanceState:
             "payload": execution_payload,
         }
 
-    def cancel_proposal(self, tx: GovernanceTransaction) -> Dict:
+    def cancel_proposal(self, tx: GovernanceTransaction) -> dict:
         """
         Process proposal cancellation transaction.
 
@@ -431,7 +431,7 @@ class GovernanceState:
             tx: GovernanceTransaction with type CANCEL_PROPOSAL
 
         Returns:
-            Dict with success status and details
+            dict with success status and details
         """
         proposal_id = tx.proposal_id
         if not proposal_id or proposal_id not in self.proposals:
@@ -487,7 +487,7 @@ class GovernanceState:
             "cancelled_at": current_time,
         }
 
-    def delegate_vote(self, tx: GovernanceTransaction) -> Dict:
+    def delegate_vote(self, tx: GovernanceTransaction) -> dict:
         """
         Process vote delegation transaction.
 
@@ -501,7 +501,7 @@ class GovernanceState:
                 - expiry: Optional timestamp when delegation expires (0 = permanent)
 
         Returns:
-            Dict with success status and delegation details
+            dict with success status and delegation details
         """
         delegator = tx.submitter
         delegate_address = tx.data.get("delegate_address")
@@ -545,7 +545,7 @@ class GovernanceState:
             "delegation_txid": tx.txid,
         }
 
-    def revoke_delegation(self, tx: GovernanceTransaction) -> Dict:
+    def revoke_delegation(self, tx: GovernanceTransaction) -> dict:
         """
         Process vote delegation revocation transaction.
 
@@ -555,7 +555,7 @@ class GovernanceState:
             tx: GovernanceTransaction with type REVOKE_DELEGATION
 
         Returns:
-            Dict with success status
+            dict with success status
         """
         delegator = tx.submitter
 
@@ -621,7 +621,7 @@ class GovernanceState:
         """
         return self._resolve_delegation_chain(voter_address)
 
-    def rollback_change(self, tx: GovernanceTransaction) -> Dict:
+    def rollback_change(self, tx: GovernanceTransaction) -> dict:
         """Process rollback transaction"""
 
         original_proposal_id = tx.data.get("original_proposal_id")
@@ -638,7 +638,7 @@ class GovernanceState:
             "rollback_txid": tx.txid,
         }
 
-    def _check_proposal_approved(self, proposal_id: str) -> tuple[bool, str, Dict]:
+    def _check_proposal_approved(self, proposal_id: str) -> tuple[bool, str, dict]:
         """Check if proposal has enough votes to be approved"""
 
         if proposal_id not in self.votes:
@@ -698,7 +698,7 @@ class GovernanceState:
 
         return True, f"Approved with {voter_count} voters ({approval_pct:.1f}% approval)", details
 
-    def _check_implementation_approved(self, proposal_id: str) -> tuple[bool, str, Dict]:
+    def _check_implementation_approved(self, proposal_id: str) -> tuple[bool, str, dict]:
         """Check if 50% of original voters approved implementation"""
 
         original_voters_set = self.original_voters.get(proposal_id, set())
@@ -727,7 +727,7 @@ class GovernanceState:
         else:
             return False, f"Need {required_yes} yes votes, have {yes_count}", details
 
-    def get_proposal_state(self, proposal_id: str) -> Dict | None:
+    def get_proposal_state(self, proposal_id: str) -> dict | None:
         """Get current state of proposal"""
 
         if proposal_id not in self.proposals:

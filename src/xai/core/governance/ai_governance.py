@@ -61,7 +61,7 @@ class VotingPowerDisplay:
     """
 
     @staticmethod
-    def show_contribution_impact(minutes_contributed: float) -> Dict:
+    def show_contribution_impact(minutes_contributed: float) -> dict:
         """
         Show what voting power comes from contributing X minutes
         Prevents discouragement from seeing large contributors
@@ -85,7 +85,7 @@ class VotingPowerDisplay:
         }
 
     @staticmethod
-    def compare_contributors(contributor_minutes: list[float]) -> list[Dict]:
+    def compare_contributors(contributor_minutes: list[float]) -> list[dict]:
         """
         Show how multiple contributors compare
         Demonstrates small contributors still matter
@@ -181,7 +181,7 @@ class VotingPower:
 
         return min(base_power, self.max_node_votes)
 
-    def calculate_total_voting_power(self, voter_data: Dict) -> tuple[float, Dict]:
+    def calculate_total_voting_power(self, voter_data: dict) -> tuple[float, dict]:
         """
         Calculate total voting power across all contributions
 
@@ -584,7 +584,7 @@ class AIWorkloadDistribution:
         }
         return entry["quality_score"]
 
-    def calculate_workload_shares(self, total_task_minutes: float) -> Dict:
+    def calculate_workload_shares(self, total_task_minutes: float) -> dict:
         """
         Divide AI workload among contributors proportionally
 
@@ -631,7 +631,7 @@ class AIWorkloadDistribution:
 
     def execute_distributed_task(
         self, task_description: str, total_estimated_minutes: float
-    ) -> Dict:
+    ) -> dict:
         """
         Execute AI task using distributed workload
 
@@ -720,7 +720,7 @@ class ConsensusRules:
         self.absolute_minimum = 50  # Never go below 50 voters
         self.revote_delay_days = 7  # Wait 7 days before revote
 
-    def _apply_power_caps(self, votes: Dict) -> Dict:
+    def _apply_power_caps(self, votes: dict) -> dict:
         """
         Cap individual voting power to prevent whale control
         Returns adjusted votes
@@ -755,8 +755,8 @@ class ConsensusRules:
         return adjusted_votes
 
     def check_consensus_reached(
-        self, proposal: Dict, votes: Dict, current_min_voters: int = None
-    ) -> tuple[bool, str, Dict]:
+        self, proposal: dict, votes: dict, current_min_voters: int = None
+    ) -> tuple[bool, str, dict]:
         """
         Check if proposal reached consensus
 
@@ -838,7 +838,7 @@ class AIGovernanceProposal:
         detailed_prompt: str,
         estimated_minutes: float,
         proposal_type: ProposalType = ProposalType.AI_IMPROVEMENT,
-        parameter_change: Dict | None = None,
+        parameter_change: dict | None = None,
         submitter_address: str | None = None,
         submitter_voting_power: float = 0,
     ) -> None:
@@ -885,7 +885,7 @@ class AIGovernanceProposal:
 
     def submit_time_estimate(
         self, voter_address: str, estimated_minutes: float, voter_power: float
-    ) -> Dict:
+    ) -> dict:
         """
         Community members estimate AI work time
         Weighted by voting power to prevent spam
@@ -915,7 +915,7 @@ class AIGovernanceProposal:
             "estimate_count": len(self.time_estimates),
         }
 
-    def close_vote_attempt(self, consensus_rules: "ConsensusRules") -> Dict:
+    def close_vote_attempt(self, consensus_rules: "ConsensusRules") -> dict:
         """
         Close current vote attempt and determine next action
         """
@@ -970,7 +970,7 @@ class AIGovernanceProposal:
                 "attempt_number": len(self.vote_attempts),
             }
 
-    def activate_timelock(self, governance_params: "GovernanceParameters") -> Dict:
+    def activate_timelock(self, governance_params: "GovernanceParameters") -> dict:
         """
         Activate timelock after approval
         Standard mechanism: delay between approval and execution
@@ -1002,7 +1002,7 @@ class AIGovernanceProposal:
 
         return True, "Ready for execution"
 
-    def get_vote_summary(self) -> Dict:
+    def get_vote_summary(self) -> dict:
         """Get current vote tallies"""
 
         yes_power = sum(v["voting_power"] for v in self.votes.values() if v["vote"] == "yes")
@@ -1037,7 +1037,7 @@ class ProposalImpactAnalyzer:
             ai_executor: Optional AI executor for ML-powered analysis
         """
         self.ai_executor = ai_executor
-        self.analysis_cache: dict[str, Dict] = {}
+        self.analysis_cache: dict[str, dict] = {}
 
     @staticmethod
     def _clamp(value: float, min_value: float = 0.0, max_value: float = 1.0) -> float:
@@ -1055,7 +1055,7 @@ class ProposalImpactAnalyzer:
             return [str(item).lower() for item in value if isinstance(item, (str, int, float))]
         return []
 
-    def _extract_tags(self, proposal: Dict) -> set[str]:
+    def _extract_tags(self, proposal: dict) -> set[str]:
         """Collect normalized tags/keywords describing the proposal impact surface."""
         tags: set[str] = set()
         for key in ("tags", "components", "modules", "impact_scope"):
@@ -1086,8 +1086,8 @@ class ProposalImpactAnalyzer:
         return sum(weight for keyword, weight in keyword_weights.items() if keyword in lowered)
 
     def analyze_proposal_impact(
-        self, proposal: Dict, historical_data: Dict | None = None
-    ) -> Dict:
+        self, proposal: dict, historical_data: dict | None = None
+    ) -> dict:
         """
         Generate comprehensive impact analysis for a proposal
 
@@ -1156,12 +1156,12 @@ class ProposalImpactAnalyzer:
 
     def _assess_risks(
         self,
-        proposal: Dict,
-        technical_analysis: Dict,
-        security_assessment: Dict,
-        financial_impact: Dict,
-        community_impact: Dict,
-    ) -> Dict:
+        proposal: dict,
+        technical_analysis: dict,
+        security_assessment: dict,
+        financial_impact: dict,
+        community_impact: dict,
+    ) -> dict:
         """Assess proposal risks using holistic signal aggregation."""
         description = str(proposal.get("description", "")).lower()
         tags = self._extract_tags(proposal)
@@ -1255,8 +1255,8 @@ class ProposalImpactAnalyzer:
         }
 
     def _predict_community_impact(
-        self, proposal: Dict, historical_data: Dict | None = None
-    ) -> Dict:
+        self, proposal: dict, historical_data: dict | None = None
+    ) -> dict:
         """Predict how proposal will impact the community with contextual signals."""
         historical = historical_data or {}
         feedback = proposal.get("community_feedback", {})
@@ -1391,7 +1391,7 @@ class ProposalImpactAnalyzer:
             "stakeholder_groups": stakeholder_groups,
         }
 
-    def _analyze_technical_changes(self, proposal: Dict) -> Dict:
+    def _analyze_technical_changes(self, proposal: dict) -> dict:
         """Analyze technical aspects of the proposal."""
         tags = self._extract_tags(proposal)
         description = str(proposal.get("description", "")).lower()
@@ -1488,8 +1488,8 @@ class ProposalImpactAnalyzer:
         }
 
     def _analyze_financial_impact(
-        self, proposal: Dict, historical_data: Dict | None = None
-    ) -> Dict:
+        self, proposal: dict, historical_data: dict | None = None
+    ) -> dict:
         """Analyze financial implications with realistic production estimates."""
         tags = self._extract_tags(proposal)
         historical = historical_data or {}
@@ -1553,7 +1553,7 @@ class ProposalImpactAnalyzer:
             "cost_benefit_ratio": round(cost_benefit_ratio, 2),
         }
 
-    def _assess_security_implications(self, proposal: Dict) -> Dict:
+    def _assess_security_implications(self, proposal: dict) -> dict:
         """Assess security implications with granular attack surface analysis."""
         tags = self._extract_tags(proposal)
         description = str(proposal.get("description", "")).lower()
@@ -1654,12 +1654,12 @@ class ProposalImpactAnalyzer:
 
     def _generate_recommendations(
         self,
-        proposal: Dict,
-        risk_assessment: Dict,
-        community_impact: Dict,
-        technical_analysis: Dict,
-        security_assessment: Dict,
-        financial_impact: Dict,
+        proposal: dict,
+        risk_assessment: dict,
+        community_impact: dict,
+        technical_analysis: dict,
+        security_assessment: dict,
+        financial_impact: dict,
     ) -> list[str]:
         """Generate actionable recommendations anchored to the detected risks."""
         tags = self._extract_tags(proposal)
@@ -1700,11 +1700,11 @@ class ProposalImpactAnalyzer:
 
     def _calculate_overall_score(
         self,
-        risk_assessment: Dict,
-        community_impact: Dict,
-        technical_analysis: Dict,
-        security_assessment: Dict,
-        financial_impact: Dict,
+        risk_assessment: dict,
+        community_impact: dict,
+        technical_analysis: dict,
+        security_assessment: dict,
+        financial_impact: dict,
     ) -> float:
         """Calculate overall proposal score (0-100)"""
         # Invert risk (low risk = high score)
@@ -1757,7 +1757,7 @@ class ProposalImpactAnalyzer:
         confidence = min(0.5 + (distance_from_middle / 100), 0.95)
         return round(confidence, 2)
 
-    def generate_analysis_report(self, analysis: Dict) -> str:
+    def generate_analysis_report(self, analysis: dict) -> str:
         """Generate human-readable analysis report"""
         report = f"""
 {'='*80}
@@ -1812,7 +1812,7 @@ class AIGovernance:
     """Simplified AI governance facade used by the pytest suite."""
 
     def __init__(self) -> None:
-        self.proposals: dict[str, Dict] = {}
+        self.proposals: dict[str, dict] = {}
         self.parameters: dict[str, float] = {"quorum": 0.5, "timelock_days": 1.0}
         self.voter_type_weights = {
             VoterType.NODE_OPERATOR: 1.25,
@@ -1916,7 +1916,7 @@ class AIGovernance:
     def get_voter_type_weight(self, voter_type: VoterType) -> float:
         return self.voter_type_weights.get(voter_type, 1.0)
 
-    def tally_votes(self, proposal_id: str) -> Dict:
+    def tally_votes(self, proposal_id: str) -> dict:
         proposal = self.proposals.get(proposal_id)
         if not proposal:
             return {"passed": False}
@@ -1936,7 +1936,7 @@ class AIGovernance:
         proposal["last_tally"] = result
         return result
 
-    def execute_proposal(self, proposal_id: str) -> Dict | None:
+    def execute_proposal(self, proposal_id: str) -> dict | None:
         proposal = self.proposals.get(proposal_id)
         if not proposal:
             return None

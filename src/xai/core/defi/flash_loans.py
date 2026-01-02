@@ -522,7 +522,7 @@ class FlashLoanProvider:
         """Calculate fee for a flash loan."""
         return (amount * self.flash_loan_fee) // self.BASIS_POINTS
 
-    def get_pool_stats(self) -> Dict:
+    def get_pool_stats(self) -> dict:
         """Get flash loan pool statistics."""
         return {
             "total_loans": self.total_loans,
@@ -571,7 +571,7 @@ class FlashLoanProvider:
 
     # ==================== Serialization ====================
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Serialize state."""
         return {
             "name": self.name,

@@ -193,7 +193,7 @@ class StrictAIPoolManager:
         api_key: str,
         donated_tokens: int,  # MANDATORY
         donated_minutes: int | None = None,  # Optional alternative limit
-    ) -> Dict:
+    ) -> dict:
         """
         Submit API key donation with MANDATORY usage limits
 
@@ -286,7 +286,7 @@ class StrictAIPoolManager:
         estimated_tokens: int,
         provider: AIProvider,
         max_tokens_override: int | None = None,
-    ) -> Dict:
+    ) -> dict:
         """
         Execute AI task with STRICT enforcement of donated limits
 
@@ -316,7 +316,7 @@ class StrictAIPoolManager:
         job_start_time = time.time()
         metrics.record_queue_event()
 
-        def _fail(reason: str, message: str, extra: dict[str, Any] | None = None) -> Dict:
+        def _fail(reason: str, message: str, extra: dict[str, Any] | None = None) -> dict:
             _safe_metrics_call(
                 lambda: task_metrics.jobs_failed.labels(provider=provider.value, reason=reason).inc()
             )
@@ -628,7 +628,7 @@ class StrictAIPoolManager:
         estimated_tokens: int,
         max_tokens: int,
         provider: AIProvider,
-    ) -> Dict:
+    ) -> dict:
         """
         Execute AI task with STRICT limit enforcement
         """
@@ -735,7 +735,7 @@ class StrictAIPoolManager:
             "provider": provider.value,
         }
 
-    def _call_anthropic_with_limit(self, api_key: str, task: str, max_tokens: int) -> Dict:
+    def _call_anthropic_with_limit(self, api_key: str, task: str, max_tokens: int) -> dict:
         """
         Call Anthropic API with STRICT token limit
         """
@@ -762,7 +762,7 @@ class StrictAIPoolManager:
         except anthropic.APIError as e:
             return {"success": False, "error": str(e), "tokens_used": 0}
 
-    def _call_openai_with_limit(self, api_key: str, task: str, max_tokens: int) -> Dict:
+    def _call_openai_with_limit(self, api_key: str, task: str, max_tokens: int) -> dict:
         """
         Call OpenAI API with STRICT token limit
         """
@@ -789,7 +789,7 @@ class StrictAIPoolManager:
         except openai.APIError as e:
             return {"success": False, "error": str(e), "tokens_used": 0}
 
-    def _call_google_with_limit(self, api_key: str, task: str, max_tokens: int) -> Dict:
+    def _call_google_with_limit(self, api_key: str, task: str, max_tokens: int) -> dict:
         """
         Call Google Gemini API with STRICT token limit
         """
@@ -970,7 +970,7 @@ class StrictAIPoolManager:
             logging.debug("AI pool state load failed: %s", e)
             self.donated_keys = self.donated_keys or {}
 
-    def get_pool_status(self) -> Dict:
+    def get_pool_status(self) -> dict:
         """Get detailed pool status with strict limit tracking"""
 
         by_provider = {}

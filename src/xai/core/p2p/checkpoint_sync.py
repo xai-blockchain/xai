@@ -19,7 +19,7 @@ import requests
 from ecdsa import BadSignatureError, SECP256k1, VerifyingKey
 
 from xai.core.consensus.checkpoint_payload import CheckpointPayload
-from .chunked_sync import ChunkedStateSyncService, SyncProgress
+from .chunked_sync import ChunkedStateSyncService, SyncChunk, SyncProgress
 
 
 @dataclass

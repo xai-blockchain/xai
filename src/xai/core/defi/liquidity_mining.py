@@ -408,7 +408,7 @@ class LiquidityFarm:
             token_address: Specific token (None = all)
 
         Returns:
-            Dict of token -> amount claimed
+            dict of token -> amount claimed
         """
         position = self.positions.get(caller)
         if not position:
@@ -599,7 +599,7 @@ class LiquidityFarm:
 
         return pending
 
-    def get_position(self, user: str) -> Dict | None:
+    def get_position(self, user: str) -> dict | None:
         """Get user position details."""
         position = self.positions.get(user)
         if not position:
@@ -616,7 +616,7 @@ class LiquidityFarm:
             "staked_at": position.staked_at,
         }
 
-    def get_farm_info(self) -> Dict:
+    def get_farm_info(self) -> dict:
         """Get farm information."""
         return {
             "name": self.name,
@@ -795,7 +795,7 @@ class FarmFactory:
         addresses = self.farms_by_lp.get(lp_token, [])
         return [self.farms[addr] for addr in addresses if addr in self.farms]
 
-    def get_all_active_farms(self) -> list[Dict]:
+    def get_all_active_farms(self) -> list[dict]:
         """Get info for all active farms."""
         return [
             farm.get_farm_info()

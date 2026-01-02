@@ -81,7 +81,7 @@ class AICodeSubmission:
 
     def add_community_review(
         self, reviewer_address: str, approved: bool, comments: str, voting_power: float
-    ) -> Dict:
+    ) -> dict:
         """
         Community member reviews code
         Similar to code review on GitHub
@@ -108,7 +108,7 @@ class AICodeSubmission:
             "status": self.review_status.value,
         }
 
-    def run_safety_checks(self) -> Dict:
+    def run_safety_checks(self) -> dict:
         """
         Automated safety validation
         Prevents AI from breaking blockchain
@@ -257,7 +257,7 @@ class AICodeSubmission:
 
         return True
 
-    def run_test_suite(self) -> Dict:
+    def run_test_suite(self) -> dict:
         """
         Run blockchain test suite against new code
         Must pass ALL tests
@@ -325,7 +325,7 @@ class AICodeSubmission:
         self.review_status = ReviewStatus.READY_FOR_VOTE
         return True, "Ready for implementation vote"
 
-    def cast_implementation_vote(self, voter_address: str, approved: bool) -> Dict:
+    def cast_implementation_vote(self, voter_address: str, approved: bool) -> dict:
         """
         Cast vote for FINAL implementation approval
         Only original approvers can vote
@@ -342,7 +342,7 @@ class AICodeSubmission:
 
         return {"success": True, "vote_recorded": approved}
 
-    def check_implementation_approval(self, required_percent: float = 50) -> tuple[bool, str, Dict]:
+    def check_implementation_approval(self, required_percent: float = 50) -> tuple[bool, str, dict]:
         """
         Check if implementation approved by original voters
 

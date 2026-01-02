@@ -384,12 +384,12 @@ class AdvancedRateLimiter:
         self.endpoint_configs[endpoint] = config
         security_logger.info(f"Rate limit set for {endpoint}: {config}")
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """
         Get rate limiter statistics.
 
         Returns:
-            Dict: Statistics dictionary
+            dict: Statistics dictionary
         """
         return {
             'total_requests': self.stats.total_requests,

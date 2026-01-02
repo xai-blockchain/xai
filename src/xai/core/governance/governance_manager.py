@@ -258,7 +258,7 @@ class GovernanceManager:
             proposal_data: Additional payload data for the proposal
 
         Returns:
-            Dict with proposal_id, txid, and status
+            dict with proposal_id, txid, and status
         """
         if not self.blockchain.governance_state:
             return {"success": False, "error": "Governance not initialized"}
@@ -313,7 +313,7 @@ class GovernanceManager:
             voting_power: Voting power of the voter (0 = auto-calculate from balance)
 
         Returns:
-            Dict with txid, status, and vote details
+            dict with txid, status, and vote details
         """
         if not self.blockchain.governance_state:
             return {"success": False, "error": "Governance not initialized"}
@@ -360,7 +360,7 @@ class GovernanceManager:
             voting_power: Reviewer's voting power (0 = auto-calculate)
 
         Returns:
-            Dict with txid, status, and review count
+            dict with txid, status, and review count
         """
         if not self.blockchain.governance_state:
             return {"success": False, "error": "Governance not initialized"}
@@ -399,7 +399,7 @@ class GovernanceManager:
             executor: Address executing the proposal
 
         Returns:
-            Dict with execution status and details
+            dict with execution status and details
         """
         if not self.blockchain.governance_state:
             return {"success": False, "error": "Governance not initialized"}
@@ -443,7 +443,7 @@ class GovernanceManager:
             voting_power: Voting power (defaults to balance if 0)
 
         Returns:
-            Dict with txid, status, and vote result
+            dict with txid, status, and vote result
         """
         if not self.blockchain.governance_state:
             return {"success": False, "error": "Governance not initialized"}
@@ -479,7 +479,7 @@ class GovernanceManager:
             proposal_id: ID of the proposal to execute
 
         Returns:
-            Dict with execution status and details
+            dict with execution status and details
         """
         return self.execute_governance_proposal(proposal_id, executor)
 

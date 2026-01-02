@@ -7,6 +7,7 @@ type and provides simple helpers for validating SLIP-0044 assignments.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 

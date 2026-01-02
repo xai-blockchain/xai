@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 """
-XAI AI Development Pool - Autonomous Blockchain Development
-Miners donate AI API credits to fund autonomous development
-Multiple AI models compete to contribute the most
+XAI AI Development Pool.
 
-Revolutionary Concept:
-1. Miners donate API minutes from Claude, GPT-4, Gemini, etc.
-2. Credits pooled on-chain with encrypted API keys
-3. When threshold reached, AI autonomously works on tasks
-4. Public leaderboard shows which AI/users contributed most
-5. Gamified competition drives sustainable development
+Concept:
+1. Miners donate AI API credits to fund development tasks
+2. Credits are pooled with encrypted API keys
+3. When a threshold is reached, AI performs queued tasks
+4. A leaderboard tracks contributions
 """
 
 import hashlib
@@ -130,7 +127,7 @@ class AIDonation:
         data = f"{self.donor_address}{self.timestamp}{self.donated_tokens}"
         return hashlib.sha256(data.encode()).hexdigest()[:16]
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary for blockchain storage"""
         return {
             "donation_id": self.donation_id,
@@ -161,7 +158,7 @@ class DevelopmentTask:
         self.tokens_used = 0
         self.result = None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "task_id": self.task_id,
             "task_type": self.task_type,
@@ -194,7 +191,7 @@ class AIDevelopmentPool:
 
     def donate_ai_credits(
         self, donor_address: str, ai_model: AIModel, api_key: str, token_amount: int
-    ) -> Dict:
+    ) -> dict:
         """
         Donate AI API credits to the development pool
 
@@ -261,7 +258,7 @@ class AIDevelopmentPool:
 
     def create_development_task(
         self, task_type: str, description: str, estimated_tokens: int, priority: int = 5
-    ) -> Dict:
+    ) -> dict:
         """
         Create a new development task for AI to complete
 
@@ -385,7 +382,7 @@ class AIDevelopmentPool:
         else:
             task.status = "failed"
 
-    def _simulate_ai_task(self, task: DevelopmentTask, model: AIModel, api_key: str) -> Dict:
+    def _simulate_ai_task(self, task: DevelopmentTask, model: AIModel, api_key: str) -> dict:
         """
         Simulate AI task execution
         In production, this would call actual AI APIs
@@ -400,7 +397,7 @@ class AIDevelopmentPool:
             "output": f"Task {task.task_id} completed by {model.value}",
         }
 
-    def get_donor_leaderboard(self, top_n: int = 10) -> list[Dict]:
+    def get_donor_leaderboard(self, top_n: int = 10) -> list[dict]:
         """Get top donors by tokens contributed"""
 
         sorted_donors = sorted(self.donor_leaderboard.items(), key=lambda x: x[1], reverse=True)[
@@ -424,7 +421,7 @@ class AIDevelopmentPool:
 
         return leaderboard
 
-    def get_model_leaderboard(self) -> list[Dict]:
+    def get_model_leaderboard(self) -> list[dict]:
         """Get AI model competition leaderboard"""
 
         sorted_models = sorted(self.model_leaderboard.items(), key=lambda x: x[1], reverse=True)
@@ -468,7 +465,7 @@ class AIDevelopmentPool:
 
         return 0
 
-    def get_pool_stats(self) -> Dict:
+    def get_pool_stats(self) -> dict:
         """Get overall pool statistics"""
 
         total_donated_tokens = sum(d.donated_tokens for d in self.donations)
@@ -523,7 +520,7 @@ class AIDonationTransaction:
         data = f"{self.sender}{self.ai_model}{self.timestamp}{self.token_amount}"
         return hashlib.sha256(data.encode()).hexdigest()
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "txid": self.txid,
             "sender": self.sender,

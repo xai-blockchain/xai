@@ -117,26 +117,16 @@ cat > "${BUILD_DIR}/usr/share/metainfo/io.xai-blockchain.xai.appdata.xml" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
     <id>io.xai-blockchain.xai</id>
-    <metadata_license>MIT</metadata_license>
-    <project_license>MIT</project_license>
+    <metadata_license>Apache-2.0</metadata_license>
+    <project_license>Apache-2.0</project_license>
     <name>XAI Blockchain</name>
-    <summary>AI-Enhanced Blockchain Platform</summary>
+    <summary>Proof-of-work blockchain implementation</summary>
     <description>
         <p>
-            XAI is a production-ready blockchain implementation featuring proof-of-work
-            consensus, intelligent AI-based governance, and comprehensive wallet management.
+            XAI is a Python-based proof-of-work blockchain implementation with a UTXO
+            transaction model, REST API, and wallet CLI.
         </p>
-        <p>Features:</p>
-        <ul>
-            <li>Proof-of-Work (SHA-256) consensus with adjustable difficulty</li>
-            <li>UTXO-based transaction model with full signature verification</li>
-            <li>Smart contract engine with EVM compatibility</li>
-            <li>AI governance system for proposals and voting</li>
-            <li>Atomic swap support for 11+ cryptocurrencies</li>
-            <li>Comprehensive wallet CLI with HD wallet support</li>
-        </ul>
     </description>
-    <url type="homepage">https://xai-blockchain.io</url>
     <launchable type="desktop-id">xai-blockchain.desktop</launchable>
     <provides>
         <binary>xai-node</binary>

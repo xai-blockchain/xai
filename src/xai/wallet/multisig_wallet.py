@@ -117,7 +117,7 @@ class MultiSigWallet:
 
         Args:
             message: Message that was signed
-            signatures: Dict of {public_key_hex: signature_hex}
+            signatures: dict of {public_key_hex: signature_hex}
 
         Returns:
             True if threshold met with valid signatures
@@ -218,10 +218,10 @@ class MultiSigWallet:
     def create_transaction(
         self,
         tx_id: str,
-        tx_data: Dict,
+        tx_data: dict,
         nonce: int | None = None,
         sequence: int | None = None,
-    ) -> Dict:
+    ) -> dict:
         """
         Create a new pending transaction for signature collection.
 
@@ -254,7 +254,7 @@ class MultiSigWallet:
 
         return self.pending_transactions[tx_id]
 
-    def add_partial_signature(self, tx_id: str, public_key_hex: str, signature_hex: str) -> Dict:
+    def add_partial_signature(self, tx_id: str, public_key_hex: str, signature_hex: str) -> dict:
         """
         Add a partial signature to a pending transaction (TASK 210).
 
@@ -326,7 +326,7 @@ class MultiSigWallet:
             "is_ready": tx["status"] == "ready",
         }
 
-    def get_transaction_status(self, tx_id: str) -> Dict | None:
+    def get_transaction_status(self, tx_id: str) -> dict | None:
         """
         Get status of a pending transaction.
 
@@ -349,7 +349,7 @@ class MultiSigWallet:
             "signers": list(tx["signatures"].keys()),
         }
 
-    def finalize_transaction(self, tx_id: str) -> Dict:
+    def finalize_transaction(self, tx_id: str) -> dict:
         """
         Finalize and broadcast a transaction once threshold is met (TASK 210).
 

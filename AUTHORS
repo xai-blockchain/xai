@@ -1,21 +1,9 @@
 # Authors
 
-This file lists the authors and contributors to the XAI Blockchain project.
+Maintainers and contributors to the XAI Blockchain project.
 
-## Original Author
-
-Jeff DeCristofaro <info@xaiblockchain.org>
-  - Project creator and lead developer
-  - Copyright holder: Aequitas Foundation
+## Maintainers
+- Jeff DeCristofaro <info@xaiblockchain.org>
 
 ## Contributors
-
-Contributors who have signed off on the Developer Certificate of Origin (DCO)
-and contributed to this project will be listed here.
-
-<!--
-To be added as a contributor:
-1. Submit a pull request with your contribution
-2. Sign off your commits with: git commit -s
-3. Your name will be added after your first merged contribution
--->
+Add your name via a pull request after your first merged contribution.

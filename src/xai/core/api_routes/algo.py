@@ -153,7 +153,7 @@ def register_algo_routes(routes: "NodeAPIRoutes") -> None:
         including fee optimization and fraud detection modules.
 
         Returns:
-            Dict containing:
+            dict containing:
                 - enabled (bool): Whether algorithmic features are enabled
                 - features (list): List of active feature modules with their status
                 - warning (str, optional): Warning if modules not installed

@@ -33,7 +33,7 @@
     "desktop"
   ],
   "author": "XAI Team",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
     "@noble/secp256k1": "^2.1.0",
     "argon2": "^0.40.1",

@@ -358,7 +358,7 @@ class BlockchainSerializer:
                            Set to False after first batch for efficiency.
 
         Returns:
-            Dict containing:
+            dict containing:
             - chain: List of block dicts for the requested range
             - pending_transactions: List of pending tx dicts (if include_pending)
             - difficulty: Current difficulty
@@ -414,7 +414,7 @@ class BlockchainSerializer:
         For long chains, prefer to_dict_paginated() for incremental sync.
 
         Returns:
-            Dict containing chain, pending transactions, difficulty, and stats
+            dict containing chain, pending transactions, difficulty, and stats
         """
         return {
             "chain": [self._block_to_full_dict(block) for block in self.blockchain.chain],
@@ -436,7 +436,7 @@ class BlockchainSerializer:
         Materialize a lightweight blockchain snapshot from serialized data.
 
         Args:
-            data: Dict produced by to_dict() containing chain/pending/difficulty
+            data: dict produced by to_dict() containing chain/pending/difficulty
 
         Returns:
             SimpleNamespace with `chain`, `pending_transactions`, and `difficulty`

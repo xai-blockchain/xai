@@ -21,7 +21,7 @@ class PartitionEvent:
     partition_type: str  # 'full', 'partial', 'suspected'
     affected_peers: set[str]
     connectivity_ratio: float
-    details: Dict
+    details: dict
 
 class PartitionDetector:
     """

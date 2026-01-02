@@ -60,7 +60,7 @@ class LiquidityPool:
         self.event_log = []
         self.audit_signer = AuditSigner(os.path.join(Config.DATA_DIR, "liquidity_audit"))
 
-    def add_liquidity(self, provider_address: str, xai_amount: float, other_amount: float) -> Dict:
+    def add_liquidity(self, provider_address: str, xai_amount: float, other_amount: float) -> dict:
         """
         Add liquidity to pool
 
@@ -153,7 +153,7 @@ class LiquidityPool:
             "current_price": self.other_reserve / self.xai_reserve,
         }
 
-    def remove_liquidity(self, provider_address: str, lp_tokens: float) -> Dict:
+    def remove_liquidity(self, provider_address: str, lp_tokens: float) -> dict:
         """
         Remove liquidity from pool
 
@@ -202,7 +202,7 @@ class LiquidityPool:
             "remaining_lp_tokens": self.liquidity_providers[provider_address],
         }
 
-    def swap_xai_for_other(self, xai_amount: float, max_slippage_pct: float = 5.0) -> Dict:
+    def swap_xai_for_other(self, xai_amount: float, max_slippage_pct: float = 5.0) -> dict:
         """
         Swap XAI for other token
 
@@ -291,7 +291,7 @@ class LiquidityPool:
             "protocol_fee": protocol_fee,
         }
 
-    def swap_other_for_xai(self, other_amount: float, max_slippage_pct: float = 5.0) -> Dict:
+    def swap_other_for_xai(self, other_amount: float, max_slippage_pct: float = 5.0) -> dict:
         """
         Swap other token for XAI
         """
@@ -360,7 +360,7 @@ class LiquidityPool:
             "protocol_fee": protocol_fee,
         }
 
-    def get_quote(self, input_amount: float, input_is_xai: bool) -> Dict:
+    def get_quote(self, input_amount: float, input_is_xai: bool) -> dict:
         """
         Get quote for swap without executing
         """
@@ -393,7 +393,7 @@ class LiquidityPool:
             "fee_amount": input_amount * self.fee_percentage,
         }
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Get pool statistics"""
 
         return {
@@ -410,7 +410,7 @@ class LiquidityPool:
             "tvl_other": self.other_reserve,
         }
 
-    def withdraw_protocol_fees(self, destination: str, amount: float | None = None) -> Dict:
+    def withdraw_protocol_fees(self, destination: str, amount: float | None = None) -> dict:
         amount = amount or self.protocol_fee_balance
         if amount <= 0 or amount > self.protocol_fee_balance:
             return {"success": False, "error": "Invalid amount"}
@@ -425,7 +425,7 @@ class LiquidityPool:
             "destination": destination,
         }
 
-    def _log_event(self, event_type: str, payload: Dict):
+    def _log_event(self, event_type: str, payload: dict):
         entry = {"event": event_type, "payload": payload, "timestamp": time.time()}
         signature = self.audit_signer.sign(json.dumps(entry, sort_keys=True))
         entry["signature"] = signature
@@ -451,7 +451,7 @@ class PoolManager:
         """Get specific pool"""
         return self.pools.get(pair)
 
-    def get_all_pools_stats(self) -> list[Dict]:
+    def get_all_pools_stats(self) -> list[dict]:
         """Get stats for all pools"""
 
         stats = []
@@ -464,7 +464,7 @@ class PoolManager:
         stats.sort(key=lambda x: x["tvl_xai"], reverse=True)
         return stats
 
-    def find_best_price(self, xai_amount: float, target_coin: str) -> Dict:
+    def find_best_price(self, xai_amount: float, target_coin: str) -> dict:
         """
         Find pool with best price for swap
 

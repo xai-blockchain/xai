@@ -169,7 +169,7 @@ class DatabaseMigrationManager:
             )
             return False
 
-    def get_migration_history(self) -> list[Dict]:
+    def get_migration_history(self) -> list[dict]:
         """Get complete migration history"""
         cursor = self.conn.cursor()
         cursor.execute("""
@@ -418,7 +418,7 @@ class ExplorerDatabase:
             )
         return None
 
-    def record_metric(self, metric_type: str, value: float, data: Dict | None = None) -> None:
+    def record_metric(self, metric_type: str, value: float, data: dict | None = None) -> None:
         """Record analytics metric"""
         try:
             with self.lock:
@@ -1433,7 +1433,7 @@ class MempoolMonitor:
                 "error": str(e)
             }
 
-    def get_mempool_chart_data(self, hours: int = 24) -> list[Dict]:
+    def get_mempool_chart_data(self, hours: int = 24) -> list[dict]:
         """Get historical mempool data for charting"""
         cutoff_time = time.time() - (hours * 3600)
 

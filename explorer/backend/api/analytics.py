@@ -51,8 +51,7 @@ async def get_ai_analytics(
     period: str = Query("24h", regex="^(1h|24h|7d|30d|all)$")
 ):
     """
-    Get AI usage analytics over time
-    Revolutionary: AI compute marketplace trends and insights
+    Get AI usage analytics over time.
     """
     try:
         async with httpx.AsyncClient() as client:

@@ -5,6 +5,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from collections.abc import Mapping
 
 
 def _coerce_int(value: Any) -> int | None:

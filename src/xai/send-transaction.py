@@ -13,8 +13,8 @@ from pathlib import Path
 
 import requests
 
-from src.xai.core.blockchain import Transaction
-from src.xai.core.wallet import Wallet
+from xai.core.blockchain import Transaction
+from xai.core.wallet import Wallet
 
 
 def parse_args():

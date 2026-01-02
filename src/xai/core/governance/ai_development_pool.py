@@ -49,7 +49,7 @@ class AIDevelopmentPool:
             priority: Task priority (1-10)
 
         Returns:
-            Dict with task_id and status
+            dict with task_id and status
         """
         task_id = f"task_{len(self.tasks)}"
         task = DevelopmentTask(task_id, task_type, description, estimated_tokens, priority)

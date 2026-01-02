@@ -1617,7 +1617,7 @@ class SponsoredTransactionProcessor:
         """Get a registered sponsor by address"""
         return self.sponsors.get(sponsor_address)
 
-    def get_all_sponsors(self) -> dict[str, Dict]:
+    def get_all_sponsors(self) -> dict[str, dict]:
         """Get stats for all registered sponsors"""
         return {
             addr: sponsor.get_stats()

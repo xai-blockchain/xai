@@ -609,7 +609,7 @@ def index():
     stats = get_governance_stats()
     proposals = get_proposals("active")
     all_proposals = get_all_proposals()
-    vote_history = []
+    vote_history: list[dict[str, str]] = []
 
     return render_template_string(
         HTML_TEMPLATE,

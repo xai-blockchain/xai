@@ -288,7 +288,7 @@ class NetworkSecurityManager:
 
         return True
 
-    def _verify_certificate_pin(self, hostname: str, certificate: Dict) -> bool:
+    def _verify_certificate_pin(self, hostname: str, certificate: dict) -> bool:
         """
         Verify certificate against pinned certificates.
 
@@ -336,12 +336,12 @@ class NetworkSecurityManager:
                 response.headers['Strict-Transport-Security'] = hsts_value
             return response
 
-    def get_security_status(self) -> Dict:
+    def get_security_status(self) -> dict:
         """
         Get network security status.
 
         Returns:
-            Dict: Security status information
+            dict: Security status information
         """
         return {
             'https_enabled': self.enable_https,

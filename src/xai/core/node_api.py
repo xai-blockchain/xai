@@ -24,6 +24,7 @@ import logging
 import os
 import re
 import time
+from collections.abc import Sequence
 from contextlib import nullcontext
 from typing import TYPE_CHECKING, Any
 

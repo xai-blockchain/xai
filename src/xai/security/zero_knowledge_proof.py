@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 """
-Production Zero-Knowledge Proof (ZKP) Implementation
+Zero-Knowledge Proof (ZKP) Implementation.
 
-This module provides production-ready zero-knowledge proof protocols including:
-1. Schnorr Protocol (for discrete logarithm knowledge)
-2. Pedersen Commitments (hiding and binding)
-3. Range Proofs (prove value in range without revealing)
-4. Set Membership Proofs (prove membership without revealing element)
+Includes:
+1. Schnorr protocol (discrete logarithm knowledge)
+2. Pedersen commitments (hiding and binding)
+3. Range proofs (value in range without revealing)
+4. Set membership proofs (membership without revealing element)
 
-Uses elliptic curve cryptography (py_ecc) for secure proof generation and verification.
+Uses elliptic curve cryptography (py_ecc) for proof generation and verification.
 """
 
 import hashlib

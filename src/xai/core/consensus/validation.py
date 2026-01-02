@@ -16,6 +16,7 @@ All validation functions raise ValueError with clear error messages.
 """
 
 import re
+from collections.abc import Iterable
 from decimal import ROUND_DOWN, Decimal, InvalidOperation, getcontext
 from typing import Any
 

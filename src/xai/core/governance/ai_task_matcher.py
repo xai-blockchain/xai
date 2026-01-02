@@ -442,7 +442,7 @@ class AITaskMatcher:
         estimated_tokens: int,
         available_providers: list[str] | None = None,
         prefer_cost_optimization: bool = False,
-    ) -> Dict:
+    ) -> dict:
         """
         Select the BEST AI model for a given task
 

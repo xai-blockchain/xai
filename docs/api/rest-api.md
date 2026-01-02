@@ -1,40 +1,51 @@
-# REST API Reference (Overview)
+# REST API (Quick Reference)
 
-Use this as a quick map of key endpoints. Field-level contracts are in `docs/api/openapi.yaml`; error/rate details are in `docs/api/api_error_codes.md` and `docs/api/rate_limits.md`.
+Base URL: `http://<host>:<port>` (defaults to `localhost:8545` unless overridden).
 
 ## Authentication
-- `X-API-Key` or `Authorization: Bearer <JWT>` for protected endpoints.
-- Admin endpoints may require elevated scopes.
+
+If API auth is enabled (`XAI_API_AUTH_REQUIRED=1`), include one of:
+
+- `X-API-Key: <key>`
+- `Authorization: Bearer <token>`
 
 ## Core
-- `GET /`, `/health`, `/stats`
-- `GET /block/<hash>`
-- `GET /address/<address>/nonce`
+
+- `GET /`
+- `GET /health`
+- `GET /stats`
+- `GET /mempool`
 - `GET /mempool/stats`
+- `GET /metrics`
 
-## Wallet & Transactions
-- `POST /wallet/create`, `/wallet/import`, `/wallet/sign`
-- `POST /send` (enforces timestamp/txid checks, hash acknowledgement)
+## Blockchain
+
+- `GET /blocks`
+- `GET /blocks/<index>`
+- `GET /block/<hash>`
+- `GET /chain/range`
+
+## Transactions
+
+- `GET /transactions`
 - `GET /transaction/<txid>`
+- `POST /send`
 
-## Contracts
-- `POST /contracts/deploy`
-- `GET /contracts/<address>/abi`
-- `GET /contracts/<address>/events`
+## Wallet
 
-## Governance
-- `GET /governance/proposals`
-- `POST /governance/propose`
-- `POST /governance/vote`
+- `GET /balance/<address>`
+- `GET /address/<address>/nonce`
+- `GET /history/<address>`
 
-## Explorer/Analytics
-- `GET /mempool` (paginated)
-- `GET /address/<addr>/history` (paginated)
-- `GET /peers` (`verbose=true` for details)
+## Peers
 
-## WebSocket
-- `GET /ws` — real-time blocks/tx/mempool; see `docs/api/websocket_messages.md`.
+- `GET /peers`
+- `POST /peers/add`
 
-## Error/Size/Rate
-- Size caps via `API_MAX_JSON_BYTES`; pagination caps default to 500.
-- HTTP error codes and rate limiting behavior are described in the linked docs above.***
+## Faucet (testnet only)
+
+- `POST /faucet/claim`
+
+## Full Surface
+
+The API surface includes additional routes for mining, contracts, exchange, recovery, and admin operations. See `src/xai/core/api_routes/` for the full list and request/response shapes.

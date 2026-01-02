@@ -78,8 +78,8 @@ class SecureAPIKeyManager:
         self.fernet = Fernet(self.master_key)
 
         # Key storage
-        self.stored_keys: dict[str, Dict] = {}
-        self.access_log: list[Dict] = []
+        self.stored_keys: dict[str, dict] = {}
+        self.access_log: list[dict] = []
 
         # Rate limiting
         self.submission_rate_limit = {}  # address -> last_submission_time
@@ -116,7 +116,7 @@ class SecureAPIKeyManager:
         api_key: str,
         donated_tokens: int,
         expiration_days: int | None = None,
-    ) -> Dict:
+    ) -> dict:
         """
         Securely submit API key donation
 
@@ -274,7 +274,7 @@ class SecureAPIKeyManager:
 
         return time_since >= self.min_submission_interval
 
-    def _validate_api_key_format(self, provider: AIProvider, api_key: str) -> Dict:
+    def _validate_api_key_format(self, provider: AIProvider, api_key: str) -> dict:
         """
         Validate API key format (not actual validity - that requires API call)
         """
@@ -322,7 +322,7 @@ class SecureAPIKeyManager:
         # In real implementation, this would be a background task
         pass
 
-    def validate_key(self, key_id: str, is_valid: bool) -> Dict:
+    def validate_key(self, key_id: str, is_valid: bool) -> dict:
         """
         Mark key as validated or invalid
         Called after background validation completes
@@ -351,7 +351,7 @@ class SecureAPIKeyManager:
 
     def get_api_key_for_task(
         self, provider: AIProvider, required_tokens: int
-    ) -> tuple[str, str, Dict] | None:
+    ) -> tuple[str, str, dict] | None:
         """
         Retrieve decrypted API key for use in a task
 
@@ -411,7 +411,7 @@ class SecureAPIKeyManager:
 
         return (key_id, decrypted_key, key_record)
 
-    def mark_tokens_used(self, key_id: str, tokens_used: int, task_completed: bool = True) -> Dict:
+    def mark_tokens_used(self, key_id: str, tokens_used: int, task_completed: bool = True) -> dict:
         """
         Mark tokens as used after task completion
         Automatically destroys key if depleted
@@ -490,7 +490,7 @@ class SecureAPIKeyManager:
         data = f"{donor_address}{provider.value}{api_key}{time.time()}"
         return hashlib.sha256(data.encode()).hexdigest()[:16]
 
-    def _save_key_to_disk(self, key_id: str, key_record: Dict):
+    def _save_key_to_disk(self, key_id: str, key_record: dict):
         """Save encrypted key record to disk"""
         file_path = os.path.join(self.storage_path, f"{key_id}.enc")
 
@@ -528,7 +528,7 @@ class SecureAPIKeyManager:
         with open(log_file, "a") as f:
             f.write(json.dumps(log_entry) + "\n")
 
-    def get_key_status(self, key_id: str) -> Dict | None:
+    def get_key_status(self, key_id: str) -> dict | None:
         """Get current status of a stored key"""
         if key_id not in self.stored_keys:
             return None
@@ -540,7 +540,7 @@ class SecureAPIKeyManager:
 
         return key_record
 
-    def get_donor_keys(self, donor_address: str) -> list[Dict]:
+    def get_donor_keys(self, donor_address: str) -> list[dict]:
         """Get all keys donated by a specific address"""
         return [
             self.get_key_status(kid)
@@ -548,7 +548,7 @@ class SecureAPIKeyManager:
             if krec["donor_address"] == donor_address
         ]
 
-    def get_pool_statistics(self) -> Dict:
+    def get_pool_statistics(self) -> dict:
         """Get statistics about the API key pool"""
 
         stats_by_provider = {}

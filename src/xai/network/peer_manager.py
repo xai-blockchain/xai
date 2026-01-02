@@ -12,6 +12,7 @@ import ssl
 import threading
 import time
 from collections import defaultdict, deque
+from collections.abc import Iterable
 from typing import Any
 
 import websockets
@@ -620,7 +621,7 @@ class PeerReputation:
         with self.lock:
             return sorted(self.scores.items(), key=lambda x: x[1], reverse=True)[:limit]
 
-    def get_history(self, peer_id: str) -> list[Dict]:
+    def get_history(self, peer_id: str) -> list[dict]:
         """Get reputation history for a peer"""
         with self.lock:
             return list(self.history.get(peer_id, []))
@@ -927,7 +928,7 @@ class PeerDiscovery:
             sr = secrets.SystemRandom()
             return sr.sample(addresses, min(count, len(addresses)))
 
-    def get_discovered_peers(self) -> list[Dict]:
+    def get_discovered_peers(self) -> list[dict]:
         """Get all discovered peers"""
         with self.lock:
             return list(self.discovered_peers)

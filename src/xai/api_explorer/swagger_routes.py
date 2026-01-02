@@ -116,7 +116,7 @@ def swagger_ui() -> str:
 
 
 @api_explorer_bp.route("/swagger")
-def swagger_redirect() -> Response:
+def swagger_redirect() -> Any:
     """Redirect /swagger to /api/docs."""
     return redirect(url_for("api_explorer.swagger_ui"), code=301)
 

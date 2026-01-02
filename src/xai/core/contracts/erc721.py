@@ -70,8 +70,8 @@ class NFTMetadata:
     image: str = ""
     external_url: str = ""
     animation_url: str = ""
-    attributes: list[Dict] = field(default_factory=list)
-    properties: Dict = field(default_factory=dict)
+    attributes: list[dict] = field(default_factory=list)
+    properties: dict = field(default_factory=dict)
 
 @dataclass
 class NFTEvent:
@@ -692,7 +692,7 @@ class ERC721Token:
 
     # ==================== Serialization ====================
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Serialize NFT state to dictionary."""
         return {
             "name": self.name,
@@ -717,7 +717,7 @@ class ERC721Token:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "ERC721Token":
+    def from_dict(cls, data: dict) -> "ERC721Token":
         """Deserialize NFT state from dictionary."""
         token = cls(
             name=data["name"],
@@ -837,7 +837,7 @@ class ERC721Factory:
 
         return None
 
-    def list_collections(self) -> list[Dict]:
+    def list_collections(self) -> list[dict]:
         """List all deployed collections."""
         return [
             {

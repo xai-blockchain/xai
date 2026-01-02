@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class AITaskService:
     """
     Monitors AI tasks and provider activity
-    Revolutionary feature: Real-time AI compute tracking
+    Real-time AI compute tracking.
     """
 
     def __init__(self, db, node_url: str):

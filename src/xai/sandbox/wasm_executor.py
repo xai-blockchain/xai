@@ -631,7 +631,7 @@ def get_available_toolchains() -> dict[str, bool]:
     Detect available WASM compilation toolchains.
 
     Returns:
-        Dict mapping language to availability (True if toolchain found)
+        dict mapping language to availability (True if toolchain found)
     """
     import shutil
 

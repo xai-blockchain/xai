@@ -453,7 +453,7 @@ class MobileTelemetryCollector:
         Get bandwidth usage breakdown by operation type.
 
         Returns:
-            Dict mapping event_type to {bytes_sent, bytes_received, total}
+            dict mapping event_type to {bytes_sent, bytes_received, total}
         """
         breakdown: dict[str, dict[str, int]] = defaultdict(
             lambda: {'bytes_sent': 0, 'bytes_received': 0, 'total': 0}
@@ -472,7 +472,7 @@ class MobileTelemetryCollector:
         Get battery impact breakdown by operation type.
 
         Returns:
-            Dict mapping event_type to {total_drain, avg_drain, event_count}
+            dict mapping event_type to {total_drain, avg_drain, event_count}
         """
         breakdown: dict[str, list[float]] = defaultdict(list)
 

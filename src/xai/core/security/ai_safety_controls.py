@@ -18,6 +18,7 @@ import os
 import re
 import threading
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from enum import Enum
@@ -764,7 +765,7 @@ class AISafetyControls:
 
         return True
 
-    def cancel_personal_ai_request(self, request_id: str, user_address: str) -> Dict:
+    def cancel_personal_ai_request(self, request_id: str, user_address: str) -> dict:
         """
         Cancel a Personal AI request (user control)
 
@@ -834,7 +835,7 @@ class AISafetyControls:
 
         return True
 
-    def emergency_stop_trading_bot(self, user_address: str) -> Dict:
+    def emergency_stop_trading_bot(self, user_address: str) -> dict:
         """
         Emergency stop for trading bot (instant)
 
@@ -1290,7 +1291,7 @@ class AISafetyControls:
         }
         return response
 
-    def create_ai_sandbox(self, sandbox_id: str, resource_limits: Dict | None = None) -> Dict:
+    def create_ai_sandbox(self, sandbox_id: str, resource_limits: dict | None = None) -> dict:
         """
         Create sandboxed environment for AI execution
 
@@ -1561,7 +1562,7 @@ class AISafetyControls:
 
     # ===== HALLUCINATION DETECTION =====
 
-    def detect_hallucination(self, ai_output: str, expected_context: Dict) -> dict[str, Any]:
+    def detect_hallucination(self, ai_output: str, expected_context: dict) -> dict[str, Any]:
         """
         Detect potential AI hallucinations using knowledge base cross-checks.
 

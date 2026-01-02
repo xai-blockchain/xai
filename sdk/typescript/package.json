@@ -1,7 +1,7 @@
 {
   "name": "@xai/sdk",
   "version": "1.0.0",
-  "description": "Production-ready TypeScript/JavaScript SDK for the XAI blockchain",
+  "description": "TypeScript/JavaScript SDK for the XAI node API",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -39,7 +39,7 @@
     "typescript"
   ],
   "author": "XAI Team",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/xai-blockchain/xai.git",

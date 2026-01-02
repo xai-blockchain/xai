@@ -56,7 +56,7 @@ class BlacklistGovernanceVote:
         """Check if voting can start"""
         return time.time() >= self.vote_start_time
 
-    def cast_vote(self, node_id: str, vote: VoteOption, node_is_active: bool = True) -> Dict:
+    def cast_vote(self, node_id: str, vote: VoteOption, node_is_active: bool = True) -> dict:
         """
         Cast vote (only active nodes can vote)
 
@@ -102,7 +102,7 @@ class BlacklistGovernanceVote:
 
         return {"success": True, "vote_recorded": vote.value, "signature": node_vote.signature}
 
-    def get_vote_tally(self) -> Dict:
+    def get_vote_tally(self) -> dict:
         """Get current vote counts"""
 
         tally = {
@@ -123,7 +123,7 @@ class BlacklistGovernanceVote:
             "total_votes": len(self.votes),
         }
 
-    def close_vote(self) -> Dict:
+    def close_vote(self) -> dict:
         """
         Close vote after voting period ends
 

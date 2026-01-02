@@ -10,7 +10,7 @@ Software automatically becomes available when timestamp passes
 import base64
 import hashlib
 import time
-from typing import Dict, List
+from typing import Any
 
 from xai.core.constants import GENESIS_TIMESTAMP, SECONDS_PER_DAY
 
@@ -43,7 +43,7 @@ class TimeLockRelease:
             return base64.b64decode(self.code).decode("utf-8")
         return None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary for genesis block"""
         return {
             "component": self.component,
@@ -54,7 +54,7 @@ class TimeLockRelease:
             "code_hash": self.code_hash,
         }
 
-    def to_public_dict(self) -> Dict:
+    def to_public_dict(self) -> dict:
         """Public info (without code if not active)"""
         return {
             "component": self.component,
@@ -71,7 +71,7 @@ class TimeLockRelease:
 class SoftwareReleaseManager:
     """Manages time-locked software releases in blockchain"""
 
-    def __init__(self, genesis_releases: list[Dict] = None):
+    def __init__(self, genesis_releases: list[dict] = None):
         self.releases = []
 
         if genesis_releases:
@@ -85,7 +85,7 @@ class SoftwareReleaseManager:
                 )
                 self.releases.append(release)
 
-    def get_available_software(self) -> list[Dict]:
+    def get_available_software(self) -> list[dict]:
         """Get all currently active software releases"""
         active = [r for r in self.releases if r.is_active()]
 
@@ -99,12 +99,12 @@ class SoftwareReleaseManager:
             for r in active
         ]
 
-    def get_upcoming_releases(self) -> list[Dict]:
+    def get_upcoming_releases(self) -> list[dict]:
         """Get info about locked releases (no code)"""
         upcoming = [r for r in self.releases if not r.is_active()]
         return [r.to_public_dict() for r in upcoming]
 
-    def get_all_releases_info(self) -> Dict:
+    def get_all_releases_info(self) -> dict:
         """Get comprehensive release information"""
         return {
             "available_now": self.get_available_software(),
@@ -112,7 +112,7 @@ class SoftwareReleaseManager:
             "total_releases": len(self.releases),
         }
 
-def create_genesis_software_releases() -> list[Dict]:
+def create_genesis_software_releases() -> list[dict]:
     """
     Create time-locked software releases for genesis block
 
@@ -166,7 +166,7 @@ def create_genesis_software_releases() -> list[Dict]:
 
     return releases
 
-def verify_release_integrity(release_data: Dict, expected_hash: str) -> bool:
+def verify_release_integrity(release_data: dict, expected_hash: str) -> bool:
     """
     Verify software release hasn't been tampered with
 

@@ -1284,7 +1284,7 @@ class Blockchain(
             if block:
                 self._process_governance_block_transactions(block)
 
-    def _rebuild_nonce_tracker(self, chain: List) -> None:
+    def _rebuild_nonce_tracker(self, chain: list) -> None:
         """
         Rebuild nonce tracker from chain state.
 
@@ -3653,7 +3653,7 @@ class Blockchain(
                            Set to False after first batch for efficiency.
 
         Returns:
-            Dict containing:
+            dict containing:
             - chain: List of block dicts for the requested range
             - pending_transactions: List of pending tx dicts (if include_pending)
             - difficulty: Current difficulty
@@ -3711,7 +3711,7 @@ class Blockchain(
         For long chains, prefer to_dict_paginated() for incremental sync.
 
         Returns:
-            Dict containing chain, pending transactions, difficulty, and stats
+            dict containing chain, pending transactions, difficulty, and stats
         """
         return {
             "chain": [self._block_to_full_dict(block) for block in self.chain],
@@ -3731,7 +3731,7 @@ class Blockchain(
         Materialize a lightweight blockchain snapshot from serialized data.
 
         Args:
-            data: Dict produced by to_dict() containing chain/pending/difficulty
+            data: dict produced by to_dict() containing chain/pending/difficulty
 
         Returns:
             SimpleNamespace with `chain`, `pending_transactions`, and `difficulty`

@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import sysconfig
+from collections.abc import Iterable
 from pathlib import Path
 
 

@@ -40,11 +40,11 @@ class PaymentProcessor:
         self.credit_card_fee_fixed = Decimal("0.30")
 
         # Refund tracking (Task 108)
-        self.payment_history: dict[str, Dict] = {}
-        self.refund_history: list[Dict] = []
+        self.payment_history: dict[str, dict] = {}
+        self.refund_history: list[dict] = []
         self.refund_time_window_days = 30  # 30-day refund window
 
-    def calculate_purchase(self, usd_amount: float) -> Dict:
+    def calculate_purchase(self, usd_amount: float) -> dict:
         amount = Decimal(str(usd_amount))
         if amount < self.min_purchase_usd:
             return {"success": False, "error": f"Minimum purchase is ${self.min_purchase_usd}"}
@@ -67,7 +67,7 @@ class PaymentProcessor:
 
     def process_card_payment(
         self, user_address: str, usd_amount: float, card_token: str, email: str
-    ) -> Dict:
+    ) -> dict:
         calc = self.calculate_purchase(usd_amount)
         if not calc.get("success"):
             return calc
@@ -95,8 +95,8 @@ class PaymentProcessor:
         return payment_record
 
     def process_bank_transfer(
-        self, user_address: str, usd_amount: float, bank_details: Dict
-    ) -> Dict:
+        self, user_address: str, usd_amount: float, bank_details: dict
+    ) -> dict:
         calc = self.calculate_purchase(usd_amount)
         if not calc.get("success"):
             return calc
@@ -123,7 +123,7 @@ class PaymentProcessor:
             "timestamp": time.time(),
         }
 
-    def get_supported_payment_methods(self) -> Dict:
+    def get_supported_payment_methods(self) -> dict:
         fee_text = (
             f"{float(self.credit_card_fee_percent * 100):.1f}% + ${self.credit_card_fee_fixed}"
         )
@@ -143,7 +143,7 @@ class PaymentProcessor:
             },
         }
 
-    def get_current_price(self) -> Dict:
+    def get_current_price(self) -> dict:
         return {
             "AXN/USD": float(self.axn_usd_price),
             "AXN/EUR": float(self.axn_usd_price * Decimal("0.92")),
@@ -159,7 +159,7 @@ class PaymentProcessor:
         refund_amount: float | None = None,
         reason: RefundReason = RefundReason.CUSTOMER_REQUEST,
         notes: str = ""
-    ) -> Dict:
+    ) -> dict:
         """
         Process a refund for a previous payment.
 
@@ -170,7 +170,7 @@ class PaymentProcessor:
             notes: Additional notes about the refund
 
         Returns:
-            Dict with refund status and details
+            dict with refund status and details
         """
         # Validate payment exists
         if payment_id not in self.payment_history:
@@ -263,7 +263,7 @@ class PaymentProcessor:
             "reason": reason.value,
         }
 
-    def get_payment_status(self, payment_id: str) -> Dict:
+    def get_payment_status(self, payment_id: str) -> dict:
         """
         Get the current status of a payment including refund information.
 
@@ -271,7 +271,7 @@ class PaymentProcessor:
             payment_id: The payment ID to query
 
         Returns:
-            Dict with payment status and refund details
+            dict with payment status and refund details
         """
         if payment_id not in self.payment_history:
             return {
@@ -296,7 +296,7 @@ class PaymentProcessor:
             "payment_date": payment["timestamp"],
         }
 
-    def get_refund_history(self, user_address: str | None = None, limit: int = 100) -> list[Dict]:
+    def get_refund_history(self, user_address: str | None = None, limit: int = 100) -> list[dict]:
         """
         Get refund history, optionally filtered by user address.
 
@@ -317,7 +317,7 @@ class PaymentProcessor:
 
         return refunds[:limit]
 
-    def cancel_refund(self, refund_id: str, reason: str = "") -> Dict:
+    def cancel_refund(self, refund_id: str, reason: str = "") -> dict:
         """
         Cancel a pending refund (only works for pending refunds).
 
@@ -326,7 +326,7 @@ class PaymentProcessor:
             reason: Reason for cancellation
 
         Returns:
-            Dict with cancellation status
+            dict with cancellation status
         """
         # Find refund
         refund = next((r for r in self.refund_history if r["refund_id"] == refund_id), None)

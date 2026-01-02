@@ -51,7 +51,7 @@ class TokenType:
     minted: int = 0
     is_fungible: bool = True  # True = fungible, False = NFT (max_supply=1)
     uri: str = ""
-    metadata: Dict = field(default_factory=dict)
+    metadata: dict = field(default_factory=dict)
 
 @dataclass
 class MultiTokenEvent:
@@ -378,7 +378,7 @@ class ERC1155Token:
         max_supply: int = 0,
         is_fungible: bool = True,
         uri: str = "",
-        metadata: Dict | None = None,
+        metadata: dict | None = None,
     ) -> int:
         """
         Create a new token type.
@@ -730,7 +730,7 @@ class ERC1155Token:
 
     # ==================== Serialization ====================
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Serialize state to dictionary."""
         return {
             "name": self.name,
@@ -761,7 +761,7 @@ class ERC1155Token:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "ERC1155Token":
+    def from_dict(cls, data: dict) -> "ERC1155Token":
         """Deserialize state from dictionary."""
         token = cls(
             name=data.get("name", ""),

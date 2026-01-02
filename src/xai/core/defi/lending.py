@@ -810,7 +810,7 @@ class LendingPool:
 
         return self._calculate_health_factor(position)
 
-    def get_user_account_data(self, user: str) -> Dict:
+    def get_user_account_data(self, user: str) -> dict:
         """
         Get comprehensive account data for a user.
 
@@ -888,7 +888,7 @@ class LendingPool:
             "ltv": (total_debt * self.BASIS_POINTS // total_collateral) if total_collateral > 0 else 0,
         }
 
-    def get_reserve_data(self, asset: str) -> Dict:
+    def get_reserve_data(self, asset: str) -> dict:
         """Get reserve/pool data for an asset."""
         self._require_asset(asset)
 
@@ -1324,7 +1324,7 @@ class LendingPool:
 
     # ==================== Serialization ====================
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Serialize pool state."""
         return {
             "name": self.name,

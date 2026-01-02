@@ -60,7 +60,7 @@ def load_or_create_identity(data_dir: str) -> dict[str, str]:
 
     return identity
 
-def _atomic_write_json(path: str, payload: Dict) -> None:
+def _atomic_write_json(path: str, payload: dict) -> None:
     tmp = f"{path}.tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, sort_keys=True)

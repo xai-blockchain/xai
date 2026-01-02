@@ -464,7 +464,7 @@ def register_notification_routes(routes: "NodeAPIRoutes") -> None:
         Get push notification system statistics.
 
         Returns:
-            Dict containing device counts by platform and status
+            dict containing device counts by platform and status
 
         Example:
             GET /notifications/stats

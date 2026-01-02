@@ -11,7 +11,7 @@ in the genesis block.
 import json
 import os
 
-from src.xai.core.wallet import Wallet
+from xai.core.wallet import Wallet
 
 
 def create_time_capsule_reserve():
@@ -31,7 +31,7 @@ def create_time_capsule_reserve():
     # Generate reserve wallet
     reserve_wallet = Wallet()
 
-    reserve_data = {
+    reserve_data: dict[str, str | int | float | list[str]] = {
         "address": reserve_wallet.address,
         "private_key": reserve_wallet.private_key,
         "public_key": reserve_wallet.public_key,

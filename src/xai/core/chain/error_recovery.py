@@ -57,7 +57,7 @@ class ErrorRecoveryManager:
     """
 
     def __init__(
-        self, blockchain: Any, node: Any | None = None, config: Dict | None = None
+        self, blockchain: Any, node: Any | None = None, config: dict | None = None
     ) -> None:
         """
         Initialize error recovery manager.
@@ -69,7 +69,7 @@ class ErrorRecoveryManager:
         """
         self.blockchain = blockchain
         self.node = node
-        self.config: Dict = config or {}
+        self.config: dict = config or {}
 
         # Recovery state
         self.state: RecoveryState = RecoveryState.HEALTHY
@@ -303,7 +303,7 @@ class ErrorRecoveryManager:
 # Convenience functions for backward compatibility
 
 def create_recovery_manager(
-    blockchain: Any, node: Any | None = None, config: Dict | None = None
+    blockchain: Any, node: Any | None = None, config: dict | None = None
 ) -> ErrorRecoveryManager:
     """
     Create and initialize error recovery manager.

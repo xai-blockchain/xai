@@ -48,7 +48,7 @@ class BlacklistSource(ABC):
     def fetch_addresses(self) -> set[str]:
         """Fetch and return addresses exposed by this source."""
 
-    def update(self) -> Dict:
+    def update(self) -> dict:
         """Update blacklist from source"""
         if not self.needs_update():
             return {
@@ -219,7 +219,7 @@ class BlacklistManager:
         self.last_full_update = 0
         self.update_history = []
 
-    def update_all_sources(self) -> Dict:
+    def update_all_sources(self) -> dict:
         """Update from all sources"""
 
         results = {
@@ -271,7 +271,7 @@ class BlacklistManager:
         data = "|".join(sorted_addresses)
         return hashlib.sha256(data.encode()).hexdigest()
 
-    def get_update_status(self) -> Dict:
+    def get_update_status(self) -> dict:
         """Get update status for all sources"""
 
         status = {
@@ -335,7 +335,7 @@ class ConsensusBlacklistValidator:
 
     def validate_node_blacklist(
         self, node_blacklist_hash: str, node_last_update: float, current_blacklist_hash: str
-    ) -> Dict:
+    ) -> dict:
         """
         Validate node's blacklist is current
 

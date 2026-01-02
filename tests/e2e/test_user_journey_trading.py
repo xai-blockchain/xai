@@ -7,6 +7,7 @@ Receive payment -> Check final balance
 
 import pytest
 from xai.core.blockchain import Blockchain
+from xai.core.config import NETWORK
 from xai.core.wallet import Wallet
 
 
@@ -20,7 +21,8 @@ class TestUserJourneyTrading:
         assert wallet.address is not None
         assert wallet.public_key is not None
         assert wallet.private_key is not None
-        assert wallet.address.startswith("XAI")
+        prefix = "XAI" if NETWORK.lower() == "mainnet" else "TXAI"
+        assert wallet.address.startswith(prefix)
 
     def test_user_receives_funds(self, e2e_blockchain_dir):
         """User receives funds from another user"""
@@ -134,6 +136,7 @@ class TestUserJourneyTrading:
         # Multiple transactions
         transactions = []
         amounts = [1.0, 2.0, 1.5, 0.5]
+        miner = Wallet()
 
         for amount in amounts:
             tx = blockchain.create_transaction(
@@ -144,11 +147,10 @@ class TestUserJourneyTrading:
                 user1.private_key,
                 user1.public_key
             )
+            assert tx is not None
             transactions.append(tx)
             blockchain.add_transaction(tx)
-
-        # Mine all transactions
-        blockchain.mine_pending_transactions(Wallet().address)
+            blockchain.mine_pending_transactions(miner.address)
 
         # Check final balance
         total_sent = sum(amounts)
@@ -211,6 +213,7 @@ class TestUserJourneyTrading:
 
         # Trade fractional amounts
         fractional_amounts = [0.123, 0.456, 0.789]
+        miner = Wallet()
 
         for i, amount in enumerate(fractional_amounts):
             tx = blockchain.create_transaction(
@@ -221,10 +224,9 @@ class TestUserJourneyTrading:
                 alice.private_key,
                 alice.public_key
             )
+            assert tx is not None
             blockchain.add_transaction(tx)
-
-        # Mine
-        blockchain.mine_pending_transactions(Wallet().address)
+            blockchain.mine_pending_transactions(miner.address)
 
         # Verify balance
         bob_balance = blockchain.get_balance(bob.address)
@@ -237,6 +239,7 @@ class TestUserJourneyTrading:
 
         sender = Wallet()
         recipients = [Wallet() for _ in range(10)]
+        miner = Wallet()
 
         # Fund sender
         blockchain.mine_pending_transactions(sender.address)
@@ -251,10 +254,9 @@ class TestUserJourneyTrading:
                 sender.private_key,
                 sender.public_key
             )
+            assert tx is not None
             blockchain.add_transaction(tx)
-
-        # Mine to confirm all
-        blockchain.mine_pending_transactions(Wallet().address)
+            blockchain.mine_pending_transactions(miner.address)
 
         # Verify all received
         for recipient in recipients:

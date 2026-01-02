@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 import websockets
+from websockets import WebSocketServer
 from websockets.asyncio.server import ServerConnection
 from websockets.exceptions import ConnectionClosed, WebSocketException
 
@@ -129,7 +130,7 @@ class P2PNetworkManager:
         self.peer_api_endpoints: dict[str, str] = {}  # Map peer_id -> HTTP API endpoint
         self.quic_enabled = bool(getattr(Config, "P2P_ENABLE_QUIC", False) and QUIC_AVAILABLE)
         self.quic_dial_timeout = float(getattr(Config, "P2P_QUIC_DIAL_TIMEOUT", 1.0))
-        self.server: websockets.WebSocketServer | None = None
+        self.server: WebSocketServer | None = None
         self.connections: dict[str, Any] = {}
         self.websocket_peer_ids: dict[Any, str] = {}
         self.http_peers: set[str] = set()

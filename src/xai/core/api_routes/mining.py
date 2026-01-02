@@ -111,7 +111,7 @@ def register_mining_routes(
         This endpoint requires API authentication.
 
         Returns:
-            Dict containing status message indicating mining started or already active.
+            dict containing status message indicating mining started or already active.
 
         Raises:
             AuthenticationError: If API key is missing or invalid (401).
@@ -138,7 +138,7 @@ def register_mining_routes(
         This endpoint requires API authentication.
 
         Returns:
-            Dict containing status message indicating mining stopped or wasn't active.
+            dict containing status message indicating mining stopped or wasn't active.
 
         Raises:
             AuthenticationError: If API key is missing or invalid (401).

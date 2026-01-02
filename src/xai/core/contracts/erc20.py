@@ -613,7 +613,7 @@ class ERC20Token:
 
     # ==================== Serialization ====================
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Serialize token state to dictionary."""
         return {
             "name": self.name,
@@ -630,7 +630,7 @@ class ERC20Token:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "ERC20Token":
+    def from_dict(cls, data: dict) -> "ERC20Token":
         """Deserialize token state from dictionary."""
         token = cls(
             name=data["name"],
@@ -785,7 +785,7 @@ class ERC20Factory:
 
         return None
 
-    def list_tokens(self) -> list[Dict]:
+    def list_tokens(self) -> list[dict]:
         """
         List all deployed tokens.
 

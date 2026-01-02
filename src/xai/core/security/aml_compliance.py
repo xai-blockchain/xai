@@ -51,7 +51,7 @@ class TransactionRiskScore:
         self.sanctioned_addresses = set()
 
     def calculate_risk_score(
-        self, transaction: Dict, sender_history: list[Dict] = None
+        self, transaction: dict, sender_history: list[dict] = None
     ) -> tuple[int, list[str]]:
         """
         Calculate risk score (0-100) and flag reasons
@@ -121,12 +121,12 @@ class TransactionRiskScore:
 
         return score, reasons
 
-    def _get_recent_transactions(self, history: list[Dict], window: int) -> list[Dict]:
+    def _get_recent_transactions(self, history: list[dict], window: int) -> list[dict]:
         """Get transactions within time window"""
         cutoff = time.time() - window
         return [tx for tx in history if tx.get("timestamp", 0) > cutoff]
 
-    def _detect_structuring(self, recent_txs: list[Dict], current_tx: Dict) -> bool:
+    def _detect_structuring(self, recent_txs: list[dict], current_tx: dict) -> bool:
         """Detect structuring pattern (multiple txs just under threshold)"""
         # Multiple transactions just under $10k in 24 hours
         near_threshold = [
@@ -144,7 +144,7 @@ class TransactionRiskScore:
         round_amounts = [1000, 5000, 10000, 50000, 100000, 500000, 1000000]
         return amount in round_amounts
 
-    def _detect_velocity_spike(self, history: list[Dict], current_tx: Dict) -> bool:
+    def _detect_velocity_spike(self, history: list[dict], current_tx: dict) -> bool:
         """Detect sudden spike in transaction velocity"""
         if len(history) < 10:
             return False
@@ -211,11 +211,11 @@ class AddressBlacklist:
         """Check if address is sanctioned"""
         return address in self.sanctions
 
-    def get_blacklist(self) -> Dict:
+    def get_blacklist(self) -> dict:
         """Get full blacklist"""
         return self.blacklist
 
-    def get_sanctions_list(self) -> Dict:
+    def get_sanctions_list(self) -> dict:
         """Get full sanctions list"""
         return self.sanctions
 
@@ -229,7 +229,7 @@ class RegulatorDashboard:
         self.blockchain = blockchain
         self.risk_scorer = TransactionRiskScore()
 
-    def get_flagged_transactions(self, min_score: int = 61, limit: int = 1000) -> list[Dict]:
+    def get_flagged_transactions(self, min_score: int = 61, limit: int = 1000) -> list[dict]:
         """Get all flagged transactions above risk threshold"""
 
         flagged = []
@@ -258,7 +258,7 @@ class RegulatorDashboard:
         flagged.sort(key=lambda x: x["timestamp"], reverse=True)
         return flagged[:limit]
 
-    def get_high_risk_addresses(self, min_score: int = 70) -> list[Dict]:
+    def get_high_risk_addresses(self, min_score: int = 70) -> list[dict]:
         """Get addresses with consistently high risk scores"""
 
         address_scores = {}
@@ -326,7 +326,7 @@ class RegulatorDashboard:
 
         return best
 
-    def export_compliance_report(self, start_date: int, end_date: int) -> Dict:
+    def export_compliance_report(self, start_date: int, end_date: int) -> dict:
         """Export full compliance report for date range"""
 
         report = {
@@ -371,7 +371,7 @@ class RegulatorDashboard:
 
     def search_transactions(
         self, address: str = None, min_amount: float = None, risk_level: RiskLevel = None
-    ) -> list[Dict]:
+    ) -> list[dict]:
         """Search transactions with filters"""
 
         results = []
@@ -403,7 +403,7 @@ class PublicExplorerAPI:
     def __init__(self, blockchain):
         self.blockchain = blockchain
 
-    def get_transaction(self, tx_hash: str) -> Dict:
+    def get_transaction(self, tx_hash: str) -> dict:
         """Get transaction (no risk info shown publicly)"""
 
         for block in self.blockchain.chain:
@@ -421,7 +421,7 @@ class PublicExplorerAPI:
 
         return None
 
-    def get_recent_transactions(self, limit: int = 100) -> list[Dict]:
+    def get_recent_transactions(self, limit: int = 100) -> list[dict]:
         """Get recent transactions (no filtering by risk)"""
 
         transactions = []

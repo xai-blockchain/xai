@@ -547,7 +547,7 @@ class PriceOracle:
             feed = self.feeds.get(pair)
             return feed.latest_price if feed else 0, False
 
-    def get_latest_round_data(self, pair: str) -> Dict:
+    def get_latest_round_data(self, pair: str) -> dict:
         """
         Get complete round data (Chainlink-compatible).
 
@@ -608,7 +608,7 @@ class PriceOracle:
 
     # ==================== Feed Information ====================
 
-    def get_feed_info(self, pair: str) -> Dict:
+    def get_feed_info(self, pair: str) -> dict:
         """Get feed configuration and status."""
         self._require_feed(pair)
         feed = self.feeds[pair]
@@ -1171,7 +1171,7 @@ class PriceOracle:
 
     # ==================== Serialization ====================
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Serialize oracle state."""
         return {
             "name": self.name,

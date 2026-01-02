@@ -52,7 +52,7 @@ class MarketMaker:
                    spread_percent=float(self.spread_percent * 100),
                    order_size_range=f"{self.order_size_min}-{self.order_size_max}")
 
-    def calculate_order_levels(self, pair: str = "AXN/USD") -> Dict:
+    def calculate_order_levels(self, pair: str = "AXN/USD") -> dict:
         """Calculate buy and sell order levels"""
         base_price = self.base_price
 
@@ -99,7 +99,7 @@ class MarketMaker:
             "timestamp": time.time(),
         }
 
-    def place_liquidity_orders(self, pair: str = "AXN/USD") -> Dict:
+    def place_liquidity_orders(self, pair: str = "AXN/USD") -> dict:
         """Place market making orders on the exchange"""
         levels = self.calculate_order_levels(pair)
 
@@ -161,7 +161,7 @@ class MarketMaker:
 
         return placed_orders
 
-    def get_current_orders(self) -> list[Dict]:
+    def get_current_orders(self) -> list[dict]:
         """Get market maker's current orders"""
         try:
             response = requests.get(
@@ -278,7 +278,7 @@ class MarketMaker:
             print("\n\n🛑 Market maker stopped by user")
             logger.info("Market maker stopped by user")
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Get market maker statistics"""
         orders = self.get_current_orders()
 

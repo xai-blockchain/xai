@@ -1592,7 +1592,7 @@ class EntryPoint:
 
     # ==================== Stats ====================
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Get EntryPoint statistics."""
         return {
             "total_ops_processed": self.total_ops_processed,
@@ -1685,7 +1685,7 @@ class AccountFactory:
             owners: List of owner addresses
             threshold: Number of signatures required
             salt: Salt for deterministic address
-            owner_public_keys: Dict mapping owner addresses to their 64-byte hex public keys
+            owner_public_keys: dict mapping owner addresses to their 64-byte hex public keys
                               (required for signature validation to work)
 
         Returns:

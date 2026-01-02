@@ -91,7 +91,7 @@ class LuckyBlockSystem:
         """Get all lucky blocks in range"""
         return [b for b in range(start, end + 1) if self.is_lucky_block(b)]
 
-    def get_stats(self, up_to_block: int) -> Dict:
+    def get_stats(self, up_to_block: int) -> dict:
         """Get lucky block statistics"""
         lucky_blocks = self.get_lucky_blocks_in_range(1, up_to_block)
 
@@ -117,7 +117,7 @@ class HiddenTreasureWallets:
 
     def generate_treasure_wallets(
         self, count: int = TREASURE_WALLET_COUNT, password: str = "treasure-secret"
-    ) -> list[Dict]:
+    ) -> list[dict]:
         """
         Generate hidden treasure wallets
 
@@ -176,7 +176,7 @@ class HiddenTreasureWallets:
 
         return secrets.choice(clues)
 
-    def hide_clues_in_blocks(self, blockchain) -> Dict:
+    def hide_clues_in_blocks(self, blockchain) -> dict:
         """
         Hide clues in blockchain transactions/metadata
 
@@ -207,7 +207,7 @@ class AirdropClueSystem:
 
     def schedule_airdrop(
         self, timestamp: int, amount: float, recipient_count: int, criteria: str
-    ) -> Dict:
+    ) -> dict:
         """
         Schedule future airdrop with cryptic clues
 
@@ -241,7 +241,7 @@ class AirdropClueSystem:
 
     def _generate_airdrop_clues(
         self, timestamp: int, amount: float, recipient_count: int
-    ) -> list[Dict]:
+    ) -> list[dict]:
         """
         Generate cryptic clues about upcoming airdrop
 
@@ -301,7 +301,7 @@ class AirdropClueSystem:
 
         return clues
 
-    def get_clues_for_block(self, block_number: int) -> list[Dict]:
+    def get_clues_for_block(self, block_number: int) -> list[dict]:
         """Get any clues that should appear in this block"""
 
         clues_in_block = []
@@ -319,7 +319,7 @@ class AirdropClueSystem:
 
         return clues_in_block
 
-    def get_upcoming_airdrops(self) -> list[Dict]:
+    def get_upcoming_airdrops(self) -> list[dict]:
         """Get list of upcoming airdrops (without revealing clues)"""
 
         current_time = time.time()
@@ -349,7 +349,7 @@ class EasterEggManager:
         self.treasure_wallets = HiddenTreasureWallets()
         self.airdrops = AirdropClueSystem(genesis_timestamp)
 
-    def initialize_easter_eggs(self) -> Dict:
+    def initialize_easter_eggs(self) -> dict:
         """
         Initialize all easter eggs for genesis
 
@@ -421,7 +421,7 @@ class EasterEggManager:
             "airdrop_total": AIRDROP_90_DAY_AMOUNT + AIRDROP_180_DAY_AMOUNT + AIRDROP_365_DAY_AMOUNT,
         }
 
-    def get_block_easter_eggs(self, block_number: int) -> Dict:
+    def get_block_easter_eggs(self, block_number: int) -> dict:
         """
         Get any easter eggs that should appear in this block
 

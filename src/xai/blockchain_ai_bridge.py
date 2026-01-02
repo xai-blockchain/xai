@@ -8,9 +8,9 @@ the top-level xai package instead of navigating the internal structure.
 Example:
     from xai.blockchain_ai_bridge import BlockchainAIBridge
     # Instead of:
-    # from src.xai.core.blockchain_ai_bridge import BlockchainAIBridge
+    # from xai.core.blockchain_ai_bridge import BlockchainAIBridge
 """
 
-from src.xai.core.blockchain_ai_bridge import BlockchainAIBridge
+from xai.core.blockchain_ai_bridge import BlockchainAIBridge
 
 __all__ = ["BlockchainAIBridge"]

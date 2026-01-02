@@ -26,7 +26,7 @@ def register_wallet_routes(routes: "NodeAPIRoutes") -> None:
             address (str): The blockchain address to query
 
         Returns:
-            Dict containing:
+            dict containing:
                 - address (str): The queried address
                 - balance (float): Current balance in XAI tokens
         """
@@ -105,7 +105,7 @@ def register_wallet_routes(routes: "NodeAPIRoutes") -> None:
             offset (int, optional): Number of transactions to skip (default: 0)
 
         Returns:
-            Dict containing:
+            dict containing:
                 - address (str): The queried address
                 - transaction_count (int): Total number of transactions for this address
                 - limit (int): Applied limit

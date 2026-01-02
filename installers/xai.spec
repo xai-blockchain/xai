@@ -6,7 +6,7 @@ Version:        %{pypi_version}
 Release:        1%{?dist}
 Summary:        AI-Enhanced Blockchain Platform
 
-License:        MIT
+License:        Apache-2.0
 URL:            https://xai-blockchain.io
 Source0:        https://files.pythonhosted.org/packages/source/x/%{pypi_name}/%{pypi_name}-%{version}.tar.gz
 
@@ -39,19 +39,8 @@ Requires(preun): systemd
 Requires(postun): systemd
 
 %description
-XAI is a production-ready blockchain implementation featuring proof-of-work
-consensus, intelligent AI-based governance, atomic swap support for
-cross-chain trading, and comprehensive wallet management.
-
-Key Features:
-* Proof-of-Work (SHA-256) consensus with adjustable difficulty
-* UTXO-based transaction model with full signature verification
-* Smart contract engine with EVM compatibility
-* AI governance system for proposals and voting
-* Atomic swap support for 11+ cryptocurrencies
-* Comprehensive wallet CLI with HD wallet support (BIP-32/BIP-39)
-* Multi-signature transaction support
-* Block explorer with REST API
+XAI is a Python-based proof-of-work blockchain implementation with a UTXO
+transaction model, REST API, and wallet CLI.
 
 %package devel
 Summary:        Development tools for XAI Blockchain
@@ -71,9 +60,7 @@ Summary:        Documentation for XAI Blockchain
 BuildArch:      noarch
 
 %description doc
-This package contains comprehensive documentation for the XAI blockchain
-platform, including API reference, developer guides, architecture
-documentation, and security best practices.
+This package contains documentation for the XAI blockchain implementation.
 
 %prep
 %autosetup -n %{pypi_name}-%{version}

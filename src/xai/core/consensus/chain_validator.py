@@ -33,7 +33,7 @@ class ValidationIssue:
     block_index: int | None
     issue_type: str
     description: str
-    details: Dict = field(default_factory=dict)
+    details: dict = field(default_factory=dict)
 
 @dataclass
 class ValidationReport:
@@ -60,7 +60,7 @@ class ValidationReport:
         block_index: int | None,
         issue_type: str,
         description: str,
-        details: Dict = None,
+        details: dict = None,
     ):
         """Add a validation issue"""
         issue = ValidationIssue(

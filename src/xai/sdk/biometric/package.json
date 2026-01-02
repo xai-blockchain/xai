@@ -20,7 +20,7 @@
     "react-native"
   ],
   "author": "XAI Development Team",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "peerDependencies": {
     "react": ">=16.8.0",
     "react-native": ">=0.60.0"

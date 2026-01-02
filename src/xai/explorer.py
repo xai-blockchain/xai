@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 # Rate limiting configuration
 RATE_LIMIT_WINDOW = 60  # seconds
 RATE_LIMIT_MAX_REQUESTS = 60  # requests per window
-rate_limit_data = defaultdict(lambda: {"count": 0, "reset_time": 0})
+rate_limit_data: dict[str, dict[str, int]] = defaultdict(lambda: {"count": 0, "reset_time": 0})
 rate_limit_lock = Lock()
 
 

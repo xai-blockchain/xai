@@ -8,7 +8,7 @@ import os
 import sys
 import time
 
-from src.xai.core.wallet import Wallet
+from xai.core.wallet import Wallet
 
 # Allocation (121M total)
 TOTAL_SUPPLY = 121000000.0

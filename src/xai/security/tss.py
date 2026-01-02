@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend

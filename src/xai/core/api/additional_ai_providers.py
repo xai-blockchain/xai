@@ -336,7 +336,7 @@ class FireworksAIProvider:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are a helpful AI assistant. Provide high-quality, production-ready code and responses.",
+                        "content": "You are a helpful AI assistant. Provide high-quality code and responses.",
                     },
                     {"role": "user", "content": task},
                 ],

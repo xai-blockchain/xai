@@ -46,10 +46,10 @@ class MiningAlgorithm:
         self,
         block_height: int,
         previous_hash: str,
-        transactions: list[Dict],
+        transactions: list[dict],
         miner_address: str,
         nonce: int,
-    ) -> Dict:
+    ) -> dict:
         """Create a block header for mining"""
         return {
             "version": 1,
@@ -62,7 +62,7 @@ class MiningAlgorithm:
             "difficulty": self.current_difficulty,
         }
 
-    def _merkle_root(self, transactions: list[Dict]) -> str:
+    def _merkle_root(self, transactions: list[dict]) -> str:
         """Calculate Merkle root of transactions"""
         if not transactions:
             return "0" * 64
@@ -71,7 +71,7 @@ class MiningAlgorithm:
         tx_data = json.dumps(transactions, sort_keys=True)
         return hashlib.sha256(tx_data.encode()).hexdigest()
 
-    def mine_block(self, block_header: Dict, max_iterations: int = 1000000) -> Dict | None:
+    def mine_block(self, block_header: dict, max_iterations: int = 1000000) -> dict | None:
         """
         Mine a block by finding a valid nonce
 
@@ -98,7 +98,7 @@ class MiningAlgorithm:
 
         return None
 
-    def _calculate_block_hash(self, block_header: Dict) -> str:
+    def _calculate_block_hash(self, block_header: dict) -> str:
         """
         Calculate block hash using memory-hard algorithm
 
@@ -143,7 +143,7 @@ class MiningAlgorithm:
         target = (2**256) // difficulty
         return hash_int < target
 
-    def adjust_difficulty(self, blocks: list[Dict]) -> int:
+    def adjust_difficulty(self, blocks: list[dict]) -> int:
         """
         Adjust difficulty based on recent block times
 
@@ -172,7 +172,7 @@ class MiningAlgorithm:
         self.current_difficulty = new_difficulty
         return new_difficulty
 
-    def verify_block(self, block_header: Dict, block_hash: str) -> bool:
+    def verify_block(self, block_header: dict, block_hash: str) -> bool:
         """Verify that a mined block is valid"""
         # Recalculate hash
         calculated_hash = self._calculate_block_hash(block_header)
@@ -214,7 +214,7 @@ class BrowserMiningAdapter:
         self.algorithm.MEMORY_SIZE = self.BROWSER_MEMORY_SIZE
         self.algorithm.HASH_ITERATIONS = self.BROWSER_HASH_ITERATIONS
 
-    def get_mining_job(self, block_height: int, previous_hash: str, miner_address: str) -> Dict:
+    def get_mining_job(self, block_height: int, previous_hash: str, miner_address: str) -> dict:
         """
         Get a mining job for browser client
 
@@ -238,7 +238,7 @@ class BrowserMiningAdapter:
             "target": hex((2**256) // self.algorithm.current_difficulty),
         }
 
-    def submit_share(self, job_id: str, nonce: int, block_hash: str, miner_address: str) -> Dict:
+    def submit_share(self, job_id: str, nonce: int, block_hash: str, miner_address: str) -> dict:
         """
         Submit a mining share from browser
 

@@ -62,7 +62,7 @@ class TokenClaims:
     nbf: datetime  # Not before
     jti: str  # JWT ID (for revocation)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary for JWT encoding"""
         return {
             'user_id': self.user_id,
@@ -137,7 +137,7 @@ class JWTAuthManager:
         self.revoked_tokens: dict[str, datetime] = {}
 
         # Active sessions
-        self.active_sessions: dict[str, Dict] = {}
+        self.active_sessions: dict[str, dict] = {}
 
         # Background cleanup configuration
         self._cleanup_enabled = cleanup_enabled
@@ -158,7 +158,7 @@ class JWTAuthManager:
         user_id: str,
         username: str,
         role: UserRole,
-        additional_claims: Dict | None = None,
+        additional_claims: dict | None = None,
     ) -> str:
         """
         Generate a JWT access token.
@@ -200,7 +200,7 @@ class JWTAuthManager:
             security_logger.error(f"Error generating token: {str(e)}", extra={"error_type": type(e).__name__})
             raise
 
-    def validate_token(self, token: str) -> tuple[bool, Dict | None, str | None]:
+    def validate_token(self, token: str) -> tuple[bool, dict | None, str | None]:
         """
         Validate JWT token with explicit expiration verification.
 
@@ -215,7 +215,7 @@ class JWTAuthManager:
             token: JWT token to validate
 
         Returns:
-            tuple[bool, Dict | None, str | None]: (valid, claims, error_message)
+            tuple[bool, dict | None, str | None]: (valid, claims, error_message)
         """
         try:
             # Decode token with explicit security options

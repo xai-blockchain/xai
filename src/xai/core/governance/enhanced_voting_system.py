@@ -101,7 +101,7 @@ class EnhancedVotingSystem:
         self.blockchain = blockchain
 
         # Vote storage
-        self.proposals: dict[str, Dict] = {}
+        self.proposals: dict[str, dict] = {}
         self.voter_snapshots: dict[str, dict[str, VoterSnapshot]] = (
             {}
         )  # proposal_id -> {address -> snapshot}
@@ -118,7 +118,7 @@ class EnhancedVotingSystem:
         self.min_timeline_days = 7  # 1 week minimum
 
     def calculate_voting_power(
-        self, address: str, ai_donation_history: Dict
+        self, address: str, ai_donation_history: dict
     ) -> tuple[float, float, float]:
         """
         Calculate combined voting power from coins + donations
@@ -161,8 +161,8 @@ class EnhancedVotingSystem:
         proposal_id: str,
         voter_address: str,
         vote: str,  # 'for', 'against', 'abstain'
-        ai_donation_history: Dict,
-    ) -> Dict:
+        ai_donation_history: dict,
+    ) -> dict:
         """
         Submit vote with combined coin + donation power
         """
@@ -263,7 +263,7 @@ class EnhancedVotingSystem:
             f"({coin_power:.2f} from coins + {donation_power:.2f} from donations)",
         }
 
-    def verify_voter_still_holds_coins(self, proposal_id: str, voter_address: str) -> Dict:
+    def verify_voter_still_holds_coins(self, proposal_id: str, voter_address: str) -> dict:
         """
         Verify voter still holds coins from when they voted
 
@@ -329,7 +329,7 @@ class EnhancedVotingSystem:
             "message": "Vote still valid - voter holds coins",
         }
 
-    def verify_all_votes_for_proposal(self, proposal_id: str) -> Dict:
+    def verify_all_votes_for_proposal(self, proposal_id: str) -> dict:
         """
         Verify ALL voters for a proposal still hold their coins
 
@@ -449,7 +449,7 @@ class EnhancedVotingSystem:
 
         return timeline
 
-    def checkpoint_vote(self, proposal_id: str, checkpoint: VoteCheckpoint) -> Dict:
+    def checkpoint_vote(self, proposal_id: str, checkpoint: VoteCheckpoint) -> dict:
         """
         Run verification + re-vote at checkpoint
 
@@ -490,7 +490,7 @@ class EnhancedVotingSystem:
             f"({approval_rate*100:.1f}% approval)",
         }
 
-    def get_voter_power_breakdown(self, address: str, ai_donation_history: Dict) -> Dict:
+    def get_voter_power_breakdown(self, address: str, ai_donation_history: dict) -> dict:
         """
         Show user how their voting power is calculated
         Helps them understand the benefit of holding + donating

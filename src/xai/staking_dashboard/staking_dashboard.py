@@ -14,7 +14,7 @@ from decimal import Decimal
 from typing import Any
 
 import requests
-from flask import Flask, jsonify, render_template_string, request
+from flask import Flask, Response, jsonify, render_template_string, request
 
 logger = logging.getLogger(__name__)
 
@@ -1049,7 +1049,7 @@ def api_validators():
 
 
 @app.route("/api/staking/delegations/<address>")
-def api_delegations(address: str):
+def api_delegations(address: str) -> Response:
     """Get user's delegations."""
     user_info = get_user_staking_info(address)
     return jsonify({
@@ -1060,7 +1060,7 @@ def api_delegations(address: str):
 
 
 @app.route("/api/staking/rewards/<address>")
-def api_rewards(address: str):
+def api_rewards(address: str) -> Response:
     """Get user's pending rewards."""
     user_info = get_user_staking_info(address)
     return jsonify({

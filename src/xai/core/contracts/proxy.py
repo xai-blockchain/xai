@@ -279,7 +279,7 @@ class TransparentProxy:
         """Get current version."""
         return self.version
 
-    def get_upgrade_history(self) -> list[Dict]:
+    def get_upgrade_history(self) -> list[dict]:
         """Get upgrade history."""
         return [
             {

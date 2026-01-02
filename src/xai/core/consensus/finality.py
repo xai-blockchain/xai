@@ -14,6 +14,7 @@ import math
 import os
 import threading
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Callable
 

@@ -61,7 +61,7 @@ class ConversationContext:
     Allows seamless continuation even when switching API keys
     """
 
-    messages: list[Dict]  # Full conversation history
+    messages: list[dict]  # Full conversation history
     system_prompt: str | None = None
     temperature: float = 1.0
     model: str = "claude-sonnet-4-20250514"
@@ -70,7 +70,7 @@ class ConversationContext:
         """Add message to conversation"""
         self.messages.append({"role": role, "content": content})
 
-    def get_context_for_continuation(self) -> list[Dict]:
+    def get_context_for_continuation(self) -> list[dict]:
         """Get full context for resuming after key swap"""
         return self.messages.copy()
 
@@ -104,7 +104,7 @@ class AutoSwitchingAIExecutor:
         self.key_manager = key_manager
 
         # Active task tracking
-        self.active_tasks: dict[str, Dict] = {}
+        self.active_tasks: dict[str, dict] = {}
 
         # Key swap history
         self.swap_events: list[KeySwapEvent] = []
@@ -141,7 +141,7 @@ class AutoSwitchingAIExecutor:
         provider,  # AIProvider enum
         max_total_tokens: int = 500000,  # Total budget for entire task
         streaming: bool = True,
-    ) -> Dict:
+    ) -> dict:
         """
         Execute potentially long-running AI task with automatic key switching
 
@@ -240,10 +240,10 @@ class AutoSwitchingAIExecutor:
         context: ConversationContext,
         current_key_id: str,
         current_api_key: str,
-        key_metadata: Dict,
+        key_metadata: dict,
         provider,
         max_total_tokens: int,
-    ) -> Dict:
+    ) -> dict:
         """
         Execute with streaming support and automatic key switching
 
@@ -430,10 +430,10 @@ class AutoSwitchingAIExecutor:
         context: ConversationContext,
         current_key_id: str,
         current_api_key: str,
-        key_metadata: Dict,
+        key_metadata: dict,
         provider,
         max_total_tokens: int,
-    ) -> Dict:
+    ) -> dict:
         """
         Execute without streaming but with key switching capability
 
@@ -602,7 +602,7 @@ class AutoSwitchingAIExecutor:
 
     def _switch_to_next_key(
         self, task_id: str, old_key_id: str, provider, reason: str
-    ) -> tuple[str, str, Dict] | None:
+    ) -> tuple[str, str, dict] | None:
         """
         Switch to next available API key
 
@@ -647,7 +647,7 @@ class AutoSwitchingAIExecutor:
 
     def _get_next_available_key(
         self, provider, estimated_tokens: int
-    ) -> tuple[str, str, Dict] | None:
+    ) -> tuple[str, str, dict] | None:
         """
         Get next available API key from pool
 
@@ -685,7 +685,7 @@ class AutoSwitchingAIExecutor:
         continuation_prompts: list[str],
         provider,
         max_tokens_per_turn: int = 50000,
-    ) -> Dict:
+    ) -> dict:
         """
         Execute multi-turn conversation with automatic key switching
 

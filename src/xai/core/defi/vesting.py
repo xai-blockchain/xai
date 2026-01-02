@@ -323,7 +323,7 @@ class VestingSchedule:
         vested = self.get_vested_amount(at_time)
         return self.total_amount - vested
 
-    def get_vesting_info(self) -> Dict:
+    def get_vesting_info(self) -> dict:
         """Get comprehensive vesting information."""
         now = time.time()
         vested = self.get_vested_amount(now)
@@ -998,14 +998,14 @@ class VestingVault:
 
     # ==================== View Functions ====================
 
-    def get_schedule(self, schedule_id: str) -> Dict | None:
+    def get_schedule(self, schedule_id: str) -> dict | None:
         """Get schedule details."""
         schedule = self.schedules.get(schedule_id)
         if not schedule:
             return None
         return schedule.get_vesting_info()
 
-    def get_beneficiary_schedules(self, beneficiary: str) -> list[Dict]:
+    def get_beneficiary_schedules(self, beneficiary: str) -> list[dict]:
         """Get all schedules for a beneficiary."""
         schedule_ids = self.beneficiary_schedules.get(beneficiary, [])
         return [
@@ -1024,7 +1024,7 @@ class VestingVault:
                 total += schedule.get_claimable_amount()
         return total
 
-    def get_vault_stats(self) -> Dict:
+    def get_vault_stats(self) -> dict:
         """Get vault statistics."""
         return {
             "total_locked": self.total_locked,
@@ -1053,7 +1053,7 @@ class VestingVault:
 
     # ==================== Serialization ====================
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Serialize vault state."""
         return {
             "name": self.name,

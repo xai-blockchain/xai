@@ -289,7 +289,7 @@ class EVMStorage:
         Export storage as dictionary for serialization.
 
         Returns:
-            Dict mapping hex keys to values
+            dict mapping hex keys to values
         """
         return {
             f"0x{key:064x}": slot.current
@@ -304,7 +304,7 @@ class EVMStorage:
 
         Args:
             address: Contract address
-            data: Dict mapping hex keys to values
+            data: dict mapping hex keys to values
 
         Returns:
             EVMStorage instance

@@ -27,7 +27,7 @@ def register_peer_routes(routes: "NodeAPIRoutes") -> None:
             verbose (str, optional): Set to "true", "1", "yes", or "on" for detailed info
 
         Returns:
-            Dict containing:
+            dict containing:
                 - count (int): Number of connected peers
                 - peers (list): List of peer URLs
                 - verbose (bool): Whether verbose mode was requested
@@ -95,7 +95,7 @@ def register_peer_routes(routes: "NodeAPIRoutes") -> None:
         This endpoint requires API authentication.
 
         Returns:
-            Dict containing:
+            dict containing:
                 - synced (bool): Whether sync operation completed successfully
                 - chain_length (int): Current blockchain length after sync
 

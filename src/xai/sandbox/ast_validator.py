@@ -103,7 +103,7 @@ class ASTValidator:
         'List',          # [1, 2, 3]
         'Tuple',         # (1, 2, 3)
         'Set',           # {1, 2, 3}
-        'Dict',          # {a: b}
+        'dict',          # {a: b}
 
         # Comprehensions
         'ListComp',      # [x for x in ...]

@@ -63,7 +63,7 @@ class BreakerEvent:
     breaker_id: str
     event_type: str  # "triggered", "recovered", "manual_override"
     timestamp: float
-    details: Dict
+    details: dict
     actor: str = ""  # Who triggered (address or "system")
 
 @dataclass
@@ -164,7 +164,7 @@ class CircuitBreaker:
 
         return None
 
-    def trigger(self, actor: str = "system", details: Dict | None = None) -> None:
+    def trigger(self, actor: str = "system", details: dict | None = None) -> None:
         """Trigger the circuit breaker."""
         now = time.time()
 
@@ -224,7 +224,7 @@ class CircuitBreaker:
         self._recover(actor)
         return True
 
-    def get_recent_events(self, limit: int = 10) -> list[Dict]:
+    def get_recent_events(self, limit: int = 10) -> list[dict]:
         """Get recent breaker events."""
         return [
             {
@@ -434,7 +434,7 @@ class CircuitBreakerRegistry:
     pause_callbacks: dict[str, Callable] = field(default_factory=dict)
 
     # Audit log
-    audit_log: list[Dict] = field(default_factory=list)
+    audit_log: list[dict] = field(default_factory=list)
 
     # Access control with signature verification
     access_control: AccessControl = field(default_factory=AccessControl)
@@ -718,7 +718,7 @@ class CircuitBreakerRegistry:
         allowed, _ = self.check_target(target)
         return allowed
 
-    def get_triggered_breakers(self) -> list[Dict]:
+    def get_triggered_breakers(self) -> list[dict]:
         """Get all currently triggered breakers."""
         return [
             {
@@ -733,7 +733,7 @@ class CircuitBreakerRegistry:
             if b.status == BreakerStatus.TRIGGERED
         ]
 
-    def get_system_health(self) -> Dict:
+    def get_system_health(self) -> dict:
         """Get overall system health status."""
         triggered = [b for b in self.breakers.values() if b.status == BreakerStatus.TRIGGERED]
         cooling = [b for b in self.breakers.values() if b.status == BreakerStatus.COOLING_DOWN]
@@ -1080,7 +1080,7 @@ class CircuitBreakerRegistry:
 
     # ==================== Audit ====================
 
-    def _log_action(self, actor: str, action: str, details: Dict) -> None:
+    def _log_action(self, actor: str, action: str, details: dict) -> None:
         """Log an action to audit trail."""
         self.audit_log.append({
             "timestamp": time.time(),
@@ -1093,7 +1093,7 @@ class CircuitBreakerRegistry:
         if len(self.audit_log) > 1000:
             self.audit_log = self.audit_log[-1000:]
 
-    def get_audit_log(self, limit: int = 100) -> list[Dict]:
+    def get_audit_log(self, limit: int = 100) -> list[dict]:
         """Get recent audit log entries."""
         return self.audit_log[-limit:]
 

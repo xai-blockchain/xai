@@ -1079,7 +1079,7 @@ class StakingPool:
 
     # ==================== View Functions ====================
 
-    def get_validator_info(self, validator: str) -> Dict:
+    def get_validator_info(self, validator: str) -> dict:
         """Get validator information."""
         validator_norm = self._normalize(validator)
         self._require_validator(validator_norm)
@@ -1098,7 +1098,7 @@ class StakingPool:
             "slashing_events": val.slashing_events,
         }
 
-    def get_delegation_info(self, delegator: str, validator: str) -> Dict:
+    def get_delegation_info(self, delegator: str, validator: str) -> dict:
         """Get delegation information including accumulated rewards."""
         delegation = self._get_delegation(
             self._normalize(delegator),
@@ -1121,14 +1121,14 @@ class StakingPool:
             "accumulated_rewards": delegation.accumulated_rewards,
         }
 
-    def get_all_validators(self) -> list[Dict]:
+    def get_all_validators(self) -> list[dict]:
         """Get list of all validators."""
         return [
             self.get_validator_info(addr)
             for addr in self.validators.keys()
         ]
 
-    def get_staking_stats(self) -> Dict:
+    def get_staking_stats(self) -> dict:
         """Get overall staking statistics."""
         active_validators = sum(
             1 for v in self.validators.values()
@@ -1144,7 +1144,7 @@ class StakingPool:
             "unbonding_period": self.unbonding_period,
         }
 
-    def get_delegator_rewards(self, delegator: str) -> Dict:
+    def get_delegator_rewards(self, delegator: str) -> dict:
         """
         Get all pending rewards for a delegator across all validators.
 
@@ -1152,7 +1152,7 @@ class StakingPool:
             delegator: Delegator address
 
         Returns:
-            Dict with total rewards and per-validator breakdown
+            dict with total rewards and per-validator breakdown
         """
         delegator_norm = self._normalize(delegator)
 
@@ -1236,7 +1236,7 @@ class StakingPool:
 
     # ==================== Serialization ====================
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Serialize staking pool state."""
         return {
             "name": self.name,

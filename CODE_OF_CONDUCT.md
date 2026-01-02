@@ -54,12 +54,12 @@ As a blockchain project, we hold ourselves to additional standards:
 
 ### Prohibited Conduct
 
-- **No scam promotion**: Do not promote scams, rug pulls, pump-and-dump schemes,
-  or any fraudulent financial activity
-- **No financial advice**: Do not provide investment, financial, tax, or legal
-  advice; always recommend consulting qualified professionals
-- **No token shilling**: Do not promote tokens, NFTs, or investments for
-  personal gain within community spaces
+- **No scam promotion**: Do not promote scams, rug pulls, or other fraudulent
+  market manipulation schemes
+- **No financial advice**: Do not provide financial, tax, or legal advice;
+  recommend consulting qualified professionals
+- **No token shilling**: Do not promote tokens, NFTs, or personal financial
+  interests within community spaces
 - **No false claims**: Do not make false or misleading claims about the project,
   its technology, partnerships, or capabilities
 - **No market manipulation**: Do not coordinate or encourage market manipulation
@@ -161,14 +161,14 @@ When reporting, please include:
 ### Response Process
 
 1. **Acknowledgment**: Reports will be acknowledged within 48 hours
-2. **Investigation**: The report will be reviewed and investigated fairly
+2. **Review**: The report will be reviewed fairly
 3. **Decision**: Appropriate action will be determined based on the guidelines below
 4. **Communication**: The reporter and involved parties will be informed of the outcome
 5. **Follow-up**: The situation will be monitored to ensure compliance and safety
 
 All community leaders are obligated to respect the privacy and security of the
 reporter of any incident. We will maintain confidentiality to the extent possible
-while conducting a fair investigation.
+while conducting a fair review.
 
 ## Addressing & Repairing Harm
 
@@ -266,7 +266,7 @@ For answers to common questions about this code of conduct, see the FAQ at
 
 ---
 
-**Last Updated**: January 2026
+**Last Updated**: 2026-01-01
 
 Thank you for helping make the XAI community welcoming, inclusive, and safe
 for everyone.

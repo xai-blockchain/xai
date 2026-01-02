@@ -1,36 +1,7 @@
 XAI Blockchain
-Copyright 2024-2025 Aequitas Foundation
-
-This product includes software developed by the Aequitas Foundation
-(https://xaiblockchain.org).
+Copyright 2024-2026 XAI contributors
 
 Licensed under the Apache License, Version 2.0.
 
---------------------------------------------------------------------------------
-
-XAI is an AI-native blockchain platform featuring Proof of Intelligence
-consensus, multi-chain interoperability, and advanced AI governance
-capabilities.
-
-Project Maintainer: Jeff DeCristofaro <info@xaiblockchain.org>
-
---------------------------------------------------------------------------------
-
-Third-Party Components:
-
-This software includes the following third-party components:
-
-- Flask (https://flask.palletsprojects.com/)
-  Licensed under the BSD 3-Clause License
-
-- Click (https://click.palletsprojects.com/)
-  Licensed under the BSD 3-Clause License
-
-- Web3.py (https://web3py.readthedocs.io/)
-  Licensed under the MIT License
-
-- Pydantic (https://pydantic-docs.helpmanual.io/)
-  Licensed under the MIT License
-
-For complete license information for all dependencies, see the LICENSE
-files in the .venv/ directory or the pyproject.toml file.
+This product includes software developed by the XAI contributors and other open-source projects.
+See LICENSE for terms and dependency licenses for third-party notices.

@@ -75,7 +75,7 @@ class AuditLogEntry:
     success: bool
     details: dict[str, Any]
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return asdict(self)
 
 @dataclass
@@ -631,7 +631,7 @@ class HardwareSecurityModule:
             raise ValueError(f"Key {key_id} not found")
         return metadata.public_key_pem
 
-    def list_keys(self, active_only: bool = True) -> list[Dict]:
+    def list_keys(self, active_only: bool = True) -> list[dict]:
         """List all keys with metadata"""
         keys = []
         for metadata in self.key_metadata.values():
@@ -749,7 +749,7 @@ class HardwareSecurityModule:
 
         return valid_count >= threshold
 
-    def get_audit_logs(self, limit: int = 100) -> list[Dict]:
+    def get_audit_logs(self, limit: int = 100) -> list[dict]:
         """Retrieve recent audit log entries"""
         logs = []
         if not self.audit_log_file.exists():

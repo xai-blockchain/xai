@@ -123,13 +123,13 @@ class SwapStateMachine:
         os.makedirs(storage_dir, exist_ok=True)
 
         # In-memory swap state tracking
-        self.swaps: dict[str, Dict] = {}
+        self.swaps: dict[str, dict] = {}
         self.lock = threading.RLock()
 
         # Load existing swaps from storage
         self._load_swaps()
 
-    def create_swap(self, swap_id: str, swap_data: Dict) -> bool:
+    def create_swap(self, swap_id: str, swap_data: dict) -> bool:
         """
         Create a new swap in INITIATED state
 
@@ -162,7 +162,7 @@ class SwapStateMachine:
             return True
 
     def transition(
-        self, swap_id: str, new_state: SwapState, event: SwapEvent, data: Dict | None = None
+        self, swap_id: str, new_state: SwapState, event: SwapEvent, data: dict | None = None
     ) -> tuple[bool, str]:
         """
         Transition a swap to a new state
@@ -213,7 +213,7 @@ class SwapStateMachine:
 
             return True, f"Transitioned to {new_state.value}"
 
-    def get_swap(self, swap_id: str) -> Dict | None:
+    def get_swap(self, swap_id: str) -> dict | None:
         """Get swap data by ID"""
         with self.lock:
             return self.swaps.get(swap_id)
@@ -236,7 +236,7 @@ class SwapStateMachine:
             SwapState.EXPIRED,
         ]
 
-    def get_active_swaps(self) -> dict[str, Dict]:
+    def get_active_swaps(self) -> dict[str, dict]:
         """Get all non-terminal swaps"""
         with self.lock:
             return {
@@ -245,7 +245,7 @@ class SwapStateMachine:
                 if not self.is_terminal_state(swap_id)
             }
 
-    def iter_swaps(self) -> list[tuple[str, Dict]]:
+    def iter_swaps(self) -> list[tuple[str, dict]]:
         """Return list of (swap_id, swap_data) for all swaps."""
         with self.lock:
             return list(self.swaps.items())
@@ -404,7 +404,7 @@ class SwapStateMachine:
                 exc_info=True
             )
 
-    def get_swap_history(self, swap_id: str) -> list[Dict]:
+    def get_swap_history(self, swap_id: str) -> list[dict]:
         """Get complete history of state transitions for a swap"""
         with self.lock:
             swap = self.swaps.get(swap_id)
@@ -427,7 +427,7 @@ class AtomicSwapHTLC:
         timelock_hours: int = 24,
         secret_bytes: bytes | None = None,
         deployment_config: dict[str, Any] | None = None,
-    ) -> Dict:
+    ) -> dict:
         """
         Create a new atomic swap contract
 
@@ -498,7 +498,7 @@ class AtomicSwapHTLC:
         recipient: str,
         amount: float,
         deployment_config: dict[str, Any] | None = None,
-    ) -> Dict:
+    ) -> dict:
         """
         Create HTLC for UTXO-based coins
         (BTC, LTC, DOGE, BCH, ZEC, DASH)
@@ -651,7 +651,7 @@ class AtomicSwapHTLC:
         recipient: str,
         amount: float,
         deployment_config: dict[str, Any] | None = None,
-    ) -> Dict:
+    ) -> dict:
         """
         Create HTLC for Ethereum-based tokens
         (ETH, USDT, USDC, DAI)
@@ -765,7 +765,7 @@ class AtomicSwapHTLC:
         recipient: str,
         amount: float,
         deployment_config: dict[str, Any] | None = None,
-    ) -> Dict:
+    ) -> dict:
         """
         Create HTLC for Monero (XMR)
 
@@ -846,7 +846,7 @@ class AtomicSwapHTLC:
         return current[::-1].hex()
 
     def verify_swap_claim(
-        self, secret: str, secret_hash: str, contract_data: Dict
+        self, secret: str, secret_hash: str, contract_data: dict
     ) -> tuple[bool, str]:
         """
         Verify that counterparty can claim their side of swap
@@ -873,8 +873,8 @@ class AtomicSwapHTLC:
         return True, "Valid claim - swap can proceed"
 
     def claim_swap(
-        self, secret: str, contract_data: Dict
-    ) -> tuple[bool, str, Dict | None]:
+        self, secret: str, contract_data: dict
+    ) -> tuple[bool, str, dict | None]:
         """
         Claim the counterparty's funds by revealing the secret
 
@@ -907,7 +907,7 @@ class AtomicSwapHTLC:
 
         return True, "Swap claimed successfully", claim_tx
 
-    def refund_swap(self, contract_data: Dict) -> tuple[bool, str, Dict | None]:
+    def refund_swap(self, contract_data: dict) -> tuple[bool, str, dict | None]:
         """
         Refund the swap after timelock expires
 
@@ -942,7 +942,7 @@ class AtomicSwapHTLC:
 
         return True, "Swap refunded successfully", refund_tx
 
-    def verify_refund_eligibility(self, contract_data: Dict) -> tuple[bool, str]:
+    def verify_refund_eligibility(self, contract_data: dict) -> tuple[bool, str]:
         """
         Verify if a swap is eligible for refund
 
@@ -969,7 +969,7 @@ class AtomicSwapHTLC:
 
         return True, "Eligible for refund"
 
-    def get_supported_coins(self) -> Dict:
+    def get_supported_coins(self) -> dict:
         """Get all supported coins"""
 
         return {
@@ -998,7 +998,7 @@ class CrossChainVerifier:
 
     def __init__(self, session: requests.Session | None = None, header_store: Any | None = None):
         """Initialize cross-chain verifier"""
-        self.verified_transactions: dict[str, Dict] = {}
+        self.verified_transactions: dict[str, dict] = {}
         self.lock = threading.RLock()
         self.session = session or requests.Session()
         self.session.headers.update({"User-Agent": "xai-atomic-swap-verifier/1.0"})
@@ -1085,7 +1085,7 @@ class CrossChainVerifier:
         coin_type: str,
         tx_hash: str,
         merkle_proof: list[str],
-        block_header: Dict,
+        block_header: dict,
         tx_index: int = 0,
     ) -> tuple[bool, str]:
         """
@@ -1130,7 +1130,7 @@ class CrossChainVerifier:
         *,
         min_confirmations: int = 1,
         amount_tolerance: Decimal = Decimal("0.00000001"),
-    ) -> tuple[bool, str, Dict | None]:
+    ) -> tuple[bool, str, dict | None]:
         """
         Verify a transaction on an external blockchain using oracle/API
 
@@ -1237,7 +1237,7 @@ class CrossChainVerifier:
         self,
         coin_type: str,
         tx_hash: str,
-    ) -> tuple[bool, str, Dict | None]:
+    ) -> tuple[bool, str, dict | None]:
         """
         Fetch merkle proof + block header from external APIs and verify SPV inclusion.
         """
@@ -1688,7 +1688,7 @@ class CrossChainVerifier:
 
     def create_spv_proof(
         self, coin_type: str, tx_hash: str, block_hash: str
-    ) -> Dict | None:
+    ) -> dict | None:
         """
         Create an SPV proof for a transaction (for the counterparty to verify)
 
@@ -1718,7 +1718,7 @@ class CrossChainVerifier:
             "position": 5,  # Position in block
         }
 
-    def verify_oracle_signature(self, oracle_data: Dict, signature: str) -> bool:
+    def verify_oracle_signature(self, oracle_data: dict, signature: str) -> bool:
         """
         Verify oracle data signature for trusted third-party verification
 
@@ -1733,7 +1733,7 @@ class CrossChainVerifier:
         # For now, basic validation
         return len(signature) == 128  # Simulate signature validation
 
-    def get_verification_status(self, coin_type: str, tx_hash: str) -> Dict | None:
+    def get_verification_status(self, coin_type: str, tx_hash: str) -> dict | None:
         """
         Get the verification status of a transaction
 
@@ -1991,7 +1991,7 @@ class MeshDEXPairManager:
     def __init__(self):
         self.supported_pairs = self._initialize_pairs()
 
-    def _initialize_pairs(self) -> Dict:
+    def _initialize_pairs(self) -> dict:
         """Initialize trading pairs"""
 
         pairs = {}
@@ -2035,7 +2035,7 @@ class MeshDEXPairManager:
 
     def create_swap(
         self, pair: str, axn_amount: float, other_amount: float, counterparty: str
-    ) -> Dict:
+    ) -> dict:
         """
         Create atomic swap for any of the 11 pairs
 
@@ -2072,7 +2072,7 @@ class MeshDEXPairManager:
 
         return swap
 
-    def get_all_pairs(self) -> Dict:
+    def get_all_pairs(self) -> dict:
         """Get information about all 11 trading pairs"""
 
         result = {}

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 """
-AI Tasks API endpoints - Revolutionary AI-blockchain explorer features
+AI tasks API endpoints.
 """
 from fastapi import APIRouter, Query, HTTPException, Depends
 
@@ -25,8 +25,7 @@ async def get_ai_tasks(
     limit: int = Query(20, ge=1, le=100)
 ):
     """
-    Get list of AI tasks with filtering and pagination
-    Revolutionary feature: First blockchain explorer to show AI compute jobs!
+    Get list of AI tasks with filtering and pagination.
     """
     try:
         # In production, this queries the database
@@ -123,8 +122,7 @@ async def get_ai_task_detail(task_id: str):
 @router.get("/models")
 async def get_ai_models():
     """
-    Get AI model statistics and performance comparison
-    Revolutionary: Compare Claude vs GPT-4 vs Gemini on real usage data
+    Get AI model statistics and performance comparison.
     """
     try:
         async with httpx.AsyncClient() as client:

@@ -59,12 +59,12 @@ class ProofOfIntelligence:
         self.max_solves_per_hour = 10
 
         # Challenge tracking
-        self.active_challenges: dict[str, Dict] = {}
+        self.active_challenges: dict[str, dict] = {}
         self.challenge_types_used: list[ChallengeType] = []
 
         logger.info(f"PoI initialized with difficulty={difficulty}, target={target_solve_time}s")
 
-    def generate_ai_task(self, difficulty: int | None = None, challenge_type: ChallengeType | None = None) -> Dict:
+    def generate_ai_task(self, difficulty: int | None = None, challenge_type: ChallengeType | None = None) -> dict:
         """
         Generates an AI challenge task with specified difficulty and type
 
@@ -137,7 +137,7 @@ class ProofOfIntelligence:
 
         return True, None
 
-    def simulate_ai_computation(self, task: Dict, miner_address: str) -> Dict | None:
+    def simulate_ai_computation(self, task: dict, miner_address: str) -> dict | None:
         """
         Simulates the process of solving the AI task
 
@@ -244,7 +244,7 @@ class ProofOfIntelligence:
         # Reset solve times after adjustment
         self.solve_times = self.solve_times[-10:]  # Keep last 10 for reference
 
-    def validate_proof(self, proof: Dict, task: Dict) -> bool:
+    def validate_proof(self, proof: dict, task: dict) -> bool:
         """
         Validates the proof provided by a miner
 
@@ -281,7 +281,7 @@ class ProofOfIntelligence:
 
         return is_valid
 
-    def get_statistics(self) -> Dict:
+    def get_statistics(self) -> dict:
         """Get mining statistics"""
         return {
             "current_difficulty": self.difficulty,

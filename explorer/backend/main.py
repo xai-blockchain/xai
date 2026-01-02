@@ -121,7 +121,7 @@ async def root():
     return {
         "name": "XAI Blockchain Explorer API",
         "version": "1.0.0",
-        "description": "Revolutionary AI-blockchain explorer",
+        "description": "AI task explorer and blockchain analytics",
         "features": {
             "blockchain": ["blocks", "transactions", "addresses", "search"],
             "ai": [

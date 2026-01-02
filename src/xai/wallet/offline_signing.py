@@ -70,7 +70,7 @@ def signing_preview(tx: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
     Returns:
         payload_str: Canonical JSON string with stable ordering
         tx_hash: Transaction hash to be signed (hex)
-        canonical_payload: Dict suitable for persistence/logging
+        canonical_payload: dict suitable for persistence/logging
     """
     tx_obj, canonical_payload = _build_transaction(tx)
     payload_str = json.dumps(canonical_payload, sort_keys=True, separators=(",", ":"))
