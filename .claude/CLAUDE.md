@@ -20,15 +20,13 @@ wrangler r2 object delete xai-testnet-artifacts/<path> --remote
 
 ## Testnet Server
 
-SSH key for testnet is stored at `.ssh_testnet_key` in repo root.
+Use the pre-configured SSH alias:
 
 ```bash
-# Connect to XAI testnet
-ssh -i /home/hudson/blockchain-projects/xai/.ssh_testnet_key ubuntu@54.39.129.11
-
-# Or if ~/.ssh/config is set up:
-ssh xai-testnet
+ssh xai-testnet  # 54.39.129.11
 ```
+
+The SSH config is in `~/.ssh/config`. Never store SSH keys in repositories.
 
 ## Chain Info
 - Type: Python blockchain

@@ -87,6 +87,8 @@ Thumbs.db
 *.pem
 *.key
 *.crt
+.ssh_testnet_key
+.ssh_*_key
 *.p12
 *.pfx
 *_secret.txt
