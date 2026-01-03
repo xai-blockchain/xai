@@ -6,13 +6,13 @@ Python-based proof-of-work blockchain implementation with a UTXO transaction mod
 
 See `docs/QUICKSTART.md` for a local node and wallet flow.
 
-## Public Testnet
+## Devnet
 
-To join the XAI public testnet, see the [testnets repository](https://github.com/xai-blockchain/testnets) for configuration and network details.
+To join the XAI devnet, see the [networks repository](https://github.com/xai-blockchain/testnets) for configuration and network details.
 
 | Network | Chain ID | Status |
 |---------|----------|--------|
-| [xai-testnet-1](https://github.com/xai-blockchain/testnets/tree/main/xai-testnet-1) | `testnet` | Active |
+| [xai-testnet-1](https://github.com/xai-blockchain/testnets/tree/main/xai-testnet-1) | `testnet` | Devnet |
 
 **Quick join:**
 1. Clone and install: `git clone https://github.com/xai-blockchain/xai && cd xai && pip install .`
