@@ -1,3 +1,6 @@
+# Claude Code
+.claude/
+
 # Virtual environments
 .venv/
 venv/
@@ -130,3 +133,11 @@ coverage.xml
 # Profile data
 *.prof
 *.pstat
+
+# Internal infrastructure docs (not for public release)
+TESTNET_VERIFICATION_REPORT.md
+ROADMAP_PRODUCTION.md
+docs/INCIDENT_RESPONSE_RUNBOOK.md
+
+# Kubernetes secrets with rotated keys
+k8s/validator-keys-rotated.yaml
