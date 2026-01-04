@@ -92,6 +92,7 @@ class BlockchainNode:
         host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
         miner_address: str | None = None,
+        mining_enabled: bool | None = None,
         **kwargs,
     ) -> None:
         """
@@ -102,12 +103,28 @@ class BlockchainNode:
             host: Host address to bind to
             port: Port number to listen on
             miner_address: Address to receive mining rewards
+            mining_enabled: Whether to enable mining. If None, determined by:
+                           1. XAI_MINING_ENABLED env var (if set)
+                           2. Whether --miner address is provided (legacy behavior)
         """
         # Core configuration
         self.blockchain = blockchain if blockchain is not None else Blockchain()
         self.host = host
         self.port = port
         self.miner_address = miner_address or DEFAULT_MINER_ADDRESS
+
+        # Determine mining mode (explicit param > env var > legacy behavior)
+        if mining_enabled is not None:
+            self.mining_enabled = mining_enabled
+        else:
+            env_mining = os.getenv("XAI_MINING_ENABLED", "").lower()
+            if env_mining in ("0", "false", "no", "off"):
+                self.mining_enabled = False
+            elif env_mining in ("1", "true", "yes", "on"):
+                self.mining_enabled = True
+            else:
+                # Legacy: mine if miner address was explicitly provided
+                self.mining_enabled = miner_address is not None
 
         # Node state
         self.start_time: float = 0.0
@@ -904,8 +921,18 @@ class BlockchainNode:
             else:
                 logger.info("Partial sync skipped or unavailable", extra={"event": "node.partial_sync_skipped"})
 
-        # Start auto-mining by default
-        self.start_mining()
+        # Start mining only if enabled
+        if self.mining_enabled:
+            logger.info(
+                "Mining enabled, starting miner",
+                extra={"event": "node.mining_enabled", "miner_address": self.miner_address},
+            )
+            self.start_mining()
+        else:
+            logger.info(
+                "Mining disabled, running as validator/sync node only",
+                extra={"event": "node.mining_disabled"},
+            )
 
         # Run Flask app in a separate thread
         flask_thread = threading.Thread(
@@ -947,8 +974,19 @@ async def main_async() -> None:
     parser.add_argument("--miner", help="Miner wallet address")
     parser.add_argument("--data-dir", default=os.getenv("XAI_DATA_DIR", "data"), help="Directory to persist blockchain state")
     parser.add_argument("--peers", nargs="+", help="Peer node URLs")
+    parser.add_argument(
+        "--no-mining",
+        action="store_true",
+        default=False,
+        help="Disable mining (run as validator/sync node only)",
+    )
 
     args = parser.parse_args()
+
+    # Determine mining_enabled: --no-mining flag takes precedence
+    mining_enabled = None  # Let BlockchainNode determine from env/miner
+    if args.no_mining:
+        mining_enabled = False
 
     blockchain = Blockchain(data_dir=args.data_dir)
     node = BlockchainNode(
@@ -957,6 +995,7 @@ async def main_async() -> None:
         port=args.port,
         p2p_port=args.p2p_port,
         miner_address=args.miner,
+        mining_enabled=mining_enabled,
     )
 
     if args.peers:
