@@ -9,6 +9,7 @@ from typing import Any, Dict, Tuple
 import requests
 from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
+from flasgger import Swagger
 
 try:
     from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
@@ -21,6 +22,49 @@ logger = logging.getLogger("xai-explorer")
 
 app = Flask(__name__)
 CORS(app)
+
+# Swagger/OpenAPI Configuration
+swagger_config = {
+    "headers": [],
+    "specs": [
+        {
+            "endpoint": 'apispec',
+            "route": '/apispec.json',
+            "rule_filter": lambda rule: True,
+            "model_filter": lambda tag: True,
+        }
+    ],
+    "static_url_path": "/flasgger_static",
+    "swagger_ui": True,
+    "specs_route": "/api/docs"
+}
+
+swagger_template = {
+    "info": {
+        "title": "XAI Blockchain Explorer API",
+        "description": "API for exploring the XAI AI-powered blockchain - blocks, transactions, addresses, AI tasks, models, and providers",
+        "version": "1.0.0",
+        "contact": {
+            "name": "XAI Blockchain",
+            "url": "https://xaiblockchain.com"
+        }
+    },
+    "host": "explorer.xaiblockchain.com",
+    "basePath": "/",
+    "schemes": ["https", "http"],
+    "tags": [
+        {"name": "Health", "description": "Health check endpoints"},
+        {"name": "Blocks", "description": "Block data endpoints"},
+        {"name": "Transactions", "description": "Transaction endpoints"},
+        {"name": "Addresses", "description": "Address/account endpoints"},
+        {"name": "Search", "description": "Search endpoints"},
+        {"name": "Network", "description": "Network statistics endpoints"},
+        {"name": "AI", "description": "AI task and model endpoints"},
+        {"name": "Providers", "description": "Compute provider endpoints"}
+    ]
+}
+
+swagger = Swagger(app, config=swagger_config, template=swagger_template)
 
 NODE_URL = os.getenv("XAI_NODE_URL", "http://localhost:8545").rstrip("/")
 CHAIN_NAME = os.getenv("XAI_CHAIN_NAME", "xai-testnet")
@@ -39,6 +83,41 @@ def fetch_json(path: str, params=None) -> Tuple[Dict[str, Any] | None, str | Non
 
 @app.route("/health")
 def health():
+    """
+    Health check endpoint
+    ---
+    tags:
+      - Health
+    responses:
+      200:
+        description: Node is healthy and reachable
+        schema:
+          type: object
+          properties:
+            chain:
+              type: string
+              example: xai-testnet
+            node:
+              type: object
+              properties:
+                reachable:
+                  type: boolean
+                url:
+                  type: string
+            status:
+              type: string
+              enum: [healthy, degraded]
+            timestamp:
+              type: number
+              description: Unix timestamp
+            version:
+              type: string
+            error:
+              type: string
+              nullable: true
+      503:
+        description: Node is degraded or unreachable
+    """
     data, error = fetch_json("/stats")
     healthy = data is not None
     status = "healthy" if healthy else "degraded"
@@ -54,6 +133,43 @@ def health():
 
 @app.route("/api/stats")
 def api_stats():
+    """
+    Get blockchain statistics
+    ---
+    tags:
+      - Network
+    responses:
+      200:
+        description: Current blockchain statistics
+        schema:
+          type: object
+          properties:
+            chain_height:
+              type: integer
+              description: Current block height
+            total_circulating_supply:
+              type: number
+              description: Total XAI in circulation
+            difficulty:
+              type: number
+            is_mining:
+              type: boolean
+            peers:
+              type: integer
+            node_uptime:
+              type: number
+            latest_block_hash:
+              type: string
+            miner_address:
+              type: string
+      503:
+        description: Node unreachable
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    """
     data, error = fetch_json("/stats")
     if data is None:
         return jsonify({"error": error or "Node unreachable"}), 503
@@ -61,9 +177,103 @@ def api_stats():
 
 
 @app.route("/api/blocks")
+def api_blocks_list():
+    """
+    Get latest blocks
+    ---
+    tags:
+      - Blocks
+    parameters:
+      - name: limit
+        in: query
+        type: integer
+        default: 20
+        description: Number of blocks to return
+      - name: offset
+        in: query
+        type: integer
+        default: 0
+        description: Number of blocks to skip
+    responses:
+      200:
+        description: List of recent blocks
+        schema:
+          type: object
+          properties:
+            blocks:
+              type: array
+              items:
+                type: object
+                properties:
+                  index:
+                    type: integer
+                  hash:
+                    type: string
+                  previous_hash:
+                    type: string
+                  timestamp:
+                    type: number
+                  transaction_count:
+                    type: integer
+            total:
+              type: integer
+      503:
+        description: Node unreachable
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+    """
+    data, error = fetch_json("/blocks", params=request.args or None)
+    if data is None:
+        return jsonify({"error": error or "Node unreachable"}), 503
+    return jsonify(data)
+
+
 @app.route("/api/blocks/<block_id>")
-def api_blocks(block_id: str | None = None):
-    path = f"/blocks/{block_id}" if block_id is not None else "/blocks"
+def api_blocks(block_id: str):
+    """
+    Get block by ID or hash
+    ---
+    tags:
+      - Blocks
+    parameters:
+      - name: block_id
+        in: path
+        type: string
+        required: true
+        description: Block number or block hash
+    responses:
+      200:
+        description: Block details
+        schema:
+          type: object
+          properties:
+            index:
+              type: integer
+            hash:
+              type: string
+            previous_hash:
+              type: string
+            timestamp:
+              type: number
+            transactions:
+              type: array
+              items:
+                type: object
+            miner:
+              type: string
+            difficulty:
+              type: number
+            nonce:
+              type: integer
+      404:
+        description: Block not found
+      503:
+        description: Node unreachable
+    """
+    path = f"/blocks/{block_id}"
     data, error = fetch_json(path, params=request.args or None)
     if data is None:
         return jsonify({"error": error or "Node unreachable"}), 503
@@ -72,6 +282,54 @@ def api_blocks(block_id: str | None = None):
 
 @app.route("/api/transactions")
 def api_transactions():
+    """
+    Get recent transactions
+    ---
+    tags:
+      - Transactions
+    parameters:
+      - name: limit
+        in: query
+        type: integer
+        default: 20
+        description: Number of transactions to return
+      - name: offset
+        in: query
+        type: integer
+        default: 0
+        description: Number of transactions to skip
+    responses:
+      200:
+        description: List of recent transactions
+        schema:
+          type: object
+          properties:
+            transactions:
+              type: array
+              items:
+                type: object
+                properties:
+                  txid:
+                    type: string
+                  block_index:
+                    type: integer
+                  timestamp:
+                    type: number
+                  tx_type:
+                    type: string
+                  sender:
+                    type: string
+                  recipient:
+                    type: string
+                  amount:
+                    type: number
+                  fee:
+                    type: number
+            count:
+              type: integer
+      503:
+        description: Node unreachable
+    """
     data, error = fetch_json("/transactions", params=request.args or None)
     if data is None:
         return jsonify({"error": error or "Node unreachable"}), 503
@@ -80,6 +338,49 @@ def api_transactions():
 
 @app.route("/api/transaction/<txid>")
 def api_transaction(txid: str):
+    """
+    Get transaction by ID
+    ---
+    tags:
+      - Transactions
+    parameters:
+      - name: txid
+        in: path
+        type: string
+        required: true
+        description: Transaction hash (64 hex characters)
+    responses:
+      200:
+        description: Transaction details
+        schema:
+          type: object
+          properties:
+            txid:
+              type: string
+            block_index:
+              type: integer
+            timestamp:
+              type: number
+            tx_type:
+              type: string
+            sender:
+              type: string
+            recipient:
+              type: string
+            amount:
+              type: number
+            fee:
+              type: number
+            signature:
+              type: string
+            status:
+              type: string
+              enum: [pending, confirmed]
+      404:
+        description: Transaction not found
+      503:
+        description: Node unreachable
+    """
     data, error = fetch_json(f"/transaction/{txid}")
     if data is None:
         return jsonify({"error": error or "Node unreachable"}), 503
@@ -88,6 +389,19 @@ def api_transaction(txid: str):
 
 @app.route("/metrics")
 def metrics():
+    """
+    Prometheus metrics endpoint
+    ---
+    tags:
+      - Health
+    responses:
+      200:
+        description: Prometheus metrics in text format
+        content:
+          text/plain:
+            schema:
+              type: string
+    """
     if generate_latest is None:
         return Response("# metrics unavailable\n", mimetype=CONTENT_TYPE_LATEST)
     return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
@@ -99,7 +413,43 @@ def metrics():
 
 @app.route("/api/address/<address>")
 def api_address(address: str):
-    """Get address/account details including balance and transaction count."""
+    """
+    Get address details
+    ---
+    tags:
+      - Addresses
+    parameters:
+      - name: address
+        in: path
+        type: string
+        required: true
+        description: XAI wallet address (e.g., TXAI...)
+    responses:
+      200:
+        description: Address details with balance
+        schema:
+          type: object
+          properties:
+            address:
+              type: string
+            balance:
+              type: number
+              description: Current XAI balance
+            transaction_count:
+              type: integer
+            first_seen:
+              type: number
+              nullable: true
+              description: Unix timestamp of first transaction
+            last_seen:
+              type: number
+              nullable: true
+              description: Unix timestamp of most recent transaction
+      404:
+        description: Address not found
+      503:
+        description: Node unreachable
+    """
     balance_data, balance_err = fetch_json(f"/balance/{address}")
     history_data, history_err = fetch_json(f"/history/{address}", params={"limit": 1})
 
@@ -125,7 +475,69 @@ def api_address(address: str):
 
 @app.route("/api/address/<address>/transactions")
 def api_address_transactions(address: str):
-    """Get transaction history for an address with pagination."""
+    """
+    Get address transaction history
+    ---
+    tags:
+      - Addresses
+    parameters:
+      - name: address
+        in: path
+        type: string
+        required: true
+        description: XAI wallet address
+      - name: page
+        in: query
+        type: integer
+        default: 1
+        description: Page number for pagination
+      - name: limit
+        in: query
+        type: integer
+        default: 20
+        maximum: 100
+        description: Number of transactions per page (max 100)
+    responses:
+      200:
+        description: Paginated transaction history
+        schema:
+          type: object
+          properties:
+            address:
+              type: string
+            transactions:
+              type: array
+              items:
+                type: object
+                properties:
+                  txid:
+                    type: string
+                  block:
+                    type: integer
+                  timestamp:
+                    type: number
+                  type:
+                    type: string
+                  amount:
+                    type: number
+                  fee:
+                    type: number
+                  sender:
+                    type: string
+                  recipient:
+                    type: string
+                  status:
+                    type: string
+                    enum: [pending, confirmed]
+            page:
+              type: integer
+            limit:
+              type: integer
+            total:
+              type: integer
+      503:
+        description: Node unreachable
+    """
     page = request.args.get("page", 1, type=int)
     limit = request.args.get("limit", 20, type=int)
     limit = min(limit, 100)  # Cap at 100
@@ -160,7 +572,41 @@ def api_address_transactions(address: str):
 
 @app.route("/api/search", methods=["GET", "POST"])
 def api_search():
-    """Universal search - detect and route to block, transaction, or address."""
+    """
+    Universal search
+    ---
+    tags:
+      - Search
+    parameters:
+      - name: q
+        in: query
+        type: string
+        required: true
+        description: Search query - block number, transaction hash, or address
+    responses:
+      200:
+        description: Search result with detected type
+        schema:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [block, transaction, address, unknown]
+              description: Detected search type
+            query:
+              type: string
+            result:
+              type: object
+              nullable: true
+              description: Found entity data
+            error:
+              type: string
+              nullable: true
+      400:
+        description: Invalid or empty search query
+      404:
+        description: Entity not found
+    """
     if request.method == "POST":
         query = request.json.get("q", "") if request.is_json else request.form.get("q", "")
     else:
@@ -220,7 +666,39 @@ def api_search():
 
 @app.route("/api/richlist")
 def api_richlist():
-    """Get top token holders sorted by balance."""
+    """
+    Get richlist (top token holders)
+    ---
+    tags:
+      - Addresses
+    responses:
+      200:
+        description: Top token holders sorted by balance
+        schema:
+          type: object
+          properties:
+            richlist:
+              type: array
+              items:
+                type: object
+                properties:
+                  rank:
+                    type: integer
+                  address:
+                    type: string
+                  balance:
+                    type: number
+                  percentage_of_supply:
+                    type: number
+            total_supply:
+              type: number
+            count:
+              type: integer
+            note:
+              type: string
+      503:
+        description: Node unreachable
+    """
     # XAI node doesn't have a native richlist endpoint, so we build from stats and known addresses
     stats_data, _ = fetch_json("/stats")
     total_supply = stats_data.get("total_circulating_supply", 0) if stats_data else 0
@@ -250,7 +728,40 @@ def api_richlist():
 
 @app.route("/api/mempool")
 def api_mempool():
-    """Get pending/unconfirmed transactions from mempool."""
+    """
+    Get mempool (pending transactions)
+    ---
+    tags:
+      - Transactions
+    responses:
+      200:
+        description: Pending transactions and mempool statistics
+        schema:
+          type: object
+          properties:
+            pending_count:
+              type: integer
+              description: Number of pending transactions
+            transactions:
+              type: array
+              items:
+                type: object
+            mempool_stats:
+              type: object
+              properties:
+                size_bytes:
+                  type: integer
+                evicted_low_fee_total:
+                  type: integer
+                rejected_invalid_total:
+                  type: integer
+                rejected_low_fee_total:
+                  type: integer
+                active_bans:
+                  type: integer
+      503:
+        description: Node unreachable
+    """
     data, error = fetch_json("/transactions")
     stats_data, _ = fetch_json("/stats")
 
@@ -276,7 +787,32 @@ def api_mempool():
 
 @app.route("/api/supply")
 def api_supply():
-    """Get token supply information."""
+    """
+    Get token supply information
+    ---
+    tags:
+      - Network
+    responses:
+      200:
+        description: Token supply statistics
+        schema:
+          type: object
+          properties:
+            total_supply:
+              type: number
+              description: Total XAI supply
+            circulating_supply:
+              type: number
+              description: XAI in circulation
+            burned:
+              type: number
+              description: XAI burned (always 0 for XAI)
+            chain_height:
+              type: integer
+              description: Current block height
+      503:
+        description: Node unreachable
+    """
     stats_data, error = fetch_json("/stats")
     if stats_data is None:
         return jsonify({"error": error or "Failed to fetch supply data"}), 503
@@ -291,7 +827,48 @@ def api_supply():
 
 @app.route("/api/network")
 def api_network():
-    """Get network statistics including peers and mining info."""
+    """
+    Get network statistics
+    ---
+    tags:
+      - Network
+    responses:
+      200:
+        description: Network statistics including peers and mining info
+        schema:
+          type: object
+          properties:
+            peer_count:
+              type: integer
+            peers:
+              type: array
+              items:
+                type: object
+                properties:
+                  address:
+                    type: string
+                  connected_since:
+                    type: number
+            node_version:
+              type: string
+            chain_height:
+              type: integer
+            difficulty:
+              type: number
+            is_mining:
+              type: boolean
+            node_uptime:
+              type: number
+              description: Uptime in seconds
+            latest_block_hash:
+              type: string
+            orphan_blocks_count:
+              type: integer
+            orphan_transactions_count:
+              type: integer
+      503:
+        description: Node unreachable
+    """
     stats_data, stats_err = fetch_json("/stats")
     peers_data, _ = fetch_json("/peers")
 
@@ -318,7 +895,45 @@ def api_network():
 
 @app.route("/api/ai/tasks")
 def api_ai_tasks():
-    """Get AI computation task listings (XAI-specific feature)."""
+    """
+    Get AI computation tasks
+    ---
+    tags:
+      - AI
+    responses:
+      200:
+        description: AI task listings (XAI-specific feature)
+        schema:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+              description: Whether AI features are enabled
+            tasks:
+              type: array
+              items:
+                type: object
+                properties:
+                  task_id:
+                    type: string
+                  model:
+                    type: string
+                  status:
+                    type: string
+                  created_at:
+                    type: number
+                  provider:
+                    type: string
+            total:
+              type: integer
+            features:
+              type: array
+              items:
+                type: string
+            message:
+              type: string
+              nullable: true
+    """
     # Check if algorithmic features are enabled
     algo_status, _ = fetch_json("/algo/status")
     if not algo_status or not algo_status.get("enabled", False):
@@ -340,7 +955,47 @@ def api_ai_tasks():
 
 @app.route("/api/ai/models")
 def api_ai_models():
-    """Get AI model registry (XAI-specific feature)."""
+    """
+    Get AI model registry
+    ---
+    tags:
+      - AI
+    responses:
+      200:
+        description: Registered AI models (XAI-specific feature)
+        schema:
+          type: object
+          properties:
+            enabled:
+              type: boolean
+              description: Whether AI features are enabled
+            models:
+              type: array
+              items:
+                type: object
+                properties:
+                  model_id:
+                    type: string
+                  name:
+                    type: string
+                  version:
+                    type: string
+                  provider:
+                    type: string
+                  capabilities:
+                    type: array
+                    items:
+                      type: string
+            total:
+              type: integer
+            features:
+              type: array
+              items:
+                type: string
+            message:
+              type: string
+              nullable: true
+    """
     algo_status, _ = fetch_json("/algo/status")
     if not algo_status or not algo_status.get("enabled", False):
         return jsonify({
@@ -360,7 +1015,39 @@ def api_ai_models():
 
 @app.route("/api/providers")
 def api_providers():
-    """Get AI compute providers (XAI-specific feature)."""
+    """
+    Get compute providers
+    ---
+    tags:
+      - Providers
+    responses:
+      200:
+        description: AI compute providers (XAI-specific feature)
+        schema:
+          type: object
+          properties:
+            providers:
+              type: array
+              items:
+                type: object
+                properties:
+                  address:
+                    type: string
+                  capacity:
+                    type: string
+                    enum: [active, idle, offline]
+                  tasks_completed:
+                    type: integer
+                  reputation:
+                    type: integer
+                    description: Reputation score (0-100)
+                  is_mining:
+                    type: boolean
+            total:
+              type: integer
+            ai_features_enabled:
+              type: boolean
+    """
     algo_status, _ = fetch_json("/algo/status")
 
     # Get mining stats for known providers
