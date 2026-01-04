@@ -122,7 +122,7 @@ class TestAutoSwitchingAIExecutorInitialization:
         pool_manager = Mock()
         key_manager = Mock()
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         assert executor.pool == pool_manager
@@ -148,8 +148,8 @@ class TestAutoSwitchingAIExecutorInitialization:
             'DeepSeekProvider': Mock(),
         }
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', True):
-            with patch.multiple('xai.core.auto_switching_ai_executor', **mock_providers):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', True):
+            with patch.multiple('xai.core.governance.auto_switching_ai_executor', **mock_providers):
                 executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         assert executor.perplexity is not None
@@ -164,7 +164,7 @@ class TestAutoSwitchingAIExecutorInitialization:
         pool_manager = Mock()
         key_manager = Mock()
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         assert executor.perplexity is None
@@ -184,7 +184,7 @@ class TestExecuteLongTaskWithAutoSwitch:
         key_manager = Mock()
         key_manager.get_api_key_for_task.return_value = None
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         result = executor.execute_long_task_with_auto_switch(
@@ -216,7 +216,7 @@ class TestExecuteLongTaskWithAutoSwitch:
         mock_key.mark_usage = Mock()
         pool_manager.donated_keys = {"key1": mock_key}
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         # Mock the streaming execution
@@ -254,7 +254,7 @@ class TestExecuteLongTaskWithAutoSwitch:
         mock_key.mark_usage = Mock()
         pool_manager.donated_keys = {"key1": mock_key}
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         with patch.object(executor, '_execute_with_switching') as mock_exec:
@@ -285,7 +285,7 @@ class TestExecuteLongTaskWithAutoSwitch:
         key_metadata = {"donated_tokens": 100000, "used_tokens": 0}
         key_manager.get_api_key_for_task.return_value = ("key1", "sk-test-key", key_metadata)
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         with patch.object(executor, '_execute_with_streaming_and_switching') as mock_stream:
@@ -316,7 +316,7 @@ class TestExecuteWithStreamingAndSwitching:
         mock_key.mark_usage = Mock()
         pool_manager.donated_keys = {"key1": mock_key}
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         # Set up task state
@@ -345,7 +345,7 @@ class TestExecuteWithStreamingAndSwitching:
         mock_client = Mock()
         mock_client.messages.stream.return_value = mock_stream
 
-        with patch('xai.core.auto_switching_ai_executor.anthropic.Anthropic') as mock_anthropic:
+        with patch('xai.core.governance.auto_switching_ai_executor.anthropic.Anthropic') as mock_anthropic:
             mock_anthropic.return_value = mock_client
 
             result = executor._execute_with_streaming_and_switching(
@@ -372,7 +372,7 @@ class TestExecuteWithStreamingAndSwitching:
         mock_key.mark_usage = Mock()
         pool_manager.donated_keys = {"key1": mock_key}
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         executor.active_tasks["task1"] = {
@@ -398,7 +398,7 @@ class TestExecuteWithStreamingAndSwitching:
         mock_client = Mock()
         mock_client.chat.completions.create.return_value = iter([mock_chunk1, mock_chunk2])
 
-        with patch('xai.core.auto_switching_ai_executor.openai.OpenAI') as mock_openai:
+        with patch('xai.core.governance.auto_switching_ai_executor.openai.OpenAI') as mock_openai:
             mock_openai.return_value = mock_client
 
             result = executor._execute_with_streaming_and_switching(
@@ -432,7 +432,7 @@ class TestExecuteWithStreamingAndSwitching:
             "sources": ["https://source1.com", "https://source2.com"]
         }
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
             executor.perplexity = mock_perplexity
 
@@ -476,7 +476,7 @@ class TestExecuteWithStreamingAndSwitching:
             "error": "API rate limit exceeded"
         }
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
             executor.perplexity = mock_perplexity
 
@@ -518,7 +518,7 @@ class TestExecuteWithStreamingAndSwitching:
             "tokens_used": 300
         }
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
             executor.groq = mock_groq
 
@@ -563,7 +563,7 @@ class TestExecuteWithStreamingAndSwitching:
             "tokens_used": 400
         }
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
             executor.xai = mock_xai
 
@@ -607,7 +607,7 @@ class TestExecuteWithStreamingAndSwitching:
             "tokens_used": 350
         }
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
             executor.together = mock_together
 
@@ -651,7 +651,7 @@ class TestExecuteWithStreamingAndSwitching:
             "tokens_used": 450
         }
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
             executor.fireworks = mock_fireworks
 
@@ -695,7 +695,7 @@ class TestExecuteWithStreamingAndSwitching:
             "tokens_used": 600
         }
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
             executor.deepseek = mock_deepseek
 
@@ -730,7 +730,7 @@ class TestExecuteWithStreamingAndSwitching:
 
         pool_manager.donated_keys = {"key1": Mock()}
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         executor.active_tasks["task1"] = {
@@ -773,7 +773,7 @@ class TestExecuteWithSwitching:
         mock_key.remaining_tokens.return_value = 95000
         pool_manager.donated_keys = {"key1": mock_key}
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         executor.active_tasks["task1"] = {
@@ -796,7 +796,7 @@ class TestExecuteWithSwitching:
         mock_client = Mock()
         mock_client.messages.create.return_value = mock_response
 
-        with patch('xai.core.auto_switching_ai_executor.anthropic.Anthropic') as mock_anthropic:
+        with patch('xai.core.governance.auto_switching_ai_executor.anthropic.Anthropic') as mock_anthropic:
             mock_anthropic.return_value = mock_client
 
             result = executor._execute_with_switching(
@@ -823,7 +823,7 @@ class TestExecuteWithSwitching:
         mock_key.remaining_tokens.return_value = 95000
         pool_manager.donated_keys = {"key1": mock_key}
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         executor.active_tasks["task1"] = {
@@ -846,7 +846,7 @@ class TestExecuteWithSwitching:
         mock_client = Mock()
         mock_client.chat.completions.create.return_value = mock_response
 
-        with patch('xai.core.auto_switching_ai_executor.openai.OpenAI') as mock_openai:
+        with patch('xai.core.governance.auto_switching_ai_executor.openai.OpenAI') as mock_openai:
             mock_openai.return_value = mock_client
 
             result = executor._execute_with_switching(
@@ -879,7 +879,7 @@ class TestExecuteWithSwitching:
 
         pool_manager.donated_keys = {"key1": mock_key1, "key2": mock_key2}
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         executor.active_tasks["task1"] = {
@@ -920,7 +920,7 @@ class TestExecuteWithSwitching:
         mock_key.remaining_tokens.return_value = 95000
         pool_manager.donated_keys = {"key1": mock_key}
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         executor.active_tasks["task1"] = {
@@ -943,7 +943,7 @@ class TestExecuteWithSwitching:
         mock_client = Mock()
         mock_client.messages.create.return_value = mock_response
 
-        with patch('xai.core.auto_switching_ai_executor.anthropic.Anthropic') as mock_anthropic:
+        with patch('xai.core.governance.auto_switching_ai_executor.anthropic.Anthropic') as mock_anthropic:
             mock_anthropic.return_value = mock_client
 
             result = executor._execute_with_switching(
@@ -978,7 +978,7 @@ class TestSwitchToNextKey:
         new_key_metadata = {"donated_tokens": 100000, "used_tokens": 0}
         key_manager.get_api_key_for_task.return_value = ("new_key", "sk-new-key", new_key_metadata)
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         executor.active_tasks["task1"] = {
@@ -1011,7 +1011,7 @@ class TestSwitchToNextKey:
         pool_manager.donated_keys = {}
         key_manager.get_api_key_for_task.return_value = None
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         executor.active_tasks["task1"] = {
@@ -1043,7 +1043,7 @@ class TestSwitchToNextKey:
         new_key_metadata = {"donated_tokens": 100000, "used_tokens": 0}
         key_manager.get_api_key_for_task.return_value = ("new_key", "sk-new-key", new_key_metadata)
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         executor.active_tasks["task1"] = {
@@ -1075,7 +1075,7 @@ class TestGetNextAvailableKey:
         key_metadata = {"donated_tokens": 100000, "used_tokens": 0}
         key_manager.get_api_key_for_task.return_value = ("key1", "sk-key1", key_metadata)
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         result = executor._get_next_available_key(AIProvider.ANTHROPIC, 50000)
@@ -1094,7 +1094,7 @@ class TestGetNextAvailableKey:
 
         key_manager.get_api_key_for_task.return_value = None
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         result = executor._get_next_available_key(AIProvider.ANTHROPIC, 50000)
@@ -1110,7 +1110,7 @@ class TestIsTaskComplete:
         pool_manager = Mock()
         key_manager = Mock()
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         # Test completion markers (all markers are checked against lowercased response)
@@ -1128,7 +1128,7 @@ class TestIsTaskComplete:
         pool_manager = Mock()
         key_manager = Mock()
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         assert executor._is_task_complete("This is a partial response.") is False
@@ -1146,7 +1146,7 @@ class TestExecuteMultiTurnConversation:
 
         key_manager.get_api_key_for_task.return_value = None
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         result = executor.execute_multi_turn_conversation(
@@ -1173,7 +1173,7 @@ class TestExecuteMultiTurnConversation:
         key_metadata = {"donated_tokens": 100000, "used_tokens": 10000}
         key_manager.get_api_key_for_task.return_value = ("key1", "sk-test-key", key_metadata)
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         # Mock Anthropic responses
@@ -1190,7 +1190,7 @@ class TestExecuteMultiTurnConversation:
         mock_client = Mock()
         mock_client.messages.create.side_effect = [mock_response1, mock_response2]
 
-        with patch('xai.core.auto_switching_ai_executor.anthropic.Anthropic') as mock_anthropic:
+        with patch('xai.core.governance.auto_switching_ai_executor.anthropic.Anthropic') as mock_anthropic:
             mock_anthropic.return_value = mock_client
 
             result = executor.execute_multi_turn_conversation(
@@ -1234,7 +1234,7 @@ class TestExecuteMultiTurnConversation:
             ("key2", "sk-key2", key_metadata2)
         ]
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         # Mock responses
@@ -1251,7 +1251,7 @@ class TestExecuteMultiTurnConversation:
         mock_client = Mock()
         mock_client.messages.create.side_effect = [mock_response1, mock_response2]
 
-        with patch('xai.core.auto_switching_ai_executor.anthropic.Anthropic') as mock_anthropic:
+        with patch('xai.core.governance.auto_switching_ai_executor.anthropic.Anthropic') as mock_anthropic:
             mock_anthropic.return_value = mock_client
 
             result = executor.execute_multi_turn_conversation(
@@ -1282,7 +1282,7 @@ class TestExecuteMultiTurnConversation:
             None  # No more keys available
         ]
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         mock_response = Mock()
@@ -1293,7 +1293,7 @@ class TestExecuteMultiTurnConversation:
         mock_client = Mock()
         mock_client.messages.create.return_value = mock_response
 
-        with patch('xai.core.auto_switching_ai_executor.anthropic.Anthropic') as mock_anthropic:
+        with patch('xai.core.governance.auto_switching_ai_executor.anthropic.Anthropic') as mock_anthropic:
             mock_anthropic.return_value = mock_client
 
             result = executor.execute_multi_turn_conversation(
@@ -1341,7 +1341,7 @@ class TestNonStreamingProviders:
             "tokens_used": 200
         }
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
             executor.perplexity = mock_perplexity
 
@@ -1386,7 +1386,7 @@ class TestNonStreamingProviders:
             "tokens_used": 200
         }
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
             executor.groq = mock_groq
 
@@ -1430,7 +1430,7 @@ class TestNonStreamingProviders:
             "tokens_used": 200
         }
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
             executor.xai = mock_xai
 
@@ -1474,7 +1474,7 @@ class TestNonStreamingProviders:
             "tokens_used": 200
         }
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
             executor.together = mock_together
 
@@ -1518,7 +1518,7 @@ class TestNonStreamingProviders:
             "tokens_used": 200
         }
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
             executor.fireworks = mock_fireworks
 
@@ -1562,7 +1562,7 @@ class TestNonStreamingProviders:
             "tokens_used": 200
         }
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
             executor.deepseek = mock_deepseek
 
@@ -1605,7 +1605,7 @@ class TestNonStreamingProviders:
             "error": "Rate limit exceeded"
         }
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
             executor.perplexity = mock_perplexity
 
@@ -1651,7 +1651,7 @@ class TestEdgeCases:
             "tokens_used": 100
         }
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
             executor.perplexity = mock_perplexity
 
@@ -1687,7 +1687,7 @@ class TestEdgeCases:
         mock_key = Mock()
         pool_manager.donated_keys = {"key1": mock_key}
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         # Test with high remaining tokens
@@ -1715,7 +1715,7 @@ class TestEdgeCases:
         mock_client = Mock()
         mock_client.messages.create.return_value = mock_response
 
-        with patch('xai.core.auto_switching_ai_executor.anthropic.Anthropic') as mock_anthropic:
+        with patch('xai.core.governance.auto_switching_ai_executor.anthropic.Anthropic') as mock_anthropic:
             mock_anthropic.return_value = mock_client
 
             # Call with anthropic to verify safe_limit usage
@@ -1760,7 +1760,7 @@ class TestEdgeCases:
             # No 'sources' key
         }
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
             executor.perplexity = mock_perplexity
 
@@ -1803,7 +1803,7 @@ class TestEdgeCases:
         new_key_metadata = {"donated_tokens": 100000, "used_tokens": 0}
         key_manager.get_api_key_for_task.return_value = ("key2", "sk-key2", new_key_metadata)
 
-        with patch('xai.core.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
+        with patch('xai.core.governance.auto_switching_ai_executor.NEW_PROVIDERS_AVAILABLE', False):
             executor = AutoSwitchingAIExecutor(pool_manager, key_manager)
 
         executor.active_tasks["task1"] = {

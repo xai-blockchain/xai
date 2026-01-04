@@ -133,8 +133,10 @@ class CommunityBlacklist(BlacklistSource):
     """Community-governed blacklist (multi-sig voting)"""
 
     def __init__(self):
+        url = os.getenv("XAI_COMMUNITY_BLACKLIST_URL", "https://community.xai.network/blacklist.json").strip()
         super().__init__(
             name="Community",
+            url=url,
             update_frequency_hours=6,
         )
 

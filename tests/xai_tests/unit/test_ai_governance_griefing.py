@@ -12,7 +12,7 @@ def test_burst_activity_triggers_alert(monkeypatch):
     """Low-cost burst of votes within window raises burst alert."""
     detector = GovernanceFraudDetector()
     now = time.time()
-    monkeypatch.setattr("xai.core.ai_governance.time.time", lambda: now)
+    monkeypatch.setattr("xai.core.governance.ai_governance.time.time", lambda: now)
 
     # Simulate rapid votes from many addresses
     for i in range(detector.BURST_MIN_TOTAL):
@@ -31,7 +31,7 @@ def test_power_skew_alert(monkeypatch):
     """Few voters controlling majority power triggers skew alert."""
     detector = GovernanceFraudDetector()
     now = time.time()
-    monkeypatch.setattr("xai.core.ai_governance.time.time", lambda: now)
+    monkeypatch.setattr("xai.core.governance.ai_governance.time.time", lambda: now)
 
     meta_cluster = {"wallet_cluster": "clusterA"}
     detector.record_vote("p2", "whale1", voting_power=70.0, metadata=meta_cluster)
@@ -51,7 +51,7 @@ def test_new_account_swarm_alert(monkeypatch):
         return fake_time.current
 
     fake_time.current = base_time
-    monkeypatch.setattr("xai.core.ai_governance.time.time", fake_time)
+    monkeypatch.setattr("xai.core.governance.ai_governance.time.time", fake_time)
 
     for idx in range(detector.NEW_ACCOUNT_MIN_VOTERS):
         fake_time.current = base_time + idx  # keep within window
@@ -70,7 +70,7 @@ def test_identity_cluster_alert(monkeypatch):
     """Multiple voters sharing the same IP subnet should raise cluster alert."""
     detector = GovernanceFraudDetector()
     now = time.time()
-    monkeypatch.setattr("xai.core.ai_governance.time.time", lambda: now)
+    monkeypatch.setattr("xai.core.governance.ai_governance.time.time", lambda: now)
 
     for idx in range(detector.CLUSTER_MIN_UNIQUE):
         detector.record_vote(

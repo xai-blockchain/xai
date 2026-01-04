@@ -142,6 +142,8 @@ class SecurityConfig:
     ip_whitelist: list = field(default_factory=list)
     enable_ip_blacklist: bool = True
     ip_blacklist: list = field(default_factory=list)
+    jwt_blacklist_cleanup_enabled: bool = True
+    jwt_blacklist_cleanup_interval: int = 900
     max_transaction_size: int = 102400  # 100KB
     max_mempool_size: int = 10000
 
@@ -157,6 +159,11 @@ class SecurityConfig:
             raise ValueError(f"Invalid ban_threshold: {self.ban_threshold}. Must be >= 1")
         if self.max_mempool_size < 1:
             raise ValueError(f"Invalid max_mempool_size: {self.max_mempool_size}. Must be >= 1")
+        if self.jwt_blacklist_cleanup_interval < 1:
+            raise ValueError(
+                "Invalid jwt_blacklist_cleanup_interval: "
+                f"{self.jwt_blacklist_cleanup_interval}. Must be >= 1"
+            )
 
 @dataclass
 class StorageConfig:
@@ -402,14 +409,13 @@ class ConfigManager:
             section = parts[0]
             config_key = "_".join(parts[1:])
 
-            # Apply to config
-            if section in result:
-                if not isinstance(result[section], dict):
-                    result[section] = {}
+            # Apply to config (create section if missing or invalid)
+            if section not in result or not isinstance(result[section], dict):
+                result[section] = {}
 
-                # Try to parse value as appropriate type
-                parsed_value = self._parse_env_value(value)
-                result[section][config_key] = parsed_value
+            # Try to parse value as appropriate type
+            parsed_value = self._parse_env_value(value)
+            result[section][config_key] = parsed_value
 
         return result
 
@@ -479,28 +485,38 @@ class ConfigManager:
         Args:
             config: Raw configuration dictionary
         """
+        def _coerce_section(section_name: str) -> dict[str, Any]:
+            section = config.get(section_name, {})
+            if isinstance(section, dict):
+                return section
+            logger.warning(
+                "Invalid config section type; falling back to defaults",
+                extra={"section": section_name, "type": type(section).__name__},
+            )
+            return {}
+
         # Network configuration
-        network_config = config.get("network", {})
+        network_config = _coerce_section("network")
         self.network = NetworkConfig(**network_config)
 
         # Blockchain configuration
-        blockchain_config = config.get("blockchain", {})
+        blockchain_config = _coerce_section("blockchain")
         self.blockchain = BlockchainConfig(**blockchain_config)
 
         # Security configuration
-        security_config = config.get("security", {})
+        security_config = _coerce_section("security")
         self.security = SecurityConfig(**security_config)
 
         # Storage configuration
-        storage_config = config.get("storage", {})
+        storage_config = _coerce_section("storage")
         self.storage = StorageConfig(**storage_config)
 
         # Logging configuration
-        logging_config = config.get("logging", {})
+        logging_config = _coerce_section("logging")
         self.logging = LoggingConfig(**logging_config)
 
         # Genesis configuration
-        genesis_config = config.get("genesis", {})
+        genesis_config = _coerce_section("genesis")
         self.genesis = GenesisConfig(**genesis_config)
 
     def _validate_configuration(self):

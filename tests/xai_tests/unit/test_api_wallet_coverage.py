@@ -99,7 +99,7 @@ class TestCreateWalletEndpoint:
 
         return {'handler': handler, 'client': client, 'node': node}
 
-    @patch('xai.core.api_wallet.Wallet')
+    @patch('xai.core.api.api_wallet.Wallet')
     def test_create_wallet_success(self, mock_wallet_class, setup):
         """Test successful wallet creation."""
         # Create mock wallet instance
@@ -1078,7 +1078,7 @@ class TestWalletSeedsSnapshot:
         manifest_data = {"wallets": ["wallet1", "wallet2"]}
         summary_data = {"total_wallets": 2, "total_balance": 1000000}
 
-        with patch('xai.core.api_wallet.os.path.exists', return_value=True):
+        with patch('xai.core.api.api_wallet.os.path.exists', return_value=True):
             with patch('builtins.open', mock_open()) as mock_file:
                 # Set up different return values for each call to json.load
                 mock_file.return_value.__enter__.return_value.read.side_effect = [
@@ -1096,7 +1096,7 @@ class TestWalletSeedsSnapshot:
 
     def test_wallet_seeds_snapshot_manifest_not_found(self, setup):
         """Test when manifest file doesn't exist."""
-        with patch('xai.core.api_wallet.os.path.exists', return_value=False):
+        with patch('xai.core.api.api_wallet.os.path.exists', return_value=False):
             response = setup['client'].get('/wallet-seeds/snapshot')
 
         assert response.status_code == 404
@@ -1214,7 +1214,7 @@ class TestPrivateMethodsGossipTradeEvent:
 
         return {'handler': handler}
 
-    @patch('xai.core.api_wallet.requests.post')
+    @patch('xai.core.api.api_wallet.requests.post')
     def test_gossip_trade_event_success(self, mock_post, setup, monkeypatch):
         """Test successful gossip to all peers."""
         from xai.core import config
@@ -1235,7 +1235,7 @@ class TestPrivateMethodsGossipTradeEvent:
         assert calls[0][1]['json'] == event
         assert calls[0][1]['headers']['X-Wallet-Trade-Secret'] == 'test_secret_456'
 
-    @patch('xai.core.api_wallet.requests.post')
+    @patch('xai.core.api.api_wallet.requests.post')
     def test_gossip_trade_event_partial_failure(self, mock_post, setup, monkeypatch):
         """Test gossip with one peer failing."""
         from xai.core import config
@@ -1253,7 +1253,7 @@ class TestPrivateMethodsGossipTradeEvent:
 
         assert mock_post.call_count == 2
 
-    @patch('xai.core.api_wallet.requests.post')
+    @patch('xai.core.api.api_wallet.requests.post')
     def test_gossip_trade_event_all_fail(self, mock_post, setup):
         """Test gossip when all peers fail."""
         mock_post.side_effect = Exception("Network error")
@@ -1262,7 +1262,7 @@ class TestPrivateMethodsGossipTradeEvent:
         # Should not raise exception
         setup['handler']._gossip_trade_event(event)
 
-    @patch('xai.core.api_wallet.requests.post')
+    @patch('xai.core.api.api_wallet.requests.post')
     def test_gossip_trade_event_no_peers(self, mock_post):
         """Test gossip with no peers registered."""
         from xai.core.api.api_wallet import WalletAPIHandler
@@ -1280,7 +1280,7 @@ class TestPrivateMethodsGossipTradeEvent:
         # Should not make any requests
         mock_post.assert_not_called()
 
-    @patch('xai.core.api_wallet.requests.post')
+    @patch('xai.core.api.api_wallet.requests.post')
     def test_gossip_trade_event_updates_timestamp(self, mock_post, setup, monkeypatch):
         """Test that successful gossip updates peer timestamp."""
         from xai.core import config
@@ -1326,7 +1326,7 @@ class TestCounterMetrics:
 
         return {'handler': handler, 'client': client, 'node': node}
 
-    @patch('xai.core.api_wallet.trade_orders_counter')
+    @patch('xai.core.api.api_wallet.trade_orders_counter')
     def test_trade_order_counter_incremented(self, mock_counter, setup):
         """Test that trade order counter is incremented."""
         mock_order = Mock()
@@ -1342,7 +1342,7 @@ class TestCounterMetrics:
 
         mock_counter.inc.assert_called_once()
 
-    @patch('xai.core.api_wallet.walletconnect_sessions_counter')
+    @patch('xai.core.api.api_wallet.walletconnect_sessions_counter')
     def test_walletconnect_counter_incremented(self, mock_counter, setup):
         """Test that WalletConnect sessions counter is incremented."""
         setup['node'].blockchain.trade_manager.begin_walletconnect_handshake = Mock(
@@ -1358,7 +1358,7 @@ class TestCounterMetrics:
 
         mock_counter.inc.assert_called_once()
 
-    @patch('xai.core.api_wallet.trade_secrets_counter')
+    @patch('xai.core.api.api_wallet.trade_secrets_counter')
     def test_trade_secrets_counter_incremented(self, mock_counter, setup):
         """Test that trade secrets counter is incremented."""
         data = {"secret": "my_secret"}

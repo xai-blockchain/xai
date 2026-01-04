@@ -12,6 +12,8 @@ import tempfile
 from xai.core.blockchain import Blockchain, Transaction, Block
 from xai.core.wallet import Wallet
 
+PREV_HASH = "0" * 64
+
 
 class TestBlockchainPersistence:
     """Test blockchain persistence and loading"""
@@ -256,7 +258,7 @@ class TestBlockMerkleRoot:
 
     def test_merkle_root_empty_transactions(self):
         """Test merkle root with no transactions"""
-        block = Block(1, [], "previous_hash")
+        block = Block(1, [], PREV_HASH)
 
         merkle = block.calculate_merkle_root()
 
@@ -275,7 +277,7 @@ class TestBlockMerkleRoot:
         for tx in txs:
             tx.txid = tx.calculate_hash()
 
-        block = Block(1, txs, "previous_hash")
+        block = Block(1, txs, PREV_HASH)
 
         merkle = block.calculate_merkle_root()
 
@@ -293,7 +295,7 @@ class TestBlockMerkleRoot:
         for tx in txs:
             tx.txid = tx.calculate_hash()
 
-        block = Block(1, txs, "previous_hash")
+        block = Block(1, txs, PREV_HASH)
 
         merkle = block.calculate_merkle_root()
 
@@ -309,7 +311,7 @@ class TestBlockMining:
         tx = Transaction("COINBASE", wallet.address, 12.0)
         tx.txid = tx.calculate_hash()
 
-        block = Block(1, [tx], "previous_hash", difficulty=1)
+        block = Block(1, [tx], PREV_HASH, difficulty=1)
         hash_result = block.mine_block()
 
         assert hash_result.startswith("0")
@@ -320,7 +322,7 @@ class TestBlockMining:
         tx = Transaction("COINBASE", wallet.address, 12.0)
         tx.txid = tx.calculate_hash()
 
-        block = Block(1, [tx], "previous_hash", difficulty=2)
+        block = Block(1, [tx], PREV_HASH, difficulty=2)
         hash_result = block.mine_block()
 
         assert hash_result.startswith("00")
@@ -331,7 +333,7 @@ class TestBlockMining:
         coinbase = Transaction("COINBASE", wallet.address, 12.0)
         coinbase.txid = coinbase.calculate_hash()
 
-        block = Block(1, [coinbase], "previous_hash")
+        block = Block(1, [coinbase], PREV_HASH)
 
         assert block.miner == wallet.address
 
@@ -340,7 +342,7 @@ class TestBlockMining:
         tx = Transaction("XAI" + "a" * 40, "XAI" + "b" * 40, 10.0)
         tx.txid = tx.calculate_hash()
 
-        block = Block(1, [tx], "previous_hash")
+        block = Block(1, [tx], PREV_HASH)
 
         assert block.miner is None
 
@@ -532,7 +534,7 @@ class TestBlockToDict:
         tx = Transaction("COINBASE", wallet.address, 12.0)
         tx.txid = tx.calculate_hash()
 
-        block = Block(1, [tx], "previous_hash", difficulty=4)
+        block = Block(1, [tx], PREV_HASH, difficulty=4)
         block.mine_block()
 
         block_dict = block.to_dict()
@@ -646,7 +648,7 @@ class TestBlockHashCalculation:
         tx = Transaction("COINBASE", "XAI" + "a" * 40, 12.0)
         tx.txid = tx.calculate_hash()
 
-        block = Block(1, [tx], "previous_hash")
+        block = Block(1, [tx], PREV_HASH)
         block.timestamp = 1000000  # Fixed timestamp
         block.nonce = 0
 
@@ -660,7 +662,7 @@ class TestBlockHashCalculation:
         tx = Transaction("COINBASE", "XAI" + "a" * 40, 12.0)
         tx.txid = tx.calculate_hash()
 
-        block = Block(1, [tx], "previous_hash")
+        block = Block(1, [tx], PREV_HASH)
         block.timestamp = 1000000
 
         block.nonce = 0

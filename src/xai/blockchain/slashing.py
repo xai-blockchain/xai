@@ -69,7 +69,12 @@ class InMemorySlashingManager:
     def remove_validator_stake(self, address: str):
         self.validator_stakes.pop(address, None)
 
-    def report_malicious_behavior(self, validator_address: str, offense_type: str):
+    def report_malicious_behavior(
+        self,
+        validator_address: str,
+        offense_type: str,
+        evidence: Any | None = None,
+    ):
         """Report and process validator misbehavior with automatic slashing."""
         if validator_address not in self.validator_stakes:
             self.logger.warning("Validator %s not found in stake registry.", validator_address)

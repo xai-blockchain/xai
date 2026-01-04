@@ -79,7 +79,7 @@ def check_file_for_insecure_random(file_path: Path) -> dict:
 
 def test_proof_of_intelligence_uses_secrets():
     """Test that proof_of_intelligence.py uses secrets module."""
-    file_path = Path("src/xai/core/proof_of_intelligence.py")
+    file_path = Path("src/xai/core/mining/proof_of_intelligence.py")
     result = check_file_for_insecure_random(file_path)
 
     assert not result["parse_error"], f"Failed to parse {file_path}"
@@ -118,7 +118,7 @@ def test_front_running_protection_uses_secrets():
 
 def test_peer_discovery_uses_secrets():
     """Test that peer_discovery.py uses secrets module."""
-    file_path = Path("src/xai/core/peer_discovery.py")
+    file_path = Path("src/xai/core/p2p/peer_discovery.py")
     result = check_file_for_insecure_random(file_path)
 
     assert not result["parse_error"], f"Failed to parse {file_path}"
@@ -131,7 +131,7 @@ def test_peer_discovery_uses_secrets():
 
 def test_easter_eggs_uses_secrets():
     """Test that easter_eggs.py uses secrets module."""
-    file_path = Path("src/xai/core/easter_eggs.py")
+    file_path = Path("src/xai/core/api/easter_eggs.py")
     result = check_file_for_insecure_random(file_path)
 
     assert not result["parse_error"], f"Failed to parse {file_path}"
@@ -151,11 +151,11 @@ def test_no_security_modules_use_random():
     """
     # List of security-critical files/patterns
     security_critical_files = [
-        "src/xai/core/proof_of_intelligence.py",
+        "src/xai/core/mining/proof_of_intelligence.py",
         "src/xai/blockchain/validator_rotation.py",
         "src/xai/blockchain/front_running_protection.py",
-        "src/xai/core/peer_discovery.py",
-        "src/xai/core/easter_eggs.py",
+        "src/xai/core/p2p/peer_discovery.py",
+        "src/xai/core/api/easter_eggs.py",
         "src/xai/security/secure_enclave_manager.py",
         "src/xai/core/mining_algorithm.py",
     ]

@@ -28,9 +28,11 @@ class TestFeeOrdering:
 
         size_multiplier: Multiply transaction size by adding dummy metadata
         """
+        sender = f"XAI{sender_id:040x}"
+        recipient = f"XAI{(sender_id + 1000):040x}"
         tx = Transaction(
-            sender=f"XAI{'0' * 40}sender{sender_id}",
-            recipient=f"XAI{'0' * 40}recipient{sender_id}",
+            sender=sender,
+            recipient=recipient,
             amount=amount,
             fee=fee,
         )
@@ -218,8 +220,8 @@ class TestFeeRateCalculation:
     def test_transaction_get_fee_rate(self):
         """Task 201: Transaction.get_fee_rate() should return correct value"""
         tx = Transaction(
-            sender=f"XAI{'0' * 40}test",
-            recipient=f"XAI{'0' * 40}recip",
+            sender=f"XAI{1:040x}",
+            recipient=f"XAI{2:040x}",
             amount=100.0,
             fee=2.0,
         )
@@ -236,8 +238,8 @@ class TestFeeRateCalculation:
     def test_transaction_get_size(self):
         """Task 201: Transaction.get_size() should return reasonable value"""
         tx = Transaction(
-            sender=f"XAI{'0' * 40}test",
-            recipient=f"XAI{'0' * 40}recip",
+            sender=f"XAI{1:040x}",
+            recipient=f"XAI{2:040x}",
             amount=100.0,
             fee=2.0,
         )
@@ -253,8 +255,8 @@ class TestFeeRateCalculation:
     def test_fee_rate_zero_fee(self):
         """Task 201: Handle zero fee gracefully"""
         tx = Transaction(
-            sender=f"XAI{'0' * 40}test",
-            recipient=f"XAI{'0' * 40}recip",
+            sender=f"XAI{1:040x}",
+            recipient=f"XAI{2:040x}",
             amount=100.0,
             fee=0.0,
         )

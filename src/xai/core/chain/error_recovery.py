@@ -22,6 +22,7 @@ This module acts as a lightweight coordinator that delegates to specialized modu
 
 import logging
 import threading
+import time
 from collections import deque
 from typing import Any, Callable
 
@@ -141,7 +142,7 @@ class ErrorRecoveryManager:
             try:
                 result = func(*args, **kwargs)
                 return True, result, None
-            except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+            except Exception as e:
                 self.error_logger.log_error(e, operation, "medium")
                 self.logger.error(f"Error in {operation}", extra={"error_type": type(e).__name__})
                 return False, None, str(e)
@@ -258,8 +259,6 @@ class ErrorRecoveryManager:
 
     def _monitor_health(self) -> None:
         """Background health monitoring thread."""
-        import time
-
         while self.monitoring_active:
             try:
                 self.health_monitor.update_metrics(self.blockchain, self.node)
@@ -274,10 +273,13 @@ class ErrorRecoveryManager:
                     self.backup_manager.create_backup(self.blockchain, f"auto_{int(time.time())}")
                     self.backup_manager.cleanup_old_backups(keep_count=24)
 
-            except (OSError, IOError, ValueError, TypeError, RuntimeError) as e:
+            except Exception as e:
                 self.logger.error(f"Health monitoring error: {e}", extra={"error_type": type(e).__name__})
 
-            time.sleep(60)
+            for _ in range(600):
+                if not self.monitoring_active:
+                    break
+                time.sleep(0.1)
 
     def _log_recovery(self, recovery_type: str, status: str, details: str) -> None:
         """

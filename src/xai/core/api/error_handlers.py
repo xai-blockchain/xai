@@ -83,7 +83,7 @@ class CircuitBreaker:
             result = func(*args, **kwargs)
             self._on_success()
             return True, result, None
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+        except Exception as e:
             self._on_failure()
             self.logger.error("Circuit breaker call failed", extra={"error_type": type(e).__name__, "error": str(e)})
             return False, None, str(e)
@@ -190,7 +190,7 @@ class RetryStrategy:
                 if attempt > 0:
                     self.logger.info(f"Operation succeeded on attempt {attempt + 1}")
                 return True, result, None
-            except (OSError, IOError, ValueError, TypeError, RuntimeError, ConnectionError, TimeoutError) as e:
+            except Exception as e:
                 last_error = str(e)
                 self.logger.warning(f"Attempt {attempt + 1} failed: {last_error}", extra={"error_type": type(e).__name__})
 
@@ -372,9 +372,9 @@ class ErrorHandlerRegistry:
 
     def _register_default_handlers(self) -> None:
         """Register default error handlers."""
+        self.register_handler(StorageErrorHandler())
         self.register_handler(NetworkErrorHandler())
         self.register_handler(ValidationErrorHandler())
-        self.register_handler(StorageErrorHandler())
 
     def register_handler(self, handler: ErrorHandler) -> None:
         """

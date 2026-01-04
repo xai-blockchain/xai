@@ -217,7 +217,7 @@ class AutoSwitchingAIExecutor:
 
             return result
 
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+        except Exception as e:
             logger.warning(
                 "Exception in execute_long_task_with_auto_switch",
                 extra={

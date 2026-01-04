@@ -78,7 +78,7 @@ def add_safety_control_routes(app, node):
                 }
             )
             return jsonify({"error": str(exc)}), 400
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
+        except Exception as exc:
             return _server_error(exc, "ai.cancel_personal_ai_request_failed")
 
     @app.route("/ai/request-status/<request_id>", methods=["GET"])
@@ -103,7 +103,7 @@ def add_safety_control_routes(app, node):
                 }
             )
             return jsonify({"error": str(exc)}), 400
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
+        except Exception as exc:
             return _server_error(exc, "ai.request_status_failed")
 
     # ===== TRADING BOT CONTROLS =====
@@ -142,7 +142,7 @@ def add_safety_control_routes(app, node):
                 }
             )
             return jsonify({"error": str(exc)}), 400
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
+        except Exception as exc:
             return _server_error(exc, "ai.emergency_stop_trading_bot_failed")
 
     @app.route("/ai/stop-all-trading-bots", methods=["POST"])
@@ -182,7 +182,7 @@ def add_safety_control_routes(app, node):
                 }
             )
             return jsonify({"error": str(exc)}), 400
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
+        except Exception as exc:
             return _server_error(exc, "ai.stop_all_trading_bots_failed")
 
     # ===== GOVERNANCE AI CONTROLS =====
@@ -220,7 +220,7 @@ def add_safety_control_routes(app, node):
                 }
             )
             return jsonify({"error": str(exc)}), 400
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
+        except Exception as exc:
             return _server_error(exc, "ai.pause_governance_task_failed")
 
     @app.route("/ai/resume-governance-task/<task_id>", methods=["POST"])
@@ -248,7 +248,7 @@ def add_safety_control_routes(app, node):
                 }
             )
             return jsonify({"error": str(exc)}), 400
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
+        except Exception as exc:
             return _server_error(exc, "ai.resume_governance_task_failed")
 
     @app.route("/ai/governance-task-status/<task_id>", methods=["GET"])
@@ -273,7 +273,7 @@ def add_safety_control_routes(app, node):
                 }
             )
             return jsonify({"error": str(exc)}), 400
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
+        except Exception as exc:
             return _server_error(exc, "ai.governance_task_status_failed")
 
     # ===== GLOBAL EMERGENCY STOP =====
@@ -330,7 +330,7 @@ def add_safety_control_routes(app, node):
                 }
             )
             return jsonify({"error": str(exc)}), 400
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
+        except Exception as exc:
             return _server_error(exc, "ai.emergency_stop_global_failed")
 
     @app.route("/ai/emergency-stop/deactivate", methods=["POST"])
@@ -366,7 +366,7 @@ def add_safety_control_routes(app, node):
                 }
             )
             return jsonify({"error": str(exc)}), 400
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
+        except Exception as exc:
             return _server_error(exc, "ai.emergency_stop_deactivate_failed")
 
     @app.route("/ai/safety-level", methods=["POST"])
@@ -415,7 +415,7 @@ def add_safety_control_routes(app, node):
                 }
             )
             return jsonify({"error": str(exc)}), 400
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
+        except Exception as exc:
             return _server_error(exc, "ai.set_safety_level_failed")
 
     # ===== STATUS & MONITORING =====
@@ -447,7 +447,7 @@ def add_safety_control_routes(app, node):
                 }
             )
             return jsonify({"error": str(exc)}), 400
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
+        except Exception as exc:
             return _server_error(exc, "ai.safety_status_failed")
 
     @app.route("/ai/active-operations", methods=["GET"])
@@ -476,7 +476,7 @@ def add_safety_control_routes(app, node):
                 }
             )
             return jsonify({"error": str(exc)}), 400
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
+        except Exception as exc:
             return _server_error(exc, "ai.active_operations_failed")
 
     @app.route("/ai/safety-callers", methods=["GET"])
@@ -486,7 +486,7 @@ def add_safety_control_routes(app, node):
         try:
             callers = list(safety.authorized_callers)
             return jsonify({"authorized_callers": callers}), 200
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
+        except Exception as exc:
             logger.warning(
                 "Exception in list_safety_callers",
                 extra={
@@ -520,7 +520,7 @@ def add_safety_control_routes(app, node):
                 }
             )
             return jsonify({"error": str(exc)}), 400
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
+        except Exception as exc:
             return _server_error(exc, "ai.add_safety_caller_failed")
 
     @app.route("/ai/safety-callers/<identifier>", methods=["DELETE"])
@@ -543,7 +543,7 @@ def add_safety_control_routes(app, node):
                 }
             )
             return jsonify({"error": str(exc)}), 400
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
+        except Exception as exc:
             return _server_error(exc, "ai.remove_safety_caller_failed")
 
     print("✅ AI Safety Control API endpoints added:")

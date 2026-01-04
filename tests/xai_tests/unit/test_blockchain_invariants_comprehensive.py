@@ -414,12 +414,9 @@ class TestBalanceConservationWithFeesAndBurning:
         """Burning coins must reduce circulating supply permanently"""
         bc = Blockchain(data_dir=str(tmp_path))
         wallet = Wallet()
-        # Burn address - valid XAI format but provably unspendable (no known private key)
-        # Must be all hex characters after XAI prefix (64 chars total)
-        burn_address = "XAI" + ("0" * 60) + "dea"  # 3 chars XAI + 63 hex = 66 is too long
-        # Actually XAI is 3 chars, so we need 61 hex chars after it for 64 total
-        # XAI addresses are 43 chars: "XAI" + 40 hex chars
-        burn_address = "XAI" + ("0" * 36) + "dead"  # 3 + 40 = 43 chars
+        # Burn address - valid network prefix with a provably unspendable hex body
+        prefix = "TXAI" if wallet.address.startswith("TXAI") else "XAI"
+        burn_address = prefix + ("0" * 40)
 
         # Generate funds
         for i in range(5):

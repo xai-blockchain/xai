@@ -56,6 +56,7 @@ class TestMinimumDifficulty:
         # Set very low difficulty and fast block times to trigger downward adjustment
         bc.difficulty = 1
         bc.dynamic_difficulty_adjuster.min_difficulty = 1
+        bc.dynamic_difficulty_adjuster.adjustment_window = 10
 
         # Mine blocks very quickly
         base_time = 0.0
@@ -77,6 +78,7 @@ class TestMinimumDifficulty:
         # Start at minimum difficulty
         bc.difficulty = 1
         bc.dynamic_difficulty_adjuster.min_difficulty = 1
+        bc.dynamic_difficulty_adjuster.adjustment_window = 10
 
         # Mine blocks extremely slowly
         base_time = 0.0
@@ -97,6 +99,7 @@ class TestMinimumDifficulty:
         # Start at minimum
         bc.difficulty = 1
         original_difficulty = bc.difficulty
+        bc.dynamic_difficulty_adjuster.adjustment_window = 10
 
         # Mine blocks faster than target
         base_time = 0.0
@@ -123,6 +126,7 @@ class TestMaximumDifficulty:
         # Set difficulty to maximum
         max_diff = bc.dynamic_difficulty_adjuster.max_difficulty
         bc.difficulty = max_diff
+        bc.dynamic_difficulty_adjuster.adjustment_window = 10
 
         # Mine blocks very quickly to trigger upward adjustment
         base_time = 0.0
@@ -142,6 +146,7 @@ class TestMaximumDifficulty:
         # Set to just below maximum
         max_diff = bc.dynamic_difficulty_adjuster.max_difficulty
         bc.difficulty = max_diff - 1
+        bc.dynamic_difficulty_adjuster.adjustment_window = 10
 
         # Mine extremely fast blocks
         base_time = 0.0
@@ -186,6 +191,7 @@ class TestLargeDifficultyAdjustments:
         initial_difficulty = 5
         bc.difficulty = initial_difficulty
         max_factor = bc.dynamic_difficulty_adjuster.max_adjustment_factor
+        bc.dynamic_difficulty_adjuster.adjustment_window = 10
 
         # Mine blocks extremely fast (should trigger 4x increase)
         base_time = 0.0
@@ -218,6 +224,7 @@ class TestLargeDifficultyAdjustments:
         initial_difficulty = 8
         bc.difficulty = initial_difficulty
         max_factor = bc.dynamic_difficulty_adjuster.max_adjustment_factor
+        bc.dynamic_difficulty_adjuster.adjustment_window = 10
 
         # Mine blocks extremely slowly (should trigger 1/4x decrease)
         base_time = 0.0
@@ -251,6 +258,7 @@ class TestLargeDifficultyAdjustments:
 
         initial_difficulty = 5
         bc.difficulty = initial_difficulty
+        bc.dynamic_difficulty_adjuster.adjustment_window = 10
 
         # Mine blocks at various speeds
         base_time = 0.0
@@ -284,6 +292,7 @@ class TestLargeDifficultyAdjustments:
 
         initial_difficulty = 4
         bc.difficulty = initial_difficulty
+        bc.dynamic_difficulty_adjuster.adjustment_window = 10
 
         # First epoch: mine very fast (increase difficulty)
         base_time = 0.0
@@ -316,6 +325,7 @@ class TestDifficultyTransitionsAcrossEpochs:
         bc = Blockchain(data_dir=str(tmp_path))
         wallet = Wallet()
 
+        bc.dynamic_difficulty_adjuster.adjustment_window = 10
         window = bc.dynamic_difficulty_adjuster.adjustment_window
         initial_difficulty = bc.difficulty
 
@@ -339,6 +349,7 @@ class TestDifficultyTransitionsAcrossEpochs:
         bc = Blockchain(data_dir=str(tmp_path))
         wallet = Wallet()
 
+        bc.dynamic_difficulty_adjuster.adjustment_window = 10
         window = bc.dynamic_difficulty_adjuster.adjustment_window
         initial_difficulty = bc.difficulty
 
@@ -356,6 +367,7 @@ class TestDifficultyTransitionsAcrossEpochs:
         bc = Blockchain(data_dir=str(tmp_path))
         wallet = Wallet()
 
+        bc.dynamic_difficulty_adjuster.adjustment_window = 10
         window = bc.dynamic_difficulty_adjuster.adjustment_window
 
         # Mine past epoch boundary
@@ -371,6 +383,7 @@ class TestDifficultyTransitionsAcrossEpochs:
         bc = Blockchain(data_dir=str(tmp_path))
         wallet = Wallet()
 
+        bc.dynamic_difficulty_adjuster.adjustment_window = 10
         window = bc.dynamic_difficulty_adjuster.adjustment_window
         difficulties = [bc.difficulty]
 

@@ -760,6 +760,13 @@ class AnalyticsEngine:
                 extra={"event": "explorer_backend.mempool_parse_failed"},
             )
             return {"error": str(e)}
+        except Exception as e:
+            logger.error(
+                "Unexpected mempool error: %s",
+                e,
+                extra={"event": "explorer_backend.mempool_error"},
+            )
+            return {"error": str(e)}
 
     def get_network_difficulty(self) -> dict[str, Any]:
         """Get network difficulty trend"""
@@ -812,6 +819,13 @@ class AnalyticsEngine:
                 extra={"event": "explorer_backend.stats_decode_failed"},
             )
             return None
+        except Exception as e:
+            logger.error(
+                "Unexpected stats error: %s",
+                e,
+                extra={"event": "explorer_backend.stats_error"},
+            )
+            return None
 
     def _fetch_blocks(self, limit: int = 100, offset: int = 0) -> dict[str, Any] | None:
         """Fetch blocks from node"""
@@ -836,6 +850,13 @@ class AnalyticsEngine:
                 extra={"event": "explorer_backend.blocks_decode_failed"},
             )
             return None
+        except Exception as e:
+            logger.error(
+                "Unexpected blocks error: %s",
+                e,
+                extra={"event": "explorer_backend.blocks_error"},
+            )
+            return None
 
 # ==================== SEARCH ENGINE ====================
 
@@ -857,7 +878,8 @@ class SearchEngine:
             "query": query,
             "type": search_type.value,
             "results": None,
-            "timestamp": time.time()
+            "timestamp": time.time(),
+            "found": False,
         }
 
         try:
@@ -887,6 +909,13 @@ class SearchEngine:
                 "Search error (input/parse): %s",
                 e,
                 extra={"event": "explorer_backend.search_parse_failed"},
+            )
+            result["error"] = str(e)
+        except Exception as e:
+            logger.error(
+                "Search error: %s",
+                e,
+                extra={"event": "explorer_backend.search_failed"},
             )
             result["error"] = str(e)
 
@@ -1041,6 +1070,13 @@ class RichListManager:
                 extra={"event": "explorer_backend.richlist_fetch_failed"},
             )
             return []
+        except Exception as e:
+            logger.error(
+                "Rich list error: %s",
+                e,
+                extra={"event": "explorer_backend.richlist_error"},
+            )
+            return []
 
     def _calculate_rich_list(self, limit: int) -> list[dict[str, Any]]:
         """Calculate rich list from blockchain"""
@@ -1098,6 +1134,13 @@ class RichListManager:
                 extra={"event": "explorer_backend.richlist_fetch_failed"},
             )
             return []
+        except Exception as e:
+            logger.error(
+                "Unexpected rich list error: %s",
+                e,
+                extra={"event": "explorer_backend.richlist_error"},
+            )
+            return []
 
 # ==================== CSV EXPORT ====================
 
@@ -1146,6 +1189,13 @@ class ExportManager:
                 "Export error (fetch): %s",
                 e,
                 extra={"event": "explorer_backend.export_fetch_failed"},
+            )
+            return None
+        except Exception as e:
+            logger.error(
+                "Export error: %s",
+                e,
+                extra={"event": "explorer_backend.export_failed"},
             )
             return None
 
@@ -1729,6 +1779,13 @@ def broadcast_update(update_type: str, data: dict[str, Any]) -> None:
             try:
                 client.send(message)
             except (ConnectionResetError, OSError, RuntimeError) as e:
+                logger.error(
+                    "Broadcast error: %s",
+                    e,
+                    extra={"event": "explorer_backend.broadcast_error"},
+                )
+                ws_clients.discard(client)
+            except Exception as e:
                 logger.error(
                     "Broadcast error: %s",
                     e,

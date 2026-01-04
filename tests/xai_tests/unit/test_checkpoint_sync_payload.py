@@ -3,6 +3,7 @@ Tests for payload validation via CheckpointSyncManager.
 """
 
 import hashlib
+import json
 
 from xai.core.p2p.checkpoint_sync import CheckpointSyncManager
 from xai.core.consensus.checkpoint_payload import CheckpointPayload
@@ -10,7 +11,8 @@ from xai.core.consensus.checkpoint_payload import CheckpointPayload
 
 def test_validate_payload_integrity():
     data = {"snapshot": "ok"}
-    digest = hashlib.sha256(str(data).encode("utf-8")).hexdigest()
+    serialized = json.dumps(data, sort_keys=True).encode("utf-8")
+    digest = hashlib.sha256(serialized).hexdigest()
     payload = CheckpointPayload(height=1, block_hash="h", state_hash=digest, data=data)
     assert CheckpointSyncManager.validate_payload(payload) is True
 
@@ -20,7 +22,8 @@ def test_validate_payload_integrity():
 
 def test_apply_payload_invokes_applier():
     data = {"snapshot": "ok"}
-    digest = hashlib.sha256(str(data).encode("utf-8")).hexdigest()
+    serialized = json.dumps(data, sort_keys=True).encode("utf-8")
+    digest = hashlib.sha256(serialized).hexdigest()
     payload = CheckpointPayload(height=1, block_hash="h", state_hash=digest, data=data)
 
     applied = {}

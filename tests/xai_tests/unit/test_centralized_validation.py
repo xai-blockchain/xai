@@ -16,6 +16,7 @@ from xai.core.consensus.validation import (
     validate_string,
     validate_hex_string,
 )
+from xai.core.wallets.address_checksum import normalize_address
 
 
 class TestValidateAddress:
@@ -25,13 +26,13 @@ class TestValidateAddress:
         """Test valid mainnet address with XAI prefix."""
         address = "XAI" + "0" * 40
         result = validate_address(address)
-        assert result == address
+        assert result == normalize_address(address)
 
     def test_valid_testnet_address(self):
         """Test valid testnet address with TXAI prefix."""
         address = "TXAI" + "a" * 40
         result = validate_address(address)
-        assert result == address
+        assert result == normalize_address(address)
 
     def test_special_addresses(self):
         """Test special addresses are allowed."""
@@ -276,11 +277,13 @@ class TestBackwardsCompatibility:
     def test_security_validator_methods(self):
         """Test SecurityValidator methods still work."""
         from xai.core.consensus.validation import SecurityValidator
+        from xai.core.config import NETWORK
         validator = SecurityValidator()
 
         # Test validate_address
-        addr = validator.validate_address("XAI" + "0" * 40)
-        assert addr == "XAI" + "0" * 40
+        prefix = "XAI" if NETWORK.lower() == "mainnet" else "TXAI"
+        addr = validator.validate_address(prefix + "0" * 40)
+        assert addr == prefix + "0" * 40
 
         # Test validate_amount
         amt = validator.validate_amount(10.5)

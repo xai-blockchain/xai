@@ -5,6 +5,7 @@ Goal: Achieve 80%+ coverage (154+ statements out of 193)
 Testing: All safety mechanisms, edge cases, error conditions, and integration scenarios
 """
 
+import logging
 import pytest
 import time
 import threading
@@ -48,16 +49,20 @@ class TestAISafetyControlsComprehensive:
         return MockBlockchain()
 
     @pytest.fixture
-    def safety(self, blockchain):
+    def safety(self, blockchain, tmp_path):
         """Create AISafetyControls instance"""
-        return AISafetyControls(blockchain)
+        return AISafetyControls(
+            blockchain,
+            rate_limit_storage_path=str(tmp_path / "rate_limits.json"),
+        )
 
     @pytest.fixture
-    def safety_with_custom_callers(self, blockchain):
+    def safety_with_custom_callers(self, blockchain, tmp_path):
         """Create safety controls with custom authorized callers"""
         return AISafetyControls(
             blockchain,
-            authorized_callers={"custom_admin", "CUSTOM_OPERATOR"}
+            authorized_callers={"custom_admin", "CUSTOM_OPERATOR"},
+            rate_limit_storage_path=str(tmp_path / "rate_limits.json"),
         )
 
     # ===== INITIALIZATION TESTS =====
@@ -95,7 +100,7 @@ class TestAISafetyControlsComprehensive:
 
     def test_init_thread_safety_lock(self, safety):
         """Test that thread safety lock is created"""
-        assert isinstance(safety.lock, threading.Lock)
+        assert isinstance(safety.lock, type(threading.Lock()))
 
     # ===== PERSONAL AI REQUEST TESTS =====
 
@@ -445,8 +450,9 @@ class TestAISafetyControlsComprehensive:
 
     # ===== EMERGENCY STOP TESTS =====
 
-    def test_activate_emergency_stop_success(self, safety, capsys):
+    def test_activate_emergency_stop_success(self, safety, caplog):
         """Test activating emergency stop"""
+        caplog.set_level(logging.CRITICAL, logger="xai.core.security.ai_safety_controls")
         result = safety.activate_emergency_stop(
             reason=StopReason.SECURITY_THREAT,
             details="Critical vulnerability detected",
@@ -461,9 +467,7 @@ class TestAISafetyControlsComprehensive:
         assert result["details"] == "Critical vulnerability detected"
         assert result["activated_by"] == "system"
 
-        # Verify console output
-        captured = capsys.readouterr()
-        assert "EMERGENCY STOP ACTIVATED" in captured.out
+        assert "EMERGENCY STOP ACTIVATED" in caplog.text
 
     def test_activate_emergency_stop_unauthorized(self, safety):
         """Test unauthorized user cannot activate emergency stop"""
@@ -481,7 +485,7 @@ class TestAISafetyControlsComprehensive:
         # Register multiple requests
         for i in range(3):
             safety.register_personal_ai_request(
-                f"req_{i}", f"XAI_USER_{i}", "swap", "openai", "gpt-4"
+                f"req_{i}", f"XAI_USER_{i}", "swap", "", "gpt-4"
             )
 
         result = safety.activate_emergency_stop(StopReason.EMERGENCY, activator="system")
@@ -524,8 +528,9 @@ class TestAISafetyControlsComprehensive:
         for bot in bots:
             assert bot.is_active is False
 
-    def test_deactivate_emergency_stop_success(self, safety, capsys):
+    def test_deactivate_emergency_stop_success(self, safety, caplog):
         """Test deactivating emergency stop"""
+        caplog.set_level(logging.WARNING, logger="xai.core.security.ai_safety_controls")
         safety.activate_emergency_stop(StopReason.EMERGENCY, activator="system")
         time.sleep(0.1)  # Small delay to test duration
 
@@ -536,9 +541,7 @@ class TestAISafetyControlsComprehensive:
         assert result["deactivated_by"] == "admin"
         assert result["duration_seconds"] > 0
 
-        # Verify console output
-        captured = capsys.readouterr()
-        assert "EMERGENCY STOP DEACTIVATED" in captured.out
+        assert "Emergency stop deactivated" in caplog.text
 
     def test_deactivate_emergency_stop_not_active(self, safety):
         """Test deactivating when not active"""
@@ -758,7 +761,7 @@ class TestAISafetyControlsComprehensive:
                     f"req_{start_idx}_{i}",
                     f"XAI_USER_{start_idx}",
                     "swap",
-                    "openai",
+                    "",
                     "gpt-4"
                 )
 

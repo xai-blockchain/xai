@@ -1,0 +1,16 @@
+[Unit]
+Description=XAI Testnet Block Explorer
+After=network-online.target xai.service
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu
+Environment="PATH=/home/ubuntu/xai/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="XAI_NODE_URL=http://localhost:8545"
+ExecStart=/home/ubuntu/xai/venv/bin/python3 /home/ubuntu/xai-explorer.py
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

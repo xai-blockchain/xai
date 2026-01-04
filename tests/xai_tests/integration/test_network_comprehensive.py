@@ -12,11 +12,13 @@ This file tests:
 - Node failure and recovery
 """
 
+import asyncio
 import pytest
 import time
 import threading
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import AsyncMock, Mock, patch, MagicMock
 from xai.core.blockchain import Blockchain, Transaction
+from xai.core.wallet import Wallet
 from xai.core.p2p.node_p2p import P2PNetworkManager
 from xai.core.p2p.peer_discovery import PeerDiscoveryManager
 
@@ -77,7 +79,7 @@ class TestTransactionPropagation:
 
         return blockchains, p2p_managers
 
-    @patch('xai.core.node_p2p.requests.post')
+    @patch('xai.core.p2p.node_p2p.requests.post')
     def test_transaction_broadcast_to_peers(self, mock_post, network_setup):
         """Test transaction is broadcast to all peers"""
         blockchains, p2p_managers = network_setup
@@ -93,7 +95,7 @@ class TestTransactionPropagation:
         assert mock_post.called
         assert any('node1' in str(call) for call in mock_post.call_args_list)
 
-    @patch('xai.core.node_p2p.requests.post')
+    @patch('xai.core.p2p.node_p2p.requests.post')
     def test_transaction_propagation_chain(self, mock_post, network_setup):
         """Test transaction propagates through chain"""
         blockchains, p2p_managers = network_setup
@@ -127,7 +129,7 @@ class TestBlockPropagation:
 
         return blockchains, p2p_managers
 
-    @patch('xai.core.node_p2p.requests.post')
+    @patch('xai.core.p2p.node_p2p.requests.post')
     def test_block_broadcast(self, mock_post, network_setup):
         """Test block is broadcast to peers"""
         blockchains, p2p_managers = network_setup
@@ -156,12 +158,13 @@ class TestChainSynchronization:
 
         # Node 1 has longer chain
         bc1 = Blockchain()
+        miner_wallet = Wallet()
         # Simulate longer chain by adding blocks
         for _ in range(2):
             bc1.pending_transactions.append(
-                Transaction("SYSTEM", "miner", 50, tx_type="reward")
+                Transaction("SYSTEM", miner_wallet.address, 50, tx_type="reward")
             )
-            bc1.mine_pending_transactions("miner1")
+            bc1.mine_pending_transactions(miner_wallet.address)
 
         p2p0 = P2PNetworkManager(bc0)
         p2p1 = P2PNetworkManager(bc1)
@@ -171,51 +174,42 @@ class TestChainSynchronization:
 
         return bc0, bc1, p2p0, p2p1
 
-    @patch('xai.core.node_p2p.requests.get')
-    def test_sync_adopts_longer_chain(self, mock_get, network_with_different_chains):
+    @patch('xai.core.p2p.node_p2p.P2PNetworkManager._download_remote_blocks', new_callable=AsyncMock)
+    @patch('xai.core.p2p.node_p2p.P2PNetworkManager._collect_peer_chain_summaries', new_callable=AsyncMock)
+    def test_sync_adopts_longer_chain(self, mock_collect, mock_download, network_with_different_chains):
         """Test node adopts longer chain from network"""
         bc0, bc1, p2p0, p2p1 = network_with_different_chains
 
         # Setup mock response from node1 (longer chain)
         longer_chain_data = [block.to_dict() for block in bc1.chain]
-
-        mock_response1 = Mock()
-        mock_response1.status_code = 200
-        mock_response1.json.side_effect = [
-            {"total": len(bc1.chain)},  # Initial query
-            {"blocks": longer_chain_data}  # Full chain
-        ]
-
-        mock_get.return_value = mock_response1
+        mock_collect.return_value = [{"peer": "http://node1:5001", "total": len(bc1.chain)}]
+        mock_download.return_value = longer_chain_data
 
         # Perform sync
-        result = p2p0.sync_with_network()
+        result = asyncio.run(p2p0.sync_with_network())
 
         # Should detect longer chain
         assert result is True
 
-    @patch('xai.core.node_p2p.requests.get')
-    def test_sync_keeps_own_chain_if_longest(self, mock_get):
+    @patch('xai.core.p2p.node_p2p.P2PNetworkManager._collect_peer_chain_summaries', new_callable=AsyncMock)
+    def test_sync_keeps_own_chain_if_longest(self, mock_collect):
         """Test node keeps its own chain if it's longest"""
         # Create node with long chain
         bc = Blockchain()
+        miner_wallet = Wallet()
         for _ in range(5):
             bc.pending_transactions.append(
-                Transaction("SYSTEM", "miner", 50, tx_type="reward")
+                Transaction("SYSTEM", miner_wallet.address, 50, tx_type="reward")
             )
-            bc.mine_pending_transactions("miner1")
+            bc.mine_pending_transactions(miner_wallet.address)
 
         p2p = P2PNetworkManager(bc)
         p2p.add_peer("http://node1:5001")
 
-        # Mock response from peer with shorter chain
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"total": 2}  # Shorter
+        # Mock summaries from peer with shorter chain
+        mock_collect.return_value = [{"peer": "http://node1:5001", "total": 2}]
 
-        mock_get.return_value = mock_response
-
-        result = p2p.sync_with_network()
+        result = asyncio.run(p2p.sync_with_network())
 
         # Should not update
         assert result is False
@@ -277,8 +271,8 @@ class TestNetworkPartitioning:
 class TestPeerDiscoveryIntegration:
     """Test peer discovery in network context"""
 
-    @patch('xai.core.peer_discovery.PeerDiscoveryProtocol.ping_peer')
-    @patch('xai.core.peer_discovery.PeerDiscoveryProtocol.send_get_peers_request')
+    @patch('xai.core.p2p.peer_discovery.PeerDiscoveryProtocol.ping_peer')
+    @patch('xai.core.p2p.peer_discovery.PeerDiscoveryProtocol.send_get_peers_request')
     def test_bootstrap_and_connect(self, mock_get_peers, mock_ping):
         """Test bootstrap and connection to discovered peers"""
         mock_ping.return_value = (True, 0.5)
@@ -299,7 +293,7 @@ class TestPeerDiscoveryIntegration:
         assert discovered > 0
         assert len(manager.known_peers) > 0
 
-    @patch('xai.core.peer_discovery.PeerDiscoveryProtocol.ping_peer')
+    @patch('xai.core.p2p.peer_discovery.PeerDiscoveryProtocol.ping_peer')
     def test_connect_to_discovered_peers(self, mock_ping):
         """Test connecting to discovered peers"""
         mock_ping.return_value = (True, 0.5)
@@ -336,10 +330,21 @@ class TestNodeFailureRecovery:
 
         return blockchains, p2p_managers
 
-    @patch('xai.core.node_p2p.requests.post')
-    def test_broadcast_continues_on_node_failure(self, mock_post, network_setup):
+    @patch('xai.core.p2p.node_p2p.P2PNetworkManager._get_peer_api_endpoints', return_value=[])
+    @patch('xai.core.p2p.node_p2p.P2PNetworkManager._dispatch_async')
+    @patch('xai.core.p2p.node_p2p.requests.post')
+    def test_broadcast_continues_on_node_failure(
+        self,
+        mock_post,
+        _mock_dispatch,
+        _mock_endpoints,
+        network_setup,
+    ):
         """Test broadcasting continues when some nodes fail"""
         blockchains, p2p_managers = network_setup
+        peer_endpoints = p2p_managers[0]._get_peer_api_endpoints()
+        if not peer_endpoints:
+            peer_endpoints = p2p_managers[0]._http_peers_snapshot()
 
         # Simulate one node failing
         def post_side_effect(*args, **kwargs):
@@ -356,7 +361,7 @@ class TestNodeFailureRecovery:
         p2p_managers[0].broadcast_transaction(tx)
 
         # Should have attempted all peers
-        assert mock_post.call_count == 2
+        assert mock_post.call_count == len(peer_endpoints)
 
     def test_peer_removal_after_timeout(self):
         """Test peer is removed after timeout"""
@@ -388,12 +393,17 @@ class TestConcurrentNetworkOperations:
         p2p = P2PNetworkManager(bc)
         return bc, p2p
 
-    @patch('xai.core.node_p2p.requests.post')
-    def test_concurrent_broadcasts(self, mock_post, network_setup):
+    @patch('xai.core.p2p.node_p2p.P2PNetworkManager._get_peer_api_endpoints', return_value=[])
+    @patch('xai.core.p2p.node_p2p.P2PNetworkManager._dispatch_async')
+    @patch('xai.core.p2p.node_p2p.requests.post')
+    def test_concurrent_broadcasts(self, mock_post, _mock_dispatch, _mock_endpoints, network_setup):
         """Test concurrent transaction broadcasts"""
         bc, p2p = network_setup
         p2p.add_peer("http://peer1:5000")
         p2p.add_peer("http://peer2:5000")
+        peer_endpoints = p2p._get_peer_api_endpoints()
+        if not peer_endpoints:
+            peer_endpoints = p2p._http_peers_snapshot()
 
         mock_post.return_value.status_code = 200
 
@@ -416,7 +426,7 @@ class TestConcurrentNetworkOperations:
             t.join()
 
         # All should have broadcast
-        assert mock_post.call_count >= 10  # 5 tx * 2 peers
+        assert mock_post.call_count >= len(peer_endpoints) * len(transactions)
 
     def test_concurrent_peer_additions(self, network_setup):
         """Test concurrent peer additions"""
@@ -442,8 +452,10 @@ class TestConcurrentNetworkOperations:
 class TestNetworkStressScenarios:
     """Test network under stress conditions"""
 
-    @patch('xai.core.node_p2p.requests.post')
-    def test_high_volume_broadcasts(self, mock_post):
+    @patch('xai.core.p2p.node_p2p.P2PNetworkManager._get_peer_api_endpoints', return_value=[])
+    @patch('xai.core.p2p.node_p2p.P2PNetworkManager._dispatch_async')
+    @patch('xai.core.p2p.node_p2p.requests.post')
+    def test_high_volume_broadcasts(self, mock_post, _mock_dispatch, _mock_endpoints):
         """Test network with high volume of broadcasts"""
         bc = Blockchain()
         p2p = P2PNetworkManager(bc)
@@ -451,6 +463,9 @@ class TestNetworkStressScenarios:
         # Add many peers
         for i in range(50):
             p2p.add_peer(f"http://peer{i}:5000")
+        peer_endpoints = p2p._get_peer_api_endpoints()
+        if not peer_endpoints:
+            peer_endpoints = p2p._http_peers_snapshot()
 
         mock_post.return_value.status_code = 200
 
@@ -461,10 +476,10 @@ class TestNetworkStressScenarios:
             p2p.broadcast_transaction(tx)
 
         # Should have attempted all broadcasts
-        assert mock_post.call_count == 100 * 50  # 100 tx * 50 peers
+        assert mock_post.call_count == len(peer_endpoints) * 100
 
-    @patch('xai.core.node_p2p.requests.get')
-    def test_sync_with_many_peers(self, mock_get):
+    @patch('xai.core.p2p.node_p2p.P2PNetworkManager._collect_peer_chain_summaries', new_callable=AsyncMock)
+    def test_sync_with_many_peers(self, mock_collect):
         """Test synchronization with many peers"""
         bc = Blockchain()
         p2p = P2PNetworkManager(bc)
@@ -473,24 +488,22 @@ class TestNetworkStressScenarios:
         for i in range(20):
             p2p.add_peer(f"http://peer{i}:5000")
 
-        # Mock responses from peers
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"total": 1}
+        mock_collect.return_value = []
 
-        mock_get.return_value = mock_response
-
-        p2p.sync_with_network()
+        asyncio.run(p2p.sync_with_network())
 
         # Should have queried all peers
-        assert mock_get.call_count == 20
+        assert mock_collect.await_count == 1
+        assert len(mock_collect.call_args[0][0]) == 20
 
 
 class TestNetworkErrorRecovery:
     """Test network error recovery mechanisms"""
 
-    @patch('xai.core.node_p2p.requests.post')
-    def test_retry_after_timeout(self, mock_post):
+    @patch('xai.core.p2p.node_p2p.P2PNetworkManager._get_peer_api_endpoints', return_value=[])
+    @patch('xai.core.p2p.node_p2p.P2PNetworkManager._dispatch_async')
+    @patch('xai.core.p2p.node_p2p.requests.post')
+    def test_retry_after_timeout(self, mock_post, _mock_dispatch, _mock_endpoints):
         """Test operations continue after timeout"""
         bc = Blockchain()
         p2p = P2PNetworkManager(bc)
@@ -513,25 +526,21 @@ class TestNetworkErrorRecovery:
 
         assert mock_post.call_count == 2
 
-    @patch('xai.core.node_p2p.requests.get')
-    def test_sync_recovery_after_errors(self, mock_get):
+    @patch('xai.core.p2p.node_p2p.P2PNetworkManager._collect_peer_chain_summaries', new_callable=AsyncMock)
+    def test_sync_recovery_after_errors(self, mock_collect):
         """Test sync recovers after errors"""
         bc = Blockchain()
         p2p = P2PNetworkManager(bc)
         p2p.add_peer("http://peer1:5000")
 
-        # First attempt fails
-        mock_get.side_effect = Exception("Network error")
-        result1 = p2p.sync_with_network()
+        # First attempt returns no summaries
+        mock_collect.return_value = []
+        result1 = asyncio.run(p2p.sync_with_network())
         assert result1 is False
 
         # Second attempt succeeds
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"total": 1}
-        mock_get.side_effect = None
-        mock_get.return_value = mock_response
+        mock_collect.return_value = [{"peer": "http://peer1:5000", "total": len(bc.chain)}]
 
-        result2 = p2p.sync_with_network()
+        result2 = asyncio.run(p2p.sync_with_network())
         # Since chain length is same, no update needed
         assert result2 is False  # But operation completes

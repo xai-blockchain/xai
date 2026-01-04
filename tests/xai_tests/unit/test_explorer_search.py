@@ -151,6 +151,7 @@ class TestExplorerSearch:
         )
 
         if tx:
+            assert bc.add_transaction(tx)
             txid = tx.txid
             bc.mine_pending_transactions(wallet1.address)
 
@@ -295,6 +296,7 @@ class TestExplorerSearch:
         )
 
         if tx:
+            assert bc.add_transaction(tx)
             txid = tx.txid
             bc.mine_pending_transactions(wallet1.address)
 

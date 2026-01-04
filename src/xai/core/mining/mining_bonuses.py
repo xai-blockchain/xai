@@ -22,7 +22,7 @@ from xai.core.config import Config
 logger = logging.getLogger(__name__)
 
 # Path to static config file
-_CONFIG_PATH = Path(__file__).parent.parent / "config" / "achievements.json"
+_CONFIG_PATH = Path(__file__).parents[2] / "config" / "achievements.json"
 
 
 class BonusSupplyExceededError(RuntimeError):

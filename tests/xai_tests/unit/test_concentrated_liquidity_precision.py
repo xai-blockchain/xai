@@ -52,7 +52,7 @@ class TestSafeMul:
         # Create numbers that would overflow uint256
         a = 2**200
         b = 2**100
-        with pytest.raises(OverflowError, match="Multiplication overflow"):
+        with pytest.raises(VMExecutionError, match="overflow"):
             safe_mul(a, b)
 
     def test_safe_mul_max_uint256(self):
@@ -62,7 +62,7 @@ class TestSafeMul:
         assert result == MAX_UINT256
 
         # This should overflow
-        with pytest.raises(OverflowError):
+        with pytest.raises(VMExecutionError):
             safe_mul(MAX_UINT256, 2)
 
 
@@ -125,7 +125,7 @@ class TestWadArithmetic:
 
     def test_wad_div_zero(self):
         """Test division by zero is caught."""
-        with pytest.raises(ValueError, match="Division by zero"):
+        with pytest.raises(VMExecutionError, match="division by zero"):
             wad_div(WAD, 0, round_up=False)
 
 
@@ -136,7 +136,7 @@ class TestRayArithmetic:
         """Test basic RAY multiplication."""
         a = int(1.5 * RAY)
         b = int(2.0 * RAY)
-        result = ray_mul(a, b, round_up=False)
+        result = ray_mul(a, b)
         expected = int(3.0 * RAY)
         # Allow for small rounding differences due to very high precision
         assert abs(result - expected) < RAY // 10000  # 0.01% tolerance
@@ -145,7 +145,7 @@ class TestRayArithmetic:
         """Test basic RAY division."""
         a = int(6.0 * RAY)
         b = int(2.0 * RAY)
-        result = ray_div(a, b, round_up=False)
+        result = ray_div(a, b)
         expected = int(3.0 * RAY)
         # Allow for small rounding differences
         assert abs(result - expected) < RAY // 10000  # 0.01% tolerance
@@ -509,7 +509,7 @@ class TestEdgeCases:
         assert result == half_max
 
         # Full MAX_UINT256 * 2 should overflow
-        with pytest.raises(OverflowError):
+        with pytest.raises(VMExecutionError):
             safe_mul(MAX_UINT256, 2)
 
     def test_rounding_always_favors_protocol(self):

@@ -621,12 +621,13 @@ class TestAdvancedConsensusManagerEdgeCases:
 
     def test_process_orphans_recursive_chain(self, tmp_path):
         """Test processing chain of orphans recursively"""
-        bc = Blockchain(data_dir=str(tmp_path))
+        bc = MagicMock()
+        bc.chain = [MagicMock(hash="1" * 64)]
+        bc.difficulty = 1
         manager = AdvancedConsensusManager(bc)
-        wallet = Wallet()
 
         # Create chain of orphans (use valid 64-char hex hashes)
-        parent_hash = bc.get_latest_block().hash
+        parent_hash = bc.chain[-1].hash
         orphan1_hash = "a" * 64  # Valid format hash
         orphan2_hash = "b" * 64  # Valid format hash
 
@@ -643,7 +644,8 @@ class TestAdvancedConsensusManagerEdgeCases:
         # Process orphans
         manager.process_orphans_after_block(parent_hash)
 
-        # Orphans should be processed (may still be in pool if validation fails)
+        # Orphan 1 should be removed after processing
+        assert orphan1_hash not in manager.orphan_pool.orphan_blocks
 
     def test_order_pending_transactions_empty(self, tmp_path):
         """Test ordering with no pending transactions"""
@@ -728,7 +730,7 @@ class TestTransactionOrderingRulesEdgeCases:
         rules = TransactionOrderingRules()
         wallet = Wallet()
 
-        tx = Transaction(wallet.address, "addr1", 10.0, 0.1)
+        tx = Transaction(wallet.address, Wallet().address, 10.0, 0.1)
 
         assert len(rules.order_by_fee([tx])) == 1
         assert len(rules.order_by_timestamp([tx])) == 1
@@ -773,8 +775,22 @@ class TestComplexIntegrationScenarios:
             bc.mine_pending_transactions(wallet.address)
 
         # Create some transactions
-        tx1 = bc.create_transaction(wallet.address, "addr1", 1.0, 0.5, wallet.private_key, wallet.public_key)
-        tx2 = bc.create_transaction(wallet.address, "addr2", 1.0, 0.3, wallet.private_key, wallet.public_key)
+        tx1 = bc.create_transaction(
+            wallet.address,
+            Wallet().address,
+            1.0,
+            0.5,
+            wallet.private_key,
+            wallet.public_key,
+        )
+        tx2 = bc.create_transaction(
+            wallet.address,
+            Wallet().address,
+            1.0,
+            0.3,
+            wallet.private_key,
+            wallet.public_key,
+        )
 
         if tx1:
             bc.add_transaction(tx1)

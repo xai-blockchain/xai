@@ -37,9 +37,13 @@ def mock_blockchain():
 
 
 @pytest.fixture
-def mock_safety_controls(mock_blockchain):
+def mock_safety_controls(mock_blockchain, tmp_path):
     """Create a mock AISafetyControls instance"""
-    return AISafetyControls(mock_blockchain, authorized_callers={"test_system", "governance_dao"})
+    return AISafetyControls(
+        mock_blockchain,
+        authorized_callers={"test_system", "governance_dao"},
+        rate_limit_storage_path=str(tmp_path / "rate_limits.json"),
+    )
 
 
 @pytest.fixture
@@ -770,8 +774,8 @@ def test_add_safety_caller_no_json_payload(app_client, mock_safety_controls):
     """Test adding caller without JSON payload"""
     response = app_client.post("/ai/safety-callers")
 
-    # When no JSON is provided, the API returns 500 due to NoneType access
-    assert response.status_code == 500
+    # When no JSON is provided, the API returns 400 with an error message
+    assert response.status_code == 400
     data = response.get_json()
     assert "error" in data
 

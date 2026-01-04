@@ -12,13 +12,15 @@ from datetime import datetime, timezone, timedelta
 
 from xai.core.security.jwt_auth_manager import JWTAuthManager, UserRole
 
+SECRET_KEY = "test_secret_key_32_chars_minimum____"
+
 
 class TestJWTAuthManagerCleanup:
     """Test suite for JWT Auth Manager blacklist automatic cleanup."""
 
     def test_cleanup_enabled_by_default(self):
         """Cleanup should be enabled by default."""
-        mgr = JWTAuthManager(secret_key="test_secret")
+        mgr = JWTAuthManager(secret_key=SECRET_KEY)
         try:
             assert mgr._cleanup_enabled is True
             assert mgr._cleanup_thread is not None
@@ -28,7 +30,7 @@ class TestJWTAuthManagerCleanup:
 
     def test_cleanup_disabled_when_configured(self):
         """Cleanup can be disabled via configuration."""
-        mgr = JWTAuthManager(secret_key="test_secret", cleanup_enabled=False)
+        mgr = JWTAuthManager(secret_key=SECRET_KEY, cleanup_enabled=False)
         assert mgr._cleanup_enabled is False
         assert mgr._cleanup_thread is None
 
@@ -36,7 +38,7 @@ class TestJWTAuthManagerCleanup:
         """Cleanup interval should be configurable."""
         custom_interval = 300  # 5 minutes
         mgr = JWTAuthManager(
-            secret_key="test_secret",
+            secret_key=SECRET_KEY,
             cleanup_interval_seconds=custom_interval
         )
         try:
@@ -48,7 +50,7 @@ class TestJWTAuthManagerCleanup:
         """Manual cleanup should remove expired tokens from blacklist."""
         # Create manager with very short token expiry (1 second)
         mgr = JWTAuthManager(
-            secret_key="test_secret",
+            secret_key=SECRET_KEY,
             token_expiration_hours=1/3600,  # 1 second
             cleanup_enabled=False  # Disable auto-cleanup for manual testing
         )
@@ -74,7 +76,7 @@ class TestJWTAuthManagerCleanup:
     def test_cleanup_keeps_valid_tokens(self):
         """Cleanup should NOT remove tokens that haven't expired."""
         mgr = JWTAuthManager(
-            secret_key="test_secret",
+            secret_key=SECRET_KEY,
             token_expiration_hours=1,  # 1 hour - won't expire during test
             cleanup_enabled=False
         )
@@ -98,14 +100,14 @@ class TestJWTAuthManagerCleanup:
         """Cleanup should remove only expired tokens, keeping valid ones."""
         # Short-lived tokens
         mgr_short = JWTAuthManager(
-            secret_key="test_secret",
+            secret_key=SECRET_KEY,
             token_expiration_hours=1/3600,  # 1 second
             cleanup_enabled=False
         )
 
         # Long-lived tokens
         mgr_long = JWTAuthManager(
-            secret_key="test_secret",
+            secret_key=SECRET_KEY,
             token_expiration_hours=1,  # 1 hour
             cleanup_enabled=False
         )
@@ -120,7 +122,7 @@ class TestJWTAuthManagerCleanup:
 
         # Create a combined manager for cleanup testing
         mgr_combined = JWTAuthManager(
-            secret_key="test_secret",
+            secret_key=SECRET_KEY,
             token_expiration_hours=1,
             cleanup_enabled=False
         )
@@ -145,7 +147,7 @@ class TestJWTAuthManagerCleanup:
 
     def test_background_cleanup_thread_starts(self):
         """Background cleanup thread should start automatically when enabled."""
-        mgr = JWTAuthManager(secret_key="test_secret", cleanup_enabled=True)
+        mgr = JWTAuthManager(secret_key=SECRET_KEY, cleanup_enabled=True)
         try:
             # Verify thread is running
             assert mgr._cleanup_thread is not None
@@ -158,7 +160,7 @@ class TestJWTAuthManagerCleanup:
     def test_background_cleanup_stops_gracefully(self):
         """Background cleanup thread should stop gracefully when requested."""
         mgr = JWTAuthManager(
-            secret_key="test_secret",
+            secret_key=SECRET_KEY,
             cleanup_enabled=True,
             cleanup_interval_seconds=10
         )
@@ -179,7 +181,7 @@ class TestJWTAuthManagerCleanup:
         """Background cleanup should automatically remove expired tokens."""
         # Create manager with very short cleanup interval
         mgr = JWTAuthManager(
-            secret_key="test_secret",
+            secret_key=SECRET_KEY,
             token_expiration_hours=1/3600,  # 1 second
             cleanup_enabled=True,
             cleanup_interval_seconds=2  # Run cleanup every 2 seconds
@@ -203,7 +205,7 @@ class TestJWTAuthManagerCleanup:
 
     def test_thread_safety_concurrent_revocations(self):
         """Blacklist operations should be thread-safe."""
-        mgr = JWTAuthManager(secret_key="test_secret", cleanup_enabled=False)
+        mgr = JWTAuthManager(secret_key=SECRET_KEY, cleanup_enabled=False)
 
         tokens = []
         for i in range(10):
@@ -227,7 +229,7 @@ class TestJWTAuthManagerCleanup:
     def test_thread_safety_concurrent_cleanup(self):
         """Cleanup should be thread-safe when called concurrently."""
         mgr = JWTAuthManager(
-            secret_key="test_secret",
+            secret_key=SECRET_KEY,
             token_expiration_hours=1/3600,  # 1 second
             cleanup_enabled=False
         )
@@ -268,7 +270,7 @@ class TestJWTAuthManagerCleanup:
 
     def test_thread_safety_read_write_concurrent(self):
         """Reading and writing blacklist should be thread-safe."""
-        mgr = JWTAuthManager(secret_key="test_secret", cleanup_enabled=False)
+        mgr = JWTAuthManager(secret_key=SECRET_KEY, cleanup_enabled=False)
 
         # Generate initial tokens
         initial_tokens = []
@@ -325,7 +327,7 @@ class TestJWTAuthManagerCleanup:
     def test_cleanup_logs_statistics(self, caplog):
         """Cleanup should log statistics about removed tokens."""
         mgr = JWTAuthManager(
-            secret_key="test_secret",
+            secret_key=SECRET_KEY,
             token_expiration_hours=1/3600,  # 1 second
             cleanup_enabled=False
         )
@@ -352,7 +354,7 @@ class TestJWTAuthManagerCleanup:
         import atexit
 
         # Create manager
-        mgr = JWTAuthManager(secret_key="test_secret", cleanup_enabled=True)
+        mgr = JWTAuthManager(secret_key=SECRET_KEY, cleanup_enabled=True)
 
         try:
             # The _shutdown_cleanup method should be registered
@@ -364,7 +366,7 @@ class TestJWTAuthManagerCleanup:
 
     def test_double_stop_cleanup_safe(self):
         """Calling stop_cleanup multiple times should be safe."""
-        mgr = JWTAuthManager(secret_key="test_secret", cleanup_enabled=True)
+        mgr = JWTAuthManager(secret_key=SECRET_KEY, cleanup_enabled=True)
 
         # Stop cleanup multiple times
         mgr.stop_cleanup()
@@ -376,7 +378,7 @@ class TestJWTAuthManagerCleanup:
 
     def test_cleanup_empty_blacklist(self):
         """Cleanup should handle empty blacklist gracefully."""
-        mgr = JWTAuthManager(secret_key="test_secret", cleanup_enabled=False)
+        mgr = JWTAuthManager(secret_key=SECRET_KEY, cleanup_enabled=False)
 
         # Blacklist is empty
         assert mgr.get_blacklist_size() == 0
@@ -389,7 +391,7 @@ class TestJWTAuthManagerCleanup:
 
     def test_get_blacklist_size_thread_safe(self):
         """get_blacklist_size should be thread-safe."""
-        mgr = JWTAuthManager(secret_key="test_secret", cleanup_enabled=False)
+        mgr = JWTAuthManager(secret_key=SECRET_KEY, cleanup_enabled=False)
 
         # Add initial tokens
         for i in range(10):

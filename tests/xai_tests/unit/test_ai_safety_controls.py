@@ -44,9 +44,12 @@ class TestAISafetyControls:
         return MockBlockchain()
 
     @pytest.fixture
-    def safety(self, blockchain):
+    def safety(self, blockchain, tmp_path):
         """Create AISafetyControls instance"""
-        return AISafetyControls(blockchain)
+        return AISafetyControls(
+            blockchain,
+            rate_limit_storage_path=str(tmp_path / "rate_limits.json"),
+        )
 
     def test_init(self, safety):
         """Test initialization"""

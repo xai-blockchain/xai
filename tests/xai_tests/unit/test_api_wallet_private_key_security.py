@@ -166,7 +166,7 @@ class TestPrivateKeySecurityWalletCreate:
         assert "public_key" in data
 
         # Verify format
-        assert data["address"].startswith("XAI")
+        assert data["address"].startswith(("XAI", "TXAI"))
         assert len(data["public_key"]) > 0
 
     def test_wallet_create_includes_security_warnings(self, test_client):
@@ -279,7 +279,7 @@ class TestPrivateKeySecurityWalletCreate:
         """Verify password is never logged or exposed in response"""
         password = "SecretPassword123!"
 
-        with patch("xai.core.api_wallet.logger") as mock_logger:
+        with patch("xai.core.api.api_wallet.logger") as mock_logger:
             response = test_client.post(
                 "/wallet/create",
                 data=json.dumps({"encryption_password": password}),

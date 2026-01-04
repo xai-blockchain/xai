@@ -148,7 +148,27 @@ class GovernanceAPIHandler:
         Returns:
             Tuple of (response dict, HTTP status code)
         """
-        balance = self.node.blockchain.get_balance(address)
+        try:
+            balance = self.node.blockchain.get_balance(address)
+        except Exception as exc:
+            logger.error(
+                "Failed to retrieve voting power balance: %s",
+                exc,
+                extra={
+                    "error_type": type(exc).__name__,
+                    "address": address,
+                },
+            )
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": "VOTING_POWER_UNAVAILABLE",
+                        "message": str(exc),
+                    }
+                ),
+                500,
+            )
 
         # In production, integrate with enhanced_voting_system
         coin_power = balance * 0.70

@@ -16,6 +16,7 @@ class DummyBlockchain:
         self.orphan_blocks = {}
         self.max_orphan_blocks = 2
         self.reorg_wal_path = wal_path
+        self._max_pow_target = int("f" * 64, 16)
         self.storage = SimpleNamespace(load_block_from_disk=lambda idx: None)
         self.state_manager = SimpleNamespace(add_block_to_chain=lambda block: True)
 
@@ -33,7 +34,14 @@ def test_calculate_chain_work_handles_headers_and_wrappers(tmp_path):
 
     work = fm._calculate_chain_work(chain)
 
-    assert work == (2**1 + 2**2 + 2**3)
+    def expected_work(diff: int) -> int:
+        shift_bits = min(diff * 4, 256)
+        target = 0 if shift_bits >= 256 else bc._max_pow_target >> shift_bits
+        return bc._max_pow_target // max(target + 1, 1)
+
+    expected = sum(expected_work(item.header.difficulty if hasattr(item, "header") else item.difficulty)
+                  for item in chain)
+    assert work == expected
 
 
 def test_prune_orphans_respects_maximum(tmp_path):

@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from xai.security.hsm import HardwareSecurityModule, KeyType, KeyPurpose
+from xai.security.hsm import HardwareSecurityModule, KeyType, KeyPurpose, HSMSigningError
 
 
 def _hsm(tmp_path: Path) -> HardwareSecurityModule:
@@ -36,7 +36,7 @@ def test_sign_and_verify_round_trip(tmp_path):
     message = b"hello"
     signature = hsm.sign(key_id, message)
     assert hsm.verify_signature(key_id, message, signature) is True
-    with pytest.raises(ValueError):
+    with pytest.raises(HSMSigningError):
         hsm.sign("unknown", message)
     with pytest.raises(ValueError):
         hsm.verify_signature("unknown", message, signature)

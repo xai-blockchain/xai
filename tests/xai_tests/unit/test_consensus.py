@@ -186,13 +186,16 @@ class TestTransactionOrderingRules:
         """Test ordering transactions by fee"""
         rules = TransactionOrderingRules()
         wallet = Wallet()
+        recipient1 = Wallet().address
+        recipient2 = Wallet().address
+        recipient3 = Wallet().address
 
         from xai.core.blockchain import Transaction
 
         # Create transactions with different fees
-        tx1 = Transaction(wallet.address, "XAI123", 10.0, 0.1)
-        tx2 = Transaction(wallet.address, "XAI456", 10.0, 0.5)
-        tx3 = Transaction(wallet.address, "XAI789", 10.0, 0.3)
+        tx1 = Transaction(wallet.address, recipient1, 10.0, 0.1)
+        tx2 = Transaction(wallet.address, recipient2, 10.0, 0.5)
+        tx3 = Transaction(wallet.address, recipient3, 10.0, 0.3)
 
         transactions = [tx1, tx2, tx3]
         ordered = rules.order_by_fee(transactions)
@@ -206,14 +209,17 @@ class TestTransactionOrderingRules:
         """Test ordering transactions by timestamp"""
         rules = TransactionOrderingRules()
         wallet = Wallet()
+        recipient1 = Wallet().address
+        recipient2 = Wallet().address
+        recipient3 = Wallet().address
 
         from xai.core.blockchain import Transaction
 
-        tx1 = Transaction(wallet.address, "XAI123", 10.0, 0.1)
+        tx1 = Transaction(wallet.address, recipient1, 10.0, 0.1)
         time.sleep(0.01)
-        tx2 = Transaction(wallet.address, "XAI456", 10.0, 0.1)
+        tx2 = Transaction(wallet.address, recipient2, 10.0, 0.1)
         time.sleep(0.01)
-        tx3 = Transaction(wallet.address, "XAI789", 10.0, 0.1)
+        tx3 = Transaction(wallet.address, recipient3, 10.0, 0.1)
 
         transactions = [tx3, tx1, tx2]
         ordered = rules.order_by_timestamp(transactions)
@@ -225,13 +231,16 @@ class TestTransactionOrderingRules:
         """Test transaction prioritization"""
         rules = TransactionOrderingRules()
         wallet = Wallet()
+        recipient1 = Wallet().address
+        recipient2 = Wallet().address
+        recipient3 = Wallet().address
 
         from xai.core.blockchain import Transaction
 
         # Create mix of transactions
-        tx1 = Transaction(wallet.address, "XAI123", 10.0, 0.1)
-        tx2 = Transaction(wallet.address, "XAI456", 10.0, 1.0)  # High fee
-        tx3 = Transaction(wallet.address, "XAI789", 10.0, 0.2)
+        tx1 = Transaction(wallet.address, recipient1, 10.0, 0.1)
+        tx2 = Transaction(wallet.address, recipient2, 10.0, 1.0)  # High fee
+        tx3 = Transaction(wallet.address, recipient3, 10.0, 0.2)
 
         transactions = [tx1, tx2, tx3]
         prioritized = rules.prioritize(transactions)

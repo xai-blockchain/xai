@@ -911,8 +911,9 @@ class ConsensusManager:
         if genesis.index != 0:
             return False, "Genesis block must have index 0"
 
-        if genesis.previous_hash != "0":
-            return False, "Genesis block must have previous_hash of '0'"
+        prev_hash = str(getattr(genesis, "previous_hash", ""))
+        if not prev_hash or set(prev_hash) != {"0"}:
+            return False, "Genesis block must have previous_hash of all zeros"
 
         # Validate each subsequent block
         for i in range(1, len(chain)):

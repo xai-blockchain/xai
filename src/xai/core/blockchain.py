@@ -1735,6 +1735,43 @@ class Blockchain(
             self._rollback_reorg_wal(wal_entry)
             raise
 
+    def create_manual_checkpoint(self) -> dict[str, Any]:
+        """
+        Create a manual checkpoint at the current tip.
+
+        Returns:
+            Dict with success flag and checkpoint metadata.
+        """
+        if not self.chain:
+            return {"success": False, "error": "No blocks available for checkpoint"}
+
+        try:
+            checkpoint = self.checkpoint_manager.create_manual_checkpoint(
+                self.chain[-1],
+                self.utxo_manager,
+                self.get_circulating_supply(),
+            )
+        except Exception as exc:
+            self.logger.error(
+                "Manual checkpoint creation failed",
+                extra={"error": str(exc), "error_type": type(exc).__name__},
+                exc_info=True,
+            )
+            return {"success": False, "error": str(exc)}
+
+        if not checkpoint:
+            return {"success": False, "error": "Checkpoint creation failed"}
+
+        return {
+            "success": True,
+            "height": checkpoint.height,
+            "checkpoint_hash": checkpoint.checkpoint_hash,
+        }
+
+    def get_checkpoint_info(self) -> dict[str, Any]:
+        """Return checkpoint manager status information."""
+        return self.checkpoint_manager.get_checkpoint_info()
+
     def get_latest_block(self) -> Block:
         """Get the last block in the chain by loading it from disk.
 
@@ -1996,20 +2033,28 @@ class Blockchain(
         if not self._block_within_size_limits(block, context="inbound_block"):
             return False
 
+        can_validate_time = True
         history_view = self.chain[:header.index] if header.index <= len(self.chain) else self.chain
-        time_valid, time_error = self._validate_block_timestamp(
-            header,
-            history_view,
-            emit_metrics=True,
-        )
-        if not time_valid:
-            self.logger.warn(
-                "Block rejected due to timestamp violation",
-                block_hash=header.hash,
-                block_index=header.index,
-                reason=time_error,
+        if header.index > 0:
+            if header.index > len(self.chain):
+                can_validate_time = False
+            elif self.chain and header.index - 1 < len(self.chain):
+                if self.chain[header.index - 1].hash != header.previous_hash:
+                    can_validate_time = False
+        if can_validate_time:
+            time_valid, time_error = self._validate_block_timestamp(
+                header,
+                history_view,
+                emit_metrics=True,
             )
-            return False
+            if not time_valid:
+                self.logger.warn(
+                    "Block rejected due to timestamp violation",
+                    block_hash=header.hash,
+                    block_index=header.index,
+                    reason=time_error,
+                )
+                return False
 
         # Enforce deterministic difficulty schedule when parent history is known
         if header.index > 0 and header.index <= len(self.chain):
@@ -2776,7 +2821,7 @@ class Blockchain(
                                 "reason": "validation_failed",
                             }
                         )
-                except (ValidationError, ValueError, RuntimeError, KeyError) as e:
+                except Exception as e:
                     evicted_count += 1
                     self.logger.warning(
                         f"Evicting transaction {tx.txid} from mempool after chain reorganization - "

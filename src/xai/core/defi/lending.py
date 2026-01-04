@@ -32,6 +32,7 @@ from .safe_math import (
     MAX_DEBT,
     MAX_PRICE,
     MAX_SUPPLY,
+    MAX_UINT256,
     SafeMath,
     assert_health_factor_valid,
     assert_supply_debt_invariant,
@@ -1079,7 +1080,7 @@ class LendingPool:
 
         # Health factor = collateral_threshold_value / debt_value
         health_factor = SafeMath.safe_mul(
-            total_collateral_threshold, self.RAY, MAX_COLLATERAL, "health_factor"
+            total_collateral_threshold, self.RAY, MAX_UINT256, "health_factor"
         )
         health_factor = health_factor // total_debt
 

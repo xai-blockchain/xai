@@ -77,7 +77,6 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "hypothesis>=6.92.0",
     "faker>=22.0.0",
-    "hypothesis>=6.92.0",
 
     # Code Quality
     "black>=24.0.0",

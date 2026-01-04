@@ -141,7 +141,7 @@ class TestJWTExpiration:
         time.sleep(0.1)
 
         # Mock security logging
-        with patch("xai.core.api_auth.log_security_event") as mock_log:
+        with patch("xai.core.api.api_auth.log_security_event") as mock_log:
             valid, payload, error = manager.validate_token(
                 access_token,
                 remote_addr="192.168.1.100"
@@ -168,7 +168,7 @@ class TestJWTExpiration:
             algorithm="HS256"
         )
 
-        with patch("xai.core.api_auth.log_security_event") as mock_log:
+        with patch("xai.core.api.api_auth.log_security_event") as mock_log:
             valid, payload, error = manager.validate_token(
                 wrong_token,
                 remote_addr="192.168.1.100"
@@ -191,7 +191,7 @@ class TestJWTExpiration:
         # Revoke token
         manager.revoke_token(access_token)
 
-        with patch("xai.core.api_auth.log_security_event") as mock_log:
+        with patch("xai.core.api.api_auth.log_security_event") as mock_log:
             valid, payload, error = manager.validate_token(
                 access_token,
                 remote_addr="192.168.1.100"

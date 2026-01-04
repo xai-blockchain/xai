@@ -2,28 +2,37 @@
 
 import pytest
 
+from xai.core.blockchain import Blockchain
+from xai.core.config import Config
 from xai.core.node import BlockchainNode
+from xai.core.wallet import Wallet
+from xai.core.wallets.address_checksum import normalize_address
 
 
 @pytest.fixture
-def node_client():
-    node = BlockchainNode(miner_address="XAI_TEST_MINER")
+def node_client(tmp_path):
+    blockchain = Blockchain(data_dir=str(tmp_path))
+    node = BlockchainNode(blockchain=blockchain, miner_address=Wallet().address)
     client = node.app.test_client()
     return node, client
 
 
 def test_contract_abi_endpoint_returns_payload(node_client):
     node, client = node_client
-    address = "XAI" + "A" * 40
-    normalized = address.upper()
-    node.blockchain.contracts[normalized] = {
+    address = f"{Config.ADDRESS_PREFIX}{'a' * 40}"
+    normalized = normalize_address(address)
+    contract_key = address.upper()
+    node.blockchain.contracts[contract_key] = {
         "creator": "XAITEST",
         "code": b"",
         "storage": {},
         "gas_limit": 1_000_000,
         "balance": 0,
         "created_at": 0,
-        "abi": [
+    }
+    node.blockchain.store_contract_abi(
+        address,
+        [
             {
                 "type": "function",
                 "name": "balanceOf",
@@ -31,10 +40,9 @@ def test_contract_abi_endpoint_returns_payload(node_client):
                 "outputs": [{"name": "balance", "type": "uint256"}],
             }
         ],
-        "abi_verified": True,
-        "abi_source": "unit-test",
-        "abi_updated_at": 123.0,
-    }
+        verified=True,
+        source="unit-test",
+    )
 
     response = client.get(f"/contracts/{address}/abi")
     assert response.status_code == 200
@@ -47,20 +55,23 @@ def test_contract_abi_endpoint_returns_payload(node_client):
 
 def test_contract_events_endpoint_filters_receipts(node_client):
     node, client = node_client
-    address = "XAI" + "B" * 40
-    normalized = address.upper()
+    address = f"{Config.ADDRESS_PREFIX}{'b' * 40}"
+    normalized = normalize_address(address)
+    contract_key = address.upper()
+    from_address = f"{Config.ADDRESS_PREFIX}{'1' * 40}"
+    to_address = f"{Config.ADDRESS_PREFIX}{'2' * 40}"
     node.blockchain.contract_receipts = [
         {
             "txid": "tx123",
-            "contract": normalized,
+            "contract": contract_key,
             "success": True,
             "gas_used": 21000,
             "return_data": "",
             "logs": [
                 {
                     "event": "Transfer",
-                    "from": "XAI" + "1" * 40,
-                    "to": "XAI" + "2" * 40,
+                    "from": from_address,
+                    "to": to_address,
                     "value": 15,
                 }
             ],
@@ -83,7 +94,7 @@ def test_contract_events_endpoint_filters_receipts(node_client):
 
 def test_contract_abi_missing_returns_404(node_client):
     node, client = node_client
-    address = "XAI" + "C" * 40
+    address = f"{Config.ADDRESS_PREFIX}{'c' * 40}"
     response = client.get(f"/contracts/{address}/abi")
     assert response.status_code == 404
     payload = response.get_json()

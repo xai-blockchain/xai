@@ -65,7 +65,7 @@ def sample_donated_key():
 @pytest.fixture
 def mock_metrics():
     """Mock metrics module"""
-    with patch("xai.core.ai_pool_with_strict_limits.metrics") as mock_metrics:
+    with patch("xai.core.security.ai_pool_with_strict_limits.metrics") as mock_metrics:
         mock_metrics.record_tokens = Mock()
         yield mock_metrics
 
@@ -392,8 +392,8 @@ class TestSubmitAPIKeyDonation:
 class TestExecuteAITaskWithLimits:
     """Test execute_ai_task_with_limits method"""
 
-    @patch("xai.core.ai_pool_with_strict_limits.metrics")
-    @patch("xai.core.ai_pool_with_strict_limits.anthropic")
+    @patch("xai.core.security.ai_pool_with_strict_limits.metrics")
+    @patch("xai.core.security.ai_pool_with_strict_limits.anthropic")
     def test_execute_task_success(self, mock_anthropic, mock_metrics, pool_manager):
         """Test successful task execution"""
         # Setup
@@ -455,8 +455,8 @@ class TestExecuteAITaskWithLimits:
         assert result["success"] is False
         assert result["error"] == "INSUFFICIENT_DONATED_CREDITS"
 
-    @patch("xai.core.ai_pool_with_strict_limits.metrics")
-    @patch("xai.core.ai_pool_with_strict_limits.openai")
+    @patch("xai.core.security.ai_pool_with_strict_limits.metrics")
+    @patch("xai.core.security.ai_pool_with_strict_limits.openai")
     def test_execute_task_openai_provider(self, mock_openai, mock_metrics, pool_manager):
         """Test task execution with OpenAI provider"""
         pool_manager.submit_api_key_donation(
@@ -481,8 +481,8 @@ class TestExecuteAITaskWithLimits:
         assert result["success"] is True
         assert result["tokens_used"] == 200
 
-    @patch("xai.core.ai_pool_with_strict_limits.metrics")
-    @patch("xai.core.ai_pool_with_strict_limits.genai")
+    @patch("xai.core.security.ai_pool_with_strict_limits.metrics")
+    @patch("xai.core.security.ai_pool_with_strict_limits.genai")
     def test_execute_task_google_provider(self, mock_genai, mock_metrics, pool_manager):
         """Test task execution with Google provider"""
         pool_manager.submit_api_key_donation(
@@ -778,7 +778,7 @@ class TestDeductTokensFromKeys:
 class TestAPIProviderCalls:
     """Test API provider-specific calls"""
 
-    @patch("xai.core.ai_pool_with_strict_limits.anthropic")
+    @patch("xai.core.security.ai_pool_with_strict_limits.anthropic")
     def test_call_anthropic_success(self, mock_anthropic, pool_manager):
         """Test successful Anthropic API call"""
         mock_response = Mock()
@@ -792,7 +792,7 @@ class TestAPIProviderCalls:
         assert result["tokens_used"] == 150
         assert result["output"] == "Test response"
 
-    @patch("xai.core.ai_pool_with_strict_limits.anthropic")
+    @patch("xai.core.security.ai_pool_with_strict_limits.anthropic")
     def test_call_anthropic_api_error(self, mock_anthropic, pool_manager):
         """Test Anthropic API call with error"""
         # Create a custom APIError class
@@ -808,7 +808,7 @@ class TestAPIProviderCalls:
         assert "error" in result
         assert result["tokens_used"] == 0
 
-    @patch("xai.core.ai_pool_with_strict_limits.openai")
+    @patch("xai.core.security.ai_pool_with_strict_limits.openai")
     def test_call_openai_success(self, mock_openai, pool_manager):
         """Test successful OpenAI API call"""
         mock_response = Mock()
@@ -822,7 +822,7 @@ class TestAPIProviderCalls:
         assert result["tokens_used"] == 200
         assert result["output"] == "OpenAI response"
 
-    @patch("xai.core.ai_pool_with_strict_limits.openai")
+    @patch("xai.core.security.ai_pool_with_strict_limits.openai")
     def test_call_openai_api_error(self, mock_openai, pool_manager):
         """Test OpenAI API call with error"""
         # Create a custom APIError class
@@ -838,7 +838,7 @@ class TestAPIProviderCalls:
         assert "error" in result
         assert result["tokens_used"] == 0
 
-    @patch("xai.core.ai_pool_with_strict_limits.genai")
+    @patch("xai.core.security.ai_pool_with_strict_limits.genai")
     def test_call_google_success(self, mock_genai, pool_manager):
         """Test successful Google API call"""
         mock_response = Mock()
@@ -851,7 +851,7 @@ class TestAPIProviderCalls:
         assert result["tokens_used"] > 0
         assert result["output"] == "Google response"
 
-    @patch("xai.core.ai_pool_with_strict_limits.genai")
+    @patch("xai.core.security.ai_pool_with_strict_limits.genai")
     def test_call_google_api_error(self, mock_genai, pool_manager):
         """Test Google API call with error"""
         mock_genai.GenerativeModel.return_value.generate_content.side_effect = \
@@ -916,8 +916,8 @@ class TestExecuteWithStrictLimits:
         assert result["success"] is False
         assert result["error"] == "KEY_RETRIEVAL_FAILED"
 
-    @patch("xai.core.ai_pool_with_strict_limits.metrics")
-    @patch("xai.core.ai_pool_with_strict_limits.anthropic")
+    @patch("xai.core.security.ai_pool_with_strict_limits.metrics")
+    @patch("xai.core.security.ai_pool_with_strict_limits.anthropic")
     def test_limit_exceeded_triggers_error(self, mock_anthropic, mock_metrics, pool_manager):
         """Test limit exceeded triggers critical error"""
         pool_manager.submit_api_key_donation(
@@ -947,8 +947,8 @@ class TestExecuteWithStrictLimits:
         assert result["error"] == "LIMIT_EXCEEDED"
         assert result["emergency_stop_triggered"] is True
 
-    @patch("xai.core.ai_pool_with_strict_limits.metrics")
-    @patch("xai.core.ai_pool_with_strict_limits.anthropic")
+    @patch("xai.core.security.ai_pool_with_strict_limits.metrics")
+    @patch("xai.core.security.ai_pool_with_strict_limits.anthropic")
     def test_api_call_exception_handling(self, mock_anthropic, mock_metrics, pool_manager):
         """Test exception handling during API call"""
         pool_manager.submit_api_key_donation(
@@ -975,7 +975,7 @@ class TestExecuteWithStrictLimits:
         assert result["error"] == "API_CALL_FAILED"
         assert result["tokens_charged"] == 0
 
-    @patch("xai.core.ai_pool_with_strict_limits.metrics")
+    @patch("xai.core.security.ai_pool_with_strict_limits.metrics")
     def test_unsupported_provider(self, mock_metrics, pool_manager):
         """Test unsupported provider error"""
         pool_manager.submit_api_key_donation(
@@ -1162,7 +1162,7 @@ class TestEdgeCasesAndIntegration:
 
     def test_multiple_tasks_deplete_key(self, pool_manager, mock_key_manager, mock_metrics):
         """Test multiple tasks eventually deplete a key"""
-        with patch("xai.core.ai_pool_with_strict_limits.anthropic") as mock_anthropic:
+        with patch("xai.core.security.ai_pool_with_strict_limits.anthropic") as mock_anthropic:
             pool_manager.submit_api_key_donation(
                 donor_address="XAI123456789",
                 provider=AIProvider.ANTHROPIC,
@@ -1202,7 +1202,7 @@ class TestEdgeCasesAndIntegration:
 
     def test_accuracy_calculation(self, pool_manager, mock_metrics):
         """Test accuracy percentage calculation"""
-        with patch("xai.core.ai_pool_with_strict_limits.anthropic") as mock_anthropic:
+        with patch("xai.core.security.ai_pool_with_strict_limits.anthropic") as mock_anthropic:
             pool_manager.submit_api_key_donation(
                 donor_address="XAI123456789",
                 provider=AIProvider.ANTHROPIC,
@@ -1226,7 +1226,7 @@ class TestEdgeCasesAndIntegration:
 
     def test_max_tokens_override(self, pool_manager, mock_metrics):
         """Test max_tokens_override parameter"""
-        with patch("xai.core.ai_pool_with_strict_limits.anthropic") as mock_anthropic:
+        with patch("xai.core.security.ai_pool_with_strict_limits.anthropic") as mock_anthropic:
             pool_manager.submit_api_key_donation(
                 donor_address="XAI123456789",
                 provider=AIProvider.ANTHROPIC,
@@ -1254,7 +1254,7 @@ class TestEdgeCasesAndIntegration:
 
     def test_metrics_recorded(self, pool_manager, mock_metrics):
         """Test metrics are recorded for token usage"""
-        with patch("xai.core.ai_pool_with_strict_limits.anthropic") as mock_anthropic:
+        with patch("xai.core.security.ai_pool_with_strict_limits.anthropic") as mock_anthropic:
             pool_manager.submit_api_key_donation(
                 donor_address="XAI123456789",
                 provider=AIProvider.ANTHROPIC,
@@ -1277,7 +1277,7 @@ class TestEdgeCasesAndIntegration:
 
     def test_total_usage_tracking(self, pool_manager, mock_metrics):
         """Test total usage is tracked across tasks"""
-        with patch("xai.core.ai_pool_with_strict_limits.anthropic") as mock_anthropic:
+        with patch("xai.core.security.ai_pool_with_strict_limits.anthropic") as mock_anthropic:
             pool_manager.submit_api_key_donation(
                 donor_address="XAI123456789",
                 provider=AIProvider.ANTHROPIC,
@@ -1307,4 +1307,4 @@ class TestEdgeCasesAndIntegration:
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", "--cov=xai.core.ai_pool_with_strict_limits"])
+    pytest.main([__file__, "-v", "--cov=xai.core.security.ai_pool_with_strict_limits"])

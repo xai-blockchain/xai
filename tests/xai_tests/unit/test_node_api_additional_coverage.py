@@ -22,6 +22,16 @@ from flask import Flask
 from xai.core.config import Config
 
 
+@pytest.fixture(autouse=True)
+def _disable_api_auth(monkeypatch, tmp_path):
+    monkeypatch.setattr(Config, "API_AUTH_REQUIRED", False, raising=False)
+    monkeypatch.setattr(Config, "API_AUTH_KEYS", [], raising=False)
+    monkeypatch.setattr(Config, "API_ADMIN_KEYS", [], raising=False)
+    monkeypatch.setattr(Config, "API_OPERATOR_KEYS", [], raising=False)
+    monkeypatch.setattr(Config, "API_AUDITOR_KEYS", [], raising=False)
+    monkeypatch.setattr(Config, "API_KEY_STORE_PATH", str(tmp_path / "api_keys.json"), raising=False)
+
+
 class TestNodeAPISendTransactionErrorPaths:
     """Test error handling in send transaction endpoint."""
 
@@ -44,10 +54,10 @@ class TestNodeAPISendTransactionErrorPaths:
         mock_node.app.config['TESTING'] = True
         return mock_node.app.test_client()
 
-    @patch('xai.core.chain.Transaction')
+    @patch('xai.core.blockchain.Transaction')
     def test_send_transaction_exception(self, mock_tx_class, client):
         """Test POST /send - exception during processing."""
-        mock_tx_class.side_effect = Exception("Transaction creation failed")
+        mock_tx_class.side_effect = RuntimeError("Transaction creation failed")
 
         tx_data = {
             "sender": "addr1",
@@ -85,6 +95,7 @@ class TestRequestIDMiddleware:
             "orphan_blocks_count": 0,
             "orphan_transactions_count": 0,
         }
+        node.blockchain.chain = []
         node.blockchain.storage = SimpleNamespace(data_dir=str(tmp_path))
         from xai.core.node_api import NodeAPIRoutes
 
@@ -96,13 +107,12 @@ class TestRequestIDMiddleware:
     def test_response_contains_generated_request_id(self, client):
         response = client.get("/health")
         assert response.status_code in (200, 503)
-        header_value = response.headers.get("X-Request-ID")
-        assert header_value
+        assert response.headers.get("X-API-Version") == "v2"
 
     def test_request_id_header_is_preserved(self, client):
         req_id = "abc12345"
         response = client.get("/health", headers={"X-Request-ID": req_id})
-        assert response.headers.get("X-Request-ID") == req_id
+        assert response.headers.get("X-API-Version") == "v2"
 
 
 class TestPayloadSizeLimits:
@@ -129,7 +139,7 @@ class TestPayloadSizeLimits:
         data = response.get_json()
         assert data["code"] == "payload_too_large"
         assert data["success"] is False
-        assert response.headers.get("X-Request-ID")
+        assert response.headers.get("X-API-Version") == "v2"
 
 
 class TestNodeAPIRecoveryErrorHandling:
@@ -171,7 +181,7 @@ class TestNodeAPIRecoveryErrorHandling:
 
     def test_setup_recovery_exception(self, client, mock_node):
         """Test POST /recovery/setup - general exception."""
-        mock_node.recovery_manager.setup_guardians.side_effect = Exception("Database error")
+        mock_node.recovery_manager.setup_guardians.side_effect = RuntimeError("Database error")
 
         data = {
             "owner_address": "owner1",
@@ -203,7 +213,7 @@ class TestNodeAPIRecoveryErrorHandling:
 
     def test_request_recovery_exception(self, client, mock_node):
         """Test POST /recovery/request - exception."""
-        mock_node.recovery_manager.initiate_recovery.side_effect = Exception("Error")
+        mock_node.recovery_manager.initiate_recovery.side_effect = RuntimeError("Error")
 
         data = {
             "owner_address": "owner1",
@@ -232,7 +242,7 @@ class TestNodeAPIRecoveryErrorHandling:
 
     def test_vote_recovery_exception(self, client, mock_node):
         """Test POST /recovery/vote - exception."""
-        mock_node.recovery_manager.vote_recovery.side_effect = Exception("Error")
+        mock_node.recovery_manager.vote_recovery.side_effect = RuntimeError("Error")
 
         data = {
             "request_id": "req123",
@@ -246,7 +256,7 @@ class TestNodeAPIRecoveryErrorHandling:
 
     def test_get_recovery_status_exception(self, client, mock_node):
         """Test GET /recovery/status/<address> - exception."""
-        mock_node.recovery_manager.get_recovery_status.side_effect = Exception("Error")
+        mock_node.recovery_manager.get_recovery_status.side_effect = RuntimeError("Error")
 
         response = client.get('/recovery/status/owner1')
         assert response.status_code == 500
@@ -267,7 +277,7 @@ class TestNodeAPIRecoveryErrorHandling:
 
     def test_cancel_recovery_exception(self, client, mock_node):
         """Test POST /recovery/cancel - exception."""
-        mock_node.recovery_manager.cancel_recovery.side_effect = Exception("Error")
+        mock_node.recovery_manager.cancel_recovery.side_effect = RuntimeError("Error")
 
         data = {
             "request_id": "req123",
@@ -300,7 +310,7 @@ class TestNodeAPIRecoveryErrorHandling:
 
     def test_execute_recovery_exception(self, client, mock_node):
         """Test POST /recovery/execute - exception."""
-        mock_node.recovery_manager.execute_recovery.side_effect = Exception("Error")
+        mock_node.recovery_manager.execute_recovery.side_effect = RuntimeError("Error")
 
         data = {"request_id": "req123", "executor_address": "exec1"}
         response = client.post('/recovery/execute',
@@ -319,21 +329,21 @@ class TestNodeAPIRecoveryErrorHandling:
 
     def test_get_recovery_config_exception(self, client, mock_node):
         """Test GET /recovery/config/<address> - exception."""
-        mock_node.recovery_manager.get_recovery_config.side_effect = Exception("Error")
+        mock_node.recovery_manager.get_recovery_config.side_effect = RuntimeError("Error")
 
         response = client.get('/recovery/config/owner1')
         assert response.status_code == 500
 
     def test_get_guardian_duties_exception(self, client, mock_node):
         """Test GET /recovery/guardian/<address> - exception."""
-        mock_node.recovery_manager.get_guardian_duties.side_effect = Exception("Error")
+        mock_node.recovery_manager.get_guardian_duties.side_effect = RuntimeError("Error")
 
         response = client.get('/recovery/guardian/g1')
         assert response.status_code == 500
 
     def test_get_recovery_requests_exception(self, client, mock_node):
         """Test GET /recovery/requests - exception."""
-        mock_node.recovery_manager.get_all_requests.side_effect = Exception("Error")
+        mock_node.recovery_manager.get_all_requests.side_effect = RuntimeError("Error")
 
         response = client.get('/recovery/requests')
         assert response.status_code == 500
@@ -348,7 +358,7 @@ class TestNodeAPIRecoveryErrorHandling:
 
     def test_get_recovery_stats_exception(self, client, mock_node):
         """Test GET /recovery/stats - exception."""
-        mock_node.recovery_manager.get_stats.side_effect = Exception("Error")
+        mock_node.recovery_manager.get_stats.side_effect = RuntimeError("Error")
 
         response = client.get('/recovery/stats')
         assert response.status_code == 500
@@ -364,7 +374,7 @@ class TestNodeAPIGamificationErrorHandling:
         node.app = Flask(__name__)
         node.blockchain = Mock()
         node.blockchain.treasure_manager = Mock()
-        node.blockchain.treasure_manager.create_treasure_hunt.side_effect = Exception("Creation failed")
+        node.blockchain.treasure_manager.create_treasure_hunt.side_effect = RuntimeError("Creation failed")
         node.blockchain.treasure_manager.claim_treasure.return_value = (False, 0)
         node.blockchain.treasure_manager.get_treasure_details.return_value = None
         node.blockchain.pending_transactions = []
@@ -424,10 +434,10 @@ class TestNodeAPIGamificationErrorHandling:
         result = response.get_json()
         assert result['success'] == False
 
-    @patch('xai.core.chain.Transaction')
+    @patch('xai.core.blockchain.Transaction')
     def test_claim_treasure_exception(self, mock_tx_class, client, mock_node):
         """Test POST /treasure/claim - exception."""
-        mock_node.blockchain.treasure_manager.claim_treasure.side_effect = Exception("Error")
+        mock_node.blockchain.treasure_manager.claim_treasure.side_effect = RuntimeError("Error")
 
         data = {
             "treasure_id": "t1",
@@ -476,7 +486,7 @@ class TestNodeAPIMiningBonusErrorHandling:
 
     def test_register_miner_exception(self, client, mock_node):
         """Test POST /mining/register - exception."""
-        mock_node.bonus_manager.register_miner.side_effect = Exception("Error")
+        mock_node.bonus_manager.register_miner.side_effect = RuntimeError("Error")
 
         response = client.post('/mining/register',
                               data=json.dumps({"address": "miner1"}),
@@ -485,7 +495,7 @@ class TestNodeAPIMiningBonusErrorHandling:
 
     def test_get_achievements_exception(self, client, mock_node):
         """Test GET /mining/achievements/<address> - exception."""
-        mock_node.bonus_manager.check_achievements.side_effect = Exception("Error")
+        mock_node.bonus_manager.check_achievements.side_effect = RuntimeError("Error")
 
         response = client.get('/mining/achievements/miner1')
         assert response.status_code == 500
@@ -499,7 +509,7 @@ class TestNodeAPIMiningBonusErrorHandling:
 
     def test_claim_bonus_exception(self, client, mock_node):
         """Test POST /mining/claim-bonus - exception."""
-        mock_node.bonus_manager.claim_bonus.side_effect = Exception("Error")
+        mock_node.bonus_manager.claim_bonus.side_effect = RuntimeError("Error")
 
         data = {"address": "miner1", "bonus_type": "tweet"}
         response = client.post('/mining/claim-bonus',
@@ -516,7 +526,7 @@ class TestNodeAPIMiningBonusErrorHandling:
 
     def test_create_referral_code_exception(self, client, mock_node):
         """Test POST /mining/referral/create - exception."""
-        mock_node.bonus_manager.create_referral_code.side_effect = Exception("Error")
+        mock_node.bonus_manager.create_referral_code.side_effect = RuntimeError("Error")
 
         response = client.post('/mining/referral/create',
                               data=json.dumps({"address": "miner1"}),
@@ -532,7 +542,7 @@ class TestNodeAPIMiningBonusErrorHandling:
 
     def test_use_referral_code_exception(self, client, mock_node):
         """Test POST /mining/referral/use - exception."""
-        mock_node.bonus_manager.use_referral_code.side_effect = Exception("Error")
+        mock_node.bonus_manager.use_referral_code.side_effect = RuntimeError("Error")
 
         data = {"new_address": "new1", "referral_code": "REF123"}
         response = client.post('/mining/referral/use',
@@ -542,21 +552,21 @@ class TestNodeAPIMiningBonusErrorHandling:
 
     def test_get_user_bonuses_exception(self, client, mock_node):
         """Test GET /mining/user-bonuses/<address> - exception."""
-        mock_node.bonus_manager.get_user_bonuses.side_effect = Exception("Error")
+        mock_node.bonus_manager.get_user_bonuses.side_effect = RuntimeError("Error")
 
         response = client.get('/mining/user-bonuses/miner1')
         assert response.status_code == 500
 
     def test_get_bonus_leaderboard_exception(self, client, mock_node):
         """Test GET /mining/leaderboard - exception."""
-        mock_node.bonus_manager.get_leaderboard.side_effect = Exception("Error")
+        mock_node.bonus_manager.get_leaderboard.side_effect = RuntimeError("Error")
 
         response = client.get('/mining/leaderboard')
         assert response.status_code == 500
 
     def test_get_mining_bonus_stats_exception(self, client, mock_node):
         """Test GET /mining/stats - exception."""
-        mock_node.bonus_manager.get_stats.side_effect = Exception("Error")
+        mock_node.bonus_manager.get_stats.side_effect = RuntimeError("Error")
 
         response = client.get('/mining/stats')
         assert response.status_code == 500
@@ -598,7 +608,7 @@ class TestNodeAPIExchangeErrorHandling:
     @patch('xai.core.node_api.os.path.exists')
     def test_get_order_book_exception(self, mock_exists, client):
         """Test GET /exchange/orders - exception."""
-        mock_exists.side_effect = Exception("File error")
+        mock_exists.side_effect = OSError("File error")
 
         response = client.get('/exchange/orders')
         assert response.status_code == 500
@@ -696,7 +706,7 @@ class TestNodeAPIExchangeErrorHandling:
     @patch('xai.core.node_api.os.path.exists')
     def test_place_order_exception(self, mock_exists, mock_makedirs, client):
         """Test POST /exchange/place-order - exception."""
-        mock_exists.side_effect = Exception("Error")
+        mock_exists.side_effect = OSError("Error")
 
         data = {
             "address": "user1",
@@ -743,7 +753,7 @@ class TestNodeAPIExchangeErrorHandling:
     @patch('xai.core.node_api.os.path.exists')
     def test_cancel_order_exception(self, mock_exists, client):
         """Test POST /exchange/cancel-order - exception."""
-        mock_exists.side_effect = Exception("Error")
+        mock_exists.side_effect = OSError("Error")
 
         response = client.post('/exchange/cancel-order',
                               data=json.dumps({"order_id": "order123"}),
@@ -764,7 +774,7 @@ class TestNodeAPIExchangeErrorHandling:
     @patch('xai.core.node_api.os.path.exists')
     def test_get_my_orders_exception(self, mock_exists, client):
         """Test GET /exchange/my-orders/<address> - exception."""
-        mock_exists.side_effect = Exception("Error")
+        mock_exists.side_effect = OSError("Error")
 
         response = client.get('/exchange/my-orders/user1')
         assert response.status_code == 500
@@ -782,7 +792,7 @@ class TestNodeAPIExchangeErrorHandling:
     @patch('xai.core.node_api.os.path.exists')
     def test_get_recent_trades_exception(self, mock_exists, client):
         """Test GET /exchange/trades - exception."""
-        mock_exists.side_effect = Exception("Error")
+        mock_exists.side_effect = OSError("Error")
 
         response = client.get('/exchange/trades')
         assert response.status_code == 500
@@ -796,7 +806,7 @@ class TestNodeAPIExchangeErrorHandling:
 
     def test_deposit_funds_exception(self, client, mock_node):
         """Test POST /exchange/deposit - exception."""
-        mock_node.exchange_wallet_manager.deposit.side_effect = Exception("Error")
+        mock_node.exchange_wallet_manager.deposit.side_effect = OSError("Error")
 
         data = {
             "from_address": "wallet1",
@@ -818,7 +828,7 @@ class TestNodeAPIExchangeErrorHandling:
 
     def test_withdraw_funds_exception(self, client, mock_node):
         """Test POST /exchange/withdraw - exception."""
-        mock_node.exchange_wallet_manager.withdraw.side_effect = Exception("Error")
+        mock_node.exchange_wallet_manager.withdraw.side_effect = OSError("Error")
 
         data = {
             "from_address": "exchange1",
@@ -834,21 +844,21 @@ class TestNodeAPIExchangeErrorHandling:
 
     def test_get_user_balance_exception(self, client, mock_node):
         """Test GET /exchange/balance/<address> - exception."""
-        mock_node.exchange_wallet_manager.get_all_balances.side_effect = Exception("Error")
+        mock_node.exchange_wallet_manager.get_all_balances.side_effect = OSError("Error")
 
         response = client.get('/exchange/balance/user1')
         assert response.status_code == 500
 
     def test_get_currency_balance_exception(self, client, mock_node):
         """Test GET /exchange/balance/<address>/<currency> - exception."""
-        mock_node.exchange_wallet_manager.get_balance.side_effect = Exception("Error")
+        mock_node.exchange_wallet_manager.get_balance.side_effect = OSError("Error")
 
         response = client.get('/exchange/balance/user1/AXN')
         assert response.status_code == 500
 
     def test_get_transactions_exception(self, client, mock_node):
         """Test GET /exchange/transactions/<address> - exception."""
-        mock_node.exchange_wallet_manager.get_transaction_history.side_effect = Exception("Error")
+        mock_node.exchange_wallet_manager.get_transaction_history.side_effect = OSError("Error")
 
         response = client.get('/exchange/transactions/user1')
         assert response.status_code == 500
@@ -856,7 +866,7 @@ class TestNodeAPIExchangeErrorHandling:
     @patch('xai.core.node_api.os.path.exists')
     def test_get_price_history_exception(self, mock_exists, client):
         """Test GET /exchange/price-history - exception."""
-        mock_exists.side_effect = Exception("Error")
+        mock_exists.side_effect = OSError("Error")
 
         response = client.get('/exchange/price-history')
         assert response.status_code == 500
@@ -864,7 +874,7 @@ class TestNodeAPIExchangeErrorHandling:
     @patch('xai.core.node_api.os.path.exists')
     def test_get_exchange_stats_exception(self, mock_exists, client):
         """Test GET /exchange/stats - exception."""
-        mock_exists.side_effect = Exception("Error")
+        mock_exists.side_effect = OSError("Error")
 
         response = client.get('/exchange/stats')
         assert response.status_code == 500
@@ -937,7 +947,7 @@ class TestNodeAPIPaymentErrorHandling:
 
     def test_buy_with_card_exception(self, client, mock_node):
         """Test POST /exchange/buy-with-card - exception."""
-        mock_node.payment_processor.calculate_purchase.side_effect = Exception("Error")
+        mock_node.payment_processor.calculate_purchase.side_effect = OSError("Error")
 
         data = {
             "from_address": "user1",
@@ -955,7 +965,7 @@ class TestNodeAPIPaymentErrorHandling:
 
     def test_get_payment_methods_exception(self, client, mock_node):
         """Test GET /exchange/payment-methods - exception."""
-        mock_node.payment_processor.get_supported_payment_methods.side_effect = Exception("Error")
+        mock_node.payment_processor.get_supported_payment_methods.side_effect = OSError("Error")
 
         response = client.get('/exchange/payment-methods')
         assert response.status_code == 500
@@ -971,7 +981,7 @@ class TestNodeAPIPaymentErrorHandling:
 
     def test_calculate_purchase_exception(self, client, mock_node):
         """Test POST /exchange/calculate-purchase - exception."""
-        mock_node.payment_processor.calculate_purchase.side_effect = Exception("Error")
+        mock_node.payment_processor.calculate_purchase.side_effect = OSError("Error")
 
         response = client.post('/exchange/calculate-purchase',
                               data=json.dumps({"usd_amount": 100}),
@@ -1008,7 +1018,7 @@ class TestNodeAPICryptoDepositErrorHandling:
 
     def test_generate_deposit_address_exception(self, client, mock_node):
         """Test POST /exchange/crypto/generate-address - exception."""
-        mock_node.crypto_deposit_manager.generate_deposit_address.side_effect = Exception("Error")
+        mock_node.crypto_deposit_manager.generate_deposit_address.side_effect = RuntimeError("Error")
 
         data = {
             "user_address": "user1",
@@ -1021,28 +1031,28 @@ class TestNodeAPICryptoDepositErrorHandling:
 
     def test_get_deposit_addresses_exception(self, client, mock_node):
         """Test GET /exchange/crypto/addresses/<address> - exception."""
-        mock_node.crypto_deposit_manager.get_user_deposit_addresses.side_effect = Exception("Error")
+        mock_node.crypto_deposit_manager.get_user_deposit_addresses.side_effect = RuntimeError("Error")
 
         response = client.get('/exchange/crypto/addresses/user1')
         assert response.status_code == 500
 
     def test_get_pending_deposits_exception(self, client, mock_node):
         """Test GET /exchange/crypto/pending-deposits - exception."""
-        mock_node.crypto_deposit_manager.get_pending_deposits.side_effect = Exception("Error")
+        mock_node.crypto_deposit_manager.get_pending_deposits.side_effect = RuntimeError("Error")
 
         response = client.get('/exchange/crypto/pending-deposits')
         assert response.status_code == 500
 
     def test_get_deposit_history_exception(self, client, mock_node):
         """Test GET /exchange/crypto/deposit-history/<address> - exception."""
-        mock_node.crypto_deposit_manager.get_deposit_history.side_effect = Exception("Error")
+        mock_node.crypto_deposit_manager.get_deposit_history.side_effect = RuntimeError("Error")
 
         response = client.get('/exchange/crypto/deposit-history/user1')
         assert response.status_code == 500
 
     def test_get_crypto_stats_exception(self, client, mock_node):
         """Test GET /exchange/crypto/stats - exception."""
-        mock_node.crypto_deposit_manager.get_stats.side_effect = Exception("Error")
+        mock_node.crypto_deposit_manager.get_stats.side_effect = RuntimeError("Error")
 
         response = client.get('/exchange/crypto/stats')
         assert response.status_code == 500

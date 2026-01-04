@@ -466,7 +466,7 @@ class TestChunkedSyncWithCompression:
 class TestCheckpointSyncIntegration:
     """Test integration with CheckpointSyncManager."""
 
-    @patch("xai.core.checkpoint_sync.ChunkedStateSyncService")
+    @patch("xai.core.p2p.checkpoint_sync.ChunkedStateSyncService")
     def test_chunked_sync_manager_init(self, mock_service_class):
         """Test CheckpointSyncManager with chunked sync enabled."""
         from xai.core.p2p.checkpoint_sync import CheckpointSyncManager

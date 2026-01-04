@@ -25,6 +25,14 @@ from xai.core.security.blockchain_security import BlockchainSecurityConfig
 from xai.core.chain.blockchain_exceptions import InvalidBlockError, ValidationError
 
 
+def assert_block_rejected(blockchain: Blockchain, block: Block) -> None:
+    try:
+        result = blockchain.add_block(block)
+    except (InvalidBlockError, ValidationError, ValueError):
+        return
+    assert result is False
+
+
 class TestInvalidBlockHeaders:
     """Test invalid block header scenarios"""
 
@@ -48,29 +56,22 @@ class TestInvalidBlockHeaders:
         block = Block(header=header, transactions=[])
 
         # Block should be rejected due to invalid version
-        # The blockchain validation should catch this
-        with pytest.raises((InvalidBlockError, ValidationError, ValueError)):
-            bc.add_block(block)
+        assert_block_rejected(bc, block)
 
     def test_block_header_missing_previous_hash(self, tmp_path):
         """Test block with empty/invalid previous hash is rejected"""
         bc = Blockchain(data_dir=str(tmp_path))
 
         # Create block with invalid previous hash
-        header = BlockHeader(
-            index=1,
-            previous_hash="",  # Empty previous hash
-            merkle_root="0" * 64,
-            timestamp=time.time(),
-            difficulty=bc.difficulty,
-            nonce=0,
-        )
-
-        block = Block(header=header, transactions=[])
-
-        # Should be rejected
-        with pytest.raises((InvalidBlockError, ValidationError, ValueError)):
-            bc.add_block(block)
+        with pytest.raises(ValueError):
+            BlockHeader(
+                index=1,
+                previous_hash="",  # Empty previous hash
+                merkle_root="0" * 64,
+                timestamp=time.time(),
+                difficulty=bc.difficulty,
+                nonce=0,
+            )
 
     def test_block_header_wrong_previous_hash(self, tmp_path):
         """Test block with incorrect previous hash is rejected"""
@@ -89,27 +90,22 @@ class TestInvalidBlockHeaders:
         block = Block(header=header, transactions=[])
 
         # Should be rejected due to chain break
-        with pytest.raises((InvalidBlockError, ValidationError)):
-            bc.add_block(block)
+        assert_block_rejected(bc, block)
 
     def test_block_header_invalid_hash_format(self, tmp_path):
         """Test block with malformed hash (non-hex) is rejected"""
         bc = Blockchain(data_dir=str(tmp_path))
 
         # Create block with invalid hash characters
-        header = BlockHeader(
-            index=1,
-            previous_hash="zzzz" + "0" * 60,  # Non-hex characters
-            merkle_root="0" * 64,
-            timestamp=time.time(),
-            difficulty=bc.difficulty,
-            nonce=0,
-        )
-
-        block = Block(header=header, transactions=[])
-
-        with pytest.raises((InvalidBlockError, ValidationError, ValueError)):
-            bc.add_block(block)
+        with pytest.raises(ValueError):
+            BlockHeader(
+                index=1,
+                previous_hash="zzzz" + "0" * 60,  # Non-hex characters
+                merkle_root="0" * 64,
+                timestamp=time.time(),
+                difficulty=bc.difficulty,
+                nonce=0,
+            )
 
     def test_block_header_wrong_index(self, tmp_path):
         """Test block with incorrect index is rejected"""
@@ -128,8 +124,7 @@ class TestInvalidBlockHeaders:
         block = Block(header=header, transactions=[])
 
         # Should be rejected due to index mismatch
-        with pytest.raises((InvalidBlockError, ValidationError)):
-            bc.add_block(block)
+        assert_block_rejected(bc, block)
 
     def test_block_header_negative_difficulty(self, tmp_path):
         """Test block with negative difficulty is rejected"""
@@ -158,7 +153,7 @@ class TestCorruptedBlockData:
         # Create a valid transaction
         tx = Transaction(
             sender=wallet1.address,
-            receiver=wallet2.address,
+            recipient=wallet2.address,
             amount=1.0,
             fee=0.001,
             public_key=wallet1.public_key,
@@ -182,6 +177,7 @@ class TestCorruptedBlockData:
         # Should detect merkle root mismatch
         calculated_merkle = block._calculate_merkle_root_static([tx])
         assert calculated_merkle != block.header.merkle_root
+        assert_block_rejected(bc, block)
 
     def test_block_with_invalid_pow_hash(self, tmp_path):
         """Test block with hash that doesn't meet difficulty is rejected"""
@@ -204,8 +200,7 @@ class TestCorruptedBlockData:
         assert not block.hash.startswith("0" * bc.difficulty)
 
         # Should be rejected
-        with pytest.raises((InvalidBlockError, ValidationError)):
-            bc.add_block(block)
+        assert_block_rejected(bc, block)
 
 
 class TestOversizedBlocks:
@@ -224,14 +219,15 @@ class TestOversizedBlocks:
         num_txs = (BlockchainSecurityConfig.MAX_BLOCK_SIZE // 500) + 100
 
         for i in range(num_txs):
+            recipient = f"XAI{i:040x}"
             tx = Transaction(
                 sender=wallet.address,
-                receiver=f"receiver_{i}",
+                recipient=recipient,
                 amount=0.001,
                 fee=0.0001,
                 public_key=wallet.public_key,
-                inputs=[{"txid": f"input_{i}" * 8, "vout": 0}],
-                outputs=[{"address": f"receiver_{i}", "amount": 0.001}],
+                inputs=[{"txid": f"{i:064x}", "vout": 0}],
+                outputs=[{"address": recipient, "amount": 0.001}],
             )
             tx.sign_transaction(wallet.private_key)
             transactions.append(tx)
@@ -262,8 +258,7 @@ class TestOversizedBlocks:
 
         # If block is too large, it should be rejected
         if len(block_json.encode()) > BlockchainSecurityConfig.MAX_BLOCK_SIZE:
-            with pytest.raises((InvalidBlockError, ValidationError)):
-                bc.add_block(block)
+            assert_block_rejected(bc, block)
 
     def test_block_exceeds_max_transactions(self, tmp_path):
         """Test block with too many transactions is rejected"""
@@ -275,14 +270,15 @@ class TestOversizedBlocks:
         transactions = []
 
         for i in range(max_txs + 10):  # Exceed limit by 10
+            recipient = f"XAI{i:040x}"
             tx = Transaction(
                 sender=wallet.address,
-                receiver=f"receiver_{i}",
+                recipient=recipient,
                 amount=0.001,
                 fee=0.0001,
                 public_key=wallet.public_key,
-                inputs=[{"txid": f"input_{i}" * 8, "vout": 0}],
-                outputs=[{"address": f"receiver_{i}", "amount": 0.001}],
+                inputs=[{"txid": f"{i:064x}", "vout": 0}],
+                outputs=[{"address": recipient, "amount": 0.001}],
             )
             transactions.append(tx)
 
@@ -299,8 +295,7 @@ class TestOversizedBlocks:
 
         # Should be rejected if validation checks transaction count
         if len(block.transactions) > max_txs:
-            with pytest.raises((InvalidBlockError, ValidationError)):
-                bc.add_block(block)
+            assert_block_rejected(bc, block)
 
 
 class TestBlocksWithInvalidTransactions:
@@ -315,7 +310,7 @@ class TestBlocksWithInvalidTransactions:
         # Create transaction without signature
         tx = Transaction(
             sender=wallet1.address,
-            receiver=wallet2.address,
+            recipient=wallet2.address,
             amount=1.0,
             fee=0.001,
             public_key=wallet1.public_key,
@@ -336,8 +331,7 @@ class TestBlocksWithInvalidTransactions:
         block = Block(header=header, transactions=[tx])
 
         # Should be rejected due to invalid transaction
-        with pytest.raises((InvalidBlockError, ValidationError)):
-            bc.add_block(block)
+        assert_block_rejected(bc, block)
 
     def test_block_with_negative_amount_transaction(self, tmp_path):
         """Test block with negative transaction amount is rejected"""
@@ -347,9 +341,9 @@ class TestBlocksWithInvalidTransactions:
 
         # Create transaction with negative amount
         with pytest.raises((ValueError, ValidationError)):
-            tx = Transaction(
+            Transaction(
                 sender=wallet1.address,
-                receiver=wallet2.address,
+                recipient=wallet2.address,
                 amount=-10.0,  # Invalid negative amount
                 fee=0.001,
                 public_key=wallet1.public_key,
@@ -369,7 +363,7 @@ class TestBlocksWithInvalidTransactions:
 
         tx1 = Transaction(
             sender=wallet1.address,
-            receiver=wallet2.address,
+            recipient=wallet2.address,
             amount=1.0,
             fee=0.001,
             public_key=wallet1.public_key,
@@ -380,7 +374,7 @@ class TestBlocksWithInvalidTransactions:
 
         tx2 = Transaction(
             sender=wallet1.address,
-            receiver=wallet3.address,
+            recipient=wallet3.address,
             amount=1.0,
             fee=0.001,
             public_key=wallet1.public_key,
@@ -402,8 +396,7 @@ class TestBlocksWithInvalidTransactions:
         block = Block(header=header, transactions=[tx1, tx2])
 
         # Should detect double-spend
-        with pytest.raises((InvalidBlockError, ValidationError)):
-            bc.add_block(block)
+        assert_block_rejected(bc, block)
 
     def test_block_with_invalid_signature_transaction(self, tmp_path):
         """Test block with transaction having invalid signature is rejected"""
@@ -415,7 +408,7 @@ class TestBlocksWithInvalidTransactions:
         # Create transaction and sign with wrong key
         tx = Transaction(
             sender=wallet1.address,
-            receiver=wallet2.address,
+            recipient=wallet2.address,
             amount=1.0,
             fee=0.001,
             public_key=wallet1.public_key,
@@ -440,8 +433,7 @@ class TestBlocksWithInvalidTransactions:
         block = Block(header=header, transactions=[tx])
 
         # Should be rejected
-        with pytest.raises((InvalidBlockError, ValidationError)):
-            bc.add_block(block)
+        assert_block_rejected(bc, block)
 
 
 class TestBlockBoundaryConditions:

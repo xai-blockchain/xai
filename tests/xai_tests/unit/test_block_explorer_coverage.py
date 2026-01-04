@@ -243,7 +243,7 @@ class TestGetFromNode:
         result = get_from_node("/test", use_cache=False)
 
         assert result == {"data": "test"}
-        mock_get.assert_called_once_with(f"{NODE_URL}/test", timeout=5)
+        mock_get.assert_called_once_with(f"{NODE_URL}/test", timeout=15)
 
     @patch("xai.block_explorer.requests.get")
     def test_get_from_node_success_with_cache(self, mock_get):
@@ -345,7 +345,7 @@ class TestPostToNode:
         mock_post.assert_called_once_with(
             f"{NODE_URL}/test",
             json={"data": "value"},
-            timeout=5
+            timeout=15
         )
 
     @patch("xai.block_explorer.requests.post")

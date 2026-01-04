@@ -681,7 +681,7 @@ class StrictAIPoolManager:
                     "message": f"Provider {provider} not implemented",
                 }
 
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+        except Exception as e:
             # API call failed - don't charge tokens
             logger.warning(
                 "Exception in _execute_with_strict_limits",
@@ -812,7 +812,7 @@ class StrictAIPoolManager:
                 "estimated": True,
             }
 
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+        except Exception as e:
             logger.warning(
                 "Exception in _call_google_with_limit",
                 extra={

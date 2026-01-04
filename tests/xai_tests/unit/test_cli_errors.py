@@ -51,10 +51,10 @@ class CLI:
         # Validate amount
         try:
             amount = float(args['amount'])
-            if amount <= 0:
-                raise ValueError("Invalid amount (must be positive)")
         except (ValueError, TypeError):
             raise ValueError("Invalid amount (must be a number)")
+        if amount <= 0:
+            raise ValueError("Invalid amount (must be positive)")
 
         # Validate private key
         if len(args['private_key']) < 32:

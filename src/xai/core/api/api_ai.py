@@ -139,7 +139,7 @@ class AIAPIHandler:
                 assistant_name=ctx.get("assistant_name"),
             )
             return self._personal_ai_response(result)
-        except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as e:
+        except Exception as e:
             logger.error(
                 "Personal AI atomic swap operation failed",
                 extra={

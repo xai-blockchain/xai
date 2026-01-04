@@ -1671,15 +1671,36 @@ class P2PNetworkManager:
             loop = asyncio.get_running_loop()
         except RuntimeError:
             # No running loop - use stored loop or get the default one
-            loop = self._loop or asyncio.get_event_loop()
+            loop = self._loop
+            if loop is None:
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = None
 
         # Schedule the coroutine as a task
-        if loop.is_running():
+        if loop is not None and loop.is_running():
             # Loop is running - schedule task using call_soon_threadsafe for thread safety
             asyncio.run_coroutine_threadsafe(coro, loop)
-        else:
-            # Loop exists but not running yet - create task directly
-            loop.create_task(coro)
+            return
+        if loop is not None:
+            # Loop exists but not running - run coroutine to completion
+            try:
+                loop.run_until_complete(coro)
+                return
+            except RuntimeError:
+                pass
+
+        # No loop available in this thread - run coroutine to completion
+        try:
+            asyncio.run(coro)
+        except RuntimeError:
+            # Fallback if asyncio.run is not allowed in this context
+            tmp_loop = asyncio.new_event_loop()
+            try:
+                tmp_loop.run_until_complete(coro)
+            finally:
+                tmp_loop.close()
 
     def _get_checkpoint_metadata(self) -> dict[str, Any] | None:
         """Return highest checkpoint metadata from peers or local store."""
@@ -1920,7 +1941,7 @@ class P2PNetworkManager:
                     self.peer_manager.reputation.record_invalid_transaction(peer_uri)
                 else:
                     self.peer_manager.reputation.record_valid_transaction(peer_uri)
-            except (NetworkError, requests.RequestException, ConnectionError, OSError, TimeoutError) as e:
+            except (NetworkError, requests.RequestException, ConnectionError, OSError, TimeoutError, Exception) as e:
                 # Network error broadcasting transaction - record reputation penalty
                 logger.debug(
                     "Failed to broadcast transaction to %s: %s",
@@ -2447,45 +2468,28 @@ class P2PNetworkManager:
 
     def _apply_remote_chain(self, peer_uri: str, remote_blocks: list[dict[str, Any]]) -> bool:
         """Normalize remote chain and attempt to replace local state."""
-        new_chain_headers: list[BlockHeader] = []
+        new_chain_blocks: list[Block] = []
         valid_chain = True
         for block_data in remote_blocks:
-            header_dict: dict[str, Any] | None = None
-            txs = []
-            if isinstance(block_data, dict):
-                header_dict = block_data.get("header") or block_data
-                txs = block_data.get("transactions", [])
+            if not isinstance(block_data, dict):
+                valid_chain = False
+                break
+            header_dict = block_data.get("header") or block_data
             if not header_dict:
                 valid_chain = False
                 break
-            if txs is None:
-                txs = []
-            if not isinstance(txs, list):
-                valid_chain = False
-                break
             try:
-                normalized_header = self._normalize_remote_header(header_dict)
-                header = BlockHeader(
-                    index=normalized_header["index"],
-                    previous_hash=normalized_header["previous_hash"],
-                    timestamp=normalized_header["timestamp"],
-                    merkle_root=normalized_header["merkle_root"],
-                    nonce=normalized_header["nonce"],
-                    difficulty=normalized_header["difficulty"],
-                    miner_pubkey=normalized_header.get("miner_pubkey"),
-                    signature=normalized_header.get("signature"),
-                    version=normalized_header.get("version"),
-                )
-                if "hash" in normalized_header:
-                    header.hash = normalized_header["hash"]
-                new_chain_headers.append(header)
+                block = self.blockchain.deserialize_block(block_data)
+                if "hash" in header_dict:
+                    block.header.hash = header_dict["hash"]
+                new_chain_blocks.append(block)
             except (KeyError, TypeError, ValueError) as exc:
                 logger.debug(f"Invalid block header in chain from {peer_uri}: {exc}")
                 valid_chain = False
                 break
 
-        if valid_chain and new_chain_headers:
-            if self.blockchain.replace_chain(new_chain_headers):
+        if valid_chain and new_chain_blocks:
+            if self.blockchain.replace_chain(new_chain_blocks):
                 return True
         else:
             deserializer = getattr(self.blockchain, "deserialize_chain", None)

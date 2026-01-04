@@ -47,7 +47,7 @@ class _Tx:
 
 class DummyMining(BlockchainMiningMixin):
     def __init__(self):
-        self.chain = []
+        self.chain = [SimpleNamespace(hash="0" * 64, index=0)]
         self.pending_transactions = []
         self.difficulty = 1
         self.nonce_tracker = SimpleNamespace(
@@ -69,7 +69,9 @@ class DummyMining(BlockchainMiningMixin):
         self.storage = SimpleNamespace(save_block=lambda *_: None, _save_block_to_disk=lambda *_: None)
         self.storage.save_state_to_disk = lambda *_: None
         self.streak_tracker = SimpleNamespace(
-            update_miner_streak=lambda *_: None, apply_streak_bonus=lambda *_: (0, 0)
+            update_miner_streak=lambda *_: None,
+            apply_streak_bonus=lambda *_: (0, 0),
+            _save_streaks=lambda *_: None,
         )
         self.checkpoint_manager = SimpleNamespace(
             should_create_checkpoint=lambda *_: False,
@@ -90,7 +92,7 @@ class DummyMining(BlockchainMiningMixin):
         self._max_transactions_per_block = 2
         # Use minimal hex-looking values to satisfy signing helper expectations
         self.node_identity = {"private_key": "1" * 64, "public_key": "2" * 64}
-        self._valid_address = "XAI" + "a" * 40
+        self._valid_address = "TXAI" + "a" * 40
         self.address_index = SimpleNamespace(
             index_transaction=lambda *_: None,
             rollback=lambda *_: None,
@@ -112,7 +114,7 @@ class DummyMining(BlockchainMiningMixin):
         return 0
 
     def calculate_merkle_root(self, txs):
-        return "root"
+        return "0" * 64
 
     def mine_block(self, header):
         return "hash"

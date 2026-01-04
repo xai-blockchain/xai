@@ -174,9 +174,10 @@ class TestBlockchainReorganization:
 
         wallets = [Wallet() for _ in range(5)]
 
-        # Create initial funding
-        node1.blockchain.mine_pending_transactions(wallets[0].address)
-        node2.blockchain.add_block(node1.blockchain.chain[-1])
+        # Create initial funding with multiple UTXOs
+        for _ in range(4):
+            block = node1.blockchain.mine_pending_transactions(wallets[0].address)
+            node2.blockchain.add_block(block)
 
         # Create diverse transactions
         txs = []
@@ -198,12 +199,15 @@ class TestBlockchainReorganization:
         for _ in range(2):
             node2.blockchain.mine_pending_transactions(node2.miner_address)
 
-        # Node1 mines more blocks
-        node1.blockchain.mine_pending_transactions(node1.miner_address)
+        # Node1 mines more blocks to ensure a heavier chain
+        extra_blocks = []
+        for _ in range(2):
+            extra_blocks.append(node1.blockchain.mine_pending_transactions(node1.miner_address))
 
         # Reorg node2 to follow node1
         node2.blockchain.add_block(block)
-        node2.blockchain.add_block(node1.blockchain.chain[-1])
+        for extra_block in extra_blocks:
+            node2.blockchain.add_block(extra_block)
 
         # All transactions should be confirmed
         for i, tx in enumerate(txs):

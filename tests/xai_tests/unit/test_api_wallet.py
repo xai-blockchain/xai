@@ -46,7 +46,7 @@ class TestWalletAPICreation:
         wallet_api.app.config['TESTING'] = True
         return wallet_api.app.test_client()
 
-    @patch('xai.core.api_wallet.Wallet')
+    @patch('xai.core.api.api_wallet.Wallet')
     def test_create_wallet_success(self, mock_wallet_class, client):
         """Test POST /wallet/create - successful wallet creation."""
         mock_wallet = Mock()
@@ -454,7 +454,7 @@ class TestGossipAndSnapshotRoutes:
         wallet_api.app.config['TESTING'] = True
         return wallet_api.app.test_client()
 
-    @patch('xai.core.api_wallet.Config.WALLET_TRADE_PEER_SECRET', 'secret123')
+    @patch('xai.core.api.api_wallet.Config.WALLET_TRADE_PEER_SECRET', 'secret123')
     def test_inbound_gossip_success(self, client, wallet_api):
         """Test POST /wallet-trades/gossip - valid secret."""
         event_data = {"type": "order", "data": {}}
@@ -464,7 +464,7 @@ class TestGossipAndSnapshotRoutes:
                               headers={'X-Wallet-Trade-Secret': 'secret123'})
         assert response.status_code == 200
 
-    @patch('xai.core.api_wallet.Config.WALLET_TRADE_PEER_SECRET', 'secret123')
+    @patch('xai.core.api.api_wallet.Config.WALLET_TRADE_PEER_SECRET', 'secret123')
     def test_inbound_gossip_invalid_secret(self, client):
         """Test POST /wallet-trades/gossip - invalid secret."""
         event_data = {"type": "order", "data": {}}
@@ -482,7 +482,7 @@ class TestGossipAndSnapshotRoutes:
         assert result['success'] == True
         assert 'snapshot' in result
 
-    @patch('xai.core.api_wallet.Config.WALLET_TRADE_PEER_SECRET', 'secret123')
+    @patch('xai.core.api.api_wallet.Config.WALLET_TRADE_PEER_SECRET', 'secret123')
     def test_register_trade_peer_success(self, client, wallet_api):
         """Test POST /wallet-trades/peers/register - success."""
         data = {"host": "http://peer1:5000", "secret": "secret123"}
@@ -492,7 +492,7 @@ class TestGossipAndSnapshotRoutes:
         assert response.status_code == 200
         assert "http://peer1:5000" in wallet_api.trade_peers
 
-    @patch('xai.core.api_wallet.Config.WALLET_TRADE_PEER_SECRET', 'secret123')
+    @patch('xai.core.api.api_wallet.Config.WALLET_TRADE_PEER_SECRET', 'secret123')
     def test_register_trade_peer_invalid_secret(self, client):
         """Test POST /wallet-trades/peers/register - invalid secret."""
         data = {"host": "http://peer1:5000", "secret": "wrongsecret"}
@@ -542,8 +542,8 @@ class TestWalletSeedsSnapshot:
         wallet_api.app.config['TESTING'] = True
         return wallet_api.app.test_client()
 
-    @patch('xai.core.api_wallet.os.path.exists')
-    @patch('xai.core.api_wallet.open')
+    @patch('xai.core.api.api_wallet.os.path.exists')
+    @patch('xai.core.api.api_wallet.open')
     def test_wallet_seeds_snapshot_success(self, mock_open, mock_exists, client):
         """Test GET /wallet-seeds/snapshot - success."""
         mock_exists.return_value = True
@@ -559,7 +559,7 @@ class TestWalletSeedsSnapshot:
         response = client.get('/wallet-seeds/snapshot')
         assert response.status_code == 200
 
-    @patch('xai.core.api_wallet.os.path.exists')
+    @patch('xai.core.api.api_wallet.os.path.exists')
     def test_wallet_seeds_snapshot_not_found(self, mock_exists, client):
         """Test GET /wallet-seeds/snapshot - files not found."""
         mock_exists.return_value = False
@@ -615,8 +615,8 @@ class TestGossipTradeEvent:
         }
         return WalletAPIHandler(node, app, broadcast_callback, trade_peers)
 
-    @patch('xai.core.api_wallet.requests.post')
-    @patch('xai.core.api_wallet.Config.WALLET_TRADE_PEER_SECRET', 'secret123')
+    @patch('xai.core.api.api_wallet.requests.post')
+    @patch('xai.core.api.api_wallet.Config.WALLET_TRADE_PEER_SECRET', 'secret123')
     def test_gossip_trade_event_success(self, mock_post, wallet_api):
         """Test _gossip_trade_event - successful gossip."""
         mock_post.return_value.status_code = 200
@@ -626,8 +626,8 @@ class TestGossipTradeEvent:
 
         assert mock_post.call_count == 2  # Called for each peer
 
-    @patch('xai.core.api_wallet.Config.WALLET_TRADE_PEER_SECRET', 'secret123')
-    @patch('xai.core.api_wallet.requests.post')
+    @patch('xai.core.api.api_wallet.Config.WALLET_TRADE_PEER_SECRET', 'secret123')
+    @patch('xai.core.api.api_wallet.requests.post')
     def test_gossip_trade_event_failure(self, mock_post, wallet_api):
         """Test _gossip_trade_event - peer failure."""
         mock_post.side_effect = Exception("Connection refused")

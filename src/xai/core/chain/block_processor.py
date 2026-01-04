@@ -63,9 +63,16 @@ class BlockProcessor:
         from xai.core.transaction import Transaction
 
         # Try to load genesis block from file (for unified network)
-        genesis_file = os.path.join(os.path.dirname(__file__), "genesis.json")
+        genesis_candidates = []
+        if getattr(self.blockchain, "data_dir", None):
+            genesis_candidates.append(os.path.join(self.blockchain.data_dir, "genesis.json"))
+        chain_dir = os.path.dirname(__file__)
+        genesis_candidates.append(os.path.join(chain_dir, "genesis.json"))
+        genesis_candidates.append(os.path.join(os.path.dirname(chain_dir), "genesis.json"))
 
-        if os.path.exists(genesis_file):
+        genesis_file = next((path for path in genesis_candidates if os.path.exists(path)), None)
+
+        if genesis_file:
             self.logger.info(f"Loading genesis block from {genesis_file}")
             with open(genesis_file, "r") as f:
                 genesis_data = json.load(f)

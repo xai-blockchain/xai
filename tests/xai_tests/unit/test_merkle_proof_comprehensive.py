@@ -17,6 +17,14 @@ import hashlib
 import time
 
 
+def _addr(index: int) -> str:
+    return f"TXAI{index:040x}"
+
+
+def _txid(index: int) -> str:
+    return f"{index:064x}"
+
+
 class TestMerkleProofGeneration:
     """Test merkle proof generation for various tree sizes"""
 
@@ -25,12 +33,12 @@ class TestMerkleProofGeneration:
         transactions = []
         for i in range(count):
             tx = Transaction(
-                sender=f"XAI{'0' * 40}sender{i}",
-                recipient=f"XAI{'0' * 40}recip{i}",
+                sender=_addr(i + 1),
+                recipient=_addr(i + 1001),
                 amount=float(i + 1),
                 fee=0.1,
             )
-            tx.txid = f"txid_{i:04d}_{'x' * 56}"
+            tx.txid = _txid(i + 1)
             transactions.append(tx)
         return transactions
 
@@ -40,12 +48,12 @@ class TestMerkleProofGeneration:
         block = Block(index=1, transactions=txs, previous_hash="0" * 64, difficulty=1)
 
         # Generate proof for the only transaction
-        proof = block.generate_merkle_proof(0)
+        proof = block.generate_merkle_proof(txs[0].txid)
 
         assert proof is not None, "Proof should not be None for single transaction"
         assert isinstance(proof, list), "Proof should be a list"
         # Single transaction tree has no siblings needed
-        assert len(proof) == 0 or proof == [block.merkle_root], "Single tx proof should be empty or just root"
+        assert proof == [], "Single tx proof should be empty"
 
     def test_merkle_proof_two_transactions(self):
         """Task 198: Test merkle proof for two transactions"""
@@ -53,12 +61,12 @@ class TestMerkleProofGeneration:
         block = Block(index=1, transactions=txs, previous_hash="0" * 64, difficulty=1)
 
         # Generate proof for first transaction
-        proof_0 = block.generate_merkle_proof(0)
+        proof_0 = block.generate_merkle_proof(txs[0].txid)
         assert proof_0 is not None, "Proof should not be None"
         assert len(proof_0) > 0, "Proof should contain sibling hash"
 
         # Generate proof for second transaction
-        proof_1 = block.generate_merkle_proof(1)
+        proof_1 = block.generate_merkle_proof(txs[1].txid)
         assert proof_1 is not None, "Proof should not be None"
         assert len(proof_1) > 0, "Proof should contain sibling hash"
 
@@ -71,7 +79,7 @@ class TestMerkleProofGeneration:
             # Test proof for first, middle, and last transaction
             indices = [0, count // 2, count - 1]
             for idx in indices:
-                proof = block.generate_merkle_proof(idx)
+                proof = block.generate_merkle_proof(txs[idx].txid)
                 assert proof is not None, f"Proof should not be None for index {idx} in {count} txs"
                 # For power of 2, proof length should be log2(count)
                 import math
@@ -86,7 +94,7 @@ class TestMerkleProofGeneration:
 
             # Test proof for all transactions
             for idx in range(count):
-                proof = block.generate_merkle_proof(idx)
+                proof = block.generate_merkle_proof(txs[idx].txid)
                 assert proof is not None, f"Proof should not be None for index {idx} in {count} txs"
                 assert len(proof) > 0, f"Proof should not be empty for {count} txs"
 
@@ -99,7 +107,7 @@ class TestMerkleProofGeneration:
         # Test random indices
         test_indices = [0, 1, 50, 99]
         for idx in test_indices:
-            proof = block.generate_merkle_proof(idx)
+            proof = block.generate_merkle_proof(txs[idx].txid)
             assert proof is not None, f"Proof should exist for index {idx}"
             # Proof length should be roughly log2(100) ≈ 7
             assert 5 <= len(proof) <= 10, f"Proof length should be reasonable for 100 txs"
@@ -109,10 +117,9 @@ class TestMerkleProofGeneration:
         txs = self.create_test_transactions(5)
         block = Block(index=1, transactions=txs, previous_hash="0" * 64, difficulty=1)
 
-        # Test out of bounds indices
-        assert block.generate_merkle_proof(-1) is None, "Negative index should return None"
-        assert block.generate_merkle_proof(5) is None, "Index >= len should return None"
-        assert block.generate_merkle_proof(100) is None, "Large invalid index should return None"
+        # Test unknown txid
+        with pytest.raises(ValueError):
+            block.generate_merkle_proof(_txid(9999))
 
 
 class TestMerkleProofVerification:
@@ -123,12 +130,12 @@ class TestMerkleProofVerification:
         transactions = []
         for i in range(count):
             tx = Transaction(
-                sender=f"XAI{'0' * 40}sender{i}",
-                recipient=f"XAI{'0' * 40}recip{i}",
+                sender=_addr(i + 2001),
+                recipient=_addr(i + 3001),
                 amount=float(i + 1),
                 fee=0.1,
             )
-            tx.txid = f"txid_{i:04d}_{'x' * 56}"
+            tx.txid = _txid(i + 2001)
             transactions.append(tx)
         return transactions
 
@@ -140,10 +147,10 @@ class TestMerkleProofVerification:
 
             # Generate and verify proof for each transaction
             for idx in range(count):
-                proof = block.generate_merkle_proof(idx)
+                proof = block.generate_merkle_proof(txs[idx].txid)
                 tx_hash = txs[idx].txid
 
-                is_valid = block.verify_merkle_proof(tx_hash, idx, proof)
+                is_valid = block.verify_merkle_proof(tx_hash, block.merkle_root, proof)
                 assert is_valid, f"Valid proof should verify for tx {idx} in {count} txs"
 
     def test_verify_invalid_merkle_proof_wrong_hash(self):
@@ -152,11 +159,11 @@ class TestMerkleProofVerification:
         block = Block(index=1, transactions=txs, previous_hash="0" * 64, difficulty=1)
 
         # Generate valid proof
-        proof = block.generate_merkle_proof(0)
+        proof = block.generate_merkle_proof(txs[0].txid)
 
         # Try to verify with wrong tx hash
-        wrong_hash = "wrong_hash_" + "x" * 50
-        is_valid = block.verify_merkle_proof(wrong_hash, 0, proof)
+        wrong_hash = _txid(99999)
+        is_valid = block.verify_merkle_proof(wrong_hash, block.merkle_root, proof)
         assert not is_valid, "Proof with wrong tx hash should fail verification"
 
     def test_verify_invalid_merkle_proof_wrong_index(self):
@@ -165,11 +172,11 @@ class TestMerkleProofVerification:
         block = Block(index=1, transactions=txs, previous_hash="0" * 64, difficulty=1)
 
         # Generate proof for index 0
-        proof = block.generate_merkle_proof(0)
-        tx_hash = txs[0].txid
+        proof = block.generate_merkle_proof(txs[0].txid)
+        tx_hash = txs[2].txid
 
-        # Try to verify at wrong index
-        is_valid = block.verify_merkle_proof(tx_hash, 2, proof)
+        # Proof should fail for a different tx hash
+        is_valid = block.verify_merkle_proof(tx_hash, block.merkle_root, proof)
         assert not is_valid, "Proof verified at wrong index should fail"
 
     def test_verify_invalid_merkle_proof_tampered(self):
@@ -178,15 +185,15 @@ class TestMerkleProofVerification:
         block = Block(index=1, transactions=txs, previous_hash="0" * 64, difficulty=1)
 
         # Generate valid proof
-        proof = block.generate_merkle_proof(0)
+        proof = block.generate_merkle_proof(txs[0].txid)
         tx_hash = txs[0].txid
 
         if proof and len(proof) > 0:
             # Tamper with the proof by modifying a hash
             tampered_proof = proof.copy()
-            tampered_proof[0] = "tampered_" + "x" * 54
+            tampered_proof[0] = (_txid(123456), proof[0][1])
 
-            is_valid = block.verify_merkle_proof(tx_hash, 0, tampered_proof)
+            is_valid = block.verify_merkle_proof(tx_hash, block.merkle_root, tampered_proof)
             assert not is_valid, "Tampered proof should fail verification"
 
     def test_verify_invalid_merkle_proof_empty(self):
@@ -197,9 +204,8 @@ class TestMerkleProofVerification:
         tx_hash = txs[0].txid
 
         # Empty proof should only be valid for single transaction
-        is_valid = block.verify_merkle_proof(tx_hash, 0, [])
-        # This depends on implementation - might be valid for single tx or always invalid
-        # The test documents the expected behavior
+        is_valid = block.verify_merkle_proof(tx_hash, block.merkle_root, [])
+        assert not is_valid, "Empty proof should fail for multi-transaction blocks"
 
     def test_verify_invalid_merkle_proof_wrong_length(self):
         """Task 199: Reject proof with wrong length"""
@@ -207,18 +213,18 @@ class TestMerkleProofVerification:
         block = Block(index=1, transactions=txs, previous_hash="0" * 64, difficulty=1)
 
         # Generate valid proof
-        proof = block.generate_merkle_proof(0)
+        proof = block.generate_merkle_proof(txs[0].txid)
         tx_hash = txs[0].txid
 
         if proof and len(proof) > 1:
             # Try proof with extra element
-            extended_proof = proof + ["extra_hash_" + "x" * 52]
-            is_valid = block.verify_merkle_proof(tx_hash, 0, extended_proof)
-            # May or may not fail depending on implementation
+            extended_proof = proof + [(_txid(777777), True)]
+            is_valid = block.verify_merkle_proof(tx_hash, block.merkle_root, extended_proof)
+            assert not is_valid, "Proof with extra elements should fail"
 
             # Try proof with missing element
             short_proof = proof[:-1]
-            is_valid = block.verify_merkle_proof(tx_hash, 0, short_proof)
+            is_valid = block.verify_merkle_proof(tx_hash, block.merkle_root, short_proof)
             assert not is_valid, "Proof with wrong length should fail"
 
     def test_verify_all_transactions_in_block(self):
@@ -229,9 +235,9 @@ class TestMerkleProofVerification:
 
         # Every transaction should have a valid proof
         for idx in range(count):
-            proof = block.generate_merkle_proof(idx)
+            proof = block.generate_merkle_proof(txs[idx].txid)
             tx_hash = txs[idx].txid
-            is_valid = block.verify_merkle_proof(tx_hash, idx, proof)
+            is_valid = block.verify_merkle_proof(tx_hash, block.merkle_root, proof)
             assert is_valid, f"Proof verification failed for tx {idx}"
 
 
@@ -243,12 +249,12 @@ class TestMerkleProofEdgeCases:
         transactions = []
         for i in range(count):
             tx = Transaction(
-                sender=f"XAI{'0' * 40}sender{i}",
-                recipient=f"XAI{'0' * 40}recip{i}",
+                sender=_addr(i + 4001),
+                recipient=_addr(i + 5001),
                 amount=float(i + 1),
                 fee=0.1,
             )
-            tx.txid = f"txid_{i:04d}_{'x' * 56}"
+            tx.txid = _txid(i + 4001)
             transactions.append(tx)
         return transactions
 
@@ -256,8 +262,8 @@ class TestMerkleProofEdgeCases:
         """Edge case: Block with no transactions"""
         block = Block(index=1, transactions=[], previous_hash="0" * 64, difficulty=1)
 
-        proof = block.generate_merkle_proof(0)
-        assert proof is None or proof == [], "Empty block should return None/empty proof"
+        with pytest.raises(ValueError):
+            block.generate_merkle_proof(_txid(1))
 
     def test_merkle_proof_duplicate_transactions(self):
         """Edge case: Block with duplicate transaction hashes"""
@@ -268,8 +274,8 @@ class TestMerkleProofEdgeCases:
         block = Block(index=1, transactions=txs, previous_hash="0" * 64, difficulty=1)
 
         # Both duplicates should have valid proofs
-        proof_0 = block.generate_merkle_proof(0)
-        proof_2 = block.generate_merkle_proof(2)
+        proof_0 = block.generate_merkle_proof(txs[0].txid)
+        proof_2 = block.generate_merkle_proof(txs[2].txid)
 
         assert proof_0 is not None, "Proof should exist for first duplicate"
         assert proof_2 is not None, "Proof should exist for second duplicate"
@@ -283,7 +289,7 @@ class TestMerkleProofEdgeCases:
 
         # Generate proofs for several transactions
         for idx in range(5):
-            _ = block.generate_merkle_proof(idx)
+            _ = block.generate_merkle_proof(txs[idx].txid)
 
         # Merkle root should not change
         assert block.merkle_root == original_root, "Merkle root should not change after proof generation"
@@ -294,15 +300,16 @@ class TestMerkleProofEdgeCases:
         block1 = Block(index=1, transactions=txs1, previous_hash="0" * 64, difficulty=1)
 
         txs2 = self.create_test_transactions(5)
+        txs2[0].txid = _txid(999999)
         block2 = Block(index=2, transactions=txs2, previous_hash="1" * 64, difficulty=1)
 
         # Get proof from block1
-        proof = block1.generate_merkle_proof(0)
+        proof = block1.generate_merkle_proof(txs1[0].txid)
         tx_hash = txs1[0].txid
 
         # Try to verify against block2's merkle root
         # This should fail because merkle roots are different
-        is_valid = block2.verify_merkle_proof(tx_hash, 0, proof)
+        is_valid = block2.verify_merkle_proof(tx_hash, block2.merkle_root, proof)
         assert not is_valid, "Proof from one block should not verify in another block"
 
 

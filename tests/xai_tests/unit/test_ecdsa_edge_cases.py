@@ -204,7 +204,7 @@ class TestECDSASignatureMalleability:
     """
 
     def test_high_s_signature_verification(self):
-        """High-S signatures should still verify (our impl accepts both)."""
+        """High-S signatures should be rejected to prevent malleability."""
         priv, pub = generate_secp256k1_keypair_hex()
         message = b"malleability test"
         sig = sign_message_hex(priv, message)
@@ -220,9 +220,9 @@ class TestECDSASignatureMalleability:
         high_s = curve_order - s
         high_s_sig = sig[:64] + high_s.to_bytes(32, "big").hex()
 
-        # Both signatures should verify (our implementation is permissive)
+        # Only low-S signature should verify
         assert verify_signature_hex(pub, message, sig) is True
-        assert verify_signature_hex(pub, message, high_s_sig) is True
+        assert verify_signature_hex(pub, message, high_s_sig) is False
 
     def test_signature_different_for_different_messages(self):
         """Same key signing different messages produces different signatures."""

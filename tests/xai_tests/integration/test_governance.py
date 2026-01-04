@@ -375,7 +375,7 @@ class TestGovernanceIntegration:
         bc.mine_pending_transactions(wallet.address)
 
         # Create governance transaction
-        tx = Transaction(wallet.address, "GOVERNANCE_CONTRACT", 0.0, 0.1, tx_type="governance")
+        tx = Transaction(wallet.address, "GOVERNANCE", 0.0, 0.1, tx_type="governance")
 
         assert tx.tx_type == "governance"
 

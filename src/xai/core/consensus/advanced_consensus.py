@@ -808,7 +808,8 @@ class AdvancedConsensusManager:
         Args:
             block_hash: Hash of newly added block
         """
-        orphans = self.orphan_pool.get_orphans_by_parent(block_hash)
+        # Copy to avoid in-loop mutation when new orphans are re-added.
+        orphans = list(self.orphan_pool.get_orphans_by_parent(block_hash))
 
         for orphan in orphans:
             # Try to process orphan again

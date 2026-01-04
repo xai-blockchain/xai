@@ -11,6 +11,8 @@ import jwt as pyjwt
 
 from xai.core.security.jwt_auth_manager import JWTAuthManager, UserRole
 
+SECRET_KEY = "test_secret_key_32_chars_minimum____"
+
 
 class TestJWTAuthManagerExpiration:
     """Test JWT expiration verification in jwt_auth_manager module."""
@@ -19,7 +21,7 @@ class TestJWTAuthManagerExpiration:
     def jwt_manager(self):
         """Create JWT manager with short expiration for testing."""
         return JWTAuthManager(
-            secret_key="test-secret-key-12345",
+            secret_key=SECRET_KEY,
             algorithm="HS256",
             token_expiration_hours=1,
             refresh_token_expiration_days=30,
@@ -185,7 +187,7 @@ class TestJWTAuthManagerExpiration:
         """Test that cleanup removes expired tokens from revocation list."""
         # Create a short-lived token
         short_lived_manager = JWTAuthManager(
-            secret_key="test-secret-key-12345",
+            secret_key=SECRET_KEY,
             token_expiration_hours=0.0003,  # ~1 second
         )
 

@@ -12,12 +12,12 @@ from xai.security.module_attachment_guard import ModuleAttachmentError, ModuleAt
 
 
 def test_allowlisted_repo_module_passes():
-    guard = ModuleAttachmentGuard({"xai.core.api_mining"}, require_attribute="ATTACHMENT_SAFE")
-    guard.verify_module("xai.core.api_mining")  # Should not raise
+    guard = ModuleAttachmentGuard({"xai.core.api.api_mining"}, require_attribute="ATTACHMENT_SAFE")
+    guard.verify_module("xai.core.api.api_mining")  # Should not raise
 
 
 def test_non_allowlisted_module_rejected():
-    guard = ModuleAttachmentGuard({"xai.core.api_mining"})
+    guard = ModuleAttachmentGuard({"xai.core.api.api_mining"})
     with pytest.raises(ModuleAttachmentError):
         guard.verify_module("json")
 

@@ -922,7 +922,7 @@ def main():
             print_info("\nTestnet Faucet Information:")
             print(f"  Address: {Colors.YELLOW}{wallet_info[0]}{Colors.ENDC}")
             print(f"  Faucet URL: {Colors.CYAN}https://faucet.xai.network{Colors.ENDC}")
-            print(f"  Discord: {Colors.CYAN}https://discord.gg/xai-network{Colors.ENDC}")
+            print(f"  Discord: {Colors.CYAN}https://discord.gg/jqNEDhG8{Colors.ENDC}")
             print_info("\nVisit the faucet URL or ask in Discord for testnet tokens.")
 
     # Step: Summary and Next Steps

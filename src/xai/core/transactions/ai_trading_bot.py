@@ -905,7 +905,7 @@ Return JSON:
             else:
                 return {"success": False, "error": f"Provider {self.ai_provider} not supported"}
 
-        except (ValueError, TypeError, KeyError, AttributeError, ConnectionError, TimeoutError) as e:
+        except Exception as e:
             logger.error(
                 "AI provider call failed: %s - %s",
                 type(e).__name__,

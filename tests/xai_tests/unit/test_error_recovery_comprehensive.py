@@ -226,8 +226,8 @@ class TestErrorRecoveryManager:
         assert success is False
         assert "custom error" in error
 
-    @patch("xai.core.error_recovery.CorruptionDetector")
-    @patch("xai.core.error_recovery.CorruptionRecovery")
+    @patch("xai.core.chain.error_recovery.CorruptionDetector")
+    @patch("xai.core.chain.error_recovery.CorruptionRecovery")
     def test_handle_corruption_no_corruption(self, mock_corruption_recovery, mock_detector, manager):
         """Test handle_corruption when no corruption is detected"""
         # Mock detector to return no corruption
@@ -239,7 +239,7 @@ class TestErrorRecoveryManager:
         assert error is None
         assert manager.state == RecoveryState.HEALTHY
 
-    @patch("xai.core.error_recovery.CorruptionRecovery")
+    @patch("xai.core.chain.error_recovery.CorruptionRecovery")
     def test_handle_corruption_detected(self, mock_corruption_recovery, manager):
         """Test handle_corruption when corruption is detected"""
         # Mock detector to return corruption
@@ -257,7 +257,7 @@ class TestErrorRecoveryManager:
         assert manager.state == RecoveryState.HEALTHY
         assert len(manager.recovery_log) > 0
 
-    @patch("xai.core.error_recovery.CorruptionRecovery")
+    @patch("xai.core.chain.error_recovery.CorruptionRecovery")
     def test_handle_corruption_recovery_failed(self, mock_corruption_recovery, manager):
         """Test handle_corruption when recovery fails"""
         # Mock detector to return corruption
@@ -309,7 +309,7 @@ class TestErrorRecoveryManager:
         assert success is False
         assert "No node instance available" in error
 
-    @patch("xai.core.error_recovery.NetworkPartitionRecovery")
+    @patch("xai.core.chain.error_recovery.NetworkPartitionRecovery")
     def test_handle_network_partition_reconnect_success(self, mock_recovery, manager, node):
         """Test successful reconnection after network partition"""
         manager.node = node
@@ -323,7 +323,7 @@ class TestErrorRecoveryManager:
         assert error is None
         assert len(manager.recovery_log) > 0
 
-    @patch("xai.core.error_recovery.NetworkPartitionRecovery")
+    @patch("xai.core.chain.error_recovery.NetworkPartitionRecovery")
     def test_handle_network_partition_degraded_mode(self, mock_recovery, manager, node):
         """Test entering degraded mode on reconnection failure"""
         manager.node = node
@@ -340,7 +340,7 @@ class TestErrorRecoveryManager:
         assert "degraded mode" in error
         assert manager.state == RecoveryState.DEGRADED
 
-    @patch("xai.core.error_recovery.GracefulShutdown")
+    @patch("xai.core.chain.error_recovery.GracefulShutdown")
     def test_graceful_shutdown(self, mock_shutdown, manager):
         """Test graceful shutdown"""
         # Mock successful shutdown
@@ -363,7 +363,7 @@ class TestErrorRecoveryManager:
         call_args = manager.graceful_shutdown_manager.shutdown.call_args
         assert call_args[0][2] == "manual"
 
-    @patch("xai.core.error_recovery.BlockchainBackup")
+    @patch("xai.core.chain.error_recovery.BlockchainBackup")
     def test_create_checkpoint(self, mock_backup, manager):
         """Test creating checkpoint"""
         # Mock backup creation
@@ -477,7 +477,7 @@ class TestErrorRecoveryManager:
         # Health should have been updated
         assert update_count[0] >= 0
 
-    @patch("xai.core.error_recovery.time.time")
+    @patch("xai.core.chain.error_recovery.time.time")
     def test_monitor_health_auto_backup(self, mock_time, manager):
         """Test that monitoring performs auto-backups"""
         # This test is complex due to the hourly check

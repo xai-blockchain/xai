@@ -4,9 +4,13 @@ from xai.blockchain.emergency_pause import EmergencyPauseManager
 from xai.security.circuit_breaker import CircuitBreaker, CircuitBreakerState
 
 
-def test_manual_pause_and_unpause():
+def test_manual_pause_and_unpause(tmp_path):
     cb = CircuitBreaker("pause-cb", failure_threshold=2, recovery_timeout_seconds=1)
-    manager = EmergencyPauseManager("0xAdmin", circuit_breaker=cb)
+    manager = EmergencyPauseManager(
+        "0xAdmin",
+        circuit_breaker=cb,
+        db_path=tmp_path / "pause.db",
+    )
     assert manager.get_status()["is_paused"] is False
 
     manager.pause_operations("0xAdmin", "manual test")
@@ -18,8 +22,8 @@ def test_manual_pause_and_unpause():
     assert manager.is_paused() is False
 
 
-def test_unauthorized_access_rejected():
-    manager = EmergencyPauseManager("0xAdmin")
+def test_unauthorized_access_rejected(tmp_path):
+    manager = EmergencyPauseManager("0xAdmin", db_path=tmp_path / "pause.db")
     try:
         manager.pause_operations("0xEvil")
     except PermissionError:
@@ -28,9 +32,13 @@ def test_unauthorized_access_rejected():
         assert False, "Unauthorized pause should raise PermissionError"
 
 
-def test_circuit_breaker_auto_pause_and_unpause():
+def test_circuit_breaker_auto_pause_and_unpause(tmp_path):
     cb = CircuitBreaker("auto", failure_threshold=1, recovery_timeout_seconds=1)
-    manager = EmergencyPauseManager("0xAdmin", circuit_breaker=cb)
+    manager = EmergencyPauseManager(
+        "0xAdmin",
+        circuit_breaker=cb,
+        db_path=tmp_path / "pause.db",
+    )
 
     cb.record_failure()
     assert cb.state == CircuitBreakerState.OPEN

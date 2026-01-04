@@ -305,8 +305,8 @@ class TestLendingDustLossFix:
         """
         Test that very large amounts don't overflow.
         """
-        # Large deposit (1 billion tokens with 18 decimals)
-        large_amount = 10**9 * 10**18
+        # Large deposit within collateral bounds
+        large_amount = 100_000 * 10**18
 
         pool.supply("user1", "XAI", large_amount)
 

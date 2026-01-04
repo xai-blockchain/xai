@@ -378,16 +378,16 @@ class TestReorgWithDifferentDifficulty:
         bc = Blockchain(data_dir=str(tmp_path))
         wallet = Wallet()
 
-        # Change difficulty
-        original_difficulty = bc.difficulty
+        # Change difficulty and compute expected adjustment
         bc.difficulty = 5
+        expected_difficulty = bc.calculate_next_difficulty()
 
-        # Mine with new difficulty
+        # Mine with adjusted difficulty
         bc.mine_pending_transactions(wallet.address)
 
-        # Verify difficulty was used
+        # Verify difficulty matches adjustment
         block = bc.get_latest_block()
-        assert block.difficulty == 5
+        assert block.difficulty == expected_difficulty
 
     def test_reorg_with_adaptive_difficulty(self, tmp_path):
         """Test reorganization with adaptive difficulty adjustment"""

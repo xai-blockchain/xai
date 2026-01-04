@@ -20,7 +20,11 @@ def test_deterministic_snapshot_matches_fixture(tmp_path):
     fixture = json.loads(fixture_path.read_text())
 
     time_iter = _time_generator()
-    with patch("time.time", side_effect=lambda: float(next(time_iter))):
+    time_side_effect = lambda: float(next(time_iter))
+    with (
+        patch("xai.core.blockchain_components.mining_mixin.time.time", side_effect=time_side_effect),
+        patch("xai.core.governance.gamification.time.time", side_effect=time_side_effect),
+    ):
         chain = Blockchain(data_dir=str(tmp_path))
         chain.difficulty = 1
         miner_priv, miner_pub = deterministic_keypair_from_seed(b"deterministic-fixture-seed-0001")

@@ -544,7 +544,7 @@ class TestRiskManagement:
 class TestAICallMocking:
     """Test AI API calls with mocking"""
 
-    @patch("xai.core.ai_trading_bot.anthropic.Anthropic")
+    @patch("xai.core.transactions.ai_trading_bot.anthropic.Anthropic")
     def test_call_anthropic_ai_success(self, mock_anthropic_class, trading_bot):
         """Test successful Anthropic AI call"""
         # Setup mock
@@ -560,7 +560,7 @@ class TestAICallMocking:
         assert result["success"] is True
         assert '{"action": "BUY"' in result["response"]
 
-    @patch("xai.core.ai_trading_bot.openai.OpenAI")
+    @patch("xai.core.transactions.ai_trading_bot.openai.OpenAI")
     def test_call_openai_ai_success(self, mock_openai_class, mock_blockchain, mock_personal_ai, basic_config):
         """Test successful OpenAI call"""
         # Create OpenAI bot
@@ -606,7 +606,7 @@ class TestAICallMocking:
         assert result["success"] is False
         assert "not supported" in result["error"]
 
-    @patch("xai.core.ai_trading_bot.anthropic.Anthropic")
+    @patch("xai.core.transactions.ai_trading_bot.anthropic.Anthropic")
     def test_call_ai_exception(self, mock_anthropic_class, trading_bot):
         """Test AI call with exception"""
         # Setup mock to raise exception
@@ -623,7 +623,7 @@ class TestAICallMocking:
 class TestMarketAnalysis:
     """Test market analysis functionality"""
 
-    @patch("xai.core.ai_trading_bot.anthropic.Anthropic")
+    @patch("xai.core.transactions.ai_trading_bot.anthropic.Anthropic")
     def test_analyze_market_buy_signal(self, mock_anthropic_class, trading_bot):
         """Test market analysis with BUY signal"""
         # Setup AI mock
@@ -649,7 +649,7 @@ class TestMarketAnalysis:
         assert result["confidence"] == 0.85
         assert result["amount"] == 80.0
 
-    @patch("xai.core.ai_trading_bot.anthropic.Anthropic")
+    @patch("xai.core.transactions.ai_trading_bot.anthropic.Anthropic")
     def test_analyze_market_sell_signal(self, mock_anthropic_class, trading_bot):
         """Test market analysis with SELL signal"""
         mock_client = Mock()
@@ -671,7 +671,7 @@ class TestMarketAnalysis:
         assert result["action"] == TradeAction.SELL
         assert result["confidence"] == 0.75
 
-    @patch("xai.core.ai_trading_bot.anthropic.Anthropic")
+    @patch("xai.core.transactions.ai_trading_bot.anthropic.Anthropic")
     def test_analyze_market_hold_signal(self, mock_anthropic_class, trading_bot):
         """Test market analysis with HOLD signal"""
         mock_client = Mock()
@@ -702,7 +702,7 @@ class TestMarketAnalysis:
             assert "failed" in result["reasoning"]
             assert result["confidence"] == 0.0
 
-    @patch("xai.core.ai_trading_bot.anthropic.Anthropic")
+    @patch("xai.core.transactions.ai_trading_bot.anthropic.Anthropic")
     def test_analyze_market_invalid_json(self, mock_anthropic_class, trading_bot):
         """Test market analysis with invalid JSON response"""
         mock_client = Mock()
@@ -717,7 +717,7 @@ class TestMarketAnalysis:
         assert result["action"] == TradeAction.HOLD
         assert "parse" in result["reasoning"]
 
-    @patch("xai.core.ai_trading_bot.anthropic.Anthropic")
+    @patch("xai.core.transactions.ai_trading_bot.anthropic.Anthropic")
     def test_analyze_market_invalid_action(self, mock_anthropic_class, trading_bot):
         """Test market analysis with invalid action"""
         mock_client = Mock()
@@ -1055,7 +1055,7 @@ class TestStrategyTemplates:
 class TestTradingLoopIntegration:
     """Test trading loop integration"""
 
-    @patch("xai.core.ai_trading_bot.anthropic.Anthropic")
+    @patch("xai.core.transactions.ai_trading_bot.anthropic.Anthropic")
     def test_trading_loop_single_iteration(self, mock_anthropic_class, trading_bot):
         """Test trading loop single iteration"""
         # Setup AI mock to return HOLD
@@ -1198,6 +1198,6 @@ class TestMainExecution:
         import xai.core.transactions.ai_trading_bot
 
         # Verify classes exist
-        assert hasattr(xai.core.ai_trading_bot, "AITradingBot")
-        assert hasattr(xai.core.ai_trading_bot, "TradingStrategy")
-        assert hasattr(xai.core.ai_trading_bot, "STRATEGY_TEMPLATES")
+        assert hasattr(xai.core.transactions.ai_trading_bot, "AITradingBot")
+        assert hasattr(xai.core.transactions.ai_trading_bot, "TradingStrategy")
+        assert hasattr(xai.core.transactions.ai_trading_bot, "STRATEGY_TEMPLATES")

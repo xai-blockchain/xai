@@ -236,7 +236,14 @@ class DDoSProtector:
 
         # Add request timestamp
         self.request_timestamps[ip_address].append(current_time)
+        # Enforce memory limit after adding a new IP
+        if len(self.request_timestamps) > self.max_tracked_ips:
+            self._clean_old_ips(current_time)
         return True
+
+    def check_rate_limit(self, ip_address: str) -> bool:
+        """Backward-compatible alias for check_request."""
+        return self.check_request(ip_address)
 
     def register_connection(self, ip_address: str) -> bool:
         """
@@ -288,6 +295,10 @@ class DDoSProtector:
         self.last_activity[ip_address] = current_time
         return True
 
+    def add_connection(self, ip_address: str) -> bool:
+        """Backward-compatible alias for register_connection."""
+        return self.register_connection(ip_address)
+
     def unregister_connection(self, ip_address: str):
         """
         Unregister a connection when it closes.
@@ -301,6 +312,10 @@ class DDoSProtector:
             # Clean up completely if no more connections
             if self.active_connections[ip_address] == 0:
                 del self.active_connections[ip_address]
+
+    def remove_connection(self, ip_address: str):
+        """Backward-compatible alias for unregister_connection."""
+        self.unregister_connection(ip_address)
 
 # Example Usage (for testing purposes)
 if __name__ == "__main__":

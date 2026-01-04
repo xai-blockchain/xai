@@ -1042,6 +1042,11 @@ class CrossChainVerifier:
         }
 
     @staticmethod
+    def _reconstruct_merkle_root(tx_hash: str, merkle_proof: list[str], tx_index: int) -> str:
+        """Delegate merkle root reconstruction to the shared HTLC helper."""
+        return AtomicSwapHTLC._reconstruct_merkle_root(tx_hash, merkle_proof, tx_index)
+
+    @staticmethod
     def calculate_atomic_swap_fee(
         amount: Decimal | float | str,
         fee_rate_per_byte: Decimal | float | str,

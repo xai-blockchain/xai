@@ -695,7 +695,7 @@ class TestBlockchainReorg:
         invalid_block = Block(
             len(bc.chain),  # Index
             [],  # No transactions
-            previous_hash="INVALID_HASH",  # Wrong hash - will fail validation
+            previous_hash="1" * 64,  # Wrong hash - will fail validation
             difficulty=bc.difficulty,
             timestamp=time.time(),
             nonce=12345,

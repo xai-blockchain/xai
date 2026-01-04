@@ -145,7 +145,7 @@ def test_explorer_deposit_source_parses_records(monkeypatch, tmp_path):
         assert addr in url
         return DummyResponse(payload)
 
-    monkeypatch.setattr("xai.core.crypto_deposit_monitor.requests.request", fake_request)
+    monkeypatch.setattr("xai.core.wallets.crypto_deposit_monitor.requests.request", fake_request)
 
     source = ExplorerDepositSource(
         manager,

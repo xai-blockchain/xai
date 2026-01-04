@@ -1,0 +1,152 @@
+# XAI Testnet Prelaunch Runbook (Parallel-Safe, Extensive)
+
+This runbook is designed to catch rookie errors before a public testnet launch. It is split into local (pre-testnet) tests and testnet validation. Parallel-safe steps can be run by separate agents in parallel across Aura/PAW/XAI.
+
+## Goals
+
+- Catch coding errors before public exposure
+- Validate protocol behavior, APIs, and infrastructure
+- Stress critical services without cross-agent interference
+
+## Requirements
+
+- bash, curl, jq
+- Optional: `k6` for load tests
+
+## Setup
+
+1) Copy the env template and edit values:
+
+```bash
+cp scripts/testnet/runbook/env.example scripts/testnet/runbook/.env
+```
+
+2) Edit `scripts/testnet/runbook/.env`:
+
+- Set `RUN_ID` to a unique value per agent (e.g., `xai-agent1-YYYYMMDDHHMMSS`).
+- Provide `ADDRESS` for faucet/balance checks.
+- If JSON-RPC is enabled, set `JSONRPC_URL`.
+
+3) Load the env file:
+
+```bash
+set -a
+. scripts/testnet/runbook/.env
+set +a
+```
+
+## Phase 0: Local Pre-Testnet Gates (must pass before public testnet)
+
+### 0.1 Python unit tests
+
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install .
+pytest
+```
+
+### 0.2 Targeted unit suites (optional)
+
+```bash
+pytest tests/xai_tests/unit -q
+```
+
+## Phase 1: Parallel-Safe Testnet Suite
+
+These steps are safe to run in parallel with Aura and PAW. They are read-only or minimal-impact.
+
+### 1.1 Smoke checks
+
+```bash
+bash scripts/testnet/runbook/smoke.sh
+```
+
+### 1.2 Height progression
+
+```bash
+bash scripts/testnet/runbook/height_watch.sh
+```
+
+### 1.3 Error contract checks (invalid input should fail safely)
+
+```bash
+bash scripts/testnet/runbook/error_contract.sh
+```
+
+### 1.4 Read-only load (safe defaults)
+
+```bash
+k6 run scripts/testnet/runbook/k6_api_read.js
+```
+
+Optional tuning (still safe):
+
+```bash
+VUS=10 DURATION=3m k6 run scripts/testnet/runbook/k6_api_read.js
+```
+
+Baseline+peak wrapper (recommended):
+
+```bash
+bash scripts/testnet/runbook/run_k6_baseline_peak.sh
+```
+
+Summary output:
+
+- `./out/<RUN_ID>/k6/summary.md`
+
+Optional thresholds (override defaults):
+
+```bash
+P95_MS=500 P99_MS=2000 ERROR_RATE=0.001 k6 run scripts/testnet/runbook/k6_api_read.js
+```
+
+Calibration mode (prints suggested thresholds from observed p95/p99):
+
+```bash
+CALIBRATE=1 k6 run scripts/testnet/runbook/k6_api_read.js
+```
+
+Peak profile (higher load + relaxed thresholds):
+
+```bash
+PROFILE=peak k6 run scripts/testnet/runbook/k6_api_read.js
+```
+
+### 1.5 Faucet + balance (optional)
+
+```bash
+bash scripts/testnet/runbook/faucet_and_balance.sh
+```
+
+### 1.6 JSON-RPC smoke (optional)
+
+Only run if JSON-RPC is enabled on your endpoint:
+
+```bash
+bash scripts/testnet/runbook/jsonrpc_smoke.sh
+```
+
+## Phase 2: Coordinated-Only Testnet Suite (schedule these)
+
+These tests can affect other agents and must be scheduled to avoid interference.
+
+- High-throughput transaction spam / mempool stress
+- Primary node stop/start and failover validation
+- SERVICES server stop/start
+- Rate-limit and DDoS behavior validation under load
+
+## Pass/Fail Criteria
+
+- REST endpoints respond successfully
+- Chain height does not decrease across checks
+- Invalid input returns client errors, not 200/500
+- Optional faucet/balance check returns a valid response
+- k6 read-only load stays within agreed p95 latency and error rate thresholds
+- Optional JSON-RPC smoke returns valid results
+
+## Output Artifacts
+
+- Outputs are written to `${OUT_DIR}/${RUN_ID}`
+- Attach results to the overall prelaunch report

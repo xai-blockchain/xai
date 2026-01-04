@@ -27,7 +27,7 @@ def websocket_handler(monkeypatch):
     """Create a WebSocket handler with mocks for API auth and limiter."""
 
     app = Flask(__name__)
-    monkeypatch.setattr("xai.core.api_websocket.threading.Thread", _DummyThread)
+    monkeypatch.setattr("xai.core.api.api_websocket.threading.Thread", _DummyThread)
 
     node = SimpleNamespace(app=app, blockchain=Mock())
     node.blockchain.get_stats.return_value = {}
@@ -76,7 +76,7 @@ def test_unauthorized_websocket_connection_rejected(websocket_handler):
 
     mock_ws = Mock()
 
-    with patch("xai.core.api_websocket.log_security_event") as mock_log:
+    with patch("xai.core.api.api_websocket.log_security_event") as mock_log:
         with app.test_request_context(
             "/ws",
             headers={"User-Agent": "pytest"},

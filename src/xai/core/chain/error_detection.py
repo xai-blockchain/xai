@@ -436,7 +436,8 @@ class CorruptionDetector:
                 # Verify signature (skip coinbase)
                 if tx.sender != "COINBASE":
                     try:
-                        tx.verify_signature()
+                        if not tx.verify_signature():
+                            errors.append(f"Block {i}, tx {j}: Invalid signature")
                     except Exception as e:
                         # Catch signature verification errors
                         from xai.core.transaction import (

@@ -46,7 +46,7 @@ def _install_metrics_stub(monkeypatch):
     }
     wrapper = type("Wrapper", (), {})()
     wrapper._instance = DummyCollector(metrics)
-    monkeypatch.setattr("xai.core.finality.MetricsCollector", wrapper, raising=False)
+    monkeypatch.setattr("xai.core.consensus.finality.MetricsCollector", wrapper, raising=False)
     return metrics
 
 
@@ -84,7 +84,7 @@ def test_finality_metrics_update_on_finalize(monkeypatch, tmp_path):
 
 def test_validator_vote_metric_increment(monkeypatch, tmp_path):
     metrics = _install_metrics_stub(monkeypatch)
-    monkeypatch.setattr("xai.core.finality.verify_signature_hex", lambda *args, **kwargs: True)
+    monkeypatch.setattr("xai.core.consensus.finality.verify_signature_hex", lambda *args, **kwargs: True)
 
     manager = _build_manager(tmp_path)
 
@@ -104,7 +104,7 @@ def test_validator_vote_metric_increment(monkeypatch, tmp_path):
 
 def test_validator_double_sign_metrics(monkeypatch, tmp_path):
     metrics = _install_metrics_stub(monkeypatch)
-    monkeypatch.setattr("xai.core.finality.verify_signature_hex", lambda *args, **kwargs: True)
+    monkeypatch.setattr("xai.core.consensus.finality.verify_signature_hex", lambda *args, **kwargs: True)
 
     reports = []
 

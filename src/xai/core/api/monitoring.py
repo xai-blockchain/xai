@@ -989,7 +989,7 @@ class MetricsCollector:
             }
         )
 
-        if severity_normalized in {"WARNING", "WARN", "ERROR", "CRITICAL"}:
+        if severity_normalized in {"WARNING", "WARN", "ERROR", "CRITICAL"} and not event_type.startswith("alert."):
             level = AlertLevel.WARNING if severity_normalized in {"WARNING", "WARN"} else AlertLevel.CRITICAL
             message = f"Security event {event_type} ({severity_normalized})"
             self._fire_alert(f"security.{event_type}", message, level)

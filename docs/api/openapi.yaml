@@ -1,0 +1,92 @@
+openapi: 3.0.3
+info:
+  title: XAI Blockchain API
+  version: 0.1.0
+  description: Core HTTP endpoints for node status and block access.
+servers:
+  - url: http://localhost:8545
+paths:
+  /health:
+    get:
+      summary: Health check
+      tags:
+        - System
+      responses:
+        '200':
+          description: OK
+  /blocks:
+    get:
+      summary: List blocks
+      tags:
+        - Blocks
+      responses:
+        '200':
+          description: OK
+  /blocks/{index}:
+    get:
+      summary: Get block by index
+      tags:
+        - Blocks
+      parameters:
+        - name: index
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Not found
+  /block/latest:
+    get:
+      summary: Get latest block
+      tags:
+        - Blocks
+      responses:
+        '200':
+          description: OK
+  /block/{block_hash}:
+    get:
+      summary: Get block by hash
+      tags:
+        - Blocks
+      parameters:
+        - name: block_hash
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Not found
+  /blocks/validate:
+    post:
+      summary: Validate block payload
+      tags:
+        - Blocks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: OK
+  /block/receive:
+    post:
+      summary: Receive block from peer
+      tags:
+        - Blocks
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: OK

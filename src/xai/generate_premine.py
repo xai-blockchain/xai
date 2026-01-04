@@ -30,7 +30,7 @@ from src.xai.core.config import Config
 
 # Add core directory to path
 from src.xai.core.wallet import Wallet
-from src.xai.core.wallet_encryption import WalletEncryption
+from src.xai.core.wallets.wallet_encryption import WalletEncryption
 
 # Timestamps
 GENESIS_TIMESTAMP = 1704067200.0  # Jan 1, 2024 00:00:00 UTC

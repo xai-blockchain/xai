@@ -46,8 +46,8 @@ def test_wrap_operation_failure():
     assert success is False
 
 
-@patch('xai.core.error_recovery.CorruptionDetector')
-@patch('xai.core.error_recovery.CorruptionRecovery')
+@patch('xai.core.chain.error_recovery.CorruptionDetector')
+@patch('xai.core.chain.error_recovery.CorruptionRecovery')
 def test_handle_corruption(mock_recovery, mock_detector):
     """Test handle_corruption"""
     blockchain = Mock()
@@ -63,7 +63,7 @@ def test_handle_corruption(mock_recovery, mock_detector):
     assert isinstance(success, bool)
 
 
-@patch('xai.core.error_recovery.NetworkPartitionRecovery')
+@patch('xai.core.chain.error_recovery.NetworkPartitionRecovery')
 def test_handle_network_partition(mock_recovery):
     """Test handle_network_partition"""
     blockchain = Mock()
@@ -80,7 +80,7 @@ def test_handle_network_partition(mock_recovery):
     assert isinstance(success, bool)
 
 
-@patch('xai.core.error_recovery.GracefulShutdown')
+@patch('xai.core.chain.error_recovery.GracefulShutdown')
 def test_graceful_shutdown(mock_shutdown):
     """Test graceful_shutdown"""
     blockchain = Mock()
@@ -96,7 +96,7 @@ def test_graceful_shutdown(mock_shutdown):
     assert isinstance(success, bool)
 
 
-@patch('xai.core.error_recovery.BlockchainBackup')
+@patch('xai.core.chain.error_recovery.BlockchainBackup')
 def test_create_checkpoint(mock_backup):
     """Test create_checkpoint"""
     blockchain = Mock()

@@ -173,7 +173,7 @@ class TestWalletCreationEndpoints:
         # Instead, encrypted_keystore should be present
         assert "encrypted_keystore" in data
         assert "warning" in data
-        assert data["address"].startswith("XAI")
+        assert data["address"].startswith(("XAI", "TXAI"))
         assert len(data["public_key"]) > 0
 
     def test_create_wallet_generates_unique_wallets(self, test_client):

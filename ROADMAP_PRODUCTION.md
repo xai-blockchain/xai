@@ -11,10 +11,16 @@ Last updated: 2026-01-02
 
 ### Validation
 
-- [ ] Run full test suite with a longer timeout (low-priority scheduling to avoid overload)
+- [x] Run full test suite with a longer timeout (low-priority scheduling; timed out at 20m with failures; follow-ups captured below)
 - [x] Ensure faker/hypothesis are tracked in test/dev requirements
 - [x] Confirm Python is available in PATH or via a venv for testing
 - [x] Install faker and run fuzzing tests (low-priority scheduling to avoid overload)
+
+### Full Suite Follow-up
+
+- [x] Investigate failing CLI config command tests (tests/xai_tests/cli/test_cli_config_commands.py) (3 passed)
+- [x] Investigate fuzzing failures (tests/xai_tests/fuzz/test_fuzz_transactions.py, tests/xai_tests/fuzz/test_transaction_parser_fuzz.py) (18 passed)
+- [ ] Investigate integration suite failures (tests/xai_tests/integration/* including api_ai_endpoints, api_wallet_endpoints, chain_reorg*, deterministic_fixture_snapshot, governance, mining, multi_node_consensus*, network*, node_api_endpoints, p2p_sync, quic_timeout_disconnection, reorg_mempool_double_spend, transaction_propagation)
 
 ### Test Batches (Completed/Recorded)
 
@@ -39,7 +45,7 @@ Last updated: 2026-01-02
 - [x] tests/xai_tests/unit test_advanced_consensus_enhanced.py completed via batches A-F
 - [x] tests/xai_tests/unit test_advanced_consensus_enhanced.py batch A (TestBlockStatusEnum, TestBlockPropagationMonitorEdgeCases, TestOrphanBlockPoolEdgeCases)
 - [x] tests/xai_tests/unit test_advanced_consensus_enhanced.py batch B (TestTransactionOrderingEdgeCases, TestFinalityTrackerEdgeCases, TestFinalityMechanismEdgeCases)
-- [ ] tests/xai_tests/unit test_advanced_consensus_enhanced.py batch C timed out at 4m (DynamicDifficultyAdjustment, DifficultyAdjustment, AdvancedConsensusManager)
+- [x] tests/xai_tests/unit test_advanced_consensus_enhanced.py batch C completed via C1-C3 (DynamicDifficultyAdjustment, DifficultyAdjustment, AdvancedConsensusManager)
 - [x] tests/xai_tests/unit test_advanced_consensus_enhanced.py batch C1 (TestDynamicDifficultyAdjustmentEdgeCases)
 - [x] tests/xai_tests/unit test_advanced_consensus_enhanced.py batch C2 (TestDifficultyAdjustmentEdgeCases)
 - [x] tests/xai_tests/unit test_advanced_consensus_enhanced.py batch C3.1 (test_process_new_block_with_peer_tracking)
@@ -263,6 +269,20 @@ Last updated: 2026-01-02
 - [x] tests/xai_tests/unit test_multisig_wallet_nonce.py (4 passed)
 - [x] tests/xai_tests/unit test_node_api_additional_coverage.py (79 passed)
 - [x] tests/xai_tests/unit test_node_api.py (133 passed)
+- [x] tests/xai_tests/cli test_cli_config_commands.py (3 passed)
+- [x] tests/xai_tests/fuzz test_fuzz_transactions.py (14 passed)
+- [x] tests/xai_tests/fuzz test_transaction_parser_fuzz.py (4 passed)
+- [x] tests/xai_tests/integration test_api_ai_endpoints.py (36 passed)
+- [x] tests/xai_tests/integration test_api_wallet_endpoints.py (67 passed)
+- [x] tests/xai_tests/integration test_chain_reorg.py (9 passed)
+- [x] tests/xai_tests/integration test_chain_reorg_comprehensive.py (20 passed)
+- [x] tests/xai_tests/integration test_deterministic_fixture_snapshot.py (1 passed)
+- [x] tests/xai_tests/integration test_governance.py (24 passed)
+- [x] tests/xai_tests/integration test_mining.py (19 passed)
+- [x] tests/xai_tests/integration test_multi_node_consensus.py (13 passed)
+- [x] tests/xai_tests/integration test_multi_node_consensus_comprehensive.py (20 passed)
+- [x] tests/xai_tests/integration test_network.py (26 passed)
+- [x] tests/xai_tests/integration test_network_comprehensive.py batch 01 (broadcast_continues_on_node_failure) (1 passed)
 
 ## Testnet Infrastructure Tasks
 

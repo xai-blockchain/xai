@@ -126,8 +126,11 @@ class BlockchainConsensusMixin:
             if tx.sender not in ["COINBASE", "SYSTEM", "AIRDROP"] and tx.tx_type != "coinbase":
                 total_fees += tx.fee
 
-        # Maximum allowed coinbase amount = base reward + transaction fees
-        max_allowed = expected_reward + total_fees
+        # Allow streak bonuses (up to 20%) in addition to base reward and fees
+        max_streak_bonus = 0.20
+        if getattr(self, "streak_tracker", None):
+            max_streak_bonus = getattr(self.streak_tracker, "max_bonus_percent", max_streak_bonus)
+        max_allowed = expected_reward * (1 + max_streak_bonus) + total_fees
 
         # Get actual coinbase reward
         actual_reward = coinbase_tx.amount
@@ -138,7 +141,8 @@ class BlockchainConsensusMixin:
         if actual_reward > max_allowed + tolerance:
             error_msg = (
                 f"Coinbase reward {actual_reward:.8f} XAI exceeds maximum allowed {max_allowed:.8f} XAI "
-                f"(base reward: {expected_reward:.8f} XAI, fees: {total_fees:.8f} XAI) at block height {block.index}"
+                f"(base reward: {expected_reward:.8f} XAI, fees: {total_fees:.8f} XAI, "
+                f"max streak bonus: {max_streak_bonus * 100:.0f}%) at block height {block.index}"
             )
             self.logger.warn(
                 "SECURITY: Invalid coinbase reward - potential inflation attack",

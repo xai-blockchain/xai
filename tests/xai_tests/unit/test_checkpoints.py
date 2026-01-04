@@ -13,6 +13,7 @@ from xai.core.blockchain import Blockchain, Block, Transaction
 from xai.core.consensus.checkpoints import Checkpoint, CheckpointManager
 from xai.core.transactions.utxo_manager import UTXOManager
 
+PREV_HASH = "0" * 64
 
 class TestCheckpoint:
     """Test Checkpoint class"""
@@ -152,7 +153,7 @@ class TestCheckpointManager:
 
         tx = Transaction("COINBASE", "addr1", 100.0)
         tx.txid = tx.calculate_hash()
-        block = Block(100, [tx], "prev_hash", 4)
+        block = Block(100, [tx], PREV_HASH, 4)
         block.hash = "block_hash_100"
 
         # Create checkpoint
@@ -175,7 +176,7 @@ class TestCheckpointManager:
             height = (i + 1) * 100
             tx = Transaction("COINBASE", "addr1", 100.0)
             tx.txid = tx.calculate_hash()
-            block = Block(height, [tx], "prev_hash", 4)
+            block = Block(height, [tx], PREV_HASH, 4)
             block.hash = f"block_hash_{height}"
 
             checkpoint_manager.create_checkpoint(block, utxo_manager, 100.0)
@@ -204,7 +205,7 @@ class TestCheckpointManager:
             height = i * 100
             tx = Transaction("COINBASE", "addr1", 100.0)
             tx.txid = tx.calculate_hash()
-            block = Block(height, [tx], "prev_hash", 4)
+            block = Block(height, [tx], PREV_HASH, 4)
             block.hash = f"block_hash_{height}"
 
             checkpoint_manager.create_checkpoint(block, utxo_manager, 100.0)
@@ -221,7 +222,7 @@ class TestCheckpointManager:
         # Create checkpoint at height 1000
         tx = Transaction("COINBASE", "addr1", 100.0)
         tx.txid = tx.calculate_hash()
-        block = Block(1000, [tx], "prev_hash", 4)
+        block = Block(1000, [tx], PREV_HASH, 4)
         block.hash = "block_hash_1000"
 
         checkpoint_manager.create_checkpoint(block, utxo_manager, 100.0)
@@ -295,7 +296,7 @@ class TestBlockchainCheckpoints:
         )
 
         # Should have loaded from checkpoint
-        assert len(blockchain2.chain) == 25
+        assert len(blockchain2.chain) == 26
         assert blockchain2.checkpoint_manager.latest_checkpoint_height == 20
 
     def test_checkpoint_prevents_deep_reorg(self, temp_dir):

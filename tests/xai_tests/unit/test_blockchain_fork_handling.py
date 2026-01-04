@@ -12,6 +12,8 @@ from copy import deepcopy
 from xai.core.blockchain import Blockchain, Block, Transaction
 from xai.core.wallet import Wallet
 
+INVALID_HASH = "1" * 64
+
 
 class TestBlockchainHandleFork:
     """Tests for Blockchain._handle_fork method"""
@@ -184,8 +186,8 @@ class TestBlockchainHandleFork:
 
         bc._handle_fork(fork_block)
 
-        # Fork block should be in orphans
-        assert 1 in bc.orphan_blocks or len(bc.chain) > 2  # Either orphaned or accepted
+        # Fork block should be in orphans or replace the current tip
+        assert 1 in bc.orphan_blocks or bc.chain[1].hash == fork_block.hash
 
     def test_handle_fork_extends_with_orphans(self, tmp_path):
         """Test _handle_fork extends candidate chain with orphan blocks"""
@@ -231,7 +233,7 @@ class TestBlockchainHandleFork:
         fork_block = Block(
             index=1,
             transactions=[],
-            previous_hash="invalid_hash",
+            previous_hash=INVALID_HASH,
             difficulty=bc.difficulty
         )
 
@@ -335,7 +337,7 @@ class TestBlockchainCheckOrphanChainsForReorg:
         orphan1 = Block(
             index=1,
             transactions=[],
-            previous_hash="wrong_hash",
+            previous_hash=INVALID_HASH,
             difficulty=bc.difficulty
         )
 

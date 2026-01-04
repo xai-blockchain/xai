@@ -26,7 +26,7 @@ def create_test_block(index: int, previous_hash: str = "0" * 64) -> Block:
     header = BlockHeader(
         index=index,
         previous_hash=previous_hash,
-        merkle_root="merkle" + str(index),
+        merkle_root=f"{index:064x}",
         timestamp=time.time(),
         difficulty=4,
         nonce=0,
@@ -269,7 +269,7 @@ class TestBlockchainStorageIndex:
             # Save blocks
             num_blocks = 50
             for i in range(num_blocks):
-                block = create_test_block(i, previous_hash=f"prev{i-1}" if i > 0 else "0" * 64)
+                block = create_test_block(i, previous_hash=f"{i-1:064x}" if i > 0 else "0" * 64)
                 storage._save_block_to_disk(block)
 
             # Load entire chain

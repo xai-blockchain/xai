@@ -25,6 +25,7 @@ from unittest.mock import Mock, MagicMock, patch
 from flask import Flask, jsonify
 from xai.network.peer_manager import PeerManager
 from xai.core.config import Config, NetworkType
+from xai.core.consensus.validation import validate_address
 
 VALID_SENDER = "XAI" + "A" * 40
 VALID_RECIPIENT = "XAI" + "B" * 40
@@ -35,6 +36,16 @@ VALID_API_KEY = "secret123"
 VALID_GUARDIAN_1 = "XAI" + "D" * 40
 VALID_GUARDIAN_2 = "XAI" + "E" * 40
 ADMIN_TOKEN = "admin-secret"
+
+
+@pytest.fixture(autouse=True)
+def _disable_api_auth(monkeypatch, tmp_path):
+    monkeypatch.setattr(Config, "API_AUTH_REQUIRED", False, raising=False)
+    monkeypatch.setattr(Config, "API_AUTH_KEYS", [], raising=False)
+    monkeypatch.setattr(Config, "API_ADMIN_KEYS", [], raising=False)
+    monkeypatch.setattr(Config, "API_OPERATOR_KEYS", [], raising=False)
+    monkeypatch.setattr(Config, "API_AUDITOR_KEYS", [], raising=False)
+    monkeypatch.setattr(Config, "API_KEY_STORE_PATH", str(tmp_path / "api_keys.json"), raising=False)
 
 
 class TestNodeAPICoreRoutes:
@@ -207,7 +218,7 @@ class TestNodeAPICoreRoutes:
     def test_address_nonce_endpoint_handles_errors(self, client, mock_node):
         """GET /address/<addr>/nonce propagates tracker errors."""
         tracker = Mock()
-        tracker.get_nonce.side_effect = Exception("db down")
+        tracker.get_nonce.side_effect = RuntimeError("db down")
         mock_node.blockchain.nonce_tracker = tracker
 
         response = client.get(f"/address/{VALID_SENDER}/nonce")
@@ -557,7 +568,7 @@ class TestNodeAPITransactionRoutes:
         data = response.get_json()
         assert data['found'] == False
 
-    @patch('xai.core.chain.Transaction')
+    @patch('xai.core.blockchain.Transaction')
     def test_send_transaction_success(self, mock_tx_class, client, mock_node_with_tx):
         """Test POST /send - successful transaction."""
         # Setup mock transaction
@@ -590,7 +601,7 @@ class TestNodeAPITransactionRoutes:
         assert data['txid'] == 'new_tx_id'
         assert 'message' in data
 
-    @patch('xai.core.chain.Transaction')
+    @patch('xai.core.blockchain.Transaction')
     def test_send_transaction_rate_limiter_failure(
         self,
         mock_tx_class,
@@ -605,7 +616,7 @@ class TestNodeAPITransactionRoutes:
                 raise RuntimeError("limiter down")
 
         monkeypatch.setattr(
-            'xai.core.advanced_rate_limiter.get_rate_limiter',
+            'xai.core.security.advanced_rate_limiter.get_rate_limiter',
             lambda: FailingLimiter(),
             raising=False,
         )
@@ -639,7 +650,7 @@ class TestNodeAPITransactionRoutes:
         assert 'error' in data
         assert 'Validation error' in data['error']
 
-    @patch('xai.core.chain.Transaction')
+    @patch('xai.core.blockchain.Transaction')
     def test_send_transaction_invalid_signature(self, mock_tx_class, client, mock_node_with_tx):
         """Test POST /send - invalid signature."""
         mock_tx = Mock()
@@ -664,7 +675,7 @@ class TestNodeAPITransactionRoutes:
         assert 'Invalid signature' in data['error']
         assert data['code'] == 'invalid_signature'
 
-    @patch('xai.core.chain.Transaction')
+    @patch('xai.core.blockchain.Transaction')
     def test_send_transaction_validation_failed(self, mock_tx_class, client, mock_node_with_tx):
         """Test POST /send - transaction validation failed."""
         mock_tx = Mock()
@@ -692,7 +703,7 @@ class TestNodeAPITransactionRoutes:
         assert data['success'] == False
         assert data['code'] == 'transaction_rejected'
 
-    @patch('xai.core.chain.Transaction')
+    @patch('xai.core.blockchain.Transaction')
     def test_send_transaction_requires_api_key(self, mock_tx_class, mock_node_with_tx, monkeypatch):
         """Ensure 401 is returned when API auth is required but missing."""
         monkeypatch.setattr(Config, "API_AUTH_REQUIRED", True, raising=False)
@@ -717,7 +728,7 @@ class TestNodeAPITransactionRoutes:
         data = response.get_json()
         assert data['code'] == 'unauthorized'
 
-    @patch('xai.core.chain.Transaction')
+    @patch('xai.core.blockchain.Transaction')
     def test_send_transaction_with_api_key(self, mock_tx_class, mock_node_with_tx, monkeypatch):
         """Ensure authorized requests succeed when API key provided."""
         monkeypatch.setattr(Config, "API_AUTH_REQUIRED", True, raising=False)
@@ -910,7 +921,7 @@ class TestNodeAPIMiningRoutes:
                 raise RuntimeError("limiter offline")
 
         monkeypatch.setattr(
-            'xai.core.advanced_rate_limiter.get_rate_limiter',
+            'xai.core.security.advanced_rate_limiter.get_rate_limiter',
             lambda: FailingLimiter(),
             raising=False,
         )
@@ -1088,7 +1099,7 @@ class TestNodeAPIPeerRoutes:
 
         assert response.status_code == 200
         tx_arg = mock_node.blockchain.add_transaction.call_args[0][0]
-        assert tx_arg.sender == VALID_SENDER
+        assert tx_arg.sender == validate_address(VALID_SENDER, allow_special=True)
 
     def test_receive_transaction_rejected(self, client, mock_node):
         """Test POST /transaction/receive - blockchain rejects transaction."""
@@ -1470,7 +1481,7 @@ class TestNodeAPIAdminAPIKeys:
         response = client.get('/admin/withdrawals/telemetry')
         assert response.status_code == 401
 
-    @patch('xai.core.chain.Transaction')
+    @patch('xai.core.blockchain.Transaction')
     def test_issue_api_key_and_use(self, mock_tx_class, admin_setup):
         client = admin_setup["client"]
         mock_tx = Mock()
@@ -1745,7 +1756,7 @@ class TestNodeAPIGamificationRoutes:
                               content_type='application/json')
         assert response.status_code == 200
 
-    @patch('xai.core.chain.Transaction')
+    @patch('xai.core.blockchain.Transaction')
     def test_claim_treasure_success(self, mock_tx, client):
         """Test POST /treasure/claim - success."""
         data = {
@@ -2153,6 +2164,23 @@ class TestNodeAPICryptoDepositRoutes:
 
 class TestNodeAPIFaucetRoutes:
     """Tests for the /faucet/claim endpoint."""
+
+    @pytest.fixture(autouse=True)
+    def _allow_sensitive_limits(self, monkeypatch):
+        class AllowAllLimiter:
+            def check_rate_limit(self, *_args, **_kwargs):
+                return SimpleNamespace(
+                    allowed=True,
+                    error_message=None,
+                    limit=1,
+                    reset_time=0,
+                    retry_after=None,
+                )
+
+        monkeypatch.setattr(
+            "xai.core.security.api_rate_limiting.get_api_rate_limiter",
+            lambda: AllowAllLimiter(),
+        )
 
     @pytest.fixture
     def faucet_node(self):

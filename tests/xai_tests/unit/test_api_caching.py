@@ -24,24 +24,24 @@ def mock_blockchain():
     genesis_header = BlockHeader(
         index=0,
         previous_hash="0" * 64,
-        merkle_root="genesis_merkle",
+        merkle_root="0" * 64,
         timestamp=1700000000.0,
         difficulty=4,
         nonce=0,
         version=1
     )
-    genesis_header.hash = "0xaaaa" + "a" * 60
+    genesis_header.hash = "0x" + "a" * 64
 
     block1_header = BlockHeader(
         index=1,
-        previous_hash="0xaaaa" + "a" * 60,
-        merkle_root="block1_merkle",
+        previous_hash="a" * 64,
+        merkle_root="1" * 64,
         timestamp=1700000001.0,
         difficulty=4,
         nonce=12345,
         version=1
     )
-    block1_header.hash = "0xbbbb" + "b" * 60
+    block1_header.hash = "0x" + "b" * 64
 
     genesis_block = Block(
         header=genesis_header,

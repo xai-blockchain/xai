@@ -18,13 +18,15 @@ import tempfile
 from xai.core.blockchain import Blockchain, Transaction, Block
 from xai.core.wallet import Wallet
 
+PREV_HASH = "0" * 64
+
 
 class TestMerkleRootCalculation:
     """Test merkle root calculation for various transaction sets"""
 
     def test_merkle_root_empty_transactions(self):
         """Test merkle root with no transactions"""
-        block = Block(1, [], "prev_hash", 4)
+        block = Block(1, [], PREV_HASH, 4)
 
         # Empty block should have empty merkle root
         assert block.merkle_root is not None
@@ -36,7 +38,7 @@ class TestMerkleRootCalculation:
         tx = Transaction("COINBASE", wallet.address, 12.0)
         tx.txid = tx.calculate_hash()
 
-        block = Block(1, [tx], "prev_hash", 4)
+        block = Block(1, [tx], PREV_HASH, 4)
 
         assert block.merkle_root is not None
         assert block.merkle_root == tx.txid
@@ -52,7 +54,7 @@ class TestMerkleRootCalculation:
         tx2 = Transaction(wallet1.address, wallet2.address, 5.0, 0.1, public_key=wallet1.public_key)
         tx2.txid = tx2.calculate_hash()
 
-        block = Block(1, [tx1, tx2], "prev_hash", 4)
+        block = Block(1, [tx1, tx2], PREV_HASH, 4)
 
         assert block.merkle_root is not None
         assert len(block.merkle_root) == 64
@@ -67,7 +69,7 @@ class TestMerkleRootCalculation:
             tx.txid = tx.calculate_hash() + str(i)  # Make unique
             txs.append(tx)
 
-        block = Block(1, txs, "prev_hash", 4)
+        block = Block(1, txs, PREV_HASH, 4)
 
         assert block.merkle_root is not None
         assert len(block.merkle_root) == 64
@@ -82,7 +84,7 @@ class TestBlockToDict:
         tx = Transaction("COINBASE", wallet.address, 12.0)
         tx.txid = tx.calculate_hash()
 
-        block = Block(1, [tx], "prev_hash", 4)
+        block = Block(1, [tx], PREV_HASH, 4)
         block.hash = "block_hash_123"
 
         block_dict = block.to_dict()
@@ -97,7 +99,7 @@ class TestBlockToDict:
         assert "difficulty" in block_dict
 
         assert block_dict["index"] == 1
-        assert block_dict["previous_hash"] == "prev_hash"
+        assert block_dict["previous_hash"] == PREV_HASH
         assert block_dict["hash"] == "block_hash_123"
 
 
@@ -609,7 +611,7 @@ class TestBlockMinerTracking:
         coinbase_tx = Transaction("COINBASE", wallet.address, 12.0)
         coinbase_tx.txid = coinbase_tx.calculate_hash()
 
-        block = Block(1, [coinbase_tx], "prev", 4)
+        block = Block(1, [coinbase_tx], PREV_HASH, 4)
 
         assert block.miner == wallet.address
 
@@ -622,7 +624,7 @@ class TestBlockMinerTracking:
         regular_tx = Transaction(wallet1.address, wallet2.address, 10.0, 0.1, public_key=wallet1.public_key)
         regular_tx.txid = regular_tx.calculate_hash()
 
-        block = Block(1, [regular_tx], "prev_hash" + "0" * 56, 4)
+        block = Block(1, [regular_tx], PREV_HASH, 4)
 
         # Block without COINBASE transaction should have no miner from coinbase
         # (may still have miner_pubkey from header if set)

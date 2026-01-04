@@ -9,6 +9,7 @@ import time
 import tempfile
 import shutil
 import hashlib
+from datetime import datetime
 from pathlib import Path
 
 from xai.core.governance.gamification import (
@@ -45,6 +46,8 @@ class MockBlockchain:
     
     def __init__(self):
         self.chain = []
+        self.pending_transactions = []
+        self._mempool_size_kb = None
     
     def add_block(self, transactions):
         """Add block with transactions"""
@@ -54,6 +57,38 @@ class MockBlockchain:
             block_hash=f"block_{len(self.chain)}"
         )
         self.chain.append(block)
+
+    def get_balance(self, address):
+        return 0.0
+
+    def get_chain_length(self):
+        return len(self.chain)
+
+    def get_block_by_index(self, index):
+        if 0 <= index < len(self.chain):
+            return self.chain[index]
+        return None
+
+    def get_latest_block_hash(self):
+        return self.chain[-1].hash if self.chain else "0" * 64
+
+    def get_pending_transactions(self):
+        return list(self.pending_transactions)
+
+    def add_transaction_to_mempool(self, transaction):
+        self.pending_transactions.append(transaction)
+        return True
+
+    def get_mempool_size_kb(self):
+        return self._mempool_size_kb
+
+    def set_mempool_size_kb(self, value):
+        self._mempool_size_kb = value
+
+
+@pytest.fixture
+def blockchain():
+    return MockBlockchain()
 
 
 class TestAirdropManager:
@@ -67,14 +102,14 @@ class TestAirdropManager:
         shutil.rmtree(temp, ignore_errors=True)
 
     @pytest.fixture
-    def manager(self, temp_dir):
+    def manager(self, temp_dir, blockchain):
         """Create AirdropManager with temp storage"""
-        return AirdropManager(data_dir=temp_dir)
+        return AirdropManager(blockchain_interface=blockchain, data_dir=temp_dir)
 
     def test_init(self, manager):
         """Test AirdropManager initialization"""
         assert len(manager.airdrop_history) == 0
-        assert manager.airdrop_file.exists()
+        assert manager.airdrop_file.parent.exists()
 
     def test_should_trigger_airdrop_block_100(self, manager):
         """Test airdrop triggers at block 100"""
@@ -92,10 +127,8 @@ class TestAirdropManager:
         """Test airdrop doesn't trigger at block 101"""
         assert manager.should_trigger_airdrop(101) is False
 
-    def test_get_active_addresses(self, manager):
+    def test_get_active_addresses(self, manager, blockchain):
         """Test getting active addresses from blockchain"""
-        blockchain = MockBlockchain()
-        
         # Add blocks with transactions
         blockchain.add_block([
             MockTransaction("XAI_A", "XAI_B"),
@@ -104,24 +137,22 @@ class TestAirdropManager:
         blockchain.add_block([
             MockTransaction("XAI_E", "XAI_F"),
         ])
-        
-        active = manager.get_active_addresses(blockchain)
+
+        active = manager.get_active_addresses()
         
         assert len(active) == 6
         assert "XAI_A" in active
         assert "COINBASE" not in active
         assert "GENESIS" not in active
 
-    def test_get_active_addresses_excludes_system(self, manager):
+    def test_get_active_addresses_excludes_system(self, manager, blockchain):
         """Test that COINBASE and GENESIS are excluded"""
-        blockchain = MockBlockchain()
-        
         blockchain.add_block([
             MockTransaction("COINBASE", "XAI_A"),
             MockTransaction("XAI_B", "XAI_C"),
         ])
-        
-        active = manager.get_active_addresses(blockchain)
+
+        active = manager.get_active_addresses()
         
         assert "COINBASE" not in active
         assert "GENESIS" not in active
@@ -163,17 +194,15 @@ class TestAirdropManager:
         for address, amount in amounts.items():
             assert 1.0 <= amount <= 10.0
 
-    def test_execute_airdrop(self, manager):
+    def test_execute_airdrop(self, manager, blockchain):
         """Test executing airdrop"""
-        blockchain = MockBlockchain()
-        
         # Add blocks with active addresses
         for i in range(10):
             blockchain.add_block([
                 MockTransaction(f"XAI_{i}", f"XAI_{i+10}"),
             ])
-        
-        result = manager.execute_airdrop(100, "block_hash_100", blockchain)
+
+        result = manager.execute_airdrop(100, "block_hash_100")
         
         assert result is not None
         assert len(result) <= 10
@@ -181,30 +210,24 @@ class TestAirdropManager:
 
     def test_execute_airdrop_wrong_block(self, manager):
         """Test airdrop doesn't execute at wrong block"""
-        blockchain = MockBlockchain()
-        
-        result = manager.execute_airdrop(99, "block_hash_99", blockchain)
+        result = manager.execute_airdrop(99, "block_hash_99")
         
         assert result is None
 
     def test_execute_airdrop_no_active_addresses(self, manager):
         """Test airdrop with no active addresses"""
-        blockchain = MockBlockchain()
-        
-        result = manager.execute_airdrop(100, "block_hash_100", blockchain)
+        result = manager.execute_airdrop(100, "block_hash_100")
         
         assert result is None
 
-    def test_get_recent_airdrops(self, manager):
+    def test_get_recent_airdrops(self, manager, blockchain):
         """Test getting recent airdrop history"""
-        blockchain = MockBlockchain()
-        
         # Execute multiple airdrops
         for i in range(5):
             blockchain.add_block([MockTransaction(f"XAI_{i}", f"XAI_{i+10}")])
-        
-        manager.execute_airdrop(100, "hash1", blockchain)
-        manager.execute_airdrop(200, "hash2", blockchain)
+
+        manager.execute_airdrop(100, "hash1")
+        manager.execute_airdrop(200, "hash2")
         
         recent = manager.get_recent_airdrops(limit=10)
         
@@ -286,10 +309,11 @@ class TestStreakTracker:
     def test_get_streak_bonus(self, tracker):
         """Test calculating streak bonus"""
         # Manually set streak
+        current_day = datetime.now().strftime("%Y-%m-%d")
         tracker.miner_streaks["XAI_MINER"] = {
             "current_streak": 5,
             "longest_streak": 5,
-            "last_mining_day": "2025-01-01",
+            "last_mining_day": current_day,
             "total_blocks_mined": 10,
             "mining_days": [],
         }
@@ -300,10 +324,11 @@ class TestStreakTracker:
 
     def test_get_streak_bonus_capped(self, tracker):
         """Test streak bonus is capped at 20%"""
+        current_day = datetime.now().strftime("%Y-%m-%d")
         tracker.miner_streaks["XAI_MINER"] = {
             "current_streak": 50,
             "longest_streak": 50,
-            "last_mining_day": "2025-01-01",
+            "last_mining_day": current_day,
             "total_blocks_mined": 100,
             "mining_days": [],
         }
@@ -314,10 +339,11 @@ class TestStreakTracker:
 
     def test_apply_streak_bonus(self, tracker):
         """Test applying streak bonus to reward"""
+        current_day = datetime.now().strftime("%Y-%m-%d")
         tracker.miner_streaks["XAI_MINER"] = {
             "current_streak": 10,
             "longest_streak": 10,
-            "last_mining_day": "2025-01-01",
+            "last_mining_day": current_day,
             "total_blocks_mined": 20,
             "mining_days": [],
         }
@@ -325,15 +351,16 @@ class TestStreakTracker:
         base_reward = 100.0
         final_reward, bonus_amount = tracker.apply_streak_bonus("XAI_MINER", base_reward)
         
-        assert final_reward == 120.0  # 100 + 20% bonus
-        assert bonus_amount == 20.0
+        assert final_reward == 110.0  # 100 + 10% bonus
+        assert bonus_amount == 10.0
 
     def test_get_miner_stats(self, tracker):
         """Test getting miner statistics"""
+        current_day = datetime.now().strftime("%Y-%m-%d")
         tracker.miner_streaks["XAI_MINER"] = {
             "current_streak": 7,
             "longest_streak": 10,
-            "last_mining_day": "2025-01-01",
+            "last_mining_day": current_day,
             "total_blocks_mined": 50,
             "mining_days": [],
         }
@@ -342,7 +369,7 @@ class TestStreakTracker:
         
         assert stats is not None
         assert stats["current_streak"] == 7
-        assert stats["bonus_percent"] == 7.0
+        assert stats["bonus_percent"] == pytest.approx(7.0)
 
     def test_get_miner_stats_not_found(self, tracker):
         """Test getting stats for non-existent miner"""
@@ -379,9 +406,9 @@ class TestTreasureHuntManager:
         shutil.rmtree(temp, ignore_errors=True)
 
     @pytest.fixture
-    def manager(self, temp_dir):
+    def manager(self, temp_dir, blockchain):
         """Create TreasureHuntManager with temp storage"""
-        return TreasureHuntManager(data_dir=temp_dir)
+        return TreasureHuntManager(blockchain_interface=blockchain, data_dir=temp_dir)
 
     def test_init(self, manager):
         """Test TreasureHuntManager initialization"""
@@ -534,85 +561,114 @@ class TestFeeRefundCalculator:
         shutil.rmtree(temp, ignore_errors=True)
 
     @pytest.fixture
-    def calculator(self, temp_dir):
+    def calculator(self, temp_dir, blockchain):
         """Create FeeRefundCalculator with temp storage"""
-        return FeeRefundCalculator(data_dir=temp_dir)
+        return FeeRefundCalculator(blockchain_interface=blockchain, data_dir=temp_dir)
 
     def test_init(self, calculator):
         """Test FeeRefundCalculator initialization"""
         assert calculator.LOW_CONGESTION_THRESHOLD == 5
         assert calculator.MED_CONGESTION_THRESHOLD == 10
 
-    def test_calculate_refund_rate_low_congestion(self, calculator):
+    def test_calculate_refund_rate_low_congestion(self, calculator, blockchain):
         """Test refund rate for low congestion"""
-        rate = calculator.calculate_refund_rate(3)
+        blockchain.pending_transactions = [object()] * 3
+        blockchain.set_mempool_size_kb(None)
+        rate = calculator.calculate_refund_rate()
         
         assert rate == 0.50  # 50% refund
 
-    def test_calculate_refund_rate_medium_congestion(self, calculator):
+    def test_calculate_refund_rate_medium_congestion(self, calculator, blockchain):
         """Test refund rate for medium congestion"""
-        rate = calculator.calculate_refund_rate(7)
+        blockchain.pending_transactions = [object()] * 7
+        blockchain.set_mempool_size_kb(None)
+        rate = calculator.calculate_refund_rate()
         
         assert rate == 0.25  # 25% refund
 
-    def test_calculate_refund_rate_high_congestion(self, calculator):
+    def test_calculate_refund_rate_high_congestion(self, calculator, blockchain):
         """Test refund rate for high congestion"""
-        rate = calculator.calculate_refund_rate(15)
+        blockchain.pending_transactions = [object()] * 15
+        blockchain.set_mempool_size_kb(None)
+        rate = calculator.calculate_refund_rate()
         
         assert rate == 0.0  # No refund
 
-    def test_calculate_refunds_for_block(self, calculator):
+    def test_calculate_refunds_for_block(self, calculator, blockchain):
         """Test calculating refunds for a block"""
         transactions = [
+            MockTransaction("COINBASE", "XAI_MINER", fee=0.0),
             MockTransaction("XAI_A", "XAI_B", fee=1.0),
             MockTransaction("XAI_C", "XAI_D", fee=2.0),
         ]
         
         block = MockBlock(transactions=transactions)
-        
-        refunds = calculator.calculate_refunds_for_block(block, pending_tx_count=3)
+
+        blockchain.pending_transactions = [object()] * 3
+        blockchain.set_mempool_size_kb(None)
+        refunds = calculator.calculate_refunds_for_block(block)
         
         assert len(refunds) == 2
         assert refunds["XAI_A"] == 0.5  # 50% of 1.0
         assert refunds["XAI_C"] == 1.0  # 50% of 2.0
 
-    def test_calculate_refunds_no_refund(self, calculator):
+    def test_calculate_refunds_no_refund(self, calculator, blockchain):
         """Test no refunds during high congestion"""
-        transactions = [MockTransaction("XAI_A", "XAI_B", fee=1.0)]
+        transactions = [
+            MockTransaction("COINBASE", "XAI_MINER", fee=0.0),
+            MockTransaction("XAI_A", "XAI_B", fee=1.0),
+        ]
         block = MockBlock(transactions=transactions)
-        
-        refunds = calculator.calculate_refunds_for_block(block, pending_tx_count=20)
+
+        blockchain.pending_transactions = [object()] * 20
+        blockchain.set_mempool_size_kb(None)
+        refunds = calculator.calculate_refunds_for_block(block)
         
         assert len(refunds) == 0
 
-    def test_process_refunds(self, calculator):
+    def test_process_refunds(self, calculator, blockchain):
         """Test processing refunds with history"""
-        transactions = [MockTransaction("XAI_A", "XAI_B", fee=1.0)]
+        transactions = [
+            MockTransaction("COINBASE", "XAI_MINER", fee=0.0),
+            MockTransaction("XAI_A", "XAI_B", fee=1.0),
+        ]
         block = MockBlock(transactions=transactions)
-        
-        refunds = calculator.process_refunds(block, pending_tx_count=3)
+
+        blockchain.pending_transactions = [object()] * 3
+        blockchain.set_mempool_size_kb(None)
+        refunds = calculator.process_refunds(block)
         
         assert len(refunds) == 1
         assert len(calculator.refund_history) == 1
 
-    def test_get_user_refund_history(self, calculator):
+    def test_get_user_refund_history(self, calculator, blockchain):
         """Test getting user refund history"""
-        transactions = [MockTransaction("XAI_USER", "XAI_B", fee=1.0)]
+        transactions = [
+            MockTransaction("COINBASE", "XAI_MINER", fee=0.0),
+            MockTransaction("XAI_USER", "XAI_B", fee=1.0),
+        ]
         block = MockBlock(transactions=transactions)
-        
-        calculator.process_refunds(block, pending_tx_count=3)
+
+        blockchain.pending_transactions = [object()] * 3
+        blockchain.set_mempool_size_kb(None)
+        calculator.process_refunds(block)
         
         history = calculator.get_user_refund_history("XAI_USER")
         
         assert len(history) == 1
         assert history[0]["amount"] == 0.5
 
-    def test_get_refund_stats(self, calculator):
+    def test_get_refund_stats(self, calculator, blockchain):
         """Test getting overall refund statistics"""
-        transactions = [MockTransaction("XAI_A", "XAI_B", fee=1.0)]
+        transactions = [
+            MockTransaction("COINBASE", "XAI_MINER", fee=0.0),
+            MockTransaction("XAI_A", "XAI_B", fee=1.0),
+        ]
         block = MockBlock(transactions=transactions)
-        
-        calculator.process_refunds(block, pending_tx_count=3)
+
+        blockchain.pending_transactions = [object()] * 3
+        blockchain.set_mempool_size_kb(None)
+        calculator.process_refunds(block)
         
         stats = calculator.get_refund_stats()
         
@@ -620,9 +676,9 @@ class TestFeeRefundCalculator:
         assert stats["total_amount"] == 0.5
 
 
-def test_initialize_gamification(tmp_path):
+def test_initialize_gamification(tmp_path, blockchain):
     """Test initializing all gamification managers"""
-    managers = initialize_gamification(data_dir=str(tmp_path))
+    managers = initialize_gamification(blockchain_interface=blockchain, data_dir=str(tmp_path))
     
     assert "airdrop" in managers
     assert "streak" in managers

@@ -1986,6 +1986,13 @@ class NodeAPIRoutes:
 
                 user_address = model.address
                 order_type = model.order_type
+                if order_type not in {"buy", "sell"}:
+                    return self._error_response(
+                        "Invalid order type",
+                        status=400,
+                        code="order_invalid",
+                        context={"order_type": order_type},
+                    )
 
                 # Verify balance and lock funds
                 if order_type == "buy":

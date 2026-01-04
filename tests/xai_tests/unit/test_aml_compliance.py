@@ -100,7 +100,7 @@ class TestTransactionRiskScore:
         history = [
             {"amount_usd": 9000, "timestamp": current_time - 3600},
             {"amount_usd": 8900, "timestamp": current_time - 1800},
-            {"amount_usd": 9100, "timestamp": current_time - 900},
+            {"amount_usd": 8800, "timestamp": current_time - 900},
         ]
 
         tx = {
