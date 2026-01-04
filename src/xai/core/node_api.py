@@ -1122,6 +1122,12 @@ class NodeAPIRoutes:
         def prometheus_metrics() -> tuple[str, int, dict[str, str]]:
             """Prometheus metrics endpoint."""
             try:
+                # Update peer count metric before export
+                p2p_manager = getattr(self.node, "p2p_manager", None)
+                if p2p_manager and hasattr(p2p_manager, "get_peer_count"):
+                    peer_count = p2p_manager.get_peer_count()
+                    if hasattr(self.node.metrics_collector, "record_peer_connected"):
+                        self.node.metrics_collector.record_peer_connected(peer_count)
                 metrics_output = self.node.metrics_collector.export_prometheus()
                 return metrics_output, 200, {"Content-Type": "text/plain; version=0.0.4"}
             except AttributeError as e:
@@ -1140,7 +1146,12 @@ class NodeAPIRoutes:
             """Get blockchain statistics."""
             stats = self.blockchain.get_stats()
             stats["miner_address"] = self.node.miner_address
-            stats["peers"] = len(self.node.peers)
+            # Use p2p_manager.get_peer_count() for accurate peer counting
+            p2p_manager = getattr(self.node, "p2p_manager", None)
+            if p2p_manager and hasattr(p2p_manager, "get_peer_count"):
+                stats["peers"] = p2p_manager.get_peer_count()
+            else:
+                stats["peers"] = len(self.node.peers)
             stats["is_mining"] = self.node.is_mining
             stats["node_uptime"] = time.time() - self.node.start_time
             return jsonify(stats)
