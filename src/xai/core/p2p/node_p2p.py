@@ -789,7 +789,14 @@ class P2PNetworkManager:
                 peers = self._get_peer_api_endpoints()
                 logger.info("Periodic sync found %d peer API endpoints: %s", len(peers), peers, extra={"event": "p2p.periodic_sync_peers"})
                 if not peers:
-                    logger.info("Periodic sync: No peer API endpoints, skipping", extra={"event": "p2p.periodic_sync_no_peers"})
+                    # Fallback to legacy http_peers if no API endpoints available yet
+                    # This ensures nodes started with --peers flag can sync even without
+                    # WebSocket handshake completion (fixes P2P sync bug where nodes
+                    # could see each other but never sync blocks)
+                    peers = self._http_peers_snapshot()
+                    logger.info("Periodic sync falling back to http_peers: %s", peers, extra={"event": "p2p.periodic_sync_http_fallback"})
+                if not peers:
+                    logger.info("Periodic sync: No peer endpoints available, skipping", extra={"event": "p2p.periodic_sync_no_peers"})
                     continue
 
                 local_height = len(getattr(self.blockchain, "chain", []))
