@@ -21,6 +21,11 @@ services:
       # Cooldown period in seconds (default: 1 hour)
       FAUCET_COOLDOWN: ${FAUCET_COOLDOWN:-3600}
 
+      # Turnstile (captcha)
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+      FAUCET_REQUIRE_CAPTCHA: ${FAUCET_REQUIRE_CAPTCHA:-}
+
     networks:
       - xai-network
 

@@ -27,7 +27,7 @@ export function Card({ children, className, padding = 'md' }: CardProps) {
 }
 
 interface CardHeaderProps {
-  title: string;
+  title: string | ReactNode;
   subtitle?: string;
   action?: ReactNode;
 }

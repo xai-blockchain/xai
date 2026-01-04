@@ -4,7 +4,7 @@ XAI Testnet Faucet Tests
 Comprehensive security and functionality tests for the public-facing faucet.
 Tests cover:
 - Flask routes (GET /, POST /api/request, GET /health, GET /api/stats)
-- hCaptcha verification (mocked)
+- Turnstile verification (mocked)
 - Cooldown/rate limiting logic
 - Token sending (mocked blockchain interaction)
 - Redis integration (mocked)
@@ -46,21 +46,27 @@ def faucet_env(monkeypatch, reset_faucet_module):
     monkeypatch.setenv('FAUCET_PORT', '8086')
     monkeypatch.setenv('FAUCET_AMOUNT', '100')
     monkeypatch.setenv('FAUCET_COOLDOWN', '3600')
-    monkeypatch.setenv('HCAPTCHA_SITE_KEY', '')
-    monkeypatch.setenv('HCAPTCHA_SECRET_KEY', '')
+    monkeypatch.setenv('FAUCET_IP_COOLDOWN', '0')
+    monkeypatch.setenv('FAUCET_IP_MAX_PER_WINDOW', '100')
+    monkeypatch.setenv('FAUCET_SENDER', 'TXAI' + 'b' * 40)
+    monkeypatch.setenv('TURNSTILE_SITE_KEY', '')
+    monkeypatch.setenv('TURNSTILE_SECRET_KEY', '')
     monkeypatch.setenv('REDIS_URL', '')
     yield
 
 
 @pytest.fixture
 def faucet_env_with_captcha(monkeypatch, reset_faucet_module):
-    """Set up faucet with hCaptcha enabled."""
+    """Set up faucet with Turnstile enabled."""
     monkeypatch.setenv('XAI_API_URL', 'http://test-api:8080')
     monkeypatch.setenv('FAUCET_PORT', '8086')
     monkeypatch.setenv('FAUCET_AMOUNT', '100')
     monkeypatch.setenv('FAUCET_COOLDOWN', '3600')
-    monkeypatch.setenv('HCAPTCHA_SITE_KEY', 'test-site-key')
-    monkeypatch.setenv('HCAPTCHA_SECRET_KEY', 'test-secret-key')
+    monkeypatch.setenv('FAUCET_IP_COOLDOWN', '0')
+    monkeypatch.setenv('FAUCET_IP_MAX_PER_WINDOW', '100')
+    monkeypatch.setenv('FAUCET_SENDER', 'TXAI' + 'b' * 40)
+    monkeypatch.setenv('TURNSTILE_SITE_KEY', 'test-site-key')
+    monkeypatch.setenv('TURNSTILE_SECRET_KEY', 'test-secret-key')
     monkeypatch.setenv('REDIS_URL', '')
     yield
 
@@ -75,6 +81,7 @@ def faucet_app(faucet_env):
     # Reset in-memory state
     faucet_module.request_history.clear()
     faucet_module.ip_history.clear()
+    faucet_module.ip_window_history.clear()
     faucet_module.stats['total_requests'] = 0
     faucet_module.stats['unique_addresses'] = set()
     faucet_module.stats['start_time'] = time.time()
@@ -83,13 +90,14 @@ def faucet_app(faucet_env):
 
 @pytest.fixture
 def faucet_app_with_captcha(faucet_env_with_captcha):
-    """Create faucet Flask app with hCaptcha enabled."""
+    """Create faucet Flask app with Turnstile enabled."""
     import faucet as faucet_module
     faucet_module.app.testing = True
     # Disable exception propagation so we get proper 500 responses
     faucet_module.app.config['PROPAGATE_EXCEPTIONS'] = False
     faucet_module.request_history.clear()
     faucet_module.ip_history.clear()
+    faucet_module.ip_window_history.clear()
     faucet_module.stats['total_requests'] = 0
     faucet_module.stats['unique_addresses'] = set()
     faucet_module.stats['start_time'] = time.time()
@@ -111,8 +119,8 @@ def client_with_captcha(faucet_app_with_captcha):
 @pytest.fixture
 def valid_xai_address():
     """Generate a valid-looking XAI address."""
-    # Format: AXN prefix + 40+ characters
-    return 'AXN' + 'a' * 40
+    # Format: TXAI prefix + 40+ characters
+    return 'TXAI' + 'a' * 40
 
 
 @pytest.fixture
@@ -120,16 +128,16 @@ def invalid_addresses():
     """Collection of invalid address formats for security testing."""
     return [
         '',                        # Empty
-        'AXN',                     # Too short
-        'AXN123456789',            # Too short (< 40 chars)
+        'TXAI',                     # Too short
+        'TXAI123456789',            # Too short (< 40 chars)
         'BTC' + 'a' * 40,          # Wrong prefix
-        'axn' + 'a' * 40,          # Wrong case prefix
-        'AXN ' + 'a' * 39,         # Contains space
-        'AXN\n' + 'a' * 39,        # Contains newline
-        'AXN<script>alert(1)</script>' + 'a' * 20,  # XSS attempt
-        "AXN'; DROP TABLE users;--" + 'a' * 20,     # SQL injection attempt
-        'AXN${7*7}' + 'a' * 35,    # Template injection attempt
-        'AXN../../../etc/passwd',   # Path traversal attempt
+        'txai' + 'a' * 40,          # Wrong case prefix
+        'TXAI ' + 'a' * 39,         # Contains space
+        'TXAI\n' + 'a' * 39,        # Contains newline
+        'TXAI<script>alert(1)</script>' + 'a' * 20,  # XSS attempt
+        "TXAI'; DROP TABLE users;--" + 'a' * 20,     # SQL injection attempt
+        'TXAI${7*7}' + 'a' * 35,    # Template injection attempt
+        'TXAI../../../etc/passwd',   # Path traversal attempt
     ]
 
 
@@ -162,14 +170,14 @@ class TestIndexRoute:
     def test_index_no_captcha_when_disabled(self, client):
         """Index page should not show captcha widget when disabled."""
         response = client.get('/')
-        # The h-captcha CSS class is in the stylesheet, but the widget div should not be present
+        # The Turnstile CSS class is in the stylesheet, but the widget div should not be present
         # when captcha is disabled (data-sitekey attribute indicates enabled captcha)
         assert b'data-sitekey' not in response.data
 
     def test_index_shows_captcha_when_enabled(self, client_with_captcha):
         """Index page should show captcha when enabled."""
         response = client_with_captcha.get('/')
-        assert b'h-captcha' in response.data
+        assert b'cf-turnstile' in response.data
         assert b'test-site-key' in response.data
 
 
@@ -230,7 +238,7 @@ class TestStatsRoute:
             'uptime_seconds',
             'faucet_amount',
             'cooldown_seconds',
-            'hcaptcha_enabled',
+            'turnstile_enabled',
             'redis_enabled',
         ]
         for field in expected_fields:
@@ -247,13 +255,13 @@ class TestStatsRoute:
         """Stats should show captcha disabled when not configured."""
         response = client.get('/api/stats')
         data = json.loads(response.data)
-        assert data['hcaptcha_enabled'] is False
+        assert data['turnstile_enabled'] is False
 
     def test_stats_captcha_enabled(self, client_with_captcha):
         """Stats should show captcha enabled when configured."""
         response = client_with_captcha.get('/api/stats')
         data = json.loads(response.data)
-        assert data['hcaptcha_enabled'] is True
+        assert data['turnstile_enabled'] is True
 
     def test_stats_redis_disabled(self, client):
         """Stats should show redis disabled when not configured."""
@@ -299,7 +307,7 @@ class TestRequestTokensRoute:
                 content_type='application/json'
             )
             # Should be 400 for invalid address
-            if not (invalid_addr.startswith('AXN') and len(invalid_addr) >= 40):
+            if not (invalid_addr.startswith('TXAI') and len(invalid_addr) >= 40):
                 assert response.status_code == 400, f"Should reject: {invalid_addr}"
 
     @patch('faucet.send_tokens')
@@ -391,8 +399,8 @@ class TestCooldownLogic:
         """Different addresses should not share cooldown."""
         mock_send.return_value = {'success': True, 'txid': 'test-txid'}
 
-        addr1 = 'AXN' + 'a' * 40
-        addr2 = 'AXN' + 'b' * 40
+        addr1 = 'TXAI' + 'a' * 40
+        addr2 = 'TXAI' + 'b' * 40
 
         # Both should succeed
         response1 = client.post(
@@ -423,7 +431,7 @@ class TestCooldownLogic:
         client = app.test_client()
 
         mock_send.return_value = {'success': True, 'txid': 'test-txid'}
-        valid_addr = 'AXN' + 'a' * 40
+        valid_addr = 'TXAI' + 'a' * 40
 
         # First request at time 0
         mock_time.return_value = 0
@@ -462,7 +470,7 @@ class TestCheckCooldownFunction:
         import faucet as faucet_module
         faucet_module.request_history.clear()
 
-        can_request, remaining = faucet_module.check_cooldown('AXN' + 'x' * 40)
+        can_request, remaining = faucet_module.check_cooldown('TXAI' + 'x' * 40)
         assert can_request is True
         assert remaining == 0
 
@@ -471,7 +479,7 @@ class TestCheckCooldownFunction:
         import faucet as faucet_module
         faucet_module.request_history.clear()
 
-        addr = 'AXN' + 'x' * 40
+        addr = 'TXAI' + 'x' * 40
         faucet_module.request_history[addr] = time.time()
 
         can_request, remaining = faucet_module.check_cooldown(addr)
@@ -484,7 +492,7 @@ class TestCheckCooldownFunction:
         import faucet as faucet_module
         faucet_module.request_history.clear()
 
-        addr = 'AXN' + 'x' * 40
+        addr = 'TXAI' + 'x' * 40
         # Request 2 hours ago
         faucet_module.request_history[addr] = time.time() - 7200
 
@@ -494,18 +502,18 @@ class TestCheckCooldownFunction:
 
 
 # =============================================================================
-# HCAPTCHA TESTS
+# TURNSTILE TESTS
 # =============================================================================
 
 @pytest.mark.faucet
-class TestHCaptchaVerification:
-    """Tests for hCaptcha verification."""
+class TestTurnstileVerification:
+    """Tests for Turnstile verification."""
 
     def test_captcha_skipped_when_disabled(self, faucet_env):
-        """verify_hcaptcha should return True when captcha disabled."""
+        """verify_turnstile should return True when captcha disabled."""
         import faucet as faucet_module
         # Captcha is disabled in faucet_env
-        result = faucet_module.verify_hcaptcha('')
+        result = faucet_module.verify_turnstile('')
         assert result is True
 
     def test_captcha_required_when_enabled(self, client_with_captcha, valid_xai_address):
@@ -583,7 +591,7 @@ class TestHCaptchaVerification:
     def test_captcha_api_error_fails_safely(
         self, mock_requests, faucet_env_with_captcha, valid_xai_address
     ):
-        """hCaptcha API error should reject request (fail closed)."""
+        """Turnstile API error should reject request (fail closed)."""
         import faucet as faucet_module
         faucet_module.request_history.clear()
 
@@ -609,45 +617,45 @@ class TestHCaptchaVerification:
 
 
 @pytest.mark.faucet
-class TestVerifyHCaptchaFunction:
-    """Direct tests for verify_hcaptcha helper function."""
+class TestVerifyTurnstileFunction:
+    """Direct tests for verify_turnstile helper function."""
 
     @patch('requests.post')
     def test_verify_returns_true_on_success(self, mock_requests, faucet_env_with_captcha):
-        """verify_hcaptcha returns True when API confirms success."""
+        """verify_turnstile returns True when API confirms success."""
         import faucet as faucet_module
 
         mock_response = Mock()
         mock_response.json.return_value = {'success': True}
         mock_requests.return_value = mock_response
 
-        result = faucet_module.verify_hcaptcha('valid-token')
+        result = faucet_module.verify_turnstile('valid-token')
         assert result is True
 
     @patch('requests.post')
     def test_verify_returns_false_on_failure(self, mock_requests, faucet_env_with_captcha):
-        """verify_hcaptcha returns False when API rejects token."""
+        """verify_turnstile returns False when API rejects token."""
         import faucet as faucet_module
 
         mock_response = Mock()
         mock_response.json.return_value = {'success': False}
         mock_requests.return_value = mock_response
 
-        result = faucet_module.verify_hcaptcha('invalid-token')
+        result = faucet_module.verify_turnstile('invalid-token')
         assert result is False
 
     def test_verify_returns_false_for_empty_token(self, faucet_env_with_captcha):
-        """verify_hcaptcha returns False for empty token when enabled."""
+        """verify_turnstile returns False for empty token when enabled."""
         import faucet as faucet_module
 
-        result = faucet_module.verify_hcaptcha('')
+        result = faucet_module.verify_turnstile('')
         assert result is False
 
     def test_verify_returns_false_for_none_token(self, faucet_env_with_captcha):
-        """verify_hcaptcha returns False for None token when enabled."""
+        """verify_turnstile returns False for None token when enabled."""
         import faucet as faucet_module
 
-        result = faucet_module.verify_hcaptcha(None)
+        result = faucet_module.verify_turnstile(None)
         assert result is False
 
 
@@ -665,11 +673,11 @@ class TestSendTokensFunction:
         import faucet as faucet_module
 
         mock_response = Mock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {'success': True, 'txid': 'abc123'}
-        mock_response.raise_for_status = Mock()
         mock_requests.return_value = mock_response
 
-        result = faucet_module.send_tokens('AXN' + 'a' * 40, 100.0)
+        result = faucet_module.send_tokens('TXAI' + 'a' * 40, 100.0)
 
         assert result['success'] is True
         assert result['txid'] == 'abc123'
@@ -682,7 +690,7 @@ class TestSendTokensFunction:
 
         mock_requests.side_effect = Exception("Connection refused")
 
-        result = faucet_module.send_tokens('AXN' + 'a' * 40, 100.0)
+        result = faucet_module.send_tokens('TXAI' + 'a' * 40, 100.0)
 
         assert result['success'] is False
         assert 'error' in result
@@ -694,12 +702,14 @@ class TestSendTokensFunction:
         import faucet as faucet_module
 
         mock_response = Mock()
-        mock_response.raise_for_status.side_effect = Exception("500 Server Error")
+        mock_response.status_code = 500
+        mock_response.text = "500 Server Error"
         mock_requests.return_value = mock_response
 
-        result = faucet_module.send_tokens('AXN' + 'a' * 40, 100.0)
+        result = faucet_module.send_tokens('TXAI' + 'a' * 40, 100.0)
 
         assert result['success'] is False
+        assert "Faucet API error" in result['error']
 
     @patch('requests.post')
     def test_send_tokens_correct_payload(self, mock_requests, faucet_env):
@@ -707,11 +717,11 @@ class TestSendTokensFunction:
         import faucet as faucet_module
 
         mock_response = Mock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {'success': True}
-        mock_response.raise_for_status = Mock()
         mock_requests.return_value = mock_response
 
-        addr = 'AXN' + 'a' * 40
+        addr = 'TXAI' + 'a' * 40
         amount = 100.0
         faucet_module.send_tokens(addr, amount)
 
@@ -740,13 +750,13 @@ class TestRedisIntegration:
         monkeypatch.setenv('REDIS_URL', 'redis://localhost:6379')
         monkeypatch.setenv('XAI_API_URL', 'http://test-api:8080')
         monkeypatch.setenv('FAUCET_COOLDOWN', '3600')
-        monkeypatch.setenv('HCAPTCHA_SITE_KEY', '')
-        monkeypatch.setenv('HCAPTCHA_SECRET_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SITE_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SECRET_KEY', '')
 
         import faucet as faucet_module
         faucet_module.redis_client = mock_redis
 
-        addr = 'AXN' + 'x' * 40
+        addr = 'TXAI' + 'x' * 40
         can_request, remaining = faucet_module.check_cooldown(addr)
 
         assert can_request is True
@@ -764,13 +774,13 @@ class TestRedisIntegration:
         monkeypatch.setenv('REDIS_URL', 'redis://localhost:6379')
         monkeypatch.setenv('XAI_API_URL', 'http://test-api:8080')
         monkeypatch.setenv('FAUCET_COOLDOWN', '3600')
-        monkeypatch.setenv('HCAPTCHA_SITE_KEY', '')
-        monkeypatch.setenv('HCAPTCHA_SECRET_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SITE_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SECRET_KEY', '')
 
         import faucet as faucet_module
         faucet_module.redis_client = mock_redis
 
-        addr = 'AXN' + 'x' * 40
+        addr = 'TXAI' + 'x' * 40
         can_request, remaining = faucet_module.check_cooldown(addr)
 
         assert can_request is False
@@ -786,8 +796,8 @@ class TestRedisIntegration:
         monkeypatch.setenv('REDIS_URL', 'redis://localhost:6379')
         monkeypatch.setenv('XAI_API_URL', 'http://test-api:8080')
         monkeypatch.setenv('FAUCET_COOLDOWN', '3600')
-        monkeypatch.setenv('HCAPTCHA_SITE_KEY', '')
-        monkeypatch.setenv('HCAPTCHA_SECRET_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SITE_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SECRET_KEY', '')
 
         import faucet as faucet_module
         faucet_module.redis_client = mock_redis
@@ -795,7 +805,7 @@ class TestRedisIntegration:
         faucet_module.stats['total_requests'] = 0
         faucet_module.stats['unique_addresses'] = set()
 
-        addr = 'AXN' + 'x' * 40
+        addr = 'TXAI' + 'x' * 40
         faucet_module.record_request(addr)
 
         # Verify Redis calls
@@ -814,14 +824,14 @@ class TestRedisIntegration:
         monkeypatch.setenv('REDIS_URL', 'redis://localhost:6379')
         monkeypatch.setenv('XAI_API_URL', 'http://test-api:8080')
         monkeypatch.setenv('FAUCET_COOLDOWN', '3600')
-        monkeypatch.setenv('HCAPTCHA_SITE_KEY', '')
-        monkeypatch.setenv('HCAPTCHA_SECRET_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SITE_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SECRET_KEY', '')
 
         import faucet as faucet_module
         faucet_module.redis_client = mock_redis
         faucet_module.request_history.clear()
 
-        addr = 'AXN' + 'x' * 40
+        addr = 'TXAI' + 'x' * 40
         # Should not raise, falls back to in-memory
         can_request, remaining = faucet_module.check_cooldown(addr)
 
@@ -839,8 +849,8 @@ class TestRedisIntegration:
         monkeypatch.setenv('REDIS_URL', 'redis://localhost:6379')
         monkeypatch.setenv('XAI_API_URL', 'http://test-api:8080')
         monkeypatch.setenv('FAUCET_COOLDOWN', '3600')
-        monkeypatch.setenv('HCAPTCHA_SITE_KEY', '')
-        monkeypatch.setenv('HCAPTCHA_SECRET_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SITE_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SECRET_KEY', '')
 
         import faucet as faucet_module
         faucet_module.redis_client = mock_redis
@@ -869,13 +879,13 @@ class TestRedisIntegration:
         monkeypatch.setenv('REDIS_URL', 'redis://localhost:6379')
         monkeypatch.setenv('XAI_API_URL', 'http://test-api:8080')
         monkeypatch.setenv('FAUCET_COOLDOWN', '3600')
-        monkeypatch.setenv('HCAPTCHA_SITE_KEY', '')
-        monkeypatch.setenv('HCAPTCHA_SECRET_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SITE_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SECRET_KEY', '')
 
         import faucet as faucet_module
         faucet_module.redis_client = mock_redis
 
-        addr = 'AXN' + 'x' * 40
+        addr = 'TXAI' + 'x' * 40
         can_request, remaining = faucet_module.check_cooldown(addr)
 
         assert can_request is True
@@ -892,8 +902,8 @@ class TestRedisIntegration:
         monkeypatch.setenv('REDIS_URL', 'redis://localhost:6379')
         monkeypatch.setenv('XAI_API_URL', 'http://test-api:8080')
         monkeypatch.setenv('FAUCET_COOLDOWN', '3600')
-        monkeypatch.setenv('HCAPTCHA_SITE_KEY', '')
-        monkeypatch.setenv('HCAPTCHA_SECRET_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SITE_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SECRET_KEY', '')
 
         import faucet as faucet_module
         faucet_module.redis_client = mock_redis
@@ -901,7 +911,7 @@ class TestRedisIntegration:
         faucet_module.stats['total_requests'] = 0
         faucet_module.stats['unique_addresses'] = set()
 
-        addr = 'AXN' + 'x' * 40
+        addr = 'TXAI' + 'x' * 40
         # Should not raise despite Redis error
         faucet_module.record_request(addr)
 
@@ -921,8 +931,8 @@ class TestRedisIntegration:
         monkeypatch.setenv('REDIS_URL', 'redis://localhost:6379')
         monkeypatch.setenv('XAI_API_URL', 'http://test-api:8080')
         monkeypatch.setenv('FAUCET_COOLDOWN', '3600')
-        monkeypatch.setenv('HCAPTCHA_SITE_KEY', '')
-        monkeypatch.setenv('HCAPTCHA_SECRET_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SITE_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SECRET_KEY', '')
 
         import faucet as faucet_module
         faucet_module.redis_client = mock_redis
@@ -961,8 +971,8 @@ class TestModuleLevelRedisInit:
         monkeypatch.setenv('REDIS_URL', 'redis://localhost:6379')
         monkeypatch.setenv('XAI_API_URL', 'http://test-api:8080')
         monkeypatch.setenv('FAUCET_COOLDOWN', '3600')
-        monkeypatch.setenv('HCAPTCHA_SITE_KEY', '')
-        monkeypatch.setenv('HCAPTCHA_SECRET_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SITE_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SECRET_KEY', '')
 
         # Mock the redis import to raise ImportError
         import builtins
@@ -994,8 +1004,8 @@ class TestModuleLevelRedisInit:
         monkeypatch.setenv('REDIS_URL', 'redis://localhost:6379')
         monkeypatch.setenv('XAI_API_URL', 'http://test-api:8080')
         monkeypatch.setenv('FAUCET_COOLDOWN', '3600')
-        monkeypatch.setenv('HCAPTCHA_SITE_KEY', '')
-        monkeypatch.setenv('HCAPTCHA_SECRET_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SITE_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SECRET_KEY', '')
 
         # Create a mock redis module that raises connection error
         mock_redis_module = MagicMock()
@@ -1025,8 +1035,8 @@ class TestModuleLevelRedisInit:
         monkeypatch.setenv('REDIS_URL', 'redis://localhost:6379')
         monkeypatch.setenv('XAI_API_URL', 'http://test-api:8080')
         monkeypatch.setenv('FAUCET_COOLDOWN', '3600')
-        monkeypatch.setenv('HCAPTCHA_SITE_KEY', '')
-        monkeypatch.setenv('HCAPTCHA_SECRET_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SITE_KEY', '')
+        monkeypatch.setenv('TURNSTILE_SECRET_KEY', '')
 
         # Create a mock redis module where ping fails
         mock_redis_client = MagicMock()
@@ -1070,7 +1080,7 @@ class TestSecurityValidation:
         for payload in xss_payloads:
             response = client.post(
                 '/api/request',
-                data=json.dumps({'address': f'AXN{payload}'}),
+                data=json.dumps({'address': f'TXAI{payload}'}),
                 content_type='application/json'
             )
             # Should be rejected (invalid address format)
@@ -1087,7 +1097,7 @@ class TestSecurityValidation:
         for payload in sql_payloads:
             response = client.post(
                 '/api/request',
-                data=json.dumps({'address': f'AXN{payload}'}),
+                data=json.dumps({'address': f'TXAI{payload}'}),
                 content_type='application/json'
             )
             # Should be rejected (invalid address format)
@@ -1105,7 +1115,7 @@ class TestSecurityValidation:
         for payload in cmd_payloads:
             response = client.post(
                 '/api/request',
-                data=json.dumps({'address': f'AXN{payload}'}),
+                data=json.dumps({'address': f'TXAI{payload}'}),
                 content_type='application/json'
             )
             assert response.status_code == 400
@@ -1121,7 +1131,7 @@ class TestSecurityValidation:
         for payload in traversal_payloads:
             response = client.post(
                 '/api/request',
-                data=json.dumps({'address': f'AXN{payload}'}),
+                data=json.dumps({'address': f'TXAI{payload}'}),
                 content_type='application/json'
             )
             assert response.status_code == 400
@@ -1129,7 +1139,7 @@ class TestSecurityValidation:
     def test_oversized_address_rejected(self, client):
         """Extremely long addresses should be rejected."""
         # Address with 10,000 characters
-        long_address = 'AXN' + 'a' * 10000
+        long_address = 'TXAI' + 'a' * 10000
         response = client.post(
             '/api/request',
             data=json.dumps({'address': long_address}),
@@ -1142,9 +1152,9 @@ class TestSecurityValidation:
     def test_null_byte_injection(self, client):
         """Null byte injection should be handled safely."""
         null_payloads = [
-            'AXN\x00' + 'a' * 40,
-            'AXN' + '\x00' * 40,
-            'AXN' + 'a' * 20 + '\x00' + 'a' * 19,
+            'TXAI\x00' + 'a' * 40,
+            'TXAI' + '\x00' * 40,
+            'TXAI' + 'a' * 20 + '\x00' + 'a' * 19,
         ]
         for payload in null_payloads:
             response = client.post(
@@ -1158,8 +1168,8 @@ class TestSecurityValidation:
     def test_unicode_normalization_attacks(self, client):
         """Unicode normalization attacks should be handled."""
         unicode_payloads = [
-            'AXN' + '\uff21' * 40,  # Fullwidth A
-            'AXN' + '\u0041\u030a' * 20,  # A + combining ring
+            'TXAI' + '\uff21' * 40,  # Fullwidth A
+            'TXAI' + '\u0041\u030a' * 20,  # A + combining ring
         ]
         for payload in unicode_payloads:
             response = client.post(
@@ -1173,7 +1183,7 @@ class TestSecurityValidation:
     def test_json_depth_attack(self, client):
         """Deeply nested JSON should be handled."""
         # Create deeply nested structure
-        nested = {'address': 'AXN' + 'a' * 40}
+        nested = {'address': 'TXAI' + 'a' * 40}
         for _ in range(100):
             nested = {'nested': nested}
 
@@ -1220,7 +1230,7 @@ class TestSecurityValidation:
         # Valid uppercase prefix
         response1 = client.post(
             '/api/request',
-            data=json.dumps({'address': 'AXN' + 'a' * 40}),
+            data=json.dumps({'address': 'TXAI' + 'a' * 40}),
             content_type='application/json'
         )
         assert response1.status_code == 200
@@ -1228,7 +1238,7 @@ class TestSecurityValidation:
         # Invalid lowercase prefix
         response2 = client.post(
             '/api/request',
-            data=json.dumps({'address': 'axn' + 'a' * 40}),
+            data=json.dumps({'address': 'txai' + 'a' * 40}),
             content_type='application/json'
         )
         assert response2.status_code == 400
@@ -1244,8 +1254,8 @@ class TestRateLimitingSecurity:
         """Changing address case should not bypass cooldown."""
         mock_send.return_value = {'success': True, 'txid': 'test'}
 
-        addr_lower = 'AXN' + 'a' * 40
-        addr_mixed = 'AXN' + 'A' * 40
+        addr_lower = 'TXAI' + 'a' * 40
+        addr_mixed = 'TXAI' + 'A' * 40
 
         # First request
         response1 = client.post(
@@ -1269,8 +1279,8 @@ class TestRateLimitingSecurity:
         """Adding whitespace should not bypass cooldown."""
         mock_send.return_value = {'success': True, 'txid': 'test'}
 
-        addr = 'AXN' + 'a' * 40
-        addr_with_space = ' AXN' + 'a' * 40
+        addr = 'TXAI' + 'a' * 40
+        addr_with_space = ' TXAI' + 'a' * 40
 
         # Address with leading space should be rejected (invalid format)
         response = client.post(
@@ -1320,7 +1330,7 @@ class TestRecordRequestFunction:
         faucet_module.stats['total_requests'] = 0
         faucet_module.stats['unique_addresses'] = set()
 
-        addr = 'AXN' + 'x' * 40
+        addr = 'TXAI' + 'x' * 40
         faucet_module.record_request(addr)
 
         assert addr in faucet_module.request_history
@@ -1334,8 +1344,8 @@ class TestRecordRequestFunction:
         faucet_module.stats['total_requests'] = 0
         faucet_module.stats['unique_addresses'] = set()
 
-        addr1 = 'AXN' + 'a' * 40
-        addr2 = 'AXN' + 'b' * 40
+        addr1 = 'TXAI' + 'a' * 40
+        addr2 = 'TXAI' + 'b' * 40
 
         faucet_module.record_request(addr1)
         faucet_module.record_request(addr1)  # Same address
@@ -1384,7 +1394,7 @@ class TestEdgeCases:
         """Array address should be rejected with 400."""
         response = client.post(
             '/api/request',
-            data=json.dumps({'address': ['AXN' + 'a' * 40]}),
+            data=json.dumps({'address': ['TXAI' + 'a' * 40]}),
             content_type='application/json'
         )
         assert response.status_code == 400
@@ -1393,7 +1403,7 @@ class TestEdgeCases:
         """Object address should be rejected with 400."""
         response = client.post(
             '/api/request',
-            data=json.dumps({'address': {'value': 'AXN' + 'a' * 40}}),
+            data=json.dumps({'address': {'value': 'TXAI' + 'a' * 40}}),
             content_type='application/json'
         )
         assert response.status_code == 400
@@ -1402,18 +1412,18 @@ class TestEdgeCases:
         """Malformed JSON should be handled gracefully."""
         response = client.post(
             '/api/request',
-            data='{"address": "AXN' + 'a' * 40,  # Missing closing brace
+            data='{"address": "TXAI' + 'a' * 40,  # Missing closing brace
             content_type='application/json'
         )
         assert response.status_code in [400, 500]
 
     @patch('faucet.send_tokens')
     def test_minimum_valid_address_length(self, mock_send, client):
-        """Address exactly 43 chars (AXN + 40) should be valid."""
+        """Address exactly 44 chars (TXAI + 40) should be valid."""
         mock_send.return_value = {'success': True, 'txid': 'test'}
 
-        addr = 'AXN' + 'a' * 40  # Exactly 43 chars
-        assert len(addr) == 43
+        addr = 'TXAI' + 'a' * 40  # Exactly 44 chars
+        assert len(addr) == 44
 
         response = client.post(
             '/api/request',
@@ -1424,8 +1434,8 @@ class TestEdgeCases:
 
     def test_address_exactly_at_boundary(self, client):
         """Address at exactly 40 char boundary validation."""
-        # AXN + 37 chars = 40 total, should fail (< 40 body chars)
-        short_addr = 'AXN' + 'a' * 36  # 39 total
+        # TXAI + 36 chars = 40 total, should fail (< 40 body chars)
+        short_addr = 'TXAI' + 'a' * 36  # 40 total
         response = client.post(
             '/api/request',
             data=json.dumps({'address': short_addr}),
@@ -1479,7 +1489,7 @@ class TestTypeValidation:
         """List address should return 400."""
         response = client.post(
             '/api/request',
-            data=json.dumps({'address': ['AXN' + 'a' * 40]}),
+            data=json.dumps({'address': ['TXAI' + 'a' * 40]}),
             content_type='application/json'
         )
         assert response.status_code == 400
@@ -1491,7 +1501,7 @@ class TestTypeValidation:
         """Dict address should return 400."""
         response = client.post(
             '/api/request',
-            data=json.dumps({'address': {'value': 'AXN' + 'a' * 40}}),
+            data=json.dumps({'address': {'value': 'TXAI' + 'a' * 40}}),
             content_type='application/json'
         )
         assert response.status_code == 400

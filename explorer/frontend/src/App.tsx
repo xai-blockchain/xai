@@ -9,6 +9,13 @@ import { TransactionDetail } from './pages/TransactionDetail';
 import { Address } from './pages/Address';
 import { AITasks } from './pages/AITasks';
 import { AITaskDetail } from './pages/AITaskDetail';
+import { Analytics } from './pages/Analytics';
+import { RichList } from './pages/RichList';
+import { Governance } from './pages/Governance';
+import { GovernanceDetail } from './pages/GovernanceDetail';
+import { Validators } from './pages/Validators';
+import { ValidatorDetail } from './pages/ValidatorDetail';
+import { Staking } from './pages/Staking';
 import { NotFound } from './pages/NotFound';
 
 const queryClient = new QueryClient({
@@ -35,6 +42,13 @@ export default function App() {
             <Route path="address/:address" element={<Address />} />
             <Route path="ai" element={<AITasks />} />
             <Route path="ai/:taskId" element={<AITaskDetail />} />
+            <Route path="analytics" element={<Analytics />} />
+            <Route path="richlist" element={<RichList />} />
+            <Route path="governance" element={<Governance />} />
+            <Route path="governance/:id" element={<GovernanceDetail />} />
+            <Route path="validators" element={<Validators />} />
+            <Route path="validators/:address" element={<ValidatorDetail />} />
+            <Route path="staking" element={<Staking />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>

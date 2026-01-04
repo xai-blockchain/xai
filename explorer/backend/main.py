@@ -14,7 +14,7 @@ import logging
 import os
 from typing import Any
 
-from api import blockchain, ai_tasks, providers, analytics
+from api import blockchain, ai_tasks, providers, analytics, governance, staking
 from services.indexer import BlockchainIndexer
 from services.ai_service import AITaskService
 from database.connection import Database
@@ -114,6 +114,8 @@ app.include_router(blockchain.router, prefix="/api/v1", tags=["Blockchain"], **r
 app.include_router(ai_tasks.router, prefix="/api/v1/ai", tags=["AI Tasks"], **router_kwargs)
 app.include_router(providers.router, prefix="/api/v1/ai/providers", tags=["AI Providers"], **router_kwargs)
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"], **router_kwargs)
+app.include_router(governance.router, prefix="/api/v1/governance", tags=["Governance"], **router_kwargs)
+app.include_router(staking.router, prefix="/api/v1/staking", tags=["Staking"], **router_kwargs)
 
 @app.get("/")
 async def root():
@@ -131,6 +133,17 @@ async def root():
                 "live_feed",
                 "earnings_tracking"
             ],
+            "governance": [
+                "proposals",
+                "voting",
+                "tally"
+            ],
+            "staking": [
+                "validators",
+                "delegations",
+                "rewards",
+                "unbonding"
+            ],
             "analytics": [
                 "network_stats",
                 "ai_usage_metrics",
@@ -145,6 +158,8 @@ async def root():
             "blockchain": "/api/v1/blocks",
             "ai_tasks": "/api/v1/ai/tasks",
             "providers": "/api/v1/ai/providers",
+            "governance": "/api/v1/governance/proposals",
+            "staking": "/api/v1/staking/validators",
             "websocket": "/api/v1/ws"
         }
     }

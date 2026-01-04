@@ -66,10 +66,10 @@ if not ALLOWED_PREFIXES:
     ALLOWED_PREFIXES = ['TXAI']
 ADDRESS_REGEX = re.compile(r'^(' + '|'.join(ALLOWED_PREFIXES) + r')[0-9a-fA-F]{40}$')
 
-# hCaptcha configuration (optional)
-HCAPTCHA_SITE_KEY = os.getenv('HCAPTCHA_SITE_KEY', '')
-HCAPTCHA_SECRET_KEY = os.getenv('HCAPTCHA_SECRET_KEY', '')
-HCAPTCHA_ENABLED = bool(HCAPTCHA_SITE_KEY and HCAPTCHA_SECRET_KEY)
+# Turnstile configuration (optional)
+TURNSTILE_SITE_KEY = os.getenv('TURNSTILE_SITE_KEY', '')
+TURNSTILE_SECRET_KEY = os.getenv('TURNSTILE_SECRET_KEY', '')
+TURNSTILE_ENABLED = bool(TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY)
 
 # Redis configuration (optional)
 REDIS_URL = os.getenv('REDIS_URL', '')
@@ -107,8 +107,8 @@ TEMPLATE = """
 <html>
 <head>
     <title>XAI Testnet Faucet</title>
-    {% if hcaptcha_enabled %}
-    <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+    {% if turnstile_enabled %}
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     {% endif %}
     <style>
         body {
@@ -164,7 +164,7 @@ TEMPLATE = """
             color: #0c5460;
             border: 1px solid #bee5eb;
         }
-        .h-captcha { margin: 10px 0; }
+        .cf-turnstile { margin: 10px 0; }
     </style>
 </head>
 <body>
@@ -181,8 +181,8 @@ TEMPLATE = """
         </div>
         <form id="faucetForm">
             <input type="text" id="address" placeholder="Enter your XAI address" required>
-            {% if hcaptcha_enabled %}
-            <div class="h-captcha" data-sitekey="{{ hcaptcha_sitekey }}"></div>
+            {% if turnstile_enabled %}
+            <div class="cf-turnstile" data-sitekey="{{ turnstile_sitekey }}"></div>
             {% endif %}
             <button type="submit">Request Tokens</button>
         </form>
@@ -194,10 +194,10 @@ TEMPLATE = """
             const address = document.getElementById('address').value;
             const resultDiv = document.getElementById('result');
 
-            // Get hCaptcha response if enabled
+            // Get Turnstile response if enabled
             let captchaResponse = '';
-            {% if hcaptcha_enabled %}
-            captchaResponse = hcaptcha.getResponse();
+            {% if turnstile_enabled %}
+            captchaResponse = turnstile.getResponse();
             if (!captchaResponse) {
                 resultDiv.innerHTML = '<div class="error message">Please complete the CAPTCHA</div>';
                 return;
@@ -217,13 +217,13 @@ TEMPLATE = """
 
                 if (data.success) {
                     resultDiv.innerHTML = `<div class="success message">${data.message}</div>`;
-                    {% if hcaptcha_enabled %}
-                    hcaptcha.reset();
+                    {% if turnstile_enabled %}
+                    turnstile.reset();
                     {% endif %}
                 } else {
                     resultDiv.innerHTML = `<div class="error message">${data.error}</div>`;
-                    {% if hcaptcha_enabled %}
-                    hcaptcha.reset();
+                    {% if turnstile_enabled %}
+                    turnstile.reset();
                     {% endif %}
                 }
             } catch (error) {
@@ -236,9 +236,9 @@ TEMPLATE = """
 """
 
 
-def verify_hcaptcha(token: str) -> bool:
-    """Verify hCaptcha token with hCaptcha API"""
-    if not HCAPTCHA_ENABLED:
+def verify_turnstile(token: str) -> bool:
+    """Verify Turnstile token with Turnstile API"""
+    if not TURNSTILE_ENABLED:
         return True
 
     if not token:
@@ -246,9 +246,9 @@ def verify_hcaptcha(token: str) -> bool:
 
     try:
         response = requests.post(
-            'https://hcaptcha.com/siteverify',
+            'https://challenges.cloudflare.com/turnstile/v0/siteverify',
             data={
-                'secret': HCAPTCHA_SECRET_KEY,
+                'secret': TURNSTILE_SECRET_KEY,
                 'response': token
             },
             timeout=10
@@ -256,7 +256,7 @@ def verify_hcaptcha(token: str) -> bool:
         result = response.json()
         return result.get('success', False)
     except Exception as e:
-        logger.error(f"hCaptcha verification failed: {e}")
+        logger.error(f"Turnstile verification failed: {e}")
         return False
 
 
@@ -464,8 +464,9 @@ def send_tokens(address: str, amount: float) -> dict:
         )
         if response.status_code == 200:
             return response.json()
-        if response.status_code not in (404, 405):
+        if response.status_code not in (404, 405, 429, 503):
             return {"success": False, "error": f"Faucet API error: {response.text}"}
+        logger.warning(f"Primary faucet API returned {response.status_code}: {response.text}")
     except Exception as e:
         logger.warning(f"Primary faucet API failed: {e}")
 
@@ -498,8 +499,8 @@ def index():
         ip_window=FAUCET_IP_WINDOW,
         ip_cooldown=FAUCET_IP_COOLDOWN,
         max_balance=FAUCET_MAX_BALANCE,
-        hcaptcha_enabled=HCAPTCHA_ENABLED,
-        hcaptcha_sitekey=HCAPTCHA_SITE_KEY
+        turnstile_enabled=TURNSTILE_ENABLED,
+        turnstile_sitekey=TURNSTILE_SITE_KEY
     )
 
 
@@ -523,13 +524,13 @@ def request_tokens():
         return jsonify({'success': False, 'error': 'Faucet is disabled on mainnet'}), 403
 
     # Enforce captcha when required
-    if CAPTCHA_REQUIRED and not HCAPTCHA_ENABLED:
+    if CAPTCHA_REQUIRED and not TURNSTILE_ENABLED:
         return jsonify({'success': False, 'error': 'Captcha is required but not configured'}), 503
 
-    # Verify hCaptcha if enabled
-    if HCAPTCHA_ENABLED:
+    # Verify Turnstile if enabled
+    if TURNSTILE_ENABLED:
         captcha_token = data.get('captcha', '')
-        if not verify_hcaptcha(captcha_token):
+        if not verify_turnstile(captcha_token):
             return jsonify({'success': False, 'error': 'CAPTCHA verification failed'}), 400
 
     # Validate address format (basic check)
@@ -640,7 +641,7 @@ def get_stats():
         'ip_cooldown_seconds': FAUCET_IP_COOLDOWN,
         'ip_max_per_window': FAUCET_IP_MAX_PER_WINDOW,
         'ip_window_seconds': FAUCET_IP_WINDOW,
-        'hcaptcha_enabled': HCAPTCHA_ENABLED,
+        'turnstile_enabled': TURNSTILE_ENABLED,
         'redis_enabled': redis_client is not None,
         'allowed_prefixes': ALLOWED_PREFIXES,
         'network': XAI_NETWORK
@@ -652,7 +653,7 @@ if __name__ == '__main__':
     logger.info(f"Faucet amount: {FAUCET_AMOUNT} XAI")
     logger.info(f"Cooldown period: {FAUCET_COOLDOWN} seconds")
     logger.info(f"XAI API URL: {XAI_API_URL}")
-    logger.info(f"hCaptcha: {'enabled' if HCAPTCHA_ENABLED else 'disabled'}")
+    logger.info(f"Turnstile: {'enabled' if TURNSTILE_ENABLED else 'disabled'}")
     logger.info(f"Redis: {'connected' if redis_client else 'disabled (in-memory mode)'}")
     logger.info(f"Allowed prefixes: {', '.join(ALLOWED_PREFIXES)}")
     logger.info(f"IP limits: cooldown={FAUCET_IP_COOLDOWN}s window={FAUCET_IP_WINDOW}s max={FAUCET_IP_MAX_PER_WINDOW}")

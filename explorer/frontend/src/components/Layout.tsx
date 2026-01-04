@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Blocks, ArrowRightLeft, Home, Cpu, Search } from 'lucide-react';
+import { Blocks, ArrowRightLeft, Home, Cpu, Search, BarChart2, Trophy, Vote, Shield, Coins } from 'lucide-react';
 import { clsx } from 'clsx';
 import { SearchBar } from './SearchBar';
 
@@ -8,6 +8,10 @@ const navigation = [
   { name: 'Blocks', href: '/blocks', icon: Blocks },
   { name: 'Transactions', href: '/transactions', icon: ArrowRightLeft },
   { name: 'AI Tasks', href: '/ai', icon: Cpu },
+  { name: 'Validators', href: '/validators', icon: Shield },
+  { name: 'Governance', href: '/governance', icon: Vote },
+  { name: 'Staking', href: '/staking', icon: Coins },
+  { name: 'Analytics', href: '/analytics', icon: BarChart2 },
 ];
 
 export function Layout() {
@@ -15,6 +19,15 @@ export function Layout() {
 
   return (
     <div className="min-h-screen bg-xai-darker">
+      {/* Devnet Banner */}
+      <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white py-2 px-4">
+        <div className="mx-auto max-w-7xl flex items-center justify-center gap-4 text-sm">
+          <span className="bg-black/30 px-3 py-1 rounded text-xs font-bold tracking-wider">DEVNET</span>
+          <span>This is an invite-only development network. Tokens have no value.</span>
+          <a href="https://discord.gg/jqNEDhG8" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-100 font-medium">Apply via Discord</a>
+        </div>
+      </div>
+
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-xai-border bg-xai-dark/95 backdrop-blur">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -25,8 +38,11 @@ export function Layout() {
                 <span className="text-xl font-bold text-xai-primary">X</span>
               </div>
               <div>
-                <h1 className="text-lg font-semibold text-white">XAI Explorer</h1>
-                <p className="text-xs text-xai-muted">Blockchain Explorer</p>
+                <h1 className="text-lg font-semibold text-white flex items-center gap-2">
+                  XAI Explorer
+                  <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded">Devnet</span>
+                </h1>
+                <p className="text-xs text-xai-muted">AI-Powered Blockchain</p>
               </div>
             </Link>
 
@@ -100,12 +116,15 @@ export function Layout() {
       <footer className="border-t border-xai-border bg-xai-dark mt-auto">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-xai-muted">
-              XAI Blockchain Explorer - AI-Powered Blockchain
-            </p>
+            <div className="text-sm text-xai-muted text-center sm:text-left">
+              <p>XAI Blockchain Explorer - AI-Powered Blockchain</p>
+              <p className="text-xs mt-1">Chain ID: xai-testnet-1 | Network: Devnet</p>
+            </div>
             <div className="flex items-center gap-4 text-sm text-xai-muted">
+              <a href="https://artifacts.xaiblockchain.com" target="_blank" rel="noopener" className="hover:text-xai-primary">Artifacts</a>
               <a href="/docs" className="hover:text-xai-primary">API Docs</a>
-              <a href="https://github.com/xai" className="hover:text-xai-primary">GitHub</a>
+              <a href="https://github.com/xai-blockchain/testnets" target="_blank" rel="noopener" className="hover:text-xai-primary">GitHub</a>
+              <a href="https://discord.gg/jqNEDhG8" target="_blank" rel="noopener" className="hover:text-xai-primary">Discord</a>
             </div>
           </div>
         </div>

@@ -29,21 +29,20 @@ export function Transactions() {
       for (const block of blocksData.blocks) {
         if (block.transactions) {
           for (const tx of block.transactions) {
-            const transaction: Transaction = typeof tx === 'string'
-              ? {
-                  txid: tx,
-                  blockHash: block.hash,
-                  blockHeight: block.height,
-                  timestamp: block.timestamp,
-                  type: 'transfer',
-                  from: 'Unknown',
-                  to: 'Unknown',
-                  amount: '0',
-                  fee: '0',
-                  status: 'confirmed',
-                  confirmations: 1,
-                }
-              : tx;
+            const txid = typeof tx === 'string' ? tx : tx.txid;
+            const transaction: Transaction = {
+              txid,
+              blockHash: block.hash,
+              blockHeight: block.height,
+              timestamp: block.timestamp,
+              type: 'transfer',
+              from: 'Unknown',
+              to: 'Unknown',
+              amount: '0',
+              fee: '0',
+              status: 'confirmed',
+              confirmations: 1,
+            };
             transactions.push(transaction);
           }
         }

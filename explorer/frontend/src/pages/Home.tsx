@@ -1,20 +1,76 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Blocks, ArrowRightLeft, Users, Clock, Cpu, Zap, TrendingUp, Activity } from 'lucide-react';
+import { Blocks, ArrowRightLeft, Users, Clock, Cpu, Zap, TrendingUp, Activity, Download, Droplet, BarChart2, FileCode, Radio } from 'lucide-react';
 import { Card, CardHeader } from '../components/Card';
 import { StatCard } from '../components/StatCard';
-import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from '../components/Table';
+import { Table, TableHeader, TableHead, TableCell } from '../components/Table';
 import { Badge, getStatusVariant } from '../components/Badge';
-import { HashLink, AddressLink } from '../components/HashLink';
+import { HashLink } from '../components/HashLink';
 import { Loading } from '../components/Loading';
 import { getBlocks, getNetworkStats, getAITasks, getAIStats } from '../api/client';
-import { formatNumber, formatTimeAgo, formatXAI, formatDuration } from '../utils/format';
+import { formatNumber, formatTimeAgo, formatXAI } from '../utils/format';
+import { useWebSocket, getStatusColor, getStatusText } from '../hooks/useWebSocket';
+
+// Connection status indicator component
+function ConnectionStatus({ status }: { status: 'connecting' | 'connected' | 'disconnected' | 'error' }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`relative flex h-3 w-3`}>
+        {status === 'connected' && (
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+        )}
+        <span className={`relative inline-flex rounded-full h-3 w-3 ${getStatusColor(status)}`} />
+      </span>
+      <span className={`text-sm font-medium ${
+        status === 'connected' ? 'text-green-400' :
+        status === 'connecting' ? 'text-yellow-400' :
+        status === 'error' ? 'text-red-400' :
+        'text-gray-400'
+      }`}>
+        {getStatusText(status)}
+      </span>
+    </div>
+  );
+}
+
+// Animated row for new items
+function AnimatedTableRow({ children, isNew }: { children: React.ReactNode; isNew: boolean }) {
+  return (
+    <tr className={`border-b border-xai-border transition-all duration-500 ${
+      isNew ? 'bg-xai-primary/10 animate-pulse' : ''
+    }`}>
+      {children}
+    </tr>
+  );
+}
 
 export function Home() {
+  const queryClient = useQueryClient();
+
+  // WebSocket connection
+  const {
+    status: wsStatus,
+    latestBlock,
+    latestAITask,
+    recentBlocks: wsBlocks,
+    recentAITasks: wsAITasks,
+  } = useWebSocket({
+    onBlock: () => {
+      // Invalidate queries when new data arrives
+      queryClient.invalidateQueries({ queryKey: ['blocks'] });
+      queryClient.invalidateQueries({ queryKey: ['networkStats'] });
+    },
+    onAITask: () => {
+      queryClient.invalidateQueries({ queryKey: ['aiTasks'] });
+      queryClient.invalidateQueries({ queryKey: ['aiStats'] });
+    },
+  });
+
   const { data: blocksData, isLoading: blocksLoading } = useQuery({
     queryKey: ['blocks', 1, 5],
     queryFn: () => getBlocks(1, 5),
-    refetchInterval: 10000,
+    refetchInterval: wsStatus === 'connected' ? 30000 : 10000, // Slower polling when WS connected
   });
 
   const { data: networkStats, isLoading: statsLoading } = useQuery({
@@ -26,7 +82,7 @@ export function Home() {
   const { data: aiTasksData, isLoading: aiTasksLoading } = useQuery({
     queryKey: ['aiTasks', 1, 5],
     queryFn: () => getAITasks({ page: 1, limit: 5 }),
-    refetchInterval: 15000,
+    refetchInterval: wsStatus === 'connected' ? 30000 : 15000,
   });
 
   const { data: aiStats } = useQuery({
@@ -35,10 +91,37 @@ export function Home() {
     refetchInterval: 30000,
   });
 
+  // Merge WS blocks with API blocks, preferring WS for recent ones
+  const displayBlocks = useMemo(() => {
+    if (wsBlocks.length > 0 && blocksData?.blocks) {
+      const wsBlockHashes = new Set(wsBlocks.map(b => b.hash));
+      const apiBlocks = blocksData.blocks.filter(b => !wsBlockHashes.has(b.hash));
+      return [...wsBlocks, ...apiBlocks].slice(0, 5);
+    }
+    return blocksData?.blocks || [];
+  }, [wsBlocks, blocksData?.blocks]);
+
+  // Merge WS AI tasks with API tasks
+  const displayAITasks = useMemo(() => {
+    if (wsAITasks.length > 0 && aiTasksData?.tasks) {
+      const wsTaskIds = new Set(wsAITasks.map(t => t.taskId));
+      const apiTasks = aiTasksData.tasks.filter(t => !wsTaskIds.has(t.taskId));
+      return [...wsAITasks, ...apiTasks].slice(0, 5);
+    }
+    return aiTasksData?.tasks || [];
+  }, [wsAITasks, aiTasksData?.tasks]);
+
+  // Track which items are "new" from WebSocket
+  const newBlockHashes = useMemo(() => new Set(wsBlocks.slice(0, 2).map(b => b.hash)), [wsBlocks]);
+  const newTaskIds = useMemo(() => new Set(wsAITasks.slice(0, 2).map(t => t.taskId)), [wsAITasks]);
+
   return (
     <div className="space-y-8">
-      {/* Hero Section */}
+      {/* Hero Section with Connection Status */}
       <div className="text-center py-8">
+        <div className="flex justify-center mb-4">
+          <ConnectionStatus status={wsStatus} />
+        </div>
         <h1 className="text-4xl font-bold text-white mb-4">
           XAI Blockchain Explorer
         </h1>
@@ -101,7 +184,17 @@ export function Home() {
         <Card padding="none">
           <div className="p-6 pb-0">
             <CardHeader
-              title="Recent Blocks"
+              title={
+                <div className="flex items-center gap-2">
+                  <span>Recent Blocks</span>
+                  {wsStatus === 'connected' && latestBlock && (
+                    <Badge variant="success" className="animate-pulse">
+                      <Radio className="h-3 w-3 mr-1" />
+                      Live
+                    </Badge>
+                  )}
+                </div>
+              }
               action={
                 <Link
                   to="/blocks"
@@ -112,7 +205,7 @@ export function Home() {
               }
             />
           </div>
-          {blocksLoading ? (
+          {blocksLoading && displayBlocks.length === 0 ? (
             <div className="p-6">
               <Loading size="sm" />
             </div>
@@ -124,9 +217,9 @@ export function Home() {
                 <TableHead align="center">Txs</TableHead>
                 <TableHead align="right">Time</TableHead>
               </TableHeader>
-              <TableBody>
-                {blocksData?.blocks.map((block) => (
-                  <TableRow key={block.hash}>
+              <tbody>
+                {displayBlocks.map((block) => (
+                  <AnimatedTableRow key={block.hash} isNew={newBlockHashes.has(block.hash)}>
                     <TableCell>
                       <Link
                         to={`/block/${block.height}`}
@@ -144,9 +237,9 @@ export function Home() {
                     <TableCell align="right" className="text-xai-muted">
                       {formatTimeAgo(block.timestamp)}
                     </TableCell>
-                  </TableRow>
+                  </AnimatedTableRow>
                 ))}
-              </TableBody>
+              </tbody>
             </Table>
           )}
         </Card>
@@ -155,7 +248,17 @@ export function Home() {
         <Card padding="none">
           <div className="p-6 pb-0">
             <CardHeader
-              title="Recent AI Tasks"
+              title={
+                <div className="flex items-center gap-2">
+                  <span>Recent AI Tasks</span>
+                  {wsStatus === 'connected' && latestAITask && (
+                    <Badge variant="success" className="animate-pulse">
+                      <Radio className="h-3 w-3 mr-1" />
+                      Live
+                    </Badge>
+                  )}
+                </div>
+              }
               action={
                 <Link
                   to="/ai"
@@ -166,7 +269,7 @@ export function Home() {
               }
             />
           </div>
-          {aiTasksLoading ? (
+          {aiTasksLoading && displayAITasks.length === 0 ? (
             <div className="p-6">
               <Loading size="sm" />
             </div>
@@ -178,9 +281,9 @@ export function Home() {
                 <TableHead align="center">Status</TableHead>
                 <TableHead align="right">Cost</TableHead>
               </TableHeader>
-              <TableBody>
-                {aiTasksData?.tasks.map((task) => (
-                  <TableRow key={task.taskId}>
+              <tbody>
+                {displayAITasks.map((task) => (
+                  <AnimatedTableRow key={task.taskId} isNew={newTaskIds.has(task.taskId)}>
                     <TableCell>
                       <Link
                         to={`/ai/${task.taskId}`}
@@ -200,9 +303,9 @@ export function Home() {
                     <TableCell align="right" className="text-white">
                       {formatXAI(task.actualCost || task.costEstimate)}
                     </TableCell>
-                  </TableRow>
+                  </AnimatedTableRow>
                 ))}
-              </TableBody>
+              </tbody>
             </Table>
           )}
         </Card>
@@ -250,6 +353,58 @@ export function Home() {
           </div>
         </div>
       </Card>
+
+      {/* Devnet Resources */}
+      <Card>
+        <CardHeader title="Devnet Resources" />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <a
+            href="https://artifacts.xaiblockchain.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-start gap-3 p-4 rounded-lg bg-xai-darker border border-xai-border hover:border-xai-primary/50 transition-colors group"
+          >
+            <Download className="h-5 w-5 text-xai-primary shrink-0" />
+            <div>
+              <h3 className="text-white font-medium group-hover:text-xai-primary transition-colors">Artifacts</h3>
+              <p className="text-sm text-xai-muted">Pre-built binaries and configs</p>
+            </div>
+          </a>
+          <a
+            href="/faucet"
+            className="flex items-start gap-3 p-4 rounded-lg bg-xai-darker border border-xai-border hover:border-xai-primary/50 transition-colors group"
+          >
+            <Droplet className="h-5 w-5 text-xai-primary shrink-0" />
+            <div>
+              <h3 className="text-white font-medium group-hover:text-xai-primary transition-colors">Faucet</h3>
+              <p className="text-sm text-xai-muted">Get test tokens</p>
+            </div>
+          </a>
+          <a
+            href="https://grafana.xaiblockchain.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-start gap-3 p-4 rounded-lg bg-xai-darker border border-xai-border hover:border-xai-primary/50 transition-colors group"
+          >
+            <BarChart2 className="h-5 w-5 text-xai-primary shrink-0" />
+            <div>
+              <h3 className="text-white font-medium group-hover:text-xai-primary transition-colors">Grafana</h3>
+              <p className="text-sm text-xai-muted">Network monitoring</p>
+            </div>
+          </a>
+          <a
+            href="/docs"
+            className="flex items-start gap-3 p-4 rounded-lg bg-xai-darker border border-xai-border hover:border-xai-primary/50 transition-colors group"
+          >
+            <FileCode className="h-5 w-5 text-xai-primary shrink-0" />
+            <div>
+              <h3 className="text-white font-medium group-hover:text-xai-primary transition-colors">API Docs</h3>
+              <p className="text-sm text-xai-muted">REST API reference</p>
+            </div>
+          </a>
+        </div>
+      </Card>
+
     </div>
   );
 }
