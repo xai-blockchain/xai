@@ -164,24 +164,51 @@ class Wallet:
         """
         return derive_public_key_hex(private_key)
 
+    @staticmethod
+    def _bytes_to_base32(data: bytes) -> str:
+        """Convert bytes to bech32-style base32 encoding (lowercase).
+
+        Uses the bech32 character set: abcdefghijklmnopqrstuvwxyz234567
+        This encoding is used for testnet addresses (xaitest1 prefix).
+
+        Args:
+            data: Raw bytes to encode.
+
+        Returns:
+            Base32-encoded string (lowercase).
+        """
+        alphabet = "abcdefghijklmnopqrstuvwxyz234567"
+        result = []
+        bits = 0
+        value = 0
+        for byte in data:
+            value = (value << 8) | byte
+            bits += 8
+            while bits >= 5:
+                bits -= 5
+                result.append(alphabet[(value >> bits) & 31])
+        if bits > 0:
+            result.append(alphabet[(value << (5 - bits)) & 31])
+        return "".join(result)
+
     def _generate_address(self, public_key: str) -> str:
         """
-        Generates an XAI address from a public key with EIP-55 checksum.
+        Generates an XAI address from a public key.
 
-        The address format is 'XAI' (mainnet) or 'TXAI' (testnet) followed by the first 40
-        characters of the SHA256 hash of the public key bytes, with mixed-case checksum encoding.
+        The address format depends on network:
+        - Mainnet: 'xai1' + 38 base32 characters (bech32-style)
+        - Testnet: 'xaitest1' + 32 base32 characters (bech32-style)
 
         Security Note:
             The public key is first converted from hex string to bytes before hashing.
             This ensures consistent address generation across all wallet implementations
             and matches the standard practice of hashing raw cryptographic data.
-            The checksum provides error detection for typos and copy/paste errors.
 
         Args:
             public_key: The public key as a hex string (64 bytes / 128 hex chars).
 
         Returns:
-            The generated address string with checksum (format: XAI/TXAI + 40 mixed-case hex chars).
+            The generated address string (format: xai1/xaitest1 + base32 chars).
         """
         # Import here to avoid circular dependency
         from xai.core.config import NETWORK
@@ -189,14 +216,19 @@ class Wallet:
         # Convert hex string to bytes before hashing (security best practice)
         # Hashing the bytes ensures consistent address generation across implementations
         pub_key_bytes = bytes.fromhex(public_key)
-        pub_hash = hashlib.sha256(pub_key_bytes).hexdigest()
+        pub_hash = hashlib.sha256(pub_key_bytes).digest()
 
-        # Use network-appropriate prefix
-        prefix = "XAI" if NETWORK.lower() == "mainnet" else "TXAI"
-        raw_address = f"{prefix}{pub_hash[:40]}"
-
-        # Apply EIP-55 checksum for error detection
-        return to_checksum_address(raw_address)
+        # Use network-appropriate prefix and encoding
+        if NETWORK.lower() == "mainnet":
+            # Mainnet: xai1 + 38 base32 chars (from first 24 bytes = 192 bits -> 38.4 chars)
+            address_bytes = pub_hash[:24]
+            encoded = self._bytes_to_base32(address_bytes)[:38]
+            return f"xai1{encoded}"
+        else:
+            # Testnet: xaitest1 + 32 base32 chars (from first 20 bytes = 160 bits -> 32 chars)
+            address_bytes = pub_hash[:20]
+            encoded = self._bytes_to_base32(address_bytes)[:32]
+            return f"xaitest1{encoded}"
 
     def sign_message(self, message: str) -> str:
         """

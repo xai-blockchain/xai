@@ -950,7 +950,7 @@ class SearchEngine:
         if len(query) == 64 and all(c in '0123456789abcdefABCDEF' for c in query):
             return SearchType.BLOCK_HASH
 
-        if (query.startswith("XAI") or query.startswith("TXAI")) and len(query) > 10:
+        if query.startswith(("xai1", "xaitest1", "XAI", "TXAI")) and len(query) > 10:
             return SearchType.ADDRESS
 
         if len(query) == 64:  # Assume transaction ID

@@ -9,7 +9,7 @@ import time
 import logging
 import re
 import ipaddress
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, send_from_directory, send_file
 from datetime import datetime, timedelta
 from collections import defaultdict
 import requests
@@ -19,6 +19,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# Frontend directory for static files
+FRONTEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'frontend')
 
 # Configuration
 XAI_API_URL = os.getenv('XAI_API_URL', 'http://xai-testnet-bootstrap:8080')
@@ -37,7 +40,14 @@ REQUIRE_CAPTCHA_IN_PROD = os.getenv('REQUIRE_CAPTCHA_IN_PROD', '1') == '1'
 # IP rate limiting (additional anti-abuse)
 FAUCET_IP_COOLDOWN = int(os.getenv('FAUCET_IP_COOLDOWN', '600'))  # 10 minutes
 FAUCET_IP_MAX_PER_WINDOW = int(os.getenv('FAUCET_IP_MAX_PER_WINDOW', '5'))
-FAUCET_IP_WINDOW = int(os.getenv('FAUCET_IP_WINDOW', '3600'))  # 1 hour
+FAUCET_IP_WINDOW = int(os.getenv('FAUCET_IP_WINDOW', '86400'))  # 24 hours
+
+# Wallet visit limiting (per-wallet requests per 24hr window)
+FAUCET_WALLET_MAX_PER_DAY = int(os.getenv('FAUCET_WALLET_MAX_PER_DAY', '2'))
+
+# Global daily limit (total XAI dispensed per 24hr, resets at midnight EST)
+FAUCET_DAILY_LIMIT = float(os.getenv('FAUCET_DAILY_LIMIT', '40000'))
+FAUCET_DAILY_RESET_HOUR_UTC = int(os.getenv('FAUCET_DAILY_RESET_HOUR_UTC', '5'))  # 5 UTC = midnight EST
 
 # Access control configuration (devnet-friendly)
 FAUCET_MAX_BALANCE = float(os.getenv('FAUCET_MAX_BALANCE', '0') or 0)
@@ -59,12 +69,13 @@ else:
 # Address prefix validation
 ALLOWED_PREFIXES = os.getenv(
     'FAUCET_ALLOWED_PREFIXES',
-    'TXAI' if XAI_NETWORK != 'mainnet' else 'XAI'
+    'xaitest1' if XAI_NETWORK != 'mainnet' else 'xai1'
 ).split(',')
-ALLOWED_PREFIXES = [prefix.strip().upper() for prefix in ALLOWED_PREFIXES if prefix.strip()]
+ALLOWED_PREFIXES = [prefix.strip() for prefix in ALLOWED_PREFIXES if prefix.strip()]
 if not ALLOWED_PREFIXES:
-    ALLOWED_PREFIXES = ['TXAI']
-ADDRESS_REGEX = re.compile(r'^(' + '|'.join(ALLOWED_PREFIXES) + r')[0-9a-fA-F]{40}$')
+    ALLOWED_PREFIXES = ['xaitest1']
+# Build regex pattern for address validation (supports both hex and bech32-style addresses)
+ADDRESS_REGEX = re.compile(r'^(' + '|'.join(re.escape(p) for p in ALLOWED_PREFIXES) + r')[0-9a-zA-Z]{38,42}$')
 
 # Turnstile configuration (optional)
 TURNSTILE_SITE_KEY = os.getenv('TURNSTILE_SITE_KEY', '')
@@ -79,6 +90,8 @@ redis_client = None
 request_history = {}  # Fallback in-memory storage
 ip_history = {}  # IP cooldown tracking
 ip_window_history = {}  # IP window tracking (start_ts, count)
+wallet_daily_history = {}  # Wallet daily visit tracking (reset_day, count)
+daily_dispensed = {'reset_day': 0, 'amount': 0.0}  # Global daily limit tracking
 stats = {
     'total_requests': 0,
     'unique_addresses': set(),
@@ -101,139 +114,6 @@ if REDIS_URL:
 else:
     logger.info("Redis URL not configured. Using in-memory storage for rate limits.")
 
-# HTML template
-TEMPLATE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>XAI Testnet Faucet</title>
-    {% if turnstile_enabled %}
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-    {% endif %}
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 50px auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 { color: #333; }
-        input {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            box-sizing: border-box;
-        }
-        button {
-            width: 100%;
-            padding: 12px;
-            background: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover { background: #45a049; }
-        .message {
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 5px;
-        }
-        .success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-        .cf-turnstile { margin: 10px 0; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>XAI Testnet Faucet</h1>
-        <div class="info message">
-            <p>Get {{ amount }} testnet XAI tokens for development.</p>
-            <p>Cooldown: {{ cooldown }} seconds between requests.</p>
-            <p>IP limit: max {{ ip_max_per_window }} requests per {{ ip_window }} seconds (cooldown {{ ip_cooldown }}s).</p>
-            {% if max_balance and max_balance > 0 %}
-            <p>Eligibility: balances below {{ max_balance }} XAI.</p>
-            {% endif %}
-            <p>Testnet only. Do not reuse mainnet keys. Balances may reset.</p>
-        </div>
-        <form id="faucetForm">
-            <input type="text" id="address" placeholder="Enter your XAI address" required>
-            {% if turnstile_enabled %}
-            <div class="cf-turnstile" data-sitekey="{{ turnstile_sitekey }}"></div>
-            {% endif %}
-            <button type="submit">Request Tokens</button>
-        </form>
-        <div id="result"></div>
-    </div>
-    <script>
-        document.getElementById('faucetForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const address = document.getElementById('address').value;
-            const resultDiv = document.getElementById('result');
-
-            // Get Turnstile response if enabled
-            let captchaResponse = '';
-            {% if turnstile_enabled %}
-            captchaResponse = turnstile.getResponse();
-            if (!captchaResponse) {
-                resultDiv.innerHTML = '<div class="error message">Please complete the CAPTCHA</div>';
-                return;
-            }
-            {% endif %}
-
-            resultDiv.innerHTML = '<div class="info message">Processing...</div>';
-
-            try {
-                const response = await fetch('/api/request', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ address, captcha: captchaResponse })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    resultDiv.innerHTML = `<div class="success message">${data.message}</div>`;
-                    {% if turnstile_enabled %}
-                    turnstile.reset();
-                    {% endif %}
-                } else {
-                    resultDiv.innerHTML = `<div class="error message">${data.error}</div>`;
-                    {% if turnstile_enabled %}
-                    turnstile.reset();
-                    {% endif %}
-                }
-            } catch (error) {
-                resultDiv.innerHTML = `<div class="error message">Network error: ${error.message}</div>`;
-            }
-        });
-    </script>
-</body>
-</html>
-"""
 
 
 def verify_turnstile(token: str) -> bool:
@@ -383,6 +263,113 @@ def record_ip_request(ip: str) -> None:
     ip_window_history[ip] = (window_start, count + 1)
 
 
+def get_daily_reset_day() -> int:
+    """Get the current 'day' number for daily limit tracking (resets at FAUCET_DAILY_RESET_HOUR_UTC)."""
+    now = datetime.utcnow()
+    # If before reset hour, count as previous day
+    if now.hour < FAUCET_DAILY_RESET_HOUR_UTC:
+        now = now - timedelta(days=1)
+    return now.toordinal()
+
+
+def check_daily_limit() -> tuple[bool, float]:
+    """Check if global daily faucet limit has been reached. Returns (allowed, remaining_amount)."""
+    if FAUCET_DAILY_LIMIT <= 0:
+        return True, float('inf')
+
+    current_day = get_daily_reset_day()
+
+    if redis_client:
+        try:
+            day_key = f"faucet:daily:{current_day}"
+            dispensed_str = redis_client.get(day_key)
+            dispensed = float(dispensed_str) if dispensed_str else 0.0
+            remaining = FAUCET_DAILY_LIMIT - dispensed
+            return remaining >= FAUCET_AMOUNT, remaining
+        except Exception as e:
+            logger.warning(f"Redis daily check failed: {e}")
+
+    # In-memory fallback
+    if daily_dispensed['reset_day'] != current_day:
+        daily_dispensed['reset_day'] = current_day
+        daily_dispensed['amount'] = 0.0
+
+    remaining = FAUCET_DAILY_LIMIT - daily_dispensed['amount']
+    return remaining >= FAUCET_AMOUNT, remaining
+
+
+def record_daily_dispensed(amount: float) -> None:
+    """Record amount dispensed for daily limit tracking."""
+    if FAUCET_DAILY_LIMIT <= 0:
+        return
+
+    current_day = get_daily_reset_day()
+
+    if redis_client:
+        try:
+            day_key = f"faucet:daily:{current_day}"
+            redis_client.incrbyfloat(day_key, amount)
+            # Set expiry for 48 hours to auto-cleanup
+            redis_client.expire(day_key, 172800)
+        except Exception as e:
+            logger.warning(f"Redis daily record failed: {e}")
+
+    # Always update in-memory
+    if daily_dispensed['reset_day'] != current_day:
+        daily_dispensed['reset_day'] = current_day
+        daily_dispensed['amount'] = 0.0
+    daily_dispensed['amount'] += amount
+
+
+def check_wallet_daily_limit(address: str) -> tuple[bool, int]:
+    """Check if wallet has exceeded daily visit limit. Returns (allowed, visits_remaining)."""
+    if FAUCET_WALLET_MAX_PER_DAY <= 0:
+        return True, 999
+
+    current_day = get_daily_reset_day()
+
+    if redis_client:
+        try:
+            day_key = f"faucet:wallet_daily:{address}:{current_day}"
+            visits = int(redis_client.get(day_key) or 0)
+            if visits >= FAUCET_WALLET_MAX_PER_DAY:
+                return False, 0
+            return True, FAUCET_WALLET_MAX_PER_DAY - visits
+        except Exception as e:
+            logger.warning(f"Redis wallet daily check failed: {e}")
+
+    # In-memory fallback
+    reset_day, count = wallet_daily_history.get(address, (0, 0))
+    if reset_day != current_day:
+        count = 0
+
+    if count >= FAUCET_WALLET_MAX_PER_DAY:
+        return False, 0
+    return True, FAUCET_WALLET_MAX_PER_DAY - count
+
+
+def record_wallet_daily_visit(address: str) -> None:
+    """Record wallet visit for daily limit tracking."""
+    if FAUCET_WALLET_MAX_PER_DAY <= 0:
+        return
+
+    current_day = get_daily_reset_day()
+
+    if redis_client:
+        try:
+            day_key = f"faucet:wallet_daily:{address}:{current_day}"
+            redis_client.incr(day_key)
+            redis_client.expire(day_key, 172800)  # 48hr expiry
+        except Exception as e:
+            logger.warning(f"Redis wallet daily record failed: {e}")
+
+    # Always update in-memory
+    reset_day, count = wallet_daily_history.get(address, (0, 0))
+    if reset_day != current_day:
+        count = 0
+    wallet_daily_history[address] = (current_day, count + 1)
+
+
 def check_cooldown(address: str) -> tuple[bool, int]:
     """Check if address is in cooldown period. Uses Redis if available."""
     # Try Redis first
@@ -490,18 +477,20 @@ def send_tokens(address: str, amount: float) -> dict:
 
 @app.route('/')
 def index():
-    """Render faucet interface"""
-    return render_template_string(
-        TEMPLATE,
-        amount=FAUCET_AMOUNT,
-        cooldown=FAUCET_COOLDOWN,
-        ip_max_per_window=FAUCET_IP_MAX_PER_WINDOW,
-        ip_window=FAUCET_IP_WINDOW,
-        ip_cooldown=FAUCET_IP_COOLDOWN,
-        max_balance=FAUCET_MAX_BALANCE,
-        turnstile_enabled=TURNSTILE_ENABLED,
-        turnstile_sitekey=TURNSTILE_SITE_KEY
-    )
+    """Serve faucet frontend"""
+    return send_from_directory(FRONTEND_DIR, 'index.html')
+
+
+@app.route('/wallet.html')
+def wallet_page():
+    """Serve wallet generation page"""
+    return send_from_directory(FRONTEND_DIR, 'wallet.html')
+
+
+@app.route('/<path:filename>')
+def serve_static(filename):
+    """Serve static files (CSS, JS, etc.)"""
+    return send_from_directory(FRONTEND_DIR, filename)
 
 
 @app.route('/api/request', methods=['POST'])
@@ -563,6 +552,22 @@ def request_tokens():
             'error': f'Please wait {remaining} seconds before requesting again'
         }), 429
 
+    # Check wallet daily visit limit (2 visits per 24hr)
+    wallet_ok, wallet_visits_left = check_wallet_daily_limit(address)
+    if not wallet_ok:
+        return jsonify({
+            'success': False,
+            'error': 'Wallet has reached daily visit limit (2 per 24 hours). Resets at midnight EST.'
+        }), 429
+
+    # Check global daily faucet limit (40,000 XAI per 24hr)
+    daily_ok, daily_remaining = check_daily_limit()
+    if not daily_ok:
+        return jsonify({
+            'success': False,
+            'error': f'Daily faucet limit reached ({FAUCET_DAILY_LIMIT:.0f} XAI). Resets at midnight EST.'
+        }), 429
+
     # Check recipient balance cap
     if FAUCET_MAX_BALANCE > 0:
         try:
@@ -583,6 +588,8 @@ def request_tokens():
     if result.get('success'):
         record_ip_request(client_ip)
         record_request(address)
+        record_wallet_daily_visit(address)
+        record_daily_dispensed(FAUCET_AMOUNT)
         return jsonify({
             'success': True,
             'message': f'Successfully sent {FAUCET_AMOUNT} XAI to {address}',
@@ -631,6 +638,10 @@ def get_stats():
         total_requests = stats['total_requests']
         unique_addresses = len(stats['unique_addresses'])
 
+    # Get daily dispensed amount
+    _, daily_remaining = check_daily_limit()
+    daily_dispensed_today = FAUCET_DAILY_LIMIT - daily_remaining if FAUCET_DAILY_LIMIT > 0 else 0
+
     return jsonify({
         'total_requests': total_requests,
         'unique_addresses': unique_addresses,
@@ -641,6 +652,11 @@ def get_stats():
         'ip_cooldown_seconds': FAUCET_IP_COOLDOWN,
         'ip_max_per_window': FAUCET_IP_MAX_PER_WINDOW,
         'ip_window_seconds': FAUCET_IP_WINDOW,
+        'wallet_max_per_day': FAUCET_WALLET_MAX_PER_DAY,
+        'daily_limit': FAUCET_DAILY_LIMIT,
+        'daily_dispensed': daily_dispensed_today,
+        'daily_remaining': daily_remaining if FAUCET_DAILY_LIMIT > 0 else None,
+        'daily_reset_hour_utc': FAUCET_DAILY_RESET_HOUR_UTC,
         'turnstile_enabled': TURNSTILE_ENABLED,
         'redis_enabled': redis_client is not None,
         'allowed_prefixes': ALLOWED_PREFIXES,

@@ -293,8 +293,8 @@ def transaction_detail(txid):
 @app.route("/address/<address>")
 def address_detail(address):
     """Address detail page"""
-    # Validate address format
-    if not address or not (address.startswith("XAI") or address.startswith("TXAI")):
+    # Validate address format (bech32-style: xai1, xaitest1, or legacy: XAI, TXAI)
+    if not address or not address.startswith(("xai1", "xaitest1", "XAI", "TXAI")):
         return "Invalid address format", 400
 
     # Additional length validation
@@ -362,8 +362,8 @@ def search():
         if len(query) == 64 and all(c in '0123456789abcdefABCDEF' for c in query):
             return redirect(url_for("transaction_detail", txid=query))
 
-        # Try as address (must start with XAI or TXAI and be reasonable length)
-        if (query.startswith("XAI") or query.startswith("TXAI")) and 10 <= len(query) <= 100:
+        # Try as address (bech32-style: xai1, xaitest1, or legacy: XAI, TXAI)
+        if query.startswith(("xai1", "xaitest1", "XAI", "TXAI")) and 10 <= len(query) <= 100:
             return redirect(url_for("address_detail", address=query))
 
         return render_template("search.html", error="Invalid search query format")

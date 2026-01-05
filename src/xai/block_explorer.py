@@ -341,8 +341,8 @@ def search():
     if query.isdigit():
         return render_template("search.html", redirect=f"/block/{query}")
 
-    # Check if it's an address (starts with XAI or TXAI)
-    if query.startswith("XAI") or query.startswith("TXAI"):
+    # Check if it's an address (bech32-style: xai1, xaitest1, or legacy: XAI, TXAI)
+    if query.startswith(("xai1", "xaitest1", "XAI", "TXAI")):
         return render_template("search.html", redirect=f"/address/{query}")
 
     # Assume it's a transaction ID

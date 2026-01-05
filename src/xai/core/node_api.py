@@ -185,9 +185,10 @@ class InputSanitizer:
 
         Uses centralized validation from xai.core.consensus.validation module.
 
-        XAI addresses follow the format:
-        - Mainnet: XAI + 40 hex characters (e.g., XAI1234567890abcdef...)
-        - Testnet: TXAI + 40 hex characters (e.g., TXAI1234567890abcdef...)
+        XAI addresses follow the format (bech32-style):
+        - Mainnet: xai1 + 38 base32 characters (e.g., xai1abcdefghijk...)
+        - Testnet: xaitest1 + 32 base32 characters (e.g., xaitest1abcdefghijk...)
+        - Legacy: XAI/TXAI + 40 hex characters (still accepted)
         - Special: COINBASE (mining rewards), fee addresses
 
         Args:

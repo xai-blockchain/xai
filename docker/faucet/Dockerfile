@@ -28,6 +28,9 @@ WORKDIR /app
 # Copy faucet application
 COPY --chown=faucet:faucet faucet.py ./
 
+# Copy frontend static files
+COPY --chown=faucet:faucet frontend/ ./frontend/
+
 USER faucet
 
 EXPOSE 8086

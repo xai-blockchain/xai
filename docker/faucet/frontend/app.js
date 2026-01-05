@@ -1,18 +1,6 @@
 // XAI Testnet Faucet - Frontend Application
-// Handles UI interactions, API calls, and validation
-
-const API_BASE_URL = window.location.hostname === 'localhost'
-    ? 'http://localhost:8080/faucet/api'
-    : '/faucet/api';
 
 let captchaToken = null;
-
-// State management
-const state = {
-    faucetInfo: null,
-    recentTransactions: [],
-    isLoading: false
-};
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', () => {
@@ -23,14 +11,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function initializeApp() {
     await checkNetworkStatus();
-    await loadFaucetInfo();
-    await loadRecentTransactions();
+    await loadFaucetStats();
 
-    // Refresh data every 30 seconds
-    setInterval(() => {
-        loadFaucetInfo();
-        loadRecentTransactions();
-    }, 30000);
+    // Refresh stats every 30 seconds
+    setInterval(loadFaucetStats, 30000);
 }
 
 function setupEventListeners() {
@@ -59,83 +43,56 @@ async function checkNetworkStatus() {
     const statusText = document.querySelector('.status-text');
 
     try {
-        const response = await fetch(`${API_BASE_URL}/health`);
+        const response = await fetch('/health');
         const data = await response.json();
 
         if (data.status === 'healthy') {
             statusDot.classList.remove('offline');
-            statusText.textContent = 'Network Online';
+            statusText.textContent = 'Faucet Online';
         } else {
             statusDot.classList.add('offline');
-            statusText.textContent = 'Network Issues';
+            statusText.textContent = 'Faucet Issues';
         }
     } catch (error) {
         statusDot.classList.add('offline');
-        statusText.textContent = 'Network Offline';
+        statusText.textContent = 'Faucet Offline';
         console.error('Network status check failed:', error);
     }
 }
 
-// Load faucet information
-async function loadFaucetInfo() {
+// Load faucet statistics
+async function loadFaucetStats() {
     try {
-        const response = await fetch(`${API_BASE_URL}/faucet/info`);
+        const response = await fetch('/api/stats');
         const data = await response.json();
 
-        state.faucetInfo = data;
-        updateFaucetInfo(data);
+        // Update faucet amount
+        document.getElementById('faucetAmount').textContent = data.faucet_amount;
+
+        // Update statistics
+        const dailyRemaining = data.daily_remaining !== null ? data.daily_remaining.toLocaleString() : 'N/A';
+        document.getElementById('dailyRemaining').textContent = dailyRemaining + ' XAI';
+        document.getElementById('totalRequests').textContent = data.total_requests.toLocaleString();
+        document.getElementById('uniqueRecipients').textContent = data.unique_addresses.toLocaleString();
+        document.getElementById('uptime').textContent = formatUptime(data.uptime_seconds);
     } catch (error) {
-        console.error('Failed to load faucet info:', error);
-        showError('Failed to load faucet information. Please refresh the page.');
+        console.error('Failed to load faucet stats:', error);
     }
 }
 
-function updateFaucetInfo(data) {
-    // Update faucet amount
-    document.getElementById('faucetAmount').textContent = formatAmount(data.amount_per_request);
-
-    // Update statistics
-    document.getElementById('faucetBalance').textContent = formatAmount(data.balance);
-    document.getElementById('totalDistributed').textContent = formatAmount(data.total_distributed);
-    document.getElementById('uniqueRecipients').textContent = data.unique_recipients.toLocaleString();
-    document.getElementById('last24h').textContent = data.requests_last_24h.toLocaleString();
-}
-
-// Load recent transactions
-async function loadRecentTransactions() {
-    const container = document.getElementById('recentTransactions');
-
-    try {
-        const response = await fetch(`${API_BASE_URL}/faucet/recent`);
-        const data = await response.json();
-
-        state.recentTransactions = data.transactions || [];
-
-        if (state.recentTransactions.length === 0) {
-            container.innerHTML = '<div class="loading">No recent transactions</div>';
-            return;
-        }
-
-        container.innerHTML = state.recentTransactions.map(tx => `
-            <div class="transaction-item">
-                <div>
-                    <div class="transaction-address">${truncateAddress(tx.recipient)}</div>
-                    <div class="transaction-time">${formatTimeAgo(tx.timestamp)}</div>
-                </div>
-                <div class="transaction-amount">+${formatAmount(tx.amount)} XAI</div>
-            </div>
-        `).join('');
-    } catch (error) {
-        console.error('Failed to load recent transactions:', error);
-        container.innerHTML = '<div class="loading">Failed to load transactions</div>';
+function formatUptime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 24) {
+        const days = Math.floor(hours / 24);
+        return days + 'd ' + (hours % 24) + 'h';
     }
+    return hours + 'h ' + minutes + 'm';
 }
 
 // Form submission handler
 async function handleFormSubmit(e) {
     e.preventDefault();
-
-    if (state.isLoading) return;
 
     const address = document.getElementById('address').value.trim();
     const submitBtn = document.getElementById('submitBtn');
@@ -157,26 +114,25 @@ async function handleFormSubmit(e) {
     hideAlerts();
 
     // Show loading state
-    state.isLoading = true;
     submitBtn.disabled = true;
     btnText.style.display = 'none';
     btnLoading.style.display = 'flex';
 
     try {
-        const response = await fetch(`${API_BASE_URL}/faucet/request`, {
+        const response = await fetch('/api/request', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
                 address: address,
-                captcha_token: captchaToken
+                captcha: captchaToken
             })
         });
 
         const data = await response.json();
 
-        if (response.ok) {
+        if (data.success) {
             showSuccess(data);
             document.getElementById('faucetForm').reset();
             captchaToken = null;
@@ -186,9 +142,8 @@ async function handleFormSubmit(e) {
                 turnstile.reset();
             }
 
-            // Reload data
-            await loadFaucetInfo();
-            await loadRecentTransactions();
+            // Reload stats
+            await loadFaucetStats();
         } else {
             showError(data.error || 'Request failed. Please try again.');
 
@@ -208,7 +163,6 @@ async function handleFormSubmit(e) {
         }
         captchaToken = null;
     } finally {
-        state.isLoading = false;
         submitBtn.disabled = false;
         btnText.style.display = 'inline';
         btnLoading.style.display = 'none';
@@ -223,15 +177,15 @@ function validateAddress() {
 
     // Check if address is empty
     if (!address) {
-        errorElement.textContent = 'Address is required';
-        errorElement.classList.add('show');
+        errorElement.textContent = '';
+        errorElement.classList.remove('show');
         return false;
     }
 
-    // Check if address matches pattern
-    const addressPattern = /^TXAI[a-fA-F0-9]{40}$/;
+    // Check if address matches pattern (xaitest1 followed by 32 base32 chars)
+    const addressPattern = /^xaitest1[a-z2-7]{32}$/;
     if (!addressPattern.test(address)) {
-        errorElement.textContent = 'Invalid XAI address format. Use TXAI + 40 hex characters.';
+        errorElement.textContent = 'Invalid XAI address format. Address must start with "xaitest1" followed by 32 lowercase alphanumeric characters.';
         errorElement.classList.add('show');
         return false;
     }
@@ -265,10 +219,10 @@ function showSuccess(data) {
     const message = document.getElementById('successMessage');
     const txLink = document.getElementById('txLink');
 
-    message.textContent = `Successfully sent ${formatAmount(data.amount)} XAI to ${truncateAddress(data.recipient)}`;
+    message.textContent = data.message || 'Successfully sent XAI tokens!';
 
-    if (data.tx_hash) {
-        txLink.href = `https://testnet-explorer.xaiblockchain.com/tx/${data.tx_hash}`;
+    if (data.txid && data.txid !== 'N/A') {
+        txLink.href = 'https://testnet-explorer.xaiblockchain.com/tx/' + data.txid;
         txLink.style.display = 'inline-flex';
     } else {
         txLink.style.display = 'none';
@@ -299,44 +253,3 @@ function hideAlerts() {
     document.getElementById('successAlert').style.display = 'none';
     document.getElementById('errorAlert').style.display = 'none';
 }
-
-// Utility functions
-function formatAmount(amount) {
-    if (typeof amount === 'string') {
-        amount = parseFloat(amount);
-    }
-    return amount.toLocaleString('en-US', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 6
-    });
-}
-
-function truncateAddress(address) {
-    if (!address || address.length < 20) return address;
-    return `${address.substring(0, 10)}...${address.substring(address.length - 8)}`;
-}
-
-function formatTimeAgo(timestamp) {
-    const now = Date.now();
-    const time = new Date(timestamp).getTime();
-    const diff = now - time;
-
-    const seconds = Math.floor(diff / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
-    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-    if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
-    return 'Just now';
-}
-
-// Error handling for uncaught errors
-window.addEventListener('error', (event) => {
-    console.error('Uncaught error:', event.error);
-});
-
-window.addEventListener('unhandledrejection', (event) => {
-    console.error('Unhandled promise rejection:', event.reason);
-});

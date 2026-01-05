@@ -7,7 +7,7 @@ Single source of truth for all validation functions.
 Consolidates duplicate validation logic across the codebase.
 
 This module provides:
-- Address validation (XAI/TXAI prefixes, hex format)
+- Address validation (bech32-style xai1/xaitest1 or legacy XAI/TXAI prefixes)
 - Amount validation (range, precision, overflow protection)
 - Transaction data validation
 - General input sanitization
@@ -34,20 +34,25 @@ MIN_AMOUNT = MINIMUM_TRANSACTION_AMOUNT  # 1 axai equivalent (18 decimals)
 MAX_TRANSACTION_AMOUNT = MAX_SUPPLY
 MAX_FEE = 1000.0
 
-# Address validation
-VALID_PREFIXES = ("XAI", "TXAI")
+# Address validation - bech32-style and legacy prefixes
+VALID_PREFIXES = ("xai1", "xaitest1", "XAI", "TXAI")  # bech32-style first, then legacy
+BECH32_PREFIXES = ("xai1", "xaitest1")  # New bech32-style prefixes
+LEGACY_PREFIXES = ("XAI", "TXAI")  # Legacy hex-based prefixes
 SPECIAL_ADDRESSES = (
     "COINBASE",
     "SYSTEM",
     "AIRDROP",
     "XAITRADEFEE",
     "TXAITRADEFEE",
+    "xaitest1tradefeeaddr00000000000000",  # New testnet trade fee address
+    "xai1tradefeeaddr000000000000000000000000",  # New mainnet trade fee address
     "GOVERNANCE",
     "STAKING",
     "TIMECAPSULE",
 )
 MIN_ADDRESS_LENGTH = 40
 MAX_ADDRESS_LENGTH = 100
+BECH32_ALPHABET = set("abcdefghijklmnopqrstuvwxyz234567")
 
 class AddressFormatValidator:
     """
@@ -55,6 +60,10 @@ class AddressFormatValidator:
 
     Provides strict validation with options to allow legacy formats and special
     system addresses while guarding against malformed or spoofed prefixes.
+
+    Supports two address formats:
+    - Bech32-style: xai1 + 38 base32 chars (mainnet) or xaitest1 + 32 base32 chars (testnet)
+    - Legacy: XAI/TXAI + 40 hex characters
     """
 
     def __init__(
@@ -78,6 +87,17 @@ class AddressFormatValidator:
                 return candidate
         raise ValueError(f"Invalid address prefix: must start with {' or '.join(self.allowed_prefixes)}")
 
+    def _is_bech32_prefix(self, prefix: str) -> bool:
+        """Check if prefix is a bech32-style prefix."""
+        return prefix in BECH32_PREFIXES
+
+    def _validate_bech32_body(self, body: str) -> None:
+        """Validate bech32-style address body (base32 alphabet)."""
+        if not body:
+            raise ValueError("Address body missing after prefix")
+        if not all(c in BECH32_ALPHABET for c in body):
+            raise ValueError("Address body must use bech32 alphabet (lowercase a-z, 2-7)")
+
     def _validate_hex_body(self, body: str) -> None:
         if not body:
             raise ValueError("Address body missing after prefix")
@@ -90,7 +110,7 @@ class AddressFormatValidator:
 
         Args:
             address: Address to validate
-            require_checksum: If True, require valid EIP-55 checksum
+            require_checksum: If True, require valid EIP-55 checksum (legacy addresses only)
         """
         if not address or not isinstance(address, str):
             raise ValueError("Address must be a non-empty string")
@@ -105,16 +125,28 @@ class AddressFormatValidator:
         prefix = self._require_prefix(normalized)
         prefix_len = len(prefix)
         body = normalized[prefix_len:]
+
+        # Check if using bech32-style prefix
+        if self._is_bech32_prefix(prefix):
+            self._validate_bech32_body(body)
+            body_len = len(body)
+            # xaitest1 should have 32 chars, xai1 should have 38 chars
+            expected_len = 32 if prefix == "xaitest1" else 38
+            if body_len != expected_len:
+                raise ValueError(f"Bech32 address must have {expected_len} characters after prefix")
+            return normalized
+
+        # Legacy hex-based validation
+        if not self.allow_legacy:
+            raise ValueError("Legacy address format not allowed")
+
         self._validate_hex_body(body)
 
         body_len = len(body)
         if body_len + prefix_len > MAX_ADDRESS_LENGTH:
             raise ValueError(f"Address too long: maximum {MAX_ADDRESS_LENGTH} characters")
 
-        if not self.allow_legacy and body_len != 40:
-            raise ValueError("Address must be prefix + 40 hex characters")
-
-        if self.allow_legacy and 22 <= body_len <= 60:
+        if 22 <= body_len <= 60:
             return normalized
         if body_len == 40:
             # For 40-character hex addresses, optionally validate/apply checksum

@@ -439,9 +439,9 @@ class TestnetConfig:
     FAUCET_WALLET_FILE = FAUCET_WALLET_FILE
     FAUCET_WALLET_PASSWORD = FAUCET_WALLET_PASSWORD
 
-    # Addresses (testnet prefix)
-    ADDRESS_PREFIX = "TXAI"  # Testnet XAI
-    TRADE_FEE_ADDRESS = "TXAITRADEFEE"
+    # Addresses (testnet prefix - bech32-style)
+    ADDRESS_PREFIX = "xaitest1"  # Testnet XAI (bech32-style)
+    TRADE_FEE_ADDRESS = "xaitest1tradefeeaddr00000000000000"  # System trade fee address
     FIAT_REENABLE_DATE = datetime(2026, 11, 1, 0, 0, 0, tzinfo=timezone.utc)
     LEDGER_DERIVATION_PATH = LEDGER_DERIVATION_PATH
     FIAT_UNLOCK_GOVERNANCE_START = FIAT_UNLOCK_GOVERNANCE_START
@@ -599,9 +599,9 @@ class MainnetConfig:
     FAUCET_WALLET_FILE = FAUCET_WALLET_FILE
     FAUCET_WALLET_PASSWORD = FAUCET_WALLET_PASSWORD
 
-    # Addresses (mainnet prefix)
-    ADDRESS_PREFIX = "XAI"
-    TRADE_FEE_ADDRESS = "XAITRADEFEE"
+    # Addresses (mainnet prefix - bech32-style)
+    ADDRESS_PREFIX = "xai1"  # Mainnet XAI (bech32-style)
+    TRADE_FEE_ADDRESS = "xai1tradefeeaddr000000000000000000000000"  # System trade fee address
     FIAT_REENABLE_DATE = datetime(2026, 11, 1, 0, 0, 0, tzinfo=timezone.utc)
     LEDGER_DERIVATION_PATH = LEDGER_DERIVATION_PATH
     FIAT_UNLOCK_GOVERNANCE_START = FIAT_UNLOCK_GOVERNANCE_START

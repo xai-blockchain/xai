@@ -6,12 +6,12 @@
     <title>XAI Testnet Wallet</title>
     <link rel="stylesheet" href="styles.css">
 </head>
-<body data-address-prefix="TXAI" data-coin-type="22593">
+<body>
     <!-- Testnet Banner -->
     <div class="testnet-banner">
         <span class="testnet-badge">TESTNET</span>
-        <span>This is a public testnet wallet. Tokens have no real value.</span>
-        <a href="https://discord.gg/RwQ8pma6" target="_blank" class="testnet-link">Join Discord</a>
+        <span>This is a public test network. Tokens have no real value.</span>
+        <a href="https://discord.gg/xai" target="_blank" class="testnet-link">Join Discord</a>
     </div>
 
     <div class="container">
@@ -22,7 +22,7 @@
             </div>
             <div class="header-links">
                 <a href="/" class="header-link">Back to Faucet</a>
-                <a href="https://testnet-explorer.xaiblockchain.com" target="_blank" class="header-link">Explorer</a>
+                <a href="https://github.com/xai-blockchain/xai" target="_blank" class="header-link">Docs</a>
             </div>
         </header>
 
@@ -32,19 +32,19 @@
                     <h2>Create a Testnet Wallet</h2>
                 </div>
                 <p class="help-text">This tool runs entirely in your browser. Keys never leave your device.</p>
-                <p class="help-text">Write down your recovery phrase and store it securely.</p>
+                <p class="help-text">Write down your private key and store it securely.</p>
 
                 <button type="button" id="generateBtn" class="btn-primary">Generate Wallet</button>
                 <div id="statusMessage" class="status-message" style="display: none;"></div>
 
                 <div id="walletOutput" class="wallet-output" style="display: none;">
                     <div class="form-group">
-                        <label for="mnemonicOutput">Recovery Phrase (24 words)</label>
-                        <textarea id="mnemonicOutput" rows="3" readonly></textarea>
+                        <label for="privateKeyOutput">Private Key (Keep Secret!)</label>
+                        <input id="privateKeyOutput" type="text" readonly>
                         <div class="wallet-actions">
-                            <button type="button" id="copyMnemonicBtn" class="btn-secondary">Copy Phrase</button>
+                            <button type="button" id="copyPrivateKeyBtn" class="btn-secondary">Copy Private Key</button>
                         </div>
-                        <small class="help-text">Never share your recovery phrase or private key.</small>
+                        <small class="help-text warning-text">Never share your private key with anyone. Store it securely offline.</small>
                     </div>
 
                     <div class="form-group">
@@ -57,12 +57,11 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="publicKeyOutput">Public Key (advanced)</label>
+                        <label for="publicKeyOutput">Public Key (for advanced use)</label>
                         <input id="publicKeyOutput" type="text" readonly>
                         <div class="wallet-actions">
                             <button type="button" id="copyPublicKeyBtn" class="btn-secondary">Copy Public Key</button>
                         </div>
-                        <small class="help-text">Derivation path: <span id="derivationPathOutput">m/44'/22593'/0'/0/0</span></small>
                     </div>
                 </div>
             </div>
@@ -73,18 +72,37 @@
                 </div>
                 <ul class="notice-list">
                     <li>Testnet only. Tokens have no real value. Do not reuse mainnet keys.</li>
-                    <li>Never share your recovery phrase or private key. We will never ask for it.</li>
-                    <li>Save your recovery phrase before requesting faucet tokens.</li>
+                    <li>Never share your private key. We will never ask for it.</li>
+                    <li>Save your private key before requesting faucet tokens.</li>
+                    <li>This wallet is for testing purposes only.</li>
                 </ul>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Import Existing Wallet</h2>
+                </div>
+                <p class="help-text">If you already have a private key, you can derive your address from it.</p>
+                <div class="form-group">
+                    <label for="importPrivateKey">Private Key (hex)</label>
+                    <input type="text" id="importPrivateKey" placeholder="Enter your 64-character hex private key">
+                </div>
+                <button type="button" id="importBtn" class="btn-secondary">Derive Address</button>
+                <div id="importOutput" style="display: none; margin-top: 1rem;">
+                    <div class="form-group">
+                        <label>Derived Address</label>
+                        <input id="importedAddress" type="text" readonly>
+                    </div>
+                </div>
             </div>
         </main>
 
         <footer>
             <div class="footer-links">
-                <a href="https://github.com/aura-blockchain" target="_blank">GitHub</a>
-                <a href="https://github.com/aura-blockchain/aura-testnets" target="_blank">Testnet Docs</a>
-                <a href="https://discord.gg/RwQ8pma6" target="_blank">Discord</a>
-                <a href="/explorer" target="_blank">Block Explorer</a>
+                <a href="https://github.com/xai-blockchain" target="_blank">GitHub</a>
+                <a href="https://github.com/xai-blockchain/testnets" target="_blank">Testnet Docs</a>
+                <a href="https://discord.gg/xai" target="_blank">Discord</a>
+                <a href="https://testnet-explorer.xaiblockchain.com" target="_blank">Block Explorer</a>
             </div>
             <p class="footer-text">XAI Testnet Wallet | Chain ID: xai-testnet-1 | For Development Use Only</p>
         </footer>

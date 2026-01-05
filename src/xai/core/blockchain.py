@@ -757,12 +757,35 @@ class Blockchain(
             )
         ]
 
+    @staticmethod
+    def _bytes_to_base32(data: bytes) -> str:
+        """Convert bytes to bech32-style base32 encoding (lowercase)."""
+        alphabet = "abcdefghijklmnopqrstuvwxyz234567"
+        result = []
+        bits = 0
+        value = 0
+        for byte in data:
+            value = (value << 8) | byte
+            bits += 8
+            while bits >= 5:
+                bits -= 5
+                result.append(alphabet[(value >> bits) & 31])
+        if bits > 0:
+            result.append(alphabet[(value << (5 - bits)) & 31])
+        return "".join(result)
+
     def _derive_address_from_public(self, public_key_hex: str) -> str:
-        # Use network-appropriate prefix
+        """Derive address from public key using bech32-style encoding."""
         from xai.core.config import NETWORK
-        prefix = "XAI" if NETWORK.lower() == "mainnet" else "TXAI"
-        digest = hashlib.sha256(bytes.fromhex(public_key_hex)).hexdigest()
-        return f"{prefix}{digest[:40]}"
+        pub_hash = hashlib.sha256(bytes.fromhex(public_key_hex)).digest()
+        if NETWORK.lower() == "mainnet":
+            address_bytes = pub_hash[:24]
+            encoded = self._bytes_to_base32(address_bytes)[:38]
+            return f"xai1{encoded}"
+        else:
+            address_bytes = pub_hash[:20]
+            encoded = self._bytes_to_base32(address_bytes)[:32]
+            return f"xaitest1{encoded}"
 
     def _handle_finality_misbehavior(self, validator_address: str, block_height: int, proof: dict[str, Any]) -> None:
         """Slash validators that violate finality guarantees."""

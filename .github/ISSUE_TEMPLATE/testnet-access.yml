@@ -1,0 +1,103 @@
+name: Testnet Access Request
+description: Request access to XAI testnet/devnet
+labels: ["testnet-access"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## XAI Testnet Access Request
+
+        Thank you for your interest in XAI! Please fill out this form to request testnet access.
+
+        **Alternative contact methods:**
+        - Email: dev@xaiblockchain.com
+        - Discord: https://discord.gg/xai
+
+  - type: input
+    id: name
+    attributes:
+      label: Name / Organization
+      description: Your name or organization name
+      placeholder: "John Doe / Acme Labs"
+    validations:
+      required: true
+
+  - type: input
+    id: email
+    attributes:
+      label: Contact Email
+      description: Email address for testnet credentials and updates
+      placeholder: "dev@example.com"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: purpose
+    attributes:
+      label: Primary Use Case
+      description: What will you be using the testnet for?
+      options:
+        - Application Development
+        - Smart Contract Testing
+        - Integration Testing
+        - Research / Academic
+        - Validator Testing
+        - Wallet Development
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Project Description
+      description: Brief description of what you're building or testing
+      placeholder: |
+        We are building a DeFi application that...
+    validations:
+      required: true
+
+  - type: input
+    id: wallet
+    attributes:
+      label: Testnet Wallet Address
+      description: Your XAI testnet wallet address (starts with xaitest1). Leave blank if you need help creating one.
+      placeholder: "xaitest1..."
+    validations:
+      required: false
+
+  - type: input
+    id: tokens
+    attributes:
+      label: Estimated Token Needs
+      description: How many test tokens do you anticipate needing?
+      placeholder: "1000 XAI"
+    validations:
+      required: false
+
+  - type: input
+    id: timeline
+    attributes:
+      label: Project Timeline
+      description: When do you plan to start testing?
+      placeholder: "Starting next week, ongoing for 2 months"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Acknowledgements
+      options:
+        - label: I understand testnet tokens have no real value
+          required: true
+        - label: I will not use mainnet private keys on testnet
+          required: true
+        - label: I understand testnet may reset without notice
+          required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Information
+      description: Any other details that would help us process your request
