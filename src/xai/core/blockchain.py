@@ -20,6 +20,7 @@ from types import SimpleNamespace
 from typing import Any, Sequence
 
 from xai.blockchain.slashing_manager import SlashingManager
+from xai.core.constants import MINIMUM_TRANSACTION_AMOUNT
 from xai.core.transactions.account_abstraction import (
     SponsorshipResult,
     get_sponsored_transaction_processor,
@@ -1911,7 +1912,7 @@ class Blockchain(
 
         # Add change output if necessary
         change = selected_amount - total_needed
-        if change > 0.00000001:  # Minimum dust threshold
+        if change > MINIMUM_TRANSACTION_AMOUNT:  # Minimum dust threshold
             outputs.append({"address": sender_address, "amount": change})
 
         # Get nonce for sender
@@ -2425,7 +2426,7 @@ class Blockchain(
                     output_value = sum(out.get("amount", 0.0) for out in tx.outputs)
                     current_supply += (output_value - input_value)
 
-                if current_supply > self.max_supply + 1e-8:
+                if current_supply > self.max_supply + MINIMUM_TRANSACTION_AMOUNT:
                     self.logger.warn("Chain validation failed: supply cap exceeded", index=header.index)
                     return False
 
@@ -2621,6 +2622,10 @@ class Blockchain(
         Returns:
             True if chain was replaced, False otherwise
         """
+        self.logger.info(
+            f"replace_chain called: new_chain length={len(new_chain) if new_chain else 0}, "
+            f"current chain length={len(self.chain)}"
+        )
         def _materialize(block_like: BlockHeader | Block) -> Block | None:
             if isinstance(block_like, Block):
                 return block_like
@@ -2672,6 +2677,7 @@ class Blockchain(
 
         # Chain must be at least as long to replace
         if len(materialized_chain) < len(self.chain):
+            self.logger.warn(f"replace_chain: new chain too short ({len(materialized_chain)} < {len(self.chain)})")
             return False
 
         # If chains are equal length, use fork choice rule
@@ -2705,6 +2711,7 @@ class Blockchain(
 
         # Validate the new chain
         if not self._validate_chain_structure(materialized_chain):
+            self.logger.warn(f"replace_chain: chain validation failed")
             return False
 
         # PHASE 1: SNAPSHOT ALL STATE (Two-Phase Commit Protocol)
@@ -2941,6 +2948,7 @@ class Blockchain(
         # Genesis block always valid by definition
         first = chain[0].header if hasattr(chain[0], "header") else chain[0]
         if first.index != 0 or first.previous_hash != "0" * 64:
+            self.logger.warn(f"_validate_chain_structure: Genesis check failed - index={first.index}, prev_hash starts with={first.previous_hash[:16]}...")
             return False
 
         # SECURITY: Validate genesis block size as well
@@ -2959,12 +2967,13 @@ class Blockchain(
 
             # Check previous hash link
             if current_header.previous_hash != previous_header.hash:
-                self.logger.warn(f"Invalid chain structure: block {current_header.index} previous hash mismatch")
+                self.logger.warn(f"Invalid chain structure: block {current_header.index} previous hash mismatch. Expected {previous_header.hash[:16]}..., got {current_header.previous_hash[:16]}...")
                 return False
 
             # Check block hash (recalculate and compare)
-            if current_header.hash != current_header.calculate_hash():
-                self.logger.warn(f"Invalid chain structure: block {current_header.index} hash mismatch")
+            calculated = current_header.calculate_hash()
+            if current_header.hash != calculated:
+                self.logger.warn(f"Invalid chain structure: block {current_header.index} hash mismatch. Stored: {current_header.hash[:16]}..., calculated: {calculated[:16]}...")
                 return False
 
             # Check proof of work (simplified for headers)
