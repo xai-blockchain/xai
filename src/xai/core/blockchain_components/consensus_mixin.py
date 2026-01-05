@@ -12,6 +12,8 @@ from collections.abc import Sequence
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
+from xai.core.constants import MINIMUM_TRANSACTION_AMOUNT
+
 if TYPE_CHECKING:
     from xai.core.chain.block_header import BlockHeader
     from xai.core.blockchain_components.block import Block
@@ -70,8 +72,8 @@ class BlockchainConsensusMixin:
         halvings = block_height // self.halving_interval
         reward = self.initial_block_reward / (2**halvings)
 
-        # Ensure reward doesn't go below minimum (0.00000001 AXN)
-        if reward < 0.00000001:
+        # Ensure reward doesn't go below minimum (1 axai)
+        if reward < MINIMUM_TRANSACTION_AMOUNT:
             return 0.0
 
         # Cap reward to remaining supply to prevent exceeding max_supply
@@ -136,8 +138,8 @@ class BlockchainConsensusMixin:
         actual_reward = coinbase_tx.amount
 
         # Validate coinbase doesn't exceed maximum allowed
-        # Allow small floating point tolerance (0.00000001 XAI)
-        tolerance = 0.00000001
+        # Allow small floating point tolerance (1 axai)
+        tolerance = MINIMUM_TRANSACTION_AMOUNT
         if actual_reward > max_allowed + tolerance:
             error_msg = (
                 f"Coinbase reward {actual_reward:.8f} XAI exceeds maximum allowed {max_allowed:.8f} XAI "

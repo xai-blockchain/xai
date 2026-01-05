@@ -23,7 +23,10 @@ import requests
 
 from xai.core.transactions import htlc_deployer, htlc_p2wsh
 from xai.core.config import Config
+from xai.core.constants import MINIMUM_TRANSACTION_AMOUNT
 from xai.core.p2p.spv_header_ingestor import SPVHeaderIngestor
+
+MIN_AMOUNT_DECIMAL = Decimal(str(MINIMUM_TRANSACTION_AMOUNT))
 
 
 class CoinType(Enum):
@@ -616,7 +619,7 @@ class AtomicSwapHTLC:
 
         # For zero amounts, calculate network fee only (no safety buffer)
         if amount == 0:
-            network_fee = (fee_rate * Decimal(tx_size)).quantize(Decimal("0.00000001"), rounding=ROUND_UP)
+            network_fee = (fee_rate * Decimal(tx_size)).quantize(MIN_AMOUNT_DECIMAL, rounding=ROUND_UP)
             fee = float(network_fee)
         else:
             fee = CrossChainVerifier.calculate_atomic_swap_fee(
@@ -1073,9 +1076,9 @@ class CrossChainVerifier:
         if amount_dec <= 0 or rate_dec <= 0:
             raise ValueError("Amount and fee rate must be positive")
 
-        network_fee = (rate_dec * Decimal(tx_size_bytes)).quantize(Decimal("0.00000001"), rounding=ROUND_UP)
+        network_fee = (rate_dec * Decimal(tx_size_bytes)).quantize(MIN_AMOUNT_DECIMAL, rounding=ROUND_UP)
         safety_fee = (amount_dec * Decimal(safety_buffer_bps) / Decimal(10000)).quantize(
-            Decimal("0.00000001"), rounding=ROUND_UP
+            MIN_AMOUNT_DECIMAL, rounding=ROUND_UP
         )
         total_fee = network_fee + safety_fee
 
@@ -1134,7 +1137,7 @@ class CrossChainVerifier:
         recipient: str,
         *,
         min_confirmations: int = 1,
-        amount_tolerance: Decimal = Decimal("0.00000001"),
+        amount_tolerance: Decimal = MIN_AMOUNT_DECIMAL,
     ) -> tuple[bool, str, dict | None]:
         """
         Verify a transaction on an external blockchain using oracle/API
@@ -1683,7 +1686,7 @@ class CrossChainVerifier:
         valid, _msg, data = self.verify_transaction_on_chain(
             coin_type,
             tx_hash,
-            expected_amount=Decimal("0.00000001"),  # minimal positive sentinel
+            expected_amount=MIN_AMOUNT_DECIMAL,  # minimal positive sentinel
             recipient="",  # recipient ignored in confirmation-only check
             min_confirmations=min_confirmations,
             amount_tolerance=Decimal("1000000"),  # bypass amount comparison for this path

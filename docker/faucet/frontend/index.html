@@ -20,6 +20,14 @@
             <div class="logo">
                 <h1>XAI Testnet Faucet <span class="network-tag">xai-testnet-1</span></h1>
                 <p class="subtitle">Get test tokens for XAI blockchain development</p>
+                <div class="access-cta">
+                    <p>Devnet/Testnet is currently by request only.</p>
+                    <div class="access-links">
+                        <a href="https://github.com/xai-blockchain/testnets/issues/new?template=devnet-access.yml" target="_blank" rel="noopener">Request via GitHub</a>
+                        <a href="mailto:dev@xaiblockchain.com">Email dev@xaiblockchain.com</a>
+                        <a href="https://discord.gg/xai" target="_blank" rel="noopener">Request via Discord</a>
+                    </div>
+                </div>
             </div>
             <div class="header-links">
                 <a href="https://artifacts.xaiblockchain.com" target="_blank" class="header-link">Faucet API</a>
@@ -56,10 +64,10 @@
                             name="address"
                             placeholder="TXAI..."
                             required
-                            pattern="^TXAI[a-z0-9]{38,58}$"
+                            pattern="^TXAI[a-fA-F0-9]{40}$"
                             autocomplete="off"
                         >
-                        <small class="help-text">Enter your XAI testnet address (starts with TXAI)</small>
+                        <small class="help-text">Enter your XAI testnet address (TXAI + 40 hex chars)</small>
                         <div class="error-message" id="addressError"></div>
                     </div>
 
@@ -107,6 +115,19 @@
                         <p id="errorMessage"></p>
                     </div>
                 </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>Need a wallet?</h2>
+                </div>
+                <p class="help-text">Never share your recovery phrase or private key. We will never ask for it.</p>
+                <ul class="notice-list">
+                    <li><a href="/wallet.html">Create a testnet wallet in your browser</a></li>
+                    <li><a href="https://github.com/aura-blockchain/xai/blob/main/src/xai/browser_wallet_extension/QUICKSTART.md" target="_blank" rel="noopener">XAI Browser Wallet Extension</a></li>
+                    <li><a href="https://github.com/aura-blockchain/xai/blob/main/mobile/README.md" target="_blank" rel="noopener">XAI Mobile Wallet (Expo)</a></li>
+                    <li><a href="https://github.com/aura-blockchain/xai/blob/main/docs/TESTNET_ENDPOINTS.md" target="_blank" rel="noopener">CLI (developers): xai-wallet generate-address</a></li>
+                </ul>
             </div>
 
             <div class="card">

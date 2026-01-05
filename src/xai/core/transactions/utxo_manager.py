@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Any
 from xai.core.api.structured_logger import StructuredLogger, get_structured_logger
 from xai.core.transactions.utxo_store import UTXOStore, MemoryUTXOStore, create_utxo_store
 from xai.core.consensus.validation import validate_amount
+from xai.core.constants import MINIMUM_TRANSACTION_AMOUNT
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Transaction
@@ -875,7 +876,7 @@ class UTXOManager:
                         seen_utxos.add(utxo_id)
 
             count_mismatch = self.total_utxos != actual_count
-            value_mismatch = abs(self.total_value - actual_value) > 0.00000001  # Allow for floating point error
+            value_mismatch = abs(self.total_value - actual_value) > MINIMUM_TRANSACTION_AMOUNT  # Allow for floating point error
 
             return {
                 "is_consistent": not count_mismatch and not value_mismatch and not duplicates,

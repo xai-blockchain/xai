@@ -14,6 +14,8 @@ import time
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
+from xai.core.constants import MINIMUM_TRANSACTION_AMOUNT
+
 if TYPE_CHECKING:
     from xai.core.transaction import Transaction
 
@@ -407,7 +409,7 @@ class BlockchainMempoolMixin:
                     ]
                     # Add change output if necessary
                     change = selected_amount - total_needed
-                    if change > 0.00000001:  # Minimum dust threshold
+                    if change > MINIMUM_TRANSACTION_AMOUNT:  # Minimum dust threshold
                         transaction.outputs.append({"address": transaction.sender, "amount": change})
 
             # Validate transaction (still under lock to prevent TOCTOU)

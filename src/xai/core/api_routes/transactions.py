@@ -181,7 +181,10 @@ def register_transaction_routes(routes: "NodeAPIRoutes") -> None:
                 amount=model.amount,
                 fee=model.fee,
                 public_key=model.public_key,
+                tx_type=model.tx_type,
                 nonce=model.nonce,
+                inputs=model.inputs,
+                outputs=model.outputs,
             )
             tx.signature = model.signature
             if model.metadata:

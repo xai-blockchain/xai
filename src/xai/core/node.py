@@ -233,6 +233,9 @@ class BlockchainNode:
         # Initialize optional features (these may not exist in all setups)
         self._initialize_optional_features()
         self._initialize_embedded_wallets()
+        self._faucet_wallet = None
+        self._faucet_wallet_path = None
+        self._faucet_wallet_lock = threading.Lock()
 
         # Setup API routes
         self.api_routes = NodeAPIRoutes(self)
@@ -569,6 +572,37 @@ class BlockchainNode:
 
     # ==================== FAUCET OPERATIONS ====================
 
+    def _load_faucet_wallet(self):
+        """Load the faucet wallet from disk using configured path/password."""
+        from xai.core.wallet import Wallet
+
+        faucet_file = getattr(Config, "FAUCET_WALLET_FILE", "").strip()
+        if not faucet_file:
+            raise RuntimeError("Faucet wallet file not configured (set XAI_FAUCET_WALLET_FILE)")
+
+        password = getattr(Config, "FAUCET_WALLET_PASSWORD", "").strip() or None
+        try:
+            wallet = Wallet.load_from_file(faucet_file, password)
+        except FileNotFoundError as exc:
+            raise RuntimeError(f"Faucet wallet file not found: {faucet_file}") from exc
+        except ValueError as exc:
+            raise RuntimeError(f"Failed to load faucet wallet: {exc}") from exc
+
+        logger.info(
+            "Faucet wallet loaded",
+            extra={"event": "node.faucet_wallet_loaded", "address": wallet.address[:16] + "..."},
+        )
+        return wallet
+
+    def _get_faucet_wallet(self):
+        """Return cached faucet wallet, reloading if path changes."""
+        faucet_file = getattr(Config, "FAUCET_WALLET_FILE", "").strip()
+        with self._faucet_wallet_lock:
+            if self._faucet_wallet is None or self._faucet_wallet_path != faucet_file:
+                self._faucet_wallet = self._load_faucet_wallet()
+                self._faucet_wallet_path = faucet_file
+            return self._faucet_wallet
+
     def queue_faucet_transaction(self, recipient: str, amount: float) -> Transaction:
         """
         Create a faucet transaction and enqueue it for inclusion in the next block.
@@ -580,19 +614,33 @@ class BlockchainNode:
         Returns:
             The created Transaction instance.
         """
-        faucet_tx = Transaction(
-            sender="COINBASE",
-            recipient=recipient,
+        faucet_wallet = self._get_faucet_wallet()
+        faucet_tx = self.blockchain.create_transaction(
+            sender_address=faucet_wallet.address,
+            recipient_address=recipient,
             amount=amount,
-            tx_type="faucet",
-            outputs=[{"address": recipient, "amount": amount}],
+            fee=0.0,
+            private_key=faucet_wallet.private_key,
+            public_key=faucet_wallet.public_key,
         )
+
+        if faucet_tx is None:
+            raise RuntimeError("Faucet wallet has insufficient funds or locked inputs")
+
+        faucet_tx.tx_type = "faucet"
         faucet_tx.metadata = {
             "type": "faucet",
             "requested_at": time.time(),
+            "faucet_address": faucet_wallet.address,
         }
-        faucet_tx.txid = faucet_tx.calculate_hash()
-        self.blockchain.pending_transactions.append(faucet_tx)
+
+        if not self.blockchain.add_transaction(faucet_tx):
+            if faucet_tx.inputs:
+                utxo_keys = [(inp["txid"], inp["vout"]) for inp in faucet_tx.inputs]
+                self.blockchain.utxo_manager.unlock_utxos_by_keys(utxo_keys)
+            raise RuntimeError("Faucet transaction rejected by mempool")
+
+        self.broadcast_transaction(faucet_tx)
         return faucet_tx
 
     # ==================== MINING OPERATIONS ====================

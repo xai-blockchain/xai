@@ -8,6 +8,8 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from xai.core.constants import MINIMUM_TRANSACTION_AMOUNT
+
 import yaml
 
 # ==================== CONSTANTS ====================
@@ -246,7 +248,7 @@ def calculate_block_reward(block_index: int) -> float:
     reward = initial_reward / (2**halvings)
 
     # Minimum reward
-    return max(reward, 0.00000001)
+    return max(reward, MINIMUM_TRANSACTION_AMOUNT)
 
 def calculate_difficulty(chain_length: int, target_block_time: float = 60.0) -> int:
     """

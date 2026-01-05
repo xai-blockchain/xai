@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any
 
 from flask import jsonify
 
+from xai.core.units import format_xai, to_base_units
+
 if TYPE_CHECKING:
     from xai.core.node_api import NodeAPIRoutes
 
@@ -31,7 +33,15 @@ def register_wallet_routes(routes: "NodeAPIRoutes") -> None:
                 - balance (float): Current balance in XAI tokens
         """
         balance = blockchain.get_balance(address)
-        return jsonify({"address": address, "balance": balance})
+        balance_base_units = to_base_units(balance)
+        return jsonify(
+            {
+                "address": address,
+                "balance": balance,
+                "balance_xai": format_xai(balance),
+                "balance_base_units": str(balance_base_units),
+            }
+        )
 
     @app.route("/address/<address>/nonce", methods=["GET"])
     def get_address_nonce(address: str) -> tuple[dict[str, Any], int]:

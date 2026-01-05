@@ -84,7 +84,7 @@ FEE_RATE_0_2_PERCENT: Final[float] = 0.002  # 0.2%
 FEE_RATE_1_PERCENT: Final[float] = 0.01  # 1%
 
 # Minimum amounts
-MINIMUM_TRANSACTION_AMOUNT: Final[float] = 0.00000001  # 1 satoshi equivalent
+MINIMUM_TRANSACTION_AMOUNT: Final[float] = 0.000000000000000001  # 1 axai (18 decimals)
 MINIMUM_FEE_RATE: Final[float] = 0.0000001  # Minimum fee per byte
 
 # Decimal precision

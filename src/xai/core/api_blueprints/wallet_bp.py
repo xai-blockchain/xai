@@ -26,6 +26,7 @@ from xai.core.api_blueprints.base import (
 from xai.core.config import Config, NetworkType
 from xai.core.security.input_validation_schemas import FaucetClaimInput
 from xai.core.security.rate_limiter import get_rate_limiter
+from xai.core.units import format_xai, to_base_units
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,15 @@ def get_balance(address: str) -> dict[str, Any]:
     """Get address balance."""
     blockchain = get_blockchain()
     balance = blockchain.get_balance(address)
-    return jsonify({"address": address, "balance": balance})
+    balance_base_units = to_base_units(balance)
+    return jsonify(
+        {
+            "address": address,
+            "balance": balance,
+            "balance_xai": format_xai(balance),
+            "balance_base_units": str(balance_base_units),
+        }
+    )
 
 @wallet_bp.route("/address/<address>/nonce", methods=["GET"])
 def get_address_nonce(address: str) -> tuple[dict[str, Any], int]:

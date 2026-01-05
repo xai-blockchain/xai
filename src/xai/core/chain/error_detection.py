@@ -19,6 +19,8 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any
 
+from xai.core.constants import MINIMUM_TRANSACTION_AMOUNT
+
 logger = logging.getLogger(__name__)
 
 class ErrorSeverity(Enum):
@@ -356,7 +358,7 @@ class CorruptionDetector:
                 rebuilt_balance = sum(u["amount"] for u in rebuilt_utxo[address] if not u["spent"])
                 current_balance = blockchain.get_balance(address)
 
-                if abs(rebuilt_balance - current_balance) > 0.00000001:
+                if abs(rebuilt_balance - current_balance) > MINIMUM_TRANSACTION_AMOUNT:
                     errors.append(
                         f"UTXO mismatch for {address[:10]}...: "
                         f"rebuilt={rebuilt_balance}, current={current_balance}"

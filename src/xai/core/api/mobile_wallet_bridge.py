@@ -18,6 +18,8 @@ import logging
 import time
 import uuid
 from decimal import Decimal
+
+from xai.core.constants import MINIMUM_TRANSACTION_AMOUNT
 from typing import Any
 
 from xai.core.blockchain import Transaction
@@ -231,7 +233,7 @@ class MobileWalletBridge:
 
         congestion = min(pending / 100.0, 2.0)
         recommended_fee = float(
-            (base_fee * (1 + Decimal(str(congestion)))).quantize(Decimal("0.00000001"))
+            (base_fee * (1 + Decimal(str(congestion)))).quantize(Decimal(str(MINIMUM_TRANSACTION_AMOUNT)))
         )
         backlog_ratio = pending / DEFAULT_BLOCK_CAPACITY if DEFAULT_BLOCK_CAPACITY else pending
         telemetry = {

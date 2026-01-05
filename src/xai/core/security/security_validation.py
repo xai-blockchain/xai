@@ -20,6 +20,8 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+from xai.core.constants import MAX_SUPPLY as CONST_MAX_SUPPLY, MINIMUM_TRANSACTION_AMOUNT as CONST_MIN_AMOUNT
+
 # Security logger setup
 security_logger = logging.getLogger("xai.security")
 security_logger.setLevel(logging.INFO)
@@ -103,10 +105,10 @@ class SecurityValidator:
     """
 
     # Constants
-    MAX_SUPPLY = 121000000.0
+    MAX_SUPPLY = CONST_MAX_SUPPLY
     MAX_TRANSACTION_AMOUNT = MAX_SUPPLY
     MAX_FEE = 1000.0  # Prevent excessive fees
-    MIN_AMOUNT = 0.00000001  # 1 satoshi equivalent
+    MIN_AMOUNT = CONST_MIN_AMOUNT  # 1 axai equivalent (18 decimals)
 
     # Address validation
     VALID_PREFIXES = ["XAI", "XAI", "TXAI"]

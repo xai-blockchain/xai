@@ -25,6 +25,7 @@ from typing import Any
 import base58
 
 from xai.core.security.crypto_utils import derive_public_key_hex, sign_message_hex, verify_signature_hex
+from xai.core.constants import MAX_SUPPLY as MAX_SUPPLY_XAI, MINIMUM_TRANSACTION_AMOUNT
 from xai.core.consensus.validation import validate_address, validate_amount
 
 logger = logging.getLogger(__name__)
@@ -54,8 +55,8 @@ def canonical_json(data: dict[str, Any]) -> str:
     )
 
 # Validation constants
-MAX_TRANSACTION_AMOUNT = 121_000_000.0  # Total supply cap
-MIN_TRANSACTION_AMOUNT = 0.0
+MAX_TRANSACTION_AMOUNT = MAX_SUPPLY_XAI  # Total supply cap
+MIN_TRANSACTION_AMOUNT = MINIMUM_TRANSACTION_AMOUNT
 MAX_FEE = 1_000_000.0  # Reasonable fee cap
 MAX_METADATA_SIZE = 4096  # 4KB metadata limit
 MAX_INPUTS = 1000  # Maximum inputs per transaction

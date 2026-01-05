@@ -17,6 +17,7 @@ from xai.core.chain.blockchain_exceptions import ValidationError
 from xai.core.security.blockchain_security import BlockSizeValidator
 from xai.core.api.structured_logger import get_structured_logger
 from xai.core.transaction import Transaction
+from xai.core.constants import MINIMUM_TRANSACTION_AMOUNT
 
 if TYPE_CHECKING:
     from xai.core.blockchain import Block, Blockchain
@@ -110,7 +111,7 @@ class ValidationManager:
 
         # Allow small floating point differences
         actual_reward = coinbase_tx.amount
-        if abs(actual_reward - expected_total) > 1e-8:
+        if abs(actual_reward - expected_total) > MINIMUM_TRANSACTION_AMOUNT:
             return False, (
                 f"Invalid coinbase reward: expected {expected_total:.8f}, "
                 f"got {actual_reward:.8f} (reward={expected_reward:.8f}, fees={total_fees:.8f})"

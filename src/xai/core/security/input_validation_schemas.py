@@ -15,6 +15,9 @@ class NodeTransactionInput(BaseModel):
     timestamp: float
     signature: str
     txid: str | None = Field(default=None, min_length=64, max_length=64)
+    tx_type: str | None = None
+    inputs: list[dict[str, Any]] | None = None
+    outputs: list[dict[str, Any]] | None = None
     metadata: dict[str, Any] | None = None
 
 class PeerTransactionInput(BaseModel):

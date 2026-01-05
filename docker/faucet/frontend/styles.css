@@ -58,6 +58,47 @@ header {
     font-size: 1rem;
 }
 
+.access-cta {
+    margin-top: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    color: var(--text-secondary);
+}
+
+.access-cta p {
+    margin: 0 0 0.5rem 0;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.access-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.access-links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+}
+
+.access-links a:hover {
+    background: var(--primary-color);
+    color: #fff;
+    border-color: var(--primary-color);
+}
+
 .network-status {
     display: flex;
     align-items: center;
@@ -208,6 +249,62 @@ input[type="text"]:invalid:not(:placeholder-shown) {
 
 .btn-primary:active:not(:disabled) {
     transform: translateY(0);
+}
+
+.btn-secondary {
+    padding: 0.65rem 1.25rem;
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    border-radius: 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.btn-secondary:hover {
+    border-color: rgba(148, 163, 184, 0.8);
+    background: rgba(148, 163, 184, 0.08);
+}
+
+.wallet-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.wallet-output textarea,
+.wallet-output input[type="text"] {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    margin-top: 0.5rem;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 0.5rem;
+    background: rgba(15, 23, 42, 0.6);
+    color: var(--text-primary);
+    font-family: 'Space Mono', monospace;
+}
+
+.status-message {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.95rem;
+}
+
+.status-message.success {
+    border: 1px solid var(--success-color);
+    color: var(--success-color);
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.status-message.error {
+    border: 1px solid var(--error-color);
+    color: var(--error-color);
+    background: rgba(239, 68, 68, 0.1);
 }
 
 .btn-loading {

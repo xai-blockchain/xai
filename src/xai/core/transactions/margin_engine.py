@@ -14,7 +14,11 @@ from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Callable
 
+from xai.core.constants import MINIMUM_TRANSACTION_AMOUNT
+
 DecimalLike = Decimal | float | str | int
+
+AMOUNT_QUANTIZER = Decimal(str(MINIMUM_TRANSACTION_AMOUNT))
 
 def to_decimal(value: DecimalLike) -> Decimal:
     if isinstance(value, Decimal):
@@ -59,7 +63,7 @@ class Position:
         weighted_price = (
             self.entry_price * self.size + fill_price * additional_size
         ) / new_size
-        self.entry_price = weighted_price.quantize(Decimal("0.00000001"), rounding=ROUND_HALF_UP)
+        self.entry_price = weighted_price.quantize(AMOUNT_QUANTIZER, rounding=ROUND_HALF_UP)
         self.size = new_size
 
 @dataclass
@@ -140,7 +144,7 @@ class MarginEngine:
         if leverage_dec <= 0 or leverage_dec > risk.max_leverage:
             raise MarginException("Invalid leverage selection")
         notional = abs(size_dec) * mark
-        required_margin = (notional / leverage_dec).quantize(Decimal("0.00000001"), rounding=ROUND_HALF_UP)
+        required_margin = (notional / leverage_dec).quantize(AMOUNT_QUANTIZER, rounding=ROUND_HALF_UP)
         if account.collateral < required_margin and not isolated:
             raise MarginException("Insufficient collateral for cross-margin position")
         if isolated and required_margin > account.collateral:

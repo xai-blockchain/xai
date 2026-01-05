@@ -384,12 +384,15 @@ class TestFaucetTransaction:
         mock.storage.data_dir = "/tmp/test_data"
         mock.chain = []
         mock.pending_transactions = []
-        mock.create_faucet_transaction.return_value = MagicMock(
-            tx_hash="test_hash",
-            sender="faucet",
+        mock.utxo_manager = MagicMock()
+        mock.create_transaction.return_value = MagicMock(
+            txid="test_hash",
+            sender="TXAI" + "f" * 40,
             recipient="XAI" + "1" * 40,
-            amount=100.0
+            amount=100.0,
+            inputs=[{"txid": "abc", "vout": 0}],
         )
+        mock.add_transaction.return_value = True
         return mock
 
     @pytest.fixture
@@ -415,13 +418,22 @@ class TestFaucetTransaction:
     def test_queue_faucet_transaction_creates_tx(self, node_with_patches, mock_blockchain):
         """Queuing faucet transaction calls blockchain method."""
         node = node_with_patches
-        mock_blockchain.faucet_address = "FAUCET_ADDR"
+        node.broadcast_transaction = MagicMock()
+        faucet_wallet = MagicMock(address="TXAI" + "f" * 40, private_key="priv", public_key="pub")
 
-        # Skip if faucet not configured
-        if not hasattr(mock_blockchain, 'create_faucet_transaction'):
-            pytest.skip("Faucet not configured")
+        with patch.object(node, "_get_faucet_wallet", return_value=faucet_wallet):
+            tx = node.queue_faucet_transaction("XAI" + "1" * 40, 100.0)
 
-        tx = node.queue_faucet_transaction("XAI" + "1" * 40, 100.0)
+        mock_blockchain.create_transaction.assert_called_once_with(
+            sender_address=faucet_wallet.address,
+            recipient_address="XAI" + "1" * 40,
+            amount=100.0,
+            fee=0.0,
+            private_key=faucet_wallet.private_key,
+            public_key=faucet_wallet.public_key,
+        )
+        mock_blockchain.add_transaction.assert_called_once_with(tx)
+        node.broadcast_transaction.assert_called_once_with(tx)
         assert tx is not None
 
 

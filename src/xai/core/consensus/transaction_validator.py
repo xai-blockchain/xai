@@ -20,6 +20,7 @@ from xai.core.security.security_validation import SecurityValidator, ValidationE
 from xai.core.api.structured_logger import StructuredLogger, get_structured_logger
 from xai.core.transactions.utxo_manager import UTXOManager, get_utxo_manager
 from xai.core.consensus.validation import validate_address, validate_amount, validate_fee, MonetaryAmount
+from xai.core.constants import MINIMUM_TRANSACTION_AMOUNT
 from xai.core.wallet import Wallet
 
 # Security constants for transaction validation
@@ -123,7 +124,7 @@ class TransactionValidator:
 
     def _check_fee_rate(self, transaction: "Transaction", is_mempool_check: bool) -> None:
         """Check if fee rate meets minimum requirements."""
-        if transaction.tx_type in ["governance_vote"]:
+        if transaction.tx_type in ["governance_vote", "faucet"]:
             return
 
         min_fee_rate = getattr(Config, "MEMPOOL_MIN_FEE_RATE", 0.0)
@@ -212,9 +213,9 @@ class TransactionValidator:
         # Use MonetaryAmount for precise financial comparison to avoid floating-point errors
         # Convert floats to strings with sufficient precision for MonetaryAmount constructor
         try:
-            input_amount = MonetaryAmount(f"{input_sum:.8f}")
-            output_amount = MonetaryAmount(f"{output_sum:.8f}")
-            fee_amount = MonetaryAmount(f"{transaction.fee:.8f}")
+            input_amount = MonetaryAmount(f"{input_sum:.18f}")
+            output_amount = MonetaryAmount(f"{output_sum:.18f}")
+            fee_amount = MonetaryAmount(f"{transaction.fee:.18f}")
             required_amount = output_amount + fee_amount
 
             if input_amount < required_amount:
@@ -223,7 +224,7 @@ class TransactionValidator:
                 )
         except (ValueError, TypeError):
             # Fallback to epsilon comparison if MonetaryAmount conversion fails
-            if input_sum + 1e-9 < (output_sum + transaction.fee):
+            if input_sum + MINIMUM_TRANSACTION_AMOUNT < (output_sum + transaction.fee):
                 raise ValidationError(
                     f"Insufficient input funds. Input sum: {input_sum}, Output sum: {output_sum}, Fee: {transaction.fee}"
                 )

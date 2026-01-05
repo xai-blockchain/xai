@@ -10,6 +10,7 @@ import json
 import time
 from decimal import Decimal
 
+from xai.core.constants import MINIMUM_TRANSACTION_AMOUNT
 
 class MiningAlgorithm:
     """
@@ -40,7 +41,7 @@ class MiningAlgorithm:
         """Calculate block reward based on height (with halving)"""
         halvings = block_height // self.HALVING_INTERVAL
         reward = self.BLOCK_REWARD / (2**halvings)
-        return max(reward, Decimal("0.00000001"))  # Minimum 1 satoshi
+        return max(reward, Decimal(str(MINIMUM_TRANSACTION_AMOUNT)))  # Minimum 1 axai
 
     def create_block_header(
         self,

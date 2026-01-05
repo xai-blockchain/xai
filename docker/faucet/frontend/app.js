@@ -18,6 +18,7 @@ const state = {
 document.addEventListener('DOMContentLoaded', () => {
     initializeApp();
     setupEventListeners();
+    prefillAddressFromQuery();
 });
 
 async function initializeApp() {
@@ -38,6 +39,18 @@ function setupEventListeners() {
 
     form.addEventListener('submit', handleFormSubmit);
     addressInput.addEventListener('input', validateAddress);
+}
+
+function prefillAddressFromQuery() {
+    const addressInput = document.getElementById('address');
+    if (!addressInput) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const address = params.get('address');
+    if (address) {
+        addressInput.value = address.trim();
+        validateAddress();
+    }
 }
 
 // Network status check
@@ -216,9 +229,9 @@ function validateAddress() {
     }
 
     // Check if address matches pattern
-    const addressPattern = /^TXAI[a-z0-9]{38,58}$/;
+    const addressPattern = /^TXAI[a-fA-F0-9]{40}$/;
     if (!addressPattern.test(address)) {
-        errorElement.textContent = 'Invalid XAI address format. Address must start with "TXAI"';
+        errorElement.textContent = 'Invalid XAI address format. Use TXAI + 40 hex characters.';
         errorElement.classList.add('show');
         return false;
     }

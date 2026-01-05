@@ -23,13 +23,14 @@ from typing import Any
 from xai.core.wallets.address_checksum import is_checksum_valid, normalize_address, to_checksum_address
 from xai.core.wallets.address_checksum import validate_address as validate_checksum
 from xai.core.security.security_validation import SecurityValidator, ValidationError
+from xai.core.constants import MAX_SUPPLY as MAX_SUPPLY_XAI, MINIMUM_TRANSACTION_AMOUNT, TOKEN_DECIMALS
 
 # Set global decimal precision for blockchain operations
 getcontext().prec = 28
 
 # Constants
-MAX_SUPPLY = 121_000_000.0
-MIN_AMOUNT = 0.00000001  # 1 satoshi equivalent
+MAX_SUPPLY = MAX_SUPPLY_XAI
+MIN_AMOUNT = MINIMUM_TRANSACTION_AMOUNT  # 1 axai equivalent (18 decimals)
 MAX_TRANSACTION_AMOUNT = MAX_SUPPLY
 MAX_FEE = 1000.0
 
@@ -178,7 +179,7 @@ def validate_amount(
     - Not NaN or infinite
     - Non-negative
     - Within specified bounds
-    - Has acceptable precision (max 8 decimal places)
+    - Has acceptable precision (max 18 decimal places)
 
     Args:
         amount: Amount to validate
@@ -187,7 +188,7 @@ def validate_amount(
         max_value: Maximum allowed value (default MAX_TRANSACTION_AMOUNT)
 
     Returns:
-        Validated amount as float, rounded to 8 decimal places
+        Validated amount as float, rounded to 18 decimal places
 
     Raises:
         ValueError: If amount is invalid
@@ -248,10 +249,10 @@ def validate_amount(
             f"Amount exceeds maximum: {amount_float} > {effective_max}"
         )
 
-    # Precision check (max 8 decimal places)
-    rounded = round(amount_float, 8)
-    if abs(amount_float - rounded) > 1e-10:  # Allow tiny floating point errors
-        amount_float = rounded
+    # Precision check (max 18 decimal places)
+    quantizer = Decimal(f"1e-{TOKEN_DECIMALS}")
+    rounded_decimal = amount_decimal.quantize(quantizer, rounding=ROUND_DOWN)
+    amount_float = float(rounded_decimal)
 
     return amount_float
 
@@ -402,10 +403,10 @@ class MonetaryAmount:
     Uses Decimal internally to avoid floating-point precision errors.
     All arithmetic rounds down to prevent inflation/fund creation.
 
-    Precision: 8 decimal places (like Bitcoin satoshis).
+    Precision: 18 decimal places (like Ethereum wei).
     """
 
-    PRECISION = 8  # Decimal places (1 XAI = 100_000_000 base units)
+    PRECISION = TOKEN_DECIMALS  # Decimal places (1 XAI = 10^18 base units)
     _quantizer = Decimal(f"1e-{PRECISION}")
 
     def __init__(self, value: str | int | Decimal):

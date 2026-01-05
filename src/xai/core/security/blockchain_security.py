@@ -22,6 +22,8 @@ if TYPE_CHECKING:
 
 from decimal import Decimal, getcontext
 
+from xai.core.constants import MINIMUM_TRANSACTION_AMOUNT
+
 from xai.core.config import Config
 
 logger = logging.getLogger(__name__)
@@ -202,7 +204,7 @@ class SupplyValidator:
         """
         max_allowed = expected_reward + total_fees
 
-        if coinbase_amount > max_allowed + 0.00000001:  # Allow tiny rounding
+        if coinbase_amount > max_allowed + MINIMUM_TRANSACTION_AMOUNT:  # Allow tiny rounding
             print(f"INFLATION BUG DETECTED: Coinbase {coinbase_amount} exceeds max {max_allowed}")
             return False
 

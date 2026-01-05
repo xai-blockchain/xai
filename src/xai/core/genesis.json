@@ -51,12 +51,22 @@
       "signature": null,
       "txid": "7278ad2158e713754f99e8e1d5c8ba657c68808f5e1d38940c35a30fb85c3985",
       "comment": "50% of original (36.3M of 121M total) - Reserved for mining rewards"
+    },
+    {
+      "sender": "COINBASE",
+      "recipient": "TXAI16DD08D178D436BbFAE02957F20a3d333627EAfF",
+      "amount": 1000000.0,
+      "fee": 0.0,
+      "timestamp": 1730851200.0,
+      "signature": null,
+      "comment": "Testnet faucet allocation (1,000,000 XAI)",
+      "txid": "8ff92fc16a9db4ab35d7682914240dd912e1f82d2ed4a53f013445879fa66683"
     }
   ],
   "previous_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-  "nonce": 100347,
+  "nonce": 2056,
   "difficulty": 4,
-  "hash": "0000f5bbdeb367b9a5b6a137efa792758da15fd43e9f91c42dd19a62a11e1a88",
-  "merkle_root": "14e115e4bec09374d58e39dd0ad67a26a37aa27c29405f368517e5f9527bc403",
-  "comment": "Genesis allocates 60.5M XAI (50%), leaving 60.5M for mining rewards to reach 121M cap"
+  "hash": "00000f06df2a6e724b10e28a4b8228451e4898cc5ea7a5590faa0c075facc44b",
+  "merkle_root": "eed9de73a5d8c6216ff328c35e24bec1e912ec66dd0aba060fceab1725ba733c",
+  "comment": "Genesis allocates 61.5M XAI total, leaving 59.5M for mining rewards to reach 121M cap"
 }
