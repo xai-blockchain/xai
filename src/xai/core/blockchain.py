@@ -2064,22 +2064,25 @@ class Blockchain(
                 parent_obj = history_view[-1]
                 parent_hash = parent_obj.hash if hasattr(parent_obj, "hash") else getattr(parent_obj, "hash", None)
                 if parent_hash == header.previous_hash:
-                    expected_difficulty = self._expected_difficulty_for_block(
-                        block_index=header.index,
-                        history=history_view,
-                    )
-                    if (
-                        expected_difficulty is not None
-                        and header.difficulty != expected_difficulty
-                    ):
-                        self.logger.warn(
-                            "Block rejected due to unexpected difficulty",
+                    # TESTNET: Skip difficulty validation during sync to handle historical blocks
+                    relax_difficulty = os.getenv("XAI_RELAX_DIFFICULTY_VALIDATION", "0") == "1"
+                    if not relax_difficulty:
+                        expected_difficulty = self._expected_difficulty_for_block(
                             block_index=header.index,
-                            block_hash=header.hash,
-                            declared_difficulty=header.difficulty,
-                            expected_difficulty=expected_difficulty,
+                            history=history_view,
                         )
-                        return False
+                        if (
+                            expected_difficulty is not None
+                            and header.difficulty != expected_difficulty
+                        ):
+                            self.logger.warn(
+                                "Block rejected due to unexpected difficulty",
+                                block_index=header.index,
+                                block_hash=header.hash,
+                                declared_difficulty=header.difficulty,
+                                expected_difficulty=expected_difficulty,
+                            )
+                            return False
 
         # Case 1: Block extends our current chain directly
         if header.index == len(self.chain):
@@ -2355,18 +2358,21 @@ class Blockchain(
                     self.logger.warn("Chain validation failed: block size exceeded", index=header.index)
                     return False
 
-                expected_difficulty = self._expected_difficulty_for_block(
-                    block_index=header.index,
-                    history=blocks[:idx],
-                )
-                if expected_difficulty is not None and header.difficulty != expected_difficulty:
-                    self.logger.warn(
-                        "Chain validation failed: unexpected difficulty",
-                        index=header.index,
-                        expected_difficulty=expected_difficulty,
-                        declared_difficulty=header.difficulty,
+                # TESTNET: Skip difficulty validation during sync to handle historical blocks
+                relax_difficulty = os.getenv("XAI_RELAX_DIFFICULTY_VALIDATION", "0") == "1"
+                if not relax_difficulty:
+                    expected_difficulty = self._expected_difficulty_for_block(
+                        block_index=header.index,
+                        history=blocks[:idx],
                     )
-                    return False
+                    if expected_difficulty is not None and header.difficulty != expected_difficulty:
+                        self.logger.warn(
+                            "Chain validation failed: unexpected difficulty",
+                            index=header.index,
+                            expected_difficulty=expected_difficulty,
+                            declared_difficulty=header.difficulty,
+                        )
+                        return False
 
                 # Signature optional for genesis (no miner), enforced for others when present
                 if header.signature is not None or header.index != 0:
@@ -2984,17 +2990,21 @@ class Blockchain(
             if not self._validate_header_version(current_header):
                 return False
 
-            expected_difficulty = self._expected_difficulty_for_block(
-                block_index=current_header.index,
-                history=chain[:i],
-            )
-            if expected_difficulty is not None and current_header.difficulty != expected_difficulty:
-                self.logger.warn(
-                    f"Invalid chain structure: block {current_header.index} difficulty mismatch",
-                    expected_difficulty=expected_difficulty,
-                    declared_difficulty=current_header.difficulty,
+            # TESTNET: Skip difficulty validation during sync to handle historical blocks
+            # Production nodes should not set XAI_RELAX_DIFFICULTY_VALIDATION=1
+            relax_difficulty = os.getenv("XAI_RELAX_DIFFICULTY_VALIDATION", "0") == "1"
+            if not relax_difficulty:
+                expected_difficulty = self._expected_difficulty_for_block(
+                    block_index=current_header.index,
+                    history=chain[:i],
                 )
-                return False
+                if expected_difficulty is not None and current_header.difficulty != expected_difficulty:
+                    self.logger.warn(
+                        f"Invalid chain structure: block {current_header.index} difficulty mismatch",
+                        expected_difficulty=expected_difficulty,
+                        declared_difficulty=current_header.difficulty,
+                    )
+                    return False
 
             time_valid, time_error = self._validate_block_timestamp(current_header, chain[:i])
             if not time_valid:
