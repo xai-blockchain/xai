@@ -141,3 +141,4 @@ docs/INCIDENT_RESPONSE_RUNBOOK.md
 
 # Kubernetes secrets with rotated keys
 k8s/validator-keys-rotated.yaml
+AGENTS.md
