@@ -29,6 +29,14 @@ make ci-p2p
 2. Keep changes focused and update docs as needed.
 3. Run tests.
 4. Open a pull request with a clear description.
+5. Ensure required checks pass and request review from CODEOWNERS where applicable.
+
+## Pull Request Review
+
+- Use PRs for all changes (avoid direct pushes to `main`).
+- Require at least 1-2 approvals before merge.
+- All CI checks must pass before merge.
+- Prefer squash-merge or rebase-merge to keep a linear history.
 
 ## Reporting Issues
 
