@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AIXN P2P Exchange</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      .price-up {
+        color: #10b981;
+      }
+      .price-down {
+        color: #ef4444;
+      }
+      .order-buy {
+        border-left: 3px solid #10b981;
+      }
+      .order-sell {
+        border-left: 3px solid #ef4444;
+      }
+      .flash-animation {
+        animation: flash 0.5s ease-in-out;
+      }
+      @keyframes flash {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+      .spinner {
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #3b82f6;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body class="bg-gray-900 text-white">
+    <!-- Navigation -->
+    <nav class="bg-gray-800 border-b border-gray-700 p-4">
+      <div class="container mx-auto flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-blue-400">AIXN Exchange</h1>
+        <div id="navLinks" class="flex items-center space-x-4">
+          <!-- Dynamic nav links -->
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container mx-auto p-4">
+      <!-- Login/Register Section -->
+      <div id="authSection" class="max-w-md mx-auto mt-10">
+        <div class="bg-gray-800 rounded-lg p-6 shadow-lg">
+          <div class="flex mb-6 border-b border-gray-700">
+            <button
+              id="loginTab"
+              class="flex-1 py-2 text-center font-semibold border-b-2 border-blue-500 text-blue-400"
+            >
+              Login
+            </button>
+            <button id="registerTab" class="flex-1 py-2 text-center font-semibold text-gray-400">
+              Register
+            </button>
+          </div>
+
+          <!-- Login Form -->
+          <form id="loginForm" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium mb-2">Username</label>
+              <input
+                type="text"
+                id="loginUsername"
+                class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500"
+                required
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Password</label>
+              <input
+                type="password"
+                id="loginPassword"
+                class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition"
+            >
+              Login
+            </button>
+          </form>
+
+          <!-- Register Form -->
+          <form id="registerForm" class="space-y-4 hidden">
+            <div>
+              <label class="block text-sm font-medium mb-2">Username</label>
+              <input
+                type="text"
+                id="registerUsername"
+                class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500"
+                required
+                minlength="3"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Password</label>
+              <input
+                type="password"
+                id="registerPassword"
+                class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500"
+                required
+                minlength="6"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Confirm Password</label>
+              <input
+                type="password"
+                id="registerPasswordConfirm"
+                class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-lg transition"
+            >
+              Register
+            </button>
+          </form>
+
+          <div
+            id="authError"
+            class="mt-4 p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-300 text-sm hidden"
+          ></div>
+        </div>
+      </div>
+
+      <!-- Trading Section -->
+      <div id="tradingSection" class="hidden">
+        <!-- Price Ticker -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-4 shadow-lg">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <div class="text-gray-400 text-sm mb-1">Current Price</div>
+              <div id="currentPrice" class="text-3xl font-bold text-blue-400">--</div>
+            </div>
+            <div>
+              <div class="text-gray-400 text-sm mb-1">24h Change</div>
+              <div id="priceChange" class="text-2xl font-semibold">--</div>
+            </div>
+            <div>
+              <div class="text-gray-400 text-sm mb-1">24h High</div>
+              <div id="priceHigh" class="text-2xl font-semibold">--</div>
+            </div>
+            <div>
+              <div class="text-gray-400 text-sm mb-1">24h Low</div>
+              <div id="priceLow" class="text-2xl font-semibold">--</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Wallet Balance -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-4 shadow-lg">
+          <h2 class="text-xl font-semibold mb-4">Wallet Balance</h2>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="bg-gray-700 rounded-lg p-4">
+              <div class="text-gray-400 text-sm mb-1">AIXN Balance</div>
+              <div id="aixnBalance" class="text-2xl font-bold text-blue-400">0.00</div>
+            </div>
+            <div class="bg-gray-700 rounded-lg p-4">
+              <div class="text-gray-400 text-sm mb-1">USD Balance</div>
+              <div id="usdBalance" class="text-2xl font-bold text-green-400">$0.00</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <!-- Trading Panel -->
+          <div class="lg:col-span-1">
+            <div class="bg-gray-800 rounded-lg p-6 shadow-lg">
+              <div class="flex mb-4 border-b border-gray-700">
+                <button
+                  id="buyTab"
+                  class="flex-1 py-2 text-center font-semibold border-b-2 border-green-500 text-green-400"
+                >
+                  Buy
+                </button>
+                <button id="sellTab" class="flex-1 py-2 text-center font-semibold text-gray-400">
+                  Sell
+                </button>
+              </div>
+
+              <!-- Buy Form -->
+              <form id="buyForm" class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium mb-2">Price (USD)</label>
+                  <input
+                    type="number"
+                    id="buyPrice"
+                    step="0.01"
+                    min="0"
+                    class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-green-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-2">Amount (AIXN)</label>
+                  <input
+                    type="number"
+                    id="buyAmount"
+                    step="0.01"
+                    min="0.01"
+                    class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-green-500"
+                    required
+                  />
+                </div>
+                <div class="bg-gray-700 rounded-lg p-3">
+                  <div class="text-gray-400 text-sm">Total Cost</div>
+                  <div id="buyTotal" class="text-xl font-semibold text-green-400">$0.00</div>
+                </div>
+                <button
+                  type="submit"
+                  class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center"
+                >
+                  <span id="buyBtnText">Buy AIXN</span>
+                  <div id="buySpinner" class="spinner ml-2 hidden"></div>
+                </button>
+              </form>
+
+              <!-- Sell Form -->
+              <form id="sellForm" class="space-y-4 hidden">
+                <div>
+                  <label class="block text-sm font-medium mb-2">Price (USD)</label>
+                  <input
+                    type="number"
+                    id="sellPrice"
+                    step="0.01"
+                    min="0"
+                    class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-red-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium mb-2">Amount (AIXN)</label>
+                  <input
+                    type="number"
+                    id="sellAmount"
+                    step="0.01"
+                    min="0.01"
+                    class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-red-500"
+                    required
+                  />
+                </div>
+                <div class="bg-gray-700 rounded-lg p-3">
+                  <div class="text-gray-400 text-sm">Total Receive</div>
+                  <div id="sellTotal" class="text-xl font-semibold text-red-400">$0.00</div>
+                </div>
+                <button
+                  type="submit"
+                  class="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center"
+                >
+                  <span id="sellBtnText">Sell AIXN</span>
+                  <div id="sellSpinner" class="spinner ml-2 hidden"></div>
+                </button>
+              </form>
+
+              <div
+                id="tradeError"
+                class="mt-4 p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-300 text-sm hidden"
+              ></div>
+              <div
+                id="tradeSuccess"
+                class="mt-4 p-3 bg-green-500/20 border border-green-500 rounded-lg text-green-300 text-sm hidden"
+              ></div>
+            </div>
+          </div>
+
+          <!-- Order Book -->
+          <div class="lg:col-span-1">
+            <div class="bg-gray-800 rounded-lg p-6 shadow-lg">
+              <h2 class="text-xl font-semibold mb-4">Order Book</h2>
+
+              <!-- Sell Orders (Asks) -->
+              <div class="mb-4">
+                <div class="text-sm font-semibold text-red-400 mb-2">SELL ORDERS</div>
+                <div class="space-y-1 max-h-48 overflow-y-auto" id="sellOrders">
+                  <div class="text-gray-500 text-sm text-center py-4">No sell orders</div>
+                </div>
+              </div>
+
+              <!-- Spread -->
+              <div class="border-t border-b border-gray-700 py-2 my-4">
+                <div class="text-center">
+                  <div class="text-gray-400 text-xs">SPREAD</div>
+                  <div id="spread" class="text-sm font-semibold">--</div>
+                </div>
+              </div>
+
+              <!-- Buy Orders (Bids) -->
+              <div>
+                <div class="text-sm font-semibold text-green-400 mb-2">BUY ORDERS</div>
+                <div class="space-y-1 max-h-48 overflow-y-auto" id="buyOrders">
+                  <div class="text-gray-500 text-sm text-center py-4">No buy orders</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Trades -->
+          <div class="lg:col-span-1">
+            <div class="bg-gray-800 rounded-lg p-6 shadow-lg">
+              <h2 class="text-xl font-semibold mb-4">Recent Trades</h2>
+              <div class="space-y-2 max-h-96 overflow-y-auto" id="recentTrades">
+                <div class="text-gray-500 text-sm text-center py-4">No recent trades</div>
+              </div>
+            </div>
+
+            <!-- Connection Status -->
+            <div class="mt-4 bg-gray-800 rounded-lg p-4 shadow-lg">
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-400">WebSocket Status</span>
+                <div class="flex items-center">
+                  <div id="wsStatus" class="w-3 h-3 rounded-full bg-gray-600 mr-2"></div>
+                  <span id="wsStatusText" class="text-sm">Disconnected</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div
+      id="toast"
+      class="fixed top-4 right-4 p-4 rounded-lg shadow-lg hidden transition-all transform translate-x-0"
+    >
+      <div id="toastMessage" class="text-sm font-semibold"></div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

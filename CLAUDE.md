@@ -80,15 +80,9 @@ ssh services-testnet  # 139.99.149.160
 ### Secondary Node Ports (on services-testnet)
 | Chain | RPC | gRPC | REST | P2P |
 |-------|-----|------|------|-----|
-| AURA | 26657 | 9190 | 1317 | 26656 |
-| PAW | 27657 | 9091 | 1327 | 27656 |
 | XAI | 8546 | - | - | 8766 |
 
 ### Indexers & WebSocket Proxies
 | Service | Port |
 |---------|------|
-| AURA Indexer API | 4101 |
-| PAW Indexer API | 4102 |
-| AURA WS Proxy | 4201 |
-| PAW WS Proxy | 4202 |
 | XAI WS Proxy | 4203 |

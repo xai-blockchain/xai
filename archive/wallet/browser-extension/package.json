@@ -1,0 +1,44 @@
+{
+  "name": "xai-browser-wallet-extension",
+  "version": "0.1.0",
+  "description": "XAI Browser Wallet & Miner - Lightweight wallet and networking controls",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "lint": "eslint . --ext js --fix",
+    "format": "prettier --write \"**/*.{js,json,html,css}\"",
+    "test": "vitest",
+    "security:audit": "npm audit --audit-level=moderate",
+    "clean": "rimraf dist",
+    "package": "npm run build && cd dist && zip -r ../extension.zip ."
+  },
+  "dependencies": {
+    "dompurify": "^3.0.8"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.258",
+    "esbuild": "^0.19.11",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-security": "^2.1.0",
+    "html-minifier-terser": "^7.2.0",
+    "prettier": "^3.1.1",
+    "rimraf": "^5.0.5",
+    "vitest": "^1.1.0"
+  },
+  "keywords": [
+    "blockchain",
+    "cryptocurrency",
+    "wallet",
+    "mining",
+    "browser-extension"
+  ],
+  "author": "XAI Team",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

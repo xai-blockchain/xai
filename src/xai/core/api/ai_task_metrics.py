@@ -2,7 +2,7 @@
 AI Task Execution Metrics for XAI Blockchain
 
 Comprehensive Prometheus metrics for AI task lifecycle, provider management,
-and execution tracking following PAW's proven patterns.
+and execution tracking following proven patterns.
 """
 
 from prometheus_client import REGISTRY, CollectorRegistry, Counter, Gauge, Histogram, Summary

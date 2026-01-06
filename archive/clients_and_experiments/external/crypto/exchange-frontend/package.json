@@ -1,0 +1,53 @@
+{
+  "name": "aixn-exchange-frontend",
+  "version": "1.0.0",
+  "description": "AIXN P2P Exchange Frontend - Secure Trading Platform",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext js --fix",
+    "format": "prettier --write \"**/*.{js,json,html,css}\"",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "security:audit": "npm audit --audit-level=moderate",
+    "security:check": "snyk test",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "dompurify": "^3.0.8",
+    "js-cookie": "^3.0.5"
+  },
+  "devDependencies": {
+    "@types/dompurify": "^3.0.5",
+    "autoprefixer": "^10.4.16",
+    "cssnano": "^6.0.2",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-security": "^2.1.0",
+    "postcss": "^8.4.32",
+    "prettier": "^3.1.1",
+    "rimraf": "^5.0.5",
+    "rollup-plugin-visualizer": "^5.12.0",
+    "snyk": "^1.1272.1",
+    "vite": "^5.0.10",
+    "vite-plugin-compression": "^0.5.1",
+    "vite-plugin-html": "^3.2.1",
+    "vitest": "^1.1.0"
+  },
+  "keywords": [
+    "blockchain",
+    "cryptocurrency",
+    "exchange",
+    "trading",
+    "security"
+  ],
+  "author": "XAI Team",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

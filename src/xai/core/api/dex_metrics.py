@@ -2,7 +2,7 @@
 DEX and Liquidity Pool Metrics for XAI Blockchain
 
 Comprehensive Prometheus metrics for swap operations, liquidity management,
-and pool health monitoring following PAW's proven patterns.
+and pool health monitoring following proven patterns.
 """
 
 from prometheus_client import REGISTRY, CollectorRegistry, Counter, Gauge, Histogram
