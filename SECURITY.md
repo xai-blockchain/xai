@@ -32,3 +32,18 @@ Only the default branch is supported for security fixes.
 ## Bug Bounty
 
 There is no public bug bounty program at this time.
+
+## Public Testnet Hardening
+
+Operators running the public testnet should enable proxy-aware IP resolution and
+optional IP allow/deny lists to protect rate limits and block abusive traffic.
+
+Recommended environment variables:
+
+- `XAI_TRUST_PROXY_HEADERS=1`
+- `XAI_TRUSTED_PROXY_IPS` or `XAI_TRUSTED_PROXY_NETWORKS` (Cloudflare/edge IP ranges)
+- `XAI_API_IP_ALLOWLIST` (optional, comma-separated IPs/CIDR ranges)
+- `XAI_API_IP_DENYLIST` (optional, comma-separated IPs/CIDR ranges)
+- `XAI_PUBLIC_TESTNET_HARDENED=1`
+- `XAI_WRITE_AUTH_REQUIRED=1`
+- `XAI_WRITE_AUTH_EXEMPT_PATHS` (optional, comma-separated path prefixes)

@@ -58,8 +58,10 @@ from xai.core.p2p.partial_sync import PartialSyncCoordinator
 from xai.core.security.process_sandbox import maybe_enable_process_sandbox
 from xai.core.security.request_validator_middleware import setup_request_validation
 from xai.core.api.response_compression import setup_compression
+from xai.core.logging_config import setup_logging
 from xai.core.security.security_middleware import SecurityConfig, setup_security_middleware
 from xai.core.security.security_validation import SecurityEventRouter, SecurityValidator
+from xai.core.security.crypto_utils import derive_public_key_hex, sign_message_hex
 from xai.core.transaction import Transaction
 from xai.core.security.api_rate_limiting import init_rate_limiting
 from xai.core.wallet import WalletManager
@@ -194,6 +196,9 @@ class BlockchainNode:
             dns_seeds=getattr(Config, "P2P_DNS_SEEDS", None),
             bootstrap_nodes=getattr(Config, "P2P_BOOTSTRAP_NODES", None),
         )
+        configured_peer_key = getattr(Config, "PEER_API_KEY", "").strip()
+        api_key_fallbacks = list(getattr(Config, "API_AUTH_KEYS", []) or [])
+        peer_api_key = configured_peer_key or (api_key_fallbacks[0] if api_key_fallbacks else None)
         self.p2p_manager = P2PNetworkManager(
             blockchain=self.blockchain,
             peer_manager=self.peer_manager,
@@ -201,11 +206,20 @@ class BlockchainNode:
             host=self.host,
             port=kwargs.get("p2p_port", 8765),
             api_port=self.port,  # Pass HTTP API port for handshake
+            peer_api_key=peer_api_key,
         )
         # Provide P2P to partial sync after creation
         self.partial_sync_coordinator.p2p_manager = self.p2p_manager
         # Provide identity to P2P manager
         setattr(self.p2p_manager, "node_identity", self.identity)
+
+        # Finality voting (validator auto-sign)
+        self.finality_vote_enabled = False
+        self._finality_private_key: str | None = None
+        self._finality_public_key: str | None = None
+        self._finality_validator_address: str | None = None
+        self._finality_vote_lock = threading.Lock()
+        self._configure_finality_voting()
 
         # Mining heartbeat (allow empty blocks on idle testnet)
         heartbeat_env = os.getenv("XAI_ALLOW_EMPTY_MINING", "0").lower()
@@ -219,6 +233,12 @@ class BlockchainNode:
         security_config = SecurityConfig()
         # Align security middleware CORS with CORSPolicyManager
         security_config.CORS_ORIGINS = self.cors_manager.allowed_origins
+        security_config.RATE_LIMIT_ENABLED = getattr(Config, "RATE_LIMIT_ENABLED", True)
+        security_config.TRUST_PROXY_HEADERS = getattr(Config, "TRUST_PROXY_HEADERS", False)
+        security_config.TRUSTED_PROXY_IPS = list(getattr(Config, "TRUSTED_PROXY_IPS", []) or [])
+        security_config.TRUSTED_PROXY_NETWORKS = list(getattr(Config, "TRUSTED_PROXY_NETWORKS", []) or [])
+        security_config.IP_ALLOWLIST = list(getattr(Config, "API_IP_ALLOWLIST", []) or [])
+        security_config.IP_DENYLIST = list(getattr(Config, "API_IP_DENYLIST", []) or [])
         self.security_middleware = setup_security_middleware(
             self.app,
             config=security_config,
@@ -240,6 +260,26 @@ class BlockchainNode:
         # Setup API routes
         self.api_routes = NodeAPIRoutes(self)
         self.api_routes.setup_routes()
+        self._write_auth_required = bool(getattr(Config, "WRITE_AUTH_REQUIRED", False))
+        self._write_auth_exempt_paths = list(getattr(Config, "WRITE_AUTH_EXEMPT_PATHS", []) or [])
+        if self._write_auth_required:
+            setattr(self.api_routes.api_auth, "_required", True)
+            Config.API_AUTH_REQUIRED = True
+
+        @self.app.before_request
+        def enforce_write_auth():
+            if not self._write_auth_required:
+                return None
+            if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+                if request.path.startswith("/static") or request.method == "OPTIONS":
+                    return None
+                for prefix in self._write_auth_exempt_paths:
+                    if request.path.startswith(prefix):
+                        return None
+                auth_error = self.api_routes._require_api_auth()
+                if auth_error:
+                    return auth_error
+            return None
 
         @self.app.before_request
         def before_request():
@@ -267,6 +307,221 @@ class BlockchainNode:
                     getattr(Config, "SECURITY_WEBHOOK_TOKEN", ""),
                     int(getattr(Config, "SECURITY_WEBHOOK_TIMEOUT", 5) or 5),
                 )
+            )
+
+    def _load_finality_signing_identity(self) -> dict[str, str] | None:
+        """Load validator signing key for automatic finality voting."""
+        private_key = os.getenv("XAI_FINALITY_PRIVATE_KEY", "").strip()
+        key_file = (
+            os.getenv("XAI_FINALITY_KEY_FILE", "").strip()
+            or os.getenv("XAI_VALIDATOR_KEY_FILE", "").strip()
+        )
+        wallet_payload: dict[str, Any] | None = None
+
+        if not private_key and key_file:
+            try:
+                with open(key_file, "r", encoding="utf-8") as handle:
+                    wallet_payload = json.load(handle)
+                if isinstance(wallet_payload, dict):
+                    private_key = str(
+                        wallet_payload.get("private_key")
+                        or wallet_payload.get("privateKey")
+                        or wallet_payload.get("secret_key")
+                        or ""
+                    ).strip()
+            except (OSError, json.JSONDecodeError, ValueError) as exc:
+                logger.warning(
+                    "Failed to load finality key file: %s",
+                    exc,
+                    extra={"event": "finality.keyfile_load_failed", "path": key_file},
+                )
+                return None
+
+        if not private_key:
+            return None
+
+        try:
+            public_key = derive_public_key_hex(private_key)
+        except (ValueError, TypeError) as exc:
+            logger.warning(
+                "Invalid finality private key",
+                extra={"event": "finality.private_key_invalid", "error": str(exc)},
+            )
+            return None
+
+        address = ""
+        expected_address = ""
+        expected_public = ""
+        if isinstance(wallet_payload, dict):
+            expected_address = str(wallet_payload.get("address") or "").strip()
+            expected_public = str(wallet_payload.get("public_key") or wallet_payload.get("publicKey") or "").strip()
+
+        if expected_public and expected_public != public_key:
+            logger.warning(
+                "Finality key file public key mismatch",
+                extra={
+                    "event": "finality.keyfile_pubkey_mismatch",
+                    "expected": expected_public[:16],
+                    "derived": public_key[:16],
+                },
+            )
+            return None
+
+        address = self.blockchain._derive_address_from_public(public_key)
+        if expected_address and expected_address != address:
+            logger.warning(
+                "Finality key file address mismatch",
+                extra={
+                    "event": "finality.keyfile_address_mismatch",
+                    "expected": expected_address[:16],
+                    "derived": address[:16],
+                },
+            )
+            return None
+
+        return {
+            "private_key": private_key,
+            "public_key": public_key,
+            "address": address,
+        }
+
+    def _configure_finality_voting(self) -> None:
+        """Enable automatic finality voting when a validator key is available."""
+        identity = self._load_finality_signing_identity()
+        if not identity:
+            return
+
+        manager = getattr(self.blockchain, "finality_manager", None)
+        if manager is None:
+            logger.info(
+                "Finality voting disabled: finality manager unavailable",
+                extra={"event": "finality.disabled_no_manager"},
+            )
+            return
+
+        validator = manager.validators.get(identity["address"].lower())
+        if not validator:
+            logger.warning(
+                "Finality voting disabled: signing key not in validator set",
+                extra={"event": "finality.validator_missing", "validator": identity["address"][:16]},
+            )
+            return
+
+        if validator.public_key != identity["public_key"]:
+            logger.warning(
+                "Finality voting disabled: validator public key mismatch",
+                extra={
+                    "event": "finality.validator_pubkey_mismatch",
+                    "validator": identity["address"][:16],
+                },
+            )
+            return
+
+        enabled_flag = os.getenv("XAI_FINALITY_VOTE_ENABLED", "").strip().lower()
+        if enabled_flag and enabled_flag not in {"1", "true", "yes", "on"}:
+            logger.info(
+                "Finality voting disabled by configuration",
+                extra={"event": "finality.disabled_config"},
+            )
+            return
+
+        self.finality_vote_enabled = True
+        self._finality_private_key = identity["private_key"]
+        self._finality_public_key = identity["public_key"]
+        self._finality_validator_address = identity["address"]
+        self.blockchain.set_finality_vote_callback(self._handle_finality_vote_request)
+        logger.info(
+            "Finality voting enabled",
+            extra={
+                "event": "finality.enabled",
+                "validator": identity["address"][:16],
+                "power": validator.voting_power,
+            },
+        )
+
+    def _should_skip_finality_vote(self, block_hash: str, block_index: int) -> bool:
+        manager = getattr(self.blockchain, "finality_manager", None)
+        if manager is None:
+            return True
+        validator_address = self._finality_validator_address
+        if not validator_address:
+            return True
+
+        if manager.is_finalized(block_hash=block_hash, block_height=block_index):
+            return True
+
+        certificate = manager.get_certificate_by_height(block_index)
+        if certificate and validator_address in certificate.signatures:
+            return True
+
+        for pending_hash, votes in manager.pending_votes.items():
+            if validator_address in votes:
+                if pending_hash == block_hash:
+                    return True
+                pending_block = self.blockchain.get_block_by_hash(pending_hash)
+                if pending_block and getattr(pending_block, "index", None) == block_index:
+                    logger.warning(
+                        "Skipping finality vote: already voted at height",
+                        extra={
+                            "event": "finality.vote_skip_double_sign",
+                            "block_height": block_index,
+                        },
+                    )
+                    return True
+
+        return False
+
+    def _handle_finality_vote_request(self, block: Any) -> None:
+        if not self.finality_vote_enabled:
+            return
+        manager = getattr(self.blockchain, "finality_manager", None)
+        if manager is None or not self._finality_private_key or not self._finality_validator_address:
+            return
+
+        header = getattr(block, "header", None) or block
+        block_hash = getattr(header, "hash", None) or getattr(block, "hash", None)
+        block_index = getattr(header, "index", None) or getattr(block, "index", None)
+        if not block_hash or block_index is None:
+            return
+
+        with self._finality_vote_lock:
+            if self._should_skip_finality_vote(block_hash, int(block_index)):
+                return
+            try:
+                payload = manager.build_vote_payload(header)
+                signature = sign_message_hex(self._finality_private_key, payload)
+                self.blockchain.submit_finality_vote(
+                    validator_address=self._finality_validator_address,
+                    signature=signature,
+                    block_hash=block_hash,
+                    block_index=int(block_index),
+                )
+            except (ValueError, RuntimeError, TypeError) as exc:
+                logger.debug(
+                    "Finality vote rejected locally: %s",
+                    exc,
+                    extra={"event": "finality.vote_rejected", "block_hash": str(block_hash)[:16]},
+                )
+                return
+
+        self._broadcast_finality_vote(block_hash, int(block_index), signature)
+
+    def _broadcast_finality_vote(self, block_hash: str, block_index: int, signature: str) -> None:
+        if not self.p2p_manager or not self._finality_validator_address:
+            return
+        vote_payload = {
+            "validator_address": self._finality_validator_address,
+            "signature": signature,
+            "block_hash": block_hash,
+            "block_index": block_index,
+        }
+        try:
+            self.p2p_manager.broadcast_finality_vote(vote_payload)
+        except (OSError, RuntimeError, ValueError, TypeError) as exc:
+            logger.debug(
+                "Failed to broadcast finality vote: %s",
+                exc,
+                extra={"event": "finality.vote_broadcast_failed", "block_hash": block_hash[:16]},
             )
 
     def _create_security_event_sink(self):
@@ -1054,6 +1309,10 @@ async def main_async() -> None:
 
 def main() -> None:
     """Command-line entry point for running a blockchain node."""
+    # Initialize production logging (file + console, with rotation)
+    log_level = os.getenv("XAI_LOG_LEVEL", "INFO")
+    setup_logging(level=log_level, json_logs=True, console_logs=True)
+
     try:
         maybe_enable_process_sandbox(logger)
         asyncio.run(main_async())

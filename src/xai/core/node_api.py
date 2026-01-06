@@ -63,6 +63,7 @@ from xai.core.api_routes import (
     register_contract_routes,
     register_crypto_deposit_routes,
     register_faucet_routes,
+    register_finality_routes,
     register_gamification_routes,
     register_light_client_routes,
     register_mining_bonus_routes,
@@ -664,6 +665,7 @@ class NodeAPIRoutes:
         register_crypto_deposit_routes(self)
         register_payment_routes(self)
         register_notification_routes(self)
+        register_finality_routes(self)
         register_sync_routes(self)
         register_light_client_routes(self)
         register_admin_routes(self)

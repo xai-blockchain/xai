@@ -1,0 +1,26 @@
+{
+  "chain_id": "xai-testnet-1",
+  "genesis_time": "2026-01-06T03:19:25Z",
+  "initial_height": 0,
+  "validators": [
+    {"address": "xaitest1gngtex47ft3kq2g4ler6stk4hb4mb4ks", "public_key": "f8a9d72d0026b3143be3946938f71d03e9ed3e08fd6f21e3cae26e9a7c0d7de0731d6ceb0b7f3c3a439414b1bed981078cbd38cb336625decb042ba40ba4867a", "voting_power": 25, "name": "validator-1"},
+    {"address": "xaitest1omqeo7qtdh4maard5sjz6osar244inrf", "public_key": "29cadbb8d2a7088a8d56f66bc0890a3a2dfebbef941ca2601d35f95377c07d84c4ba659b6bc0a03899f0ffb8d8b7385c65d9f0ea7ba5b565395823c67e0bab77", "voting_power": 25, "name": "validator-2"},
+    {"address": "xaitest1y5ew5qukxx6ppin2wufezdfnj3tohrww", "public_key": "542f44112c52af90a6b20df5c7599a9424583f40c2c85d438cdd9541060a9878a08a0b361c05271fe7ae4992213079707d83b14c070f6b1597f487f6918c8304", "voting_power": 25, "name": "validator-3"},
+    {"address": "xaitest1adtu5ikfcsxtqkfmkpf4jcztnrzi3xqv", "public_key": "146ede6c68ca4d349fbea459188759606e89d23e2c9540ad90a0f2b9529d4d8370cfc440c3ae23a1ccae34c79476969e4aa6b987933754cbcfcb5a4f3272aea8", "voting_power": 25, "name": "validator-4"}
+  ],
+  "accounts": [
+    {"address": "xaitest1gngtex47ft3kq2g4ler6stk4hb4mb4ks", "balance": 1000000000000},
+    {"address": "xaitest1omqeo7qtdh4maard5sjz6osar244inrf", "balance": 1000000000000},
+    {"address": "xaitest1y5ew5qukxx6ppin2wufezdfnj3tohrww", "balance": 1000000000000},
+    {"address": "xaitest1adtu5ikfcsxtqkfmkpf4jcztnrzi3xqv", "balance": 1000000000000}
+  ],
+  "consensus": {
+    "quorum_threshold": 0.667,
+    "finality_delay_blocks": 1
+  },
+  "mining": {
+    "difficulty": 1,
+    "target_block_time": 10,
+    "reward": 50
+  }
+}

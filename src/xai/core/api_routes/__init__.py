@@ -20,6 +20,7 @@ from xai.core.api_routes.exchange_orders_routes import register_exchange_orders_
 from xai.core.api_routes.exchange_payment_routes import register_exchange_payment_routes
 from xai.core.api_routes.exchange_wallet_routes import register_exchange_wallet_routes
 from xai.core.api_routes.faucet import register_faucet_routes
+from xai.core.api_routes.finality import register_finality_routes
 from xai.core.api_routes.gamification import register_gamification_routes
 from xai.core.api_routes.light_client import register_light_client_routes
 from xai.core.api_routes.mining import register_mining_routes
@@ -63,6 +64,7 @@ __all__ = [
     "register_contract_routes",
     "register_wallet_routes",
     "register_faucet_routes",
+    "register_finality_routes",
     "register_mining_routes",
     "register_peer_routes",
     "register_algo_routes",

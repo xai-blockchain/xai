@@ -127,9 +127,33 @@ def _parse_origin_list(raw: str) -> list[str]:
             origins.append(origin)
     return origins
 
+def _parse_csv_list(raw: str) -> list[str]:
+    """Convert comma-separated values into a list of trimmed strings."""
+    values: list[str] = []
+    for chunk in raw.split(","):
+        value = chunk.strip()
+        if value:
+            values.append(value)
+    return values
+
 API_RATE_LIMIT = int(os.getenv("XAI_API_RATE_LIMIT", "120"))
 API_RATE_WINDOW_SECONDS = int(os.getenv("XAI_API_RATE_WINDOW_SECONDS", "60"))
 API_MAX_JSON_BYTES = int(os.getenv("XAI_API_MAX_JSON_BYTES", "1048576"))
+PUBLIC_TESTNET_HARDENED = bool(int(os.getenv("XAI_PUBLIC_TESTNET_HARDENED", "0")))
+WRITE_AUTH_REQUIRED = bool(
+    int(
+        os.getenv(
+            "XAI_WRITE_AUTH_REQUIRED",
+            "1" if PUBLIC_TESTNET_HARDENED else "0",
+        )
+    )
+)
+WRITE_AUTH_EXEMPT_PATHS = _parse_csv_list(os.getenv("XAI_WRITE_AUTH_EXEMPT_PATHS", ""))
+TRUST_PROXY_HEADERS = bool(int(os.getenv("XAI_TRUST_PROXY_HEADERS", "0")))
+TRUSTED_PROXY_IPS = _parse_csv_list(os.getenv("XAI_TRUSTED_PROXY_IPS", ""))
+TRUSTED_PROXY_NETWORKS = _parse_csv_list(os.getenv("XAI_TRUSTED_PROXY_NETWORKS", ""))
+API_IP_ALLOWLIST = _parse_csv_list(os.getenv("XAI_API_IP_ALLOWLIST", ""))
+API_IP_DENYLIST = _parse_csv_list(os.getenv("XAI_API_IP_DENYLIST", ""))
 
 # Enhanced Rate Limiting Configuration (DDoS Protection)
 # Categories: read (high), write (medium), sensitive (strict), admin (very strict)
@@ -469,6 +493,14 @@ class TestnetConfig:
     API_DEFAULT_VERSION = API_DEFAULT_VERSION
     API_DEPRECATED_VERSIONS = API_DEPRECATED_VERSIONS
     API_VERSION_DOCS_URL = API_VERSION_DOCS_URL
+    PUBLIC_TESTNET_HARDENED = PUBLIC_TESTNET_HARDENED
+    WRITE_AUTH_REQUIRED = WRITE_AUTH_REQUIRED
+    WRITE_AUTH_EXEMPT_PATHS = WRITE_AUTH_EXEMPT_PATHS
+    TRUST_PROXY_HEADERS = TRUST_PROXY_HEADERS
+    TRUSTED_PROXY_IPS = TRUSTED_PROXY_IPS
+    TRUSTED_PROXY_NETWORKS = TRUSTED_PROXY_NETWORKS
+    API_IP_ALLOWLIST = API_IP_ALLOWLIST
+    API_IP_DENYLIST = API_IP_DENYLIST
     PEER_API_KEY = API_PEER_SHARED_KEY
     PEER_TLS_REQUIRED = bool(int(os.getenv("XAI_PEER_TLS_REQUIRED", "0")))
     PEER_CA_BUNDLE = os.getenv("XAI_PEER_CA_BUNDLE", "").strip()
@@ -630,6 +662,14 @@ class MainnetConfig:
     API_DEFAULT_VERSION = API_DEFAULT_VERSION
     API_DEPRECATED_VERSIONS = API_DEPRECATED_VERSIONS
     API_VERSION_DOCS_URL = API_VERSION_DOCS_URL
+    PUBLIC_TESTNET_HARDENED = PUBLIC_TESTNET_HARDENED
+    WRITE_AUTH_REQUIRED = WRITE_AUTH_REQUIRED
+    WRITE_AUTH_EXEMPT_PATHS = WRITE_AUTH_EXEMPT_PATHS
+    TRUST_PROXY_HEADERS = TRUST_PROXY_HEADERS
+    TRUSTED_PROXY_IPS = TRUSTED_PROXY_IPS
+    TRUSTED_PROXY_NETWORKS = TRUSTED_PROXY_NETWORKS
+    API_IP_ALLOWLIST = API_IP_ALLOWLIST
+    API_IP_DENYLIST = API_IP_DENYLIST
     PEER_API_KEY = API_PEER_SHARED_KEY
     SECURITY_WEBHOOK_URL = SECURITY_WEBHOOK_URL
     SECURITY_WEBHOOK_TOKEN = SECURITY_WEBHOOK_TOKEN
@@ -881,6 +921,14 @@ __all__ = [
     "API_RATE_LIMIT",
     "API_RATE_WINDOW_SECONDS",
     "API_MAX_JSON_BYTES",
+    "PUBLIC_TESTNET_HARDENED",
+    "WRITE_AUTH_REQUIRED",
+    "WRITE_AUTH_EXEMPT_PATHS",
+    "TRUST_PROXY_HEADERS",
+    "TRUSTED_PROXY_IPS",
+    "TRUSTED_PROXY_NETWORKS",
+    "API_IP_ALLOWLIST",
+    "API_IP_DENYLIST",
     "SAFE_GENESIS_HASHES",
     "NODE_MODE",
     "PRUNE_BLOCKS",

@@ -2031,6 +2031,42 @@ class P2PNetworkManager:
                     continue
                 self._dispatch_async(self._quic_send_payload(host, payload))
 
+    def broadcast_finality_vote(self, vote_payload: dict[str, Any]) -> None:
+        """Broadcast a finality vote to all connected peers via HTTP."""
+        # Use peer API endpoints from handshake (HTTP URLs)
+        peer_endpoints = self._get_peer_api_endpoints()
+        if not peer_endpoints:
+            # Fallback to legacy http_peers if no API endpoints available yet
+            peer_endpoints = self._http_peers_snapshot()
+
+        for peer_uri in peer_endpoints:
+            endpoint = f"{peer_uri.rstrip('/')}/finality/vote"
+            try:
+                signed_message_bytes = self.peer_manager.encryption.create_signed_message(vote_payload)
+                response = requests.post(
+                    endpoint,
+                    data=signed_message_bytes,
+                    headers={
+                        **(self._peer_headers() or {}),
+                        "Content-Type": "application/json"
+                    },
+                    timeout=self._http_timeout,
+                )
+                if response.status_code >= 400:
+                    logger.debug(
+                        "Finality vote rejected by peer %s: %s",
+                        peer_uri,
+                        response.text[:200],
+                        extra={"event": "p2p.finality_vote_rejected", "status": response.status_code},
+                    )
+            except (NetworkError, requests.RequestException, ConnectionError, OSError, TimeoutError, Exception) as exc:
+                logger.debug(
+                    "Failed to broadcast finality vote to %s: %s",
+                    peer_uri,
+                    exc,
+                    extra={"event": "p2p.finality_vote_broadcast_failed", "error_type": type(exc).__name__},
+                )
+
     async def _fetch_peer_chain_summary(self, peer_uri: str) -> dict[str, Any] | None:
         """Return quick height summary for a peer without downloading full chain.
 

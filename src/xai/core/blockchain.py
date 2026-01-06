@@ -17,7 +17,7 @@ from collections import OrderedDict, defaultdict, deque
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 from xai.blockchain.slashing_manager import SlashingManager
 from xai.core.constants import MINIMUM_TRANSACTION_AMOUNT
@@ -351,6 +351,7 @@ class Blockchain(
         )
         self._init_consensus()
         self._init_mining()
+        self._finality_vote_callback: Callable[[Block], None] | None = None
 
         # Initialize manager components for god class refactoring
         # These managers encapsulate specific areas of blockchain functionality
@@ -950,6 +951,28 @@ class Blockchain(
             "quorum_power": self.finality_manager.quorum_power,
             "aggregated_power": certificate.aggregated_power if certificate else self.finality_manager.pending_power.get(target_block.hash, 0),
         }
+
+    def set_finality_vote_callback(self, callback: Callable[[Block], None] | None) -> None:
+        """Register a callback invoked after blocks are added to the chain."""
+        self._finality_vote_callback = callback
+
+    def _emit_finality_vote_callback(self, block: Block) -> None:
+        """Invoke the configured finality vote callback safely."""
+        callback = self._finality_vote_callback
+        if not callback:
+            return
+        try:
+            callback(block)
+        except (OSError, RuntimeError, ValueError, TypeError) as exc:
+            block_hash = getattr(block, "hash", None)
+            block_index = getattr(block, "index", None)
+            self.logger.warning(
+                "Finality vote callback failed",
+                block_hash=str(block_hash)[:16] if block_hash else None,
+                block_index=block_index,
+                error=str(exc),
+                error_type=type(exc).__name__,
+            )
 
     def get_finality_certificate(
         self,
@@ -3398,6 +3421,9 @@ class Blockchain(
         # Check if any orphan transactions can now be added to mempool
         self._process_orphan_transactions()
 
+        # Submit validator finality vote (if configured)
+        self._emit_finality_vote_callback(block)
+
         return True
 
     def _process_orphan_blocks(self):
@@ -3460,6 +3486,9 @@ class Blockchain(
                         self.contracts,
                         self.contract_receipts,
                     )
+
+                    # Submit validator finality vote (if configured)
+                    self._emit_finality_vote_callback(orphan)
 
                     # Remove from orphans
                     self.orphan_blocks[next_index].remove(orphan)

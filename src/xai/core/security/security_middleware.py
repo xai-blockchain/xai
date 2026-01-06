@@ -170,6 +170,8 @@ class SecurityConfig:
     TRUST_PROXY_HEADERS: bool = False
     TRUSTED_PROXY_IPS: list[str] = []
     TRUSTED_PROXY_NETWORKS: list[str] = []
+    IP_ALLOWLIST: list[str] = []
+    IP_DENYLIST: list[str] = []
     STRICT_SESSION_FINGERPRINTING: bool = True
     SESSION_BIND_USER_AGENT: bool = True
     SESSION_BIND_ACCEPT_LANGUAGE: bool = False
@@ -281,9 +283,7 @@ class RateLimiter:
 
     def get_client_ip(self) -> str:
         """Get client IP address from request."""
-        if request.environ.get("HTTP_X_FORWARDED_FOR"):
-            return request.environ.get("HTTP_X_FORWARDED_FOR").split(",")[0].strip()
-        return request.remote_addr or "127.0.0.1"
+        return SessionManager._resolve_client_ip()
 
     def is_blocked(self, client_ip: str) -> bool:
         """Check if client IP is blocked."""
@@ -599,6 +599,22 @@ class SessionManager:
 
         if not cls._is_trusted_proxy(remote_ip):
             return remote_ip
+
+        cf_ip = request.headers.get("CF-Connecting-IP", "").strip()
+        if cf_ip:
+            try:
+                ipaddress.ip_address(cf_ip)
+                return cf_ip
+            except ValueError:
+                pass
+
+        true_client_ip = request.headers.get("True-Client-IP", "").strip()
+        if true_client_ip:
+            try:
+                ipaddress.ip_address(true_client_ip)
+                return true_client_ip
+            except ValueError:
+                pass
 
         forwarded_for = request.headers.get("X-Forwarded-For", "")
         if forwarded_for:
@@ -958,6 +974,21 @@ class SecurityMiddleware:
         if request.path.startswith("/static"):
             return None
 
+        client_ip = SessionManager._resolve_client_ip()
+        if self.config.IP_DENYLIST and self._ip_in_list(client_ip, self.config.IP_DENYLIST):
+            security_logger.warning(
+                "Blocked request from denylisted IP",
+                extra={"event": "security.ip_denylist_block", "ip": client_ip},
+            )
+            return jsonify({"error": "Access denied"}), 403
+
+        if self.config.IP_ALLOWLIST and not self._ip_in_list(client_ip, self.config.IP_ALLOWLIST):
+            security_logger.warning(
+                "Blocked request from non-allowlisted IP",
+                extra={"event": "security.ip_allowlist_block", "ip": client_ip},
+            )
+            return jsonify({"error": "Access denied"}), 403
+
         # Check request size
         content_length = request.content_length or 0
         if content_length > self.config.MAX_BODY_SIZE:
@@ -969,7 +1000,6 @@ class SecurityMiddleware:
 
         # Rate limiting
         if self.config.RATE_LIMIT_ENABLED:
-            client_ip = self.rate_limiter.get_client_ip()
             endpoint = request.path
             if not self.rate_limiter.check_rate_limit(client_ip, endpoint):
                 raise RateLimitExceeded("Rate limit exceeded")
@@ -994,6 +1024,26 @@ class SecurityMiddleware:
             response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
 
         return response
+
+    @staticmethod
+    def _ip_in_list(ip_str: str, entries: list[str]) -> bool:
+        """Return True if IP matches a list of IPs or CIDR ranges."""
+        try:
+            ip_obj = ipaddress.ip_address(ip_str)
+        except ValueError:
+            return False
+        for entry in entries:
+            entry = entry.strip()
+            if not entry:
+                continue
+            if entry == ip_str:
+                return True
+            try:
+                if ip_obj in ipaddress.ip_network(entry, strict=False):
+                    return True
+            except ValueError:
+                continue
+        return False
 
     def _is_csrf_exempt(self, path: str) -> bool:
         """Check if endpoint is CSRF exempt."""

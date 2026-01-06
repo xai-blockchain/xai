@@ -13,6 +13,39 @@ This runbook is designed to catch rookie errors before a public testnet launch. 
 - bash, curl, jq
 - Optional: `k6` for load tests
 
+## Public Testnet Security Baseline (Required)
+
+Before opening the public testnet, ensure these controls are in place:
+
+### Edge/WAF (Cloudflare or equivalent)
+- Enable bot protection and WAF rules for RPC/API/Explorer/Faucet.
+- Add rate limit rules for write-heavy endpoints:
+  - `/send`, `/faucet/claim`, `/transaction/receive`, `/block/receive`
+- Block obvious abuse patterns (high 4xx/429 spikes, known bad ASNs, malformed payloads).
+- Enforce HTTPS only and redirect HTTP → HTTPS.
+
+### Host Firewalling
+- Allow only required public ports (RPC/REST/WS/Explorer/Faucet).
+- Keep metrics/admin endpoints private (block 12000-12004, admin-only APIs).
+- Restrict SSH to known IPs; disable password login.
+
+### Node/API Hardening
+- Set proxy-aware IP handling and (optionally) allow/deny lists:
+  - `XAI_TRUST_PROXY_HEADERS=1`
+  - `XAI_TRUSTED_PROXY_NETWORKS=<edge CIDRs>`
+  - `XAI_API_IP_ALLOWLIST=<optional CIDRs>`
+  - `XAI_API_IP_DENYLIST=<optional CIDRs>`
+- Enable the public testnet hardening profile:
+  - `XAI_PUBLIC_TESTNET_HARDENED=1`
+  - `XAI_WRITE_AUTH_REQUIRED=1`
+  - `XAI_WRITE_AUTH_EXEMPT_PATHS=<optional prefixes>`
+- Ensure API keys are rotated and scoped (admin/operator/auditor).
+
+### Monitoring & Response
+- Alerts for auth failures, rate-limit spikes, mempool pressure, peer churn.
+- Log retention + centralized security webhook sink.
+- Incident response runbook reviewed and reachable.
+
 ## Setup
 
 1) Copy the env template and edit values:
