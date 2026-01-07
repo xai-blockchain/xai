@@ -2,7 +2,7 @@ base58==2.1.1
 mnemonic==0.21
 PyJWT==2.9.0
 flask==3.1.2
-Flask-Cors==4.0.0
+Flask-Cors==6.0.2
 flask-sock==0.7.0
 py-ecc==8.0.0
 pqcrypto==0.3.4
