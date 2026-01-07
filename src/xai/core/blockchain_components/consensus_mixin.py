@@ -26,6 +26,7 @@ class BlockchainConsensusMixin:
     - Block reward calculation with halving schedule
     - Difficulty adjustment algorithm
     - Coinbase transaction validation
+    - Testnet difficulty reset (20-minute rule, per Bitcoin BIP-0016)
 
     Required attributes on the implementing class:
     - chain: List of blocks/headers
@@ -39,7 +40,12 @@ class BlockchainConsensusMixin:
     - logger: Structured logger instance
     - fast_mining_enabled: Whether fast mining is enabled (test mode)
     - max_test_mining_difficulty: Cap for test mining difficulty
+    - network_type: Network type (mainnet/testnet/devnet)
     """
+
+    # Bitcoin testnet uses 20 minutes (1200 seconds) for difficulty reset
+    # This prevents testnet from stalling when hashrate drops suddenly
+    TESTNET_DIFFICULTY_RESET_SECONDS = 1200  # 20 minutes
 
     @property
     def block_reward(self) -> float:
@@ -177,6 +183,46 @@ class BlockchainConsensusMixin:
 
         return True, None
 
+    def _should_reset_testnet_difficulty(
+        self,
+        chain_view: Sequence["Block" | "BlockHeader"],
+    ) -> bool:
+        """
+        Check if testnet difficulty should reset to minimum (20-minute rule).
+
+        Bitcoin testnet (BIP-0016) allows mining at minimum difficulty if no block
+        has been found for 20 minutes. This prevents testnet from stalling when
+        hashrate drops suddenly. The difficulty resets only for a single block,
+        then returns to the calculated value.
+
+        This rule is ONLY applied on testnets, never on mainnet.
+
+        Args:
+            chain_view: The chain to check (defaults to self.chain)
+
+        Returns:
+            True if difficulty should reset to minimum, False otherwise
+        """
+        import time
+
+        # Only apply on testnets
+        network_type = getattr(self, "network_type", "mainnet")
+        if network_type == "mainnet":
+            return False
+
+        # Need at least one block to check timestamp
+        if not chain_view:
+            return False
+
+        # Get the last block's timestamp
+        last_entry = chain_view[-1]
+        last_header = last_entry.header if hasattr(last_entry, "header") else last_entry
+        last_timestamp = getattr(last_header, "timestamp", 0)
+
+        # Check if more than 20 minutes have passed since the last block
+        time_since_last_block = time.time() - last_timestamp
+        return time_since_last_block >= self.TESTNET_DIFFICULTY_RESET_SECONDS
+
     def calculate_next_difficulty(
         self,
         *,
@@ -211,6 +257,19 @@ class BlockchainConsensusMixin:
 
         def _extract_header(entry: "Block" | "BlockHeader") -> "BlockHeader":
             return entry.header if hasattr(entry, "header") else entry
+
+        # Bitcoin testnet 20-minute rule: Reset difficulty to 1 if no block for 20 minutes
+        # This prevents testnet stalls when hashrate drops. Only applies to testnets.
+        if self._should_reset_testnet_difficulty(chain_view):
+            if emit_log:
+                self.logger.info(
+                    "Testnet 20-minute rule triggered: resetting difficulty to 1",
+                    extra={
+                        "event": "consensus.testnet_difficulty_reset",
+                        "reset_threshold_seconds": self.TESTNET_DIFFICULTY_RESET_SECONDS,
+                    }
+                )
+            return 1
 
         if current_difficulty is None:
             if chain_view:

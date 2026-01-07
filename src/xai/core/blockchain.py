@@ -314,7 +314,11 @@ class Blockchain(
 
         is_pytest = bool(os.environ.get("PYTEST_CURRENT_TEST"))
         self.network_type = os.getenv("XAI_NETWORK", "testnet").lower()
-        fast_mining_default = "1" if (is_pytest and self.network_type != "mainnet") else "0"
+        # Auto-enable fast mining for testnets (Bitcoin testnet best practice)
+        # This caps difficulty to prevent runaway difficulty on low-hashrate networks
+        # Can be explicitly disabled with XAI_FAST_MINING=0 if needed
+        is_testnet = self.network_type in ("testnet", "devnet", "localnet")
+        fast_mining_default = "1" if (is_testnet or is_pytest) else "0"
         self.fast_mining_enabled = os.getenv("XAI_FAST_MINING", fast_mining_default) == "1"
         self.max_test_mining_difficulty = int(os.getenv("XAI_MAX_TEST_MINING_DIFFICULTY", "4"))
         if self.network_type == "mainnet" and self.fast_mining_enabled:

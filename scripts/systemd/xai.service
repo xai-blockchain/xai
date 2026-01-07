@@ -1,0 +1,54 @@
+[Unit]
+Description=XAI Blockchain Node
+Documentation=https://github.com/xai-blockchain/xai
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xai
+Group=xai
+WorkingDirectory=/home/xai/xai
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+Environment=XAI_NETWORK=testnet
+Environment=XAI_DATA_DIR=/home/xai/xai/data
+Environment=XAI_LOG_LEVEL=INFO
+
+# Uncomment to enable mining
+#Environment=XAI_MINING_ENABLED=true
+#Environment=XAI_MINER_ADDRESS=xaitest1your_address_here
+#Environment=XAI_ALLOW_EMPTY_MINING=true
+
+# Start command
+ExecStart=/home/xai/xai/venv/bin/python -m xai.core.node \
+  --host 0.0.0.0 \
+  --port 8545 \
+  --p2p-port 8333 \
+  --peers https://testnet-rpc.xaiblockchain.com
+
+# Restart policy
+Restart=always
+RestartSec=10
+TimeoutStartSec=60
+TimeoutStopSec=60
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/xai/xai/data /home/xai/xai/logs
+PrivateTmp=true
+
+# Resource limits
+LimitNOFILE=65535
+MemoryMax=8G
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=xai
+
+[Install]
+WantedBy=multi-user.target

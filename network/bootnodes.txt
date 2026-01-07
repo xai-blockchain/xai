@@ -1,0 +1,10 @@
+# XAI Testnet Bootstrap Nodes
+# Format: URL
+# These nodes are used for initial peer discovery
+
+# Primary testnet RPC
+https://testnet-rpc.xaiblockchain.com
+
+# Validator nodes (internal P2P)
+# http://54.39.129.11:12545
+# http://10.10.0.4:12546

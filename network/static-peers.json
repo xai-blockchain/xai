@@ -1,0 +1,15 @@
+{
+  "peers": [
+    {
+      "name": "testnet-rpc",
+      "url": "https://testnet-rpc.xaiblockchain.com",
+      "type": "rpc"
+    },
+    {
+      "name": "testnet-ws",
+      "url": "wss://testnet-ws.xaiblockchain.com",
+      "type": "websocket"
+    }
+  ],
+  "updated": "2026-01-07"
+}

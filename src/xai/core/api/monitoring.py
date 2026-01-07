@@ -573,6 +573,61 @@ class MetricsCollector:
         self.register_counter("xai_economic_streak_bonus_total", "Total streak bonuses credited to miners")
         self.register_counter("xai_economic_coinbase_payout_total", "Total coinbase payouts (rewards + fees + bonuses)")
 
+        # ==================== EIP-2159 STANDARD METRICS ====================
+        # Node info (version, chain_id, network) - critical for debugging
+        self.register_gauge("xai_node_info_version", "Node version as numeric (major*10000 + minor*100 + patch)")
+        self.register_gauge("xai_sync_status", "Sync status (1=synced, 0=syncing) per EIP-2159")
+        self.register_gauge("xai_best_known_block_number", "Highest block number known (sync target)")
+
+        # ==================== PERFORMANCE / TPS METRICS ====================
+        self.register_gauge("xai_tps_current", "Current transactions per second (1-min rolling average)")
+        self.register_gauge("xai_tps_peak", "Peak TPS observed since node start")
+        self.register_histogram(
+            "xai_block_interval_seconds",
+            "Time between consecutive blocks",
+            buckets=[1, 5, 10, 30, 60, 120, 300, 600, 1800, 3600],
+        )
+        self.register_gauge("xai_block_time_average_seconds", "Average block time over last 100 blocks")
+        self.register_gauge("xai_finality_time_seconds", "Average time to finality")
+
+        # ==================== P2P NETWORK METRICS (EIP-2159) ====================
+        self.register_gauge("xai_p2p_inbound_connections", "Number of inbound peer connections")
+        self.register_gauge("xai_p2p_outbound_connections", "Number of outbound peer connections")
+        self.register_counter("xai_p2p_bytes_received_total", "Total bytes received from peers")
+        self.register_counter("xai_p2p_bytes_sent_total", "Total bytes sent to peers")
+        self.register_counter("xai_p2p_dial_attempts_total", "Total peer connection dial attempts")
+        self.register_counter("xai_p2p_dial_failures_total", "Total peer connection dial failures")
+        self.register_histogram(
+            "xai_p2p_message_latency_seconds",
+            "P2P message round-trip latency",
+            buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10],
+        )
+
+        # ==================== VALIDATOR / CONSENSUS METRICS ====================
+        self.register_gauge("xai_validator_active_count", "Number of active validators")
+        self.register_gauge("xai_validator_total_stake", "Total stake across all validators")
+        self.register_gauge("xai_validator_participation_rate", "Validator participation rate (0-100%)")
+        self.register_counter("xai_validator_missed_blocks_total", "Total blocks missed by validators")
+        self.register_histogram(
+            "xai_consensus_round_duration_seconds",
+            "Time to reach consensus per block",
+            buckets=[0.1, 0.5, 1, 2, 5, 10, 30, 60],
+        )
+
+        # ==================== MEMPOOL ADVANCED METRICS ====================
+        self.register_gauge("xai_mempool_oldest_tx_age_seconds", "Age of oldest transaction in mempool")
+        self.register_gauge("xai_mempool_average_fee_rate", "Average fee rate in mempool (per byte)")
+        self.register_histogram(
+            "xai_mempool_tx_wait_time_seconds",
+            "Time transactions spend in mempool before confirmation",
+            buckets=[1, 5, 10, 30, 60, 300, 600, 1800, 3600],
+        )
+
+        # ==================== DATABASE / STORAGE METRICS ====================
+        self.register_gauge("xai_db_size_bytes", "Total database size in bytes")
+        self.register_gauge("xai_state_size_bytes", "Size of world state in bytes")
+        self.register_gauge("xai_chain_data_size_bytes", "Size of block data in bytes")
+
         # Start time for uptime calculation
         self.start_time = time.time()
 
@@ -827,6 +882,69 @@ class MetricsCollector:
             # Total supply
             self.get_metric("xai_total_supply").set(stats["total_circulating_supply"])
 
+            # ==================== NEW EIP-2159 & INDUSTRY STANDARD METRICS ====================
+
+            # Sync status (1=synced, 0=syncing)
+            is_synced = stats.get("is_synced", True)
+            self._set_metric_if_present("xai_sync_status", 1 if is_synced else 0)
+
+            # Best known block (sync target)
+            best_known = stats.get("best_known_block_number", stats.get("chain_height", 0))
+            self._set_metric_if_present("xai_best_known_block_number", best_known)
+
+            # Peer connection breakdown
+            peers = stats.get("peers", 0)
+            inbound = stats.get("inbound_peers", 0)
+            outbound = stats.get("outbound_peers", peers - inbound if peers else 0)
+            self._set_metric_if_present("xai_p2p_inbound_connections", inbound)
+            self._set_metric_if_present("xai_p2p_outbound_connections", outbound)
+
+            # Validator metrics
+            self._set_metric_if_present("xai_validator_active_count", stats.get("validator_count"))
+            self._set_metric_if_present("xai_validator_total_stake", stats.get("total_stake"))
+            self._set_metric_if_present("xai_validator_participation_rate", stats.get("validator_participation_rate"))
+
+            # Finality metrics
+            finalized_height = stats.get("finalized_height", 0)
+            self._set_metric_if_present("xai_consensus_finalized_height", finalized_height)
+
+            # Block interval tracking
+            last_block_time = stats.get("last_block_timestamp")
+            prev_block_time = stats.get("prev_block_timestamp")
+            if last_block_time and prev_block_time:
+                interval = last_block_time - prev_block_time
+                if interval > 0:
+                    self.get_metric("xai_block_interval_seconds").observe(interval)
+
+            # Average block time (from stats if available)
+            avg_block_time = stats.get("average_block_time")
+            self._set_metric_if_present("xai_block_time_average_seconds", avg_block_time)
+
+            # Finality time
+            finality_time = stats.get("finality_time_seconds")
+            self._set_metric_if_present("xai_finality_time_seconds", finality_time)
+
+            # TPS calculation
+            tps = stats.get("tps_current", stats.get("transactions_per_second"))
+            self._set_metric_if_present("xai_tps_current", tps)
+            if tps is not None:
+                peak_metric = self.get_metric("xai_tps_peak")
+                if peak_metric and tps > peak_metric.value:
+                    peak_metric.set(tps)
+
+            # Mempool advanced metrics
+            oldest_tx_age = stats.get("mempool_oldest_tx_age_seconds")
+            self._set_metric_if_present("xai_mempool_oldest_tx_age_seconds", oldest_tx_age)
+
+            avg_fee_rate = stats.get("mempool_average_fee_rate")
+            self._set_metric_if_present("xai_mempool_average_fee_rate", avg_fee_rate)
+
+            # Database/storage size
+            db_size = stats.get("db_size_bytes", stats.get("data_dir_size_bytes"))
+            self._set_metric_if_present("xai_db_size_bytes", db_size)
+            self._set_metric_if_present("xai_state_size_bytes", stats.get("state_size_bytes"))
+            self._set_metric_if_present("xai_chain_data_size_bytes", stats.get("chain_data_size_bytes"))
+
         except (OSError, IOError, ValueError, TypeError, RuntimeError, KeyError, AttributeError) as exc:
             logger.error(
                 "Error updating blockchain metrics: %s",
@@ -852,9 +970,71 @@ class MetricsCollector:
             self.get_metric("xai_transaction_validation_duration_seconds").observe(processing_time)
             self.tx_processing_times.append(processing_time)
 
-    def record_peer_connected(self, peer_count: int):
-        """Record peer connection"""
+    def record_peer_connected(self, peer_count: int, inbound: int = 0, outbound: int = 0):
+        """Record peer connection with optional inbound/outbound breakdown"""
         self.get_metric("xai_peers_connected").set(peer_count)
+        if inbound or outbound:
+            self._set_metric_if_present("xai_p2p_inbound_connections", inbound)
+            self._set_metric_if_present("xai_p2p_outbound_connections", outbound)
+
+    def record_p2p_bandwidth(self, bytes_sent: int = 0, bytes_received: int = 0):
+        """Record P2P bandwidth usage"""
+        if bytes_sent > 0:
+            metric = self.get_metric("xai_p2p_bytes_sent_total")
+            if metric:
+                metric.inc(bytes_sent)
+        if bytes_received > 0:
+            metric = self.get_metric("xai_p2p_bytes_received_total")
+            if metric:
+                metric.inc(bytes_received)
+
+    def record_p2p_dial(self, success: bool):
+        """Record P2P dial attempt"""
+        dial_metric = self.get_metric("xai_p2p_dial_attempts_total")
+        if dial_metric:
+            dial_metric.inc()
+        if not success:
+            fail_metric = self.get_metric("xai_p2p_dial_failures_total")
+            if fail_metric:
+                fail_metric.inc()
+
+    def record_p2p_latency(self, latency_seconds: float):
+        """Record P2P message latency"""
+        metric = self.get_metric("xai_p2p_message_latency_seconds")
+        if metric:
+            metric.observe(latency_seconds)
+
+    def record_consensus_round(self, duration_seconds: float):
+        """Record consensus round duration"""
+        metric = self.get_metric("xai_consensus_round_duration_seconds")
+        if metric:
+            metric.observe(duration_seconds)
+
+    def record_validator_missed_block(self):
+        """Record a missed block by a validator"""
+        metric = self.get_metric("xai_validator_missed_blocks_total")
+        if metric:
+            metric.inc()
+
+    def record_mempool_tx_wait_time(self, wait_seconds: float):
+        """Record how long a transaction waited in mempool before confirmation"""
+        metric = self.get_metric("xai_mempool_tx_wait_time_seconds")
+        if metric:
+            metric.observe(wait_seconds)
+
+    def set_node_version(self, version_string: str):
+        """Set node version as numeric metric (e.g., '2.1.3' -> 20103)"""
+        try:
+            parts = version_string.replace("v", "").split(".")
+            major = int(parts[0]) if len(parts) > 0 else 0
+            minor = int(parts[1]) if len(parts) > 1 else 0
+            patch = int(parts[2].split("-")[0]) if len(parts) > 2 else 0
+            numeric_version = major * 10000 + minor * 100 + patch
+            metric = self.get_metric("xai_node_info_version")
+            if metric:
+                metric.set(numeric_version)
+        except (ValueError, IndexError, AttributeError):
+            pass
 
     def record_p2p_message(self, direction: str):
         """Record P2P message sent or received"""
