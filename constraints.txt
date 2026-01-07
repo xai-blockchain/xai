@@ -7,7 +7,7 @@ flask-sock==0.7.0
 py-ecc==8.0.0
 pqcrypto==0.3.4
 gmpy2==2.2.2
-schemathesis==4.6.3
+schemathesis==4.8.0
 rich==13.9.4
 psutil==5.9.8
 bip-utils==2.10.0
