@@ -8,7 +8,7 @@ jobs:
   guardrails:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Repo sanity checks
         run: ./scripts/ci/check-repo-sanity.sh
       - name: Secret scan (gitleaks)
