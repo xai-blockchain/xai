@@ -9,7 +9,7 @@ pqcrypto==0.3.4
 gmpy2==2.2.2
 schemathesis==4.6.3
 rich==13.9.4
-psutil==5.9.8
+psutil==7.2.1
 bip-utils==2.10.0
 # Security: Pinned for CVE fixes
 jinja2>=3.1.6
