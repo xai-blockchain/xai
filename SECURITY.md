@@ -1,49 +1,106 @@
 # Security Policy
 
+## Supported Versions
+
+| Version | Supported |
+|---------|-----------|
+| main branch | Yes |
+| testnet releases | Yes |
+| < v1.0 | No |
+
 ## Reporting a Vulnerability
 
-Please do not report security issues via public issues or discussions. Send reports to:
+**DO NOT** create public GitHub issues for security vulnerabilities.
 
-- Email: security@xai.network
+### Contact
+- **Email**: security@xai-blockchain.org
+- **Response Time**: 48 hours for initial acknowledgment
+- **Disclosure Policy**: 90-day coordinated disclosure
 
-Include:
+### What to Include
 - Affected file paths and versions
-- Reproduction steps and proof of concept
-- Impact assessment and any mitigations
+- Step-by-step reproduction instructions
+- Proof of concept (if available)
+- Impact assessment
+- Suggested fix (optional)
 
 ## Scope
 
-In scope:
-- Core node and API code under `src/xai/`
-- Wallet CLI under `src/xai/wallet/`
+### In Scope
+- Core node implementation (`src/xai/core/`)
+- Blockchain logic (`src/xai/core/blockchain*.py`)
+- P2P networking (`src/xai/core/p2p/`)
+- API endpoints (`src/xai/core/api_routes/`)
+- Wallet CLI (`src/xai/wallet/`)
+- Cryptographic implementations
 
-Out of scope:
-- Third-party dependencies (report to upstream)
-- Denial-of-service testing against public infrastructure
+### Out of Scope
+- Third-party dependencies (report upstream)
+- Documentation and website
+- Denial-of-service against public testnet
+- Social engineering attacks
+- Issues already reported or known
 
-## Coordinated Disclosure
+## Security Model
 
-We will acknowledge reports and coordinate a fix before public disclosure.
+### Trust Assumptions
+1. **AI Compute Verification**: Results verified via consensus
+2. **Cryptographic Primitives**: Standard Python cryptography libraries
+3. **P2P Network**: Peer verification and rate limiting
+4. **Python Runtime**: Relies on Python's memory management
 
-## Supported Versions
+### Core Security Features
+- **Rate Limiting**: Token bucket per address
+- **API Authentication**: Optional write-auth for sensitive endpoints
+- **Proxy Awareness**: X-Forwarded-For header handling for Cloudflare
+- **IP Allow/Deny Lists**: Configurable access control
 
-Only the default branch is supported for security fixes.
+## Testnet Hardening
 
-## Bug Bounty
+Operators should enable these environment variables:
 
-There is no public bug bounty program at this time.
+```bash
+XAI_TRUST_PROXY_HEADERS=1
+XAI_TRUSTED_PROXY_IPS=<cloudflare-ips>
+XAI_PUBLIC_TESTNET_HARDENED=1
+XAI_WRITE_AUTH_REQUIRED=1
+```
 
-## Public Testnet Hardening
+## Bug Bounty Program
 
-Operators running the public testnet should enable proxy-aware IP resolution and
-optional IP allow/deny lists to protect rate limits and block abusive traffic.
+**Status**: Not yet established
 
-Recommended environment variables:
+Future bounty program planned for mainnet with token-based rewards.
 
-- `XAI_TRUST_PROXY_HEADERS=1`
-- `XAI_TRUSTED_PROXY_IPS` or `XAI_TRUSTED_PROXY_NETWORKS` (Cloudflare/edge IP ranges)
-- `XAI_API_IP_ALLOWLIST` (optional, comma-separated IPs/CIDR ranges)
-- `XAI_API_IP_DENYLIST` (optional, comma-separated IPs/CIDR ranges)
-- `XAI_PUBLIC_TESTNET_HARDENED=1`
-- `XAI_WRITE_AUTH_REQUIRED=1`
-- `XAI_WRITE_AUTH_EXEMPT_PATHS` (optional, comma-separated path prefixes)
+| Severity | Planned Reward |
+|----------|----------------|
+| Critical | Up to $15,000 |
+| High | Up to $5,000 |
+| Medium | Up to $1,500 |
+| Low | Up to $300 |
+
+### Severity Guidelines
+- **Critical**: Remote code execution, fund theft, consensus failure
+- **High**: State corruption, significant resource drain
+- **Medium**: Limited impact bugs, DoS vectors
+- **Low**: Minor issues, edge cases
+
+## Audit History
+
+| Date | Auditor | Scope | Status |
+|------|---------|-------|--------|
+| TBD | TBD | Full Protocol | Pending |
+
+## Security Checklist
+
+- [x] Apache 2.0 license
+- [x] Security contact established
+- [x] Code of conduct in place
+- [x] Signed commits required
+- [ ] External security audit
+- [ ] Bug bounty program launched
+- [ ] Incident response plan documented
+
+## Contact
+
+For security inquiries: security@xai-blockchain.org
